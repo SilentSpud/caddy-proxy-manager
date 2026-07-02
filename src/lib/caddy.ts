@@ -2570,12 +2570,24 @@ export async function buildCaddyDocument() {
   const httpApp = Object.keys(servers).length > 0 ? { http: { servers } } : {};
 
   // Build logging configuration
+  // Roll settings are spelled out explicitly rather than relying on Caddy's
+  // built-in file-writer defaults — those defaults silently stopped rotating
+  // (no compression, no cleanup of old rolled files) on the deployed build,
+  // filling the host disk. Being explicit is defensive against future
+  // upstream default/behavior changes.
+  const rollSettings = {
+    roll: true,
+    roll_size_mb: 100,
+    roll_gzip: true,
+    roll_keep: 10,
+    roll_keep_days: 30
+  };
   const loggingLogs: Record<string, unknown> = {
     // Always capture WAF rule match logs so the waf-log-parser can extract rule details.
     // Coraza does not write matched rules to the audit log (known bug), but it does emit
     // structured JSON lines via the http.handlers.waf logger for each matched rule.
     waf_rules: {
-      writer: { output: "file", filename: "/logs/waf-rules.log", mode: "0640" },
+      writer: { output: "file", filename: "/logs/waf-rules.log", mode: "0640", ...rollSettings },
       encoder: { format: "json" },
       include: ["http.handlers.waf"],
       level: "ERROR"
@@ -2583,7 +2595,7 @@ export async function buildCaddyDocument() {
   };
   if (loggingEnabled) {
     loggingLogs.http_access = {
-      writer: { output: "file", filename: "/logs/access.log", mode: "0640" },
+      writer: { output: "file", filename: "/logs/access.log", mode: "0640", ...rollSettings },
       encoder: { format: loggingFormat },
       include: ["http.log.access", "http.handlers.blocker"]
     };

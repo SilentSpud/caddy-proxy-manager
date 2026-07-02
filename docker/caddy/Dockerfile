@@ -13,8 +13,6 @@ ARG TARGETARCH
 RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
 
 # Build Caddy with plugins.
-# Track Caddy master until the v2.11.3 client TLS regression fix
-# (caddyserver/caddy#7724) is available in a stable release.
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH xcaddy build master \
     --with github.com/caddy-dns/cloudflare \
     --with github.com/caddy-dns/route53 \

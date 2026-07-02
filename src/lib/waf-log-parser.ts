@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, statSync, truncateSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import maxmind, { CountryResponse } from 'maxmind';
 import db from './db';
@@ -10,6 +10,11 @@ const AUDIT_LOG = '/logs/waf-audit.log';
 const RULES_LOG = '/logs/waf-rules.log';
 const GEOIP_DB = '/usr/share/GeoIP/GeoLite2-Country.mmdb';
 const BATCH_SIZE = 200;
+// Coraza's SecAuditLog writes directly to AUDIT_LOG with no rotation of its
+// own (unlike access.log/waf-rules.log, which go through Caddy's file writer
+// and roll automatically). Once fully ingested, truncate it in place past
+// this size so it can't grow unbounded and fill the disk.
+const AUDIT_LOG_TRUNCATE_THRESHOLD = 100 * 1024 * 1024;
 
 let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
 const geoCache = new Map<string, string | null>();
@@ -259,8 +264,18 @@ export async function parseNewWafLogEntries(): Promise<void> {
       }
     }
 
-    setState('waf_audit_log_offset', String(newOffset));
-    setState('waf_audit_log_size', String(currentSize));
+    // Once we've read through to the current end of file, it's safe to
+    // truncate: Coraza appends via O_APPEND, so writes after truncation land
+    // correctly at the new (empty) end of file.
+    if (newOffset === currentSize && currentSize > AUDIT_LOG_TRUNCATE_THRESHOLD) {
+      truncateSync(AUDIT_LOG, 0);
+      setState('waf_audit_log_offset', '0');
+      setState('waf_audit_log_size', '0');
+      console.log(`[waf-log-parser] truncated waf-audit.log after ingesting ${currentSize} bytes`);
+    } else {
+      setState('waf_audit_log_offset', String(newOffset));
+      setState('waf_audit_log_size', String(currentSize));
+    }
   } catch (err) {
     console.error('[waf-log-parser] error during parse:', err);
   }

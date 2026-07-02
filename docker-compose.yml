@@ -64,11 +64,13 @@ services:
       # Days of analytics data to keep before TTL deletes it (default 30)
       CLICKHOUSE_RETENTION_DAYS: ${CLICKHOUSE_RETENTION_DAYS:-30}
     group_add:
-      - "${CADDY_GID:-10000}"  # caddy's GID — lets the web user read /logs/access.log
+      - "${CADDY_GID:-10000}"  # caddy's GID — lets the web user read/write /logs
     volumes:
       - caddy-manager-data:/app/data
       - geoip-data:/usr/share/GeoIP:ro,z
-      - caddy-logs:/logs:ro
+      # Read-write: waf-log-parser truncates waf-audit.log after ingesting it,
+      # since Coraza's SecAuditLog has no built-in rotation of its own.
+      - caddy-logs:/logs
       # Custom ACME CA root PEM written here by web, read by caddy (issue #192)
       - acme-ca:/acme-ca
     depends_on:
