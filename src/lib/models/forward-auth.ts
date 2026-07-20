@@ -9,6 +9,7 @@ import {
   groupMembers,
 } from "../db/schema";
 import { and, eq, gt, inArray, lt } from "drizzle-orm";
+import { hostMatchesPattern } from "../host-pattern-priority";
 
 const DEFAULT_SESSION_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 const EXCHANGE_CODE_TTL = 60; // 60 seconds
@@ -286,6 +287,9 @@ export async function checkHostAccessByDomain(
     where: (table, operators) => operators.eq(table.enabled, true)
   });
 
+  // Exact-match hosts take precedence over wildcard-covered ones, mirroring
+  // how Caddy itself prioritizes routes (see host-pattern-priority.ts).
+  let wildcardMatch: (typeof allHosts)[number] | null = null;
   for (const ph of allHosts) {
     let parsed: string[];
     try {
@@ -297,6 +301,14 @@ export async function checkHostAccessByDomain(
       const hasAccess = await checkHostAccess(userId, ph.id);
       return { hasAccess, proxyHostId: ph.id };
     }
+    if (!wildcardMatch && parsed.some((d) => hostMatchesPattern(host, d))) {
+      wildcardMatch = ph;
+    }
+  }
+
+  if (wildcardMatch) {
+    const hasAccess = await checkHostAccess(userId, wildcardMatch.id);
+    return { hasAccess, proxyHostId: wildcardMatch.id };
   }
 
   // Host not found in any proxy host — deny by default
@@ -362,10 +374,28 @@ export async function setForwardAuthAccess(
 
 // ── Domain Validation ────────────────────────────────────────────────
 
+function hasForwardAuthEnabled(ph: { meta: string | null }): boolean {
+  let parsedMeta: Record<string, unknown>;
+  try {
+    parsedMeta = ph.meta ? JSON.parse(ph.meta) : {};
+  } catch {
+    return false;
+  }
+  const fa = parsedMeta.cpm_forward_auth as Record<string, unknown> | undefined;
+  return !!fa?.enabled;
+}
+
 export async function isForwardAuthDomain(host: string): Promise<boolean> {
   const allHosts = await db.query.proxyHosts.findMany({
     where: (table, operators) => operators.eq(table.enabled, true)
   });
+
+  // Exact-match hosts take precedence over wildcard-covered ones: if an
+  // explicit host exists for this domain, its own forward-auth setting
+  // decides the outcome and the wildcard host is never consulted — this
+  // mirrors the routing precedence Caddy itself applies.
+  let exactMatchFound = false;
+  let wildcardMatch: (typeof allHosts)[number] | null = null;
 
   for (const ph of allHosts) {
     let parsed: string[];
@@ -375,17 +405,19 @@ export async function isForwardAuthDomain(host: string): Promise<boolean> {
       continue;
     }
     if (parsed.some((d) => d.toLowerCase() === host.toLowerCase())) {
-      // Check that this host actually has forward auth enabled
-      let parsedMeta: Record<string, unknown>;
-      try {
-        parsedMeta = ph.meta ? JSON.parse(ph.meta) : {};
-      } catch {
-        continue;
-      }
-      const fa = parsedMeta.cpm_forward_auth as Record<string, unknown> | undefined;
-      if (fa?.enabled) return true;
+      exactMatchFound = true;
+      if (hasForwardAuthEnabled(ph)) return true;
+      continue;
+    }
+    if (!wildcardMatch && parsed.some((d) => hostMatchesPattern(host, d))) {
+      wildcardMatch = ph;
     }
   }
+
+  if (!exactMatchFound && wildcardMatch) {
+    return hasForwardAuthEnabled(wildcardMatch);
+  }
+
   return false;
 }
 
