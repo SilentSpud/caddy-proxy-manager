@@ -5,7 +5,7 @@ import { requireAdmin } from "@/src/lib/auth";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { getInstanceMode, getSlaveMasterToken, setInstanceMode, setSlaveMasterToken, syncInstances } from "@/src/lib/instance-sync";
 import { createInstance, deleteInstance, updateInstance } from "@/src/lib/models/instances";
-import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings } from "@/src/lib/settings";
+import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings } from "@/src/lib/settings";
 import { listProxyHosts, updateProxyHost, sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import type { CloudflareSettings, DnsProviderSettings, GeoBlockSettings, WafSettings } from "@/src/lib/settings";
@@ -435,6 +435,57 @@ function parseResolverList(value: string | null): string[] {
     .split(/[,\n]/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+export async function updateTrustedProxiesSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const mode = await getInstanceMode();
+    const overrideEnabled = formData.get("overrideEnabled") === "on";
+    if (mode === "slave" && !overrideEnabled) {
+      await clearSetting("trusted_proxies");
+      try {
+        await applyCaddyConfig();
+        revalidatePath("/settings");
+        return { success: true, message: "Trusted proxies settings reset to master defaults" };
+      } catch (error) {
+        console.error("Failed to apply Caddy config:", error);
+        revalidatePath("/settings");
+        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        await syncInstances();
+        return { success: true, message: `Settings reset, but could not apply to Caddy: ${errorMsg}` };
+      }
+    }
+
+    const ranges = parseResolverList(formData.get("ranges") ? String(formData.get("ranges")) : null);
+    const clientIpHeaders = parseResolverList(
+      formData.get("clientIpHeaders") ? String(formData.get("clientIpHeaders")) : null
+    );
+    const strict = formData.get("strict") === "on";
+    const defaultGeoblock = formData.get("defaultGeoblock") === "on";
+
+    await saveTrustedProxiesSettings({
+      ranges,
+      client_ip_headers: clientIpHeaders.length > 0 ? clientIpHeaders : undefined,
+      strict: strict || undefined,
+      default_geoblock: defaultGeoblock || undefined,
+    });
+
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: "Trusted proxies settings saved and applied successfully" };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      await syncInstances();
+      return { success: true, message: `Settings saved, but could not apply to Caddy: ${errorMsg}` };
+    }
+  } catch (error) {
+    console.error("Failed to save trusted proxies settings:", error);
+    return { success: false, message: error instanceof Error ? error.message : "Failed to save trusted proxies settings" };
+  }
 }
 
 export async function updateDnsSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {

@@ -13,6 +13,7 @@ import {
   getGeoBlockSettings, saveGeoBlockSettings,
   getWafSettings, saveWafSettings,
   getErrorPagesSettings, saveErrorPagesSettings,
+  getTrustedProxiesSettings, saveTrustedProxiesSettings,
 } from "@/src/lib/settings";
 import { getInstanceMode, setInstanceMode, getSlaveMasterToken, setSlaveMasterToken } from "@/src/lib/instance-sync";
 import { applyCaddyConfig } from "@/src/lib/caddy";
@@ -36,6 +37,7 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
   geoblock: { get: getGeoBlockSettings, save: saveGeoBlockSettings as (data: never) => Promise<void>, applyCaddy: true },
   waf: { get: getWafSettings, save: saveWafSettings as (data: never) => Promise<void>, applyCaddy: true },
   "error-pages": { get: getErrorPagesSettings, save: saveErrorPagesSettings as (data: never) => Promise<void>, applyCaddy: true },
+  "trusted-proxies": { get: getTrustedProxiesSettings, save: saveTrustedProxiesSettings as (data: never) => Promise<void>, applyCaddy: true },
 };
 
 export async function GET(

@@ -39,6 +39,22 @@ export type LoggingSettings = {
   format?: "json" | "console"; // Log format (default: json)
 };
 
+export type TrustedProxiesSettings = {
+  // Proxy ranges to trust for X-Forwarded-For / client IP resolution at the
+  // server level (Caddy `trusted_proxies`). Accepts CIDRs, bare IPs, and the
+  // "private_ranges" shorthand. Empty = feature disabled (current behaviour).
+  ranges: string[];
+  // Headers Caddy reads the real client IP from (Caddy `client_ip_headers`).
+  // Empty = Caddy default of X-Forwarded-For. Useful for e.g. Cf-Connecting-Ip.
+  client_ip_headers?: string[];
+  // Only trust client_ip_headers from the configured proxies, rejecting
+  // spoofed values from untrusted peers (Caddy `trusted_proxies_strict`).
+  strict?: boolean;
+  // When true, use `ranges` as the default trusted-proxy list for global
+  // geoblocking so the two settings can't silently disagree.
+  default_geoblock?: boolean;
+};
+
 export type DnsSettings = {
   enabled: boolean;
   resolvers: string[]; // Primary DNS resolvers (e.g., "1.1.1.1", "8.8.8.8")
@@ -217,6 +233,14 @@ export async function getLoggingSettings(): Promise<LoggingSettings | null> {
 
 export async function saveLoggingSettings(settings: LoggingSettings): Promise<void> {
   await setSetting("logging", settings);
+}
+
+export async function getTrustedProxiesSettings(): Promise<TrustedProxiesSettings | null> {
+  return await getEffectiveSetting<TrustedProxiesSettings>("trusted_proxies");
+}
+
+export async function saveTrustedProxiesSettings(settings: TrustedProxiesSettings): Promise<void> {
+  await setSetting("trusted_proxies", settings);
 }
 
 export async function getDnsSettings(): Promise<DnsSettings | null> {

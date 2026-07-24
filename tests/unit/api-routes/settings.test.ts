@@ -25,6 +25,8 @@ vi.mock('@/src/lib/settings', () => ({
   saveWafSettings: vi.fn(),
   getErrorPagesSettings: vi.fn(),
   saveErrorPagesSettings: vi.fn(),
+  getTrustedProxiesSettings: vi.fn(),
+  saveTrustedProxiesSettings: vi.fn(),
 }));
 
 vi.mock('@/src/lib/instance-sync', () => ({
@@ -69,6 +71,7 @@ import {
   getUpstreamDnsResolutionSettings, saveUpstreamDnsResolutionSettings,
   getGeoBlockSettings, saveGeoBlockSettings,
   getWafSettings, saveWafSettings,
+  getTrustedProxiesSettings, saveTrustedProxiesSettings,
 } from '@/src/lib/settings';
 import { getInstanceMode, setInstanceMode, getSlaveMasterToken, setSlaveMasterToken } from '@/src/lib/instance-sync';
 import { applyCaddyConfig } from '@/src/lib/caddy';
@@ -94,6 +97,8 @@ const mockGetGeoBlock = vi.mocked(getGeoBlockSettings);
 const mockSaveGeoBlock = vi.mocked(saveGeoBlockSettings);
 const mockGetWaf = vi.mocked(getWafSettings);
 const mockSaveWaf = vi.mocked(saveWafSettings);
+const mockGetTrustedProxies = vi.mocked(getTrustedProxiesSettings);
+const mockSaveTrustedProxies = vi.mocked(saveTrustedProxiesSettings);
 const mockGetInstanceMode = vi.mocked(getInstanceMode);
 const mockSetInstanceMode = vi.mocked(setInstanceMode);
 const mockGetSlaveMasterToken = vi.mocked(getSlaveMasterToken);
@@ -547,6 +552,35 @@ describe('PUT waf settings', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({ ok: true });
     expect(mockSaveWaf).toHaveBeenCalledWith(body);
+    expect(mockApplyCaddyConfig).toHaveBeenCalled();
+  });
+});
+
+describe('GET trusted-proxies settings', () => {
+  it('returns trusted-proxies settings', async () => {
+    const settings = { ranges: ['172.21.0.1/32'], client_ip_headers: ['Cf-Connecting-Ip'], strict: true, default_geoblock: false };
+    mockGetTrustedProxies.mockResolvedValue(settings as any);
+
+    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'trusted-proxies' }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual(settings);
+    expect(mockGetTrustedProxies).toHaveBeenCalled();
+  });
+});
+
+describe('PUT trusted-proxies settings', () => {
+  it('saves trusted-proxies settings and applies caddy config', async () => {
+    mockSaveTrustedProxies.mockResolvedValue(undefined);
+
+    const body = { ranges: ['private_ranges'], default_geoblock: true };
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'trusted-proxies' }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ ok: true });
+    expect(mockSaveTrustedProxies).toHaveBeenCalledWith(body);
     expect(mockApplyCaddyConfig).toHaveBeenCalled();
   });
 });

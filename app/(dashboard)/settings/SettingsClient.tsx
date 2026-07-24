@@ -4,7 +4,7 @@ import { useState, useActionState, useEffect, type ReactNode } from "react";
 import {
   Cloud, Globe, Network, Pin, Activity,
   ScrollText, Settings2, UserCheck, MapPin, KeyRound,
-  Search, ChevronRight, FileWarning, ShieldCheck,
+  Search, ChevronRight, FileWarning, ShieldCheck, Waypoints,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,7 @@ import type {
   UpstreamDnsResolutionSettings,
   GeoBlockSettings,
   ErrorPagesSettings,
+  TrustedProxiesSettings,
 } from "@/lib/settings";
 import type { DnsProviderDefinition } from "@/src/lib/dns-providers";
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
@@ -59,6 +60,7 @@ import {
   syncSlaveInstancesAction,
   updateGeoBlockSettingsAction,
   updateErrorPagesSettingsAction,
+  updateTrustedProxiesSettingsAction,
 } from "./actions";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +96,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
       { id: "dns-providers", name: "DNS Providers", desc: "Provider credentials for ACME DNS-01", icon: <Cloud className="h-4 w-4" /> },
       { id: "dns-resolvers", name: "DNS Resolvers", desc: "Custom resolvers for challenge verification", icon: <Globe className="h-4 w-4" /> },
       { id: "upstream-dns", name: "Upstream DNS Pinning", desc: "Pin upstream IPs at config-apply time", icon: <Pin className="h-4 w-4" /> },
+      { id: "trusted-proxies", name: "Trusted Proxies", desc: "Resolve real client IP behind an upstream proxy", icon: <Waypoints className="h-4 w-4" /> },
     ],
   },
   {
@@ -384,6 +387,7 @@ type Props = {
   logging: LoggingSettings | null;
   dns: DnsSettings | null;
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
+  trustedProxies: TrustedProxiesSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProvider[];
@@ -401,6 +405,7 @@ type Props = {
       logging: boolean;
       dns: boolean;
       upstreamDnsResolution: boolean;
+      trustedProxies: boolean;
     };
     slave: {
       hasToken: boolean;
@@ -436,6 +441,7 @@ export default function SettingsClient({
   logging,
   dns,
   upstreamDnsResolution,
+  trustedProxies,
   globalGeoBlock,
   globalErrorPages,
   oauthProviders,
@@ -476,6 +482,7 @@ export default function SettingsClient({
   const [syncState, syncFormAction] = useActionState(syncSlaveInstancesAction, null);
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
   const [errorPagesState, errorPagesFormAction] = useActionState(updateErrorPagesSettingsAction, null);
+  const [trustedProxiesState, trustedProxiesFormAction] = useActionState(updateTrustedProxiesSettingsAction, null);
 
   const isSlave = instanceSync.mode === "slave";
   const isMaster = instanceSync.mode === "master";
@@ -489,6 +496,7 @@ export default function SettingsClient({
   const [upstreamDnsResolutionOverride, setUpstreamDnsResolutionOverride] = useState(
     instanceSync.overrides.upstreamDnsResolution
   );
+  const [trustedProxiesOverride, setTrustedProxiesOverride] = useState(instanceSync.overrides.trustedProxies);
 
   return (
     <div className="flex min-h-[calc(100vh-3rem)] md:min-h-screen">
@@ -580,6 +588,16 @@ export default function SettingsClient({
                   isSlave={isSlave}
                   upstreamDnsResolutionOverride={upstreamDnsResolutionOverride}
                   setUpstreamDnsResolutionOverride={setUpstreamDnsResolutionOverride}
+                />
+              )}
+              {active === "trusted-proxies" && (
+                <TrustedProxiesSection
+                  trustedProxies={trustedProxies}
+                  trustedProxiesState={trustedProxiesState}
+                  trustedProxiesFormAction={trustedProxiesFormAction}
+                  isSlave={isSlave}
+                  trustedProxiesOverride={trustedProxiesOverride}
+                  setTrustedProxiesOverride={setTrustedProxiesOverride}
                 />
               )}
               {active === "geoblock" && (
@@ -1326,6 +1344,103 @@ function UpstreamDnsSection({
         Host-level settings can override this default. Resolution happens at config save/reload time and resolved IPs are written into
         Caddy&apos;s active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those
         HTTPS upstreams to avoid SNI mismatch.
+      </InfoAlert>
+    </>
+  );
+}
+
+// ─── Section: Trusted Proxies ────────────────────────────────────────────────
+
+function TrustedProxiesSection({
+  trustedProxies,
+  trustedProxiesState,
+  trustedProxiesFormAction,
+  isSlave,
+  trustedProxiesOverride,
+  setTrustedProxiesOverride,
+}: {
+  trustedProxies: TrustedProxiesSettings | null;
+  trustedProxiesState: { success: boolean; message?: string } | null;
+  trustedProxiesFormAction: (payload: FormData) => void;
+  isSlave: boolean;
+  trustedProxiesOverride: boolean;
+  setTrustedProxiesOverride: (v: boolean) => void;
+}) {
+  const disabled = isSlave && !trustedProxiesOverride;
+  return (
+    <>
+      <FormCard>
+        <form action={trustedProxiesFormAction} className="flex flex-col gap-3">
+          {trustedProxiesState?.message && (
+            <StatusAlert message={trustedProxiesState.message} success={trustedProxiesState.success} />
+          )}
+          {isSlave && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="trusted-proxies-override"
+                name="overrideEnabled"
+                checked={trustedProxiesOverride}
+                onCheckedChange={(v) => setTrustedProxiesOverride(!!v)}
+              />
+              <Label htmlFor="trusted-proxies-override">Override master settings</Label>
+            </div>
+          )}
+          <FormRow
+            label="Trusted proxy ranges"
+            hint="CIDRs, IPs, or the private_ranges shorthand — one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour."
+          >
+            <Textarea
+              name="ranges"
+              defaultValue={(trustedProxies?.ranges ?? []).join("\n")}
+              disabled={disabled}
+              rows={3}
+              placeholder={"private_ranges\n172.21.0.1/32"}
+              className="font-mono text-sm"
+            />
+          </FormRow>
+          <FormRow
+            label="Client IP headers"
+            hint="Headers Caddy reads the client IP from — one per line. Empty defaults to X-Forwarded-For. Set Cf-Connecting-Ip for Cloudflare, etc."
+          >
+            <Textarea
+              name="clientIpHeaders"
+              defaultValue={(trustedProxies?.client_ip_headers ?? []).join("\n")}
+              disabled={disabled}
+              rows={2}
+              placeholder="X-Forwarded-For"
+              className="font-mono text-sm"
+            />
+          </FormRow>
+          <FormRow label="Strict mode" hint="Only trust the client IP headers from the configured proxies, rejecting spoofed values from untrusted peers.">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="trusted-proxies-strict"
+                name="strict"
+                defaultChecked={trustedProxies?.strict ?? false}
+                disabled={disabled}
+              />
+              <Label htmlFor="trusted-proxies-strict">Enable strict trusted proxies</Label>
+            </div>
+          </FormRow>
+          <FormRow label="Apply to geoblocking" hint="Use these ranges as the default trusted-proxy list for global geoblocking so the two can't silently disagree. A geoblock list set explicitly wins.">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="trusted-proxies-geoblock"
+                name="defaultGeoblock"
+                defaultChecked={trustedProxies?.default_geoblock ?? false}
+                disabled={disabled}
+              />
+              <Label htmlFor="trusted-proxies-geoblock">Default geoblock trusted proxies from this list</Label>
+            </div>
+          </FormRow>
+          <div className="flex justify-end">
+            <Button type="submit" size="sm">Save trusted proxies settings</Button>
+          </div>
+        </form>
+      </FormCard>
+      <InfoAlert>
+        Applied to the main HTTP server, so it fixes client-IP attribution everywhere at once — access logs, analytics,
+        the country map, and any downstream handler using <code className="text-xs font-mono">{"{http.request.client_ip}"}</code>.
       </InfoAlert>
     </>
   );

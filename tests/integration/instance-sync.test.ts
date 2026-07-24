@@ -170,6 +170,17 @@ describe('buildSyncPayload', () => {
     expect(payload.settings.dns).toBeNull();
     expect(payload.settings.waf).toBeNull();
     expect(payload.settings.geoblock).toBeNull();
+    expect(payload.settings.trusted_proxies).toBeNull();
+  });
+
+  it('includes stored trusted proxies settings in the sync payload', async () => {
+    await ctx.db.insert(schema.settings).values({
+      key: 'trusted_proxies',
+      value: JSON.stringify({ ranges: ['172.21.0.1/32'], strict: true }),
+      updatedAt: nowIso(),
+    });
+    const payload = await buildSyncPayload();
+    expect(payload.settings.trusted_proxies).toEqual({ ranges: ['172.21.0.1/32'], strict: true });
   });
 
   it('includes stored ACME settings in the sync payload', async () => {
@@ -287,6 +298,7 @@ describe('applySyncPayload', () => {
         waf: null,
         geoblock: null,
         error_pages: null,
+        trusted_proxies: null,
       },
       data: {
         certificates: [],
@@ -438,6 +450,19 @@ describe('applySyncPayload', () => {
     });
     expect(row).toBeDefined();
     expect(JSON.parse(row!.value)).toEqual({ caUrl: 'https://ca.internal.example.com/acme/acme/directory' });
+  });
+
+  it('stores synced trusted proxies settings with synced: prefix', async () => {
+    const payload = emptyPayload();
+    payload.settings.trusted_proxies = { ranges: ['private_ranges'], default_geoblock: true };
+
+    await applySyncPayload(payload);
+
+    const row = await ctx.db.query.settings.findFirst({
+      where: (t, { eq }) => eq(t.key, 'synced:trusted_proxies'),
+    });
+    expect(row).toBeDefined();
+    expect(JSON.parse(row!.value)).toEqual({ ranges: ['private_ranges'], default_geoblock: true });
   });
 
   it('stores null settings as JSON null value', async () => {

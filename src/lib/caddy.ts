@@ -36,13 +36,15 @@ import {
   getGeoBlockSettings,
   getWafSettings,
   getErrorPagesSettings,
+  getTrustedProxiesSettings,
   setSetting,
   type AcmeSettings,
   type DnsSettings,
   type UpstreamDnsAddressFamily,
   type UpstreamDnsResolutionSettings,
   type GeoBlockSettings,
-  type WafSettings
+  type WafSettings,
+  type TrustedProxiesSettings
 } from "./settings";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { syncInstances } from "./instance-sync";
@@ -679,6 +681,53 @@ export function buildBlockerHandler(config: GeoBlockSettings): Record<string, un
   }
 
   return handler;
+}
+
+/**
+ * Normalize the configured trusted-proxy ranges: trim, drop blanks, and expand
+ * the "private_ranges" shorthand into concrete CIDRs (matching how the geoblock
+ * and Authentik handlers treat the same shorthand).
+ */
+export function normalizeTrustedProxyRanges(ranges: string[] | undefined | null): string[] {
+  return expandPrivateRanges((ranges ?? []).map((r) => r.trim()).filter(Boolean));
+}
+
+/**
+ * Build the server-level trusted-proxy fields for the main HTTP server object
+ * (`servers.cpm`). Caddy resolves `{http.request.client_ip}` in core — before
+ * any handler runs — so this is the only place a global trusted-proxy list can
+ * fix client-IP attribution for access logs, analytics and downstream handlers.
+ *
+ * Returns an empty object (nothing emitted, current behaviour preserved) unless
+ * at least one range is configured.
+ */
+export function buildServerTrustedProxies(
+  settings: TrustedProxiesSettings | null | undefined
+): {
+  trusted_proxies?: { source: string; ranges: string[] };
+  client_ip_headers?: string[];
+  trusted_proxies_strict?: number;
+} {
+  if (!settings) return {};
+
+  const ranges = normalizeTrustedProxyRanges(settings.ranges);
+  if (ranges.length === 0) return {};
+
+  const out: {
+    trusted_proxies: { source: string; ranges: string[] };
+    client_ip_headers?: string[];
+    trusted_proxies_strict?: number;
+  } = {
+    trusted_proxies: { source: "static", ranges }
+  };
+
+  const headers = (settings.client_ip_headers ?? []).map((h) => h.trim()).filter(Boolean);
+  if (headers.length > 0) out.client_ip_headers = headers;
+
+  // Caddy's trusted_proxies_strict is an int flag (1 = strict, 0 = off).
+  if (settings.strict) out.trusted_proxies_strict = 1;
+
+  return out;
 }
 
 type BuildProxyRoutesOptions = {
@@ -2469,14 +2518,26 @@ export async function buildCaddyDocument() {
   ]);
 
   const { usage: certificateUsage, autoManagedDomains } = collectCertificateUsage(proxyHostRows, certificateMap);
-  const [generalSettings, acmeSettings, dnsSettings, upstreamDnsResolutionSettings, globalGeoBlock, globalWaf] = await Promise.all([
+  const [generalSettings, acmeSettings, dnsSettings, upstreamDnsResolutionSettings, globalGeoBlock, globalWaf, trustedProxiesSettings] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsSettings(),
     getUpstreamDnsResolutionSettings(),
     getGeoBlockSettings(),
-    getWafSettings()
+    getWafSettings(),
+    getTrustedProxiesSettings()
   ]);
+
+  // Optionally seed the global geoblock trusted-proxy list from the server-level
+  // value so the two can't silently disagree (issue #222). Only applied as a
+  // default: an explicit per-scope geoblock list is left untouched.
+  let effectiveGlobalGeoBlock = globalGeoBlock;
+  if (trustedProxiesSettings?.default_geoblock && globalGeoBlock) {
+    const serverRanges = (trustedProxiesSettings.ranges ?? []).map((r) => r.trim()).filter(Boolean);
+    if (serverRanges.length > 0 && !(globalGeoBlock.trusted_proxies?.length)) {
+      effectiveGlobalGeoBlock = { ...globalGeoBlock, trusted_proxies: serverRanges };
+    }
+  }
   const { tlsApp, managedCertificateIds } = await buildTlsAutomation(certificateUsage, autoManagedDomains, {
     acmeEmail: generalSettings?.acmeEmail,
     dnsSettings,
@@ -2501,7 +2562,7 @@ export async function buildCaddyDocument() {
     {
       globalDnsSettings: dnsSettings,
       globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
-      globalGeoBlock,
+      globalGeoBlock: effectiveGlobalGeoBlock,
       globalWaf,
       mtlsRbac: {
         roleFingerprintMap,
@@ -2531,6 +2592,11 @@ export async function buildCaddyDocument() {
 
   const servers: Record<string, unknown> = {};
 
+  // Server-level trusted proxies / client-IP headers. Caddy resolves client_ip
+  // in core before any handler, so this is the only place a global list fixes
+  // client-IP attribution for access logs, analytics and downstream handlers.
+  const serverTrustedProxies = buildServerTrustedProxies(trustedProxiesSettings);
+
   // Main HTTP/HTTPS server for proxy hosts
   if (httpRoutes.length > 0) {
     servers.cpm = {
@@ -2542,6 +2608,8 @@ export async function buildCaddyDocument() {
       ...(hasTls ? { tls_connection_policies: tlsConnectionPolicies } : {}),
       // Custom error pages (handle_errors)
       ...(errorRoutes.length > 0 ? { errors: { routes: errorRoutes } } : {}),
+      // Trusted proxies / client_ip_headers / trusted_proxies_strict (issue #222)
+      ...serverTrustedProxies,
       // Enable access logging if configured
       ...(loggingEnabled ? { logs: { default_logger_name: "http_access" } } : {})
     };
