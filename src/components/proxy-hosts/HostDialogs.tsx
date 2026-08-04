@@ -208,6 +208,7 @@ export function EditHostDialog({
     onClose,
     certificates,
     accessLists,
+    authentikDefaults,
     caCertificates = [],
     mtlsRoles = [],
     issuedClientCerts = [],
@@ -220,6 +221,8 @@ export function EditHostDialog({
     onClose: () => void;
     certificates: Certificate[];
     accessLists: AccessList[];
+    // Required, matching CreateHostDialog — see AuthentikFields (#232).
+    authentikDefaults: AuthentikSettings | null;
     caCertificates?: CaCertificate[];
     mtlsRoles?: MtlsRole[];
     issuedClientCerts?: IssuedClientCertificate[];
@@ -333,7 +336,7 @@ export function EditHostDialog({
                         Deep-merge into reverse_proxy handler (only applies in proxy mode)
                     </p>
                 </div>
-                <AuthentikFields authentik={host.authentik} />
+                <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
                 <CpmForwardAuthFields
                     cpmForwardAuth={host.cpmForwardAuth}
                     users={forwardAuthUsers}

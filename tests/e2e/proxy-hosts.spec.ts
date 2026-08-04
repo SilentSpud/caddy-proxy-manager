@@ -257,6 +257,151 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
+   * Regression (#232): Authentik defaults reached the create dialog but not the
+   * edit dialog — `EditHostDialog` never accepted an `authentikDefaults` prop, so
+   * `AuthentikFields` fell back to empty strings. Enabling Authentik on an
+   * existing host left Outpost Domain / Upstream / Auth Endpoint blank and the
+   * save failed on the required fields, while new hosts worked fine.
+   */
+  test('edit host Authentik fields are prefilled from global defaults (#232)', async ({ page }) => {
+    const origin = new URL(page.url()).origin;
+    const defaultSettings = {
+      outpostDomain: 'edit-defaults.example.test',
+      outpostUpstream: 'http://authentik-edit.internal:9000',
+      authEndpoint: '/outpost.goauthentik.io/auth/caddy',
+    };
+
+    const originalSettings = await (await page.request.get(API_AUTHENTIK_SETTINGS)).json() as Partial<typeof defaultSettings>;
+
+    // A pre-existing host with no Authentik config of its own.
+    const createResp = await page.request.post(API_PROXY_HOSTS, {
+      headers: { Origin: origin },
+      data: {
+        name: 'Authentik Edit Defaults Host',
+        domains: ['authentik-edit-defaults.local'],
+        upstreams: ['localhost:9987'],
+      },
+    });
+    expect(createResp.ok()).toBeTruthy();
+    const created = await createResp.json() as { id: number };
+
+    try {
+      const saveResp = await page.request.put(API_AUTHENTIK_SETTINGS, {
+        headers: { Origin: origin },
+        data: defaultSettings,
+      });
+      expect(saveResp.ok()).toBeTruthy();
+
+      await page.goto('/proxy-hosts');
+      const row = page.locator('tr', { hasText: 'Authentik Edit Defaults Host' });
+      await expect(row).toBeVisible({ timeout: 10_000 });
+      await row.getByRole('button', { name: /open menu/i }).click();
+      await page.getByRole('menuitem', { name: 'Edit' }).click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+
+      const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
+      const authentikSwitch = authentikSection.getByRole('switch');
+      await expect(authentikSwitch).toHaveAttribute('data-state', 'unchecked');
+      await authentikSwitch.click();
+      await expect(authentikSwitch).toHaveAttribute('data-state', 'checked');
+
+      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(defaultSettings.outpostDomain);
+      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(defaultSettings.outpostUpstream);
+      await expect(dialog.locator('input[name="authentikAuthEndpoint"]')).toHaveValue(defaultSettings.authEndpoint);
+    } finally {
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, { headers: { Origin: origin } });
+      if (originalSettings.outpostDomain && originalSettings.outpostUpstream) {
+        await page.request.put(API_AUTHENTIK_SETTINGS, {
+          headers: { Origin: origin },
+          data: {
+            outpostDomain: originalSettings.outpostDomain,
+            outpostUpstream: originalSettings.outpostUpstream,
+            authEndpoint: originalSettings.authEndpoint ?? '',
+          },
+        });
+      }
+    }
+  });
+
+  /**
+   * The other half of #232: defaults must only fill blanks. A host with its own
+   * Authentik config must keep it when the edit dialog opens, never be
+   * overwritten by the global defaults.
+   */
+  test('edit host keeps its own Authentik values instead of global defaults (#232)', async ({ page }) => {
+    const origin = new URL(page.url()).origin;
+    const hostSettings = {
+      outpostDomain: 'host-specific.example.test',
+      outpostUpstream: 'http://host-specific.internal:9000',
+    };
+    const globalDefaults = {
+      outpostDomain: 'global-default.example.test',
+      outpostUpstream: 'http://global-default.internal:9000',
+      authEndpoint: '/outpost.goauthentik.io/auth/caddy',
+    };
+
+    const originalSettings = await (await page.request.get(API_AUTHENTIK_SETTINGS)).json() as Partial<typeof globalDefaults>;
+
+    const createResp = await page.request.post(API_PROXY_HOSTS, {
+      headers: { Origin: origin },
+      data: {
+        name: 'Authentik Own Values Host',
+        domains: ['authentik-own-values.local'],
+        upstreams: ['localhost:9986'],
+        authentik: {
+          enabled: true,
+          outpostDomain: hostSettings.outpostDomain,
+          outpostUpstream: hostSettings.outpostUpstream,
+        },
+      },
+    });
+    expect(createResp.ok()).toBeTruthy();
+    const created = await createResp.json() as {
+      id: number;
+      authentik: { outpostDomain: string | null; outpostUpstream: string | null } | null;
+    };
+    // Guard the test itself: if the payload shape drifts, the host would be stored
+    // without its own config and this test would silently assert the default path.
+    expect(created.authentik?.outpostDomain).toBe(hostSettings.outpostDomain);
+    expect(created.authentik?.outpostUpstream).toBe(hostSettings.outpostUpstream);
+
+    try {
+      const saveResp = await page.request.put(API_AUTHENTIK_SETTINGS, {
+        headers: { Origin: origin },
+        data: globalDefaults,
+      });
+      expect(saveResp.ok()).toBeTruthy();
+
+      await page.goto('/proxy-hosts');
+      const row = page.locator('tr', { hasText: 'Authentik Own Values Host' });
+      await expect(row).toBeVisible({ timeout: 10_000 });
+      await row.getByRole('button', { name: /open menu/i }).click();
+      await page.getByRole('menuitem', { name: 'Edit' }).click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+
+      // Already enabled, so the fields are visible without touching the switch.
+      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(hostSettings.outpostDomain);
+      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(hostSettings.outpostUpstream);
+    } finally {
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, { headers: { Origin: origin } });
+      if (originalSettings.outpostDomain && originalSettings.outpostUpstream) {
+        await page.request.put(API_AUTHENTIK_SETTINGS, {
+          headers: { Origin: origin },
+          data: {
+            outpostDomain: originalSettings.outpostDomain,
+            outpostUpstream: originalSettings.outpostUpstream,
+            authEndpoint: originalSettings.authEndpoint ?? '',
+          },
+        });
+      }
+    }
+  });
+
+  /**
    * Regression: per-host geoblock "Override global" toggle was silently dropped.
    *
    * The form action's `parseGeoBlockConfig` returned `geoblock_mode` (snake_case)

@@ -341,6 +341,7 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
           onClose={() => setEditHost(null)}
           certificates={certificates}
           accessLists={accessLists}
+          authentikDefaults={authentikDefaults}
           caCertificates={caCertificates}
           mtlsRoles={mtlsRoles ?? []}
           issuedClientCerts={issuedClientCerts ?? []}
