@@ -4,7 +4,9 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    ignores: ['.next/**', 'out/**', 'build/**', 'next-env.d.ts', '.claude/**'],
+    // public/maplibre holds maplibre-gl's minified worker bundle, staged from
+    // node_modules at build time by scripts/copy-maplibre-worker.mjs.
+    ignores: ['.next/**', 'out/**', 'build/**', 'next-env.d.ts', '.claude/**', 'public/maplibre/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

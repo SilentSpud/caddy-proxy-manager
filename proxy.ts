@@ -28,7 +28,9 @@ function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob:",
-    "worker-src blob:",
+    // 'self' is needed by maplibre-gl v6, which loads its tile worker from a
+    // bundled /_next/static asset instead of the blob: URL it used in v5.
+    "worker-src 'self' blob:",
     "connect-src 'self'",
     "frame-ancestors 'none'",
   ];
@@ -98,8 +100,12 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - maplibre (maplibre-gl's tile worker bundle, staged into public/ at
+     *   build time; it must load as a module script even if the session has
+     *   expired, otherwise the redirect to /login is parsed as JS and the
+     *   analytics map silently breaks)
      * - public folder
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|maplibre/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

@@ -104,8 +104,13 @@ export function apiErrorResponse(error: unknown): NextResponse {
   if (error instanceof Error && error.message.toLowerCase().includes("not found")) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
+  // Unexpected failure. Log it — some clients (notably @clickhouse/client on a
+  // connection failure) throw errors whose `message` is empty, which otherwise
+  // reaches the browser as `{"error":""}` with nothing recorded anywhere.
+  console.error("Unhandled API error:", error);
+  const message = error instanceof Error ? error.message.trim() : "";
   return NextResponse.json(
-    { error: error instanceof Error ? error.message : "Internal server error" },
+    { error: message || "Internal server error" },
     { status: 500 }
   );
 }

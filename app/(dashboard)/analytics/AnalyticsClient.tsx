@@ -329,6 +329,41 @@ function HostsCombobox({
   );
 }
 
+// ── Data fetching ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch JSON, treating a non-2xx response as a failure.
+ *
+ * The analytics endpoints answer errors with `{ error: "…" }` and a 4xx/5xx
+ * status. Parsing that body without checking `response.ok` yields an object
+ * where the caller expects an array, and the first `.map()`/`.some()` on it
+ * throws during render — which unmounts the whole analytics page, map included.
+ * So a single unreachable ClickHouse used to blank the entire page.
+ */
+async function fetchJson(url: string): Promise<unknown> {
+  const response = await fetch(url);
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const reported =
+      body && typeof body === 'object' && 'error' in body
+        ? String((body as { error: unknown }).error).trim()
+        : '';
+    // Errors thrown by the ClickHouse client often carry an empty message, so
+    // always fall back to something renderable — an empty string is falsy and
+    // would leave the failure banner invisible.
+    throw new Error(reported || `${url.split('?')[0]} failed with status ${response.status}`);
+  }
+  return body;
+}
+
+/**
+ * Defensive cast for list-shaped payloads. Renders empty rather than throwing if
+ * an endpoint ever answers 200 with something unexpected.
+ */
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AnalyticsClient() {
@@ -348,6 +383,7 @@ export default function AnalyticsClient() {
   const [blocked, setBlocked] = useState<BlockedPage | null>(null);
   const [wafStats, setWafStats] = useState<WafStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
   /** How many seconds the current selection spans — used for chart axis labels */
@@ -373,7 +409,9 @@ export default function AnalyticsClient() {
 
   // Fetch all configured+active hosts once
   useEffect(() => {
-    fetch('/api/analytics/hosts').then(r => r.json()).then(setAllHosts).catch(() => {});
+    fetchJson('/api/analytics/hosts')
+      .then(h => setAllHosts(asArray<AnalyticsHost>(h)))
+      .catch(() => setAllHosts([]));
   }, []);
 
   // Fetch all analytics data when range/host selection changes
@@ -384,28 +422,40 @@ export default function AnalyticsClient() {
     setLoading(true);
     const params = buildParams();
     Promise.all([
-      fetch(`/api/analytics/summary${params}`).then(r => r.json()),
-      fetch(`/api/analytics/timeline${params}`).then(r => r.json()),
-      fetch(`/api/analytics/countries${params}`).then(r => r.json()),
-      fetch(`/api/analytics/protocols${params}`).then(r => r.json()),
-      fetch(`/api/analytics/user-agents${params}`).then(r => r.json()),
-      fetch(`/api/analytics/blocked${params}&page=1`).then(r => r.json()),
-      fetch(`/api/analytics/waf-stats${params}`).then(r => r.json()),
+      fetchJson(`/api/analytics/summary${params}`),
+      fetchJson(`/api/analytics/timeline${params}`),
+      fetchJson(`/api/analytics/countries${params}`),
+      fetchJson(`/api/analytics/protocols${params}`),
+      fetchJson(`/api/analytics/user-agents${params}`),
+      fetchJson(`/api/analytics/blocked${params}&page=1`),
+      fetchJson(`/api/analytics/waf-stats${params}`),
     ]).then(([s, t, c, p, u, b, w]) => {
-      setSummary(s);
-      setTimeline(t);
-      setCountries(c);
-      setProtocols(p);
-      setUserAgents(u);
-      setBlocked(b);
-      setWafStats(w);
-    }).catch(() => {
+      setLoadError(null);
+      setSummary(s as AnalyticsSummary);
+      setTimeline(asArray<TimelineBucket>(t));
+      setCountries(asArray<CountryStats>(c));
+      setProtocols(asArray<ProtoStats>(p));
+      setUserAgents(asArray<UAStats>(u));
+      setBlocked(b as BlockedPage);
+      setWafStats(w as WafStats);
+    }).catch((err: unknown) => {
+      // Reset to empty rather than leaving stale data next to an error banner.
+      setLoadError(err instanceof Error ? err.message : 'Failed to load analytics data');
+      setSummary(null);
+      setTimeline([]);
+      setCountries([]);
+      setProtocols([]);
+      setUserAgents([]);
+      setBlocked(null);
+      setWafStats(null);
       toast.error('Failed to load analytics data');
     }).finally(() => setLoading(false));
   }, [buildParams, interval, customFrom, customTo]);
 
   const fetchBlockedPage = useCallback((page: number) => {
-    fetch(`/api/analytics/blocked${buildParams(`&page=${page}`)}`).then(r => r.json()).then(setBlocked).catch(() => {});
+    fetchJson(`/api/analytics/blocked${buildParams(`&page=${page}`)}`)
+      .then(b => setBlocked(b as BlockedPage))
+      .catch(() => toast.error('Failed to load blocked requests'));
   }, [buildParams]);
 
   // ── Chart configs ─────────────────────────────────────────────────────────
@@ -514,6 +564,17 @@ export default function AnalyticsClient() {
           />
         </div>
       </div>
+
+      {/* Load failure alert — e.g. ClickHouse unreachable or a failing query.
+          Rendered instead of crashing the page, so the rest of the UI stays usable. */}
+      {loadError && (
+        <div
+          data-testid="analytics-load-error"
+          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+        >
+          Failed to load analytics data — {loadError}
+        </div>
+      )}
 
       {/* Analytics disabled alert */}
       {summary?.analyticsDisabled && (

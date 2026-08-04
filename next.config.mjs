@@ -1,6 +1,13 @@
+import { copyMaplibreWorker } from './scripts/copy-maplibre-worker.mjs';
+
 // When building under Node.js (not Bun), redirect bun:sqlite to a better-sqlite3 shim
 // so `next build` works locally without Bun installed.
 const isBun = typeof globalThis.Bun !== 'undefined';
+
+// maplibre-gl v6 loads its tile worker from a separate file that Turbopack cannot
+// resolve correctly; stage it under public/ so it is served from a stable URL.
+// See scripts/copy-maplibre-worker.mjs for the full explanation.
+copyMaplibreWorker(import.meta.dirname);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

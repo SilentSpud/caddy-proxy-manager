@@ -26,3 +26,6 @@ playwright-report/
 /.superpowers
 /docs/superpowers
 .mcp.json
+
+# Staged from node_modules by scripts/copy-maplibre-worker.mjs at build time
+/public/maplibre/
