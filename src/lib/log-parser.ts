@@ -1,9 +1,10 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import maxmind, { CountryResponse } from 'maxmind';
 import db from './db';
 import { logParseState } from './db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTrafficEvents, type TrafficEventRow } from './clickhouse/client';
+import { readLines as readLinesFrom } from './log-read';
 
 const LOG_FILE = '/logs/access.log';
 const GEOIP_DB = '/usr/share/GeoIP/GeoLite2-Country.mmdb';
@@ -168,36 +169,11 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
   };
 }
 
-// Read complete (newline-terminated) lines starting at `startOffset`. The
-// offset only advances past the last newline, so a line still being written
-// when we read (the file ends mid-line) is left intact and re-read next pass
-// instead of being split into invalid fragments and lost.
+// Re-exported so existing callers/tests keep importing `readLines` from here.
+// The implementation lives in ./log-read because waf-log-parser needs the same
+// newline-safe offset accounting.
 export async function readLines(startOffset: number, file: string = LOG_FILE): Promise<{ lines: string[]; newOffset: number }> {
-  return new Promise((resolve, reject) => {
-    const lines: string[] = [];
-    let totalBytes = 0;        // all bytes read from startOffset to EOF
-    let pending: Buffer = Buffer.alloc(0); // bytes after the last newline (incomplete line)
-
-    const stream = createReadStream(file, { start: startOffset });
-    stream.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'ENOENT' || err.code === 'EACCES') resolve({ lines: [], newOffset: startOffset });
-      else reject(err);
-    });
-    stream.on('data', (chunk: Buffer) => {
-      totalBytes += chunk.length;
-      const buf = pending.length ? Buffer.concat([pending, chunk]) : chunk;
-      let start = 0;
-      let nl: number;
-      while ((nl = buf.indexOf(0x0a, start)) !== -1) {
-        const line = buf.subarray(start, nl).toString('utf8').trim();
-        if (line) lines.push(line);
-        start = nl + 1;
-      }
-      pending = start === 0 ? buf : buf.subarray(start);
-    });
-    // Complete bytes = everything except the trailing incomplete line.
-    stream.on('end', () => resolve({ lines, newOffset: startOffset + totalBytes - pending.length }));
-  });
+  return readLinesFrom(startOffset, file);
 }
 
 async function insertBatch(rows: TrafficEventRow[]): Promise<void> {

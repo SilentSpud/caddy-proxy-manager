@@ -288,7 +288,9 @@ export async function saveGeoBlockSettings(settings: GeoBlockSettings): Promise<
 
 export type WafSettings = {
   enabled: boolean;
-  mode: 'Off' | 'On';
+  // Coraza's SecRuleEngine values. DetectionOnly is settable through the REST
+  // API (the UI only offers Off/On); buildWafHandler rejects anything else.
+  mode: 'Off' | 'On' | 'DetectionOnly';
   load_owasp_crs: boolean;
   custom_directives: string;
   excluded_rule_ids?: number[];

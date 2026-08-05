@@ -2651,9 +2651,12 @@ export async function buildCaddyDocument() {
     roll_keep_days: 30
   };
   const loggingLogs: Record<string, unknown> = {
-    // Always capture WAF rule match logs so the waf-log-parser can extract rule details.
-    // Coraza does not write matched rules to the audit log (known bug), but it does emit
-    // structured JSON lines via the http.handlers.waf logger for each matched rule.
+    // WAF rule match logs. Modern Coraza puts the matched rules directly in the
+    // audit log (part H), and waf-log-parser reads them from there — this file is
+    // only a fallback for older builds that leave `messages` empty, plus a
+    // human-readable trail. Do not make event ingestion depend on it: correlating
+    // two independently-written files only works when both land in the same parse
+    // tick, which silently dropped every non-blocked event (issue #233).
     waf_rules: {
       writer: { output: "file", filename: "/logs/waf-rules.log", mode: "0640", ...rollSettings },
       encoder: { format: "json" },

@@ -91,6 +91,13 @@ export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
 export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
   const parts: string[] = [];
 
+  // `mode` is interpolated straight into the directive block, and settings are
+  // stored without validation — so anything other than a known engine mode
+  // (e.g. "On\nSecRuleRemoveById 1-999999") would smuggle in SecLang that the
+  // custom_directives allowlist below exists to reject. Clamp to Coraza's three
+  // real values and fall back to the safe one.
+  const engineMode = waf.mode === 'Off' || waf.mode === 'DetectionOnly' ? waf.mode : 'On';
+
   if (waf.load_owasp_crs) {
     // @-prefixed paths resolve from the embedded coraza-coreruleset filesystem,
     // which is only mounted when load_owasp_crs is true.
@@ -112,15 +119,23 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
   }
 
   parts.push(
-    `SecRuleEngine ${waf.mode}`,
+    `SecRuleEngine ${engineMode}`,
     // RelevantOnly logs transactions where a rule fired with the auditlog action (which all OWASP
     // CRS rules include via SecDefaultAction), covering both blocked and DetectionOnly hits.
     // Clean requests with no rule matches are silently skipped, avoiding massive log growth.
     'SecAuditEngine RelevantOnly',
     'SecAuditLog /logs/waf-audit.log',
     'SecAuditLogFormat JSON',
-    // Omit request/response bodies (parts I, J, E) and intermediate response headers (D)
-    // to prevent logging multi-MB payloads. Headers (B, F) and rule match trailer (H) are kept.
+    // Note: the audit log ends up owned by caddy with mode 0644, so the web
+    // container (a different UID) can read it but not truncate it once it passes
+    // the parser's size cap. SecAuditLogFileMode cannot fix that — the container's
+    // 0022 umask strips group-write from any mode we ask for, and requesting 0660
+    // would only narrow world-read to group-read, breaking deployments that don't
+    // add web to the caddy group. waf-log-parser therefore treats truncation as
+    // best-effort and keeps ingesting when it fails.
+    // Part H carries the matched rules, which waf-log-parser reads to attribute
+    // each event to a rule id/message/severity. Bodies (I, J, E) and intermediate
+    // response headers (D) are omitted to avoid logging multi-MB payloads.
     'SecAuditLogParts ABFHZ',
     'SecResponseBodyAccess Off',
   );

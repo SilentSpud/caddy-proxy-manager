@@ -20,6 +20,45 @@ const baseWaf = {
 };
 
 // ---------------------------------------------------------------------------
+// SecRuleEngine mode is interpolated into the directive block, and WAF settings
+// are persisted without validation — so an unrecognised mode must never reach
+// the config, or it would smuggle in SecLang past the custom_directives
+// allowlist (e.g. disabling rules the allowlist explicitly refuses).
+// ---------------------------------------------------------------------------
+
+describe('buildWafHandler — SecRuleEngine mode sanitising', () => {
+  function directives(mode: string): string {
+    const handler = buildWafHandler({ ...baseWaf, mode: mode as typeof baseWaf.mode, load_owasp_crs: false });
+    return handler.directives as string;
+  }
+
+  it('passes through the three real Coraza engine modes', () => {
+    expect(directives('On')).toContain('SecRuleEngine On');
+    expect(directives('Off')).toContain('SecRuleEngine Off');
+    expect(directives('DetectionOnly')).toContain('SecRuleEngine DetectionOnly');
+  });
+
+  it('falls back to On for an unrecognised mode', () => {
+    expect(directives('bogus')).toContain('SecRuleEngine On');
+  });
+
+  it('does not let a newline in mode inject extra directives', () => {
+    const out = directives('On\nSecRuleRemoveById 1-999999');
+    expect(out).toContain('SecRuleEngine On');
+    expect(out).not.toContain('SecRuleRemoveById 1-999999');
+  });
+
+  it('always emits the audit log parts the event parser depends on', () => {
+    const out = directives('On');
+    // Part H carries the matched rules that waf-log-parser reads for rule
+    // attribution; losing it silently strips rule id/message/severity.
+    expect(out).toContain('SecAuditLogParts ABFHZ');
+    expect(out).toContain('SecAuditLog /logs/waf-audit.log');
+    expect(out).toContain('SecAuditLogFormat JSON');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Regression: @-prefixed paths must not appear without load_owasp_crs
 // ---------------------------------------------------------------------------
 

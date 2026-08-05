@@ -499,7 +499,7 @@ function EventDetailPanel({
           {/* Metadata grid */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border bg-muted/30 p-4">
             <DetailRow label="Time">
-              <p className="text-sm">{new Date(event.ts * 1000).toLocaleString()}</p>
+              <p className="text-sm" suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</p>
             </DetailRow>
             <DetailRow label="Host">
               <p className="font-mono text-sm break-all">{event.host || "—"}</p>
@@ -833,7 +833,7 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
             <BlockedChip blocked={event.blocked} />
             <SeverityChip severity={event.severity} />
           </div>
-          <span className="text-xs text-muted-foreground">{new Date(event.ts * 1000).toLocaleString()}</span>
+          <span className="text-xs text-muted-foreground" suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</span>
         </div>
         <p className="text-xs font-mono text-muted-foreground break-all">{event.host || "—"}</p>
         {event.ruleId && <span className="text-xs text-muted-foreground">Rule #{event.ruleId}</span>}
@@ -844,8 +844,12 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
   const columns = [
     {
       id: "ts", label: "Time", width: 150,
+      // The timestamp renders on the server in the container's locale/timezone
+      // and again in the browser's — the two never match, so this text opts out
+      // of hydration checks rather than letting React discard the whole tree
+      // (error #418).
       render: (r: WafEvent) => (
-        <span className="text-muted-foreground text-[0.78rem] whitespace-nowrap font-mono">
+        <span className="text-muted-foreground text-[0.78rem] whitespace-nowrap font-mono" suppressHydrationWarning>
           {new Date(r.ts * 1000).toLocaleString()}
         </span>
       ),
