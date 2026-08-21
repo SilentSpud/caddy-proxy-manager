@@ -1,13 +1,23 @@
 "use client";
+
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Plus, MinusCircle } from "lucide-react";
+import { Button } from "@astryxdesign/core/Button";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Card } from "@astryxdesign/core/Card";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { LocationRule, LoadBalancerConfig } from "@/lib/models/proxy-hosts";
 import { LocationLoadBalancerFields } from "./LocationLoadBalancerFields";
 
 type UpstreamEntry = { protocol: string; address: string };
+
+const PROTOCOL_OPTIONS = [
+  { value: "http://", label: "http://" },
+  { value: "https://", label: "https://" },
+];
 
 function parseUpstream(upstream: string): UpstreamEntry {
   if (upstream.startsWith("https://")) return { protocol: "https://", address: upstream.slice(8) };
@@ -24,7 +34,10 @@ type RuleState = { path: string; upstreams: UpstreamEntry[]; loadBalancer: LoadB
 function toState(rules: LocationRule[]): RuleState[] {
   return rules.map((r) => ({
     path: r.path,
-    upstreams: r.upstreams.length > 0 ? r.upstreams.map(parseUpstream) : [{ protocol: "http://", address: "" }],
+    upstreams:
+      r.upstreams.length > 0
+        ? r.upstreams.map(parseUpstream)
+        : [{ protocol: "http://", address: "" }],
     loadBalancer: r.loadBalancer ?? null,
   }));
 }
@@ -35,9 +48,7 @@ function toJson(rules: RuleState[]): string {
       .filter((r) => r.path.trim())
       .map((r) => ({
         path: r.path.trim(),
-        upstreams: r.upstreams
-          .filter((u) => u.address.trim())
-          .map(serializeUpstream),
+        upstreams: r.upstreams.filter((u) => u.address.trim()).map(serializeUpstream),
         loadBalancer: r.loadBalancer?.enabled ? r.loadBalancer : null,
       }))
       .filter((r) => r.upstreams.length > 0)
@@ -50,10 +61,12 @@ export function LocationRulesFields({ initialData = [] }: Props) {
   const [rules, setRules] = useState<RuleState[]>(toState(initialData));
 
   const addRule = () =>
-    setRules((r) => [...r, { path: "", upstreams: [{ protocol: "http://", address: "" }], loadBalancer: null }]);
+    setRules((r) => [
+      ...r,
+      { path: "", upstreams: [{ protocol: "http://", address: "" }], loadBalancer: null },
+    ]);
 
-  const removeRule = (i: number) =>
-    setRules((r) => r.filter((_, idx) => idx !== i));
+  const removeRule = (i: number) => setRules((r) => r.filter((_, idx) => idx !== i));
 
   const updatePath = (i: number, value: string) =>
     setRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, path: value } : rule)));
@@ -108,88 +121,97 @@ export function LocationRulesFields({ initialData = [] }: Props) {
     );
 
   return (
-    <div>
-      <p className="text-sm font-semibold mb-2">Location Rules</p>
+    <VStack gap={2}>
+      <Text type="body" size="sm" weight="semibold">
+        Location Rules
+      </Text>
       <input type="hidden" name="locationRulesJson" value={toJson(rules)} />
+
       {rules.length > 0 && (
-        <div className="mb-2 flex flex-col gap-4">
+        <VStack gap={4}>
           {rules.map((rule, i) => (
-            <div key={i} className="rounded-md border p-3 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <span className="text-xs font-medium text-muted-foreground px-1 mb-1 block">Path Pattern</span>
-                  <Input
-                    size={1}
+            <Card key={i}>
+              <VStack gap={3}>
+                <HStack gap={2} vAlign="end">
+                  <TextInput
+                    label="Path Pattern"
+                    size="sm"
                     placeholder="/ws/*"
                     value={rule.path}
-                    onChange={(e) => updatePath(i, e.target.value)}
-                    className="h-8 text-sm"
+                    onChange={(next) => updatePath(i, next)}
                   />
-                </div>
-                <div className="self-end">
-                  <Button
-                    type="button"
+                  <IconButton
                     variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    size="sm"
+                    label={`Remove location rule ${i + 1}`}
+                    icon={<Trash2 />}
                     onClick={() => removeRule(i)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-muted-foreground px-1 mb-1 block">Upstreams</span>
-                <div className="flex flex-col gap-2">
-                  {rule.upstreams.map((up, j) => (
-                    <div key={j} className="flex items-center gap-2">
-                      <Select value={up.protocol} onValueChange={(val) => updateUpstreamProtocol(i, j, val)}>
-                        <SelectTrigger className="w-28 h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="http://">http://</SelectItem>
-                          <SelectItem value="https://">https://</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={up.address}
-                        onChange={(e) => updateUpstreamAddress(i, j, e.target.value)}
-                        placeholder="10.0.0.5:8080"
-                        className="flex-1 h-8 text-sm"
-                      />
-                      <span title={rule.upstreams.length === 1 ? "At least one upstream required" : "Remove upstream"}>
-                        <Button
-                          type="button"
+                  />
+                </HStack>
+
+                <VStack gap={2}>
+                  <Text type="body" size="xsm" color="secondary" weight="medium">
+                    Upstreams
+                  </Text>
+                  {rule.upstreams.map((up, j) => {
+                    const isOnlyUpstream = rule.upstreams.length === 1;
+                    return (
+                      <HStack key={j} gap={2} vAlign="end">
+                        <Selector
+                          label="Protocol"
+                          isLabelHidden
+                          size="sm"
+                          width={120}
+                          options={PROTOCOL_OPTIONS}
+                          value={up.protocol}
+                          onChange={(next) => updateUpstreamProtocol(i, j, next as string)}
+                        />
+                        <TextInput
+                          label={`Upstream ${j + 1}`}
+                          isLabelHidden
+                          size="sm"
+                          value={up.address}
+                          onChange={(next) => updateUpstreamAddress(i, j, next)}
+                          placeholder="10.0.0.5:8080"
+                        />
+                        <IconButton
                           variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          size="sm"
+                          label={`Remove upstream ${j + 1}`}
+                          icon={<MinusCircle />}
+                          isDisabled={isOnlyUpstream}
+                          tooltip={
+                            isOnlyUpstream ? "At least one upstream is required" : "Remove upstream"
+                          }
                           onClick={() => removeUpstream(i, j)}
-                          disabled={rule.upstreams.length === 1}
-                        >
-                          <MinusCircle className="h-4 w-4" />
-                        </Button>
-                      </span>
-                    </div>
-                  ))}
-                  <Button type="button" variant="ghost" size="sm" onClick={() => addUpstream(i)} className="self-start">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Upstream
-                  </Button>
-                </div>
-              </div>
-              <LocationLoadBalancerFields
-                value={rule.loadBalancer}
-                onChange={(value) => updateLoadBalancer(i, value)}
-              />
-            </div>
+                        />
+                      </HStack>
+                    );
+                  })}
+                  <HStack>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label="Add Upstream"
+                      icon={<Plus />}
+                      onClick={() => addUpstream(i)}
+                    />
+                  </HStack>
+                </VStack>
+
+                <LocationLoadBalancerFields
+                  value={rule.loadBalancer}
+                  onChange={(value) => updateLoadBalancer(i, value)}
+                />
+              </VStack>
+            </Card>
           ))}
-        </div>
+        </VStack>
       )}
-      <Button type="button" variant="ghost" size="sm" onClick={addRule}>
-        <Plus className="h-4 w-4 mr-1" />
-        Add Location Rule
-      </Button>
-    </div>
+
+      <HStack>
+        <Button variant="ghost" size="sm" label="Add Location Rule" icon={<Plus />} onClick={addRule} />
+      </HStack>
+    </VStack>
   );
 }

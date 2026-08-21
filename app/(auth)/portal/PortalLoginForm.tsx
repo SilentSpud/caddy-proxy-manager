@@ -1,14 +1,22 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Shield } from "lucide-react";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Center } from "@astryxdesign/core/Center";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/Stack";
+import {
+  AUTOFILL_CURRENT_PASSWORD,
+  AUTOFILL_USERNAME,
+} from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 
 interface PortalLoginFormProps {
   rid: string;
@@ -18,6 +26,36 @@ interface PortalLoginFormProps {
   /** False in OIDC-only mode: there are no local accounts to sign in with. */
   localLoginEnabled?: boolean;
   existingSession?: { userId: string; name: string | null; email: string | null } | null;
+}
+
+/** The portal is always one centred card; only its contents vary. */
+function PortalCard({
+  title,
+  description,
+  hasShield = true,
+  children,
+}: {
+  title: string;
+  description: ReactNode;
+  hasShield?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <Center minHeight="100vh" padding={4}>
+      <Card width={400}>
+        <VStack gap={4}>
+          <VStack gap={1} hAlign="center">
+            {hasShield && <Icon icon={Shield} size="lg" color="secondary" />}
+            <Heading level={1}>{title}</Heading>
+            <Text type="body" size="sm" color="secondary" justify="center">
+              {description}
+            </Text>
+          </VStack>
+          {children}
+        </VStack>
+      </Card>
+    </Center>
+  );
 }
 
 export default function PortalLoginForm({
@@ -31,6 +69,8 @@ export default function PortalLoginForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   // If user already has a NextAuth session (e.g. from OAuth), auto-create forward auth session
   useEffect(() => {
@@ -62,11 +102,12 @@ export default function PortalLoginForm({
     setError(null);
     setPending(true);
 
-    const formData = new FormData(event.currentTarget);
-    const username = String(formData.get("username") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
+    // Read from state, not FormData: Astryx withholds an input's `name` while
+    // it is disabled, and these fields disable themselves once a sign-in is
+    // pending, so a FormData read here would be racing that re-render.
+    const trimmedUsername = username.trim();
 
-    if (!username || !password) {
+    if (!trimmedUsername || !password) {
       setError("Username and password are required.");
       setPending(false);
       return;
@@ -76,7 +117,7 @@ export default function PortalLoginForm({
       const response = await fetch("/api/forward-auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, rid }),
+        body: JSON.stringify({ username: trimmedUsername, password, rid }),
       });
 
       const data = await response.json();
@@ -107,130 +148,101 @@ export default function PortalLoginForm({
 
   if (!hasRedirect) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader className="text-center space-y-1">
-            <CardTitle className="text-xl">Authentication Required</CardTitle>
-            <CardDescription>No redirect destination specified.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <PortalCard
+        title="Authentication Required"
+        description="No redirect destination specified."
+        hasShield={false}
+      />
     );
   }
 
   // If we have a session and are auto-redirecting, show a loading state
   if (existingSession && pending && !error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader className="text-center space-y-1">
-            <div className="flex justify-center mb-2">
-              <Shield className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <CardTitle className="text-xl">Authorizing...</CardTitle>
-            <CardDescription>
-              Signing in as {existingSession.name ?? existingSession.email}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <PortalCard
+        title="Authorizing..."
+        description={`Signing in as ${existingSession.name ?? existingSession.email}`}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center space-y-1">
-          <div className="flex justify-center mb-2">
-            <Shield className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <CardTitle className="text-xl">Authentication Required</CardTitle>
-          <CardDescription>
-            {targetDomain
-              ? <>Sign in to access <span className="font-medium text-foreground">{targetDomain}</span></>
-              : "Sign in to continue"
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+    <PortalCard
+      title="Authentication Required"
+      description={
+        targetDomain ? (
+          <>
+            Sign in to access <strong>{targetDomain}</strong>
+          </>
+        ) : (
+          "Sign in to continue"
+        )
+      }
+    >
+      {error && <Banner status="error" title="Could not sign in" description={error} />}
 
-          {enabledProviders.length > 0 && (
-            <>
-              <div className="space-y-2">
-                {enabledProviders.map((provider) => {
-                  const isPending = oauthPending === provider.id;
-                  return (
-                    <Button
-                      key={provider.id}
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => handleOAuthSignIn(provider.id)}
-                      disabled={disabled}
-                    >
-                      {isPending ? (
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                      ) : null}
-                      Sign in with {provider.name}
-                    </Button>
-                  );
-                })}
-              </div>
-              {localLoginEnabled && (
-                <div className="relative">
-                  <Separator />
-                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-                    or
-                  </span>
-                </div>
-              )}
-            </>
-          )}
+      {enabledProviders.length > 0 && (
+        <>
+          <VStack gap={2}>
+            {enabledProviders.map((provider) => (
+              <Button
+                key={provider.id}
+                variant="secondary"
+                width="100%"
+                label={`Sign in with ${provider.name}`}
+                isLoading={oauthPending === provider.id}
+                isDisabled={disabled}
+                onClick={() => handleOAuthSignIn(provider.id)}
+              />
+            ))}
+          </VStack>
+          {localLoginEnabled && <Divider label="or" />}
+        </>
+      )}
 
-          {!localLoginEnabled && enabledProviders.length === 0 && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                Single sign-on is the only way to sign in, but no provider is configured.
-              </AlertDescription>
-            </Alert>
-          )}
+      {!localLoginEnabled && enabledProviders.length === 0 && (
+        <Banner
+          status="error"
+          title="No sign-in method available"
+          description="Single sign-on is the only way to sign in, but no provider is configured."
+        />
+      )}
 
-          {localLoginEnabled && (
-            <form onSubmit={handleCredentialSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
-                  autoFocus={enabledProviders.length === 0}
-                  disabled={disabled}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  disabled={disabled}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={disabled}>
-                {pending ? "Signing in..." : "Sign in"}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      {localLoginEnabled && (
+        <form onSubmit={handleCredentialSubmit}>
+          <VStack gap={4}>
+            <TextInput
+              {...AUTOFILL_USERNAME}
+              label="Username"
+              htmlName="username"
+              value={username}
+              onChange={setUsername}
+              isRequired
+              hasAutoFocus={enabledProviders.length === 0}
+              isDisabled={disabled}
+              width="100%"
+            />
+            <TextInput
+              {...AUTOFILL_CURRENT_PASSWORD}
+              label="Password"
+              type="password"
+              htmlName="password"
+              value={password}
+              onChange={setPassword}
+              isRequired
+              isDisabled={disabled}
+              width="100%"
+            />
+            <Button
+              type="submit"
+              label={pending ? "Signing in..." : "Sign in"}
+              isLoading={pending}
+              isDisabled={disabled}
+              width="100%"
+            />
+          </VStack>
+        </form>
+      )}
+    </PortalCard>
   );
 }

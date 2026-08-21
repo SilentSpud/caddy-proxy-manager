@@ -4,27 +4,36 @@ import { useState, useActionState, useEffect, type ReactNode } from "react";
 import {
   Cloud, Globe, Network, Pin, Activity,
   ScrollText, Settings2, UserCheck, MapPin, KeyRound,
-  Search, ChevronRight, FileWarning, ShieldCheck, Waypoints, UserCircle,
+  Search, FileWarning, ShieldCheck, Waypoints, UserCircle,
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { LucideIcon } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { CommandPalette } from "@astryxdesign/core/CommandPalette";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Kbd } from "@astryxdesign/core/Kbd";
+import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
+import { Link } from "@astryxdesign/core/Link";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Selector } from "@astryxdesign/core/Selector";
+import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
+import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { createStaticSource } from "@astryxdesign/core/Typeahead/utils";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { StatusChip } from "@/components/ui/StatusChip";
+import {
+  AUTOFILL_NEW_PASSWORD,
+  AUTOFILL_OFF,
+  NATIVE_REQUIRED,
+} from "@/components/ui/native-input-attrs";
 import type {
   GeneralSettings,
   AcmeSettings,
@@ -63,7 +72,6 @@ import {
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
 } from "./actions";
-import { cn } from "@/lib/utils";
 
 // ─── Settings navigation catalog ─────────────────────────────────────────────
 
@@ -71,7 +79,7 @@ type SettingItem = {
   id: string;
   name: string;
   desc: string;
-  icon: ReactNode;
+  icon: LucideIcon;
 };
 
 type SettingsGroup = {
@@ -85,38 +93,38 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "system",
     label: "System",
     items: [
-      { id: "sync", name: "Instance Sync", desc: "Standalone, master, or slave coordination", icon: <Network className="h-4 w-4" /> },
-      { id: "general", name: "General", desc: "Primary domain and ACME contact email", icon: <Settings2 className="h-4 w-4" /> },
-      { id: "acme", name: "ACME Server", desc: "Custom ACME directory URL for internal CAs", icon: <ShieldCheck className="h-4 w-4" /> },
-      { id: "avatars", name: "User Avatars", desc: "Gravatar fallback for users without an icon", icon: <UserCircle className="h-4 w-4" /> },
+      { id: "sync", name: "Instance Sync", desc: "Standalone, master, or slave coordination", icon: Network },
+      { id: "general", name: "General", desc: "Primary domain and ACME contact email", icon: Settings2 },
+      { id: "acme", name: "ACME Server", desc: "Custom ACME directory URL for internal CAs", icon: ShieldCheck },
+      { id: "avatars", name: "User Avatars", desc: "Gravatar fallback for users without an icon", icon: UserCircle },
     ],
   },
   {
     id: "networking",
     label: "Networking",
     items: [
-      { id: "dns-providers", name: "DNS Providers", desc: "Provider credentials for ACME DNS-01", icon: <Cloud className="h-4 w-4" /> },
-      { id: "dns-resolvers", name: "DNS Resolvers", desc: "Custom resolvers for challenge verification", icon: <Globe className="h-4 w-4" /> },
-      { id: "upstream-dns", name: "Upstream DNS Pinning", desc: "Pin upstream IPs at config-apply time", icon: <Pin className="h-4 w-4" /> },
-      { id: "trusted-proxies", name: "Trusted Proxies", desc: "Resolve real client IP behind an upstream proxy", icon: <Waypoints className="h-4 w-4" /> },
+      { id: "dns-providers", name: "DNS Providers", desc: "Provider credentials for ACME DNS-01", icon: Cloud },
+      { id: "dns-resolvers", name: "DNS Resolvers", desc: "Custom resolvers for challenge verification", icon: Globe },
+      { id: "upstream-dns", name: "Upstream DNS Pinning", desc: "Pin upstream IPs at config-apply time", icon: Pin },
+      { id: "trusted-proxies", name: "Trusted Proxies", desc: "Resolve real client IP behind an upstream proxy", icon: Waypoints },
     ],
   },
   {
     id: "security",
     label: "Security",
     items: [
-      { id: "geoblock", name: "Global Geoblocking", desc: "Default geoblock rules across all hosts", icon: <MapPin className="h-4 w-4" /> },
-      { id: "error-pages", name: "Error Pages", desc: "Global custom error responses (fallback for all hosts)", icon: <FileWarning className="h-4 w-4" /> },
-      { id: "authentik", name: "Authentik Defaults", desc: "Forward-auth defaults for new proxy hosts", icon: <UserCheck className="h-4 w-4" /> },
-      { id: "oauth", name: "OAuth Providers", desc: "OAuth/OIDC SSO providers", icon: <KeyRound className="h-4 w-4" /> },
+      { id: "geoblock", name: "Global Geoblocking", desc: "Default geoblock rules across all hosts", icon: MapPin },
+      { id: "error-pages", name: "Error Pages", desc: "Global custom error responses (fallback for all hosts)", icon: FileWarning },
+      { id: "authentik", name: "Authentik Defaults", desc: "Forward-auth defaults for new proxy hosts", icon: UserCheck },
+      { id: "oauth", name: "OAuth Providers", desc: "OAuth/OIDC SSO providers", icon: KeyRound },
     ],
   },
   {
     id: "observability",
     label: "Observability",
     items: [
-      { id: "metrics", name: "Metrics & Monitoring", desc: "Prometheus metrics endpoint", icon: <Activity className="h-4 w-4" /> },
-      { id: "logging", name: "Access Logging", desc: "HTTP access log for proxied requests", icon: <ScrollText className="h-4 w-4" /> },
+      { id: "metrics", name: "Metrics & Monitoring", desc: "Prometheus metrics endpoint", icon: Activity },
+      { id: "logging", name: "Access Logging", desc: "HTTP access log for proxied requests", icon: ScrollText },
     ],
   },
 ];
@@ -132,27 +140,15 @@ function findItem(id: string) {
 // ─── Alert helpers ───────────────────────────────────────────────────────────
 
 function StatusAlert({ message, success }: { message: string; success: boolean }) {
-  return (
-    <Alert variant={success ? "default" : "destructive"}>
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
-  );
+  return <Banner status={success ? "success" : "error"} title={message} />;
 }
 
-function InfoAlert({ children }: { children: ReactNode }) {
-  return (
-    <Alert className="border-blue-500/30 bg-blue-500/5 text-blue-700 dark:text-blue-400 [&>svg]:text-blue-500">
-      <AlertDescription>{children}</AlertDescription>
-    </Alert>
-  );
+function InfoAlert({ title, children }: { title: string; children?: ReactNode }) {
+  return <Banner status="info" title={title} description={children} />;
 }
 
-function WarnAlert({ children }: { children: ReactNode }) {
-  return (
-    <Alert className="border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400 [&>svg]:text-amber-500">
-      <AlertDescription>{children}</AlertDescription>
-    </Alert>
-  );
+function WarnAlert({ title, children }: { title: string; children?: ReactNode }) {
+  return <Banner status="warning" title={title} description={children} />;
 }
 
 // ─── Layout primitives ───────────────────────────────────────────────────────
@@ -167,47 +163,84 @@ function FormCard({
   footer?: ReactNode;
 }) {
   return (
-    <Card className="overflow-hidden">
-      {title && (
-        <div className="px-4 py-3 border-b border-border">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {title}
-          </span>
-        </div>
-      )}
-      <CardContent className="p-4">{children}</CardContent>
-      {footer && (
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-border bg-muted/30">
-          {footer}
-        </div>
-      )}
+    <Card padding={4}>
+      <VStack gap={4}>
+        {title && (
+          <>
+            <Text type="label" size="xsm" weight="semibold" color="secondary">
+              {title}
+            </Text>
+            <Divider />
+          </>
+        )}
+        {children}
+        {footer && (
+          <>
+            <Divider />
+            <HStack justify="end" gap={2}>
+              {footer}
+            </HStack>
+          </>
+        )}
+      </VStack>
     </Card>
   );
 }
 
-function FormRow({
-  label,
-  hint,
-  children,
+/**
+ * The "Override master settings" toggle a slave instance shows above each form.
+ *
+ * Replaces a Checkbox paired with a loose <Label>; CheckboxInput carries its own
+ * label, so the association is real rather than positional.
+ */
+function OverrideToggle({
+  value,
+  onChange,
+  isDisabled,
 }: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  isDisabled?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-3 py-3 border-b border-border last:border-b-0 items-start">
-      <div className="min-w-0">
-        <div className="text-sm font-medium">{label}</div>
-        {hint && (
-          <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{hint}</div>
-        )}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
+    <CheckboxInput
+      label="Override master settings"
+      htmlName="overrideEnabled"
+      value={value}
+      onChange={onChange}
+      isDisabled={isDisabled}
+    />
+  );
+}
+
+/** Right-aligned submit button, the footer every settings form ends with. */
+function SaveButton({ label, isDisabled }: { label: string; isDisabled?: boolean }) {
+  return (
+    <HStack justify="end">
+      <Button type="submit" size="sm" label={label} isDisabled={isDisabled} />
+    </HStack>
   );
 }
 
 // ─── Cmd-K Palette ───────────────────────────────────────────────────────────
+
+type PaletteItem = {
+  id: string;
+  label: string;
+  auxiliaryData: { desc: string; group: string };
+};
+
+const PALETTE_ITEMS: PaletteItem[] = ALL_ITEMS.map((item) => ({
+  id: item.id,
+  label: item.name,
+  auxiliaryData: { desc: item.desc, group: item.groupLabel },
+}));
+
+// Keywords let a search match a setting's description or its group, which is
+// what the old CommandItem `value` string concatenation was doing.
+const PALETTE_SOURCE = createStaticSource(PALETTE_ITEMS, {
+  keywords: (item) => [item.auxiliaryData.desc, item.auxiliaryData.group],
+});
 
 function SettingsCmdK({
   open,
@@ -219,37 +252,31 @@ function SettingsCmdK({
   onSelect: (id: string) => void;
 }) {
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Jump to a setting..." />
-      <CommandList>
-        <CommandEmpty>No settings match your search.</CommandEmpty>
-        {SETTINGS_GROUPS.map((group) => (
-          <CommandGroup key={group.id} heading={group.label}>
-            {group.items.map((item) => (
-              <CommandItem
-                key={item.id}
-                value={`${item.name} ${item.desc} ${group.label}`}
-                onSelect={() => {
-                  onSelect(item.id);
-                  onOpenChange(false);
-                }}
-                className="gap-3"
-              >
-                <span className="text-muted-foreground">{item.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{item.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{item.desc}</div>
-                </div>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        ))}
-      </CommandList>
-    </CommandDialog>
+    <CommandPalette
+      isOpen={open}
+      onOpenChange={onOpenChange}
+      label="Jump to a setting"
+      searchSource={PALETTE_SOURCE}
+      emptySearchText="No settings match your search."
+      onValueChange={(id) => {
+        onSelect(id);
+        onOpenChange(false);
+      }}
+      renderItem={(item) => (
+        <VStack gap={0}>
+          <Text type="body" size="sm" weight="medium">
+            {item.label}
+          </Text>
+          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+            {item.auxiliaryData.desc}
+          </Text>
+        </VStack>
+      )}
+    />
   );
 }
 
-// ─── Settings Sidebar ────────────────────────────────────────────────────────
+// ─── Settings navigation ─────────────────────────────────────────────────────
 
 function SettingsSidebar({
   active,
@@ -261,62 +288,42 @@ function SettingsSidebar({
   onSearchClick: () => void;
 }) {
   return (
-    <aside aria-label="Settings navigation" className="hidden lg:flex flex-col w-[260px] shrink-0 border-r border-border bg-card">
-      {/* Search trigger */}
-      <div className="p-3 border-b border-border">
-        <button
-          onClick={onSearchClick}
-          className="flex items-center gap-2 w-full h-8 px-2.5 rounded-md border border-border bg-muted/40 text-muted-foreground text-xs hover:bg-muted/60 transition-colors"
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1 text-left">Jump to setting...</span>
-          <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            <span className="text-xs">⌘</span>K
-          </kbd>
-        </button>
-      </div>
-
-      {/* Nav groups */}
-      <ScrollArea className="flex-1">
-        <nav className="p-2">
-          {SETTINGS_GROUPS.map((group) => (
-            <div key={group.id} className="mt-3 first:mt-1">
-              <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {group.label}
-              </div>
-              {group.items.map((item) => {
-                const isActive = item.id === active;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onSelect(item.id)}
-                    className={cn(
-                      "relative flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-sm text-left transition-colors",
-                      isActive
-                        ? "bg-primary/10 text-foreground font-medium"
-                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                    )}
-                  >
-                    {isActive && (
-                      <span className="absolute -left-2 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary" />
-                    )}
-                    <span className={cn(isActive ? "text-primary" : "text-muted-foreground")}>
-                      {item.icon}
-                    </span>
-                    <span className="flex-1 truncate">{item.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-      </ScrollArea>
-    </aside>
+    <VStack gap={2} padding={3}>
+      <Button
+        variant="secondary"
+        size="sm"
+        width="100%"
+        icon={<Search />}
+        label="Jump to setting..."
+        endContent={<Kbd keys="mod+K" />}
+        onClick={onSearchClick}
+      />
+      <SideNav>
+        {SETTINGS_GROUPS.map((group) => (
+          <SideNavSection key={group.id} title={group.label}>
+            {group.items.map((item) => (
+              <SideNavItem
+                key={item.id}
+                label={item.name}
+                icon={<item.icon />}
+                isSelected={item.id === active}
+                onClick={() => onSelect(item.id)}
+              />
+            ))}
+          </SideNavSection>
+        ))}
+      </SideNav>
+    </VStack>
   );
 }
 
-// ─── Mobile settings nav ─────────────────────────────────────────────────────
-
+/**
+ * Narrow-screen navigation.
+ *
+ * Was a horizontally scrolling strip of fourteen pills, which needed a drag or
+ * a shift-scroll to reach the last of them. A select names the current section
+ * and reaches any other in one press.
+ */
 function MobileSettingsNav({
   active,
   onSelect,
@@ -327,33 +334,27 @@ function MobileSettingsNav({
   onSearchClick: () => void;
 }) {
   return (
-    <div className="lg:hidden" data-testid="mobile-settings-nav">
-      <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={onSearchClick}
-          className="flex items-center gap-2 flex-1 h-9 px-3 rounded-md border border-border bg-muted/40 text-muted-foreground text-sm hover:bg-muted/60 transition-colors"
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          <span>Jump to setting...</span>
-        </button>
-      </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-none">
-        {ALL_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onSelect(item.id)}
-            className={cn(
-              "flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-              item.id === active
-                ? "bg-primary/10 text-primary border-primary/30"
-                : "bg-muted/40 text-muted-foreground border-border hover:bg-muted/60"
-            )}
-          >
-            {item.name}
-          </button>
-        ))}
-      </div>
-    </div>
+    <VStack gap={2} data-testid="mobile-settings-nav">
+      <Button
+        variant="secondary"
+        size="sm"
+        width="100%"
+        icon={<Search />}
+        label="Jump to setting..."
+        onClick={onSearchClick}
+      />
+      <Selector
+        label="Settings section"
+        isLabelHidden
+        value={active}
+        onChange={onSelect}
+        options={SETTINGS_GROUPS.map((group) => ({
+          type: "section" as const,
+          title: group.label,
+          options: group.items.map((item) => ({ value: item.id, label: item.name })),
+        }))}
+      />
+    </VStack>
   );
 }
 
@@ -363,17 +364,18 @@ function DetailHeader({ activeId }: { activeId: string }) {
   const item = findItem(activeId);
   if (!item) return null;
   return (
-    <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border px-6 py-4">
-      <div data-testid="settings-breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-        <span>Settings</span>
-        <ChevronRight className="h-3 w-3" />
-        <span>{item.groupLabel}</span>
+    <VStack gap={1}>
+      <div data-testid="settings-breadcrumb">
+        <Breadcrumbs>
+          <BreadcrumbItem>Settings</BreadcrumbItem>
+          <BreadcrumbItem isCurrent>{item.groupLabel}</BreadcrumbItem>
+        </Breadcrumbs>
       </div>
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">{item.name}</h1>
-      </div>
-      <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{item.desc}</p>
-    </div>
+      <Heading level={1}>{item.name}</Heading>
+      <Text type="body" size="sm" color="secondary">
+        {item.desc}
+      </Text>
+    </VStack>
   );
 }
 
@@ -508,180 +510,188 @@ export default function SettingsClient({
   const [trustedProxiesOverride, setTrustedProxiesOverride] = useState(instanceSync.overrides.trustedProxies);
 
   return (
-    <div className="flex min-h-[calc(100vh-3rem)] md:min-h-screen">
-      {/* Desktop sidebar */}
-      <SettingsSidebar
-        active={active}
-        onSelect={setActive}
-        onSearchClick={() => setCmdkOpen(true)}
-      />
-
-      {/* Detail pane */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <DetailHeader activeId={active} />
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 md:px-6 md:py-5 max-w-3xl">
-            {/* Mobile nav */}
-            <MobileSettingsNav
+    <>
+      <Layout
+        height="fill"
+        start={
+          <LayoutPanel width={260} hasDivider label="Settings navigation">
+            <SettingsSidebar
               active={active}
               onSelect={setActive}
               onSearchClick={() => setCmdkOpen(true)}
             />
+          </LayoutPanel>
+        }
+        content={
+          <LayoutContent padding={5}>
+            <VStack gap={5} maxWidth={768}>
+              <DetailHeader activeId={active} />
 
-            <div className="flex flex-col gap-4">
-              {active === "sync" && (
-                <SyncSection
-                  instanceSync={instanceSync}
-                  instanceModeState={instanceModeState}
-                  instanceModeFormAction={instanceModeFormAction}
-                  slaveTokenState={slaveTokenState}
-                  slaveTokenFormAction={slaveTokenFormAction}
-                  slaveInstanceState={slaveInstanceState}
-                  slaveInstanceFormAction={slaveInstanceFormAction}
-                  syncState={syncState}
-                  syncFormAction={syncFormAction}
-                  isSlave={isSlave}
-                  isMaster={isMaster}
-                />
-              )}
-              {active === "general" && (
-                <GeneralSection
-                  general={general}
-                  generalState={generalState}
-                  generalFormAction={generalFormAction}
-                  isSlave={isSlave}
-                  generalOverride={generalOverride}
-                  setGeneralOverride={setGeneralOverride}
-                />
-              )}
-              {active === "acme" && (
-                <AcmeSection
-                  acme={acme}
-                  acmeState={acmeState}
-                  acmeFormAction={acmeFormAction}
-                  isSlave={isSlave}
-                  acmeOverride={acmeOverride}
-                  setAcmeOverride={setAcmeOverride}
-                />
-              )}
-              {active === "dns-providers" && (
-                <DnsProvidersSection
-                  dnsProvider={dnsProvider}
-                  dnsProviderDefinitions={dnsProviderDefinitions}
-                  dnsProviderState={dnsProviderState}
-                  dnsProviderFormAction={dnsProviderFormAction}
-                  selectedProvider={selectedProvider}
-                  setSelectedProvider={setSelectedProvider}
-                  configuredProviders={configuredProviders}
-                  isSlave={isSlave}
-                  dnsProviderOverride={dnsProviderOverride}
-                  setDnsProviderOverride={setDnsProviderOverride}
-                />
-              )}
-              {active === "dns-resolvers" && (
-                <DnsResolversSection
-                  dns={dns}
-                  dnsState={dnsState}
-                  dnsFormAction={dnsFormAction}
-                  isSlave={isSlave}
-                  dnsOverride={dnsOverride}
-                  setDnsOverride={setDnsOverride}
-                />
-              )}
-              {active === "upstream-dns" && (
-                <UpstreamDnsSection
-                  upstreamDnsResolution={upstreamDnsResolution}
-                  upstreamDnsResolutionState={upstreamDnsResolutionState}
-                  upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
-                  isSlave={isSlave}
-                  upstreamDnsResolutionOverride={upstreamDnsResolutionOverride}
-                  setUpstreamDnsResolutionOverride={setUpstreamDnsResolutionOverride}
-                />
-              )}
-              {active === "trusted-proxies" && (
-                <TrustedProxiesSection
-                  trustedProxies={trustedProxies}
-                  trustedProxiesState={trustedProxiesState}
-                  trustedProxiesFormAction={trustedProxiesFormAction}
-                  isSlave={isSlave}
-                  trustedProxiesOverride={trustedProxiesOverride}
-                  setTrustedProxiesOverride={setTrustedProxiesOverride}
-                />
-              )}
-              {active === "geoblock" && (
-                <GeoBlockSection
-                  globalGeoBlock={globalGeoBlock}
-                  geoBlockState={geoBlockState}
-                  geoBlockFormAction={geoBlockFormAction}
-                />
-              )}
-              {active === "error-pages" && (
-                <ErrorPagesSection
-                  globalErrorPages={globalErrorPages}
-                  errorPagesState={errorPagesState}
-                  errorPagesFormAction={errorPagesFormAction}
-                />
-              )}
-              {active === "authentik" && (
-                <AuthentikSection
-                  authentik={authentik}
-                  authentikState={authentikState}
-                  authentikFormAction={authentikFormAction}
-                  isSlave={isSlave}
-                  authentikOverride={authentikOverride}
-                  setAuthentikOverride={setAuthentikOverride}
-                />
-              )}
-              {active === "oauth" && (
-                <OAuthSection
-                  oauthProviders={oauthProviders}
-                  localUsersDisabled={localUsersDisabled}
-                  baseUrl={baseUrl}
-                />
-              )}
-              {active === "avatars" && (
-                <AvatarsSection
-                  avatars={avatars}
-                  avatarsState={avatarsState}
-                  avatarsFormAction={avatarsFormAction}
-                  isSlave={isSlave}
-                  avatarsOverride={avatarsOverride}
-                  setAvatarsOverride={setAvatarsOverride}
-                />
-              )}
-              {active === "metrics" && (
-                <MetricsSection
-                  metrics={metrics}
-                  metricsState={metricsState}
-                  metricsFormAction={metricsFormAction}
-                  isSlave={isSlave}
-                  metricsOverride={metricsOverride}
-                  setMetricsOverride={setMetricsOverride}
-                />
-              )}
-              {active === "logging" && (
-                <LoggingSection
-                  logging={logging}
-                  loggingState={loggingState}
-                  loggingFormAction={loggingFormAction}
-                  isSlave={isSlave}
-                  loggingOverride={loggingOverride}
-                  setLoggingOverride={setLoggingOverride}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+              <MobileSettingsNav
+                active={active}
+                onSelect={setActive}
+                onSearchClick={() => setCmdkOpen(true)}
+              />
 
-      {/* Cmd-K palette */}
+              <VStack gap={4}>
+                {active === "sync" && (
+                  <SyncSection
+                    instanceSync={instanceSync}
+                    instanceModeState={instanceModeState}
+                    instanceModeFormAction={instanceModeFormAction}
+                    slaveTokenState={slaveTokenState}
+                    slaveTokenFormAction={slaveTokenFormAction}
+                    slaveInstanceState={slaveInstanceState}
+                    slaveInstanceFormAction={slaveInstanceFormAction}
+                    syncState={syncState}
+                    syncFormAction={syncFormAction}
+                    isSlave={isSlave}
+                    isMaster={isMaster}
+                  />
+                )}
+                {active === "general" && (
+                  <GeneralSection
+                    general={general}
+                    generalState={generalState}
+                    generalFormAction={generalFormAction}
+                    isSlave={isSlave}
+                    generalOverride={generalOverride}
+                    setGeneralOverride={setGeneralOverride}
+                  />
+                )}
+                {active === "acme" && (
+                  <AcmeSection
+                    acme={acme}
+                    acmeState={acmeState}
+                    acmeFormAction={acmeFormAction}
+                    isSlave={isSlave}
+                    acmeOverride={acmeOverride}
+                    setAcmeOverride={setAcmeOverride}
+                  />
+                )}
+                {active === "dns-providers" && (
+                  <DnsProvidersSection
+                    dnsProvider={dnsProvider}
+                    dnsProviderDefinitions={dnsProviderDefinitions}
+                    dnsProviderState={dnsProviderState}
+                    dnsProviderFormAction={dnsProviderFormAction}
+                    selectedProvider={selectedProvider}
+                    setSelectedProvider={setSelectedProvider}
+                    configuredProviders={configuredProviders}
+                    isSlave={isSlave}
+                    dnsProviderOverride={dnsProviderOverride}
+                    setDnsProviderOverride={setDnsProviderOverride}
+                  />
+                )}
+                {active === "dns-resolvers" && (
+                  <DnsResolversSection
+                    dns={dns}
+                    dnsState={dnsState}
+                    dnsFormAction={dnsFormAction}
+                    isSlave={isSlave}
+                    dnsOverride={dnsOverride}
+                    setDnsOverride={setDnsOverride}
+                  />
+                )}
+                {active === "upstream-dns" && (
+                  <UpstreamDnsSection
+                    upstreamDnsResolution={upstreamDnsResolution}
+                    upstreamDnsResolutionState={upstreamDnsResolutionState}
+                    upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
+                    isSlave={isSlave}
+                    upstreamDnsResolutionOverride={upstreamDnsResolutionOverride}
+                    setUpstreamDnsResolutionOverride={setUpstreamDnsResolutionOverride}
+                  />
+                )}
+                {active === "trusted-proxies" && (
+                  <TrustedProxiesSection
+                    trustedProxies={trustedProxies}
+                    trustedProxiesState={trustedProxiesState}
+                    trustedProxiesFormAction={trustedProxiesFormAction}
+                    isSlave={isSlave}
+                    trustedProxiesOverride={trustedProxiesOverride}
+                    setTrustedProxiesOverride={setTrustedProxiesOverride}
+                  />
+                )}
+                {active === "geoblock" && (
+                  <GeoBlockSection
+                    globalGeoBlock={globalGeoBlock}
+                    geoBlockState={geoBlockState}
+                    geoBlockFormAction={geoBlockFormAction}
+                  />
+                )}
+                {active === "error-pages" && (
+                  <ErrorPagesSection
+                    globalErrorPages={globalErrorPages}
+                    errorPagesState={errorPagesState}
+                    errorPagesFormAction={errorPagesFormAction}
+                  />
+                )}
+                {active === "authentik" && (
+                  <AuthentikSection
+                    authentik={authentik}
+                    authentikState={authentikState}
+                    authentikFormAction={authentikFormAction}
+                    isSlave={isSlave}
+                    authentikOverride={authentikOverride}
+                    setAuthentikOverride={setAuthentikOverride}
+                  />
+                )}
+                {active === "oauth" && (
+                  <OAuthSection
+                    oauthProviders={oauthProviders}
+                    localUsersDisabled={localUsersDisabled}
+                    baseUrl={baseUrl}
+                  />
+                )}
+                {active === "avatars" && (
+                  <AvatarsSection
+                    avatars={avatars}
+                    avatarsState={avatarsState}
+                    avatarsFormAction={avatarsFormAction}
+                    isSlave={isSlave}
+                    avatarsOverride={avatarsOverride}
+                    setAvatarsOverride={setAvatarsOverride}
+                  />
+                )}
+                {active === "metrics" && (
+                  <MetricsSection
+                    metrics={metrics}
+                    metricsState={metricsState}
+                    metricsFormAction={metricsFormAction}
+                    isSlave={isSlave}
+                    metricsOverride={metricsOverride}
+                    setMetricsOverride={setMetricsOverride}
+                  />
+                )}
+                {active === "logging" && (
+                  <LoggingSection
+                    logging={logging}
+                    loggingState={loggingState}
+                    loggingFormAction={loggingFormAction}
+                    isSlave={isSlave}
+                    loggingOverride={loggingOverride}
+                    setLoggingOverride={setLoggingOverride}
+                  />
+                )}
+              </VStack>
+            </VStack>
+          </LayoutContent>
+        }
+      />
+
       <SettingsCmdK open={cmdkOpen} onOpenChange={setCmdkOpen} onSelect={setActive} />
-    </div>
+    </>
   );
 }
 
 // ─── Section: Instance Sync ──────────────────────────────────────────────────
+
+const MODE_OPTIONS = [
+  { value: "standalone", label: "Standalone" },
+  { value: "master", label: "Master" },
+  { value: "slave", label: "Slave" },
+];
 
 function SyncSection({
   instanceSync,
@@ -708,188 +718,226 @@ function SyncSection({
   isSlave: boolean;
   isMaster: boolean;
 }) {
+  const [mode, setMode] = useState<string>(instanceSync.mode);
+  const [masterToken, setMasterToken] = useState("");
+  const [clearToken, setClearToken] = useState(false);
+  const [instName, setInstName] = useState("");
+  const [instBaseUrl, setInstBaseUrl] = useState("");
+  const [instApiToken, setInstApiToken] = useState("");
+
   return (
     <>
       <FormCard title="Mode">
-        <form action={instanceModeFormAction} className="flex flex-col gap-3">
-          {instanceSync.modeFromEnv && (
-            <InfoAlert>
-              Instance mode is configured via INSTANCE_MODE environment variable and cannot be changed at runtime.
-            </InfoAlert>
-          )}
-          {instanceModeState?.message && (
-            <StatusAlert message={instanceModeState.message} success={instanceModeState.success} />
-          )}
-          <FormRow label="Instance mode" hint="Standalone runs alone. Master pushes config to slaves. Slave pulls from a master.">
-            <Select name="mode" defaultValue={instanceSync.mode} disabled={instanceSync.modeFromEnv}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="standalone">Standalone</SelectItem>
-                <SelectItem value="master">Master</SelectItem>
-                <SelectItem value="slave">Slave</SelectItem>
-              </SelectContent>
-            </Select>
-          </FormRow>
-          <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled={instanceSync.modeFromEnv}>
-              Save instance mode
-            </Button>
-          </div>
+        <form action={instanceModeFormAction}>
+          <VStack gap={3}>
+            {instanceSync.modeFromEnv && (
+              <InfoAlert title="Instance mode is set by the INSTANCE_MODE environment variable">
+                It cannot be changed at runtime.
+              </InfoAlert>
+            )}
+            {instanceModeState?.message && (
+              <StatusAlert message={instanceModeState.message} success={instanceModeState.success} />
+            )}
+            <Selector
+              label="Instance mode"
+              description="Standalone runs alone. Master pushes config to slaves. Slave pulls from a master."
+              htmlName="mode"
+              options={MODE_OPTIONS}
+              value={mode}
+              onChange={setMode}
+              isDisabled={instanceSync.modeFromEnv}
+            />
+            <SaveButton label="Save instance mode" isDisabled={instanceSync.modeFromEnv} />
+          </VStack>
         </form>
       </FormCard>
 
       {isSlave && (
         <FormCard title="Master Connection">
-          <form action={slaveTokenFormAction} className="flex flex-col gap-3">
-            {instanceSync.tokenFromEnv && (
-              <InfoAlert>
-                Sync token is configured via INSTANCE_SYNC_TOKEN environment variable and cannot be changed at runtime.
-              </InfoAlert>
-            )}
-            {slaveTokenState?.message && (
-              <StatusAlert message={slaveTokenState.message} success={slaveTokenState.success} />
-            )}
-            {instanceSync.slave?.hasToken && !instanceSync.tokenFromEnv && (
-              <InfoAlert>
-                A master sync token is configured. Leave the token field blank to keep it, or select &ldquo;Remove existing token&rdquo; to delete it.
-              </InfoAlert>
-            )}
-            <FormRow label="Master sync token">
-              <Input
-                name="masterToken"
-                type="password"
-                autoComplete="new-password"
-                placeholder="Enter new token"
-                disabled={instanceSync.tokenFromEnv}
-                className="h-8 text-sm"
+          <VStack gap={3}>
+            <form action={slaveTokenFormAction}>
+              <VStack gap={3}>
+                {instanceSync.tokenFromEnv && (
+                  <InfoAlert title="Sync token is set by the INSTANCE_SYNC_TOKEN environment variable">
+                    It cannot be changed at runtime.
+                  </InfoAlert>
+                )}
+                {slaveTokenState?.message && (
+                  <StatusAlert message={slaveTokenState.message} success={slaveTokenState.success} />
+                )}
+                {instanceSync.slave?.hasToken && !instanceSync.tokenFromEnv && (
+                  <InfoAlert title="A master sync token is configured">
+                    Leave the token field blank to keep it, or select &ldquo;Remove existing
+                    token&rdquo; to delete it.
+                  </InfoAlert>
+                )}
+                <TextInput
+                  {...AUTOFILL_NEW_PASSWORD}
+                  label="Master sync token"
+                  type="password"
+                  htmlName="masterToken"
+                  value={masterToken}
+                  onChange={setMasterToken}
+                  placeholder="Enter new token"
+                  isDisabled={instanceSync.tokenFromEnv}
+                />
+                <CheckboxInput
+                  label="Remove existing token"
+                  htmlName="clearToken"
+                  value={clearToken}
+                  onChange={setClearToken}
+                  isDisabled={!instanceSync.slave?.hasToken || instanceSync.tokenFromEnv}
+                />
+                <SaveButton label="Save master token" isDisabled={instanceSync.tokenFromEnv} />
+              </VStack>
+            </form>
+            {instanceSync.slave?.lastSyncError ? (
+              <WarnAlert
+                title={
+                  instanceSync.slave?.lastSyncAt
+                    ? `Last sync: ${instanceSync.slave.lastSyncAt}`
+                    : "No sync payload has been received yet."
+                }
+              >
+                {instanceSync.slave?.lastSyncError}
+              </WarnAlert>
+            ) : (
+              <InfoAlert
+                title={
+                  instanceSync.slave?.lastSyncAt
+                    ? `Last sync: ${instanceSync.slave.lastSyncAt}`
+                    : "No sync payload has been received yet."
+                }
               />
-            </FormRow>
-            <div className="flex items-center gap-2 px-0.5">
-              <Checkbox
-                id="clearToken"
-                name="clearToken"
-                disabled={!instanceSync.slave?.hasToken || instanceSync.tokenFromEnv}
-              />
-              <Label htmlFor="clearToken">Remove existing token</Label>
-            </div>
-            <div className="flex justify-end">
-              <Button type="submit" size="sm" disabled={instanceSync.tokenFromEnv}>
-                Save master token
-              </Button>
-            </div>
-          </form>
-          {instanceSync.slave?.lastSyncError ? (
-            <WarnAlert>
-              {instanceSync.slave?.lastSyncAt
-                ? `Last sync: ${instanceSync.slave.lastSyncAt} (${instanceSync.slave.lastSyncError})`
-                : "No sync payload has been received yet."}
-            </WarnAlert>
-          ) : (
-            <InfoAlert>
-              {instanceSync.slave?.lastSyncAt
-                ? `Last sync: ${instanceSync.slave.lastSyncAt}`
-                : "No sync payload has been received yet."}
-            </InfoAlert>
-          )}
+            )}
+          </VStack>
         </FormCard>
       )}
 
       {isMaster && (
         <FormCard title={`Slave Instances (${(instanceSync.master?.instances.length ?? 0) + (instanceSync.master?.envInstances.length ?? 0)})`}>
-          <form action={slaveInstanceFormAction} className="flex flex-col gap-3">
-            {slaveInstanceState?.message && (
-              <StatusAlert message={slaveInstanceState.message} success={slaveInstanceState.success} />
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inst-name">Instance name</Label>
-                <Input id="inst-name" name="name" placeholder="Edge node EU-1" className="h-8 text-sm" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inst-base-url">Base URL</Label>
-                <Input id="inst-base-url" name="baseUrl" placeholder="https://slave-1.example.com" className="h-8 text-sm" />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="inst-api-token">Slave API token</Label>
-              <Input id="inst-api-token" name="apiToken" type="password" autoComplete="new-password" className="h-8 text-sm" />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <form action={syncFormAction}>
+          <VStack gap={3}>
+            <form action={slaveInstanceFormAction}>
+              <VStack gap={3}>
+                {slaveInstanceState?.message && (
+                  <StatusAlert message={slaveInstanceState.message} success={slaveInstanceState.success} />
+                )}
+                <Grid columns={{ minWidth: 220, max: 2 }} gap={3}>
+                  <TextInput
+                    label="Instance name"
+                    htmlName="name"
+                    value={instName}
+                    onChange={setInstName}
+                    placeholder="Edge node EU-1"
+                  />
+                  <TextInput
+                    label="Base URL"
+                    htmlName="baseUrl"
+                    value={instBaseUrl}
+                    onChange={setInstBaseUrl}
+                    placeholder="https://slave-1.example.com"
+                  />
+                </Grid>
+                <TextInput
+                  {...AUTOFILL_NEW_PASSWORD}
+                  label="Slave API token"
+                  type="password"
+                  htmlName="apiToken"
+                  value={instApiToken}
+                  onChange={setInstApiToken}
+                />
+                <HStack justify="end">
+                  <Button type="submit" size="sm" label="Add slave instance" />
+                </HStack>
+              </VStack>
+            </form>
+
+            {/* Its own form: nesting one inside the add-instance form was
+                invalid HTML, and the browser silently dropped it. */}
+            <form action={syncFormAction}>
+              <VStack gap={2}>
                 {syncState?.message && (
                   <StatusAlert message={syncState.message} success={syncState.success} />
                 )}
-                <Button type="submit" variant="outline" size="sm">Sync now</Button>
-              </form>
-              <Button type="submit" size="sm">Add slave instance</Button>
-            </div>
-          </form>
+                <HStack>
+                  <Button type="submit" variant="secondary" size="sm" label="Sync now" />
+                </HStack>
+              </VStack>
+            </form>
 
-          {instanceSync.master?.instances.length === 0 && instanceSync.master?.envInstances.length === 0 && (
-            <div className="mt-3">
-              <InfoAlert>No slave instances configured yet.</InfoAlert>
-            </div>
-          )}
+            {instanceSync.master?.instances.length === 0 && instanceSync.master?.envInstances.length === 0 && (
+              <InfoAlert title="No slave instances configured yet." />
+            )}
 
-          {instanceSync.master?.envInstances && instanceSync.master.envInstances.length > 0 && (
-            <div className="mt-3 flex flex-col gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Environment-configured (INSTANCE_SLAVES)
-              </p>
-              {instanceSync.master.envInstances.map((instance, index) => (
-                <div
-                  key={`env-${index}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/20 px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-semibold">{instance.name}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{instance.url}</p>
-                  </div>
-                  <StatusChip status="active" label="ENV" />
-                </div>
-              ))}
-            </div>
-          )}
+            {instanceSync.master?.envInstances && instanceSync.master.envInstances.length > 0 && (
+              <VStack gap={2}>
+                <Text type="label" size="xsm" weight="semibold" color="secondary">
+                  Environment-configured (INSTANCE_SLAVES)
+                </Text>
+                {instanceSync.master.envInstances.map((instance, index) => (
+                  <Card key={`env-${index}`} variant="muted" padding={3}>
+                    <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
+                      <VStack gap={0}>
+                        <Text type="body" size="sm" weight="semibold">
+                          {instance.name}
+                        </Text>
+                        <Text type="code" size="xsm" color="secondary">
+                          {instance.url}
+                        </Text>
+                      </VStack>
+                      <StatusChip status="active" label="ENV" />
+                    </HStack>
+                  </Card>
+                ))}
+              </VStack>
+            )}
 
-          {instanceSync.master?.instances && instanceSync.master.instances.length > 0 && (
-            <div className="mt-3 flex flex-col gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">UI-configured instances</p>
-              {instanceSync.master.instances.map((instance) => (
-                <div
-                  key={instance.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-semibold">{instance.name}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{instance.baseUrl}</p>
-                    <span className="text-xs text-muted-foreground">
-                      {instance.lastSyncAt ? `Last sync: ${instance.lastSyncAt}` : "No sync yet"}
-                    </span>
-                    {instance.lastSyncError && (
-                      <span className="block text-xs text-destructive">{instance.lastSyncError}</span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <form action={toggleSlaveInstanceAction}>
-                      <input type="hidden" name="instanceId" value={instance.id} />
-                      <input type="hidden" name="enabled" value={instance.enabled ? "" : "on"} />
-                      <Button type="submit" variant="outline" size="sm" className={instance.enabled ? "text-amber-600 border-amber-500/50" : "text-emerald-600 border-emerald-500/50"}>
-                        {instance.enabled ? "Disable" : "Enable"}
-                      </Button>
-                    </form>
-                    <form action={deleteSlaveInstanceAction}>
-                      <input type="hidden" name="instanceId" value={instance.id} />
-                      <Button type="submit" variant="outline" size="sm" className="text-destructive border-destructive/50">
-                        Remove
-                      </Button>
-                    </form>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            {instanceSync.master?.instances && instanceSync.master.instances.length > 0 && (
+              <VStack gap={2}>
+                <Text type="label" size="xsm" weight="semibold" color="secondary">
+                  UI-configured instances
+                </Text>
+                {instanceSync.master.instances.map((instance) => (
+                  <Card key={instance.id} padding={3}>
+                    <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
+                      <VStack gap={0}>
+                        <Text type="body" size="sm" weight="semibold">
+                          {instance.name}
+                        </Text>
+                        <Text type="code" size="xsm" color="secondary">
+                          {instance.baseUrl}
+                        </Text>
+                        <Text type="body" size="xsm" color="secondary">
+                          {instance.lastSyncAt ? `Last sync: ${instance.lastSyncAt}` : "No sync yet"}
+                        </Text>
+                        {instance.lastSyncError && (
+                          <Text type="body" size="xsm" color="secondary">
+                            {instance.lastSyncError}
+                          </Text>
+                        )}
+                      </VStack>
+                      <HStack gap={2}>
+                        <form action={toggleSlaveInstanceAction}>
+                          <input type="hidden" name="instanceId" value={instance.id} />
+                          <input type="hidden" name="enabled" value={instance.enabled ? "" : "on"} />
+                          <Button
+                            type="submit"
+                            variant="secondary"
+                            size="sm"
+                            label={instance.enabled ? "Disable" : "Enable"}
+                          />
+                        </form>
+                        <form action={deleteSlaveInstanceAction}>
+                          <input type="hidden" name="instanceId" value={instance.id} />
+                          <Button type="submit" variant="destructive" size="sm" label="Remove" />
+                        </form>
+                      </HStack>
+                    </HStack>
+                  </Card>
+                ))}
+              </VStack>
+            )}
+          </VStack>
         </FormCard>
       )}
     </>
@@ -913,44 +961,43 @@ function GeneralSection({
   generalOverride: boolean;
   setGeneralOverride: (v: boolean) => void;
 }) {
+  const [primaryDomain, setPrimaryDomain] = useState(
+    general?.primaryDomain ?? "caddyproxymanager.com"
+  );
+  const [acmeEmail, setAcmeEmail] = useState(general?.acmeEmail ?? "");
+  const disabled = isSlave && !generalOverride;
+
   return (
     <FormCard title="Defaults">
-      <form action={generalFormAction} className="flex flex-col gap-3">
-        {generalState?.message && (
-          <StatusAlert message={generalState.message} success={generalState.success} />
-        )}
-        {isSlave && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="general-override"
-              name="overrideEnabled"
-              checked={generalOverride}
-              onCheckedChange={(v) => setGeneralOverride(!!v)}
-            />
-            <Label htmlFor="general-override">Override master settings</Label>
-          </div>
-        )}
-        <FormRow label="Primary domain" hint="Default domain shown when creating new proxy hosts.">
-          <Input
-            name="primaryDomain"
-            defaultValue={general?.primaryDomain ?? "caddyproxymanager.com"}
-            required
-            disabled={isSlave && !generalOverride}
-            className="h-8 text-sm font-mono"
+      <form action={generalFormAction}>
+        <VStack gap={3}>
+          {generalState?.message && (
+            <StatusAlert message={generalState.message} success={generalState.success} />
+          )}
+          {isSlave && (
+            <OverrideToggle value={generalOverride} onChange={setGeneralOverride} />
+          )}
+          <TextInput
+            {...NATIVE_REQUIRED}
+            label="Primary domain"
+            description="Default domain shown when creating new proxy hosts."
+            htmlName="primaryDomain"
+            value={primaryDomain}
+            onChange={setPrimaryDomain}
+            isRequired
+            isDisabled={disabled}
           />
-        </FormRow>
-        <FormRow label="ACME contact email" hint="Used by Let's Encrypt for expiry notifications.">
-          <Input
-            name="acmeEmail"
+          <TextInput
+            label="ACME contact email"
+            description="Used by Let's Encrypt for expiry notifications."
             type="email"
-            defaultValue={general?.acmeEmail ?? ""}
-            disabled={isSlave && !generalOverride}
-            className="h-8 text-sm"
+            htmlName="acmeEmail"
+            value={acmeEmail}
+            onChange={setAcmeEmail}
+            isDisabled={disabled}
           />
-        </FormRow>
-        <div className="flex justify-end">
-          <Button type="submit" size="sm">Save general settings</Button>
-        </div>
+          <SaveButton label="Save general settings" />
+        </VStack>
       </form>
     </FormCard>
   );
@@ -973,59 +1020,85 @@ function AcmeSection({
   acmeOverride: boolean;
   setAcmeOverride: (v: boolean) => void;
 }) {
+  const [caUrl, setCaUrl] = useState(acme?.caUrl ?? "");
+  const [caRootPem, setCaRootPem] = useState(acme?.caRootPem ?? "");
   const disabled = isSlave && !acmeOverride;
+
   return (
     <FormCard title="Custom ACME Directory">
-      <form action={acmeFormAction} className="flex flex-col gap-3">
-        {acmeState?.message && (
-          <StatusAlert message={acmeState.message} success={acmeState.success} />
-        )}
-        {isSlave && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="acme-override"
-              name="overrideEnabled"
-              checked={acmeOverride}
-              onCheckedChange={(v) => setAcmeOverride(!!v)}
-            />
-            <Label htmlFor="acme-override">Override master settings</Label>
-          </div>
-        )}
-        <FormRow
-          label="ACME directory URL"
-          hint="Leave empty to use the Let's Encrypt default. For an internal CA (OpenBao, Step-CA, Windows ADCS), paste its ACME directory URL — must be HTTPS."
-        >
-          <Input
-            name="caUrl"
-            type="url"
+      <form action={acmeFormAction}>
+        <VStack gap={3}>
+          {acmeState?.message && (
+            <StatusAlert message={acmeState.message} success={acmeState.success} />
+          )}
+          {isSlave && <OverrideToggle value={acmeOverride} onChange={setAcmeOverride} />}
+          <TextInput
+            label="ACME directory URL"
+            isOptional
+            description="Leave empty to use the Let's Encrypt default. For an internal CA (OpenBao, Step-CA, Windows ADCS), paste its ACME directory URL — must be HTTPS."
+            htmlName="caUrl"
+            value={caUrl}
+            onChange={setCaUrl}
             placeholder="https://ca.internal.example.com/acme/acme/directory"
-            defaultValue={acme?.caUrl ?? ""}
-            disabled={disabled}
-            className="h-8 text-sm font-mono"
+            isDisabled={disabled}
           />
-        </FormRow>
-        <FormRow
-          label="CA root certificate (PEM)"
-          hint="Optional. If the ACME endpoint's TLS certificate is signed by an internal root not in the system trust store, paste the root (or chain) here so Caddy can connect to it."
-        >
-          <Textarea
-            name="caRootPem"
+          <TextArea
+            label="CA root certificate (PEM)"
+            isOptional
+            description="If the ACME endpoint's TLS certificate is signed by an internal root not in the system trust store, paste the root (or chain) here so Caddy can connect to it."
+            htmlName="caRootPem"
+            value={caRootPem}
+            onChange={setCaRootPem}
             placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-            defaultValue={acme?.caRootPem ?? ""}
-            disabled={disabled}
             rows={6}
-            className="text-xs font-mono"
+            isDisabled={disabled}
           />
-        </FormRow>
-        <div className="flex justify-end">
-          <Button type="submit" size="sm" disabled={disabled}>Save ACME settings</Button>
-        </div>
+          <SaveButton label="Save ACME settings" isDisabled={disabled} />
+        </VStack>
       </form>
     </FormCard>
   );
 }
 
 // ─── Section: DNS Providers ──────────────────────────────────────────────────
+
+function DnsProviderCredentialFields({
+  providerDef,
+  isDisabled,
+}: {
+  providerDef: DnsProviderDefinition;
+  isDisabled: boolean;
+}) {
+  // Keyed on the provider so switching providers resets the credentials
+  // instead of carrying the previous provider's values across.
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  return (
+    <>
+      {providerDef.description && (
+        <Text type="body" size="xsm" color="secondary">
+          {providerDef.description}
+        </Text>
+      )}
+      {providerDef.fields.map((field) => (
+        <TextInput
+          key={field.key}
+          {...(field.type === "password" ? AUTOFILL_NEW_PASSWORD : AUTOFILL_OFF)}
+          label={field.label}
+          isOptional={!field.required}
+          isRequired={field.required}
+          description={field.description ?? undefined}
+          type={field.type === "password" ? "password" : "text"}
+          htmlName={`credential_${field.key}`}
+          value={values[field.key] ?? ""}
+          onChange={(v) => setValues((prev) => ({ ...prev, [field.key]: v }))}
+          placeholder={field.placeholder ?? ""}
+          isDisabled={isDisabled}
+        />
+      ))}
+    </>
+  );
+}
 
 function DnsProvidersSection({
   dnsProvider,
@@ -1050,61 +1123,67 @@ function DnsProvidersSection({
   dnsProviderOverride: boolean;
   setDnsProviderOverride: (v: boolean) => void;
 }) {
+  const providerDef = dnsProviderDefinitions.find((p) => p.name === selectedProvider);
+  const isUpdate = configuredProviders.includes(selectedProvider);
+  const hasProvider = Boolean(selectedProvider) && selectedProvider !== "none";
+  const disabled = isSlave && !dnsProviderOverride;
+
+  const providerOptions = [
+    { value: "none", label: "Select..." },
+    ...dnsProviderDefinitions.map((p) => ({
+      value: p.name,
+      label: `${p.displayName}${configuredProviders.includes(p.name) ? " (update)" : ""}`,
+    })),
+  ];
+
   return (
     <>
       {dnsProviderState?.message && (
         <StatusAlert message={dnsProviderState.message} success={dnsProviderState.success} />
       )}
       {isSlave && (
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="dnsprovider-override"
-            name="overrideEnabled"
-            form="dnsp-add-form"
-            checked={dnsProviderOverride}
-            onCheckedChange={(v) => setDnsProviderOverride(!!v)}
-          />
-          <Label htmlFor="dnsprovider-override">Override master settings</Label>
-        </div>
+        /* Lives outside the form it belongs to, so its value is carried by the
+           hidden field inside dnsp-add-form rather than by the control itself. */
+        <CheckboxInput
+          label="Override master settings"
+          value={dnsProviderOverride}
+          onChange={setDnsProviderOverride}
+        />
       )}
 
-      {/* Configured providers */}
       {configuredProviders.length > 0 && (
         <FormCard title="Configured providers">
-          <div className="flex flex-col gap-2.5">
+          <VStack gap={2}>
             {configuredProviders.map((name) => {
               const def = dnsProviderDefinitions.find((p) => p.name === name);
               const isDefault = dnsProvider?.default === name;
               return (
-                <div
-                  key={name}
-                  className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3 bg-muted/20"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-sm font-semibold">{def?.displayName ?? name}</span>
-                    {isDefault && <Badge variant="default" className="text-[10px]">Default</Badge>}
-                  </div>
-                  <div className="flex gap-2">
-                    {!isDefault && (
+                <Card key={name} variant="muted" padding={3}>
+                  <HStack justify="between" gap={3} vAlign="center" wrap="wrap">
+                    <HStack gap={2} vAlign="center">
+                      <Text type="body" size="sm" weight="semibold">
+                        {def?.displayName ?? name}
+                      </Text>
+                      {isDefault && <Badge variant="info" label="Default" />}
+                    </HStack>
+                    <HStack gap={2}>
+                      {!isDefault && (
+                        <form action={dnsProviderFormAction}>
+                          <input type="hidden" name="action" value="set-default" />
+                          <input type="hidden" name="provider" value={name} />
+                          {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
+                          <Button type="submit" variant="secondary" size="sm" label="Set default" />
+                        </form>
+                      )}
                       <form action={dnsProviderFormAction}>
-                        <input type="hidden" name="action" value="set-default" />
+                        <input type="hidden" name="action" value="remove" />
                         <input type="hidden" name="provider" value={name} />
                         {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
-                        <Button type="submit" variant="outline" size="sm">
-                          Set default
-                        </Button>
+                        <Button type="submit" variant="destructive" size="sm" label="Remove" />
                       </form>
-                    )}
-                    <form action={dnsProviderFormAction}>
-                      <input type="hidden" name="action" value="remove" />
-                      <input type="hidden" name="provider" value={name} />
-                      {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
-                      <Button type="submit" variant="outline" size="sm" className="text-destructive border-destructive/50">
-                        Remove
-                      </Button>
-                    </form>
-                  </div>
-                </div>
+                    </HStack>
+                  </HStack>
+                </Card>
               );
             })}
             {dnsProvider?.default && (
@@ -1112,93 +1191,69 @@ function DnsProvidersSection({
                 <input type="hidden" name="action" value="set-default" />
                 <input type="hidden" name="provider" value="none" />
                 {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
-                <Button type="submit" variant="ghost" size="sm" className="text-xs text-muted-foreground">
-                  Clear default (HTTP-01 only)
-                </Button>
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  label="Clear default (HTTP-01 only)"
+                />
               </form>
             )}
-          </div>
+          </VStack>
         </FormCard>
       )}
 
-      {/* Add provider form */}
       <FormCard
         title={configuredProviders.length > 0 ? "Add or update provider" : "Add a provider"}
         footer={
           <>
             {isSlave && <input type="hidden" name="overrideEnabled" form="dnsp-add-form" value={dnsProviderOverride ? "on" : ""} />}
-            <Button type="submit" form="dnsp-add-form" size="sm" disabled={!selectedProvider || selectedProvider === "none"}>
-              {selectedProvider && selectedProvider !== "none" && configuredProviders.includes(selectedProvider) ? "Update provider" : "Add provider"}
-            </Button>
+            <Button
+              type="submit"
+              form="dnsp-add-form"
+              size="sm"
+              label={hasProvider && isUpdate ? "Update provider" : "Add provider"}
+              isDisabled={!hasProvider}
+            />
           </>
         }
       >
-        <form id="dnsp-add-form" action={dnsProviderFormAction} className="flex flex-col gap-3">
-          <input type="hidden" name="action" value="save" />
-          <FormRow label="Provider" hint={`${dnsProviderDefinitions.length} providers supported`}>
-            <Select
-              name="provider"
+        <form id="dnsp-add-form" action={dnsProviderFormAction}>
+          <VStack gap={3}>
+            <input type="hidden" name="action" value="save" />
+            <Selector
+              label="Provider"
+              description={`${dnsProviderDefinitions.length} providers supported`}
+              htmlName="provider"
+              options={providerOptions}
               value={selectedProvider}
-              onValueChange={setSelectedProvider}
-              disabled={isSlave && !dnsProviderOverride}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a DNS provider..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Select...</SelectItem>
-                {dnsProviderDefinitions.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>
-                    {p.displayName}{configuredProviders.includes(p.name) ? " (update)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormRow>
+              onChange={setSelectedProvider}
+              placeholder="Select a DNS provider..."
+              hasSearch
+              isDisabled={disabled}
+            />
 
-          {/* Dynamic credential fields */}
-          {selectedProvider && selectedProvider !== "none" && (() => {
-            const providerDef = dnsProviderDefinitions.find((p) => p.name === selectedProvider);
-            if (!providerDef) return null;
-            const isUpdate = configuredProviders.includes(selectedProvider);
-            return (
+            {hasProvider && providerDef && (
               <>
-                {providerDef.description && (
-                  <p className="text-xs text-muted-foreground">{providerDef.description}</p>
-                )}
-                {providerDef.fields.map((field) => (
-                  <FormRow key={field.key} label={field.label + (field.required ? "" : " (optional)")}>
-                    <div className="flex flex-col gap-1">
-                      <Input
-                        name={`credential_${field.key}`}
-                        type={field.type === "password" ? "password" : "text"}
-                        autoComplete={field.type === "password" ? "new-password" : "off"}
-                        placeholder={field.placeholder ?? ""}
-                        disabled={isSlave && !dnsProviderOverride}
-                        className="h-8 text-sm"
-                      />
-                      {field.description && (
-                        <p className="text-xs text-muted-foreground">{field.description}</p>
-                      )}
-                    </div>
-                  </FormRow>
-                ))}
+                <DnsProviderCredentialFields
+                  key={providerDef.name}
+                  providerDef={providerDef}
+                  isDisabled={disabled}
+                />
                 {isUpdate && (
-                  <InfoAlert>
-                    Credentials are already configured. Leave fields blank to keep existing values.
+                  <InfoAlert title="Credentials are already configured">
+                    Leave fields blank to keep existing values.
                   </InfoAlert>
                 )}
                 {providerDef.docsUrl && (
-                  <p className="text-xs text-muted-foreground">
-                    <a href={providerDef.docsUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                      Provider documentation
-                    </a>
-                  </p>
+                  <Link href={providerDef.docsUrl} target="_blank">
+                    Provider documentation
+                  </Link>
                 )}
               </>
-            );
-          })()}
-          {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
+            )}
+            {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
+          </VStack>
         </form>
       </FormCard>
     </>
@@ -1222,78 +1277,78 @@ function DnsResolversSection({
   dnsOverride: boolean;
   setDnsOverride: (v: boolean) => void;
 }) {
+  const [enabled, setEnabled] = useState(dns?.enabled ?? false);
+  const [resolvers, setResolvers] = useState(dns?.resolvers?.join("\n") ?? "");
+  const [fallbacks, setFallbacks] = useState(dns?.fallbacks?.join("\n") ?? "");
+  const [timeout, setTimeoutValue] = useState(dns?.timeout ?? "");
+  const disabled = isSlave && !dnsOverride;
+
   return (
     <>
       <FormCard>
-        <form action={dnsFormAction} className="flex flex-col gap-3">
-          {dnsState?.message && (
-            <StatusAlert message={dnsState.message} success={dnsState.success} />
-          )}
-          {isSlave && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="dns-override"
-                name="overrideEnabled"
-                checked={dnsOverride}
-                onCheckedChange={(v) => setDnsOverride(!!v)}
-              />
-              <Label htmlFor="dns-override">Override master settings</Label>
-            </div>
-          )}
-          <FormRow label="Custom resolvers">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="dns-enabled"
-                name="enabled"
-                defaultChecked={dns?.enabled ?? false}
-                disabled={isSlave && !dnsOverride}
-              />
-              <Label htmlFor="dns-enabled">Enable custom DNS resolvers</Label>
-            </div>
-          </FormRow>
-          <FormRow label="Primary resolvers">
-            <textarea
-              name="resolvers"
+        <form action={dnsFormAction}>
+          <VStack gap={3}>
+            {dnsState?.message && (
+              <StatusAlert message={dnsState.message} success={dnsState.success} />
+            )}
+            {isSlave && <OverrideToggle value={dnsOverride} onChange={setDnsOverride} />}
+            <CheckboxInput
+              label="Enable custom DNS resolvers"
+              htmlName="enabled"
+              value={enabled}
+              onChange={setEnabled}
+              isDisabled={disabled}
+            />
+            <TextArea
+              label="Primary resolvers"
+              isOptional
+              htmlName="resolvers"
+              value={resolvers}
+              onChange={setResolvers}
               placeholder={"1.1.1.1\n8.8.8.8"}
-              defaultValue={dns?.resolvers?.join("\n") ?? ""}
               rows={2}
-              disabled={isSlave && !dnsOverride}
-              className="flex min-h-[56px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+              isDisabled={disabled}
             />
-          </FormRow>
-          <FormRow label="Fallback resolvers">
-            <textarea
-              name="fallbacks"
+            <TextArea
+              label="Fallback resolvers"
+              isOptional
+              htmlName="fallbacks"
+              value={fallbacks}
+              onChange={setFallbacks}
               placeholder={"8.8.4.4\n1.0.0.1"}
-              defaultValue={dns?.fallbacks?.join("\n") ?? ""}
               rows={2}
-              disabled={isSlave && !dnsOverride}
-              className="flex min-h-[56px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+              isDisabled={disabled}
             />
-          </FormRow>
-          <FormRow label="Query timeout" hint="e.g. 5s, 10s">
-            <Input
-              name="timeout"
+            <TextInput
+              label="Query timeout"
+              isOptional
+              description="e.g. 5s, 10s"
+              htmlName="timeout"
+              value={timeout}
+              onChange={setTimeoutValue}
               placeholder="5s"
-              defaultValue={dns?.timeout ?? ""}
-              disabled={isSlave && !dnsOverride}
-              className="h-8 text-sm w-32"
+              width={160}
+              isDisabled={disabled}
             />
-          </FormRow>
-          <div className="flex justify-end">
-            <Button type="submit" size="sm">Save DNS settings</Button>
-          </div>
+            <SaveButton label="Save DNS settings" />
+          </VStack>
         </form>
       </FormCard>
-      <InfoAlert>
-        Custom DNS resolvers are useful when your DNS provider has slow propagation or when using split-horizon DNS.
-        Common public resolvers: 1.1.1.1 (Cloudflare), 8.8.8.8 (Google), 9.9.9.9 (Quad9).
+      <InfoAlert title="When to use custom resolvers">
+        Useful when your DNS provider has slow propagation or when using split-horizon DNS. Common
+        public resolvers: 1.1.1.1 (Cloudflare), 8.8.8.8 (Google), 9.9.9.9 (Quad9).
       </InfoAlert>
     </>
   );
 }
 
 // ─── Section: Upstream DNS Pinning ───────────────────────────────────────────
+
+const FAMILY_OPTIONS = [
+  { value: "both", label: "Both (Prefer IPv6)" },
+  { value: "ipv6", label: "IPv6 only" },
+  { value: "ipv4", label: "IPv4 only" },
+];
 
 function UpstreamDnsSection({
   upstreamDnsResolution,
@@ -1310,60 +1365,50 @@ function UpstreamDnsSection({
   upstreamDnsResolutionOverride: boolean;
   setUpstreamDnsResolutionOverride: (v: boolean) => void;
 }) {
+  const [enabled, setEnabled] = useState(upstreamDnsResolution?.enabled ?? false);
+  const [family, setFamily] = useState<string>(upstreamDnsResolution?.family ?? "both");
+  const disabled = isSlave && !upstreamDnsResolutionOverride;
+
   return (
     <>
       <FormCard>
-        <form action={upstreamDnsResolutionFormAction} className="flex flex-col gap-3">
-          {upstreamDnsResolutionState?.message && (
-            <StatusAlert message={upstreamDnsResolutionState.message} success={upstreamDnsResolutionState.success} />
-          )}
-          {isSlave && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="udns-override"
-                name="overrideEnabled"
-                checked={upstreamDnsResolutionOverride}
-                onCheckedChange={(v) => setUpstreamDnsResolutionOverride(!!v)}
+        <form action={upstreamDnsResolutionFormAction}>
+          <VStack gap={3}>
+            {upstreamDnsResolutionState?.message && (
+              <StatusAlert message={upstreamDnsResolutionState.message} success={upstreamDnsResolutionState.success} />
+            )}
+            {isSlave && (
+              <OverrideToggle
+                value={upstreamDnsResolutionOverride}
+                onChange={setUpstreamDnsResolutionOverride}
               />
-              <Label htmlFor="udns-override">Override master settings</Label>
-            </div>
-          )}
-          <FormRow label="Pin upstream IPs" hint="Resolves upstream hostnames at config-apply time and writes IPs into Caddy's active config.">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="udns-enabled"
-                name="enabled"
-                defaultChecked={upstreamDnsResolution?.enabled ?? false}
-                disabled={isSlave && !upstreamDnsResolutionOverride}
-              />
-              <Label htmlFor="udns-enabled">Enable upstream DNS pinning</Label>
-            </div>
-          </FormRow>
-          <FormRow label="Address family" hint="Both resolves AAAA + A with IPv6 preferred ordering.">
-            <Select
-              name="family"
-              defaultValue={upstreamDnsResolution?.family ?? "both"}
-              disabled={isSlave && !upstreamDnsResolutionOverride}
-            >
-              <SelectTrigger className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="both">Both (Prefer IPv6)</SelectItem>
-                <SelectItem value="ipv6">IPv6 only</SelectItem>
-                <SelectItem value="ipv4">IPv4 only</SelectItem>
-              </SelectContent>
-            </Select>
-          </FormRow>
-          <div className="flex justify-end">
-            <Button type="submit" size="sm">Save upstream DNS pinning settings</Button>
-          </div>
+            )}
+            <CheckboxInput
+              label="Enable upstream DNS pinning"
+              description="Resolves upstream hostnames at config-apply time and writes IPs into Caddy's active config."
+              htmlName="enabled"
+              value={enabled}
+              onChange={setEnabled}
+              isDisabled={disabled}
+            />
+            <Selector
+              label="Address family"
+              description="Both resolves AAAA + A with IPv6 preferred ordering."
+              htmlName="family"
+              options={FAMILY_OPTIONS}
+              value={family}
+              onChange={setFamily}
+              isDisabled={disabled}
+              width={280}
+            />
+            <SaveButton label="Save upstream DNS pinning settings" />
+          </VStack>
         </form>
       </FormCard>
-      <InfoAlert>
-        Host-level settings can override this default. Resolution happens at config save/reload time and resolved IPs are written into
-        Caddy&apos;s active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those
-        HTTPS upstreams to avoid SNI mismatch.
+      <InfoAlert title="Host-level settings can override this default">
+        Resolution happens at config save/reload time and resolved IPs are written into Caddy&apos;s
+        active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning
+        is skipped for those HTTPS upstreams to avoid SNI mismatch.
       </InfoAlert>
     </>
   );
@@ -1386,81 +1431,73 @@ function TrustedProxiesSection({
   trustedProxiesOverride: boolean;
   setTrustedProxiesOverride: (v: boolean) => void;
 }) {
+  const [ranges, setRanges] = useState((trustedProxies?.ranges ?? []).join("\n"));
+  const [clientIpHeaders, setClientIpHeaders] = useState(
+    (trustedProxies?.client_ip_headers ?? []).join("\n")
+  );
+  const [strict, setStrict] = useState(trustedProxies?.strict ?? false);
+  const [defaultGeoblock, setDefaultGeoblock] = useState(trustedProxies?.default_geoblock ?? false);
   const disabled = isSlave && !trustedProxiesOverride;
+
   return (
     <>
       <FormCard>
-        <form action={trustedProxiesFormAction} className="flex flex-col gap-3">
-          {trustedProxiesState?.message && (
-            <StatusAlert message={trustedProxiesState.message} success={trustedProxiesState.success} />
-          )}
-          {isSlave && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="trusted-proxies-override"
-                name="overrideEnabled"
-                checked={trustedProxiesOverride}
-                onCheckedChange={(v) => setTrustedProxiesOverride(!!v)}
+        <form action={trustedProxiesFormAction}>
+          <VStack gap={3}>
+            {trustedProxiesState?.message && (
+              <StatusAlert message={trustedProxiesState.message} success={trustedProxiesState.success} />
+            )}
+            {isSlave && (
+              <OverrideToggle
+                value={trustedProxiesOverride}
+                onChange={setTrustedProxiesOverride}
               />
-              <Label htmlFor="trusted-proxies-override">Override master settings</Label>
-            </div>
-          )}
-          <FormRow
-            label="Trusted proxy ranges"
-            hint="CIDRs, IPs, or the private_ranges shorthand — one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour."
-          >
-            <Textarea
-              name="ranges"
-              defaultValue={(trustedProxies?.ranges ?? []).join("\n")}
-              disabled={disabled}
+            )}
+            <TextArea
+              label="Trusted proxy ranges"
+              isOptional
+              description="CIDRs, IPs, or the private_ranges shorthand — one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour."
+              htmlName="ranges"
+              value={ranges}
+              onChange={setRanges}
               rows={3}
               placeholder={"private_ranges\n172.21.0.1/32"}
-              className="font-mono text-sm"
+              isDisabled={disabled}
             />
-          </FormRow>
-          <FormRow
-            label="Client IP headers"
-            hint="Headers Caddy reads the client IP from — one per line. Empty defaults to X-Forwarded-For. Set Cf-Connecting-Ip for Cloudflare, etc."
-          >
-            <Textarea
-              name="clientIpHeaders"
-              defaultValue={(trustedProxies?.client_ip_headers ?? []).join("\n")}
-              disabled={disabled}
+            <TextArea
+              label="Client IP headers"
+              isOptional
+              description="Headers Caddy reads the client IP from — one per line. Empty defaults to X-Forwarded-For. Set Cf-Connecting-Ip for Cloudflare, etc."
+              htmlName="clientIpHeaders"
+              value={clientIpHeaders}
+              onChange={setClientIpHeaders}
               rows={2}
               placeholder="X-Forwarded-For"
-              className="font-mono text-sm"
+              isDisabled={disabled}
             />
-          </FormRow>
-          <FormRow label="Strict mode" hint="Only trust the client IP headers from the configured proxies, rejecting spoofed values from untrusted peers.">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="trusted-proxies-strict"
-                name="strict"
-                defaultChecked={trustedProxies?.strict ?? false}
-                disabled={disabled}
-              />
-              <Label htmlFor="trusted-proxies-strict">Enable strict trusted proxies</Label>
-            </div>
-          </FormRow>
-          <FormRow label="Apply to geoblocking" hint="Use these ranges as the default trusted-proxy list for global geoblocking so the two can't silently disagree. A geoblock list set explicitly wins.">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="trusted-proxies-geoblock"
-                name="defaultGeoblock"
-                defaultChecked={trustedProxies?.default_geoblock ?? false}
-                disabled={disabled}
-              />
-              <Label htmlFor="trusted-proxies-geoblock">Default geoblock trusted proxies from this list</Label>
-            </div>
-          </FormRow>
-          <div className="flex justify-end">
-            <Button type="submit" size="sm">Save trusted proxies settings</Button>
-          </div>
+            <CheckboxInput
+              label="Enable strict trusted proxies"
+              description="Only trust the client IP headers from the configured proxies, rejecting spoofed values from untrusted peers."
+              htmlName="strict"
+              value={strict}
+              onChange={setStrict}
+              isDisabled={disabled}
+            />
+            <CheckboxInput
+              label="Default geoblock trusted proxies from this list"
+              description="Use these ranges as the default trusted-proxy list for global geoblocking so the two can't silently disagree. A geoblock list set explicitly wins."
+              htmlName="defaultGeoblock"
+              value={defaultGeoblock}
+              onChange={setDefaultGeoblock}
+              isDisabled={disabled}
+            />
+            <SaveButton label="Save trusted proxies settings" />
+          </VStack>
         </form>
       </FormCard>
-      <InfoAlert>
-        Applied to the main HTTP server, so it fixes client-IP attribution everywhere at once — access logs, analytics,
-        the country map, and any downstream handler using <code className="text-xs font-mono">{"{http.request.client_ip}"}</code>.
+      <InfoAlert title="Applied to the main HTTP server">
+        This fixes client-IP attribution everywhere at once — access logs, analytics, the country
+        map, and any downstream handler using the client_ip placeholder.
       </InfoAlert>
     </>
   );
@@ -1479,17 +1516,17 @@ function GeoBlockSection({
 }) {
   return (
     <FormCard>
-      <form action={geoBlockFormAction} className="flex flex-col gap-3">
-        {geoBlockState?.message && (
-          <StatusAlert message={geoBlockState.message} success={geoBlockState.success} />
-        )}
-        <GeoBlockFields
-          initialValues={{ geoblock: globalGeoBlock ?? null, geoblock_mode: "merge" }}
-          showModeSelector={false}
-        />
-        <div className="flex justify-end">
-          <Button type="submit" size="sm">Save geoblocking settings</Button>
-        </div>
+      <form action={geoBlockFormAction}>
+        <VStack gap={3}>
+          {geoBlockState?.message && (
+            <StatusAlert message={geoBlockState.message} success={geoBlockState.success} />
+          )}
+          <GeoBlockFields
+            initialValues={{ geoblock: globalGeoBlock ?? null, geoblock_mode: "merge" }}
+            showModeSelector={false}
+          />
+          <SaveButton label="Save geoblocking settings" />
+        </VStack>
       </form>
     </FormCard>
   );
@@ -1508,18 +1545,18 @@ function ErrorPagesSection({
 }) {
   return (
     <FormCard>
-      <form action={errorPagesFormAction} className="flex flex-col gap-3">
-        {errorPagesState?.message && (
-          <StatusAlert message={errorPagesState.message} success={errorPagesState.success} />
-        )}
-        <p className="text-sm text-muted-foreground">
-          These error pages apply to every proxy host as a fallback. A per-host error page for the
-          same status code takes precedence.
-        </p>
-        <ErrorPagesFields initialData={globalErrorPages?.rules ?? []} />
-        <div className="flex justify-end">
-          <Button type="submit" size="sm">Save error pages</Button>
-        </div>
+      <form action={errorPagesFormAction}>
+        <VStack gap={3}>
+          {errorPagesState?.message && (
+            <StatusAlert message={errorPagesState.message} success={errorPagesState.success} />
+          )}
+          <Text type="body" size="sm" color="secondary">
+            These error pages apply to every proxy host as a fallback. A per-host error page for the
+            same status code takes precedence.
+          </Text>
+          <ErrorPagesFields initialData={globalErrorPages?.rules ?? []} />
+          <SaveButton label="Save error pages" />
+        </VStack>
       </form>
     </FormCard>
   );
@@ -1542,55 +1579,52 @@ function AuthentikSection({
   authentikOverride: boolean;
   setAuthentikOverride: (v: boolean) => void;
 }) {
+  const [outpostDomain, setOutpostDomain] = useState(authentik?.outpostDomain ?? "");
+  const [outpostUpstream, setOutpostUpstream] = useState(authentik?.outpostUpstream ?? "");
+  const [authEndpoint, setAuthEndpoint] = useState(authentik?.authEndpoint ?? "");
+  const disabled = isSlave && !authentikOverride;
+
   return (
     <FormCard>
-      <form action={authentikFormAction} className="flex flex-col gap-3">
-        {authentikState?.message && (
-          <StatusAlert message={authentikState.message} success={authentikState.success} />
-        )}
-        {isSlave && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="authentik-override"
-              name="overrideEnabled"
-              checked={authentikOverride}
-              onCheckedChange={(v) => setAuthentikOverride(!!v)}
-            />
-            <Label htmlFor="authentik-override">Override master settings</Label>
-          </div>
-        )}
-        <FormRow label="Outpost domain">
-          <Input
-            name="outpostDomain"
+      <form action={authentikFormAction}>
+        <VStack gap={3}>
+          {authentikState?.message && (
+            <StatusAlert message={authentikState.message} success={authentikState.success} />
+          )}
+          {isSlave && (
+            <OverrideToggle value={authentikOverride} onChange={setAuthentikOverride} />
+          )}
+          <TextInput
+            {...NATIVE_REQUIRED}
+            label="Outpost domain"
+            htmlName="outpostDomain"
+            value={outpostDomain}
+            onChange={setOutpostDomain}
             placeholder="outpost.goauthentik.io"
-            defaultValue={authentik?.outpostDomain ?? ""}
-            required
-            disabled={isSlave && !authentikOverride}
-            className="h-8 text-sm font-mono"
+            isRequired
+            isDisabled={disabled}
           />
-        </FormRow>
-        <FormRow label="Outpost upstream">
-          <Input
-            name="outpostUpstream"
+          <TextInput
+            {...NATIVE_REQUIRED}
+            label="Outpost upstream"
+            htmlName="outpostUpstream"
+            value={outpostUpstream}
+            onChange={setOutpostUpstream}
             placeholder="http://authentik-server:9000"
-            defaultValue={authentik?.outpostUpstream ?? ""}
-            required
-            disabled={isSlave && !authentikOverride}
-            className="h-8 text-sm font-mono"
+            isRequired
+            isDisabled={disabled}
           />
-        </FormRow>
-        <FormRow label="Auth endpoint">
-          <Input
-            name="authEndpoint"
+          <TextInput
+            label="Auth endpoint"
+            isOptional
+            htmlName="authEndpoint"
+            value={authEndpoint}
+            onChange={setAuthEndpoint}
             placeholder="/outpost.goauthentik.io/auth/caddy"
-            defaultValue={authentik?.authEndpoint ?? ""}
-            disabled={isSlave && !authentikOverride}
-            className="h-8 text-sm font-mono"
+            isDisabled={disabled}
           />
-        </FormRow>
-        <div className="flex justify-end">
-          <Button type="submit" size="sm">Save Authentik defaults</Button>
-        </div>
+          <SaveButton label="Save Authentik defaults" />
+        </VStack>
       </form>
     </FormCard>
   );
@@ -1618,8 +1652,6 @@ function OAuthSection({
   );
 }
 
-// ─── Section: Metrics & Monitoring ───────────────────────────────────────────
-
 // ─── Section: User Avatars ───────────────────────────────────────────────────
 
 function AvatarsSection({
@@ -1637,52 +1669,39 @@ function AvatarsSection({
   avatarsOverride: boolean;
   setAvatarsOverride: (v: boolean) => void;
 }) {
+  const [gravatarEnabled, setGravatarEnabled] = useState(avatars.gravatarEnabled);
+
   return (
     <FormCard title="Fallback icon">
-      <form action={avatarsFormAction} className="flex flex-col gap-3">
-        {avatars.fromEnv && (
-          <InfoAlert>
-            Gravatar is configured via the AVATAR_GRAVATAR environment variable and cannot be
-            changed here.
-          </InfoAlert>
-        )}
-        {avatarsState?.message && (
-          <StatusAlert message={avatarsState.message} success={avatarsState.success} />
-        )}
-        {isSlave && !avatars.fromEnv && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="avatars-override"
-              name="overrideEnabled"
-              checked={avatarsOverride}
-              onCheckedChange={(v) => setAvatarsOverride(!!v)}
-            />
-            <Label htmlFor="avatars-override">Override master settings</Label>
-          </div>
-        )}
-        <FormRow
-          label="Gravatar fallback"
-          hint="For users with no icon of their own, look one up from gravatar.com by their email address. Their browser contacts gravatar.com directly, which discloses their IP and a hash of their address to a third party. Accounts with a local-only address are never looked up, and anyone without a Gravatar falls back to their initial."
-        >
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="avatars-gravatar"
-              name="gravatarEnabled"
-              defaultChecked={avatars.gravatarEnabled}
-              disabled={avatars.fromEnv || (isSlave && !avatarsOverride)}
-            />
-            <Label htmlFor="avatars-gravatar">Use Gravatar when a user has no icon</Label>
-          </div>
-        </FormRow>
-        <div className="flex justify-end">
-          <Button type="submit" size="sm" disabled={avatars.fromEnv}>
-            Save avatar settings
-          </Button>
-        </div>
+      <form action={avatarsFormAction}>
+        <VStack gap={3}>
+          {avatars.fromEnv && (
+            <InfoAlert title="Gravatar is set by the AVATAR_GRAVATAR environment variable">
+              It cannot be changed here.
+            </InfoAlert>
+          )}
+          {avatarsState?.message && (
+            <StatusAlert message={avatarsState.message} success={avatarsState.success} />
+          )}
+          {isSlave && !avatars.fromEnv && (
+            <OverrideToggle value={avatarsOverride} onChange={setAvatarsOverride} />
+          )}
+          <CheckboxInput
+            label="Use Gravatar when a user has no icon"
+            description="For users with no icon of their own, look one up from gravatar.com by their email address. Their browser contacts gravatar.com directly, which discloses their IP and a hash of their address to a third party. Accounts with a local-only address are never looked up, and anyone without a Gravatar falls back to their initial."
+            htmlName="gravatarEnabled"
+            value={gravatarEnabled}
+            onChange={setGravatarEnabled}
+            isDisabled={avatars.fromEnv || (isSlave && !avatarsOverride)}
+          />
+          <SaveButton label="Save avatar settings" isDisabled={avatars.fromEnv} />
+        </VStack>
       </form>
     </FormCard>
   );
 }
+
+// ─── Section: Metrics & Monitoring ───────────────────────────────────────────
 
 function MetricsSection({
   metrics,
@@ -1699,57 +1718,56 @@ function MetricsSection({
   metricsOverride: boolean;
   setMetricsOverride: (v: boolean) => void;
 }) {
+  const [enabled, setEnabled] = useState(metrics?.enabled ?? false);
+  const [port, setPort] = useState(metrics?.port ?? 9090);
+  const disabled = isSlave && !metricsOverride;
+
   return (
     <>
       <FormCard>
-        <form action={metricsFormAction} className="flex flex-col gap-3">
-          {metricsState?.message && (
-            <StatusAlert message={metricsState.message} success={metricsState.success} />
-          )}
-          {isSlave && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="metrics-override"
-                name="overrideEnabled"
-                checked={metricsOverride}
-                onCheckedChange={(v) => setMetricsOverride(!!v)}
-              />
-              <Label htmlFor="metrics-override">Override master settings</Label>
-            </div>
-          )}
-          <FormRow label="Metrics endpoint" hint="Prometheus-compatible scrape endpoint, exposed on a dedicated port.">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="metrics-enabled"
-                name="enabled"
-                defaultChecked={metrics?.enabled ?? false}
-                disabled={isSlave && !metricsOverride}
-              />
-              <Label htmlFor="metrics-enabled">Enable metrics endpoint</Label>
-            </div>
-          </FormRow>
-          <FormRow label="Port" hint="Separate from admin API on port 2019.">
-            <Input
-              name="port"
-              type="number"
-              defaultValue={metrics?.port ?? 9090}
-              disabled={isSlave && !metricsOverride}
-              className="h-8 text-sm w-32 font-mono"
+        <form action={metricsFormAction}>
+          <VStack gap={3}>
+            {metricsState?.message && (
+              <StatusAlert message={metricsState.message} success={metricsState.success} />
+            )}
+            {isSlave && <OverrideToggle value={metricsOverride} onChange={setMetricsOverride} />}
+            <CheckboxInput
+              label="Enable metrics endpoint"
+              description="Prometheus-compatible scrape endpoint, exposed on a dedicated port."
+              htmlName="enabled"
+              value={enabled}
+              onChange={setEnabled}
+              isDisabled={disabled}
             />
-          </FormRow>
-          <div className="flex justify-end">
-            <Button type="submit" size="sm">Save metrics settings</Button>
-          </div>
+            <NumberInput
+              label="Port"
+              description="Separate from admin API on port 2019."
+              htmlName="port"
+              value={port}
+              onChange={setPort}
+              isIntegerOnly
+              min={1}
+              max={65535}
+              width={160}
+              isDisabled={disabled}
+            />
+            <SaveButton label="Save metrics settings" />
+          </VStack>
         </form>
       </FormCard>
-      <InfoAlert>
-        Configure your monitoring tool to scrape <code className="text-xs font-mono">http://caddy-proxy-manager-caddy:{metrics?.port ?? 9090}/metrics</code> from within the Docker network.
+      <InfoAlert title="Point your monitoring tool at the metrics endpoint">
+        {`Scrape http://caddy-proxy-manager-caddy:${metrics?.port ?? 9090}/metrics from within the Docker network.`}
       </InfoAlert>
     </>
   );
 }
 
 // ─── Section: Access Logging ─────────────────────────────────────────────────
+
+const LOG_FORMAT_OPTIONS = [
+  { value: "json", label: "JSON" },
+  { value: "console", label: "Console (Common Log Format)" },
+];
 
 function LoggingSection({
   logging,
@@ -1766,58 +1784,41 @@ function LoggingSection({
   loggingOverride: boolean;
   setLoggingOverride: (v: boolean) => void;
 }) {
+  const [enabled, setEnabled] = useState(logging?.enabled ?? false);
+  const [format, setFormat] = useState<string>(logging?.format ?? "json");
+  const disabled = isSlave && !loggingOverride;
+
   return (
     <>
       <FormCard>
-        <form action={loggingFormAction} className="flex flex-col gap-3">
-          {loggingState?.message && (
-            <StatusAlert message={loggingState.message} success={loggingState.success} />
-          )}
-          {isSlave && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="logging-override"
-                name="overrideEnabled"
-                checked={loggingOverride}
-                onCheckedChange={(v) => setLoggingOverride(!!v)}
-              />
-              <Label htmlFor="logging-override">Override master settings</Label>
-            </div>
-          )}
-          <FormRow label="Access logging">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="logging-enabled"
-                name="enabled"
-                defaultChecked={logging?.enabled ?? false}
-                disabled={isSlave && !loggingOverride}
-              />
-              <Label htmlFor="logging-enabled">Enable access logging</Label>
-            </div>
-          </FormRow>
-          <FormRow label="Format">
-            <Select
-              name="format"
-              defaultValue={logging?.format ?? "json"}
-              disabled={isSlave && !loggingOverride}
-            >
-              <SelectTrigger className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="json">JSON</SelectItem>
-                <SelectItem value="console">Console (Common Log Format)</SelectItem>
-              </SelectContent>
-            </Select>
-          </FormRow>
-          <div className="flex justify-end">
-            <Button type="submit" size="sm">Save logging settings</Button>
-          </div>
+        <form action={loggingFormAction}>
+          <VStack gap={3}>
+            {loggingState?.message && (
+              <StatusAlert message={loggingState.message} success={loggingState.success} />
+            )}
+            {isSlave && <OverrideToggle value={loggingOverride} onChange={setLoggingOverride} />}
+            <CheckboxInput
+              label="Enable access logging"
+              htmlName="enabled"
+              value={enabled}
+              onChange={setEnabled}
+              isDisabled={disabled}
+            />
+            <Selector
+              label="Format"
+              htmlName="format"
+              options={LOG_FORMAT_OPTIONS}
+              value={format}
+              onChange={setFormat}
+              isDisabled={disabled}
+              width={280}
+            />
+            <SaveButton label="Save logging settings" />
+          </VStack>
         </form>
       </FormCard>
-      <InfoAlert>
-        Access logs are stored in the caddy-logs Docker volume.
-        View with: <code className="text-xs font-mono">docker exec caddy-proxy-manager-caddy tail -f /logs/access.log</code>
+      <InfoAlert title="Access logs live in the caddy-logs Docker volume">
+        View with: docker exec caddy-proxy-manager-caddy tail -f /logs/access.log
       </InfoAlert>
     </>
   );

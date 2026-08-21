@@ -1,10 +1,12 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, X } from "lucide-react";
 import { useState } from "react";
+import { Plus } from "lucide-react";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Text } from "@astryxdesign/core/Text";
+import { Token } from "@astryxdesign/core/Token";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 
 type Props = {
   value?: number[];
@@ -12,60 +14,56 @@ type Props = {
 
 export function WafRuleExclusions({ value }: Props) {
   const [ids, setIds] = useState<number[]>(value ?? []);
-  const [inputVal, setInputVal] = useState("");
+  const [draft, setDraft] = useState<number | null>(null);
 
   function addId() {
-    const n = parseInt(inputVal.trim(), 10);
-    if (!Number.isInteger(n) || n <= 0) return;
-    if (ids.includes(n)) { setInputVal(""); return; }
-    setIds((prev) => [...prev, n]);
-    setInputVal("");
-  }
-
-  function removeId(id: number) {
-    setIds((prev) => prev.filter((x) => x !== id));
+    if (draft === null || !Number.isInteger(draft) || draft <= 0) return;
+    setIds((prev) => (prev.includes(draft) ? prev : [...prev, draft]));
+    setDraft(null);
   }
 
   return (
-    <div>
+    <VStack gap={2}>
       <input type="hidden" name="wafExcludedRuleIds" value={JSON.stringify(ids)} />
-      <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">
-        Excluded Rule IDs
-      </span>
-      <span className="text-xs text-muted-foreground block mb-2">
-        Rules listed here are disabled via <code>SecRuleRemoveById</code>
-      </span>
+
+      <VStack gap={1}>
+        <Text type="body" size="sm" weight="semibold">
+          Excluded Rule IDs
+        </Text>
+        <Text type="body" size="xsm" color="secondary">
+          Rules listed here are disabled via SecRuleRemoveById
+        </Text>
+      </VStack>
+
       {ids.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
+        <HStack gap={2} wrap="wrap">
           {ids.map((id) => (
-            <Badge key={id} variant="secondary" className="gap-1 pr-1 font-mono text-xs">
-              {id}
-              <button
-                type="button"
-                onClick={() => removeId(id)}
-                className="rounded-full hover:bg-destructive/20 p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
+            // Token owns its own remove control, replacing the button nested
+            // inside a Badge with a hand-rolled hover background.
+            <Token
+              key={id}
+              size="sm"
+              label={String(id)}
+              onRemove={() => setIds((prev) => prev.filter((x) => x !== id))}
+            />
           ))}
-        </div>
+        </HStack>
       )}
-      <div className="flex items-center gap-2 max-w-[260px]">
-        <Input
-          size={1}
+
+      <HStack gap={2} vAlign="end">
+        <NumberInput
+          label="Rule ID"
+          isLabelHidden
           placeholder="Rule ID"
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addId(); } }}
-          inputMode="numeric"
-          pattern="[0-9]*"
-          className="flex-1 h-8 text-sm"
+          value={draft}
+          onChange={setDraft}
+          isIntegerOnly
+          min={1}
+          width={160}
+          onEnter={addId}
         />
-        <Button type="button" size="icon" variant="ghost" onClick={addId} className="h-8 w-8">
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+        <IconButton variant="ghost" size="sm" label="Add excluded rule ID" icon={<Plus />} onClick={addId} />
+      </HStack>
+    </VStack>
   );
 }

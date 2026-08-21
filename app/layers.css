@@ -1,0 +1,15 @@
+/**
+ * Canonical cascade layer order for the app.
+ *
+ * This lives in its own file, imported before anything else, because webpack
+ * (and therefore Next.js) hoists `@import` content above the inline CSS that
+ * follows it — an `@layer` declaration written inline in globals.css would end
+ * up *after* the imports it is meant to order.
+ *
+ * Order matters in both directions: a later layer beats an earlier one
+ * regardless of specificity, and unlayered styles beat every layer. Astryx
+ * component styles live in astryx-base/astryx-theme, so anything that must not
+ * override them (resets, Tailwind preflight) is declared before, and app
+ * utilities that must keep winning are declared after.
+ */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;

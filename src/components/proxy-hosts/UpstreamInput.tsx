@@ -1,123 +1,132 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MinusCircle, Plus } from "lucide-react";
+"use client";
+
 import { useState } from "react";
+import { MinusCircle, Plus } from "lucide-react";
+import { Button } from "@astryxdesign/core/Button";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 
 type UpstreamEntry = {
-    protocol: string;
-    address: string;
+  protocol: string;
+  address: string;
 };
 
+const PROTOCOL_OPTIONS = [
+  { value: "http://", label: "http://" },
+  { value: "https://", label: "https://" },
+];
+
 function parseUpstream(upstream: string): UpstreamEntry {
-    if (upstream.startsWith("https://")) {
-        return { protocol: "https://", address: upstream.slice(8) };
-    }
-    if (upstream.startsWith("http://")) {
-        return { protocol: "http://", address: upstream.slice(7) };
-    }
-    return { protocol: "http://", address: upstream };
+  if (upstream.startsWith("https://")) {
+    return { protocol: "https://", address: upstream.slice(8) };
+  }
+  if (upstream.startsWith("http://")) {
+    return { protocol: "http://", address: upstream.slice(7) };
+  }
+  return { protocol: "http://", address: upstream };
 }
 
 export function UpstreamInput({
-    defaultUpstreams = [],
-    name = "upstreams"
+  defaultUpstreams = [],
+  name = "upstreams",
 }: {
-    defaultUpstreams?: string[];
-    name?: string;
+  defaultUpstreams?: string[];
+  name?: string;
 }) {
-    const initialEntries: UpstreamEntry[] = defaultUpstreams.length > 0
-        ? defaultUpstreams.map(parseUpstream)
-        : [{ protocol: "http://", address: "" }];
+  const initialEntries: UpstreamEntry[] =
+    defaultUpstreams.length > 0
+      ? defaultUpstreams.map(parseUpstream)
+      : [{ protocol: "http://", address: "" }];
 
-    const [entries, setEntries] = useState<UpstreamEntry[]>(initialEntries);
+  const [entries, setEntries] = useState<UpstreamEntry[]>(initialEntries);
 
-    const handleProtocolChange = (index: number, newProtocol: string) => {
-        const updated = [...entries];
-        updated[index].protocol = newProtocol || "http://";
-        setEntries(updated);
-    };
-
-    const handleAddressChange = (index: number, newAddress: string) => {
-        const updated = [...entries];
-        // Strip protocol if user pasted a full URL
-        if (newAddress.startsWith("https://")) {
-            updated[index].protocol = "https://";
-            updated[index].address = newAddress.slice(8);
-        } else if (newAddress.startsWith("http://")) {
-            updated[index].protocol = "http://";
-            updated[index].address = newAddress.slice(7);
-        } else {
-            updated[index].address = newAddress;
-        }
-        setEntries(updated);
-    };
-
-    const handleAdd = () => {
-        setEntries([...entries, { protocol: "http://", address: "" }]);
-    };
-
-    const handleRemove = (index: number) => {
-        if (entries.length === 1) return;
-        setEntries(entries.filter((_, i) => i !== index));
-    };
-
-    const serializedValue = entries
-        .filter(e => e.address.trim() !== "")
-        .map(e => `${e.protocol}${e.address.trim()}`)
-        .join("\n");
-
-    return (
-        <div>
-            <input type="hidden" name={name} value={serializedValue} />
-            <p className="text-sm text-muted-foreground mb-1">Upstreams</p>
-            <div className="flex flex-col gap-3">
-                {entries.map((entry, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                        <Select value={entry.protocol} onValueChange={(val) => handleProtocolChange(index, val)}>
-                            <SelectTrigger className="w-28">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="http://">http://</SelectItem>
-                                <SelectItem value="https://">https://</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Input
-                            value={entry.address}
-                            onChange={(e) => handleAddressChange(index, e.target.value)}
-                            placeholder="10.0.0.5:8080"
-                            className="flex-1"
-                            required={index === 0}
-                        />
-                        <span title={entries.length === 1 ? "At least one upstream required" : "Remove upstream"}>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemove(index)}
-                                disabled={entries.length === 1}
-                                className="text-destructive hover:text-destructive mt-0.5"
-                            >
-                                <MinusCircle className="h-4 w-4" />
-                            </Button>
-                        </span>
-                    </div>
-                ))}
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAdd}
-                    className="self-start"
-                >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Upstream
-                </Button>
-            </div>
-            <span className="text-xs text-muted-foreground mt-0.5 block">
-                Backend servers to proxy requests to
-            </span>
-        </div>
+  const handleProtocolChange = (index: number, newProtocol: string) => {
+    setEntries((prev) =>
+      prev.map((entry, i) =>
+        i === index ? { ...entry, protocol: newProtocol || "http://" } : entry
+      )
     );
+  };
+
+  const handleAddressChange = (index: number, newAddress: string) => {
+    setEntries((prev) =>
+      prev.map((entry, i) => {
+        if (i !== index) return entry;
+        // Strip protocol if the user pasted a full URL.
+        if (newAddress.startsWith("https://")) {
+          return { protocol: "https://", address: newAddress.slice(8) };
+        }
+        if (newAddress.startsWith("http://")) {
+          return { protocol: "http://", address: newAddress.slice(7) };
+        }
+        return { ...entry, address: newAddress };
+      })
+    );
+  };
+
+  const handleAdd = () => setEntries((prev) => [...prev, { protocol: "http://", address: "" }]);
+
+  const handleRemove = (index: number) =>
+    setEntries((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+
+  const serializedValue = entries
+    .filter((e) => e.address.trim() !== "")
+    .map((e) => `${e.protocol}${e.address.trim()}`)
+    .join("\n");
+
+  const isOnlyEntry = entries.length === 1;
+
+  return (
+    <VStack gap={2}>
+      <input type="hidden" name={name} value={serializedValue} />
+      <Text type="body" size="sm" weight="semibold">
+        Upstreams
+      </Text>
+
+      <VStack gap={3}>
+        {entries.map((entry, index) => (
+          <HStack key={index} gap={2} vAlign="end">
+            <Selector
+              label="Protocol"
+              isLabelHidden
+              width={120}
+              options={PROTOCOL_OPTIONS}
+              value={entry.protocol}
+              onChange={(next) => handleProtocolChange(index, next as string)}
+            />
+            <TextInput
+              label={`Upstream ${index + 1}`}
+              isLabelHidden
+              value={entry.address}
+              onChange={(next) => handleAddressChange(index, next)}
+              placeholder="10.0.0.5:8080"
+              isRequired={index === 0}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label={`Remove upstream ${index + 1}`}
+              icon={<MinusCircle />}
+              isDisabled={isOnlyEntry}
+              // Explains the disabled state on hover, replacing a title on a
+              // wrapper span that screen readers never announced.
+              tooltip={isOnlyEntry ? "At least one upstream is required" : "Remove upstream"}
+              onClick={() => handleRemove(index)}
+            />
+          </HStack>
+        ))}
+
+        <HStack>
+          <Button variant="ghost" size="sm" label="Add Upstream" icon={<Plus />} onClick={handleAdd} />
+        </HStack>
+      </VStack>
+
+      <Text type="body" size="xsm" color="secondary">
+        Backend servers to proxy requests to
+      </Text>
+    </VStack>
+  );
 }

@@ -1,4 +1,20 @@
-@import "tailwindcss";
+/* Layer order first — see layers.css for why it is a separate file. */
+@import "./layers.css";
+
+/* Tailwind v4, split so preflight and utilities land in the right layers.
+   Unlayered preflight would silently override Astryx component styles. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+
+/* Astryx: reset lowest, then component styles, then the theme tokens. */
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+/* Backs Tailwind utilities with Astryx tokens (bg-surface, text-primary, ...). */
+@import "@astryxdesign/core/tailwind-theme.css";
+
+/* Unlayered last so existing app utility classes keep winning during migration. */
+@import "tailwindcss/utilities.css" layer(utilities);
 
 @theme inline {
   --color-background: var(--background);
@@ -88,5 +104,21 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /**
+   * Visual masking for a secret typed into a multi-line field.
+   *
+   * A private key must be entered in a <textarea>: <input type="password">
+   * strips newlines on paste, which corrupts PEM. Astryx's TextArea exposes no
+   * masking prop and no className, so the mask is applied from a wrapper.
+   * -webkit-text-security is supported in Chromium, WebKit and Firefox 118+;
+   * where it is not, the field degrades to plain text rather than breaking.
+   */
+  [data-masked-input="true"] textarea {
+    -webkit-text-security: disc;
+    text-security: disc;
   }
 }

@@ -2,12 +2,16 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Center } from "@astryxdesign/core/Center";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/Stack";
+import { AUTOFILL_CURRENT_PASSWORD } from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface LinkAccountClientProps {
   provider: string;
@@ -59,64 +63,59 @@ export default function LinkAccountClient({
   const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center space-y-1">
-          <CardTitle className="text-2xl font-bold">Link Your Account</CardTitle>
-          <CardDescription>
-            An account with <strong>{email}</strong> already exists
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground text-center">
+    <Center minHeight="100vh" padding={4}>
+      <Card width={400}>
+        <VStack gap={4}>
+          <VStack gap={1} hAlign="center">
+            <Heading level={1}>
+              Link Your Account
+            </Heading>
+            <Text type="body" size="sm" color="secondary">
+              An account with <strong>{email}</strong> already exists
+            </Text>
+          </VStack>
+
+          <Text type="body" size="sm" color="secondary" justify="center">
             Would you like to link your <strong>{providerName}</strong> account to your existing
             account? Enter your password to confirm.
-          </p>
+          </Text>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {error && <Banner status="error" title="Could not link account" description={error} />}
 
-          <form onSubmit={handleLinkAccount} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
+          <form onSubmit={handleLinkAccount}>
+            <VStack gap={3}>
+              <TextInput
+                {...AUTOFILL_CURRENT_PASSWORD}
+                label="Password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                autoFocus
-                disabled={loading}
+                onChange={setPassword}
+                isRequired
+                hasAutoFocus
+                isDisabled={loading}
+                width="100%"
               />
-            </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                  Linking Account…
-                </>
-              ) : (
-                "Link Account"
-              )}
-            </Button>
+              <Button
+                type="submit"
+                label={loading ? "Linking Account…" : "Link Account"}
+                isLoading={loading}
+                isDisabled={loading}
+                width="100%"
+              />
 
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={handleUsePassword}
-              disabled={loading}
-            >
-              Sign in with Password Instead
-            </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                label="Sign in with Password Instead"
+                onClick={handleUsePassword}
+                isDisabled={loading}
+                width="100%"
+              />
+            </VStack>
           </form>
-        </CardContent>
+        </VStack>
       </Card>
-    </div>
+    </Center>
   );
 }

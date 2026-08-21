@@ -1,59 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { Avatar } from "@astryxdesign/core/Avatar";
+import type { AvatarSize } from "@astryxdesign/core/Avatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 
 interface UserAvatarProps {
   /** Sources and initial, resolved on the server by resolveAvatar(). */
   avatar: ResolvedAvatar;
+  /** Display name — drives the initials, the alt text, and the tooltip. */
   alt?: string;
-  className?: string;
-  fallbackClassName?: string;
+  size?: AvatarSize;
+  /** Omit the built-in tooltip where the name is already visible beside it. */
+  tooltip?: boolean;
 }
 
 /**
- * Renders a user's icon, stepping down through the available sources as each
- * one fails to load.
+ * Renders a user's icon, stepping down through the sources as each fails.
  *
- * Radix's Avatar only falls back once — from a single image to the fallback
- * node — so it cannot express "custom icon, then Gravatar, then initial" on its
- * own. Tracking which sources have failed and feeding it one `src` at a time
- * does, and it covers every reason a source can fail: a Gravatar that does not
- * exist (the URL asks for a 404), a stale data URL, or a provider picture the
- * Content-Security-Policy blocks.
+ * Astryx's Avatar owns the whole cascade natively — `src` (their own icon),
+ * then `fallbackSrc` (their Gravatar, which 404s when they have none), then
+ * initials derived from the name. That replaces the manual step-down this
+ * component used to run, and it covers the same failure modes: a Gravatar that
+ * does not exist, a stale data URL, or a provider picture blocked by CSP.
+ *
+ * `avatar.initial` is still the last resort, for an account with no usable name
+ * or email for Avatar to derive initials from.
  */
-export function UserAvatar({ avatar, alt, className, fallbackClassName }: UserAvatarProps) {
-  const sources = [avatar.imageUrl, avatar.gravatarUrl].filter(
-    (source): source is string => Boolean(source)
-  );
-
-  const [failedCount, setFailedCount] = useState(0);
-
-  // A different user (or a freshly uploaded icon) means the previous failures
-  // say nothing about the new sources.
-  useEffect(() => {
-    setFailedCount(0);
-  }, [avatar.imageUrl, avatar.gravatarUrl]);
-
-  const currentSource = sources[failedCount];
-
+export function UserAvatar({ avatar, alt, size = "md", tooltip }: UserAvatarProps) {
   return (
-    <Avatar className={className}>
-      {currentSource && (
-        // Keyed by source so React remounts on step-down; without it the img
-        // keeps the failed element's error state and never retries.
-        <AvatarImage
-          key={currentSource}
-          src={currentSource}
-          alt={alt}
-          onError={() => setFailedCount((count) => count + 1)}
-        />
-      )}
-      <AvatarFallback className={cn("bg-primary text-primary-foreground", fallbackClassName)}>
-        {avatar.initial}
-      </AvatarFallback>
-    </Avatar>
+    <Avatar
+      src={avatar.imageUrl ?? undefined}
+      fallbackSrc={avatar.gravatarUrl ?? undefined}
+      name={alt?.trim() || avatar.initial}
+      size={size}
+      tooltip={tooltip}
+    />
   );
 }

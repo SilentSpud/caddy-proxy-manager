@@ -1,9 +1,14 @@
 "use client";
+
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Plus } from "lucide-react";
+import { Button } from "@astryxdesign/core/Button";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Card } from "@astryxdesign/core/Card";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ErrorPageRule } from "@/lib/models/proxy-hosts";
 
 type RuleState = { statuses: string; body: string; contentType: string };
@@ -50,64 +55,78 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
   const [rules, setRules] = useState<RuleState[]>(toState(initialData));
 
   const addRule = () =>
-    setRules((r) => [...r, { statuses: "502, 503, 504", body: "<h1>Service temporarily unavailable</h1>", contentType: "" }]);
+    setRules((r) => [
+      ...r,
+      {
+        statuses: "502, 503, 504",
+        body: "<h1>Service temporarily unavailable</h1>",
+        contentType: "",
+      },
+    ]);
 
   const removeRule = (i: number) => setRules((r) => r.filter((_, idx) => idx !== i));
-
   const updateRule = (i: number, key: keyof RuleState, value: string) =>
     setRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, [key]: value } : rule)));
 
   return (
-    <div>
-      <p className="text-sm font-semibold mb-2">Error Pages</p>
+    <VStack gap={2}>
+      <Text type="body" size="sm" weight="semibold">
+        Error Pages
+      </Text>
       <input type="hidden" name={name} value={toJson(rules)} />
+
       {rules.length > 0 && (
-        <div className="mb-2 flex flex-col gap-3">
+        <VStack gap={3}>
           {rules.map((rule, i) => (
-            <div key={i} className="rounded-md border p-3 flex flex-col gap-2">
-              <div className="grid grid-cols-[1fr_1fr_40px] gap-2 items-center">
-                <Input
-                  size={1}
-                  placeholder="502, 503, 504 (blank = all errors)"
-                  value={rule.statuses}
-                  onChange={(e) => updateRule(i, "statuses", e.target.value)}
-                  className="h-8 text-sm"
+            <Card key={i}>
+              <VStack gap={2}>
+                <HStack gap={2} vAlign="end">
+                  <TextInput
+                    label="Status codes"
+                    size="sm"
+                    placeholder="502, 503, 504 (blank = all errors)"
+                    value={rule.statuses}
+                    onChange={(next) => updateRule(i, "statuses", next)}
+                  />
+                  <TextInput
+                    label="Content type"
+                    isOptional
+                    size="sm"
+                    placeholder="text/html; charset=utf-8"
+                    value={rule.contentType}
+                    onChange={(next) => updateRule(i, "contentType", next)}
+                  />
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    label={`Remove error page ${i + 1}`}
+                    icon={<Trash2 />}
+                    onClick={() => removeRule(i)}
+                  />
+                </HStack>
+                <TextArea
+                  label="Response body"
+                  isLabelHidden
+                  placeholder="<h1>Service temporarily unavailable</h1>"
+                  value={rule.body}
+                  onChange={(next) => updateRule(i, "body", next)}
+                  rows={3}
                 />
-                <Input
-                  size={1}
-                  placeholder="text/html; charset=utf-8"
-                  value={rule.contentType}
-                  onChange={(e) => updateRule(i, "contentType", e.target.value)}
-                  className="h-8 text-sm"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => removeRule(i)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <Textarea
-                placeholder="<h1>Service temporarily unavailable</h1>"
-                value={rule.body}
-                onChange={(e) => updateRule(i, "body", e.target.value)}
-                className="text-sm font-mono min-h-20"
-              />
-            </div>
+              </VStack>
+            </Card>
           ))}
-        </div>
+        </VStack>
       )}
-      <Button type="button" variant="ghost" size="sm" onClick={addRule}>
-        <Plus className="h-4 w-4 mr-1" />
-        Add Error Page
-      </Button>
-      <p className="text-xs text-muted-foreground mt-1">
-        Serve a custom response body when a request errors (e.g. 502/503 when the upstream is down, or 404).
-        Comma-separate status codes, or leave blank to match every error. The original status code is preserved.
-      </p>
-    </div>
+
+      <HStack>
+        <Button variant="ghost" size="sm" label="Add Error Page" icon={<Plus />} onClick={addRule} />
+      </HStack>
+
+      <Text type="body" size="xsm" color="secondary">
+        Serve a custom response body when a request errors (e.g. 502/503 when the upstream is down,
+        or 404). Comma-separate status codes, or leave blank to match every error. The original
+        status code is preserved.
+      </Text>
+    </VStack>
   );
 }

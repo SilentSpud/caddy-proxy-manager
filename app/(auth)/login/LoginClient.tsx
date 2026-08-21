@@ -2,14 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { authClient } from "@/src/lib/auth-client";
 import { LogIn } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Center } from "@astryxdesign/core/Center";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/Stack";
+import { AUTOFILL_CURRENT_PASSWORD, AUTOFILL_USERNAME } from "@/components/ui/native-input-attrs";
+import { authClient } from "@/src/lib/auth-client";
 
 interface LoginClientProps {
   enabledProviders: Array<{ id: string; name: string }>;
@@ -28,17 +32,20 @@ export default function LoginClient({
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoginError(null);
     setLoginPending(true);
 
-    const formData = new FormData(event.currentTarget);
-    const username = String(formData.get("username") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
+    // Read from state, not FormData: Astryx withholds an input's `name` while
+    // it is disabled, and these fields disable themselves once a sign-in is
+    // pending, so a FormData read here would be racing that re-render.
+    const trimmedUsername = username.trim();
 
-    if (!username || !password) {
+    if (!trimmedUsername || !password) {
       setLoginError("Username and password are required.");
       setLoginPending(false);
       return;
@@ -51,7 +58,7 @@ export default function LoginClient({
       error: { status?: number; message?: string } | null;
     }>;
     const signInUsername = (authClient.signIn as unknown as { username: SignInUsername }).username;
-    const { error } = await signInUsername({ username, password });
+    const { error } = await signInUsername({ username: trimmedUsername, password });
 
     if (error) {
       let message: string | null = null;
@@ -83,106 +90,96 @@ export default function LoginClient({
   const disabled = loginPending || !!oauthPending;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center space-y-1">
-          <CardTitle className="text-2xl font-bold">{appName}</CardTitle>
-          <CardDescription>
-            {!localLoginEnabled
-              ? "Sign in with single sign-on"
-              : enabledProviders.length > 0
-                ? "Sign in to your account"
-                : "Sign in with your credentials"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <Center minHeight="100vh" padding={4}>
+      <Card width={400}>
+        <VStack gap={4}>
+          <VStack gap={1} hAlign="center">
+            <Heading level={1}>{appName}</Heading>
+            <Text type="body" size="sm" color="secondary">
+              {!localLoginEnabled
+                ? "Sign in with single sign-on"
+                : enabledProviders.length > 0
+                  ? "Sign in to your account"
+                  : "Sign in with your credentials"}
+            </Text>
+          </VStack>
+
           {loginError && (
-            <Alert variant="destructive">
-              <AlertDescription>{loginError}</AlertDescription>
-            </Alert>
+            <Banner status="error" title="Could not sign in" description={loginError} />
           )}
 
           {enabledProviders.length > 0 && (
             <>
-              <div className="space-y-2">
+              <VStack gap={2}>
                 {enabledProviders.map((provider) => {
                   const isPending = oauthPending === provider.id;
                   return (
                     <Button
                       key={provider.id}
-                      variant="outline"
-                      className="w-full"
+                      variant="secondary"
+                      width="100%"
+                      icon={<LogIn />}
+                      label={
+                        isPending
+                          ? `Signing in with ${provider.name}…`
+                          : `Continue with ${provider.name}`
+                      }
+                      isLoading={isPending}
+                      isDisabled={disabled}
                       onClick={() => handleOAuthSignIn(provider.id)}
-                      disabled={disabled}
-                    >
-                      {isPending ? (
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                      ) : (
-                        <LogIn className="h-4 w-4 mr-2" />
-                      )}
-                      {isPending ? `Signing in with ${provider.name}…` : `Continue with ${provider.name}`}
-                    </Button>
+                    />
                   );
                 })}
-              </div>
-              {localLoginEnabled && (
-                <div className="relative">
-                  <Separator />
-                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-                    Or sign in with credentials
-                  </span>
-                </div>
-              )}
+              </VStack>
+              {localLoginEnabled && <Divider label="Or sign in with credentials" />}
             </>
           )}
 
           {!localLoginEnabled && enabledProviders.length === 0 && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                Single sign-on is the only way to sign in, but no provider is configured.
-                Configure one with the OAUTH_* environment variables.
-              </AlertDescription>
-            </Alert>
+            <Banner
+              status="error"
+              title="No sign-in method available"
+              description="Single sign-on is the only way to sign in, but no provider is configured. Configure one with the OAUTH_* environment variables."
+            />
           )}
 
           {localLoginEnabled && (
-            <form onSubmit={handleSignIn} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  name="username"
-                  required
-                  autoComplete="username"
-                  autoFocus={enabledProviders.length === 0}
-                  disabled={disabled}
+            <form onSubmit={handleSignIn}>
+              <VStack gap={3}>
+                <TextInput
+                  {...AUTOFILL_USERNAME}
+                  label="Username"
+                  htmlName="username"
+                  value={username}
+                  onChange={setUsername}
+                  isRequired
+                  hasAutoFocus={enabledProviders.length === 0}
+                  isDisabled={disabled}
+                  width="100%"
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
+                <TextInput
+                  {...AUTOFILL_CURRENT_PASSWORD}
+                  label="Password"
                   type="password"
-                  required
-                  autoComplete="current-password"
-                  disabled={disabled}
+                  htmlName="password"
+                  value={password}
+                  onChange={setPassword}
+                  isRequired
+                  isDisabled={disabled}
+                  width="100%"
                 />
-              </div>
-              <Button type="submit" className="w-full" disabled={disabled}>
-                {loginPending ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                    Signing in…
-                  </>
-                ) : (
-                  "Sign in"
-                )}
-              </Button>
+                <Button
+                  type="submit"
+                  label={loginPending ? "Signing in…" : "Sign in"}
+                  isLoading={loginPending}
+                  isDisabled={disabled}
+                  width="100%"
+                />
+              </VStack>
             </form>
           )}
-        </CardContent>
+        </VStack>
       </Card>
-    </div>
+    </Center>
   );
 }

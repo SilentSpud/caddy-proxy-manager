@@ -1,7 +1,10 @@
 "use client";
 
 import { Lock } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@astryxdesign/core/Card";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
 import type { AcmeHost } from "../page";
@@ -13,54 +16,49 @@ type Props = {
   statusFilter: string | null;
 };
 
+/** "example.com +2" — the primary domain plus a count of the rest. */
+function domainSummary(r: AcmeHost) {
+  return r.domains.length > 1 ? `${r.domains[0]} +${r.domains.length - 1}` : r.domains[0];
+}
+
 const columns = [
   {
     id: "name",
     label: "Proxy Host",
     render: (r: AcmeHost) => (
-      <div className="flex items-start gap-3">
-        <div className={[
-          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border",
-          r.enabled
-            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-            : "border-zinc-500/20 bg-zinc-500/10 text-zinc-400",
-        ].join(" ")}>
-          <Lock className="h-3.5 w-3.5" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold leading-tight">{r.name}</p>
-          <p className="text-xs text-muted-foreground font-mono mt-0.5">
-            {r.domains[0]}
-            {r.domains.length > 1 && (
-              <span className="ml-1 text-muted-foreground">+{r.domains.length - 1}</span>
-            )}
-          </p>
-        </div>
-      </div>
+      <HStack gap={3} vAlign="center">
+        <Icon icon={Lock} size="sm" color={r.enabled ? "success" : "disabled"} />
+        <VStack gap={0}>
+          <Text type="body" size="sm" weight="semibold">
+            {r.name}
+          </Text>
+          <Text type="code" size="xsm" color="secondary">
+            {domainSummary(r)}
+          </Text>
+        </VStack>
+      </HStack>
     ),
   },
   {
     id: "status",
     label: "Status",
     width: 110,
-    render: (r: AcmeHost) => (
-      <StatusChip status={r.enabled ? "active" : "inactive"} />
-    ),
+    render: (r: AcmeHost) => <StatusChip status={r.enabled ? "active" : "inactive"} />,
   },
 ];
 
 function acmeMobileCard(r: AcmeHost) {
   return (
-    <Card className={["border-l-2", r.enabled ? "border-l-emerald-500" : "border-l-zinc-500/30"].join(" ")}>
-      <CardContent className="p-4 flex flex-col gap-1.5">
-        <p className="text-sm font-semibold">{r.name}</p>
-        <p className="text-xs text-muted-foreground font-mono">
-          {r.domains[0]}{r.domains.length > 1 ? ` +${r.domains.length - 1}` : ""}
-        </p>
-        <div className="flex items-center gap-2 flex-wrap mt-1">
-          <StatusChip status={r.enabled ? "active" : "inactive"} />
-        </div>
-      </CardContent>
+    <Card>
+      <VStack gap={2}>
+        <Text type="body" size="sm" weight="semibold">
+          {r.name}
+        </Text>
+        <Text type="code" size="xsm" color="secondary">
+          {domainSummary(r)}
+        </Text>
+        <StatusChip status={r.enabled ? "active" : "inactive"} />
+      </VStack>
     </Card>
   );
 }
@@ -92,7 +90,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
       emptyMessage="No ACME certificates match"
       pagination={pagination}
       mobileCard={acmeMobileCard}
-      rowClassName={(r) => r.enabled ? "" : "opacity-75"}
+      rowStatus={(r) => (r.enabled ? null : { color: "gray", label: "Disabled" })}
     />
   );
 }

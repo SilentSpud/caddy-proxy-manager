@@ -2,27 +2,28 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import dayjs, { type Dayjs } from 'dayjs';
 import { toast } from 'sonner';
-import { ChevronLeft, ChevronRight, Check, ChevronsUpDown, X } from 'lucide-react';
 import type { ApexOptions } from 'apexcharts';
 
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { Badge } from '@astryxdesign/core/Badge';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { Card } from '@astryxdesign/core/Card';
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
+import { DateTimeInput, type ISODateTimeString } from '@astryxdesign/core/DateTimeInput';
+import { EmptyState } from '@astryxdesign/core/EmptyState';
+import { Grid } from '@astryxdesign/core/Grid';
+import { Heading } from '@astryxdesign/core/Heading';
+import { Link as AstryxLink } from '@astryxdesign/core/Link';
+import { MultiSelector } from '@astryxdesign/core/MultiSelector';
+import { Pagination } from '@astryxdesign/core/Pagination';
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
+import { Spinner } from '@astryxdesign/core/Spinner';
+import { Table, pixel, proportional, useTableRowStatus, type TableColumn } from '@astryxdesign/core/Table';
+import { Text } from '@astryxdesign/core/Text';
+import { Tooltip } from '@astryxdesign/core/Tooltip';
+import { HStack, VStack } from '@astryxdesign/core/Stack';
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
@@ -31,9 +32,9 @@ const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
 const WorldMap = dynamic(() => import('./WorldMapInner'), {
   ssr: false,
   loading: () => (
-    <div className="flex justify-center items-center h-[240px]">
-      <span className="inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin opacity-60" />
-    </div>
+    <HStack justify="center" vAlign="center" height={240}>
+      <Spinner label="Loading map" />
+    </HStack>
   ),
 }) as React.ComponentType<{ data: import('./WorldMapInner').CountryStats[]; selectedCountry?: string | null }>;
 
@@ -70,7 +71,13 @@ interface BlockedEvent {
 }
 interface BlockedPage { events: BlockedEvent[]; total: number; page: number; pages: number; }
 
+/** Table-facing shapes: Astryx's Table requires an index signature on rows. */
+type CountryRow = { countryCode: string; total: number; blocked: number; waf: number; allowed: number; [k: string]: unknown };
+type ProtoRow = ProtoStats & { [k: string]: unknown };
+type BlockedRow = BlockedEvent & { [k: string]: unknown };
+
 interface TopWafRule { ruleId: number; count: number; message: string | null; hosts: { host: string; count: number }[]; }
+type WafRuleRow = TopWafRule & { [k: string]: unknown };
 interface WafStats { total: number; topRules: TopWafRule[]; byCountry: { countryCode: string; count: number }[]; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,6 +128,14 @@ const DARK_CHART: ApexOptions = {
 
 // ── Local DateTimePicker ───────────────────────────────────────────────────────
 
+/**
+ * A date and a time in one control.
+ *
+ * Was a Popover holding a Calendar plus a bare <input type="time">, which meant
+ * two separate widgets and a hand-rolled string round-trip. DateTimeInput owns
+ * both halves, so this only converts between its ISO string and the Dayjs value
+ * the rest of the page works in.
+ */
 function DateTimePicker({
   value,
   onChange,
@@ -130,72 +145,42 @@ function DateTimePicker({
   onChange: (v: Dayjs | null) => void;
   placeholder?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [timeStr, setTimeStr] = useState(value ? value.format('HH:mm') : '00:00');
-
-  // Keep timeStr in sync when value changes externally
-  useEffect(() => {
-    if (value) setTimeStr(value.format('HH:mm'));
-  }, [value]);
-
-  const selectedDate = value ? value.toDate() : undefined;
-
-  function handleDaySelect(day: Date | undefined) {
-    if (!day) return;
-    const [hh, mm] = timeStr.split(':').map(Number);
-    const next = dayjs(day).hour(hh || 0).minute(mm || 0).second(0);
-    onChange(next);
-  }
-
-  function handleTimeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setTimeStr(e.target.value);
-    if (value) {
-      const [hh, mm] = e.target.value.split(':').map(Number);
-      onChange(value.hour(hh || 0).minute(mm || 0).second(0));
-    }
-  }
-
-  const label = value ? value.format('DD/MM/YYYY HH:mm') : (placeholder ?? 'Pick date & time');
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="w-[180px] justify-start text-left font-normal text-xs">
-          {label}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={selectedDate}
-          onSelect={handleDaySelect}
-          autoFocus
-        />
-        <div className="flex items-center gap-2 px-3 pb-3">
-          <span className="text-xs text-muted-foreground">Time:</span>
-          <input
-            type="time"
-            value={timeStr}
-            onChange={handleTimeChange}
-            className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
-      </PopoverContent>
-    </Popover>
+    <DateTimeInput
+      label={placeholder ?? 'Pick date & time'}
+      isLabelHidden
+      value={(value ? value.format('YYYY-MM-DDTHH:mm') : undefined) as ISODateTimeString | undefined}
+      onChange={(next) => onChange(next ? dayjs(next) : null)}
+      size="sm"
+      width={200}
+    />
   );
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
+/**
+ * The `color` prop stays a raw hex: these cards share the chart palette so a
+ * red block-rate figure matches the red in the series beside it, and the chart
+ * library is not theme-token aware.
+ */
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div className="h-full rounded-lg border border-white/[0.12] p-5">
-      <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
-      <p className="mt-1 text-3xl font-bold tracking-tight" style={color ? { color } : undefined}>
-        {value}
-      </p>
-      {sub && <p className="mt-1 text-sm text-muted-foreground">{sub}</p>}
-    </div>
+    <Card padding={5} height="100%">
+      <VStack gap={1}>
+        <Text type="label" size="xsm" color="secondary">
+          {label}
+        </Text>
+        <Text type="display-3" hasTabularNumbers>
+          <span style={color ? { color } : undefined}>{value}</span>
+        </Text>
+        {sub && (
+          <Text type="body" size="sm" color="secondary">
+            {sub}
+          </Text>
+        )}
+      </VStack>
+    </Card>
   );
 }
 
@@ -203,6 +188,15 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
 
 const INCLUDE_UNCONFIGURED_KEY = 'analytics:includeUnconfiguredHosts';
 
+/**
+ * Host filter.
+ *
+ * Was a Popover wrapping a Command list with hand-built "select all" / "clear"
+ * buttons, a hand-built include-unconfigured toggle, and a hand-built badge
+ * summary. MultiSelector provides search, select-all and the badge summary
+ * natively; the unconfigured toggle is the one thing left to render, and it is
+ * a real checkbox now rather than a button with a faded tick.
+ */
 function HostsCombobox({
   allHosts,
   selectedHosts,
@@ -212,7 +206,6 @@ function HostsCombobox({
   selectedHosts: string[];
   onChange: (v: string[]) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [includeUnconfigured, setIncludeUnconfigured] = useState(false);
 
   // Restore the persisted "include unconfigured hosts" preference
@@ -228,104 +221,31 @@ function HostsCombobox({
   const hasUnconfigured = allHosts.some(h => !h.configured);
   const visibleHosts = (includeUnconfigured ? allHosts : allHosts.filter(h => h.configured)).map(h => h.host);
 
-  function toggle(host: string) {
-    if (selectedHosts.includes(host)) {
-      onChange(selectedHosts.filter(h => h !== host));
-    } else {
-      onChange([...selectedHosts, host]);
-    }
-  }
-
-  const label =
-    selectedHosts.length === 0
-      ? 'All hosts'
-      : selectedHosts.length <= 2
-        ? selectedHosts.join(', ')
-        : `${selectedHosts.length} hosts`;
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          role="combobox"
-          aria-expanded={open}
-          className="w-[220px] justify-between text-xs font-normal"
-        >
-          <span className="truncate">{label}</span>
-          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[240px] p-0">
-        <Command>
-          <CommandInput placeholder="Search hosts..." className="text-xs" />
-          <div className="flex items-center gap-1 border-b px-2 py-1">
-            <button
-              className="text-xs text-muted-foreground hover:text-foreground px-1"
-              onMouseDown={e => { e.preventDefault(); onChange(visibleHosts); }}
-            >
-              Select all
-            </button>
-            <span className="text-muted-foreground">·</span>
-            <button
-              className="text-xs text-muted-foreground hover:text-foreground px-1"
-              onMouseDown={e => { e.preventDefault(); onChange([]); }}
-            >
-              Clear
-            </button>
-          </div>
-          {hasUnconfigured && (
-            <button
-              className={cn(
-                'flex w-full items-center gap-2 border-b px-2 py-1.5 text-xs transition-colors',
-                includeUnconfigured ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-              )}
-              onMouseDown={e => { e.preventDefault(); setFilter(!includeUnconfigured); }}
-              title="Show hosts that received traffic but aren't configured as proxy hosts in Caddy"
-            >
-              <Check className={cn('h-3 w-3 shrink-0', includeUnconfigured ? 'opacity-100' : 'opacity-30')} />
-              <span>Include unconfigured hosts</span>
-            </button>
-          )}
-          <CommandList>
-            <CommandEmpty>No hosts found.</CommandEmpty>
-            <CommandGroup>
-              {visibleHosts.map(host => (
-                <CommandItem key={host} value={host} onSelect={() => toggle(host)} className="text-xs">
-                  <Check
-                    className={cn('mr-2 h-3 w-3', selectedHosts.includes(host) ? 'opacity-100' : 'opacity-0')}
-                  />
-                  <span className="truncate">{host}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-        {selectedHosts.length > 0 && (
-          <div className="flex flex-wrap gap-1 border-t px-2 py-2 max-h-24 overflow-y-auto">
-            {selectedHosts.length <= 2
-              ? selectedHosts.map(h => (
-                  <Badge key={h} variant="secondary" className="text-xs gap-1">
-                    <span className="max-w-[80px] truncate">{h}</span>
-                    <button onMouseDown={e => { e.preventDefault(); toggle(h); }}>
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  </Badge>
-                ))
-              : (
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    {selectedHosts.length} hosts
-                    <button onMouseDown={e => { e.preventDefault(); onChange([]); }}>
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  </Badge>
-                )
-            }
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
+    <VStack gap={2}>
+      <MultiSelector
+        label="Hosts"
+        isLabelHidden
+        options={visibleHosts.map(h => ({ value: h, label: h }))}
+        value={selectedHosts}
+        onChange={onChange}
+        hasSearch
+        searchPlaceholder="Search hosts..."
+        hasSelectAll
+        triggerDisplay="badges"
+        maxBadges={2}
+        placeholder="All hosts"
+        width={240}
+      />
+      {hasUnconfigured && (
+        <CheckboxInput
+          label="Include unconfigured hosts"
+          description="Hosts that received traffic but are not configured as proxy hosts in Caddy."
+          value={includeUnconfigured}
+          onChange={setFilter}
+        />
+      )}
+    </VStack>
   );
 }
 
@@ -517,44 +437,271 @@ export default function AnalyticsClient() {
 
   const INTERVALS: DisplayInterval[] = ['1h', '12h', '24h', '7d', '30d', 'custom'];
 
+  // -- Table shapes ----------------------------------------------------------
+  // Astryx's Table wants rows carrying an index signature, so each dataset is
+  // widened at this one boundary rather than on the domain types themselves.
+
+  const countryRows: CountryRow[] = countries.slice(0, 10).map(c => ({
+    countryCode: c.countryCode,
+    total: c.total,
+    blocked: c.blocked,
+    waf: wafByCountry.get(c.countryCode) ?? 0,
+    allowed: Math.max(0, c.total - c.blocked),
+  }));
+
+  // Replaces a hand-tinted row background, which signalled selection by colour
+  // alone and was invisible to assistive tech.
+  const countryStatus = useTableRowStatus<CountryRow>({
+    getStatus: (row) =>
+      row.countryCode === selectedCountry ? { color: 'accent', label: 'Selected' } : null,
+  });
+
+  const countryColumns: TableColumn<CountryRow>[] = [
+    {
+      key: 'countryCode',
+      header: 'Country',
+      width: proportional(1),
+      // The whole row used to be the click target for filtering the map, which
+      // no keyboard user could reach. The country itself is the control now.
+      renderCell: (row) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          label={
+            row.countryCode === selectedCountry
+              ? `Clear map filter for ${row.countryCode}`
+              : `Filter map to ${row.countryCode}`
+          }
+          onClick={() =>
+            setSelectedCountry(cur => (cur === row.countryCode ? null : row.countryCode))
+          }
+        >
+          <HStack gap={2} vAlign="center">
+            <span aria-hidden="true">{countryFlag(row.countryCode)}</span>
+            <Text type="inherit" size="sm">{row.countryCode}</Text>
+          </HStack>
+        </Button>
+      ),
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      align: 'end',
+      width: pixel(90),
+      renderCell: (row) => (
+        <Text type="body" size="sm" hasTabularNumbers>{row.total.toLocaleString()}</Text>
+      ),
+    },
+    {
+      key: 'allowed',
+      header: 'Allowed',
+      align: 'end',
+      width: pixel(90),
+      renderCell: (row) => (
+        <Text type="body" size="sm" hasTabularNumbers>{row.allowed.toLocaleString()}</Text>
+      ),
+    },
+    {
+      key: 'waf',
+      header: 'WAF',
+      align: 'end',
+      width: pixel(80),
+      renderCell: (row) => (
+        <Text type="body" size="sm" color={row.waf > 0 ? 'primary' : 'secondary'} hasTabularNumbers>
+          {row.waf > 0 ? row.waf.toLocaleString() : '—'}
+        </Text>
+      ),
+    },
+    {
+      key: 'blocked',
+      header: 'Blocked',
+      align: 'end',
+      width: pixel(90),
+      renderCell: (row) => (
+        <Text type="body" size="sm" color={row.blocked > 0 ? 'primary' : 'secondary'} hasTabularNumbers>
+          {row.blocked.toLocaleString()}
+        </Text>
+      ),
+    },
+  ];
+
+  const protocolRows: ProtoRow[] = protocols.map(p => ({ ...p }));
+
+  const protocolColumns: TableColumn<ProtoRow>[] = [
+    {
+      key: 'proto',
+      header: 'Protocol',
+      width: proportional(1),
+      renderCell: (row) => <Text type="body" size="sm">{row.proto}</Text>,
+    },
+    {
+      key: 'count',
+      header: 'Requests',
+      align: 'end',
+      width: pixel(110),
+      renderCell: (row) => (
+        <Text type="body" size="sm" hasTabularNumbers>{row.count.toLocaleString()}</Text>
+      ),
+    },
+    {
+      key: 'percent',
+      header: 'Share',
+      align: 'end',
+      width: pixel(80),
+      renderCell: (row) => (
+        <Text type="body" size="sm" color="secondary" hasTabularNumbers>{row.percent}%</Text>
+      ),
+    },
+  ];
+
+  const blockedRows: BlockedRow[] = (blocked?.events ?? []).map(ev => ({ ...ev }));
+
+  const blockedColumns: TableColumn<BlockedRow>[] = [
+    {
+      key: 'ts',
+      header: 'Time',
+      width: pixel(170),
+      renderCell: (row) => (
+        <Text type="body" size="sm" color="secondary">
+          <span suppressHydrationWarning>{new Date(row.ts * 1000).toLocaleString()}</span>
+        </Text>
+      ),
+    },
+    {
+      key: 'clientIp',
+      header: 'IP',
+      width: pixel(130),
+      renderCell: (row) => <Text type="code" size="sm">{row.clientIp}</Text>,
+    },
+    {
+      key: 'countryCode',
+      header: 'Country',
+      width: pixel(100),
+      renderCell: (row) => (
+        <Text type="body" size="sm">
+          {row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : '—'}
+        </Text>
+      ),
+    },
+    {
+      key: 'host',
+      header: 'Host',
+      width: pixel(160),
+      renderCell: (row) => (
+        <Text type="body" size="sm" maxLines={1}>{row.host || '—'}</Text>
+      ),
+    },
+    {
+      key: 'method',
+      header: 'Method',
+      width: pixel(90),
+      renderCell: (row) => <Text type="code" size="sm">{row.method}</Text>,
+    },
+    {
+      key: 'uri',
+      header: 'URI',
+      width: proportional(1),
+      renderCell: (row) => (
+        <Tooltip content={row.uri}>
+          <Text type="code" size="sm" maxLines={1}>{row.uri}</Text>
+        </Tooltip>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: pixel(80),
+      align: 'end',
+      renderCell: (row) => <Badge variant="error" label={String(row.status)} />,
+    },
+  ];
+
+  const wafRuleRows: WafRuleRow[] = (wafStats?.topRules ?? []).map(r => ({ ...r }));
+
+  const wafRuleColumns: TableColumn<WafRuleRow>[] = [
+    {
+      key: 'ruleId',
+      header: 'Rule',
+      width: pixel(90),
+      renderCell: (row) => <Text type="code" size="sm">#{row.ruleId}</Text>,
+    },
+    {
+      key: 'message',
+      header: 'Description',
+      width: proportional(1),
+      renderCell: (row) =>
+        row.message ? (
+          <Tooltip content={row.message}>
+            <Text type="body" size="sm" color="secondary" maxLines={1}>{row.message}</Text>
+          </Tooltip>
+        ) : (
+          <Text type="body" size="sm" color="secondary">—</Text>
+        ),
+    },
+    {
+      key: 'count',
+      header: 'Hits',
+      width: pixel(80),
+      align: 'end',
+      renderCell: (row) => (
+        <Text type="body" size="sm" weight="semibold" hasTabularNumbers>
+          {row.count.toLocaleString()}
+        </Text>
+      ),
+    },
+    {
+      key: 'hosts',
+      header: 'Triggered by',
+      width: proportional(1),
+      renderCell: (row) => (
+        <HStack gap={1} wrap="wrap">
+          {row.hosts.map(h => (
+            <Badge key={h.host} label={`${h.host} ×${h.count}`} />
+          ))}
+        </HStack>
+      ),
+    },
+  ];
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-8 max-w-full overflow-hidden">
+    <VStack gap={8}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Traffic Intelligence</p>
-          <h1 className="text-xl font-bold tracking-tight">Analytics</h1>
-        </div>
-        <div className="flex flex-row items-center gap-3 flex-wrap">
-          {/* Interval toggle group */}
-          <div className="flex items-center rounded-md border border-input p-0.5 gap-0.5">
+      <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
+        <VStack gap={0}>
+          <Text type="label" size="xsm" color="secondary">
+            Traffic Intelligence
+          </Text>
+          <Heading level={1}>Analytics</Heading>
+        </VStack>
+        <HStack gap={3} vAlign="center" wrap="wrap">
+          {/* Was six buttons whose selected state read only as a filled
+              variant; SegmentedControl exposes the choice as a radio group. */}
+          <SegmentedControl
+            label="Time interval"
+            size="sm"
+            value={interval}
+            onChange={(next) => {
+              const iv = next as DisplayInterval;
+              if (iv === 'custom' && !customFrom) {
+                setCustomFrom(dayjs().subtract(24, 'hour'));
+                setCustomTo(dayjs());
+              }
+              setIntervalVal(iv);
+            }}
+          >
             {INTERVALS.map(iv => (
-              <Button
-                key={iv}
-                size="sm"
-                variant={interval === iv ? 'default' : 'ghost'}
-                className="h-7 px-2.5 text-xs"
-                onClick={() => {
-                  if (iv === 'custom' && !customFrom) {
-                    setCustomFrom(dayjs().subtract(24, 'hour'));
-                    setCustomTo(dayjs());
-                  }
-                  setIntervalVal(iv);
-                }}
-              >
-                {iv === 'custom' ? 'Custom' : iv}
-              </Button>
+              <SegmentedControlItem key={iv} value={iv} label={iv === 'custom' ? 'Custom' : iv} />
             ))}
-          </div>
+          </SegmentedControl>
 
           {interval === 'custom' && (
-            <div className="flex items-center gap-1.5">
+            <HStack gap={2} vAlign="center">
               <DateTimePicker value={customFrom} onChange={setCustomFrom} placeholder="From" />
-              <span className="text-xs text-muted-foreground">–</span>
+              <Text type="body" size="xsm" color="secondary">&ndash;</Text>
               <DateTimePicker value={customTo} onChange={setCustomTo} placeholder="To" />
-            </div>
+            </HStack>
           )}
 
           <HostsCombobox
@@ -562,49 +709,51 @@ export default function AnalyticsClient() {
             selectedHosts={selectedHosts}
             onChange={setSelectedHosts}
           />
-        </div>
-      </div>
+        </HStack>
+      </HStack>
 
       {/* Load failure alert — e.g. ClickHouse unreachable or a failing query.
           Rendered instead of crashing the page, so the rest of the UI stays usable. */}
       {loadError && (
-        <div
-          data-testid="analytics-load-error"
-          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-        >
-          Failed to load analytics data — {loadError}
+        <div data-testid="analytics-load-error">
+          <Banner status="error" title="Failed to load analytics data" description={loadError} />
         </div>
       )}
 
       {/* Analytics disabled alert */}
       {summary?.analyticsDisabled && (
-        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">
-          ClickHouse analytics is not enabled — traffic and WAF data is not being collected.{' '}
-          Add <code className="font-mono bg-blue-500/10 px-1 rounded">COMPOSE_PROFILES=clickhouse</code> and{' '}
-          <code className="font-mono bg-blue-500/10 px-1 rounded">CLICKHOUSE_PASSWORD=…</code> to your{' '}
-          <code className="font-mono bg-blue-500/10 px-1 rounded">.env</code> and restart to enable analytics.
-        </div>
+        <Banner
+          status="info"
+          title="ClickHouse analytics is not enabled"
+          description="Traffic and WAF data is not being collected. Add COMPOSE_PROFILES=clickhouse and CLICKHOUSE_PASSWORD=… to your .env and restart to enable analytics."
+        />
       )}
 
       {/* Logging disabled alert */}
       {summary?.loggingDisabled && !summary?.analyticsDisabled && (
-        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
-          Caddy access logging is not enabled — no traffic data is being collected.{' '}
-          <Link href="/settings" className="underline underline-offset-2">Enable logging in Settings</Link>.
-        </div>
+        <Banner
+          status="warning"
+          title="Caddy access logging is not enabled"
+          description={
+            <Text type="body" size="sm">
+              No traffic data is being collected.{' '}
+              <AstryxLink href="/settings">Enable logging in Settings</AstryxLink>.
+            </Text>
+          }
+        />
       )}
 
       {/* Loading overlay */}
       {loading && (
-        <div className="flex justify-center py-12">
-          <span className="inline-block w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin opacity-60" />
-        </div>
+        <HStack justify="center" padding={10}>
+          <Spinner size="lg" label="Loading analytics" />
+        </HStack>
       )}
 
       {!loading && summary && (
         <>
           {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          <Grid columns={{ minWidth: 150, max: 5 }} gap={3}>
             <StatCard label="Total Requests" value={summary.totalRequests.toLocaleString()} />
             <StatCard label="Unique IPs" value={summary.uniqueIps.toLocaleString()} />
             <StatCard
@@ -625,15 +774,16 @@ export default function AnalyticsClient() {
               sub={wafStats && wafStats.topRules.length > 0 ? `${wafStats.topRules.length} rules triggered` : 'No WAF events'}
               color={(wafStats?.total ?? 0) > 0 ? '#f59e0b' : undefined}
             />
-          </div>
+          </Grid>
 
           {/* Timeline */}
-          <div className="rounded-lg border border-white/[0.12] p-5">
-            <p className="text-sm font-semibold mb-4">Requests Over Time</p>
+          <Card padding={5}>
+            <VStack gap={4}>
+            <Text type="body" size="sm" weight="semibold">Requests Over Time</Text>
             {timeline.length === 0 ? (
-              <div className="py-10 text-center text-muted-foreground text-sm">No data for this period</div>
+              <EmptyState title="No data for this period" isCompact />
             ) : (
-              <div className="overflow-x-auto w-full">
+              <div style={{ overflowX: 'auto', width: '100%' }}>
                 <ReactApexChart
                   type="area"
                   series={timelineSeries}
@@ -642,219 +792,109 @@ export default function AnalyticsClient() {
                 />
               </div>
             )}
-          </div>
+            </VStack>
+          </Card>
 
           {/* World map + Countries */}
-          <div className="grid grid-cols-1 md:grid-cols-[7fr_5fr] gap-3">
-            <div className="rounded-lg border border-white/[0.12] flex flex-col p-5">
-              <p className="text-sm font-semibold mb-2">Traffic by Country</p>
-              <div className="flex-1 min-h-[280px]">
+          <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
+            <Card padding={5}>
+              <VStack gap={2} minHeight={280}>
+                <Text type="body" size="sm" weight="semibold">Traffic by Country</Text>
                 <WorldMap data={countries} selectedCountry={selectedCountry} />
-              </div>
-            </div>
-            <div className="rounded-lg border border-white/[0.12] p-4">
-              <p className="text-sm font-semibold mb-3">Top Countries</p>
+              </VStack>
+            </Card>
+            <Card padding={4}>
+              <VStack gap={3}>
+              <Text type="body" size="sm" weight="semibold">Top Countries</Text>
               {countries.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground text-sm">No geo data available</div>
+                <EmptyState title="No geo data available" isCompact />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-muted-foreground">Country</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Total</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Allowed</TableHead>
-                      <TableHead className="text-muted-foreground text-right">WAF</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Blocked</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {countries.slice(0, 10).map(c => {
-                      const wafCount = wafByCountry.get(c.countryCode) ?? 0;
-                      const allowedCount = Math.max(0, c.total - c.blocked);
-                      return (
-                        <TableRow
-                          key={c.countryCode}
-                          onClick={() => setSelectedCountry(s => s === c.countryCode ? null : c.countryCode)}
-                          className={cn(
-                            'cursor-pointer',
-                            selectedCountry === c.countryCode ? 'bg-sky-300/[0.08]' : 'hover:bg-sky-300/[0.05]',
-                          )}
-                        >
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span>{countryFlag(c.countryCode)}</span>
-                              <span className="text-sm">{c.countryCode}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right text-sm">{c.total.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-sm">{allowedCount.toLocaleString()}</TableCell>
-                          <TableCell className={cn('text-right text-sm', wafCount > 0 ? 'text-yellow-400' : 'text-muted-foreground')}>
-                            {wafCount > 0 ? wafCount.toLocaleString() : '—'}
-                          </TableCell>
-                          <TableCell className={cn('text-right text-sm', c.blocked > 0 ? 'text-red-400' : 'text-muted-foreground')}>
-                            {c.blocked.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <Table
+                  data={countryRows}
+                  columns={countryColumns}
+                  idKey="countryCode"
+                  hasHover
+                  plugins={{ rowStatus: countryStatus }}
+                />
               )}
-            </div>
-          </div>
+              </VStack>
+            </Card>
+          </Grid>
 
           {/* Protocols + User Agents */}
-          <div className="grid grid-cols-1 md:grid-cols-[5fr_7fr] gap-3">
-            <div className="rounded-lg border border-white/[0.12] p-5">
-              <p className="text-sm font-semibold mb-4">HTTP Protocols</p>
-              {protocols.length === 0 ? (
-                <div className="py-10 text-center text-muted-foreground text-sm">No data</div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto w-full">
-                    <ReactApexChart type="donut" series={donutSeries} options={donutOptions} height={220} />
-                  </div>
-                  <Table className="mt-2">
-                    <TableBody>
-                      {protocols.map(p => (
-                        <TableRow key={p.proto}>
-                          <TableCell className="text-sm">{p.proto}</TableCell>
-                          <TableCell className="text-right text-sm">{p.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">{p.percent}%</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </>
-              )}
-            </div>
-            <div className="rounded-lg border border-white/[0.12] p-5">
-              <p className="text-sm font-semibold mb-4">Top User Agents</p>
-              {userAgents.length === 0 ? (
-                <div className="py-10 text-center text-muted-foreground text-sm">No data</div>
-              ) : (
-                <div className="overflow-x-auto w-full">
-                  <ReactApexChart type="bar" series={barSeries} options={barOptions} height={260} />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Recent Blocked Requests */}
-          <div className="rounded-lg border border-white/[0.12] p-5">
-            <p className="text-sm font-semibold mb-4">Recent Blocked Requests</p>
-            {!blocked || blocked.events.length === 0 ? (
-              <div className="rounded-lg bg-black/30 py-10 text-center text-sm text-muted-foreground">
-                No blocked requests in this period
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {['Time', 'IP', 'Country', 'Host', 'Method', 'URI', 'Status'].map(h => (
-                          <TableHead key={h} className="text-muted-foreground whitespace-nowrap">{h}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {blocked.events.map(ev => (
-                        <TableRow key={ev.id}>
-                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                            {new Date(ev.ts * 1000).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">{ev.clientIp}</TableCell>
-                          <TableCell className="text-sm">
-                            {ev.countryCode ? `${countryFlag(ev.countryCode)} ${ev.countryCode}` : '—'}
-                          </TableCell>
-                          <TableCell className="max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap text-sm">
-                            {ev.host || '—'}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">{ev.method}</TableCell>
-                          <TableCell className="max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">
-                            <span className="font-mono text-sm" title={ev.uri}>{ev.uri}</span>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm text-red-400">{ev.status}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                {blocked.pages > 1 && (
-                  <div className="flex justify-center items-center gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={blocked.page <= 1}
-                      onClick={() => fetchBlockedPage(blocked.page - 1)}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Page {blocked.page} of {blocked.pages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={blocked.page >= blocked.pages}
-                      onClick={() => fetchBlockedPage(blocked.page + 1)}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+          <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
+            <Card padding={5}>
+              <VStack gap={4}>
+                <Text type="body" size="sm" weight="semibold">HTTP Protocols</Text>
+                {protocols.length === 0 ? (
+                  <EmptyState title="No data" isCompact />
+                ) : (
+                  <>
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                      <ReactApexChart type="donut" series={donutSeries} options={donutOptions} height={220} />
+                    </div>
+                    <Table data={protocolRows} columns={protocolColumns} idKey="proto" />
+                  </>
+                )}
+              </VStack>
+            </Card>
+            <Card padding={5}>
+              <VStack gap={4}>
+                <Text type="body" size="sm" weight="semibold">Top User Agents</Text>
+                {userAgents.length === 0 ? (
+                  <EmptyState title="No data" isCompact />
+                ) : (
+                  <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <ReactApexChart type="bar" series={barSeries} options={barOptions} height={260} />
                   </div>
                 )}
-              </>
-            )}
-          </div>
+              </VStack>
+            </Card>
+          </Grid>
+
+          {/* Recent Blocked Requests */}
+          <Card padding={5}>
+            <VStack gap={4}>
+              <Text type="body" size="sm" weight="semibold">Recent Blocked Requests</Text>
+              {!blocked || blocked.events.length === 0 ? (
+                <EmptyState title="No blocked requests in this period" isCompact />
+              ) : (
+                <>
+                  <Table data={blockedRows} columns={blockedColumns} idKey="id" hasHover />
+                  {blocked.pages > 1 && (
+                    <HStack justify="center">
+                      <Pagination
+                        page={blocked.page}
+                        pageSize={blocked.events.length || 1}
+                        totalItems={blocked.total}
+                        onChange={fetchBlockedPage}
+                      />
+                    </HStack>
+                  )}
+                </>
+              )}
+            </VStack>
+          </Card>
 
           {/* WAF Top Rules */}
           {wafStats && wafStats.total > 0 && (
-            <div className="rounded-lg border border-white/[0.12] p-5">
-              <p className="text-sm font-semibold mb-4">Top WAF Rules Triggered</p>
-              <div className="overflow-x-auto w-full">
-                <ReactApexChart type="bar" series={wafBarSeries} options={wafBarOptions} height={Math.max(120, wafStats.topRules.length * 32)} />
-              </div>
-              <Table className="mt-4">
-                <TableHeader>
-                  <TableRow>
-                    {['Rule', 'Description', 'Hits', 'Triggered by'].map(h => (
-                      <TableHead key={h} className="text-muted-foreground whitespace-nowrap">{h}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {wafStats.topRules.map(rule => (
-                    <TableRow key={rule.ruleId}>
-                      <TableCell className="font-mono text-sm text-yellow-400">#{rule.ruleId}</TableCell>
-                      <TableCell className="max-w-[320px]">
-                        {rule.message ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <p className="text-sm text-muted-foreground truncate max-w-[300px]">{rule.message}</p>
-                            </TooltipTrigger>
-                            <TooltipContent>{rule.message}</TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm font-semibold">{rule.count.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {rule.hosts.map(h => (
-                            <Badge key={h.host} variant="secondary" className="text-xs">{h.host} ×{h.count}</Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <Card padding={5}>
+              <VStack gap={4}>
+                <Text type="body" size="sm" weight="semibold">Top WAF Rules Triggered</Text>
+                <div style={{ overflowX: 'auto', width: '100%' }}>
+                  <ReactApexChart
+                    type="bar"
+                    series={wafBarSeries}
+                    options={wafBarOptions}
+                    height={Math.max(120, wafStats.topRules.length * 32)}
+                  />
+                </div>
+                <Table data={wafRuleRows} columns={wafRuleColumns} idKey="ruleId" />
+              </VStack>
+            </Card>
           )}
         </>
       )}
-    </div>
+    </VStack>
   );
 }

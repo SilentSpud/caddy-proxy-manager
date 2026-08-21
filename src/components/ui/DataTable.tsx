@@ -1,19 +1,25 @@
 "use client";
 
+import { ReactNode, useCallback, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react";
 import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { ReactNode } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+  pixel,
+  proportional,
+  useTableRowExpansion,
+  useTableRowStatus,
+  type TableColumn,
+  type TableRowStatus,
+} from "@astryxdesign/core/Table";
+import { Button } from "@astryxdesign/core/Button";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Card } from "@astryxdesign/core/Card";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Pagination } from "@astryxdesign/core/Pagination";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { VStack } from "@astryxdesign/core/Stack";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 
 export type Column<T> = {
   id: string;
@@ -24,14 +30,24 @@ export type Column<T> = {
   render?: (row: T) => ReactNode;
 };
 
+export type { TableRowStatus };
+
+/** Row shape Astryx's Table works in; see the note in DataTable below. */
+type TableRow = Record<string, unknown>;
+
 type DataTableProps<T> = {
   columns: Column<T>[];
   data: T[];
   keyField: keyof T;
   emptyMessage?: string;
   loading?: boolean;
+  /** Renders a trailing "open" control on each row, rather than a bare row click. */
   onRowClick?: (row: T) => void;
-  rowClassName?: (row: T) => string;
+  /**
+   * Per-row status indicator. Replaces the old rowClassName, which tinted rows
+   * with hardcoded colours that conveyed meaning by colour alone.
+   */
+  rowStatus?: (row: T) => TableRowStatus | null;
   pagination?: {
     total: number;
     page: number;
@@ -39,48 +55,67 @@ type DataTableProps<T> = {
   };
   sort?: { sortBy: string; sortDir: "asc" | "desc" };
   mobileCard?: (row: T) => ReactNode;
+  /**
+   * Detail panel shown below a row when it is expanded. Supplying this adds the
+   * expand chevron column; the open set is owned here, since no caller so far
+   * needs to drive it from outside.
+   */
+  expandedRow?: (row: T) => ReactNode;
 };
+
+const SKELETON_ROWS = 5;
+const SKELETON_CARDS = 3;
+
+const ALIGN: Record<NonNullable<Column<unknown>["align"]>, "start" | "center" | "end"> = {
+  left: "start",
+  center: "center",
+  right: "end",
+};
+
+function toColumnWidth(width: Column<unknown>["width"]) {
+  if (typeof width === "number") return pixel(width);
+  if (typeof width === "string") {
+    const parsed = Number.parseInt(width, 10);
+    if (Number.isFinite(parsed)) return pixel(parsed);
+  }
+  return proportional(1);
+}
 
 function PaginationBar({ page, perPage, total }: { page: number; perPage: number; total: number }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const pageCount = Math.ceil(total / perPage);
 
-  if (pageCount <= 1) return null;
-
-  function goTo(newPage: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", String(newPage));
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  if (Math.ceil(total / perPage) <= 1) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 mt-4">
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => goTo(page - 1)}
-        disabled={page <= 1}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      <span className="text-sm text-muted-foreground">
-        Page {page} of {pageCount}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => goTo(page + 1)}
-        disabled={page >= pageCount}
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
+    <Pagination
+      page={page}
+      pageSize={perPage}
+      totalItems={total}
+      onChange={(nextPage) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("page", String(nextPage));
+        router.push(`${pathname}?${params.toString()}`);
+      }}
+    />
   );
 }
 
-function SortableHeader({ col, sort }: { col: Column<unknown>; sort?: { sortBy: string; sortDir: "asc" | "desc" } }) {
+/**
+ * A column heading that toggles sort order through the URL.
+ *
+ * The table's own sortable plugin sorts client-side; this app sorts on the
+ * server and carries the order in the query string, so the heading stays a
+ * plain control that pushes a new URL.
+ */
+function SortableHeader<T>({
+  col,
+  sort,
+}: {
+  col: Column<T>;
+  sort?: { sortBy: string; sortDir: "asc" | "desc" };
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -90,96 +125,20 @@ function SortableHeader({ col, sort }: { col: Column<unknown>; sort?: { sortBy: 
   const isActive = sort?.sortBy === col.sortKey;
   const nextDir = isActive && sort?.sortDir === "asc" ? "desc" : "asc";
 
-  function handleSort() {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("sortBy", col.sortKey!);
-    params.set("sortDir", nextDir);
-    params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
-  }
-
   return (
-    <Button variant="ghost" size="sm" className="-ml-3 h-8 font-medium" onClick={handleSort}>
-      {col.label}
-      {isActive ? (
-        sort?.sortDir === "asc" ? <ArrowUp className="ml-1 h-3.5 w-3.5" /> : <ArrowDown className="ml-1 h-3.5 w-3.5" />
-      ) : (
-        <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-50" />
-      )}
-    </Button>
-  );
-}
-
-function DesktopTable<T>({
-  columns, data, keyField, emptyMessage, onRowClick, rowClassName, isEmpty, loading, sort,
-}: {
-  columns: Column<T>[];
-  data: T[];
-  keyField: keyof T;
-  emptyMessage: string;
-  onRowClick?: (row: T) => void;
-  rowClassName?: (row: T) => string;
-  isEmpty: boolean;
-  loading?: boolean;
-  sort?: { sortBy: string; sortDir: "asc" | "desc" };
-}) {
-  return (
-    <div className="rounded-md border bg-card overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((col) => (
-              <TableHead
-                key={col.id}
-                style={{ width: col.width }}
-                className={col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : ""}
-              >
-                <SortableHeader col={col as Column<unknown>} sort={sort} />
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {loading ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>
-                {columns.map((col) => (
-                  <TableCell key={col.id}>
-                    <Skeleton className="h-4 w-full" />
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : isEmpty ? (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="text-center py-12 text-muted-foreground">
-                {emptyMessage}
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.map((row) => (
-              <TableRow
-                key={String(row[keyField])}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={[
-                  onRowClick ? "cursor-pointer hover:bg-muted/50" : "",
-                  rowClassName ? rowClassName(row) : "",
-                ].filter(Boolean).join(" ")}
-              >
-                {columns.map((col) => (
-                  <TableCell
-                    key={col.id}
-                    className={col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : ""}
-                  >
-                    {col.render ? col.render(row) : (row as Record<string, unknown>)[col.id] as ReactNode}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <Button
+      variant="ghost"
+      size="sm"
+      label={col.label}
+      endContent={isActive ? (sort?.sortDir === "asc" ? <ArrowUp /> : <ArrowDown />) : <ArrowUpDown />}
+      onClick={() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("sortBy", col.sortKey!);
+        params.set("sortDir", nextDir);
+        params.set("page", "1");
+        router.push(`${pathname}?${params.toString()}`);
+      }}
+    />
   );
 }
 
@@ -190,60 +149,126 @@ export function DataTable<T>({
   emptyMessage = "No data available",
   loading = false,
   onRowClick,
-  rowClassName,
+  rowStatus,
   pagination,
   sort,
   mobileCard,
+  expandedRow,
 }: DataTableProps<T>) {
   const isEmpty = data.length === 0 && !loading;
+  // Replaces the paired `block md:hidden` / `hidden md:block` wrappers, so only
+  // one of the two views is ever mounted.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
 
-  if (mobileCard) {
+  // Astryx's Table requires rows to carry an index signature. The app's domain
+  // types are plain interfaces, so the cast is confined to this boundary rather
+  // than pushed onto every model as `extends Record<string, unknown>`.
+  const getStatus = useCallback(
+    (row: TableRow) => (rowStatus ? rowStatus(row as T) : null),
+    [rowStatus]
+  );
+  const statusPlugin = useTableRowStatus<TableRow>({ getStatus });
+
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const expansionPlugin = useTableRowExpansion<TableRow>({
+    expandedKeys,
+    onToggle: useCallback((key: string) => {
+      setExpandedKeys((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      });
+    }, []),
+    getRowKey: useCallback((row: TableRow) => String(row[keyField as string]), [keyField]),
+    renderExpanded: useCallback(
+      (row: TableRow) => (expandedRow ? expandedRow(row as T) : null),
+      [expandedRow]
+    ),
+  });
+
+  const plugins = {
+    ...(rowStatus ? { rowStatus: statusPlugin } : {}),
+    ...(expandedRow ? { expansion: expansionPlugin } : {}),
+  };
+
+  const tableColumns: TableColumn<TableRow>[] = columns.map((col) => ({
+    key: col.id,
+    header: <SortableHeader col={col} sort={sort} />,
+    width: toColumnWidth(col.width),
+    align: col.align ? ALIGN[col.align] : undefined,
+    renderCell: col.render
+      ? (row: TableRow) => col.render!(row as T)
+      : (row: TableRow) => row[col.id] as ReactNode,
+  }));
+
+  if (onRowClick) {
+    // The old table opened a row on click, which no keyboard user could reach.
+    // An explicit trailing control keeps the affordance and makes it focusable.
+    tableColumns.push({
+      key: "__open",
+      header: "",
+      width: pixel(48),
+      align: "end",
+      resizable: false,
+      renderCell: (row: TableRow) => (
+        <IconButton
+          variant="ghost"
+          size="sm"
+          label="View details"
+          icon={<ChevronRight />}
+          onClick={() => onRowClick(row as T)}
+        />
+      ),
+    });
+  }
+
+  if (mobileCard && isNarrow) {
     return (
-      <div>
-        <div className="block md:hidden">
-          {loading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i}><CardContent className="py-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
-              ))}
-            </div>
-          ) : isEmpty ? (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                {emptyMessage}
-              </CardContent>
+      <VStack gap={3}>
+        {loading ? (
+          Array.from({ length: SKELETON_CARDS }).map((_, index) => (
+            <Card key={`skeleton-${index}`}>
+              <Skeleton height={80} />
             </Card>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {data.map((row) => (
-                <div key={String(row[keyField])}>{mobileCard(row)}</div>
-              ))}
-            </div>
-          )}
-          {pagination && <PaginationBar {...pagination} />}
-        </div>
-        <div className="hidden md:block">
-          <DesktopTable
-            columns={columns} data={data} keyField={keyField}
-            emptyMessage={emptyMessage} onRowClick={onRowClick}
-            rowClassName={rowClassName}
-            isEmpty={isEmpty} loading={loading} sort={sort}
-          />
-          {pagination && <PaginationBar {...pagination} />}
-        </div>
-      </div>
+          ))
+        ) : isEmpty ? (
+          <Card>
+            <EmptyState title={emptyMessage} isCompact />
+          </Card>
+        ) : (
+          data.map((row) => <VStack key={String(row[keyField])}>{mobileCard(row)}</VStack>)
+        )}
+        {pagination && <PaginationBar {...pagination} />}
+      </VStack>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <Card>
+        <EmptyState title={emptyMessage} />
+      </Card>
     );
   }
 
   return (
-    <div>
-      <DesktopTable
-        columns={columns} data={data} keyField={keyField}
-        emptyMessage={emptyMessage} onRowClick={onRowClick}
-        rowClassName={rowClassName}
-        isEmpty={isEmpty} loading={loading}
-      />
+    <VStack gap={4}>
+      {loading ? (
+        <VStack gap={2}>
+          {Array.from({ length: SKELETON_ROWS }).map((_, index) => (
+            <Skeleton key={`skeleton-${index}`} height={40} />
+          ))}
+        </VStack>
+      ) : (
+        <Table
+          data={data as readonly unknown[] as TableRow[]}
+          columns={tableColumns}
+          idKey={String(keyField)}
+          hasHover
+          plugins={Object.keys(plugins).length > 0 ? plugins : undefined}
+        />
+      )}
       {pagination && <PaginationBar {...pagination} />}
-    </div>
+    </VStack>
   );
 }

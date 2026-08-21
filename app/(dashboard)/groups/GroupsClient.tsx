@@ -2,13 +2,22 @@
 
 import { useState } from "react";
 import { Users, Plus, Trash2, UserPlus, UserMinus } from "lucide-react";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Avatar } from "@astryxdesign/core/Avatar";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Divider } from "@astryxdesign/core/Divider";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
 import {
   createGroupAction,
@@ -46,10 +55,17 @@ type Props = {
   users: UserEntry[];
 };
 
+function displayName(entry: { name: string | null; email: string }) {
+  return entry.name ?? entry.email.split("@")[0];
+}
+
 export default function GroupsClient({ groups, users }: Props) {
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [addMemberGroupId, setAddMemberGroupId] = useState<number | null>(null);
+  const [deleteGroup, setDeleteGroup] = useState<Group | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
 
   function getAvailableUsers(group: Group): UserEntry[] {
     const memberIds = new Set(group.members.map((m) => m.userId));
@@ -57,205 +73,231 @@ export default function GroupsClient({ groups, users }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full">
+    <VStack gap={6}>
       <PageHeader
         title="Groups"
         description="Organize users into groups for forward auth access control."
       />
 
-      <div className="flex justify-end">
-        <Button onClick={() => setShowCreate(!showCreate)} variant="outline" size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          New Group
-        </Button>
-      </div>
+      <HStack justify="end">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Plus />}
+          label="New Group"
+          onClick={() => setShowCreate(!showCreate)}
+        />
+      </HStack>
 
       {showCreate && (
         <Card>
-          <CardContent className="pt-4">
-            <form
-              action={async (formData) => {
-                await createGroupAction(formData);
-                setShowCreate(false);
-                router.refresh();
-              }}
-              className="flex flex-col gap-3"
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" name="name" placeholder="e.g. Developers" required />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="description">Description</Label>
-                  <Input id="description" name="description" placeholder="Optional description" />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" size="sm">Create</Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
+          <form
+            action={async (formData) => {
+              await createGroupAction(formData);
+              setShowCreate(false);
+              setName("");
+              setDescription("");
+              router.refresh();
+            }}
+          >
+            <VStack gap={3}>
+              <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
+                <TextInput
+                  {...NATIVE_REQUIRED}
+                  label="Name"
+                  htmlName="name"
+                  value={name}
+                  onChange={setName}
+                  placeholder="e.g. Developers"
+                  isRequired
+                />
+                <TextInput
+                  label="Description"
+                  isOptional
+                  htmlName="description"
+                  value={description}
+                  onChange={setDescription}
+                  placeholder="Optional description"
+                />
+              </Grid>
+              <HStack gap={2}>
+                <Button type="submit" size="sm" label="Create" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  label="Cancel"
+                  onClick={() => setShowCreate(false)}
+                />
+              </HStack>
+            </VStack>
+          </form>
         </Card>
       )}
 
       {groups.length === 0 && !showCreate && (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p>No groups yet. Create one to organize user access.</p>
-          </CardContent>
+          <EmptyState
+            icon={<Users />}
+            title="No groups yet"
+            description="Create one to organize user access."
+          />
         </Card>
       )}
 
-      <div className="grid gap-4">
+      <VStack gap={4}>
         {groups.map((group) => {
           const available = getAvailableUsers(group);
           return (
-            <Card key={group.id} className="border-l-4 border-l-blue-500">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-base">{group.name}</h3>
+            <Card key={group.id}>
+              <VStack gap={3}>
+                <HStack justify="between" vAlign="start" gap={3}>
+                  <VStack gap={0}>
+                    <HStack gap={2} vAlign="center">
+                      <Heading level={3}>{group.name}</Heading>
                       {group.source === "oidc" && (
-                        <Badge
-                          variant="info"
-                          title="Membership is reconciled from the identity provider on every sign-in"
-                        >
-                          IdP-managed
-                        </Badge>
+                        <Badge variant="info" label="IdP-managed" />
                       )}
-                    </div>
-                    {group.description && (
-                      <p className="text-sm text-muted-foreground">{group.description}</p>
+                    </HStack>
+                    {group.source === "oidc" && (
+                      <Text type="body" size="xsm" color="secondary">
+                        Membership is reconciled from the identity provider on every sign-in.
+                      </Text>
                     )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground border rounded-full px-2 py-0.5">
-                      {group.members.length} member{group.members.length !== 1 ? "s" : ""}
-                    </span>
-                    <Button
+                    {group.description && (
+                      <Text type="body" size="sm" color="secondary">
+                        {group.description}
+                      </Text>
+                    )}
+                  </VStack>
+                  <HStack gap={2} vAlign="center">
+                    <Badge
+                      label={`${group.members.length} member${group.members.length !== 1 ? "s" : ""}`}
+                    />
+                    <IconButton
                       variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
+                      size="sm"
+                      label="Add member"
+                      tooltip="Add member"
+                      icon={<UserPlus />}
                       onClick={() =>
                         setAddMemberGroupId(addMemberGroupId === group.id ? null : group.id)
                       }
-                      title="Add member"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={async () => {
-                        const warning =
-                          group.source === "oidc"
-                            ? `Delete group "${group.name}"? It is managed by an identity provider and will be recreated the next time a member signs in.`
-                            : `Delete group "${group.name}"?`;
-                        if (confirm(warning)) {
-                          await deleteGroupAction(group.id);
-                          router.refresh();
-                        }
-                      }}
-                      title="Delete group"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {addMemberGroupId === group.id && (
-                  <div className="mb-3">
-                    <p className="text-sm font-medium mb-2">Add a user to this group</p>
-                    {available.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">All users are already in this group.</p>
-                    ) : (
-                      <div className="border rounded-md max-h-48 overflow-y-auto">
-                        {available.map((user) => (
-                          <button
-                            key={user.id}
-                            type="button"
-                            className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-muted/50 border-b last:border-b-0 transition-colors"
-                            onClick={async () => {
-                              await addGroupMemberAction(group.id, user.id);
-                              setAddMemberGroupId(null);
-                              router.refresh();
-                            }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
-                                {(user.name ?? user.email)[0]?.toUpperCase()}
-                              </div>
-                              <div>
-                                <span className="text-sm">{user.name ?? user.email.split("@")[0]}</span>
-                                <span className="text-xs text-muted-foreground ml-2">{user.email}</span>
-                              </div>
-                            </div>
-                            <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <Button
-                      type="button"
+                    />
+                    <IconButton
                       variant="ghost"
                       size="sm"
-                      className="mt-2"
-                      onClick={() => setAddMemberGroupId(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
+                      label={`Delete group ${group.name}`}
+                      tooltip="Delete group"
+                      icon={<Trash2 />}
+                      onClick={() => setDeleteGroup(group)}
+                    />
+                  </HStack>
+                </HStack>
+
+                {addMemberGroupId === group.id && (
+                  <VStack gap={2}>
+                    <Text type="body" size="sm" weight="medium">
+                      Add a user to this group
+                    </Text>
+                    {available.length === 0 ? (
+                      <Text type="body" size="sm" color="secondary">
+                        All users are already in this group.
+                      </Text>
+                    ) : (
+                      /* Scroll cap kept from the original: neither List nor
+                         Stack exposes a max-height, and a fixed height would
+                         pad out a short list. */
+                      <div style={{ maxHeight: 192, overflowY: "auto" }}>
+                        <List hasDividers>
+                          {available.map((user) => (
+                            <ListItem
+                              key={user.id}
+                              startContent={<Avatar name={displayName(user)} size="sm" />}
+                              label={displayName(user)}
+                              description={user.email}
+                              endContent={
+                                <Text type="body" size="xsm" color="secondary">
+                                  {user.role}
+                                </Text>
+                              }
+                              onClick={async () => {
+                                await addGroupMemberAction(group.id, user.id);
+                                setAddMemberGroupId(null);
+                                router.refresh();
+                              }}
+                            />
+                          ))}
+                        </List>
+                      </div>
+                    )}
+                    <HStack>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        label="Cancel"
+                        onClick={() => setAddMemberGroupId(null)}
+                      />
+                    </HStack>
+                  </VStack>
                 )}
 
                 {group.members.length > 0 && (
                   <>
-                    <Separator className="my-2" />
-                    <div className="space-y-1">
+                    <Divider />
+                    <List>
                       {group.members.map((member) => (
-                        <div
+                        <ListItem
                           key={member.userId}
-                          className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-                              {(member.name ?? member.email)[0]?.toUpperCase()}
-                            </div>
-                            <span className="text-sm">
-                              {member.name ?? member.email.split("@")[0]}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {member.email}
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                            onClick={async () => {
-                              await removeGroupMemberAction(group.id, member.userId);
-                              router.refresh();
-                            }}
-                            title="Remove member"
-                          >
-                            <UserMinus className="h-3 w-3" />
-                          </Button>
-                        </div>
+                          startContent={<Avatar name={displayName(member)} size="sm" />}
+                          label={displayName(member)}
+                          description={member.email}
+                          endContent={
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              label={`Remove ${displayName(member)} from ${group.name}`}
+                              tooltip="Remove member"
+                              icon={<UserMinus />}
+                              onClick={async () => {
+                                await removeGroupMemberAction(group.id, member.userId);
+                                router.refresh();
+                              }}
+                            />
+                          }
+                        />
                       ))}
-                    </div>
+                    </List>
                   </>
                 )}
-              </CardContent>
+              </VStack>
             </Card>
           );
         })}
-      </div>
-    </div>
+      </VStack>
+
+      {/* Replaces window.confirm, which was unstyled and not announced as a
+          dialog. The IdP caveat is preserved verbatim. */}
+      <AlertDialog
+        isOpen={deleteGroup !== null}
+        onOpenChange={(open) => !open && setDeleteGroup(null)}
+        title="Delete group"
+        description={
+          deleteGroup === null
+            ? ""
+            : deleteGroup.source === "oidc"
+              ? `Delete group "${deleteGroup.name}"? It is managed by an identity provider and will be recreated the next time a member signs in.`
+              : `Delete group "${deleteGroup.name}"?`
+        }
+        actionLabel="Delete group"
+        onAction={async () => {
+          if (deleteGroup === null) return;
+          await deleteGroupAction(deleteGroup.id);
+          setDeleteGroup(null);
+          router.refresh();
+        }}
+      />
+    </VStack>
   );
 }

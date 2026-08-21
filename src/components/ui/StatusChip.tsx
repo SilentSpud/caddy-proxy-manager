@@ -1,34 +1,42 @@
-import { cn } from "@/lib/utils";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack } from "@astryxdesign/core/Stack";
 
 type StatusType = "active" | "inactive" | "error" | "warning";
+
+/**
+ * A status dot with its label beside it.
+ *
+ * StatusDot carries the semantic colour and the accessible name; the visible
+ * Text is what the docs require so status never depends on colour alone. This
+ * replaces a hand-built pill with hardcoded green/amber/red plus a glow shadow,
+ * none of which adapted to the theme.
+ */
+const STATUS_CONFIG: Record<
+  StatusType,
+  { variant: "success" | "warning" | "error" | "neutral"; label: string }
+> = {
+  active: { variant: "success", label: "Active" },
+  inactive: { variant: "neutral", label: "Paused" },
+  error: { variant: "error", label: "Error" },
+  warning: { variant: "warning", label: "Warning" },
+};
 
 type StatusChipProps = {
   status: StatusType;
   label?: string;
-  className?: string;
 };
 
-const STATUS_CONFIG: Record<StatusType, { dot: string; text: string; label: string }> = {
-  active:   { dot: "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]",  text: "text-green-500",  label: "Active"  },
-  inactive: { dot: "bg-zinc-500",                                          text: "text-zinc-600 dark:text-zinc-400",   label: "Paused"  },
-  error:    { dot: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]",    text: "text-red-500",    label: "Error"   },
-  warning:  { dot: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]", text: "text-amber-500",  label: "Warning" },
-};
-
-export function StatusChip({ status, label, className }: StatusChipProps) {
+export function StatusChip({ status, label }: StatusChipProps) {
   const config = STATUS_CONFIG[status];
   const displayLabel = label ?? config.label;
 
   return (
-    <span className={cn(
-      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full",
-      "bg-muted/30 border border-border",
-      className
-    )}>
-      <span className={cn("w-2 h-2 rounded-full shrink-0", config.dot)} />
-      <span className={cn("text-xs font-semibold leading-none", config.text)}>
+    <HStack gap={2} vAlign="center">
+      <StatusDot variant={config.variant} label={displayLabel} />
+      <Text type="body" size="xsm" weight="semibold">
         {displayLabel}
-      </span>
-    </span>
+      </Text>
+    </HStack>
   );
 }

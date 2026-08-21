@@ -1,26 +1,38 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useActionState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Search, X, ShieldOff, Trash2, Copy, ChevronDown } from "lucide-react";
+import { ShieldOff, Trash2, Copy } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { DateTimeInput, type ISODateTimeString } from "@astryxdesign/core/DateTimeInput";
+import { Divider } from "@astryxdesign/core/Divider";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Switch } from "@astryxdesign/core/Switch";
+import { TabList, Tab } from "@astryxdesign/core/TabList";
+import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 
-import { DataTable } from "@/components/ui/DataTable";
+import { AppDialog } from "@/components/ui/AppDialog";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { SearchField } from "@/components/ui/SearchField";
+import { nativeAttrs } from "@/components/ui/native-input-attrs";
 import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
 import {
@@ -149,86 +161,120 @@ function normalizeAuditMessage(message: AuditMessage): AuditMessage {
 }
 
 /* ── Severity config ──────────────────────────────────────────────────────── */
-const SEVERITY_CLASSES: Record<string, string> = {
-  CRITICAL: "border-red-500 text-red-500",
-  ERROR:    "border-red-500 text-red-500",
-  HIGH:     "border-red-500 text-red-500",
-  WARNING:  "border-yellow-500 text-yellow-500",
-  NOTICE:   "border-blue-500 text-blue-500",
-  INFO:     "border-blue-500 text-blue-500",
+/** Maps a Coraza severity onto the theme's badge variants. */
+const SEVERITY_VARIANTS: Record<string, "error" | "warning" | "info"> = {
+  CRITICAL: "error",
+  ERROR:    "error",
+  HIGH:     "error",
+  WARNING:  "warning",
+  NOTICE:   "info",
+  INFO:     "info",
 };
 
 /* ── Chips ───────────────────────────────────────────────────────────────── */
 function SeverityChip({ severity }: { severity: string | null }) {
-  if (!severity) return <span className="text-muted-foreground text-xs">—</span>;
+  if (!severity) {
+    return (
+      <Text type="body" size="xsm" color="secondary">
+        &mdash;
+      </Text>
+    );
+  }
   const upper = severity.toUpperCase();
-  const classes = SEVERITY_CLASSES[upper] ?? "border-muted text-muted-foreground";
-  return (
-    <Badge variant="outline" className={cn("text-[0.7rem] font-semibold px-1.5 py-0 h-[18px]", classes)}>
-      {upper}
-    </Badge>
-  );
+  return <Badge variant={SEVERITY_VARIANTS[upper] ?? "neutral"} label={upper} />;
 }
 
 function BlockedChip({ blocked }: { blocked: boolean }) {
   return blocked ? (
-    <Badge className="text-[0.7rem] font-semibold px-1.5 py-0 h-[18px] bg-destructive hover:bg-destructive/90">Blocked</Badge>
+    <Badge variant="error" label="Blocked" />
   ) : (
-    <Badge variant="outline" className="text-[0.7rem] font-semibold px-1.5 py-0 h-[18px] border-yellow-500/60 text-yellow-500">
-      Detected
-    </Badge>
+    <Badge variant="warning" label="Detected" />
   );
 }
 
 /* ── Detail field row ─────────────────────────────────────────────────────── */
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div>
-      <p className="text-[0.62rem] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <div className="mt-0.5">{children}</div>
-    </div>
+    <VStack gap={0}>
+      <Text type="label" size="3xs" weight="bold" color="secondary">
+        {label}
+      </Text>
+      {children}
+    </VStack>
   );
 }
 
 /* ── Stats bar ────────────────────────────────────────────────────────────── */
 function StatsBar({ stats }: { stats: WafEventStats }) {
   const items = [
-    { label: "Total Events",       value: stats.total,            color: "" },
-    { label: "Blocked",            value: stats.blocked,          color: "text-destructive" },
-    { label: "Critical",           value: stats.critical,         color: "text-yellow-500" },
-    { label: "Unique Hosts",       value: stats.uniqueHosts,      color: "text-primary" },
-    { label: "Rule IDs Triggered", value: stats.ruleIdsTriggered, color: "text-blue-500" },
+    { label: "Total Events",       value: stats.total,            color: "primary" as const },
+    { label: "Blocked",            value: stats.blocked,          color: "accent" as const },
+    { label: "Critical",           value: stats.critical,         color: "accent" as const },
+    { label: "Unique Hosts",       value: stats.uniqueHosts,      color: "accent" as const },
+    { label: "Rule IDs Triggered", value: stats.ruleIdsTriggered, color: "accent" as const },
   ];
 
   return (
-    <div className="grid grid-cols-5 gap-3">
+    <Grid columns={{ minWidth: 140, max: 5 }} gap={3}>
       {items.map(({ label, value, color }) => (
-        <div key={label} className="rounded-lg border bg-card px-4 py-3 flex flex-col gap-0.5">
-          <span className={cn("text-2xl font-bold leading-none", color || "text-foreground")}>{value}</span>
-          <span className="text-[0.7rem] text-muted-foreground font-medium">{label}</span>
-        </div>
+        <Card key={label} padding={3}>
+          <VStack gap={0}>
+            <Text type="display-3" color={color} hasTabularNumbers>
+              {value}
+            </Text>
+            <Text type="body" size="xsm" weight="medium" color="secondary">
+              {label}
+            </Text>
+          </VStack>
+        </Card>
       ))}
-    </div>
+    </Grid>
   );
 }
 
 /* ── Audit panel ─────────────────────────────────────────────────────────── */
 function HeadersGrid({ headers }: { headers?: Record<string, string | string[]> }) {
-  if (!headers || Object.keys(headers).length === 0)
-    return <span className="text-muted-foreground text-xs">—</span>;
+  if (!headers || Object.keys(headers).length === 0) {
+    return (
+      <Text type="body" size="xsm" color="secondary">
+        &mdash;
+      </Text>
+    );
+  }
   return (
-    <div className="grid gap-x-3 gap-y-0.5 font-mono text-xs" style={{ gridTemplateColumns: "auto 1fr" }}>
-      {Object.entries(headers).map(([k, v]) => [
-        <span key={k + "-k"} className="text-muted-foreground whitespace-nowrap">{k}</span>,
-        <span key={k + "-v"} className="break-all">{Array.isArray(v) ? v.join(", ") : v}</span>,
-      ])}
-    </div>
+    <MetadataList>
+      {Object.entries(headers).map(([k, v]) => (
+        <MetadataListItem key={k} label={k}>
+          <Text type="code" size="xsm">
+            {Array.isArray(v) ? v.join(", ") : v}
+          </Text>
+        </MetadataListItem>
+      ))}
+    </MetadataList>
+  );
+}
+
+/** Pretty-prints a body when it parses as JSON, otherwise shows it verbatim. */
+function bodyCode(body: string) {
+  try {
+    return { code: JSON.stringify(JSON.parse(body), null, 2), language: "json" };
+  } catch {
+    return { code: body, language: "plaintext" };
+  }
+}
+
+function MatchTags({ tags }: { tags: string[] }) {
+  return (
+    <HStack gap={1} wrap="wrap">
+      {tags.map((t) => (
+        <Badge key={t} label={t} />
+      ))}
+    </HStack>
   );
 }
 
 function AuditPanel({ rawData }: { rawData: string | null }) {
   const [innerTab, setInnerTab] = useState("overview");
-  const [showRaw, setShowRaw] = useState(false);
 
   let data: AuditData | null = null;
   if (rawData) {
@@ -236,11 +282,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   }
 
   if (!data) {
-    return (
-      <div className="rounded-lg border bg-muted/40 px-4 py-5 text-sm text-muted-foreground text-center">
-        No audit data available for this event.
-      </div>
-    );
+    return <EmptyState title="No audit data available for this event." isCompact />;
   }
 
   const tx   = data.transaction ?? null;
@@ -248,184 +290,173 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   const res  = tx?.response ?? null;
   const msgs = (data.messages ?? []).map(normalizeAuditMessage);
 
-  const INNER_TABS = [
-    { id: "overview",  label: "Overview" },
-    { id: "request",   label: "Request"  },
-    { id: "response",  label: "Response" },
-    ...(msgs.length ? [{ id: "matches", label: `Matches (${msgs.length})` }] : []),
-  ];
-
-  const tabCls = (id: string) => cn(
-    "px-2.5 py-1 rounded text-xs font-medium transition-colors",
-    innerTab === id
-      ? "bg-muted text-foreground"
-      : "text-muted-foreground hover:text-foreground"
-  );
-
   return (
-    <div className="flex flex-col gap-3">
-      {/* Inner tab bar */}
-      <div className="flex gap-1 p-0.5 rounded-lg border bg-background self-start">
-        {INNER_TABS.map(t => (
-          <button key={t.id} className={tabCls(t.id)} onClick={() => setInnerTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <VStack gap={3}>
+      <TabList value={innerTab} onChange={setInnerTab} size="sm">
+        <Tab value="overview" label="Overview" />
+        <Tab value="request" label="Request" />
+        <Tab value="response" label="Response" />
+        {msgs.length > 0 && <Tab value="matches" label={`Matches (${msgs.length})`} />}
+      </TabList>
 
-      {/* Tab content */}
-      <div className="rounded-lg border bg-muted/40 p-4 flex flex-col gap-3">
-        {/* ── Overview ── */}
-        {innerTab === "overview" && tx && (
-          <>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              <DetailRow label="Transaction ID">
-                <span className="font-mono text-xs">{tx.id ?? "—"}</span>
+      <Card variant="muted" padding={4}>
+        <VStack gap={3}>
+          {innerTab === "overview" && tx && (
+            <>
+              <MetadataList columns="multi">
+                <MetadataListItem label="Transaction ID">
+                  <Text type="code" size="xsm">{tx.id ?? "—"}</Text>
+                </MetadataListItem>
+                <MetadataListItem label="Timestamp">
+                  <Text type="body" size="sm">{tx.timestamp ?? "—"}</Text>
+                </MetadataListItem>
+                <MetadataListItem label="Client">
+                  <Text type="code" size="xsm">{tx.client_ip ?? "—"}:{tx.client_port ?? 0}</Text>
+                </MetadataListItem>
+                <MetadataListItem label="Server">
+                  <Text type="code" size="xsm">{tx.server_id ?? "—"}:{tx.host_port ?? 0}</Text>
+                </MetadataListItem>
+              </MetadataList>
+              {msgs.length > 0 && (
+                <>
+                  <Divider />
+                  <VStack gap={2}>
+                    <Text type="label" size="3xs" weight="bold" color="secondary">
+                      Matched Rules
+                    </Text>
+                    {msgs.map((m, i) => (
+                      <Card key={i} variant="red" padding={3}>
+                        <VStack gap={2}>
+                          <HStack gap={2} vAlign="center">
+                            <Text type="code" size="xsm" weight="semibold">
+                              Rule {m.details?.ruleId ?? "—"}
+                            </Text>
+                            <SeverityChip severity={m.details?.severity ?? null} />
+                          </HStack>
+                          <Text type="body" size="xsm">{m.message}</Text>
+                          {m.details?.match && (
+                            <Text type="code" size="xsm" color="secondary">
+                              &#8627; {m.details.match}
+                            </Text>
+                          )}
+                          {(m.details?.tags?.length ?? 0) > 0 && (
+                            <MatchTags tags={m.details!.tags!} />
+                          )}
+                        </VStack>
+                      </Card>
+                    ))}
+                  </VStack>
+                </>
+              )}
+            </>
+          )}
+
+          {innerTab === "request" && req && (
+            <VStack gap={3}>
+              <Card padding={2}>
+                <HStack gap={2} vAlign="center" wrap="wrap" justify="between">
+                  <HStack gap={2} vAlign="center">
+                    <Text type="code" size="xsm" weight="semibold" color="accent">
+                      {req.method}
+                    </Text>
+                    <Text type="code" size="xsm">{req.uri}</Text>
+                  </HStack>
+                  <Text type="code" size="xsm" color="secondary">{req.protocol}</Text>
+                </HStack>
+              </Card>
+              <DetailRow label="Headers"><HeadersGrid headers={req.headers} /></DetailRow>
+              {req.args && Object.keys(req.args).length > 0 && (
+                <DetailRow label="Query Args">
+                  <HeadersGrid headers={req.args as Record<string, string>} />
+                </DetailRow>
+              )}
+              {req.body && (
+                <DetailRow label="Body">
+                  <CodeBlock {...bodyCode(req.body)} width="100%" isCollapsible />
+                </DetailRow>
+              )}
+              <DetailRow label="Content Length">
+                <Text type="code" size="xsm">{req.length ?? 0} bytes</Text>
               </DetailRow>
-              <DetailRow label="Timestamp">
-                <span className="text-sm">{tx.timestamp ?? "—"}</span>
-              </DetailRow>
-              <DetailRow label="Client">
-                <span className="font-mono text-xs">{tx.client_ip ?? "—"}:{tx.client_port ?? 0}</span>
-              </DetailRow>
-              <DetailRow label="Server">
-                <span className="font-mono text-xs">{tx.server_id ?? "—"}:{tx.host_port ?? 0}</span>
-              </DetailRow>
-            </div>
-            {msgs.length > 0 && (
-              <div className="pt-3 border-t flex flex-col gap-2">
-                <p className="text-[0.62rem] font-bold uppercase tracking-wider text-muted-foreground">Matched Rules</p>
-                {msgs.map((m, i) => (
-                  <div key={i} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-destructive font-semibold">Rule {m.details?.ruleId ?? "—"}</span>
+            </VStack>
+          )}
+
+          {innerTab === "response" && res && (
+            <VStack gap={3}>
+              <Card padding={2}>
+                <HStack gap={2} vAlign="center">
+                  <Badge
+                    variant={
+                      (res.status ?? 0) >= 400
+                        ? "error"
+                        : (res.status ?? 0) >= 300
+                          ? "warning"
+                          : "success"
+                    }
+                    label={String(res.status || "—")}
+                  />
+                  <Text type="code" size="xsm" color="secondary">{res.protocol}</Text>
+                </HStack>
+              </Card>
+              <DetailRow label="Response Headers"><HeadersGrid headers={res.headers} /></DetailRow>
+              {res.body && (
+                <DetailRow label="Body">
+                  <CodeBlock {...bodyCode(res.body)} width="100%" isCollapsible />
+                </DetailRow>
+              )}
+            </VStack>
+          )}
+
+          {innerTab === "matches" && (
+            <VStack gap={4}>
+              {msgs.map((m, i) => (
+                <VStack key={i} gap={2}>
+                  <MetadataList columns="multi">
+                    <MetadataListItem label="Rule ID">
+                      <Text type="code" size="xsm" weight="semibold">
+                        {m.details?.ruleId ?? "—"}
+                      </Text>
+                    </MetadataListItem>
+                    <MetadataListItem label="Severity">
                       <SeverityChip severity={m.details?.severity ?? null} />
-                    </div>
-                    <span className="text-xs">{m.message}</span>
-                    {m.details?.match && (
-                      <span className="font-mono text-[0.7rem] text-muted-foreground break-all">↳ {m.details.match}</span>
-                    )}
-                    {(m.details?.tags?.length ?? 0) > 0 && (
-                      <div className="flex gap-1 flex-wrap mt-0.5">
-                        {m.details!.tags!.map(t => (
-                          <span key={t} className="text-[0.62rem] px-1.5 py-px rounded-full bg-muted text-muted-foreground">{t}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+                    </MetadataListItem>
+                    <MetadataListItem label="Message">
+                      <Text type="body" size="xsm">{m.message}</Text>
+                    </MetadataListItem>
+                    <MetadataListItem label="Log Data">
+                      <Text type="code" size="xsm">{m.details?.logdata ?? "—"}</Text>
+                    </MetadataListItem>
+                    <MetadataListItem label="File">
+                      <Text type="code" size="xsm" color="secondary">
+                        {m.details?.file ?? "—"}:{m.details?.lineNumber ?? ""}
+                      </Text>
+                    </MetadataListItem>
+                    <MetadataListItem label="Reference">
+                      <Text type="code" size="xsm" color="secondary">
+                        {m.details?.reference ?? "—"}
+                      </Text>
+                    </MetadataListItem>
+                  </MetadataList>
+                  {(m.details?.tags?.length ?? 0) > 0 && (
+                    <DetailRow label="Tags">
+                      <MatchTags tags={m.details!.tags!} />
+                    </DetailRow>
+                  )}
+                </VStack>
+              ))}
+            </VStack>
+          )}
+        </VStack>
+      </Card>
 
-        {/* ── Request ── */}
-        {innerTab === "request" && req && (
-          <div className="flex flex-col gap-3">
-            <div className="font-mono text-xs rounded bg-background border px-3 py-2 flex gap-2 items-baseline flex-wrap">
-              <span className="text-primary font-semibold">{req.method}</span>
-              <span className="break-all">{req.uri}</span>
-              <span className="text-muted-foreground ml-auto shrink-0">{req.protocol}</span>
-            </div>
-            <DetailRow label="Headers"><HeadersGrid headers={req.headers} /></DetailRow>
-            {req.args && Object.keys(req.args).length > 0 && (
-              <DetailRow label="Query Args"><HeadersGrid headers={req.args as Record<string, string>} /></DetailRow>
-            )}
-            {req.body && (
-              <DetailRow label="Body">
-                <pre className="font-mono text-[0.7rem] text-muted-foreground bg-background border rounded px-3 py-2 whitespace-pre-wrap break-all overflow-x-auto">
-                  {(() => { try { return JSON.stringify(JSON.parse(req.body), null, 2); } catch { return req.body; } })()}
-                </pre>
-              </DetailRow>
-            )}
-            <DetailRow label="Content Length">
-              <span className="font-mono text-xs">{req.length ?? 0} bytes</span>
-            </DetailRow>
-          </div>
-        )}
-
-        {/* ── Response ── */}
-        {innerTab === "response" && res && (
-          <div className="flex flex-col gap-3">
-            <div className="font-mono text-xs rounded bg-background border px-3 py-2 flex gap-2 items-center">
-              <span className={cn("font-bold text-sm", (res.status ?? 0) >= 400 ? "text-destructive" : (res.status ?? 0) >= 300 ? "text-yellow-500" : "text-green-500")}>
-                {res.status || "—"}
-              </span>
-              <span className="text-muted-foreground">{res.protocol}</span>
-            </div>
-            <DetailRow label="Response Headers"><HeadersGrid headers={res.headers} /></DetailRow>
-            {res.body && (
-              <DetailRow label="Body">
-                <pre className="font-mono text-[0.7rem] text-muted-foreground bg-background border rounded px-3 py-2 whitespace-pre-wrap break-all overflow-x-auto">
-                  {res.body}
-                </pre>
-              </DetailRow>
-            )}
-          </div>
-        )}
-
-        {/* ── Matches ── */}
-        {innerTab === "matches" && (
-          <div className="flex flex-col gap-4">
-            {msgs.map((m, i) => (
-              <div key={i} className="flex flex-col gap-2.5">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                  <DetailRow label="Rule ID">
-                    <span className="font-mono text-xs text-destructive font-semibold">{m.details?.ruleId ?? "—"}</span>
-                  </DetailRow>
-                  <DetailRow label="Severity">
-                    <SeverityChip severity={m.details?.severity ?? null} />
-                  </DetailRow>
-                  <DetailRow label="Message">
-                    <span className="text-xs">{m.message}</span>
-                  </DetailRow>
-                  <DetailRow label="Log Data">
-                    <span className="font-mono text-[0.7rem] break-all">{m.details?.logdata ?? "—"}</span>
-                  </DetailRow>
-                  <DetailRow label="File">
-                    <span className="font-mono text-[0.68rem] text-muted-foreground break-all">
-                      {m.details?.file ?? "—"}:{m.details?.lineNumber ?? ""}
-                    </span>
-                  </DetailRow>
-                  <DetailRow label="Reference">
-                    <span className="font-mono text-[0.7rem] text-muted-foreground">{m.details?.reference ?? "—"}</span>
-                  </DetailRow>
-                </div>
-                {(m.details?.tags?.length ?? 0) > 0 && (
-                  <DetailRow label="Tags">
-                    <div className="flex gap-1.5 flex-wrap mt-1">
-                      {m.details!.tags!.map(t => (
-                        <span key={t} className="text-[0.65rem] px-1.5 py-px rounded-full border bg-muted text-muted-foreground">{t}</span>
-                      ))}
-                    </div>
-                  </DetailRow>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Collapsible raw JSON */}
-      <div className="rounded-lg border overflow-hidden">
-        <button
-          onClick={() => setShowRaw(r => !r)}
-          className="w-full flex items-center justify-between px-3 py-2 bg-muted/40 text-muted-foreground text-xs font-medium hover:bg-muted/70 transition-colors"
-        >
-          <span>Raw JSON</span>
-          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-150", showRaw && "rotate-180")} />
-        </button>
-        {showRaw && (
-          <pre className="px-3 py-3 bg-background font-mono text-[0.72rem] max-h-80 overflow-auto text-muted-foreground whitespace-pre-wrap break-all">
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        )}
-      </div>
-    </div>
+      <Collapsible defaultIsOpen={false} trigger={<Text type="body" size="xsm">Raw JSON</Text>}>
+        <CodeBlock code={JSON.stringify(data, null, 2)} language="json" width="100%" isCollapsible />
+      </Collapsible>
+    </VStack>
   );
 }
 
-/* ── Event detail panel (modal drawer) ───────────────────────────────────── */
+/* ── Event detail panel ──────────────────────────────────────────────────── */
 function EventDetailPanel({
   event,
   onClose,
@@ -448,12 +479,6 @@ function EventDetailPanel({
   const isHostOnlySuppressed  = event.ruleId != null && !!eventHostBare && (hostWafMap[eventHostBare] ?? []).includes(event.ruleId);
   const isHostSuppressed      = isGloballySuppressed || isHostOnlySuppressed;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   function handleSuppressGlobally() {
     if (!event.ruleId) return;
     startTransition(async () => {
@@ -473,101 +498,94 @@ function EventDetailPanel({
   }
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Drawer */}
-      <aside className="fixed top-0 right-0 bottom-0 z-50 flex w-[540px] max-w-[92vw] flex-col border-l border-border bg-card shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+    // Was a hand-built fixed-position drawer with its own backdrop and Escape
+    // handler; Dialog brings focus trapping and dismissal with it.
+    <AppDialog
+      open
+      onClose={onClose}
+      title="WAF Event"
+      maxWidth="lg"
+      actions={<Button variant="secondary" label="Close" onClick={onClose} />}
+    >
+      <VStack gap={4}>
+        <HStack gap={2} vAlign="center">
           <BlockedChip blocked={event.blocked} />
           <SeverityChip severity={event.severity} />
-          <h2 className="text-sm font-semibold ml-1">WAF Event</h2>
-          <Button variant="ghost" size="icon" onClick={onClose} className="ml-auto h-7 w-7">
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        </HStack>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        <Card variant="muted" padding={4}>
+          <MetadataList columns="multi">
+            <MetadataListItem label="Time">
+              {/* Rendered on the server in the container's timezone and again in
+                  the browser's; the two never match, so this opts out of
+                  hydration checks rather than discarding the tree. */}
+              <Text type="body" size="sm">
+                <span suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</span>
+              </Text>
+            </MetadataListItem>
+            <MetadataListItem label="Host">
+              <Text type="code" size="sm">{event.host || "—"}</Text>
+            </MetadataListItem>
+            <MetadataListItem label="Client IP">
+              <HStack gap={2} vAlign="center" wrap="wrap">
+                <Text type="code" size="sm">{event.clientIp}</Text>
+                {event.countryCode && <Badge label={event.countryCode} />}
+              </HStack>
+            </MetadataListItem>
+            <MetadataListItem label="Method">
+              <Text type="code" size="sm" weight="semibold" color="accent">
+                {event.method}
+              </Text>
+            </MetadataListItem>
+            <MetadataListItem label="URI">
+              <Text type="code" size="xsm" color="secondary">{event.uri || "—"}</Text>
+            </MetadataListItem>
+            <MetadataListItem label="Rule ID">
+              <Text type="code" size="sm" weight="semibold">{event.ruleId ?? "—"}</Text>
+            </MetadataListItem>
+            <MetadataListItem label="Rule Message">
+              <Text type="body" size="sm">{event.ruleMessage ?? "—"}</Text>
+            </MetadataListItem>
+          </MetadataList>
+        </Card>
 
-          {/* Metadata grid */}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border bg-muted/30 p-4">
-            <DetailRow label="Time">
-              <p className="text-sm" suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</p>
-            </DetailRow>
-            <DetailRow label="Host">
-              <p className="font-mono text-sm break-all">{event.host || "—"}</p>
-            </DetailRow>
-            <DetailRow label="Client IP">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-mono text-sm">{event.clientIp}</span>
-                {event.countryCode && (
-                  <Badge variant="outline" className="text-[0.65rem] h-[18px] px-1">{event.countryCode}</Badge>
-                )}
-              </div>
-            </DetailRow>
-            <DetailRow label="Method">
-              <span className="font-mono text-sm font-semibold text-primary">{event.method}</span>
-            </DetailRow>
-            <div className="col-span-2">
-              <DetailRow label="URI">
-                <p className="font-mono text-xs break-all text-muted-foreground">{event.uri || "—"}</p>
-              </DetailRow>
-            </div>
-            <DetailRow label="Rule ID">
-              <span className="font-mono text-sm text-destructive font-semibold">{event.ruleId ?? "—"}</span>
-            </DetailRow>
-            <div className="col-span-2">
-              <DetailRow label="Rule Message">
-                <p className="text-sm break-words leading-snug">{event.ruleMessage ?? "—"}</p>
-              </DetailRow>
-            </div>
-          </div>
-
-          {/* Suppress actions */}
-          {event.ruleId != null && (
-            <div className="flex gap-2 flex-wrap">
+        {event.ruleId != null && (
+          <HStack gap={2} wrap="wrap">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<ShieldOff />}
+              label={isGloballySuppressed ? "Suppressed Globally" : "Suppress Globally"}
+              isDisabled={pending || isGloballySuppressed}
+              onClick={handleSuppressGlobally}
+            />
+            {event.host && (
               <Button
                 size="sm"
-                variant="outline"
-                className="text-[0.72rem] text-destructive border-destructive/40 hover:bg-destructive/10 h-7 gap-1.5"
-                onClick={handleSuppressGlobally}
-                disabled={pending || isGloballySuppressed}
-              >
-                <ShieldOff className="h-3 w-3" />
-                {isGloballySuppressed ? "Suppressed Globally" : "Suppress Globally"}
-              </Button>
-              {event.host && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-[0.72rem] text-yellow-500 border-yellow-500/40 hover:bg-yellow-500/10 h-7 gap-1.5"
-                  onClick={handleSuppressForHost}
-                  disabled={pending || isHostSuppressed}
-                >
-                  <ShieldOff className="h-3 w-3" />
-                  {isHostSuppressed ? `Suppressed for ${event.host}` : `Suppress for ${event.host}`}
-                </Button>
-              )}
-            </div>
-          )}
+                variant="secondary"
+                icon={<ShieldOff />}
+                label={
+                  isHostSuppressed
+                    ? `Suppressed for ${event.host}`
+                    : `Suppress for ${event.host}`
+                }
+                isDisabled={pending || isHostSuppressed}
+                onClick={handleSuppressForHost}
+              />
+            )}
+          </HStack>
+        )}
 
-          <Separator />
+        <Divider />
 
-          {/* Audit data */}
-          <div>
-            <p className="text-[0.62rem] font-bold uppercase tracking-wider text-muted-foreground mb-2">Audit Data</p>
-            <AuditPanel rawData={event.rawData} />
-          </div>
-        </div>
-      </aside>
-    </>
+        <VStack gap={2}>
+          <Text type="label" size="3xs" weight="bold" color="secondary">
+            Audit Data
+          </Text>
+          <AuditPanel rawData={event.rawData} />
+        </VStack>
+      </VStack>
+    </AppDialog>
   );
 }
 
@@ -636,100 +654,144 @@ function GlobalSuppressedRules({
     return String(id).includes(q) || (messages[id] ?? "").toLowerCase().includes(q);
   });
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-semibold">Global WAF Rule Exclusions</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Rules listed here are suppressed globally via <code>SecRuleRemoveById</code> for all proxy hosts using global WAF settings.
-        </p>
-        {!wafEnabled && (
-          <Alert className="mt-3">
-            <AlertDescription>Global WAF is currently disabled. Exclusions are saved but have no effect until WAF is enabled.</AlertDescription>
-          </Alert>
-        )}
-      </div>
+  const noDescription = "No description available — rule has not triggered yet";
 
-      <div>
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Add Rule by ID</p>
-        <div className="flex items-center gap-2 mt-1.5 max-w-xs">
-          <Input
-            placeholder="Rule ID"
-            value={addInput}
-            onChange={(e) => { setAddInput(e.target.value); setPendingRule(null); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleLookup(); } }}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            className="flex-1"
-            disabled={lookupPending || pending}
+  return (
+    <VStack gap={4}>
+      <VStack gap={2}>
+        <Heading level={2}>Global WAF Rule Exclusions</Heading>
+        <Text type="body" size="sm" color="secondary">
+          Rules listed here are suppressed globally via SecRuleRemoveById for all proxy hosts using
+          global WAF settings.
+        </Text>
+        {!wafEnabled && (
+          <Banner
+            status="warning"
+            title="Global WAF is currently disabled"
+            description="Exclusions are saved but have no effect until WAF is enabled."
           />
-          <Button variant="outline" size="sm" onClick={handleLookup} disabled={!addInput.trim() || lookupPending || pending}>
-            {lookupPending ? "Looking up…" : "Look up"}
-          </Button>
-        </div>
-        {pendingRule && (
-          <div className="mt-3 px-4 py-3 rounded-lg border border-yellow-500 bg-muted max-w-[480px]">
-            <p className="text-sm font-mono font-bold text-red-400">Rule {pendingRule.id}</p>
-            <p className="text-xs block mt-0.5 text-muted-foreground">
-              {pendingRule.message ?? "No description available — rule has not triggered yet"}
-            </p>
-            <div className="flex items-center gap-2 mt-3">
-              <Button size="sm" variant="destructive" onClick={handleConfirmAdd} disabled={pending}>
-                {pending ? "Suppressing…" : "Suppress Globally"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => { setPendingRule(null); setAddInput(""); }} disabled={pending}>
-                Cancel
-              </Button>
-            </div>
-          </div>
         )}
-      </div>
+      </VStack>
+
+      <VStack gap={2}>
+        <HStack gap={2} vAlign="end" maxWidth={360}>
+          <TextInput
+            {...nativeAttrs({ pattern: "[0-9]*" })}
+            label="Add Rule by ID"
+            size="sm"
+            value={addInput}
+            onChange={(v) => { setAddInput(v); setPendingRule(null); }}
+            onEnter={handleLookup}
+            placeholder="Rule ID"
+            isDisabled={lookupPending || pending}
+            width="100%"
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            label="Look up"
+            isLoading={lookupPending}
+            isDisabled={!addInput.trim() || lookupPending || pending}
+            onClick={handleLookup}
+          />
+        </HStack>
+        {pendingRule && (
+          <Card variant="muted" padding={3} maxWidth={480}>
+            <VStack gap={2}>
+              <Text type="code" size="sm" weight="bold">
+                Rule {pendingRule.id}
+              </Text>
+              <Text type="body" size="xsm" color="secondary">
+                {pendingRule.message ?? noDescription}
+              </Text>
+              <HStack gap={2} vAlign="center">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  label="Suppress Globally"
+                  isLoading={pending}
+                  isDisabled={pending}
+                  onClick={handleConfirmAdd}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  label="Cancel"
+                  isDisabled={pending}
+                  onClick={() => { setPendingRule(null); setAddInput(""); }}
+                />
+              </HStack>
+            </VStack>
+          </Card>
+        )}
+      </VStack>
 
       {excluded.length > 0 && (
-        <div className="relative max-w-[400px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by rule ID or message…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
-        </div>
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by rule ID or message…"
+          label="Search suppressed rules"
+          width={400}
+        />
       )}
 
       {excluded.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg">
-          <ShieldOff className="h-9 w-9 opacity-30 mb-2 mx-auto" />
-          <p className="text-sm">No globally suppressed rules.</p>
-          <p className="text-xs">Add a rule above or open a WAF event and click &quot;Suppress Globally&quot;.</p>
-        </div>
+        <EmptyState
+          icon={<ShieldOff />}
+          title="No globally suppressed rules."
+          description='Add a rule above or open a WAF event and click "Suppress Globally".'
+        />
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">No rules match your search.</p>
+        <Text type="body" size="sm" color="secondary">
+          No rules match your search.
+        </Text>
       ) : (
-        <div className="flex flex-col gap-2">
+        <VStack gap={2}>
           {filtered.map((id) => (
-            <div key={id} className="flex items-center gap-4 px-4 py-3 rounded-lg border bg-muted/50">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-mono font-bold text-red-400">Rule {id}</p>
-                <p className="text-xs block mt-0.5 text-muted-foreground">
-                  {messages[id] ?? "No description available — rule has not triggered yet"}
-                </p>
-              </div>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemove(id)} disabled={pending}
-                      className="shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Remove suppression</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+            <Card key={id} variant="muted" padding={3}>
+              <HStack gap={4} vAlign="center" justify="between">
+                <VStack gap={0}>
+                  <Text type="code" size="sm" weight="bold">
+                    Rule {id}
+                  </Text>
+                  <Text type="body" size="xsm" color="secondary">
+                    {messages[id] ?? noDescription}
+                  </Text>
+                </VStack>
+                <IconButton
+                  variant="ghost"
+                  label={`Remove suppression for rule ${id}`}
+                  tooltip="Remove suppression"
+                  icon={<Trash2 />}
+                  isDisabled={pending}
+                  onClick={() => handleRemove(id)}
+                />
+              </HStack>
+            </Card>
           ))}
-        </div>
+        </VStack>
       )}
-    </div>
+    </VStack>
   );
 }
 
 /* ── Main client component ───────────────────────────────────────────────── */
+const RANGE_OPTIONS: { value: RangeOption; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "24h", label: "24h" },
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "custom", label: "Custom" },
+];
+
+const WAF_TEMPLATES = [
+  { label: "Allow IP",             snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"` },
+  { label: "Disable WAF for path", snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"` },
+  { label: "Remove XSS rules",     snippet: `SecRuleRemoveByTag "attack-xss"` },
+  { label: "Block User-Agent",     snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"` },
+];
+
 export default function WafEventsClient({ events, stats, pagination, initialSearch, initialRange, initialFrom, initialTo, globalExcluded, globalExcludedMessages, globalWafEnabled, hostWafMap, globalWaf }: Props) {
   const router       = useRouter();
   const pathname     = usePathname();
@@ -747,7 +809,6 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
   const [wafEnabled, setWafEnabled] = useState(globalWaf?.enabled ?? false);
   const [wafLoadOwaspCrs, setWafLoadOwaspCrs]     = useState(globalWaf?.load_owasp_crs ?? true);
   const [wafCustomDirectives, setWafCustomDirectives]     = useState(globalWaf?.custom_directives ?? "");
-  const [wafShowTemplates, setWafShowTemplates]   = useState(false);
 
   useEffect(() => { setSearchTerm(initialSearch); }, [initialSearch]);
   useEffect(() => {
@@ -802,11 +863,6 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
     router.push(`${pathname}?${params.toString()}`);
   }, [pathname, router, searchParams]);
 
-  const selectRange = useCallback((nextRange: Exclude<RangeOption, 'custom'>) => {
-    setRange(nextRange);
-    pushRange(nextRange);
-  }, [pushRange]);
-
   const activateCustom = useCallback(() => {
     setRange('custom');
     if (!customFrom || !customTo) {
@@ -817,263 +873,281 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
     }
   }, [customFrom, customTo]);
 
-  const METHOD_COLORS: Record<string, string> = {
-    GET:    "text-green-500",
-    POST:   "text-primary",
-    PUT:    "text-yellow-500",
-    DELETE: "text-destructive",
-    PATCH:  "text-yellow-500",
-  };
+  const handleRangeChange = useCallback((next: string) => {
+    const value = next as RangeOption;
+    if (value === 'custom') {
+      activateCustom();
+      return;
+    }
+    setRange(value);
+    pushRange(value);
+  }, [activateCustom, pushRange]);
 
   const mobileCard = (event: WafEvent) => (
-    <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setSelected(event)}>
-      <CardContent className="p-3 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
+    <Card>
+      <VStack gap={2}>
+        <HStack justify="between" vAlign="center" gap={2}>
+          <HStack gap={2} vAlign="center">
             <BlockedChip blocked={event.blocked} />
             <SeverityChip severity={event.severity} />
-          </div>
-          <span className="text-xs text-muted-foreground" suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</span>
-        </div>
-        <p className="text-xs font-mono text-muted-foreground break-all">{event.host || "—"}</p>
-        {event.ruleId && <span className="text-xs text-muted-foreground">Rule #{event.ruleId}</span>}
-      </CardContent>
+          </HStack>
+          <Text type="body" size="xsm" color="secondary">
+            <span suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</span>
+          </Text>
+        </HStack>
+        <Text type="code" size="xsm" color="secondary">{event.host || "—"}</Text>
+        {event.ruleId && (
+          <Text type="body" size="xsm" color="secondary">Rule #{event.ruleId}</Text>
+        )}
+      </VStack>
     </Card>
   );
 
-  const columns = [
+  const columns: Column<WafEvent>[] = [
     {
       id: "ts", label: "Time", width: 150,
       // The timestamp renders on the server in the container's locale/timezone
       // and again in the browser's — the two never match, so this text opts out
       // of hydration checks rather than letting React discard the whole tree
       // (error #418).
-      render: (r: WafEvent) => (
-        <span className="text-muted-foreground text-[0.78rem] whitespace-nowrap font-mono" suppressHydrationWarning>
-          {new Date(r.ts * 1000).toLocaleString()}
-        </span>
+      render: (r) => (
+        <Text type="code" size="xsm" color="secondary">
+          <span suppressHydrationWarning>{new Date(r.ts * 1000).toLocaleString()}</span>
+        </Text>
       ),
     },
     {
-      id: "blocked", label: "Action", width: 76,
-      render: (r: WafEvent) => <BlockedChip blocked={r.blocked} />,
+      id: "blocked", label: "Action", width: 90,
+      render: (r) => <BlockedChip blocked={r.blocked} />,
     },
     {
-      id: "severity", label: "Severity", width: 80,
-      render: (r: WafEvent) => <SeverityChip severity={r.severity} />,
+      id: "severity", label: "Severity", width: 100,
+      render: (r) => <SeverityChip severity={r.severity} />,
     },
     {
       id: "host", label: "Host", width: 130,
-      render: (r: WafEvent) => (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="font-mono text-[0.78rem] max-w-[130px] overflow-hidden text-ellipsis whitespace-nowrap block">
-                {r.host || <span className="opacity-40">—</span>}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{r.host ?? ""}</TooltipContent>
+      render: (r) =>
+        r.host ? (
+          <Tooltip content={r.host}>
+            <Text type="code" size="xsm" maxLines={1}>
+              {r.host}
+            </Text>
           </Tooltip>
-        </TooltipProvider>
-      ),
+        ) : (
+          <Text type="body" size="xsm" color="secondary">
+            &mdash;
+          </Text>
+        ),
     },
     {
       id: "clientIp", label: "Client IP", width: 130,
-      render: (r: WafEvent) => (
-        <div className="flex items-center gap-1">
-          <span className="font-mono text-[0.78rem] whitespace-nowrap">{r.clientIp}</span>
-          {r.countryCode && (
-            <Badge variant="outline" className="text-[0.62rem] h-[16px] px-1 shrink-0">{r.countryCode}</Badge>
-          )}
-        </div>
+      render: (r) => (
+        <HStack gap={1} vAlign="center">
+          <Text type="code" size="xsm">{r.clientIp}</Text>
+          {r.countryCode && <Badge label={r.countryCode} />}
+        </HStack>
       ),
     },
     {
       id: "method", label: "Request", width: 200,
-      render: (r: WafEvent) => (
-        <div className="flex items-baseline gap-1.5 overflow-hidden font-mono min-w-0">
-          <span className={cn("font-bold text-[0.7rem] shrink-0", METHOD_COLORS[r.method] ?? "text-muted-foreground")}>
+      render: (r) => (
+        <HStack gap={2} vAlign="center">
+          <Text type="code" size="xsm" weight="bold" color={r.method ? "accent" : "secondary"}>
             {r.method || "—"}
-          </span>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-[0.78rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-                  {r.uri || "—"}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{r.uri}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+          </Text>
+          <Tooltip content={r.uri ?? ""}>
+            <Text type="code" size="xsm" color="secondary" maxLines={1}>
+              {r.uri || "—"}
+            </Text>
+          </Tooltip>
+        </HStack>
       ),
     },
     {
-      id: "ruleId", label: "Rule ID", width: 70,
-      render: (r: WafEvent) => (
-        <span className="text-muted-foreground font-mono text-[0.78rem]">{r.ruleId ?? "—"}</span>
+      id: "ruleId", label: "Rule ID", width: 80,
+      render: (r) => (
+        <Text type="code" size="xsm" color="secondary">{r.ruleId ?? "—"}</Text>
       ),
     },
   ];
 
   return (
-    <div className="flex flex-col gap-4 w-full">
-      <h1 className="text-3xl font-semibold">WAF</h1>
-      <p className="text-muted-foreground">Web Application Firewall events and rule management.</p>
+    <VStack gap={4}>
+      <VStack gap={1}>
+        <Heading level={1}>WAF</Heading>
+        <Text type="body" color="secondary">
+          Web Application Firewall events and rule management.
+        </Text>
+      </VStack>
 
-      <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v !== "events") setSelected(null); }}>
-        <TabsList>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="suppressed">Suppressed Rules</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
+      <TabList
+        value={tab}
+        onChange={(v) => { setTab(v); if (v !== "events") setSelected(null); }}
+        hasDivider
+      >
+        <Tab value="events" label="Events" />
+        <Tab value="suppressed" label="Suppressed Rules" />
+        <Tab value="settings" label="Settings" />
+      </TabList>
 
-        <TabsContent value="events" className="mt-4">
-          <div className="flex flex-col gap-4">
-            {/* Table area — always full width; detail opens as an overlay drawer */}
-            <div className="flex flex-col gap-4 min-w-0">
-              <StatsBar stats={stats} />
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant={range === 'all' ? 'default' : 'outline'} onClick={() => selectRange('all')}>All time</Button>
-                  <Button size="sm" variant={range === '24h' ? 'default' : 'outline'} onClick={() => selectRange('24h')}>24h</Button>
-                  <Button size="sm" variant={range === '7d' ? 'default' : 'outline'} onClick={() => selectRange('7d')}>7d</Button>
-                  <Button size="sm" variant={range === '30d' ? 'default' : 'outline'} onClick={() => selectRange('30d')}>30d</Button>
-                  <Button size="sm" variant={range === 'custom' ? 'default' : 'outline'} onClick={activateCustom}>Custom</Button>
-                </div>
-                {range === 'custom' && (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <Input type="datetime-local" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-[220px]" />
-                    <Input type="datetime-local" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-[220px]" />
-                    <Button size="sm" onClick={() => pushRange('custom', customFrom, customTo)}>Apply range</Button>
-                  </div>
-                )}
-                <div className="relative max-w-[480px]">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by host, IP, URI, or rule message..."
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); updateSearch(e.target.value); }}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-              <DataTable
-                columns={columns}
-                data={events}
-                keyField="id"
-                emptyMessage="No WAF events found. Enable the WAF in Settings and send some traffic to see events here."
-                pagination={pagination}
-                onRowClick={(row) => setSelected(prev => prev?.id === row.id ? null : row)}
-                rowClassName={(row) => row.id === selected?.id ? "bg-primary/5" : ""}
-                mobileCard={mobileCard}
-              />
-            </div>
-
-            {selected && (
-              <EventDetailPanel
-                event={selected}
-                onClose={() => setSelected(null)}
-                globalExcluded={localGlobalExcluded}
-                hostWafMap={localHostWafMap}
-                onSuppressGlobal={(ruleId) => setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])}
-                onSuppressHost={(ruleId, host) => {
-                  const bare = host.replace(/:\d+$/, "");
-                  setLocalHostWafMap((prev) => ({ ...prev, [bare]: [...new Set([...(prev[bare] ?? []), ruleId])] }));
-                }}
-              />
+      {tab === "events" && (
+        <VStack gap={4}>
+          <StatsBar stats={stats} />
+          <VStack gap={3}>
+            {/* Was five buttons whose "selected" state read only as a filled
+                variant; SegmentedControl exposes the choice as a radio group. */}
+            <SegmentedControl
+              label="Time range"
+              size="sm"
+              value={range}
+              onChange={handleRangeChange}
+            >
+              {RANGE_OPTIONS.map((o) => (
+                <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+              ))}
+            </SegmentedControl>
+            {range === 'custom' && (
+              <HStack gap={2} vAlign="end" wrap="wrap">
+                <DateTimeInput
+                  label="From"
+                  size="sm"
+                  value={(customFrom || undefined) as ISODateTimeString | undefined}
+                  onChange={(v) => setCustomFrom(v ?? "")}
+                />
+                <DateTimeInput
+                  label="To"
+                  size="sm"
+                  value={(customTo || undefined) as ISODateTimeString | undefined}
+                  onChange={(v) => setCustomTo(v ?? "")}
+                />
+                <Button
+                  size="sm"
+                  label="Apply range"
+                  onClick={() => pushRange('custom', customFrom, customTo)}
+                />
+              </HStack>
             )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="suppressed">
-          <GlobalSuppressedRules
-            excluded={localGlobalExcluded}
-            messages={localGlobalMessages}
-            wafEnabled={globalWafEnabled}
-            onRemove={(ruleId) => setLocalGlobalExcluded((prev) => prev.filter((id) => id !== ruleId))}
-            onAdd={(ruleId, message) => {
-              setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])]);
-              setLocalGlobalMessages((prev) => ({ ...prev, [ruleId]: message }));
-            }}
+            <SearchField
+              value={searchTerm}
+              onChange={(v) => { setSearchTerm(v); updateSearch(v); }}
+              placeholder="Search by host, IP, URI, or rule message..."
+              label="Search WAF events"
+              width={480}
+            />
+          </VStack>
+          <DataTable
+            columns={columns}
+            data={events}
+            keyField="id"
+            emptyMessage="No WAF events found. Enable the WAF in Settings and send some traffic to see events here."
+            pagination={pagination}
+            onRowClick={(row) => setSelected(prev => prev?.id === row.id ? null : row)}
+            rowStatus={(row) =>
+              row.id === selected?.id ? { color: "accent", label: "Selected" } : null
+            }
+            mobileCard={mobileCard}
           />
-        </TabsContent>
 
-        <TabsContent value="settings">
-          <div className="flex flex-col gap-6 max-w-[720px]">
-            <div>
-              <h2 className="text-lg font-semibold">WAF Settings</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Configure the global Web Application Firewall. Per-host settings can merge with or override these defaults.
-                Powered by <strong>Coraza</strong> with optional OWASP Core Rule Set.
-              </p>
-            </div>
-            <form action={wafFormAction} className="flex flex-col gap-4">
+          {selected && (
+            <EventDetailPanel
+              event={selected}
+              onClose={() => setSelected(null)}
+              globalExcluded={localGlobalExcluded}
+              hostWafMap={localHostWafMap}
+              onSuppressGlobal={(ruleId) => setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])}
+              onSuppressHost={(ruleId, host) => {
+                const bare = host.replace(/:\d+$/, "");
+                setLocalHostWafMap((prev) => ({ ...prev, [bare]: [...new Set([...(prev[bare] ?? []), ruleId])] }));
+              }}
+            />
+          )}
+        </VStack>
+      )}
+
+      {tab === "suppressed" && (
+        <GlobalSuppressedRules
+          excluded={localGlobalExcluded}
+          messages={localGlobalMessages}
+          wafEnabled={globalWafEnabled}
+          onRemove={(ruleId) => setLocalGlobalExcluded((prev) => prev.filter((id) => id !== ruleId))}
+          onAdd={(ruleId, message) => {
+            setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])]);
+            setLocalGlobalMessages((prev) => ({ ...prev, [ruleId]: message }));
+          }}
+        />
+      )}
+
+      {tab === "settings" && (
+        <VStack gap={6} maxWidth={720}>
+          <VStack gap={1}>
+            <Heading level={2}>WAF Settings</Heading>
+            <Text type="body" size="sm" color="secondary">
+              Configure the global Web Application Firewall. Per-host settings can merge with or
+              override these defaults. Powered by Coraza with optional OWASP Core Rule Set.
+            </Text>
+          </VStack>
+          <form action={wafFormAction}>
+            <VStack gap={4}>
               <input type="hidden" name="wafEnabled" value={wafEnabled ? "on" : ""} />
               <input type="hidden" name="wafLoadOwaspCrs" value={wafLoadOwaspCrs ? "on" : ""} />
               {wafState?.message && (
-                <Alert variant={wafState.success ? "default" : "destructive"}>
-                  <AlertDescription>{wafState.message}</AlertDescription>
-                </Alert>
-              )}
-              <div className="flex items-center gap-3">
-                <Switch checked={wafEnabled} onCheckedChange={setWafEnabled} id="waf_enabled" />
-                <Label htmlFor="waf_enabled">Enable WAF globally (blocking)</Label>
-              </div>
-              <div className="flex items-center gap-3">
-                <Checkbox checked={wafLoadOwaspCrs} onCheckedChange={(v) => setWafLoadOwaspCrs(!!v)} id="waf_load_owasp_crs" />
-                <Label htmlFor="waf_load_owasp_crs">
-                  Load OWASP Core Rule Set{" "}
-                  <span className="text-xs text-muted-foreground">(covers SQLi, XSS, LFI, RCE — recommended)</span>
-                </Label>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="waf_custom_directives">Custom SecLang Directives</Label>
-                <Textarea
-                  id="waf_custom_directives"
-                  name="wafCustomDirectives"
-                  rows={3}
-                  value={wafCustomDirectives}
-                  onChange={(e) => setWafCustomDirectives(e.target.value)}
-                  placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
-                  className="font-mono text-[0.8rem] resize-y"
+                <Banner
+                  status={wafState.success ? "success" : "error"}
+                  title={wafState.message}
                 />
-                <p className="text-xs text-muted-foreground">ModSecurity SecLang syntax. Applied after OWASP CRS if enabled.</p>
-              </div>
-              <div>
-                <Button type="button" variant="ghost" size="sm" className="text-muted-foreground px-0" onClick={() => setWafShowTemplates((v) => !v)}>
-                  Quick Templates
-                  <ChevronDown className={cn("ml-1 h-4 w-4 transition-transform duration-200", wafShowTemplates && "rotate-180")} />
-                </Button>
-                <div className={cn("overflow-hidden transition-all duration-200", wafShowTemplates ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0 pointer-events-none")}>
-                  <div className="flex flex-col gap-1.5 mt-2">
-                    {[
-                      { label: "Allow IP",             snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"` },
-                      { label: "Disable WAF for path", snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"` },
-                      { label: "Remove XSS rules",     snippet: `SecRuleRemoveByTag "attack-xss"` },
-                      { label: "Block User-Agent",     snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"` },
-                    ].map((t) => (
-                      <Button key={t.label} type="button" size="sm" variant="outline" className="justify-start font-mono text-[0.72rem]"
-                        onClick={() => setWafCustomDirectives((prev) => prev ? `${prev}\n${t.snippet}` : t.snippet)}>
-                        <Copy className="h-3 w-3 mr-1.5 shrink-0" />
-                        {t.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <Alert>
-                <AlertDescription className="text-[0.8rem]">
-                  Rule exclusions are managed on the <strong>Suppressed Rules</strong> tab.
-                </AlertDescription>
-              </Alert>
-              <div className="flex justify-end">
-                <Button type="submit">Save WAF settings</Button>
-              </div>
-            </form>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+              )}
+              <Switch
+                label="Enable WAF globally (blocking)"
+                value={wafEnabled}
+                onChange={setWafEnabled}
+              />
+              <CheckboxInput
+                label="Load OWASP Core Rule Set"
+                description="Covers SQLi, XSS, LFI, RCE — recommended."
+                value={wafLoadOwaspCrs}
+                onChange={setWafLoadOwaspCrs}
+              />
+              <TextArea
+                label="Custom SecLang Directives"
+                isOptional
+                htmlName="wafCustomDirectives"
+                rows={3}
+                value={wafCustomDirectives}
+                onChange={setWafCustomDirectives}
+                placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
+                description="ModSecurity SecLang syntax. Applied after OWASP CRS if enabled."
+              />
+              <Collapsible
+                defaultIsOpen={false}
+                trigger={<Text type="body" size="sm">Quick Templates</Text>}
+              >
+                <VStack gap={2}>
+                  {WAF_TEMPLATES.map((t) => (
+                    <Button
+                      key={t.label}
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      icon={<Copy />}
+                      label={t.label}
+                      onClick={() =>
+                        setWafCustomDirectives((prev) => (prev ? `${prev}\n${t.snippet}` : t.snippet))
+                      }
+                    />
+                  ))}
+                </VStack>
+              </Collapsible>
+              <Banner
+                status="info"
+                title="Rule exclusions live on the Suppressed Rules tab"
+              />
+              <HStack justify="end">
+                <Button type="submit" label="Save WAF settings" />
+              </HStack>
+            </VStack>
+          </form>
+        </VStack>
+      )}
+    </VStack>
   );
 }

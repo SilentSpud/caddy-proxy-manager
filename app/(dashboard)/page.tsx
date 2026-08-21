@@ -8,18 +8,11 @@ import {
   proxyHosts
 } from "@/src/lib/db/schema";
 import { count, desc, isNull, sql } from "drizzle-orm";
-import { ArrowLeftRight, ShieldCheck, KeyRound } from "lucide-react";
-import { ReactNode } from "react";
 import { getAnalyticsSummary } from "@/src/lib/analytics-db";
 import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
 import type { Metadata } from "next";
 
-type StatCard = {
-  label: string;
-  icon: ReactNode;
-  count: number;
-  href: string;
-};
+import type { StatCard } from "./OverviewClient";
 
 async function loadStats(): Promise<StatCard[]> {
   const [proxyHostCountResult, acmeRows, certRows, importedCertCountResult, accessListCountResult] =
@@ -69,10 +62,12 @@ async function loadStats(): Promise<StatCard[]> {
   const certificatesCount = acmeCount + (importedCertCountResult[0]?.value ?? 0);
   const accessListsCount = accessListCountResult[0]?.value ?? 0;
 
+  // The icon travels as a name, not an element: a component cannot cross the
+  // server/client boundary, and an element would carry its styling with it.
   return [
-    { label: "Proxy Hosts", icon: <ArrowLeftRight className="h-4 w-4" />, count: proxyHostsCount, href: "/proxy-hosts" },
-    { label: "Certificates", icon: <ShieldCheck className="h-4 w-4" />, count: certificatesCount, href: "/certificates" },
-    { label: "Access Lists", icon: <KeyRound className="h-4 w-4" />, count: accessListsCount, href: "/access-lists" }
+    { label: "Proxy Hosts", icon: "proxyHosts", count: proxyHostsCount, href: "/proxy-hosts" },
+    { label: "Certificates", icon: "certificates", count: certificatesCount, href: "/certificates" },
+    { label: "Access Lists", icon: "accessLists", count: accessListsCount, href: "/access-lists" }
   ];
 }
 

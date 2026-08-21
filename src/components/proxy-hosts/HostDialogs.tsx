@@ -1,8 +1,12 @@
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useActionState, useEffect } from "react";
+"use client";
+
+import { useActionState, useEffect, useState } from "react";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Selector } from "@astryxdesign/core/Selector";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Text } from "@astryxdesign/core/Text";
+import { VStack } from "@astryxdesign/core/Stack";
 import {
     createProxyHostAction,
     deleteProxyHostAction,
@@ -39,6 +43,21 @@ type ForwardAuthUser = { id: number; email: string; name: string | null; role: s
 type ForwardAuthGroup = { id: number; name: string; description: string | null; member_count: number };
 type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
 
+const NONE_VALUE = "__none__";
+
+/** The action result banner, shared by all three dialogs. */
+function ActionStatus({ status, message }: { status: string; message?: string }) {
+    if (status === "idle" || !message) return null;
+    return <Banner status={status === "error" ? "error" : "success"} title={message} />;
+}
+
+function toOptions(items: { id: number; name: string }[], noneLabel: string) {
+    return [
+        { value: NONE_VALUE, label: noneLabel },
+        ...items.map((item) => ({ value: String(item.id), label: item.name })),
+    ];
+}
+
 export function CreateHostDialog({
     open,
     onClose,
@@ -66,6 +85,13 @@ export function CreateHostDialog({
 }) {
     const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
 
+    const [name, setName] = useState(initialData ? `${initialData.name} (Copy)` : "");
+    const [domains, setDomains] = useState(initialData?.domains.join("\n") ?? "");
+    const [certificateId, setCertificateId] = useState(String(initialData?.certificateId ?? NONE_VALUE));
+    const [accessListId, setAccessListId] = useState(String(initialData?.accessListId ?? NONE_VALUE));
+    const [preHandlers, setPreHandlers] = useState(initialData?.customPreHandlersJson ?? "");
+    const [reverseProxy, setReverseProxy] = useState(initialData?.customReverseProxyJson ?? "");
+
     useEffect(() => {
         if (state.status === "success") {
             setTimeout(onClose, 1000);
@@ -83,120 +109,90 @@ export function CreateHostDialog({
                 (document.getElementById("create-host-form") as HTMLFormElement)?.requestSubmit();
             }}
         >
-            <form id="create-host-form" action={formAction} className="flex flex-col gap-5">
-                {state.status !== "idle" && state.message && (
-                    <Alert variant={state.status === "error" ? "destructive" : "default"}>
-                        <AlertDescription>{state.message}</AlertDescription>
-                    </Alert>
-                )}
-                <SettingsToggles
-                    hstsSubdomains={initialData?.hstsSubdomains}
-                    skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
-                    enabled={true}
-                />
-                <div>
-                    <label htmlFor="name" className="text-sm font-medium mb-1 block">Name</label>
-                    <Input
-                        id="name"
-                        name="name"
+            <form id="create-host-form" action={formAction}>
+                <VStack gap={5}>
+                    <ActionStatus status={state.status} message={state.message} />
+                    <SettingsToggles
+                        hstsSubdomains={initialData?.hstsSubdomains}
+                        skipHttpsValidation={initialData?.skipHttpsHostnameValidation}
+                        enabled={true}
+                    />
+                    <TextInput
+                        label="Name"
+                        htmlName="name"
                         placeholder="My Service"
-                        defaultValue={initialData ? `${initialData.name} (Copy)` : ""}
-                        required
+                        value={name}
+                        onChange={setName}
+                        isRequired
                     />
-                </div>
-                <div>
-                    <label htmlFor="domains" className="text-sm font-medium mb-1 block">Domains</label>
-                    <Textarea
-                        id="domains"
-                        name="domains"
+                    <TextArea
+                        label="Domains"
+                        htmlName="domains"
                         placeholder="app.example.com"
-                        defaultValue={initialData?.domains.join("\n") ?? ""}
-                        required
+                        value={domains}
+                        onChange={setDomains}
+                        isRequired
                         rows={2}
+                        description="One per line or comma-separated. Wildcards like *.example.com are supported."
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                        One per line or comma-separated. Wildcards like *.example.com are supported.
-                    </p>
-                </div>
-                <UpstreamInput defaultUpstreams={initialData?.upstreams} />
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Certificate</label>
-                    <Select name="certificateId" defaultValue={String(initialData?.certificateId ?? "__none__")}>
-                        <SelectTrigger aria-label="Certificate">
-                            <SelectValue placeholder="Managed by Caddy (Auto)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">Managed by Caddy (Auto)</SelectItem>
-                            {certificates.map((cert) => (
-                                <SelectItem key={cert.id} value={String(cert.id)}>
-                                    {cert.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Access List</label>
-                    <Select name="accessListId" defaultValue={String(initialData?.accessListId ?? "__none__")}>
-                        <SelectTrigger aria-label="Access List">
-                            <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">None</SelectItem>
-                            {accessLists.map((list) => (
-                                <SelectItem key={list.id} value={String(list.id)}>
-                                    {list.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <RedirectsFields initialData={initialData?.redirects} />
-                <LocationRulesFields initialData={initialData?.locationRules} />
-                <RewriteFields initialData={initialData?.rewrite} />
-                <PathAllowsFields initialData={initialData?.pathAllows} />
-                <PathBlocksFields initialData={initialData?.pathBlocks} />
-                <PathRewritesFields initialData={initialData?.pathRewrites} />
-                <ErrorPagesFields initialData={initialData?.errorPages} />
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Custom Pre-Handlers (JSON)</label>
-                    <Textarea
-                        name="customPreHandlersJson"
+                    <UpstreamInput defaultUpstreams={initialData?.upstreams} />
+                    <Selector
+                        label="Certificate"
+                        htmlName="certificateId"
+                        options={toOptions(certificates, "Managed by Caddy (Auto)")}
+                        value={certificateId}
+                        onChange={(next) => setCertificateId(next as string)}
+                    />
+                    <Selector
+                        label="Access List"
+                        htmlName="accessListId"
+                        options={toOptions(accessLists, "None")}
+                        value={accessListId}
+                        onChange={(next) => setAccessListId(next as string)}
+                    />
+                    <RedirectsFields initialData={initialData?.redirects} />
+                    <LocationRulesFields initialData={initialData?.locationRules} />
+                    <RewriteFields initialData={initialData?.rewrite} />
+                    <PathAllowsFields initialData={initialData?.pathAllows} />
+                    <PathBlocksFields initialData={initialData?.pathBlocks} />
+                    <PathRewritesFields initialData={initialData?.pathRewrites} />
+                    <ErrorPagesFields initialData={initialData?.errorPages} />
+                    <TextArea
+                        label="Custom Pre-Handlers (JSON)"
+                        htmlName="customPreHandlersJson"
                         placeholder='[{"handler": "headers", ...}]'
-                        defaultValue={initialData?.customPreHandlersJson ?? ""}
+                        value={preHandlers}
+                        onChange={setPreHandlers}
                         rows={3}
+                        description="Optional JSON array of Caddy handlers"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Optional JSON array of Caddy handlers</p>
-                </div>
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Custom Reverse Proxy (JSON)</label>
-                    <Textarea
-                        name="customReverseProxyJson"
+                    <TextArea
+                        label="Custom Reverse Proxy (JSON)"
+                        htmlName="customReverseProxyJson"
                         placeholder='{"headers": {"request": {...}}}'
-                        defaultValue={initialData?.customReverseProxyJson ?? ""}
+                        value={reverseProxy}
+                        onChange={setReverseProxy}
                         rows={3}
+                        description="Deep-merge into reverse_proxy handler (only applies in proxy mode)"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Deep-merge into reverse_proxy handler (only applies in proxy mode)
-                    </p>
-                </div>
-                <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
-                <CpmForwardAuthFields
-                    cpmForwardAuth={initialData?.cpmForwardAuth}
-                    users={forwardAuthUsers}
-                    groups={forwardAuthGroups}
-                />
-                <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
-                <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
-                <UpstreamDnsResolutionFields upstreamDnsResolution={initialData?.upstreamDnsResolution} />
-                <GeoBlockFields />
-                <WafFields value={initialData?.waf} />
-                <MtlsFields
-                    value={initialData?.mtls}
-                    caCertificates={caCertificates}
-                    mtlsRoles={mtlsRoles}
-                    issuedClientCerts={issuedClientCerts}
-                />
+                    <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
+                    <CpmForwardAuthFields
+                        cpmForwardAuth={initialData?.cpmForwardAuth}
+                        users={forwardAuthUsers}
+                        groups={forwardAuthGroups}
+                    />
+                    <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
+                    <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
+                    <UpstreamDnsResolutionFields upstreamDnsResolution={initialData?.upstreamDnsResolution} />
+                    <GeoBlockFields />
+                    <WafFields value={initialData?.waf} />
+                    <MtlsFields
+                        value={initialData?.mtls}
+                        caCertificates={caCertificates}
+                        mtlsRoles={mtlsRoles}
+                        issuedClientCerts={issuedClientCerts}
+                    />
+                </VStack>
             </form>
         </AppDialog>
     );
@@ -230,7 +226,17 @@ export function EditHostDialog({
     forwardAuthGroups?: ForwardAuthGroup[];
     forwardAuthAccess?: ForwardAuthAccessData | null;
 }) {
-    const [state, formAction] = useActionState(updateProxyHostAction.bind(null, host.id), INITIAL_ACTION_STATE);
+    const [state, formAction] = useActionState(
+        updateProxyHostAction.bind(null, host.id),
+        INITIAL_ACTION_STATE
+    );
+
+    const [name, setName] = useState(host.name);
+    const [domains, setDomains] = useState(host.domains.join("\n"));
+    const [certificateId, setCertificateId] = useState(String(host.certificateId ?? NONE_VALUE));
+    const [accessListId, setAccessListId] = useState(String(host.accessListId ?? NONE_VALUE));
+    const [preHandlers, setPreHandlers] = useState(host.customPreHandlersJson ?? "");
+    const [reverseProxy, setReverseProxy] = useState(host.customReverseProxyJson ?? "");
 
     useEffect(() => {
         if (state.status === "success") {
@@ -249,117 +255,92 @@ export function EditHostDialog({
                 (document.getElementById("edit-host-form") as HTMLFormElement)?.requestSubmit();
             }}
         >
-            <form id="edit-host-form" action={formAction} className="flex flex-col gap-5">
-                {state.status !== "idle" && state.message && (
-                    <Alert variant={state.status === "error" ? "destructive" : "default"}>
-                        <AlertDescription>{state.message}</AlertDescription>
-                    </Alert>
-                )}
-                <SettingsToggles
-                    hstsSubdomains={host.hstsSubdomains}
-                    skipHttpsValidation={host.skipHttpsHostnameValidation}
-                    enabled={host.enabled}
-                />
-                <div>
-                    <label htmlFor="name" className="text-sm font-medium mb-1 block">Name</label>
-                    <Input id="name" name="name" defaultValue={host.name} required />
-                </div>
-                <div>
-                    <label htmlFor="domains" className="text-sm font-medium mb-1 block">Domains</label>
-                    <Textarea
-                        id="domains"
-                        name="domains"
-                        defaultValue={host.domains.join("\n")}
+            <form id="edit-host-form" action={formAction}>
+                <VStack gap={5}>
+                    <ActionStatus status={state.status} message={state.message} />
+                    <SettingsToggles
+                        hstsSubdomains={host.hstsSubdomains}
+                        skipHttpsValidation={host.skipHttpsHostnameValidation}
+                        enabled={host.enabled}
+                    />
+                    <TextInput
+                        label="Name"
+                        htmlName="name"
+                        value={name}
+                        onChange={setName}
+                        isRequired
+                    />
+                    <TextArea
+                        label="Domains"
+                        htmlName="domains"
+                        value={domains}
+                        onChange={setDomains}
                         rows={2}
+                        description="One per line or comma-separated. Wildcards like *.example.com are supported."
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                        One per line or comma-separated. Wildcards like *.example.com are supported.
-                    </p>
-                </div>
-                <UpstreamInput defaultUpstreams={host.upstreams} />
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Certificate</label>
-                    <Select name="certificateId" defaultValue={String(host.certificateId ?? "__none__")}>
-                        <SelectTrigger aria-label="Certificate">
-                            <SelectValue placeholder="Managed by Caddy (Auto)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">Managed by Caddy (Auto)</SelectItem>
-                            {certificates.map((cert) => (
-                                <SelectItem key={cert.id} value={String(cert.id)}>
-                                    {cert.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Access List</label>
-                    <Select name="accessListId" defaultValue={String(host.accessListId ?? "__none__")}>
-                        <SelectTrigger aria-label="Access List">
-                            <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="__none__">None</SelectItem>
-                            {accessLists.map((list) => (
-                                <SelectItem key={list.id} value={String(list.id)}>
-                                    {list.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <RedirectsFields initialData={host.redirects} />
-                <LocationRulesFields initialData={host.locationRules} />
-                <RewriteFields initialData={host.rewrite} />
-                <PathAllowsFields initialData={host.pathAllows} />
-                <PathBlocksFields initialData={host.pathBlocks} />
-                <PathRewritesFields initialData={host.pathRewrites} />
-                <ErrorPagesFields initialData={host.errorPages} />
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Custom Pre-Handlers (JSON)</label>
-                    <Textarea
-                        name="customPreHandlersJson"
-                        defaultValue={host.customPreHandlersJson ?? ""}
+                    <UpstreamInput defaultUpstreams={host.upstreams} />
+                    <Selector
+                        label="Certificate"
+                        htmlName="certificateId"
+                        options={toOptions(certificates, "Managed by Caddy (Auto)")}
+                        value={certificateId}
+                        onChange={(next) => setCertificateId(next as string)}
+                    />
+                    <Selector
+                        label="Access List"
+                        htmlName="accessListId"
+                        options={toOptions(accessLists, "None")}
+                        value={accessListId}
+                        onChange={(next) => setAccessListId(next as string)}
+                    />
+                    <RedirectsFields initialData={host.redirects} />
+                    <LocationRulesFields initialData={host.locationRules} />
+                    <RewriteFields initialData={host.rewrite} />
+                    <PathAllowsFields initialData={host.pathAllows} />
+                    <PathBlocksFields initialData={host.pathBlocks} />
+                    <PathRewritesFields initialData={host.pathRewrites} />
+                    <ErrorPagesFields initialData={host.errorPages} />
+                    <TextArea
+                        label="Custom Pre-Handlers (JSON)"
+                        htmlName="customPreHandlersJson"
+                        value={preHandlers}
+                        onChange={setPreHandlers}
                         rows={3}
+                        description="Optional JSON array of Caddy handlers"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Optional JSON array of Caddy handlers</p>
-                </div>
-                <div>
-                    <label className="text-sm font-medium mb-1 block">Custom Reverse Proxy (JSON)</label>
-                    <Textarea
-                        name="customReverseProxyJson"
-                        defaultValue={host.customReverseProxyJson ?? ""}
+                    <TextArea
+                        label="Custom Reverse Proxy (JSON)"
+                        htmlName="customReverseProxyJson"
+                        value={reverseProxy}
+                        onChange={setReverseProxy}
                         rows={3}
+                        description="Deep-merge into reverse_proxy handler (only applies in proxy mode)"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Deep-merge into reverse_proxy handler (only applies in proxy mode)
-                    </p>
-                </div>
-                <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
-                <CpmForwardAuthFields
-                    cpmForwardAuth={host.cpmForwardAuth}
-                    users={forwardAuthUsers}
-                    groups={forwardAuthGroups}
-                    currentAccess={forwardAuthAccess}
-                />
-                <LoadBalancerFields loadBalancer={host.loadBalancer} />
-                <DnsResolverFields dnsResolver={host.dnsResolver} />
-                <UpstreamDnsResolutionFields upstreamDnsResolution={host.upstreamDnsResolution} />
-                <GeoBlockFields
-                    initialValues={{
-                        geoblock: host.geoblock,
-                        geoblock_mode: host.geoblockMode,
-                    }}
-                />
-                <WafFields value={host.waf} />
-                <MtlsFields
-                    value={host.mtls}
-                    caCertificates={caCertificates}
-                    proxyHostId={host.id}
-                    mtlsRoles={mtlsRoles}
-                    issuedClientCerts={issuedClientCerts}
-                />
+                    <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
+                    <CpmForwardAuthFields
+                        cpmForwardAuth={host.cpmForwardAuth}
+                        users={forwardAuthUsers}
+                        groups={forwardAuthGroups}
+                        currentAccess={forwardAuthAccess}
+                    />
+                    <LoadBalancerFields loadBalancer={host.loadBalancer} />
+                    <DnsResolverFields dnsResolver={host.dnsResolver} />
+                    <UpstreamDnsResolutionFields upstreamDnsResolution={host.upstreamDnsResolution} />
+                    <GeoBlockFields
+                        initialValues={{
+                            geoblock: host.geoblock,
+                            geoblock_mode: host.geoblockMode,
+                        }}
+                    />
+                    <WafFields value={host.waf} />
+                    <MtlsFields
+                        value={host.mtls}
+                        caCertificates={caCertificates}
+                        proxyHostId={host.id}
+                        mtlsRoles={mtlsRoles}
+                        issuedClientCerts={issuedClientCerts}
+                    />
+                </VStack>
             </form>
         </AppDialog>
     );
@@ -374,7 +355,10 @@ export function DeleteHostDialog({
     host: ProxyHost;
     onClose: () => void;
 }) {
-    const [state, formAction] = useActionState(deleteProxyHostAction.bind(null, host.id), INITIAL_ACTION_STATE);
+    const [state, formAction] = useActionState(
+        deleteProxyHostAction.bind(null, host.id),
+        INITIAL_ACTION_STATE
+    );
 
     useEffect(() => {
         if (state.status === "success") {
@@ -393,25 +377,28 @@ export function DeleteHostDialog({
                 (document.getElementById("delete-host-form") as HTMLFormElement)?.requestSubmit();
             }}
         >
-            <form id="delete-host-form" action={formAction} className="flex flex-col gap-4">
-                {state.status !== "idle" && state.message && (
-                    <Alert variant={state.status === "error" ? "destructive" : "default"}>
-                        <AlertDescription>{state.message}</AlertDescription>
-                    </Alert>
-                )}
-                <p className="text-sm">
-                    Are you sure you want to delete the proxy host <strong>{host.name}</strong>?
-                </p>
-                <p className="text-sm text-muted-foreground">
-                    This will remove the configuration for:
-                </p>
-                <div className="pl-4">
-                    <p className="text-sm text-muted-foreground">• Domains: {host.domains.join(", ")}</p>
-                    <p className="text-sm text-muted-foreground">• Upstreams: {host.upstreams.join(", ")}</p>
-                </div>
-                <p className="text-sm text-destructive font-medium">
-                    This action cannot be undone.
-                </p>
+            <form id="delete-host-form" action={formAction}>
+                <VStack gap={4}>
+                    <ActionStatus status={state.status} message={state.message} />
+                    <Text type="body" size="sm">
+                        Are you sure you want to delete the proxy host <strong>{host.name}</strong>?
+                    </Text>
+                    <VStack gap={1}>
+                        <Text type="body" size="sm" color="secondary">
+                            This will remove the configuration for:
+                        </Text>
+                        <Text type="body" size="sm" color="secondary">
+                            • Domains: {host.domains.join(", ")}
+                        </Text>
+                        <Text type="body" size="sm" color="secondary">
+                            • Upstreams: {host.upstreams.join(", ")}
+                        </Text>
+                    </VStack>
+                    <Banner
+                        status="warning"
+                        title="This action cannot be undone"
+                    />
+                </VStack>
             </form>
         </AppDialog>
     );

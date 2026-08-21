@@ -1,25 +1,30 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ShieldCheck, Plus, UserPlus } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Divider } from "@astryxdesign/core/Divider";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Icon } from "@astryxdesign/core/Icon";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { MtlsRole, MtlsRoleWithCertificates } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 
-const ACCENT_COLORS = [
-  { border: "border-l-amber-500", icon: "border-amber-500/30 bg-amber-500/10 text-amber-500", badge: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400", avatar: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
-  { border: "border-l-cyan-500", icon: "border-cyan-500/30 bg-cyan-500/10 text-cyan-500", badge: "border-cyan-500/30 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400", avatar: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400" },
-  { border: "border-l-violet-500", icon: "border-violet-500/30 bg-violet-500/10 text-violet-500", badge: "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400", avatar: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
-  { border: "border-l-emerald-500", icon: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500", badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400", avatar: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
-  { border: "border-l-rose-500", icon: "border-rose-500/30 bg-rose-500/10 text-rose-500", badge: "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400", avatar: "bg-rose-500/15 text-rose-600 dark:text-rose-400" },
-];
+/**
+ * Per-position card tints. Decorative only: a role's colour says nothing about
+ * it, so these map onto the theme's non-semantic variants rather than the
+ * hand-written amber/cyan/violet/emerald/rose classes they replace.
+ */
+const CARD_VARIANTS = ["orange", "cyan", "purple", "green", "red"] as const;
 
 type Props = {
   roles: MtlsRole[];
@@ -38,32 +43,37 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <VStack gap={4}>
       {/* Create inline form */}
       {createOpen ? (
         <CreateRoleCard onClose={() => setCreateOpen(false)} />
       ) : (
-        <Button variant="outline" className="w-full border-dashed gap-2" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" /> Create New Role
-        </Button>
+        <Button
+          variant="secondary"
+          width="100%"
+          icon={<Plus />}
+          label="Create New Role"
+          onClick={() => setCreateOpen(true)}
+        />
       )}
 
       {filtered.length === 0 && !createOpen && (
-        <div className="flex flex-col items-center gap-2 py-12 text-center">
-          <ShieldCheck className="h-10 w-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">
-            {search ? "No roles match your search." : "No mTLS roles yet."}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Roles group client certificates for access control on proxy hosts.
-          </p>
-        </div>
+        <EmptyState
+          icon={<ShieldCheck />}
+          title={search ? "No roles match your search." : "No mTLS roles yet."}
+          description="Roles group client certificates for access control on proxy hosts."
+        />
       )}
 
       {filtered.map((role, idx) => (
-        <RoleCard key={role.id} role={role} accent={ACCENT_COLORS[idx % ACCENT_COLORS.length]} activeCerts={activeCerts} />
+        <RoleCard
+          key={role.id}
+          role={role}
+          variant={CARD_VARIANTS[idx % CARD_VARIANTS.length]}
+          activeCerts={activeCerts}
+        />
       ))}
-    </div>
+    </VStack>
   );
 }
 
@@ -91,37 +101,58 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Card className="border-l-2 border-l-primary">
-      <CardContent className="pt-5 pb-4 px-5 flex flex-col gap-3">
-        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Name</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. admin" className="h-8 text-sm" autoFocus />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Description</Label>
-            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional" className="h-8 text-sm" />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onClose}>Cancel</Button>
-          <Button size="sm" className="h-7 text-xs" onClick={handleCreate} disabled={submitting}>
-            {submitting ? "Creating..." : "Create Role"}
-          </Button>
-        </div>
-      </CardContent>
+    <Card padding={5}>
+      <VStack gap={3}>
+        {error && <Banner status="error" title="Could not create role" description={error} />}
+        <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
+          <TextInput
+            label="Name"
+            size="sm"
+            value={name}
+            onChange={setName}
+            placeholder="e.g. admin"
+            hasAutoFocus
+          />
+          <TextInput
+            label="Description"
+            isOptional
+            size="sm"
+            value={description}
+            onChange={setDescription}
+            placeholder="Optional"
+          />
+        </Grid>
+        <HStack justify="end" gap={2}>
+          <Button variant="ghost" size="sm" label="Cancel" onClick={onClose} />
+          <Button
+            size="sm"
+            label="Create Role"
+            onClick={handleCreate}
+            isLoading={submitting}
+            isDisabled={submitting}
+          />
+        </HStack>
+      </VStack>
     </Card>
   );
 }
 
 /* ── Single role card ── */
 
-function RoleCard({ role, accent, activeCerts }: { role: MtlsRole; accent: typeof ACCENT_COLORS[0]; activeCerts: IssuedClientCertificate[] }) {
+function RoleCard({
+  role,
+  variant,
+  activeCerts,
+}: {
+  role: MtlsRole;
+  variant: (typeof CARD_VARIANTS)[number];
+  activeCerts: IssuedClientCertificate[];
+}) {
   const [assignedIds, setAssignedIds] = useState<Set<number>>(new Set());
   const [loaded, setLoaded] = useState(false);
   const [toggling, setToggling] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [name, setName] = useState(role.name);
   const [description, setDescription] = useState(role.description ?? "");
 
@@ -161,93 +192,143 @@ function RoleCard({ role, accent, activeCerts }: { role: MtlsRole; accent: typeo
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete role "${role.name}"?`)) return;
     await fetch(`/api/v1/mtls-roles/${role.id}`, { method: "DELETE" });
     window.location.reload();
   }
 
+  const certCountLabel = `${assignedIds.size} ${assignedIds.size === 1 ? "certificate" : "certificates"}`;
+
   return (
-    <Card className={`border-l-2 ${accent.border}`}>
-      <CardContent className="flex flex-col gap-4 pt-5 pb-5 px-5">
+    <Card variant={variant} padding={5}>
+      <VStack gap={4}>
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${accent.icon}`}>
-            <ShieldCheck className="h-4 w-4" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">{role.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {assignedIds.size} {assignedIds.size === 1 ? "certificate" : "certificates"}
-              {role.description && ` · ${role.description}`}
-            </p>
-          </div>
-          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums ${accent.badge}`}>
-            {assignedIds.size}
-          </span>
-        </div>
+        <HStack justify="between" vAlign="center" gap={3}>
+          <HStack gap={3} vAlign="center">
+            <Icon icon={ShieldCheck} />
+            <VStack gap={0}>
+              <Text type="body" size="sm" weight="semibold" maxLines={1}>
+                {role.name}
+              </Text>
+              <Text type="body" size="xsm" color="secondary">
+                {certCountLabel}
+                {role.description && ` · ${role.description}`}
+              </Text>
+            </VStack>
+          </HStack>
+          <Badge label={assignedIds.size} />
+        </HStack>
 
         {/* Edit form */}
         {editing ? (
-          <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">Name</Label>
-                <Input value={name} onChange={e => setName(e.target.value)} className="h-8 text-sm" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">Description</Label>
-                <Input value={description} onChange={e => setDescription(e.target.value)} className="h-8 text-sm" placeholder="Optional" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditing(false)}>Cancel</Button>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSave}>Save</Button>
-            </div>
-          </div>
+          <VStack gap={3}>
+            <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
+              <TextInput label="Name" size="sm" value={name} onChange={setName} />
+              <TextInput
+                label="Description"
+                isOptional
+                size="sm"
+                value={description}
+                onChange={setDescription}
+                placeholder="Optional"
+              />
+            </Grid>
+            <HStack justify="end" gap={2}>
+              <Button variant="ghost" size="sm" label="Cancel" onClick={() => setEditing(false)} />
+              <Button variant="secondary" size="sm" label="Save" onClick={handleSave} />
+            </HStack>
+          </VStack>
         ) : (
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditing(true)}>Edit</Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-destructive" onClick={handleDelete}>Delete role</Button>
-          </div>
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="sm" label="Edit" onClick={() => setEditing(true)} />
+            <Button
+              variant="ghost"
+              size="sm"
+              label="Delete role"
+              onClick={() => setDeleteOpen(true)}
+            />
+          </HStack>
         )}
 
-        <Separator />
+        <Divider />
 
         {/* Certificates */}
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Certificates</p>
+        <VStack gap={2}>
+          <Text type="label" size="xsm" weight="semibold" color="secondary">
+            Certificates
+          </Text>
 
           {!loaded ? (
-            <p className="text-sm text-muted-foreground py-2">Loading...</p>
+            <Text type="body" size="sm" color="secondary">
+              Loading...
+            </Text>
           ) : activeCerts.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
-              <UserPlus className="h-4 w-4 shrink-0" />
-              No client certificates issued yet.
-            </div>
+            <EmptyState
+              icon={<UserPlus />}
+              title="No client certificates issued yet."
+              isCompact
+            />
           ) : (
-            <div className="flex flex-col divide-y divide-border rounded-md border overflow-hidden">
-              {activeCerts.map(cert => {
-                const isAssigned = assignedIds.has(cert.id);
-                const isLoading = toggling === cert.id;
-                return (
-                  <div key={cert.id} className={`flex items-center justify-between px-3 py-2 bg-muted/20 hover:bg-muted/40 transition-colors ${isLoading ? "opacity-50" : ""}`}>
-                    <div className="flex items-center gap-2.5">
-                      <Checkbox checked={isAssigned} disabled={isLoading} onCheckedChange={() => handleToggle(cert.id)} />
-                      <div>
-                        <p className="text-sm font-medium leading-tight">{cert.commonName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          expires {new Date(cert.validTo).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    {isAssigned && <Badge variant="secondary" className="text-xs">Assigned</Badge>}
-                  </div>
-                );
-              })}
-            </div>
+            <List hasDividers>
+              {activeCerts.map(cert => (
+                <CertAssignmentRow
+                  key={cert.id}
+                  cert={cert}
+                  isAssigned={assignedIds.has(cert.id)}
+                  isLoading={toggling === cert.id}
+                  onToggle={() => handleToggle(cert.id)}
+                />
+              ))}
+            </List>
           )}
-        </div>
-      </CardContent>
+        </VStack>
+      </VStack>
+
+      {/* Replaces window.confirm, which was unstyled and not announced as a
+          dialog to assistive tech. */}
+      <AlertDialog
+        isOpen={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete role"
+        description={`Delete role "${role.name}"? Proxy hosts referencing it will lose this grouping.`}
+        actionLabel="Delete role"
+        onAction={handleDelete}
+      />
     </Card>
+  );
+}
+
+function CertAssignmentRow({
+  cert,
+  isAssigned,
+  isLoading,
+  onToggle,
+}: {
+  cert: IssuedClientCertificate;
+  isAssigned: boolean;
+  isLoading: boolean;
+  onToggle: () => void;
+}) {
+  const checkboxRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <ListItem
+      // The checkbox owns the row's keyboard access, so the whole row is a
+      // click target without adding a second tab stop.
+      interactiveRef={checkboxRef}
+      startContent={
+        <CheckboxInput
+          ref={checkboxRef}
+          label={`Assign ${cert.commonName} to this role`}
+          isLabelHidden
+          value={isAssigned}
+          isDisabled={isLoading}
+          onChange={onToggle}
+        />
+      }
+      label={cert.commonName}
+      description={`expires ${new Date(cert.validTo).toLocaleDateString()}`}
+      endContent={isAssigned ? <Badge label="Assigned" /> : undefined}
+      isDisabled={isLoading}
+    />
   );
 }

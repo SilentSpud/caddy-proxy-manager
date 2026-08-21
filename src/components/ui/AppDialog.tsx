@@ -1,12 +1,10 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+"use client";
+
 import { ReactNode } from "react";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
+import { HStack } from "@astryxdesign/core/Stack";
+import { Button } from "@astryxdesign/core/Button";
 
 type AppDialogProps = {
   open: boolean;
@@ -20,12 +18,13 @@ type AppDialogProps = {
   isSubmitting?: boolean;
 };
 
-const MAX_WIDTH_CLASS: Record<NonNullable<AppDialogProps["maxWidth"]>, string> = {
-  xs: "max-w-xs",
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-2xl",
-  xl: "max-w-4xl",
+/** Token-backed widths, replacing the max-w-* utility classes. */
+const DIALOG_WIDTH: Record<NonNullable<AppDialogProps["maxWidth"]>, number> = {
+  xs: 320,
+  sm: 420,
+  md: 560,
+  lg: 720,
+  xl: 960,
 };
 
 export function AppDialog({
@@ -40,36 +39,36 @@ export function AppDialog({
   isSubmitting = false,
 }: AppDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={MAX_WIDTH_CLASS[maxWidth]}>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex-1 min-h-0 overflow-y-auto py-4 px-1">{children}</div>
-
-        <DialogFooter>
-          {actions ?? (
-            <>
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              {onSubmit && (
-                <Button onClick={onSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                      Saving…
-                    </>
-                  ) : (
-                    submitLabel
+    <Dialog
+      isOpen={open}
+      onOpenChange={(isOpen) => !isOpen && onClose()}
+      width={DIALOG_WIDTH[maxWidth]}
+      // "form" keeps a backdrop click from discarding half-entered input.
+      purpose="form"
+    >
+      <Layout
+        header={<DialogHeader title={title} onOpenChange={() => onClose()} />}
+        content={<LayoutContent>{children}</LayoutContent>}
+        footer={
+          <LayoutFooter>
+            <HStack gap={2} justify="end">
+              {actions ?? (
+                <>
+                  <Button variant="secondary" label="Cancel" onClick={onClose} />
+                  {onSubmit && (
+                    <Button
+                      label={submitLabel}
+                      onClick={onSubmit}
+                      isLoading={isSubmitting}
+                      isDisabled={isSubmitting}
+                    />
                   )}
-                </Button>
+                </>
               )}
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
+            </HStack>
+          </LayoutFooter>
+        }
+      />
     </Dialog>
   );
 }

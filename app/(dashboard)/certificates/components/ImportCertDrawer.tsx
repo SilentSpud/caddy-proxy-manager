@@ -1,13 +1,15 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, EyeOff, FileUp } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Button } from "@astryxdesign/core/Button";
+import { FileInput } from "@astryxdesign/core/FileInput";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
+import { AppDialog } from "@/components/ui/AppDialog";
 import { createCertificateAction, updateCertificateAction } from "../actions";
 import type { ImportedCertView } from "../page";
 
@@ -17,19 +19,30 @@ type Props = {
   onClose: () => void;
 };
 
+const FORM_ID = "import-cert-form";
+
 export function ImportCertDrawer({ open, cert, onClose }: Props) {
   const isEdit = cert !== null;
   const [isPending, startTransition] = useTransition();
   const [showKey, setShowKey] = useState(false);
+  const [name, setName] = useState("");
+  const [domains, setDomains] = useState("");
   const [certPem, setCertPem] = useState("");
   const [keyPem, setKeyPem] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
-  const certFileRef = useRef<HTMLInputElement>(null);
-  const keyFileRef = useRef<HTMLInputElement>(null);
 
-  function handleClose() {
+  // The inputs are controlled, so opening the dialog has to seed them; the
+  // old markup relied on defaultValue plus a remount to do the same job.
+  useEffect(() => {
+    if (!open) return;
+    setName(cert?.name ?? "");
+    setDomains(cert?.domains.join("\n") ?? "");
     setCertPem("");
     setKeyPem("");
+    setShowKey(false);
+  }, [open, cert]);
+
+  function handleClose() {
     setShowKey(false);
     onClose();
   }
@@ -47,153 +60,117 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
     });
   }
 
-  function readFile(file: File, setter: (v: string) => void) {
+  function readFile(file: File | File[] | null, setter: (v: string) => void) {
+    const single = Array.isArray(file) ? file[0] : file;
+    if (!single) return;
     const reader = new FileReader();
     reader.onload = (e) => setter(e.target?.result as string);
-    reader.readAsText(file);
+    reader.readAsText(single);
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <SheetContent side="right" className="w-full sm:w-[480px] sm:max-w-[480px] flex flex-col gap-6 overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{isEdit ? "Edit Certificate" : "Import Certificate"}</SheetTitle>
-        </SheetHeader>
-
-        <form
-          ref={formRef}
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-4 flex-1"
-        >
+    <AppDialog
+      open={open}
+      onClose={handleClose}
+      title={isEdit ? "Edit Certificate" : "Import Certificate"}
+      maxWidth="md"
+      actions={
+        <>
+          <Button variant="secondary" label="Cancel" onClick={handleClose} isDisabled={isPending} />
+          {/* The footer sits outside the <form>, so the button is wired to it
+              by id. That also restores implicit submission on Enter. */}
+          <Button
+            type="submit"
+            form={FORM_ID}
+            label={isEdit ? "Save Changes" : "Import Certificate"}
+            isLoading={isPending}
+            isDisabled={isPending}
+          />
+        </>
+      }
+    >
+      <form id={FORM_ID} ref={formRef} onSubmit={handleSubmit}>
+        <VStack gap={4}>
           <input type="hidden" name="type" value="imported" />
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ic-name">Name</Label>
-            <Input
-              id="ic-name"
-              name="name"
-              defaultValue={isEdit ? cert.name : ""}
-              required
-              autoFocus
-            />
-            <p className="text-xs text-muted-foreground">Descriptive name to identify this certificate</p>
-          </div>
+          <TextInput
+            {...NATIVE_REQUIRED}
+            label="Name"
+            htmlName="name"
+            value={name}
+            onChange={setName}
+            isRequired
+            hasAutoFocus
+            description="Descriptive name to identify this certificate"
+          />
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ic-domains">Domains (one per line)</Label>
-            <Textarea
-              id="ic-domains"
-              name="domain_names"
-              defaultValue={isEdit ? cert.domains.join("\n") : ""}
-              rows={3}
-            />
-            <p className="text-xs text-muted-foreground">Domains covered by this certificate</p>
-          </div>
+          <TextArea
+            label="Domains (one per line)"
+            htmlName="domain_names"
+            value={domains}
+            onChange={setDomains}
+            rows={3}
+            description="Domains covered by this certificate"
+          />
 
-          {/* Certificate PEM */}
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ic-cert-pem">Certificate PEM</Label>
-              <Textarea
-                id="ic-cert-pem"
-                name="certificate_pem"
-                placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-                rows={6}
-                value={certPem}
-                onChange={(e) => setCertPem(e.target.value)}
-                className="font-mono text-xs"
-              />
-              <p className="text-xs text-muted-foreground">Full chain recommended (cert + intermediates)</p>
-            </div>
-            <input
-              type="file"
-              ref={certFileRef}
+          <VStack gap={2}>
+            <TextArea
+              label="Certificate PEM"
+              htmlName="certificate_pem"
+              placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
+              rows={6}
+              value={certPem}
+              onChange={setCertPem}
+              description="Full chain recommended (cert + intermediates)"
+            />
+            <FileInput
+              label="Load certificate from file"
+              isLabelHidden
               accept=".pem,.crt,.cer,.txt"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) readFile(file, setCertPem);
-              }}
+              value={null}
+              onChange={(f) => readFile(f, setCertPem)}
             />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="self-start"
-              onClick={() => certFileRef.current?.click()}
-            >
-              <FileUp className="h-4 w-4 mr-2" />
-              Load from file
-            </Button>
-          </div>
+          </VStack>
 
-          {/* Private Key PEM */}
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ic-key-pem">Private Key PEM</Label>
-              <div className="relative">
-                {/* <input type="password"> strips newlines on paste, corrupting multi-line PEM keys — always render a textarea and mask visually instead. */}
-                <Textarea
-                  id="ic-key-pem"
-                  name="private_key_pem"
-                  placeholder={showKey ? "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----" : "••••••••••••••••"}
+          <VStack gap={2}>
+            <HStack gap={2} vAlign="start">
+              {/* The mask is a CSS wrapper, not input type=password: a password
+                  input strips newlines on paste and would corrupt the PEM. */}
+              <div data-masked-input={showKey ? "false" : "true"} style={{ flex: 1 }}>
+                <TextArea
+                  label="Private Key PEM"
+                  htmlName="private_key_pem"
+                  placeholder={
+                    showKey
+                      ? "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+                      : "••••••••"
+                  }
                   rows={6}
                   value={keyPem}
-                  onChange={(e) => setKeyPem(e.target.value)}
-                  className="font-mono text-xs pr-10"
-                  style={showKey ? undefined : { WebkitTextSecurity: "disc" } as React.CSSProperties}
+                  onChange={setKeyPem}
+                  hasSpellCheck={false}
+                  width="100%"
+                  description="Keep this secure. Never share your private key."
                 />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1 h-7 w-7"
-                      onClick={() => setShowKey((v) => !v)}
-                      aria-label={showKey ? "Hide private key" : "Show private key"}
-                    >
-                      {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{showKey ? "Hide" : "Show"}</TooltipContent>
-                </Tooltip>
               </div>
-              <p className="text-xs text-muted-foreground">Keep this secure! Never share your private key</p>
-            </div>
-            <input
-              type="file"
-              ref={keyFileRef}
+              <IconButton
+                variant="ghost"
+                label={showKey ? "Hide private key" : "Show private key"}
+                tooltip={showKey ? "Hide" : "Show"}
+                icon={showKey ? <EyeOff /> : <Eye />}
+                onClick={() => setShowKey((v) => !v)}
+              />
+            </HStack>
+            <FileInput
+              label="Load private key from file"
+              isLabelHidden
               accept=".pem,.key,.txt"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) readFile(file, setKeyPem);
-              }}
+              value={null}
+              onChange={(f) => readFile(f, setKeyPem)}
             />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="self-start"
-              onClick={() => keyFileRef.current?.click()}
-            >
-              <FileUp className="h-4 w-4 mr-2" />
-              Load from file
-            </Button>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 justify-end mt-auto pt-2">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Saving..." : isEdit ? "Save Changes" : "Import Certificate"}
-            </Button>
-          </div>
-        </form>
-      </SheetContent>
-    </Sheet>
+          </VStack>
+        </VStack>
+      </form>
+    </AppDialog>
   );
 }

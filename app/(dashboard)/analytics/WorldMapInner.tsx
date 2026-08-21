@@ -5,7 +5,9 @@ import MapGL, { Layer, Popup, Source, type MapLayerMouseEvent } from 'react-map-
 import { feature } from 'topojson-client';
 import type { Topology, GeometryCollection } from 'topojson-specification';
 import { setWorkerUrl, type ExpressionSpecification, type FillLayerSpecification, type LineLayerSpecification } from 'maplibre-gl';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@astryxdesign/core/Skeleton';
+import { Text } from '@astryxdesign/core/Text';
+import { HStack } from '@astryxdesign/core/Stack';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // maplibre-gl v6 loads its tile worker from a separate file resolved at runtime
@@ -271,9 +273,7 @@ export default function WorldMapInner({ data, selectedCountry }: { data: Country
 
   if (!geojson) {
     return (
-      <div className="flex justify-center items-center h-[300px]">
-        <Skeleton className="w-full h-[400px] rounded-lg" />
-      </div>
+      <Skeleton width="100%" height={400} />
     );
   }
 
@@ -362,11 +362,20 @@ export default function WorldMapInner({ data, selectedCountry }: { data: Country
       </div>
 
       {max > 0 && (
-        <div className="flex items-center gap-2 mt-1.5 px-0.5">
-          <p className="text-xs text-muted-foreground">Low</p>
-          <div className="flex-1 h-[5px] rounded-full" style={{ background: 'linear-gradient(to right, #1e3a8a, #3b82f6, #93c5fd)' }} />
-          <p className="text-xs text-muted-foreground">High</p>
-        </div>
+        <HStack gap={2} vAlign="center">
+          <Text type="body" size="xsm" color="secondary">Low</Text>
+          {/* The ramp mirrors the map's own fill-colour interpolation, so it
+              stays in the map's palette rather than the theme's. */}
+          <div
+            style={{
+              flex: 1,
+              height: 5,
+              borderRadius: 999,
+              background: 'linear-gradient(to right, #1e3a8a, #3b82f6, #93c5fd)',
+            }}
+          />
+          <Text type="body" size="xsm" color="secondary">High</Text>
+        </HStack>
       )}
     </div>
   );

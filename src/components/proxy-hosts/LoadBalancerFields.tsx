@@ -1,8 +1,14 @@
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+"use client";
+
 import { useState } from "react";
+import { Card } from "@astryxdesign/core/Card";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Switch } from "@astryxdesign/core/Switch";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Text } from "@astryxdesign/core/Text";
+import { Grid } from "@astryxdesign/core/Grid";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { ProxyHost, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 
 const LOAD_BALANCING_POLICIES = [
@@ -13,263 +19,300 @@ const LOAD_BALANCING_POLICIES = [
   { value: "first", label: "First Available", description: "First available upstream" },
   { value: "header", label: "Header Hash", description: "Hash based on request header" },
   { value: "cookie", label: "Cookie", description: "Cookie-based sticky sessions" },
-  { value: "uri_hash", label: "URI Hash", description: "URI path-based distribution" }
+  { value: "uri_hash", label: "URI Hash", description: "URI path-based distribution" },
 ];
 
+/**
+ * Every value is held in one state object because Astryx inputs are controlled,
+ * where these were uncontrolled `defaultValue` fields. `htmlName` on each input
+ * keeps the submitted FormData keys byte-identical to before.
+ */
+type TextFields = {
+  policyHeaderField: string;
+  policyCookieName: string;
+  policyCookieSecret: string;
+  tryDuration: string;
+  tryInterval: string;
+  activeHealthUri: string;
+  activeHealthInterval: string;
+  activeHealthTimeout: string;
+  activeHealthBody: string;
+  passiveHealthFailDuration: string;
+  passiveHealthUnhealthyStatus: string;
+  passiveHealthUnhealthyLatency: string;
+};
+
+type NumberFields = {
+  retries: number | null;
+  activeHealthPort: number | null;
+  activeHealthStatus: number | null;
+  passiveHealthMaxFails: number | null;
+};
+
 export function LoadBalancerFields({
-  loadBalancer
+  loadBalancer,
 }: {
   loadBalancer?: ProxyHost["loadBalancer"] | null;
 }) {
   const initial = loadBalancer ?? null;
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [policy, setPolicy] = useState<LoadBalancingPolicy>(initial?.policy ?? "random");
-  const [activeHealthEnabled, setActiveHealthEnabled] = useState(initial?.activeHealthCheck?.enabled ?? false);
-  const [passiveHealthEnabled, setPassiveHealthEnabled] = useState(initial?.passiveHealthCheck?.enabled ?? false);
+  const [activeHealthEnabled, setActiveHealthEnabled] = useState(
+    initial?.activeHealthCheck?.enabled ?? false
+  );
+  const [passiveHealthEnabled, setPassiveHealthEnabled] = useState(
+    initial?.passiveHealthCheck?.enabled ?? false
+  );
 
-  const showHeaderField = policy === "header";
-  const showCookieFields = policy === "cookie";
+  const [text, setText] = useState<TextFields>({
+    policyHeaderField: initial?.policyHeaderField ?? "",
+    policyCookieName: initial?.policyCookieName ?? "",
+    policyCookieSecret: initial?.policyCookieSecret ?? "",
+    tryDuration: initial?.tryDuration ?? "",
+    tryInterval: initial?.tryInterval ?? "",
+    activeHealthUri: initial?.activeHealthCheck?.uri ?? "",
+    activeHealthInterval: initial?.activeHealthCheck?.interval ?? "",
+    activeHealthTimeout: initial?.activeHealthCheck?.timeout ?? "",
+    activeHealthBody: initial?.activeHealthCheck?.body ?? "",
+    passiveHealthFailDuration: initial?.passiveHealthCheck?.failDuration ?? "",
+    passiveHealthUnhealthyStatus:
+      initial?.passiveHealthCheck?.unhealthyStatus?.join(", ") ?? "",
+    passiveHealthUnhealthyLatency: initial?.passiveHealthCheck?.unhealthyLatency ?? "",
+  });
+
+  const [numbers, setNumbers] = useState<NumberFields>({
+    retries: initial?.retries ?? null,
+    activeHealthPort: initial?.activeHealthCheck?.port ?? null,
+    activeHealthStatus: initial?.activeHealthCheck?.status ?? null,
+    passiveHealthMaxFails: initial?.passiveHealthCheck?.maxFails ?? null,
+  });
+
+  const setTextField = (key: keyof TextFields) => (value: string) =>
+    setText((prev) => ({ ...prev, [key]: value }));
+  const setNumberField = (key: keyof NumberFields) => (value: number | null) =>
+    setNumbers((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="rounded-lg border border-cyan-500/60 bg-cyan-500/5 p-5">
+    <Card>
       <input type="hidden" name="lbPresent" value="1" />
       <input type="hidden" name="lbEnabledPresent" value="1" />
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-row items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">Load Balancer</p>
-            <p className="text-sm text-muted-foreground">
+
+      <VStack gap={4}>
+        <HStack justify="between" vAlign="center" gap={4}>
+          <VStack gap={1}>
+            <Text type="body" size="sm" weight="semibold">
+              Load Balancer
+            </Text>
+            <Text type="body" size="sm" color="secondary">
               Configure load balancing and health checks for multiple upstreams
-            </p>
-          </div>
+            </Text>
+          </VStack>
           <Switch
-            name="lbEnabled"
-            checked={enabled}
-            onCheckedChange={setEnabled}
+            label="Enable load balancing"
+            isLabelHidden
+            htmlName="lbEnabled"
+            value={enabled}
+            onChange={setEnabled}
           />
-        </div>
+        </HStack>
 
-        <div className={cn(
-          "overflow-hidden transition-all duration-200",
-          enabled ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-        )}>
-          <div className="flex flex-col gap-6">
-            {/* Policy Selection */}
-            <div>
-              <p className="text-sm font-semibold mb-2">Selection Policy</p>
-              <input type="hidden" name="lbPolicy" value={policy} />
-              <Select value={policy} onValueChange={(v) => setPolicy(v as LoadBalancingPolicy)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select policy" />
-                </SelectTrigger>
-                <SelectContent>
-                  {LOAD_BALANCING_POLICIES.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label} - {p.description}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {enabled && (
+          <VStack gap={6}>
+            <input type="hidden" name="lbPolicy" value={policy} />
+            <Selector
+              label="Selection Policy"
+              options={LOAD_BALANCING_POLICIES}
+              value={policy}
+              onChange={(next) => setPolicy(next as LoadBalancingPolicy)}
+            />
 
-            {/* Header-based policy fields */}
-            <div className={cn(
-              "overflow-hidden transition-all duration-200",
-              showHeaderField ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-            )}>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Header Field Name</label>
-                <Input
-                  name="lbPolicyHeaderField"
-                  placeholder="X-Custom-Header"
-                  defaultValue={initial?.policyHeaderField ?? ""}
-                  className="h-8 text-sm"
+            {policy === "header" && (
+              <TextInput
+                label="Header Field Name"
+                htmlName="lbPolicyHeaderField"
+                placeholder="X-Custom-Header"
+                value={text.policyHeaderField}
+                onChange={setTextField("policyHeaderField")}
+                description="The request header to hash for upstream selection"
+              />
+            )}
+
+            {policy === "cookie" && (
+              <VStack gap={4}>
+                <TextInput
+                  label="Cookie Name"
+                  htmlName="lbPolicyCookieName"
+                  placeholder="server_id"
+                  value={text.policyCookieName}
+                  onChange={setTextField("policyCookieName")}
+                  description="Name of the cookie for sticky sessions"
                 />
-                <p className="text-xs text-muted-foreground mt-1">The request header to hash for upstream selection</p>
-              </div>
-            </div>
+                <TextInput
+                  label="Cookie Secret"
+                  isOptional
+                  htmlName="lbPolicyCookieSecret"
+                  placeholder="your-secret-key"
+                  value={text.policyCookieSecret}
+                  onChange={setTextField("policyCookieSecret")}
+                  description="Secret key for HMAC cookie signing"
+                />
+              </VStack>
+            )}
 
-            {/* Cookie-based policy fields */}
-            <div className={cn(
-              "overflow-hidden transition-all duration-200",
-              showCookieFields ? "max-h-[300px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-            )}>
-              <div className="flex flex-col gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Cookie Name</label>
-                  <Input
-                    name="lbPolicyCookieName"
-                    placeholder="server_id"
-                    defaultValue={initial?.policyCookieName ?? ""}
-                    className="h-8 text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Name of the cookie for sticky sessions</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Cookie Secret (Optional)</label>
-                  <Input
-                    name="lbPolicyCookieSecret"
-                    placeholder="your-secret-key"
-                    defaultValue={initial?.policyCookieSecret ?? ""}
-                    className="h-8 text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Secret key for HMAC cookie signing</p>
-                </div>
-              </div>
-            </div>
+            <VStack gap={2}>
+              <Text type="body" size="sm" weight="semibold">
+                Retry Settings
+              </Text>
+              <Grid columns={3} gap={4}>
+                <TextInput
+                  label="Try Duration"
+                  htmlName="lbTryDuration"
+                  placeholder="5s"
+                  value={text.tryDuration}
+                  onChange={setTextField("tryDuration")}
+                  description="How long to try upstreams"
+                />
+                <TextInput
+                  label="Try Interval"
+                  htmlName="lbTryInterval"
+                  placeholder="250ms"
+                  value={text.tryInterval}
+                  onChange={setTextField("tryInterval")}
+                  description="Wait between attempts"
+                />
+                <NumberInput
+                  label="Max Retries"
+                  htmlName="lbRetries"
+                  min={0}
+                  isIntegerOnly
+                  value={numbers.retries}
+                  onChange={setNumberField("retries")}
+                  description="Maximum retry attempts"
+                />
+              </Grid>
+            </VStack>
 
-            {/* Retry Settings */}
-            <div>
-              <p className="text-sm font-semibold mb-2">Retry Settings</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Try Duration</label>
-                  <Input
-                    name="lbTryDuration"
-                    placeholder="5s"
-                    defaultValue={initial?.tryDuration ?? ""}
-                    className="h-8 text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">How long to try upstreams</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Try Interval</label>
-                  <Input
-                    name="lbTryInterval"
-                    placeholder="250ms"
-                    defaultValue={initial?.tryInterval ?? ""}
-                    className="h-8 text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Wait between attempts</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Max Retries</label>
-                  <Input
-                    name="lbRetries"
-                    type="number"
-                    min={0}
-                    defaultValue={initial?.retries ?? ""}
-                    className="h-8 text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Maximum retry attempts</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Active Health Checks */}
-            <div className="rounded-lg border border-border p-4">
+            <Card variant="muted">
               <input type="hidden" name="lbActiveHealthEnabledPresent" value="1" />
-              <div className="flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                  <Switch
-                    name="lbActiveHealthEnabled"
-                    checked={activeHealthEnabled}
-                    onCheckedChange={setActiveHealthEnabled}
-                  />
-                  <div>
-                    <p className="text-sm font-semibold">Active Health Checks</p>
-                    <span className="text-xs text-muted-foreground">Periodically probe upstreams to check health</span>
-                  </div>
-                </div>
+              <VStack gap={4}>
+                <Switch
+                  label="Active Health Checks"
+                  description="Periodically probe upstreams to check health"
+                  htmlName="lbActiveHealthEnabled"
+                  value={activeHealthEnabled}
+                  onChange={setActiveHealthEnabled}
+                />
+                {activeHealthEnabled && (
+                  <Grid columns={2} gap={4}>
+                    <TextInput
+                      label="Health Check URI"
+                      htmlName="lbActiveHealthUri"
+                      placeholder="/health"
+                      value={text.activeHealthUri}
+                      onChange={setTextField("activeHealthUri")}
+                      description="Path to probe for health"
+                    />
+                    <NumberInput
+                      label="Health Check Port"
+                      htmlName="lbActiveHealthPort"
+                      min={1}
+                      max={65535}
+                      isIntegerOnly
+                      value={numbers.activeHealthPort}
+                      onChange={setNumberField("activeHealthPort")}
+                      description="Override upstream port"
+                    />
+                    <TextInput
+                      label="Check Interval"
+                      htmlName="lbActiveHealthInterval"
+                      placeholder="30s"
+                      value={text.activeHealthInterval}
+                      onChange={setTextField("activeHealthInterval")}
+                      description="How often to check"
+                    />
+                    <TextInput
+                      label="Check Timeout"
+                      htmlName="lbActiveHealthTimeout"
+                      placeholder="5s"
+                      value={text.activeHealthTimeout}
+                      onChange={setTextField("activeHealthTimeout")}
+                      description="Timeout for health probe"
+                    />
+                    <NumberInput
+                      label="Expected Status Code"
+                      htmlName="lbActiveHealthStatus"
+                      min={100}
+                      max={599}
+                      isIntegerOnly
+                      value={numbers.activeHealthStatus}
+                      onChange={setNumberField("activeHealthStatus")}
+                      description="Expected HTTP status"
+                    />
+                    <TextInput
+                      label="Expected Body"
+                      htmlName="lbActiveHealthBody"
+                      placeholder="OK"
+                      value={text.activeHealthBody}
+                      onChange={setTextField("activeHealthBody")}
+                      description="Expected response body"
+                    />
+                  </Grid>
+                )}
+              </VStack>
+            </Card>
 
-                <div className={cn(
-                  "overflow-hidden transition-all duration-200",
-                  activeHealthEnabled ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-                )}>
-                  <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Health Check URI</label>
-                        <Input name="lbActiveHealthUri" placeholder="/health" defaultValue={initial?.activeHealthCheck?.uri ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Path to probe for health</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Health Check Port</label>
-                        <Input name="lbActiveHealthPort" type="number" min={1} max={65535} defaultValue={initial?.activeHealthCheck?.port ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Override upstream port</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Check Interval</label>
-                        <Input name="lbActiveHealthInterval" placeholder="30s" defaultValue={initial?.activeHealthCheck?.interval ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">How often to check</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Check Timeout</label>
-                        <Input name="lbActiveHealthTimeout" placeholder="5s" defaultValue={initial?.activeHealthCheck?.timeout ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Timeout for health probe</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Expected Status Code</label>
-                        <Input name="lbActiveHealthStatus" type="number" min={100} max={599} defaultValue={initial?.activeHealthCheck?.status ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Expected HTTP status</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Expected Body</label>
-                        <Input name="lbActiveHealthBody" placeholder="OK" defaultValue={initial?.activeHealthCheck?.body ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Expected response body</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Passive Health Checks */}
-            <div className="rounded-lg border border-border p-4">
+            <Card variant="muted">
               <input type="hidden" name="lbPassiveHealthEnabledPresent" value="1" />
-              <div className="flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                  <Switch
-                    name="lbPassiveHealthEnabled"
-                    checked={passiveHealthEnabled}
-                    onCheckedChange={setPassiveHealthEnabled}
-                  />
-                  <div>
-                    <p className="text-sm font-semibold">Passive Health Checks</p>
-                    <span className="text-xs text-muted-foreground">Mark upstreams unhealthy based on response failures</span>
-                  </div>
-                </div>
-
-                <div className={cn(
-                  "overflow-hidden transition-all duration-200",
-                  passiveHealthEnabled ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-                )}>
-                  <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Fail Duration</label>
-                        <Input name="lbPassiveHealthFailDuration" placeholder="30s" defaultValue={initial?.passiveHealthCheck?.failDuration ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">How long to remember failures</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Max Failures</label>
-                        <Input name="lbPassiveHealthMaxFails" type="number" min={0} defaultValue={initial?.passiveHealthCheck?.maxFails ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Failures before marking unhealthy</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Unhealthy Status Codes</label>
-                        <Input name="lbPassiveHealthUnhealthyStatus" placeholder="500, 502, 503" defaultValue={initial?.passiveHealthCheck?.unhealthyStatus?.join(", ") ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Comma-separated status codes</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Unhealthy Latency</label>
-                        <Input name="lbPassiveHealthUnhealthyLatency" placeholder="5s" defaultValue={initial?.passiveHealthCheck?.unhealthyLatency ?? ""} className="h-8 text-sm" />
-                        <p className="text-xs text-muted-foreground mt-1">Latency threshold for unhealthy</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+              <VStack gap={4}>
+                <Switch
+                  label="Passive Health Checks"
+                  description="Mark upstreams unhealthy based on response failures"
+                  htmlName="lbPassiveHealthEnabled"
+                  value={passiveHealthEnabled}
+                  onChange={setPassiveHealthEnabled}
+                />
+                {passiveHealthEnabled && (
+                  <Grid columns={2} gap={4}>
+                    <TextInput
+                      label="Fail Duration"
+                      htmlName="lbPassiveHealthFailDuration"
+                      placeholder="30s"
+                      value={text.passiveHealthFailDuration}
+                      onChange={setTextField("passiveHealthFailDuration")}
+                      description="How long to remember failures"
+                    />
+                    <NumberInput
+                      label="Max Failures"
+                      htmlName="lbPassiveHealthMaxFails"
+                      min={0}
+                      isIntegerOnly
+                      value={numbers.passiveHealthMaxFails}
+                      onChange={setNumberField("passiveHealthMaxFails")}
+                      description="Failures before marking unhealthy"
+                    />
+                    <TextInput
+                      label="Unhealthy Status Codes"
+                      htmlName="lbPassiveHealthUnhealthyStatus"
+                      placeholder="500, 502, 503"
+                      value={text.passiveHealthUnhealthyStatus}
+                      onChange={setTextField("passiveHealthUnhealthyStatus")}
+                      description="Comma-separated status codes"
+                    />
+                    <TextInput
+                      label="Unhealthy Latency"
+                      htmlName="lbPassiveHealthUnhealthyLatency"
+                      placeholder="5s"
+                      value={text.passiveHealthUnhealthyLatency}
+                      onChange={setTextField("passiveHealthUnhealthyLatency")}
+                      description="Latency threshold for unhealthy"
+                    />
+                  </Grid>
+                )}
+              </VStack>
+            </Card>
+          </VStack>
+        )}
+      </VStack>
+    </Card>
   );
 }

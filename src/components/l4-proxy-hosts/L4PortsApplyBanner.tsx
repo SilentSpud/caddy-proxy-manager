@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, CheckCircle, XCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { RefreshCw } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 
 type PortsDiff = {
   currentPorts: string[];
@@ -93,80 +95,65 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
     return null;
   }
 
-  const isSpinning =
-    status.state === "pending" || status.state === "applying";
+  const isSpinning = status.state === "pending" || status.state === "applying";
 
-  const alertVariant: "default" | "destructive" =
-    status.state === "failed" ? "destructive" : "default";
-
-  const stateIcon =
-    status.state === "applied" ? (
-      <CheckCircle className="h-4 w-4 text-green-500" />
-    ) : status.state === "failed" ? (
-      <XCircle className="h-4 w-4 text-destructive" />
-    ) : isSpinning ? (
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-    ) : null;
+  const bannerStatus =
+    status.state === "failed"
+      ? "error"
+      : status.state === "applied"
+        ? "success"
+        : diff.needsApply
+          ? "warning"
+          : "info";
 
   return (
-    <Alert
-      variant={alertVariant}
-      className={cn(
-        "flex items-start gap-3",
-        status.state === "applied" && "border-green-500/50 text-green-700 dark:text-green-400",
-        diff.needsApply && status.state !== "failed" && status.state !== "applied" && "border-yellow-500/50 text-yellow-800 dark:text-yellow-400"
-      )}
-    >
-      {stateIcon && <div className="mt-0.5 shrink-0">{stateIcon}</div>}
-      <AlertDescription className="flex-1">
-        <div className="flex flex-col gap-1">
-          {diff.needsApply ? (
-            <p className="text-sm">
-              <strong>Docker port changes pending.</strong> The caddy container
-              needs to be recreated to expose L4 ports.
+    <Banner
+      status={bannerStatus}
+      // Banner supplies its own status icon; only the in-flight spinner needs
+      // to replace it.
+      icon={isSpinning ? <Spinner size="sm" /> : undefined}
+      title={
+        diff.needsApply ? "Docker port changes pending" : (status.message ?? "Docker port status")
+      }
+      description={
+        <VStack gap={1}>
+          {diff.needsApply && (
+            <>
+              <Text type="body" size="sm">
+                The caddy container needs to be recreated to expose L4 ports.
+              </Text>
               {diff.requiredPorts.length > 0 && (
-                <span className="inline-flex items-center gap-1 ml-1 flex-wrap">
-                  Required:{" "}
+                <HStack gap={1} wrap="wrap" vAlign="center">
+                  <Text type="body" size="sm">
+                    Required:
+                  </Text>
                   {diff.requiredPorts.map((p) => (
-                    <Badge
-                      key={p}
-                      variant="outline"
-                      className="text-[0.7rem] h-5 px-1.5"
-                    >
-                      {p}
-                    </Badge>
+                    <Badge key={p} label={p} />
                   ))}
-                </span>
+                </HStack>
               )}
-            </p>
-          ) : (
-            <p className="text-sm">{status.message}</p>
+            </>
           )}
           {status.state === "failed" && status.error && (
-            <p className="text-xs text-destructive">{status.error}</p>
+            <Text type="body" size="xsm">
+              {status.error}
+            </Text>
           )}
-        </div>
-      </AlertDescription>
-      {diff.needsApply && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleApply}
-          disabled={
-            applying ||
-            status.state === "pending" ||
-            status.state === "applying"
-          }
-          className="shrink-0 ml-auto"
-        >
-          {applying ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent mr-1.5" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-          )}
-          Apply Ports
-        </Button>
-      )}
-    </Alert>
+        </VStack>
+      }
+      endContent={
+        diff.needsApply ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw />}
+            label="Apply Ports"
+            isLoading={applying}
+            isDisabled={applying || isSpinning}
+            onClick={handleApply}
+          />
+        ) : undefined
+      }
+    />
   );
 }

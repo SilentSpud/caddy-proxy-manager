@@ -1,6 +1,9 @@
 import { Plus } from "lucide-react";
 import { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@astryxdesign/core/Button";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 
 type PageHeaderProps = {
   title: string;
@@ -14,19 +17,22 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+    <HStack justify="between" vAlign="start" gap={4} wrap="wrap" paddingBlock={2}>
+      <VStack gap={1} maxWidth={560}>
+        <Heading level={1}>{title}</Heading>
         {description && (
-          <p className="text-sm text-muted-foreground max-w-xl">{description}</p>
+          <Text type="body" size="sm" color="secondary">
+            {description}
+          </Text>
         )}
-      </div>
+      </VStack>
       {action && (
-        <Button onClick={action.onClick} className="shrink-0">
-          {action.icon ?? <Plus className="h-4 w-4" />}
-          {action.label}
-        </Button>
+        <Button
+          label={action.label}
+          icon={action.icon ?? <Plus />}
+          onClick={action.onClick}
+        />
       )}
-    </div>
+    </HStack>
   );
 }

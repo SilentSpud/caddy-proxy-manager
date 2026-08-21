@@ -1,21 +1,23 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   LayoutDashboard, ArrowLeftRight, Cable, KeyRound, ShieldCheck,
-  ShieldOff, BarChart2, History, Settings, LogOut, Menu, Sun, Moon,
+  ShieldOff, BarChart2, History, Settings, LogOut, Sun, Moon,
   FileJson2, Users, UserCog,
 } from "lucide-react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { AppShell } from "@astryxdesign/core/AppShell";
+import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
+import { NavIcon } from "@astryxdesign/core/NavIcon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Text } from "@astryxdesign/core/Text";
+import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 
 type User = {
   id: string;
@@ -30,8 +32,8 @@ const NAV_ITEMS = [
   { href: "/proxy-hosts",    label: "Proxy Hosts",    icon: ArrowLeftRight,  adminOnly: true  },
   { href: "/l4-proxy-hosts", label: "L4 Proxy Hosts", icon: Cable,           adminOnly: true  },
   { href: "/access-lists",   label: "Access Lists",   icon: KeyRound,        adminOnly: true  },
-  { href: "/groups",          label: "Groups",          icon: Users,           adminOnly: true  },
-  { href: "/users",           label: "Users",           icon: UserCog,         adminOnly: true  },
+  { href: "/groups",         label: "Groups",         icon: Users,           adminOnly: true  },
+  { href: "/users",          label: "Users",          icon: UserCog,         adminOnly: true  },
   { href: "/certificates",   label: "Certificates",   icon: ShieldCheck,     adminOnly: true  },
   { href: "/waf",            label: "WAF",            icon: ShieldOff,       adminOnly: true  },
   { href: "/analytics",      label: "Analytics",      icon: BarChart2,       adminOnly: true  },
@@ -42,157 +44,109 @@ const NAV_ITEMS = [
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   return (
-    <Button
+    <IconButton
       variant="ghost"
-      size="icon"
-      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      aria-label="Toggle theme"
-    >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-    </Button>
+      size="sm"
+      label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      icon={isDark ? <Moon /> : <Sun />}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+    />
   );
 }
 
-function NavContent({ pathname, user, avatar, appName, onNavigate }: {
-  pathname: string;
+function SignOutButton() {
+  return (
+    <form action="/api/auth/logout" method="POST">
+      <IconButton variant="ghost" size="sm" label="Sign out" icon={<LogOut />} type="submit" />
+    </form>
+  );
+}
+
+/** The signed-in user, shown in the SideNav footer as a link to their profile. */
+function UserFooter({ user, avatar }: { user: User; avatar: ResolvedAvatar }) {
+  const router = useRouter();
+  const { closeMobileNav } = useAppShellMobile();
+
+  return (
+    <HStack gap={2} vAlign="center" justify="between" width="100%">
+      <HStack
+        gap={2}
+        vAlign="center"
+        as="button"
+        onClick={() => {
+          router.push("/profile");
+          closeMobileNav();
+        }}
+      >
+        <UserAvatar avatar={avatar} alt={user.name ?? "User"} size="sm" />
+        <VStack hAlign="start">
+          <Text type="body" size="sm" weight="medium" maxLines={1}>
+            {user.name ?? "Administrator"}
+          </Text>
+          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+            {user.email}
+          </Text>
+        </VStack>
+      </HStack>
+      <HStack gap={1} vAlign="center">
+        <ThemeToggle />
+        <SignOutButton />
+      </HStack>
+    </HStack>
+  );
+}
+
+export default function DashboardLayoutClient({
+  user,
+  avatar,
+  appName,
+  children,
+}: {
   user: User;
   avatar: ResolvedAvatar;
   appName: string;
-  onNavigate?: () => void;
+  children: ReactNode;
 }) {
-  const router = useRouter();
+  const pathname = usePathname();
   const isAdmin = user.role === "admin";
   const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-4 py-5 flex items-center gap-2">
-        <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-xs">C</span>
-        </div>
-        <p className="font-semibold text-sm tracking-tight">{appName}</p>
-      </div>
-      <Separator />
+  // Settings and Access Lists render their own full-bleed frame, so the shell
+  // does not add page padding on top of it.
+  const isFullBleed = pathname === "/settings" || pathname === "/access-lists";
 
-      {/* Nav items */}
-      <ScrollArea className="flex-1 px-2 py-2">
-        <nav className="flex flex-col gap-0.5">
-          {visibleItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
-            return (
-              <Button
+  return (
+    <AppShell
+      contentPadding={isFullBleed ? 0 : 6}
+      sideNav={
+        <SideNav
+          header={
+            <SideNavHeading
+              heading={appName}
+              headingHref="/"
+              icon={<NavIcon icon={<Text type="body" size="xsm" weight="bold">C</Text>} />}
+            />
+          }
+          footer={<UserFooter user={user} avatar={avatar} />}
+        >
+          <SideNavSection title="Navigation" isHeaderHidden>
+            {visibleItems.map(({ href, label, icon }) => (
+              <SideNavItem
                 key={href}
-                variant="ghost"
-                className={cn(
-                  "w-full justify-start gap-3 h-9 px-3",
-                  active
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60 font-normal"
-                )}
-                asChild
-                onClick={onNavigate}
-              >
-                <Link href={href}>
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {label}
-                </Link>
-              </Button>
-            );
-          })}
-        </nav>
-      </ScrollArea>
-
-      {/* Footer */}
-      <div className="p-3 space-y-1">
-        <Separator className="mb-2" />
-        <div className="flex items-center justify-between px-1">
-          <Button
-            variant="ghost"
-            className="flex-1 justify-start gap-3 px-2 h-auto py-2 min-w-0"
-            onClick={() => { router.push("/profile"); onNavigate?.(); }}
-          >
-            <UserAvatar
-              avatar={avatar}
-              alt={user.name ?? "User"}
-              className="h-8 w-8 shrink-0"
-              fallbackClassName="text-xs"
-            />
-            <div className="flex flex-col items-start overflow-hidden min-w-0">
-              <span className="text-sm font-medium truncate w-full">{user.name ?? "Administrator"}</span>
-              <span className="text-xs text-muted-foreground truncate w-full">{user.email}</span>
-            </div>
-          </Button>
-          <div className="flex items-center shrink-0">
-            <ThemeToggle />
-            <form action="/api/auth/logout" method="POST">
-              <Button
-                type="submit"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                title="Sign Out"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function DashboardLayoutClient({ user, avatar, appName, children }: { user: User; avatar: ResolvedAvatar; appName: string; children: ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const pathname = usePathname();
-  const router = useRouter();
-
-  return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar — fixed, hidden on mobile */}
-      <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-border bg-card z-30">
-        <NavContent pathname={pathname} user={user} avatar={avatar} appName={appName} />
-      </aside>
-
-      {/* Mobile top bar */}
-      <header className="md:hidden fixed top-0 inset-x-0 h-12 flex items-center justify-between px-4 border-b border-border bg-card z-40">
-        <Button variant="ghost" size="icon" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
-          <Menu className="h-5 w-5" />
-        </Button>
-        <span className="font-semibold text-sm">{appName}</span>
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" aria-label="Go to profile" onClick={() => router.push("/profile")}>
-            <UserAvatar
-              avatar={avatar}
-              alt={user.name ?? "User"}
-              className="h-6 w-6"
-              fallbackClassName="text-[10px]"
-            />
-          </Button>
-        </div>
-      </header>
-
-      {/* Mobile Sheet drawer */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-64 sm:max-w-[256px] p-0">
-          <NavContent pathname={pathname} user={user} avatar={avatar} appName={appName} onNavigate={() => setMobileOpen(false)} />
-        </SheetContent>
-      </Sheet>
-
-      {/* Main content */}
-      <main className="flex-1 md:ml-64 mt-12 md:mt-0 overflow-x-hidden">
-        {pathname === "/settings" || pathname === "/access-lists" ? (
-          children
-        ) : (
-          <div className="max-w-screen-xl mx-auto px-4 md:px-8 py-6">
-            {children}
-          </div>
-        )}
-      </main>
-    </div>
+                as={Link}
+                href={href}
+                label={label}
+                icon={icon}
+                isSelected={pathname === href}
+              />
+            ))}
+          </SideNavSection>
+        </SideNav>
+      }
+    >
+      {children}
+    </AppShell>
   );
 }

@@ -1,21 +1,41 @@
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { InputHTMLAttributes } from "react";
+"use client";
 
-type SearchFieldProps = InputHTMLAttributes<HTMLInputElement> & {
-  className?: string;
+import { Search } from "lucide-react";
+import { TextInput } from "@astryxdesign/core/TextInput";
+
+type SearchFieldProps = {
+  value?: string;
+  onChange?: (value: string) => void;
+  placeholder?: string;
+  /** Label for screen readers; the field shows only the icon and placeholder. */
+  label?: string;
+  width?: number | string;
+  hasAutoFocus?: boolean;
 };
 
-export function SearchField({ className, ...props }: SearchFieldProps) {
+/**
+ * The app's search box. TextInput owns the icon slot and the clear affordance,
+ * so this no longer positions an icon over a padded input by hand.
+ */
+export function SearchField({
+  value,
+  onChange,
+  placeholder = "Search...",
+  label = "Search",
+  width = 280,
+  hasAutoFocus,
+}: SearchFieldProps) {
   return (
-    <div className={cn("relative max-w-xs", className)}>
-      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-      <Input
-        placeholder="Search..."
-        className="pl-8"
-        {...props}
-      />
-    </div>
+    <TextInput
+      label={label}
+      isLabelHidden
+      value={value ?? ""}
+      onChange={onChange}
+      placeholder={placeholder}
+      startIcon={<Search />}
+      hasClear
+      width={width}
+      hasAutoFocus={hasAutoFocus}
+    />
   );
 }

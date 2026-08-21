@@ -1,21 +1,24 @@
-import { Input } from "@/components/ui/input";
+"use client";
+
+import { useState } from "react";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import type { RewriteConfig } from "@/lib/models/proxy-hosts";
 
 type Props = { initialData?: RewriteConfig | null };
 
 export function RewriteFields({ initialData }: Props) {
+  // Astryx inputs are controlled; htmlName keeps the value in the submitted
+  // FormData exactly as the uncontrolled defaultValue did.
+  const [pathPrefix, setPathPrefix] = useState(initialData?.path_prefix ?? "");
+
   return (
-    <div>
-      <label htmlFor="rewritePathPrefix" className="text-sm font-medium mb-1 block">Path Prefix Rewrite</label>
-      <Input
-        id="rewritePathPrefix"
-        name="rewritePathPrefix"
-        placeholder="/recipes"
-        defaultValue={initialData?.path_prefix ?? ""}
-      />
-      <p className="text-xs text-muted-foreground mt-1">
-        Prepend this prefix to every request before proxying (e.g. /recipes → /recipes/original/path)
-      </p>
-    </div>
+    <TextInput
+      label="Path Prefix Rewrite"
+      htmlName="rewritePathPrefix"
+      value={pathPrefix}
+      onChange={setPathPrefix}
+      placeholder="/recipes"
+      description="Prepend this prefix to every request before proxying (e.g. /recipes → /recipes/original/path)"
+    />
   );
 }

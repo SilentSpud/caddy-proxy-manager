@@ -2,24 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { MoreHorizontal, Network, ArrowRight } from "lucide-react";
+import { Network, ArrowRight } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Card } from "@astryxdesign/core/Card";
+import { Icon } from "@astryxdesign/core/Icon";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 import { toggleL4ProxyHostAction } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
-import { DataTable } from "@/components/ui/DataTable";
+import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { CreateL4HostDialog, EditL4HostDialog, DeleteL4HostDialog } from "@/components/l4-proxy-hosts/L4HostDialogs";
 import { L4PortsApplyBanner } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
 
@@ -40,10 +36,55 @@ function formatMatcher(host: L4ProxyHost): string {
 }
 
 function ProtocolBadge({ protocol }: { protocol: string }) {
-  if (protocol === "tcp") {
-    return <Badge variant="info">{protocol.toUpperCase()}</Badge>;
-  }
-  return <Badge variant="warning">{protocol.toUpperCase()}</Badge>;
+  return (
+    <Badge variant={protocol === "tcp" ? "info" : "warning"} label={protocol.toUpperCase()} />
+  );
+}
+
+/** "10.0.0.1:443 +2" — the primary upstream plus a count of the rest. */
+function summarizeUpstreams(upstreams: string[]) {
+  return upstreams.length > 1 ? `${upstreams[0]} +${upstreams.length - 1}` : upstreams[0];
+}
+
+/**
+ * The enable switch plus the row menu, shared by the table and the cards.
+ * Declared at module scope: nested inside the page component it would be a new
+ * component type on every render, remounting the menu and closing it mid-use.
+ */
+function HostActions({
+  host,
+  onToggle,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  host: L4ProxyHost;
+  onToggle: (enabled: boolean) => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <HStack gap={2} vAlign="center" justify="end">
+      <Switch
+        label={`Enable ${host.name}`}
+        isLabelHidden
+        value={host.enabled}
+        onChange={onToggle}
+      />
+      <MoreMenu
+        label={`Actions for ${host.name}`}
+        size="sm"
+        alignment="end"
+        items={[
+          { label: "Edit", onClick: onEdit },
+          { label: "Duplicate", onClick: onDuplicate },
+          { type: "divider" },
+          { label: "Delete", variant: "destructive", onClick: onDelete },
+        ]}
+      />
+    </HStack>
+  );
 }
 
 export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, initialSort }: Props) {
@@ -79,26 +120,38 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
     signalBannerRefresh();
   };
 
-  const columns = [
+  function openDuplicate(host: L4ProxyHost) {
+    setDuplicateHost(host);
+    setCreateOpen(true);
+  }
+
+  const actionsFor = (host: L4ProxyHost) => (
+    <HostActions
+      host={host}
+      onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
+      onEdit={() => setEditHost(host)}
+      onDuplicate={() => openDuplicate(host)}
+      onDelete={() => setDeleteHost(host)}
+    />
+  );
+
+  const columns: Column<L4ProxyHost>[] = [
     {
       id: "name",
       label: "Name / Matcher",
       sortKey: "name",
-      render: (host: L4ProxyHost) => (
-        <div className="flex items-start gap-3">
-          <div className={[
-            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border",
-            host.protocol === "tcp"
-              ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-500"
-              : "border-amber-500/30 bg-amber-500/10 text-amber-500",
-          ].join(" ")}>
-            <Network className="h-3.5 w-3.5" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold leading-tight">{host.name}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{formatMatcher(host)}</p>
-          </div>
-        </div>
+      render: (host) => (
+        <HStack gap={3} vAlign="center">
+          <Icon icon={Network} size="sm" color={host.protocol === "tcp" ? "accent" : "warning"} />
+          <VStack gap={0}>
+            <Text type="body" size="sm" weight="semibold">
+              {host.name}
+            </Text>
+            <Text type="body" size="xsm" color="secondary">
+              {formatMatcher(host)}
+            </Text>
+          </VStack>
+        </HStack>
       ),
     },
     {
@@ -106,31 +159,28 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
       label: "Protocol",
       sortKey: "protocol",
       width: 90,
-      render: (host: L4ProxyHost) => <ProtocolBadge protocol={host.protocol} />,
+      render: (host) => <ProtocolBadge protocol={host.protocol} />,
     },
     {
       id: "listen",
       label: "Listen",
       sortKey: "listenAddress",
-      render: (host: L4ProxyHost) => (
-        <span className="text-sm font-mono font-medium tabular-nums text-foreground/80">
+      render: (host) => (
+        <Text type="code" size="sm" weight="medium" hasTabularNumbers>
           {host.listenAddress}
-        </span>
+        </Text>
       ),
     },
     {
       id: "upstreams",
       label: "Upstreams",
-      render: (host: L4ProxyHost) => (
-        <div className="flex items-center gap-1.5">
-          <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-          <span className="text-sm font-mono font-medium text-foreground/80">
-            {host.upstreams[0]}
-            {host.upstreams.length > 1 && (
-              <span className="ml-1 text-muted-foreground">+{host.upstreams.length - 1}</span>
-            )}
-          </span>
-        </div>
+      render: (host) => (
+        <HStack gap={2} vAlign="center">
+          <Icon icon={ArrowRight} size="xsm" color="secondary" />
+          <Text type="code" size="sm" weight="medium">
+            {summarizeUpstreams(host.upstreams)}
+          </Text>
+        </HStack>
       ),
     },
     {
@@ -138,91 +188,39 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
       label: "Status",
       sortKey: "enabled",
       width: 110,
-      render: (host: L4ProxyHost) => (
-        <StatusChip status={host.enabled ? "active" : "inactive"} />
-      ),
+      render: (host) => <StatusChip status={host.enabled ? "active" : "inactive"} />,
     },
     {
       id: "actions",
       label: "",
-      align: "right" as const,
-      width: 80,
-      render: (host: L4ProxyHost) => (
-        <div className="flex items-center gap-2 justify-end">
-          <Switch
-            checked={host.enabled}
-            onCheckedChange={(checked) => handleToggleEnabled(host.id, checked)}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Open menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setEditHost(host)}>Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setDuplicateHost(host); setCreateOpen(true); }}>Duplicate</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setDeleteHost(host)}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      ),
+      align: "right",
+      width: 120,
+      render: (host) => actionsFor(host),
     },
   ];
 
   const mobileCard = (host: L4ProxyHost) => (
-    <Card className={[
-      "border-l-2",
-      host.protocol === "tcp" ? "border-l-cyan-500" : "border-l-amber-500",
-    ].join(" ")}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold truncate">{host.name}</p>
-              <ProtocolBadge protocol={host.protocol} />
-            </div>
-            <p className="text-xs text-muted-foreground font-mono truncate">
-              {host.listenAddress}
-              <span className="mx-1 text-muted-foreground">→</span>
-              {host.upstreams[0]}{host.upstreams.length > 1 ? ` +${host.upstreams.length - 1}` : ""}
-            </p>
-            <StatusChip status={host.enabled ? "active" : "inactive"} className="w-fit mt-1" />
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Switch
-              checked={host.enabled}
-              onCheckedChange={(checked) => handleToggleEnabled(host.id, checked)}
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setEditHost(host)}>Edit</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setDuplicateHost(host); setCreateOpen(true); }}>Duplicate</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteHost(host)}>Delete</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </CardContent>
+    <Card>
+      <HStack justify="between" vAlign="start" gap={2}>
+        <VStack gap={1}>
+          <HStack gap={2} vAlign="center">
+            <Text type="body" size="sm" weight="semibold" maxLines={1}>
+              {host.name}
+            </Text>
+            <ProtocolBadge protocol={host.protocol} />
+          </HStack>
+          <Text type="code" size="xsm" color="secondary" maxLines={1}>
+            {host.listenAddress} &rarr; {summarizeUpstreams(host.upstreams)}
+          </Text>
+          <StatusChip status={host.enabled ? "active" : "inactive"} />
+        </VStack>
+        {actionsFor(host)}
+      </HStack>
     </Card>
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <VStack gap={6}>
       <L4PortsApplyBanner refreshSignal={bannerRefresh} />
 
       <PageHeader
@@ -231,13 +229,13 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
         action={{ label: "Create L4 Host", onClick: () => setCreateOpen(true) }}
       />
 
-      <div className="flex items-center gap-2">
+      <HStack gap={2} vAlign="center">
         <SearchField
           value={searchTerm}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={handleSearchChange}
           placeholder="Search L4 hosts..."
         />
-      </div>
+      </HStack>
 
       <DataTable
         columns={columns}
@@ -247,7 +245,7 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}
-        rowClassName={(host) => host.enabled ? "" : "opacity-75"}
+        rowStatus={(host) => (host.enabled ? null : { color: "gray", label: "Disabled" })}
       />
 
       <CreateL4HostDialog
@@ -271,6 +269,6 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
           onClose={() => { setDeleteHost(null); signalBannerRefresh(); }}
         />
       )}
-    </div>
+    </VStack>
   );
 }

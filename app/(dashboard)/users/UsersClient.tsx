@@ -2,15 +2,28 @@
 
 import { useState } from "react";
 import { UserCog, Trash2, Pencil, Ban, CheckCircle2, Plus } from "lucide-react";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { SearchField } from "@/components/ui/SearchField";
+import {
+  AUTOFILL_EMAIL,
+  AUTOFILL_NEW_PASSWORD,
+  NATIVE_REQUIRED,
+  nativeAttrs,
+} from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import {
   createUserAction,
@@ -40,16 +53,22 @@ type Props = {
   localUsersEnabled?: boolean;
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  admin: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
-  user: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-  viewer: "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/30",
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "user", label: "User" },
+  { value: "viewer", label: "Viewer" },
+];
+
+/** Role tint. Admin reads as elevated privilege, the rest are informational. */
+const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
+  admin: "red",
+  user: "blue",
+  viewer: "neutral",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-  disabled: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
-};
+function userLabel(user: UserEntry) {
+  return user.name ?? user.email.split("@")[0];
+}
 
 export default function UsersClient({ users, localUsersEnabled = true }: Props) {
   const router = useRouter();
@@ -57,6 +76,9 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [createRole, setCreateRole] = useState<UserEntry["role"]>("user");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createName, setCreateName] = useState("");
+  const [createPassword, setCreatePassword] = useState("");
 
   const filtered = search
     ? users.filter(
@@ -68,115 +90,129 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
     : users;
 
   return (
-    <div className="flex flex-col gap-6 w-full">
-      <PageHeader
-        title="Users"
-        description="Manage user accounts, roles, and access."
-      />
+    <VStack gap={6}>
+      <PageHeader title="Users" description="Manage user accounts, roles, and access." />
 
-      <div className="flex items-center gap-3">
-        <Input
-          placeholder="Search users..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <span className="text-sm text-muted-foreground ml-auto">
-          {filtered.length} user{filtered.length !== 1 ? "s" : ""}
-        </span>
-        {localUsersEnabled && (
-          <Button onClick={() => setShowCreate(!showCreate)} variant="outline" size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Create User
-          </Button>
-        )}
-      </div>
+      <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
+        <SearchField value={search} onChange={setSearch} placeholder="Search users..." label="Search users" />
+        <HStack gap={3} vAlign="center">
+          <Text type="body" size="sm" color="secondary">
+            {filtered.length} user{filtered.length !== 1 ? "s" : ""}
+          </Text>
+          {localUsersEnabled && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Plus />}
+              label="Create User"
+              onClick={() => setShowCreate(!showCreate)}
+            />
+          )}
+        </HStack>
+      </HStack>
 
       {localUsersEnabled && showCreate && (
         <Card>
-          <CardContent className="pt-4">
-            <form
-              action={async (formData) => {
-                formData.set("role", createRole);
-                await createUserAction(formData);
-                setShowCreate(false);
-                setCreateRole("user");
-                router.refresh();
-              }}
-              className="flex flex-col gap-3"
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="create-email">Email</Label>
-                  <Input id="create-email" name="email" type="email" placeholder="user@example.com" required data-testid="create-email" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="create-name">Name</Label>
-                  <Input id="create-name" name="name" placeholder="Display name" data-testid="create-name" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="create-role">Role</Label>
-                  <Select value={createRole} onValueChange={(v) => setCreateRole(v as UserEntry["role"])}>
-                    <SelectTrigger id="create-role" data-testid="create-role">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="user">User</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="create-password">Password</Label>
-                  <Input id="create-password" name="password" type="password" placeholder="Min 8 characters" required minLength={8} data-testid="create-password" />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" size="sm">Create</Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
+          <form
+            action={async (formData) => {
+              formData.set("role", createRole);
+              await createUserAction(formData);
+              setShowCreate(false);
+              setCreateRole("user");
+              setCreateEmail("");
+              setCreateName("");
+              setCreatePassword("");
+              router.refresh();
+            }}
+          >
+            <VStack gap={3}>
+              <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
+                <TextInput
+                  {...NATIVE_REQUIRED}
+                  {...AUTOFILL_EMAIL}
+                  data-testid="create-email"
+                  label="Email"
+                  type="email"
+                  htmlName="email"
+                  value={createEmail}
+                  onChange={setCreateEmail}
+                  placeholder="user@example.com"
+                  isRequired
+                />
+                <TextInput
+                  data-testid="create-name"
+                  label="Name"
+                  isOptional
+                  htmlName="name"
+                  value={createName}
+                  onChange={setCreateName}
+                  placeholder="Display name"
+                />
+                <Selector
+                  data-testid="create-role"
+                  label="Role"
+                  options={ROLE_OPTIONS}
+                  value={createRole}
+                  onChange={(v) => setCreateRole(v as UserEntry["role"])}
+                />
+                <TextInput
+                  {...NATIVE_REQUIRED}
+                  {...AUTOFILL_NEW_PASSWORD}
+                  {...nativeAttrs({ minLength: 8 })}
+                  data-testid="create-password"
+                  label="Password"
+                  type="password"
+                  htmlName="password"
+                  value={createPassword}
+                  onChange={setCreatePassword}
+                  placeholder="Min 8 characters"
+                  isRequired
+                />
+              </Grid>
+              <HStack gap={2}>
+                <Button type="submit" size="sm" label="Create" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  label="Cancel"
+                  onClick={() => setShowCreate(false)}
+                />
+              </HStack>
+            </VStack>
+          </form>
         </Card>
       )}
 
       {filtered.length === 0 && (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <UserCog className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p>No users found.</p>
-          </CardContent>
+          <EmptyState icon={<UserCog />} title="No users found." />
         </Card>
       )}
 
-      <div className="grid gap-3">
+      <VStack gap={3}>
         {filtered.map((user) => (
-          <Card key={user.id}>
-            <CardContent className="py-3 px-4">
-              {editUserId === user.id ? (
-                <EditUserRow
-                  user={user}
-                  onClose={() => setEditUserId(null)}
-                  onSave={() => {
-                    setEditUserId(null);
-                    router.refresh();
-                  }}
-                />
-              ) : (
-                <UserRow
-                  user={user}
-                  onEdit={() => setEditUserId(user.id)}
-                  onRefresh={() => router.refresh()}
-                />
-              )}
-            </CardContent>
+          <Card key={user.id} padding={3}>
+            {editUserId === user.id ? (
+              <EditUserRow
+                user={user}
+                onClose={() => setEditUserId(null)}
+                onSave={() => {
+                  setEditUserId(null);
+                  router.refresh();
+                }}
+              />
+            ) : (
+              <UserRow
+                user={user}
+                onEdit={() => setEditUserId(user.id)}
+                onRefresh={() => router.refresh()}
+              />
+            )}
           </Card>
         ))}
-      </div>
-    </div>
+      </VStack>
+    </VStack>
   );
 }
 
@@ -190,90 +226,92 @@ function UserRow({
   onRefresh: () => void;
 }) {
   const isDisabled = user.status !== "active";
+  const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | null>(null);
 
   return (
-    <div className="flex items-center gap-3">
-      <UserAvatar
-        avatar={user.avatar}
-        alt={user.name ?? user.email}
-        className="h-9 w-9 shrink-0"
-        fallbackClassName="bg-muted text-foreground text-sm font-medium"
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">
-            {user.name ?? user.email.split("@")[0]}
-          </span>
-          {isDisabled && (
-            <Badge variant="outline" className={STATUS_COLORS.disabled}>
-              disabled
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="truncate">{user.email}</span>
-          <span>·</span>
-          <span>{user.provider}</span>
-        </div>
-      </div>
-      <Badge variant="outline" className={ROLE_COLORS[user.role] ?? ""}>
-        {user.role}
-      </Badge>
-      <div className="flex items-center gap-1 shrink-0">
-        {user.status === "active" ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-amber-500"
-            title="Disable user"
-            onClick={async () => {
-              if (confirm(`Disable user "${user.name ?? user.email}"?`)) {
-                await updateUserStatusAction(user.id, "disabled");
+    <HStack gap={3} vAlign="center" justify="between">
+      <HStack gap={3} vAlign="center">
+        <UserAvatar avatar={user.avatar} alt={user.name ?? user.email} size="md" />
+        <VStack gap={0}>
+          <HStack gap={2} vAlign="center">
+            <Text type="body" size="sm" weight="medium" maxLines={1}>
+              {userLabel(user)}
+            </Text>
+            {isDisabled && <Badge variant="error" label="disabled" />}
+          </HStack>
+          <Text type="body" size="xsm" color="secondary" maxLines={1}>
+            {user.email} · {user.provider}
+          </Text>
+        </VStack>
+      </HStack>
+
+      <HStack gap={2} vAlign="center">
+        <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
+        <HStack gap={1} vAlign="center">
+          {user.status === "active" ? (
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label={`Disable user ${userLabel(user)}`}
+              tooltip="Disable user"
+              icon={<Ban />}
+              onClick={() => setConfirmKind("disable")}
+            />
+          ) : (
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label={`Enable user ${userLabel(user)}`}
+              tooltip="Enable user"
+              icon={<CheckCircle2 />}
+              onClick={async () => {
+                await updateUserStatusAction(user.id, "active");
                 onRefresh();
-              }
-            }}
-          >
-            <Ban className="h-3.5 w-3.5" />
-          </Button>
-        ) : (
-          <Button
+              }}
+            />
+          )}
+          <IconButton
             variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-emerald-500"
-            title="Enable user"
-            onClick={async () => {
-              await updateUserStatusAction(user.id, "active");
-              onRefresh();
-            }}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          title="Edit user"
-          onClick={onEdit}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          title="Delete user"
-          onClick={async () => {
-            if (confirm(`Permanently delete user "${user.name ?? user.email}"? This cannot be undone.`)) {
-              await deleteUserAction(user.id);
-              onRefresh();
-            }
-          }}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
+            size="sm"
+            label={`Edit user ${userLabel(user)}`}
+            tooltip="Edit user"
+            icon={<Pencil />}
+            onClick={onEdit}
+          />
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={`Delete user ${userLabel(user)}`}
+            tooltip="Delete user"
+            icon={<Trash2 />}
+            onClick={() => setConfirmKind("delete")}
+          />
+        </HStack>
+      </HStack>
+
+      {/* Both actions used window.confirm, which is unstyled and not announced
+          as a dialog. The wording is carried over unchanged. */}
+      <AlertDialog
+        isOpen={confirmKind !== null}
+        onOpenChange={(open) => !open && setConfirmKind(null)}
+        title={confirmKind === "delete" ? "Delete user" : "Disable user"}
+        description={
+          confirmKind === "delete"
+            ? `Permanently delete user "${user.name ?? user.email}"? This cannot be undone.`
+            : `Disable user "${user.name ?? user.email}"?`
+        }
+        actionLabel={confirmKind === "delete" ? "Delete user" : "Disable user"}
+        onAction={async () => {
+          if (confirmKind === "delete") {
+            await deleteUserAction(user.id);
+          } else {
+            await updateUserStatusAction(user.id, "disabled");
+          }
+          setConfirmKind(null);
+          onRefresh();
+        }}
+      />
+    </HStack>
   );
 }
 
@@ -287,13 +325,17 @@ function EditUserRow({
   onSave: () => void;
 }) {
   const [role, setRole] = useState(user.role);
+  const [name, setName] = useState(user.name ?? "");
+  const [email, setEmail] = useState(user.email);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Pencil className="h-4 w-4" />
-        Editing {user.name ?? user.email}
-      </div>
+    <VStack gap={3}>
+      <HStack gap={2} vAlign="center">
+        <Icon icon={Pencil} size="sm" />
+        <Text type="body" size="sm" weight="medium">
+          Editing {user.name ?? user.email}
+        </Text>
+      </HStack>
       <form
         action={async (formData) => {
           await updateUserInfoAction(user.id, formData);
@@ -302,44 +344,37 @@ function EditUserRow({
           }
           onSave();
         }}
-        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
       >
-        <div className="space-y-1">
-          <Label htmlFor={`name-${user.id}`}>Name</Label>
-          <Input
-            id={`name-${user.id}`}
-            name="name"
-            defaultValue={user.name ?? ""}
-            placeholder="Display name"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`email-${user.id}`}>Email</Label>
-          <Input
-            id={`email-${user.id}`}
-            name="email"
-            defaultValue={user.email}
-            placeholder="Email address"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label>Role</Label>
-          <Select value={role} onValueChange={(v) => setRole(v as UserEntry["role"])}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="user">User</SelectItem>
-              <SelectItem value="viewer">Viewer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="sm:col-span-3 flex gap-2">
-          <Button type="submit" size="sm">Save</Button>
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-        </div>
+        <VStack gap={3}>
+          <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
+            <TextInput
+              label="Name"
+              htmlName="name"
+              value={name}
+              onChange={setName}
+              placeholder="Display name"
+            />
+            <TextInput
+              {...AUTOFILL_EMAIL}
+              label="Email"
+              htmlName="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="Email address"
+            />
+            <Selector
+              label="Role"
+              options={ROLE_OPTIONS}
+              value={role}
+              onChange={(v) => setRole(v as UserEntry["role"])}
+            />
+          </Grid>
+          <HStack gap={2}>
+            <Button type="submit" size="sm" label="Save" />
+            <Button type="button" variant="ghost" size="sm" label="Cancel" onClick={onClose} />
+          </HStack>
+        </VStack>
       </form>
-    </div>
+    </VStack>
   );
 }

@@ -1,13 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { BarChart2, Activity } from "lucide-react";
+import { Activity, ArrowLeftRight, BarChart2, KeyRound, ShieldCheck } from "lucide-react";
 import { ReactNode } from "react";
+import { Card } from "@astryxdesign/core/Card";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Icon } from "@astryxdesign/core/Icon";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 
-type StatCard = {
+/** Icons the overview can show, keyed by name so the server can name one. */
+const STAT_ICONS = {
+  proxyHosts: ArrowLeftRight,
+  certificates: ShieldCheck,
+  accessLists: KeyRound,
+} as const;
+
+export type StatCard = {
   label: string;
-  icon: ReactNode;
+  icon: keyof typeof STAT_ICONS;
   count: number;
   href: string;
 };
@@ -22,24 +37,28 @@ type TrafficSummary = {
   blockedPercent: number;
 } | null;
 
-// Per-position accent colors for stat cards (proxy hosts, certs, access lists, traffic)
-const CARD_ACCENTS = [
-  { border: "border-l-violet-500", icon: "border-violet-500/30 bg-violet-500/10 text-violet-500", count: "text-violet-600 dark:text-violet-400" },
-  { border: "border-l-emerald-500", icon: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500", count: "text-emerald-600 dark:text-emerald-400" },
-  { border: "border-l-amber-500", icon: "border-amber-500/30 bg-amber-500/10 text-amber-500", count: "text-amber-600 dark:text-amber-400" },
-];
+/**
+ * Per-position card tints, so the stat cards stay visually distinguishable.
+ * These are decorative only — nothing about a card's meaning is carried by its
+ * colour, which is why the previous hand-rolled violet/emerald/amber classes
+ * could be swapped for the theme's own non-semantic variants.
+ */
+const CARD_VARIANTS = ["purple", "green", "orange"] as const;
 
-const TRAFFIC_ACCENT = {
-  border: "border-l-cyan-500",
-  icon: "border-cyan-500/30 bg-cyan-500/10 text-cyan-500",
-  count: "text-cyan-600 dark:text-cyan-400",
-};
-
-function getEventDotColor(summary: string): string {
+/**
+ * The activity dot's colour used to be the only signal of what kind of change
+ * an event was. StatusDot carries a label too, so the distinction is now
+ * available to screen readers rather than being colour-only.
+ */
+function getEventStatus(summary: string): { variant: "success" | "error" | "accent"; label: string } {
   const lower = summary.toLowerCase();
-  if (lower.startsWith("delete") || lower.startsWith("remove")) return "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]";
-  if (lower.startsWith("create") || lower.startsWith("add")) return "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]";
-  return "bg-primary shadow-[0_0_6px_var(--primary)]";
+  if (lower.startsWith("delete") || lower.startsWith("remove")) {
+    return { variant: "error", label: "Removal" };
+  }
+  if (lower.startsWith("create") || lower.startsWith("add")) {
+    return { variant: "success", label: "Creation" };
+  }
+  return { variant: "accent", label: "Change" };
 }
 
 function formatRelativeTime(iso: string): string {
@@ -50,6 +69,33 @@ function formatRelativeTime(iso: string): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+function StatTile({
+  icon,
+  value,
+  label,
+  children,
+}: {
+  icon: ReactNode;
+  value: string;
+  label: string;
+  children?: ReactNode;
+}) {
+  return (
+    <VStack gap={3}>
+      <HStack justify="between" vAlign="start" gap={2}>
+        {icon}
+        <Text type="display-3" hasTabularNumbers>
+          {value}
+        </Text>
+      </HStack>
+      <Text type="body" size="sm" weight="medium" color="secondary">
+        {label}
+      </Text>
+      {children}
+    </VStack>
+  );
 }
 
 export default function OverviewClient({
@@ -66,113 +112,87 @@ export default function OverviewClient({
   isAdmin?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-8">
-      {/* Welcome header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Welcome back, <span className="text-primary">{userName}</span>
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+    <VStack gap={8}>
+      <VStack gap={1}>
+        <Heading level={1}>Welcome back, {userName}</Heading>
+        <Text type="body" size="sm" color="secondary">
           Everything you need to orchestrate Caddy proxies, certificates, and secure edge services.
-        </p>
-      </div>
+        </Text>
+      </VStack>
 
-      {/* Stat grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => {
-          const accent = CARD_ACCENTS[i % CARD_ACCENTS.length];
-          return (
-            <Link key={stat.label} href={stat.href} className="block group">
-              <Card className={`border-l-2 ${accent.border} hover:bg-muted/40 transition-colors`}>
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${accent.icon} transition-transform group-hover:scale-110`}>
-                      {stat.icon}
-                    </div>
-                    <span className={`text-3xl font-bold tabular-nums ${accent.count}`}>
-                      {stat.count}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-muted-foreground mt-3">{stat.label}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+      <Grid columns={{ minWidth: 220, max: 4 }} gap={4}>
+        {stats.map((stat, i) => (
+          <ClickableCard
+            key={stat.label}
+            label={`${stat.label}: ${stat.count}`}
+            href={stat.href}
+            variant={CARD_VARIANTS[i % CARD_VARIANTS.length]}
+            padding={5}
+          >
+            <StatTile
+              icon={<Icon icon={STAT_ICONS[stat.icon]} />}
+              value={String(stat.count)}
+              label={stat.label}
+            />
+          </ClickableCard>
+        ))}
 
-        {/* Traffic (24h) card — admin only */}
         {isAdmin && (
-          <Link href="/analytics" className="block group">
-            <Card className={`border-l-2 ${TRAFFIC_ACCENT.border} hover:bg-muted/40 transition-colors`}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${TRAFFIC_ACCENT.icon} transition-transform group-hover:scale-110`}>
-                    <BarChart2 className="h-4 w-4" />
-                  </div>
-                  <span className={`text-3xl font-bold tabular-nums ${TRAFFIC_ACCENT.count}`}>
-                    {trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "—"}
-                  </span>
-                </div>
-                <p className="text-sm font-medium text-muted-foreground mt-3">Traffic (24h)</p>
-                {trafficSummary && trafficSummary.totalRequests > 0 && (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">Blocked</span>
-                      <span className={`text-xs font-semibold tabular-nums ${trafficSummary.blockedPercent > 0 ? "text-rose-500" : "text-muted-foreground"}`}>
-                        {trafficSummary.blockedPercent}%
-                      </span>
-                    </div>
-                    <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-rose-500 transition-all"
-                        style={{ width: `${Math.min(trafficSummary.blockedPercent, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </Link>
-        )}
-      </div>
-
-      {/* Recent Activity — admin only */}
-      {isAdmin && (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary">
-              <Activity className="h-3.5 w-3.5" />
-            </div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Recent Activity</h2>
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              {recentEvents.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-muted-foreground">No activity recorded yet.</p>
-              ) : (
-                <div className="relative">
-                  {/* Vertical timeline line */}
-                  <div className="absolute left-[28px] top-4 bottom-4 w-px bg-border" />
-                  {recentEvents.map((event, index) => (
-                    <div
-                      key={`${event.createdAt}-${index}`}
-                      className="relative flex items-start gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
-                    >
-                      {/* Dot */}
-                      <div className={`relative z-10 mt-1 h-3 w-3 shrink-0 rounded-full ${getEventDotColor(event.summary)}`} />
-                      <span className="flex-1 text-sm leading-snug">{event.summary}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                        {formatRelativeTime(event.createdAt)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+          <ClickableCard label="Traffic in the last 24 hours" href="/analytics" variant="cyan" padding={5}>
+            <StatTile
+              icon={<Icon icon={BarChart2} />}
+              value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "—"}
+              label="Traffic (24h)"
+            >
+              {trafficSummary && trafficSummary.totalRequests > 0 && (
+                <ProgressBar
+                  label="Blocked"
+                  value={Math.min(trafficSummary.blockedPercent, 100)}
+                  variant={trafficSummary.blockedPercent > 0 ? "error" : "neutral"}
+                  hasValueLabel
+                />
               )}
-            </CardContent>
+            </StatTile>
+          </ClickableCard>
+        )}
+      </Grid>
+
+      {isAdmin && (
+        <VStack gap={3}>
+          <HStack gap={2} vAlign="center">
+            <Icon icon={Activity} size="sm" color="accent" />
+            <Heading level={2} accessibilityLevel={2}>
+              Recent Activity
+            </Heading>
+          </HStack>
+
+          <Card padding={0}>
+            {recentEvents.length === 0 ? (
+              <Text type="body" size="sm" color="secondary">
+                No activity recorded yet.
+              </Text>
+            ) : (
+              <List hasDividers>
+                {recentEvents.map((event, index) => {
+                  const status = getEventStatus(event.summary);
+                  return (
+                    <ListItem
+                      key={`${event.createdAt}-${index}`}
+                      startContent={<StatusDot variant={status.variant} label={status.label} />}
+                      label={event.summary}
+                      endContent={
+                        <Text type="body" size="xsm" color="secondary" hasTabularNumbers>
+                          {formatRelativeTime(event.createdAt)}
+                        </Text>
+                      }
+                    />
+                  );
+                })}
+              </List>
+            )}
           </Card>
-        </div>
+        </VStack>
       )}
-    </div>
+    </VStack>
   );
 }

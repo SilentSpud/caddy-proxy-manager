@@ -1,24 +1,17 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ChevronDown, ChevronUp, KeyRound, MoreVertical, Plus, ShieldCheck } from "lucide-react";
-import React, { useState } from "react";
+import { KeyRound, Plus, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { DataTable, type Column } from "@/components/ui/DataTable";
 import {
   DeleteCaCertDialog,
   IssueClientCertDialog,
@@ -52,52 +45,53 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
   const active = ca.issuedCerts.filter((c) => !c.revokedAt);
 
   return (
-    <div className="px-5 py-4 bg-muted/30 border-t">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <VStack gap={3} padding={4}>
+      <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
+        <HStack gap={2} vAlign="center">
+          <Text type="label" size="xsm" weight="semibold" color="secondary">
             Issued Client Certificates
-            <span className="ml-2 inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              {active.length} active
-            </span>
-          </span>
-          <div className="flex gap-2">
-            {ca.hasPrivateKey && (
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setIssueCaOpen(true)}>
-                Issue Cert
-              </Button>
-            )}
-            {ca.issuedCerts.length > 0 && (
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setManageOpen(true)}>
-                Manage
-              </Button>
-            )}
-          </div>
-        </div>
+          </Text>
+          <Badge variant="success" label={`${active.length} active`} />
+        </HStack>
+        <HStack gap={2}>
+          {ca.hasPrivateKey && (
+            <Button size="sm" variant="secondary" label="Issue Cert" onClick={() => setIssueCaOpen(true)} />
+          )}
+          {ca.issuedCerts.length > 0 && (
+            <Button size="sm" variant="secondary" label="Manage" onClick={() => setManageOpen(true)} />
+          )}
+        </HStack>
+      </HStack>
 
-        {active.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No active client certificates for this CA.</p>
-        ) : (
-          <div className="flex flex-col divide-y divide-border rounded-md border overflow-hidden">
-            {active.slice(0, 5).map((issued) => {
-              const expired = new Date(issued.validTo).getTime() < Date.now();
-              return (
-                <div key={issued.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-background/60">
-                  <span className="text-sm font-mono">{issued.commonName}</span>
-                  <Badge variant={expired ? "destructive" : "success"} className="text-[10px] px-1.5 py-0">
-                    {expired ? "Expired" : "Active"}
-                  </Badge>
-                </div>
-              );
-            })}
-            {active.length > 5 && (
-              <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/30">
-                +{active.length - 5} more — click &quot;Manage&quot; to view all
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {active.length === 0 ? (
+        <Text type="body" size="sm" color="secondary">
+          No active client certificates for this CA.
+        </Text>
+      ) : (
+        <List hasDividers>
+          {active.slice(0, 5).map((issued) => {
+            const expired = new Date(issued.validTo).getTime() < Date.now();
+            return (
+              <ListItem
+                key={issued.id}
+                label={issued.commonName}
+                endContent={
+                  <Badge
+                    variant={expired ? "error" : "success"}
+                    label={expired ? "Expired" : "Active"}
+                  />
+                }
+              />
+            );
+          })}
+          {active.length > 5 && (
+            <ListItem
+              label={`+${active.length - 5} more`}
+              description={'Use "Manage" to view all'}
+            />
+          )}
+        </List>
+      )}
 
       <ManageIssuedClientCertsDialog
         open={manageOpen}
@@ -105,12 +99,8 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
         issuedCerts={ca.issuedCerts}
         onClose={() => setManageOpen(false)}
       />
-      <IssueClientCertDialog
-        open={issueCaOpen}
-        cert={ca}
-        onClose={() => setIssueCaOpen(false)}
-      />
-    </div>
+      <IssueClientCertDialog open={issueCaOpen} cert={ca} onClose={() => setIssueCaOpen(false)} />
+    </VStack>
   );
 }
 
@@ -123,41 +113,34 @@ function CaActionsMenu({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [issuedOpen, setIssuedOpen] = useState(false);
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {ca.hasPrivateKey && (
-            <DropdownMenuItem onClick={() => { setOpen(false); setIssuedOpen(true); }}>
-              Issue Client Cert
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onClick={() => { setOpen(false); onEdit(); }}>Edit</DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={() => { setOpen(false); onDelete(); }}
-          >
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreMenu
+        label={`Actions for CA certificate ${ca.name}`}
+        size="sm"
+        alignment="end"
+        items={[
+          ...(ca.hasPrivateKey
+            ? [{ label: "Issue Client Cert", onClick: () => setIssuedOpen(true) }]
+            : []),
+          { label: "Edit", onClick: onEdit },
+          { label: "Delete", variant: "destructive" as const, onClick: onDelete },
+        ]}
+      />
       <IssueClientCertDialog open={issuedOpen} cert={ca} onClose={() => setIssuedOpen(false)} />
     </>
   );
 }
 
+function activeCount(ca: CaCertificateView) {
+  return ca.issuedCerts.filter((c) => !c.revokedAt).length;
+}
+
 export function CaTab({ caCertificates, search, statusFilter }: Props) {
   const [drawerCert, setDrawerCert] = useState<CaCertificateView | null | false>(false);
   const [deleteCert, setDeleteCert] = useState<CaCertificateView | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const filtered = caCertificates.filter((ca) => {
     if (statusFilter) return false;
@@ -165,150 +148,140 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
     return true;
   });
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => setDrawerCert(null)}>
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Add CA Certificate
-        </Button>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="md:hidden flex flex-col gap-3">
-        {filtered.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <p className="text-muted-foreground">
-                {search || statusFilter ? "No CA certificates match" : "No CA certificates configured."}
-              </p>
-            </CardContent>
-          </Card>
+  const columns: Column<CaCertificateView>[] = [
+    {
+      id: "name",
+      label: "Name",
+      render: (ca) => (
+        <HStack gap={3} vAlign="center">
+          <Icon icon={ShieldCheck} size="sm" color="accent" />
+          <Text type="body" size="sm" weight="semibold">
+            {ca.name}
+          </Text>
+        </HStack>
+      ),
+    },
+    {
+      id: "privateKey",
+      label: "Private Key",
+      width: 140,
+      render: (ca) =>
+        ca.hasPrivateKey ? (
+          <Badge variant="success" icon={<KeyRound />} label="Stored" />
         ) : (
-          filtered.map((ca) => {
-            const activeCount = ca.issuedCerts.filter((c) => !c.revokedAt).length;
-            return (
-              <Card key={ca.id} className="border-l-2 border-l-violet-500">
-                <CardContent className="p-4 flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-md border border-violet-500/30 bg-violet-500/10 text-violet-500">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                      </div>
-                      <span className="text-sm font-semibold">{ca.name}</span>
-                    </div>
-                    <CaActionsMenu ca={ca} onEdit={() => setDrawerCert(ca)} onDelete={() => setDeleteCert(ca)} />
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ca.hasPrivateKey && (
-                      <Badge variant="success" className="text-[10px] px-1.5 py-0">
-                        <KeyRound className="h-2.5 w-2.5 mr-0.5" />Key stored
-                      </Badge>
-                    )}
-                    {ca.issuedCerts.length > 0 && (
-                      <Badge variant={activeCount > 0 ? "info" : "secondary"} className="text-[10px] px-1.5 py-0">
-                        {activeCount}/{ca.issuedCerts.length} active
-                      </Badge>
-                    )}
-                    <span className="text-xs text-muted-foreground">{formatRelativeDate(ca.createdAt)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+          <Text type="body" size="sm" color="secondary">
+            &mdash;
+          </Text>
+        ),
+    },
+    {
+      id: "issued",
+      label: "Issued Certs",
+      width: 140,
+      render: (ca) =>
+        ca.issuedCerts.length === 0 ? (
+          <Text type="body" size="sm" color="secondary">
+            None
+          </Text>
+        ) : (
+          <Badge
+            variant={activeCount(ca) > 0 ? "info" : "neutral"}
+            label={`${activeCount(ca)}/${ca.issuedCerts.length} active`}
+          />
+        ),
+    },
+    {
+      id: "added",
+      label: "Added",
+      width: 120,
+      render: (ca) => (
+        <Text type="body" size="sm" color="secondary">
+          {formatRelativeDate(ca.createdAt)}
+        </Text>
+      ),
+    },
+    {
+      id: "actions",
+      label: "",
+      align: "right",
+      width: 64,
+      render: (ca) => (
+        <CaActionsMenu
+          ca={ca}
+          onEdit={() => setDrawerCert(ca)}
+          onDelete={() => setDeleteCert(ca)}
+        />
+      ),
+    },
+  ];
 
-      {/* Desktop table */}
-      <div className="hidden md:block rounded-md border overflow-x-auto">
-        <Table className="min-w-[600px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10" />
-              <TableHead>Name</TableHead>
-              <TableHead>Private Key</TableHead>
-              <TableHead>Issued Certs</TableHead>
-              <TableHead>Added</TableHead>
-              <TableHead className="text-right w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  {search || statusFilter ? "No CA certificates match" : "No CA certificates configured."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((ca) => {
-                const activeCount = ca.issuedCerts.filter((c) => !c.revokedAt).length;
-                const expanded = expandedId === ca.id;
-                return (
-                  <React.Fragment key={ca.id}>
-                    <TableRow className={expanded ? "bg-muted/20" : ""}>
-                      <TableCell className="pr-0 w-10">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          onClick={() => setExpandedId(expanded ? null : ca.id)}
-                        >
-                          {expanded
-                            ? <ChevronUp className="h-4 w-4" />
-                            : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-md border border-violet-500/30 bg-violet-500/10 text-violet-500">
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                          </div>
-                          <span className="text-sm font-semibold">{ca.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {ca.hasPrivateKey ? (
-                          <Badge variant="success" className="text-[10px] px-1.5 py-0">
-                            <KeyRound className="h-2.5 w-2.5 mr-0.5" />Stored
-                          </Badge>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {ca.issuedCerts.length === 0 ? (
-                          <span className="text-sm text-muted-foreground">None</span>
-                        ) : (
-                          <Badge variant={activeCount > 0 ? "info" : "secondary"} className="text-[10px] px-1.5 py-0">
-                            {activeCount}/{ca.issuedCerts.length} active
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">{formatRelativeDate(ca.createdAt)}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <CaActionsMenu
-                          ca={ca}
-                          onEdit={() => setDrawerCert(ca)}
-                          onDelete={() => setDeleteCert(ca)}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    {expanded && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="p-0">
-                          <IssuedCertsPanel ca={ca} />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                );
-              })
+  function caMobileCard(ca: CaCertificateView) {
+    return (
+      <Card>
+        <VStack gap={2}>
+          <HStack justify="between" vAlign="center" gap={2}>
+            <HStack gap={2} vAlign="center">
+              <Icon icon={ShieldCheck} size="sm" color="accent" />
+              <Text type="body" size="sm" weight="semibold">
+                {ca.name}
+              </Text>
+            </HStack>
+            <CaActionsMenu
+              ca={ca}
+              onEdit={() => setDrawerCert(ca)}
+              onDelete={() => setDeleteCert(ca)}
+            />
+          </HStack>
+          <HStack gap={2} wrap="wrap" vAlign="center">
+            {ca.hasPrivateKey && (
+              <Badge variant="success" icon={<KeyRound />} label="Key stored" />
             )}
-          </TableBody>
-        </Table>
-      </div>
+            {ca.issuedCerts.length > 0 && (
+              <Badge
+                variant={activeCount(ca) > 0 ? "info" : "neutral"}
+                label={`${activeCount(ca)}/${ca.issuedCerts.length} active`}
+              />
+            )}
+            <Text type="body" size="xsm" color="secondary">
+              {formatRelativeDate(ca.createdAt)}
+            </Text>
+          </HStack>
+          {/* The desktop table expands in place; on mobile the panel simply
+              follows the card, since there is no row to expand into. */}
+          <IssuedCertsPanel ca={ca} />
+        </VStack>
+      </Card>
+    );
+  }
+
+  return (
+    <VStack gap={4}>
+      <HStack justify="end">
+        <Button
+          variant="secondary"
+          size="sm"
+          label="Add CA Certificate"
+          icon={<Plus />}
+          onClick={() => setDrawerCert(null)}
+        />
+      </HStack>
+
+      {filtered.length === 0 ? (
+        <Card>
+          <EmptyState
+            title={search || statusFilter ? "No CA certificates match" : "No CA certificates configured"}
+          />
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={filtered}
+          keyField="id"
+          emptyMessage="No CA certificates match"
+          mobileCard={caMobileCard}
+          expandedRow={(ca) => <IssuedCertsPanel ca={ca} />}
+        />
+      )}
 
       <CaCertDrawer
         open={drawerCert !== false}
@@ -322,6 +295,6 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
           onClose={() => setDeleteCert(null)}
         />
       )}
-    </div>
+    </VStack>
   );
 }

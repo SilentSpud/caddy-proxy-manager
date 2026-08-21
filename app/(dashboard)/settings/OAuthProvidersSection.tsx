@@ -1,22 +1,22 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertDialog } from "@astryxdesign/core/AlertDialog";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Grid } from "@astryxdesign/core/Grid";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { AppDialog } from "@/components/ui/AppDialog";
+import { AUTOFILL_NEW_PASSWORD } from "@/components/ui/native-input-attrs";
 import type { OAuthProvider } from "@/src/lib/models/oauth-providers";
 import {
   createOAuthProviderAction,
@@ -75,6 +75,17 @@ const emptyForm: FormData = {
   syncGroups: false,
 };
 
+const TYPE_OPTIONS = [
+  { value: "oidc", label: "OIDC (OpenID Connect)" },
+  { value: "oauth2", label: "OAuth2" },
+];
+
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "user", label: "User" },
+  { value: "viewer", label: "Viewer" },
+];
+
 export default function OAuthProvidersSection({
   initialProviders,
   baseUrl,
@@ -86,8 +97,7 @@ export default function OAuthProvidersSection({
   const [form, setForm] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<OAuthProvider | null>(null);
 
   const callbackUrl = useCallback(
     (providerId: string) => `${baseUrl}/api/auth/oauth2/callback/${providerId}`,
@@ -213,457 +223,328 @@ export default function OAuthProvidersSection({
     try {
       await deleteOAuthProviderAction(id);
       setProviders((prev) => prev.filter((p) => p.id !== id));
-      setDeleteConfirmId(null);
+      setDeleteConfirm(null);
     } catch (err) {
       console.error("Failed to delete provider:", err);
     }
-  }
-
-  function copyToClipboard(text: string, providerId: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedId(providerId);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
   }
 
   function updateField<K extends keyof FormData>(field: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  const anyEnabled = providers.some((p) => p.enabled);
+
   return (
-    <div className="flex flex-col gap-3">
+    <VStack gap={3}>
       {localUsersDisabled && (
-        <Alert
-          className={
-            providers.some((p) => p.enabled)
-              ? "border-blue-500/30 bg-blue-500/5 text-blue-700 dark:text-blue-400"
-              : "border-destructive/50 bg-destructive/5 text-destructive"
+        <Banner
+          status={anyEnabled ? "info" : "error"}
+          title="Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true)"
+          description={
+            anyEnabled
+              ? "All accounts are provisioned by the providers below."
+              : "No provider is enabled, so nobody can sign in."
           }
-        >
-          <AlertDescription>
-            Local user management is disabled (<code className="font-mono">AUTH_DISABLE_LOCAL_USERS=true</code>).
-            {providers.some((p) => p.enabled)
-              ? " All accounts are provisioned by the providers below."
-              : " No provider is enabled, so nobody can sign in."}
-          </AlertDescription>
-        </Alert>
+        />
       )}
 
       {providers.length === 0 && (
-        <Alert className="border-blue-500/30 bg-blue-500/5 text-blue-700 dark:text-blue-400 [&>svg]:text-blue-500">
-          <AlertDescription>
-            No OAuth providers configured. Add a provider to enable single sign-on.
-          </AlertDescription>
-        </Alert>
+        <Banner
+          status="info"
+          title="No OAuth providers configured"
+          description="Add a provider to enable single sign-on."
+        />
       )}
 
-      {providers.map((provider) => (
-        <div
-          key={provider.id}
-          className="flex flex-col gap-2 rounded-md border px-4 py-3"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold">{provider.name}</p>
-              <Badge variant="muted">{provider.type.toUpperCase()}</Badge>
-              <Badge variant={provider.source === "env" ? "info" : "secondary"}>
-                {provider.source === "env" ? "ENV" : "UI"}
-              </Badge>
-              {provider.roleMappingEnabled && (
-                <Badge variant="secondary" title="Roles are assigned from this provider's group claim">
-                  Group roles
-                </Badge>
-              )}
-              {provider.syncGroups && (
-                <Badge variant="secondary" title="CPM groups are mirrored from this provider">
-                  Group sync
-                </Badge>
-              )}
-              {!provider.enabled && (
-                <Badge variant="warning">Disabled</Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <Label htmlFor={`toggle-${provider.id}`} className="text-xs text-muted-foreground">
-                  Enabled
-                </Label>
-                <Switch
-                  id={`toggle-${provider.id}`}
-                  checked={provider.enabled}
-                  onCheckedChange={() => handleToggleEnabled(provider)}
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openEditDialog(provider)}
-                disabled={provider.source === "env"}
-                title={provider.source === "env" ? "Environment-sourced providers cannot be edited" : "Edit provider"}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              {deleteConfirmId === provider.id ? (
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="destructive"
+      {providers.map((provider) => {
+        const isFromEnv = provider.source === "env";
+        return (
+          <Card key={provider.id} padding={3}>
+            <VStack gap={2}>
+              <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
+                <HStack gap={2} vAlign="center" wrap="wrap">
+                  <Text type="body" size="sm" weight="semibold">
+                    {provider.name}
+                  </Text>
+                  <Badge label={provider.type.toUpperCase()} />
+                  <Badge
+                    variant={isFromEnv ? "info" : "neutral"}
+                    label={isFromEnv ? "ENV" : "UI"}
+                  />
+                  {provider.roleMappingEnabled && <Badge label="Group roles" />}
+                  {provider.syncGroups && <Badge label="Group sync" />}
+                  {!provider.enabled && <Badge variant="warning" label="Disabled" />}
+                </HStack>
+                <HStack gap={2} vAlign="center">
+                  <Switch
+                    label="Enabled"
+                    value={provider.enabled}
+                    onChange={() => handleToggleEnabled(provider)}
+                  />
+                  <IconButton
+                    variant="secondary"
                     size="sm"
-                    onClick={() => handleDelete(provider.id)}
-                  >
-                    Confirm
-                  </Button>
-                  <Button
-                    variant="outline"
+                    label={`Edit ${provider.name}`}
+                    icon={<Pencil />}
+                    isDisabled={isFromEnv}
+                    tooltip={
+                      isFromEnv
+                        ? "Environment-sourced providers cannot be edited"
+                        : "Edit provider"
+                    }
+                    onClick={() => openEditDialog(provider)}
+                  />
+                  <IconButton
+                    variant="secondary"
                     size="sm"
-                    onClick={() => setDeleteConfirmId(null)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive border-destructive/50"
-                  onClick={() => setDeleteConfirmId(provider.id)}
-                  disabled={provider.source === "env"}
-                  title={provider.source === "env" ? "Environment-sourced providers cannot be deleted" : "Delete provider"}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <code className="text-xs font-mono text-muted-foreground break-all">
-              {callbackUrl(provider.id)}
-            </code>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 shrink-0"
-              onClick={() => copyToClipboard(callbackUrl(provider.id), provider.id)}
-              title="Copy callback URL"
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-            {copiedId === provider.id && (
-              <span className="text-xs text-emerald-600">Copied!</span>
-            )}
-          </div>
-        </div>
-      ))}
+                    label={`Delete ${provider.name}`}
+                    icon={<Trash2 />}
+                    isDisabled={isFromEnv}
+                    tooltip={
+                      isFromEnv
+                        ? "Environment-sourced providers cannot be deleted"
+                        : "Delete provider"
+                    }
+                    onClick={() => setDeleteConfirm(provider)}
+                  />
+                </HStack>
+              </HStack>
+              {/* CodeBlock owns the copy affordance, replacing the hand-built
+                  button and its two-second "Copied!" flag. */}
+              <CodeBlock code={callbackUrl(provider.id)} width="100%" />
+            </VStack>
+          </Card>
+        );
+      })}
 
-      <div className="flex justify-end">
-        <Button size="sm" onClick={openAddDialog}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Provider
-        </Button>
-      </div>
+      <HStack justify="end">
+        <Button size="sm" icon={<Plus />} label="Add Provider" onClick={openAddDialog} />
+      </HStack>
+
+      {/* The inline Confirm/Cancel pair became a real dialog, so a destructive
+          action is announced as one. */}
+      <AlertDialog
+        isOpen={deleteConfirm !== null}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        title="Delete OAuth provider"
+        description={
+          deleteConfirm === null
+            ? ""
+            : `Delete "${deleteConfirm.name}"? Users who sign in through it will lose access.`
+        }
+        actionLabel="Delete provider"
+        onAction={() => deleteConfirm && handleDelete(deleteConfirm.id)}
+      />
 
       {/* Add / Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingProvider ? "Edit OAuth Provider" : "Add OAuth Provider"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingProvider
-                ? "Update the OAuth provider configuration."
-                : "Configure a new OAuth or OIDC provider for single sign-on."}
-            </DialogDescription>
-          </DialogHeader>
+      <AppDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        title={editingProvider ? "Edit OAuth Provider" : "Add OAuth Provider"}
+        maxWidth="lg"
+        submitLabel={editingProvider ? "Update Provider" : "Create Provider"}
+        onSubmit={handleSave}
+        isSubmitting={saving}
+      >
+        <VStack gap={3}>
+          <Text type="body" size="sm" color="secondary">
+            {editingProvider
+              ? "Update the OAuth provider configuration."
+              : "Configure a new OAuth or OIDC provider for single sign-on."}
+          </Text>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {error && <Banner status="error" title="Could not save provider" description={error} />}
 
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-name">Name *</Label>
-              <Input
-                id="oauth-name"
-                value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                placeholder="e.g. Google, Keycloak"
-                className="h-8 text-sm"
-              />
-            </div>
+          <TextInput
+            label="Name"
+            isRequired
+            size="sm"
+            value={form.name}
+            onChange={(v) => updateField("name", v)}
+            placeholder="e.g. Google, Keycloak"
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-type">Type</Label>
-              <Select
-                value={form.type}
-                onValueChange={(v) => updateField("type", v)}
-              >
-                <SelectTrigger id="oauth-type" className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="oidc">OIDC (OpenID Connect)</SelectItem>
-                  <SelectItem value="oauth2">OAuth2</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <Selector
+            label="Type"
+            size="sm"
+            options={TYPE_OPTIONS}
+            value={form.type}
+            onChange={(v) => updateField("type", v)}
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-client-id">Client ID *</Label>
-              <Input
-                id="oauth-client-id"
-                value={form.clientId}
-                onChange={(e) => updateField("clientId", e.target.value)}
-                className="h-8 text-sm font-mono"
-              />
-            </div>
+          <TextInput
+            label="Client ID"
+            isRequired
+            size="sm"
+            value={form.clientId}
+            onChange={(v) => updateField("clientId", v)}
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-client-secret">Client Secret *</Label>
-              <Input
-                id="oauth-client-secret"
-                type="password"
-                autoComplete="new-password"
-                value={form.clientSecret}
-                onChange={(e) => updateField("clientSecret", e.target.value)}
-                className="h-8 text-sm"
-              />
-            </div>
+          <TextInput
+            {...AUTOFILL_NEW_PASSWORD}
+            label="Client Secret"
+            isRequired
+            type="password"
+            size="sm"
+            value={form.clientSecret}
+            onChange={(v) => updateField("clientSecret", v)}
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-issuer">Issuer URL</Label>
-              <Input
-                id="oauth-issuer"
-                value={form.issuer}
-                onChange={(e) => updateField("issuer", e.target.value)}
-                placeholder="https://accounts.google.com"
-                className="h-8 text-sm font-mono"
-              />
-              <p className="text-xs text-muted-foreground">
-                For OIDC providers, the issuer URL enables automatic discovery of endpoints.
-              </p>
-            </div>
+          <TextInput
+            label="Issuer URL"
+            isOptional
+            size="sm"
+            value={form.issuer}
+            onChange={(v) => updateField("issuer", v)}
+            placeholder="https://accounts.google.com"
+            description="For OIDC providers, the issuer URL enables automatic discovery of endpoints."
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-auth-url">Authorization URL</Label>
-              <Input
-                id="oauth-auth-url"
-                value={form.authorizationUrl}
-                onChange={(e) => updateField("authorizationUrl", e.target.value)}
-                placeholder="Override discovered endpoint"
-                className="h-8 text-sm font-mono"
-              />
-            </div>
+          <TextInput
+            label="Authorization URL"
+            isOptional
+            size="sm"
+            value={form.authorizationUrl}
+            onChange={(v) => updateField("authorizationUrl", v)}
+            placeholder="Override discovered endpoint"
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-token-url">Token URL</Label>
-              <Input
-                id="oauth-token-url"
-                value={form.tokenUrl}
-                onChange={(e) => updateField("tokenUrl", e.target.value)}
-                placeholder="Override discovered endpoint"
-                className="h-8 text-sm font-mono"
-              />
-            </div>
+          <TextInput
+            label="Token URL"
+            isOptional
+            size="sm"
+            value={form.tokenUrl}
+            onChange={(v) => updateField("tokenUrl", v)}
+            placeholder="Override discovered endpoint"
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-userinfo-url">Userinfo URL</Label>
-              <Input
-                id="oauth-userinfo-url"
-                value={form.userinfoUrl}
-                onChange={(e) => updateField("userinfoUrl", e.target.value)}
-                placeholder="Override discovered endpoint"
-                className="h-8 text-sm font-mono"
-              />
-            </div>
+          <TextInput
+            label="Userinfo URL"
+            isOptional
+            size="sm"
+            value={form.userinfoUrl}
+            onChange={(v) => updateField("userinfoUrl", v)}
+            placeholder="Override discovered endpoint"
+          />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="oauth-scopes">Scopes</Label>
-              <Input
-                id="oauth-scopes"
-                value={form.scopes}
-                onChange={(e) => updateField("scopes", e.target.value)}
-                placeholder="openid email profile"
-                className="h-8 text-sm font-mono"
-              />
-            </div>
+          <TextInput
+            label="Scopes"
+            size="sm"
+            value={form.scopes}
+            onChange={(v) => updateField("scopes", v)}
+            placeholder="openid email profile"
+          />
 
-            <div className="flex items-center gap-2 pt-1">
-              <Switch
-                id="oauth-auto-link"
-                checked={form.autoLink}
-                onCheckedChange={(v) => updateField("autoLink", v)}
-              />
-              <Label htmlFor="oauth-auto-link">
-                Auto-link accounts
-              </Label>
-            </div>
-            <p className="text-xs text-muted-foreground -mt-1">
-              Automatically link OAuth accounts to existing users with the same email address.
-            </p>
+          <Switch
+            label="Auto-link accounts"
+            value={form.autoLink}
+            onChange={(v) => updateField("autoLink", v)}
+            description="Automatically link OAuth accounts to existing users with the same email address."
+          />
 
-            <div className="rounded-md border p-3 flex flex-col gap-3">
-              <div className="flex flex-col gap-0.5">
-                <p className="text-sm font-semibold">Group mapping</p>
-                <p className="text-xs text-muted-foreground">
+          <Card variant="muted" padding={3}>
+            <VStack gap={3}>
+              <VStack gap={0}>
+                <Text type="body" size="sm" weight="semibold">
+                  Group mapping
+                </Text>
+                <Text type="body" size="xsm" color="secondary">
                   Derive CPM roles and groups from the identity provider&apos;s group claim.
-                </p>
-              </div>
+                </Text>
+              </VStack>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="oauth-groups-claim">Groups claim</Label>
-                <Input
-                  id="oauth-groups-claim"
-                  value={form.groupsClaim}
-                  onChange={(e) => updateField("groupsClaim", e.target.value)}
-                  placeholder="groups"
-                  className="h-8 text-sm font-mono"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Claim holding the user&apos;s groups. Use dots for nested claims, e.g.{" "}
-                  <code className="font-mono">resource_access.cpm.roles</code>. Remember to request a
-                  matching scope above.
-                </p>
-              </div>
+              {/* The helper text below used inline <code> spans. Astryx ties a
+                  field's description to it via aria-describedby but types it as
+                  a plain string, so the monospace styling is traded for keeping
+                  that association. */}
+              <TextInput
+                label="Groups claim"
+                size="sm"
+                value={form.groupsClaim}
+                onChange={(v) => updateField("groupsClaim", v)}
+                placeholder="groups"
+                description="Claim holding the user's groups. Use dots for nested claims, e.g. resource_access.cpm.roles. Remember to request a matching scope above."
+              />
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="oauth-group-prefix">Group prefix</Label>
-                <Input
-                  id="oauth-group-prefix"
-                  value={form.groupPrefix}
-                  onChange={(e) => updateField("groupPrefix", e.target.value)}
-                  placeholder="CPM_"
-                  className="h-8 text-sm font-mono"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Shorthand for naming the role groups: with prefix{" "}
-                  <code className="font-mono">CPM_</code>, members of{" "}
-                  <code className="font-mono">CPM_Admin</code> become admins,{" "}
-                  <code className="font-mono">CPM_User</code> users and{" "}
-                  <code className="font-mono">CPM_Viewer</code> viewers. Optional — name the groups
-                  below instead if they do not share a prefix.
-                </p>
-              </div>
+              <TextInput
+                label="Group prefix"
+                isOptional
+                size="sm"
+                value={form.groupPrefix}
+                onChange={(v) => updateField("groupPrefix", v)}
+                placeholder="CPM_"
+                description="Shorthand for naming the role groups: with prefix CPM_, members of CPM_Admin become admins, CPM_User users and CPM_Viewer viewers. Name the groups below instead if they do not share a prefix."
+              />
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="oauth-role-mapping"
-                  checked={form.roleMappingEnabled}
-                  onCheckedChange={(v) => updateField("roleMappingEnabled", v)}
-                />
-                <Label htmlFor="oauth-role-mapping">Assign roles from groups</Label>
-              </div>
-              <p className="text-xs text-muted-foreground -mt-1">
-                The provider becomes authoritative: a user who loses the admin group is demoted on their
-                next sign-in. The last remaining admin is never demoted.
-              </p>
+              <Switch
+                label="Assign roles from groups"
+                value={form.roleMappingEnabled}
+                onChange={(v) => updateField("roleMappingEnabled", v)}
+                description="The provider becomes authoritative: a user who loses the admin group is demoted on their next sign-in. The last remaining admin is never demoted."
+              />
 
               {form.roleMappingEnabled && (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="oauth-admin-group" className="text-xs">Admin groups</Label>
-                      <Input
-                        id="oauth-admin-group"
-                        value={form.adminGroup}
-                        onChange={(e) => updateField("adminGroup", e.target.value)}
-                        placeholder={form.groupPrefix ? `${form.groupPrefix}Admin` : "platform-owners"}
-                        className="h-8 text-sm font-mono"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="oauth-user-group" className="text-xs">User groups</Label>
-                      <Input
-                        id="oauth-user-group"
-                        value={form.userGroup}
-                        onChange={(e) => updateField("userGroup", e.target.value)}
-                        placeholder={form.groupPrefix ? `${form.groupPrefix}User` : "staff"}
-                        className="h-8 text-sm font-mono"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="oauth-viewer-group" className="text-xs">Viewer groups</Label>
-                      <Input
-                        id="oauth-viewer-group"
-                        value={form.viewerGroup}
-                        onChange={(e) => updateField("viewerGroup", e.target.value)}
-                        placeholder={form.groupPrefix ? `${form.groupPrefix}Viewer` : "auditors"}
-                        className="h-8 text-sm font-mono"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground -mt-1">
+                  <Grid columns={{ minWidth: 160, max: 3 }} gap={2}>
+                    <TextInput
+                      label="Admin groups"
+                      size="sm"
+                      value={form.adminGroup}
+                      onChange={(v) => updateField("adminGroup", v)}
+                      placeholder={form.groupPrefix ? `${form.groupPrefix}Admin` : "platform-owners"}
+                    />
+                    <TextInput
+                      label="User groups"
+                      size="sm"
+                      value={form.userGroup}
+                      onChange={(v) => updateField("userGroup", v)}
+                      placeholder={form.groupPrefix ? `${form.groupPrefix}User` : "staff"}
+                    />
+                    <TextInput
+                      label="Viewer groups"
+                      size="sm"
+                      value={form.viewerGroup}
+                      onChange={(v) => updateField("viewerGroup", v)}
+                      placeholder={form.groupPrefix ? `${form.groupPrefix}Viewer` : "auditors"}
+                    />
+                  </Grid>
+                  <Text type="body" size="xsm" color="secondary">
                     Name the groups exactly as your provider reports them. Separate several with
-                    commas — <code className="font-mono">platform-owners, sre-oncall</code> — and any
-                    one of them grants the role. A role left blank falls back to the prefix above, so
-                    the two styles can be mixed. The most privileged match wins.
-                  </p>
+                    commas &mdash; platform-owners, sre-oncall &mdash; and any one of them grants the
+                    role. A role left blank falls back to the prefix above, so the two styles can be
+                    mixed. The most privileged match wins.
+                  </Text>
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="oauth-default-role">Role when no group matches</Label>
-                    <Select
-                      value={form.defaultRole}
-                      onValueChange={(v) => updateField("defaultRole", v as AppRole)}
-                    >
-                      <SelectTrigger id="oauth-default-role" className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Selector
+                    label="Role when no group matches"
+                    size="sm"
+                    options={ROLE_OPTIONS}
+                    value={form.defaultRole}
+                    onChange={(v) => updateField("defaultRole", v as AppRole)}
+                  />
                 </>
               )}
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="oauth-sync-groups"
-                  checked={form.syncGroups}
-                  onCheckedChange={(v) => updateField("syncGroups", v)}
-                />
-                <Label htmlFor="oauth-sync-groups">Mirror groups into CPM groups</Label>
-              </div>
-              <p className="text-xs text-muted-foreground -mt-1">
-                Creates CPM groups from the remaining prefixed claims (with the prefix stripped) for
-                forward-auth access control. Groups you created yourself are never modified.
-              </p>
-            </div>
+              <Switch
+                label="Mirror groups into CPM groups"
+                value={form.syncGroups}
+                onChange={(v) => updateField("syncGroups", v)}
+                description="Creates CPM groups from the remaining prefixed claims (with the prefix stripped) for forward-auth access control. Groups you created yourself are never modified."
+              />
+            </VStack>
+          </Card>
 
-            {editingProvider && (
-              <div className="flex flex-col gap-1.5 pt-1">
-                <Label className="text-xs text-muted-foreground">Callback URL</Label>
-                <div className="flex items-center gap-2">
-                  <code className="text-xs font-mono text-muted-foreground break-all">
-                    {callbackUrl(editingProvider.id)}
-                  </code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 shrink-0"
-                    onClick={() => copyToClipboard(callbackUrl(editingProvider.id), editingProvider.id)}
-                    title="Copy callback URL"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : editingProvider ? "Update Provider" : "Create Provider"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          {editingProvider && (
+            <VStack gap={1}>
+              <Text type="label" size="xsm" color="secondary">
+                Callback URL
+              </Text>
+              <CodeBlock code={callbackUrl(editingProvider.id)} width="100%" />
+            </VStack>
+          )}
+        </VStack>
+      </AppDialog>
+    </VStack>
   );
 }

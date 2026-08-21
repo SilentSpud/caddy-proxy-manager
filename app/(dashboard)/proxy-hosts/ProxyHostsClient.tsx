@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Globe, MoreHorizontal, ArrowRight, Shield, Bug, MapPin, Scale, KeyRound, UserCheck, CornerRightDown, Replace, Ban, GitBranch, ShieldCheck, LogIn } from "lucide-react";
+import { Globe, ArrowRight, Shield, Bug, MapPin, Scale, KeyRound, UserCheck, CornerRightDown, Replace, Ban, GitBranch, ShieldCheck, LogIn } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Card } from "@astryxdesign/core/Card";
+import { Icon } from "@astryxdesign/core/Icon";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AccessList } from "@/lib/models/access-lists";
 import type { Certificate } from "@/lib/models/certificates";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
@@ -13,20 +20,9 @@ import type { IssuedClientCertificate } from "@/lib/models/issued-client-certifi
 import { toggleProxyHostAction } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
-import { DataTable } from "@/components/ui/DataTable";
+import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { CreateHostDialog, EditHostDialog, DeleteHostDialog } from "@/components/proxy-hosts/HostDialogs";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = { id: number; name: string; description: string | null; member_count: number };
@@ -47,6 +43,79 @@ type Props = {
   forwardAuthGroups?: ForwardAuthGroup[];
   forwardAuthAccessMap?: ForwardAuthAccessMap;
 };
+
+/**
+ * The feature badges, as data rather than thirteen near-identical JSX blocks.
+ * `variant` distinguishes the two that mean "traffic is being restricted" from
+ * the rest, which the original also did via info/warning.
+ */
+const FEATURES: ReadonlyArray<{
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  variant?: "info" | "warning";
+  isOn: (host: ProxyHost) => boolean;
+}> = [
+  { key: "tls", label: "TLS", variant: "info", isOn: (h) => Boolean(h.certificateId) },
+  { key: "auth", label: "Auth", icon: <Shield />, variant: "warning", isOn: (h) => Boolean(h.accessListId) },
+  { key: "authentik", label: "Authentik", icon: <UserCheck />, isOn: (h) => Boolean(h.authentik?.enabled) },
+  { key: "forward-auth", label: "Forward Auth", icon: <LogIn />, isOn: (h) => Boolean(h.cpmForwardAuth?.enabled) },
+  { key: "waf", label: "WAF", icon: <Bug />, isOn: (h) => Boolean(h.waf?.enabled) },
+  { key: "geo", label: "Geo", icon: <MapPin />, isOn: (h) => Boolean(h.geoblock?.enabled) },
+  { key: "lb", label: "LB", icon: <Scale />, isOn: (h) => Boolean(h.loadBalancer?.enabled) },
+  { key: "mtls", label: "mTLS", icon: <KeyRound />, isOn: (h) => Boolean(h.mtls?.enabled) },
+  { key: "redirects", label: "Redirects", icon: <CornerRightDown />, isOn: (h) => h.redirects?.length > 0 },
+  { key: "rewrite", label: "Rewrite", icon: <Replace />, isOn: (h) => Boolean(h.rewrite) },
+  { key: "path-allows", label: "Allows", icon: <ShieldCheck />, isOn: (h) => h.pathAllows?.length > 0 },
+  { key: "path-blocks", label: "Blocks", icon: <Ban />, isOn: (h) => h.pathBlocks?.length > 0 },
+  { key: "path-rewrites", label: "Path Rewrites", icon: <GitBranch />, isOn: (h) => h.pathRewrites?.length > 0 },
+];
+
+/** "example.com +2" — the primary entry plus a count of the rest. */
+function summarize(values: string[]) {
+  return values.length > 1 ? `${values[0]} +${values.length - 1}` : values[0];
+}
+
+/**
+ * The enable switch plus the row menu, shared by the table and the cards.
+ * Declared at module scope: nested inside the page component it would be a new
+ * component type on every render, remounting the menu and closing it mid-use.
+ */
+function HostActions({
+  host,
+  onToggle,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  host: ProxyHost;
+  onToggle: (enabled: boolean) => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <HStack gap={2} vAlign="center" justify="end">
+      <Switch
+        label={`Enable ${host.name}`}
+        isLabelHidden
+        value={host.enabled}
+        onChange={onToggle}
+      />
+      <MoreMenu
+        label={`Actions for ${host.name}`}
+        size="sm"
+        alignment="end"
+        items={[
+          { label: "Edit", onClick: onEdit },
+          { label: "Duplicate", onClick: onDuplicate },
+          { type: "divider" },
+          { label: "Delete", variant: "destructive", onClick: onDelete },
+        ]}
+      />
+    </HStack>
+  );
+}
 
 export default function ProxyHostsClient({ hosts, certificates, accessLists, caCertificates, authentikDefaults, pagination, initialSearch, initialSort, mtlsRoles, issuedClientCerts, forwardAuthUsers, forwardAuthGroups, forwardAuthAccessMap }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -85,122 +154,62 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
     await toggleProxyHostAction(id, enabled);
   };
 
-  const columns = [
+  function openDuplicate(host: ProxyHost) {
+    setDuplicateHost(host);
+    setDialogKey((k) => k + 1);
+    setCreateOpen(true);
+  }
+
+  const columns: Column<ProxyHost>[] = [
     {
       id: "name",
       label: "Name / Domain",
       sortKey: "name",
-      render: (host: ProxyHost) => (
-        <div className="flex items-start gap-3">
-          <div className={[
-            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border",
-            host.enabled
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-              : "border-zinc-500/20 bg-zinc-500/10 text-zinc-400"
-          ].join(" ")}>
-            <Globe className="h-3.5 w-3.5" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold leading-tight">{host.name}</p>
-            <p className="text-xs text-muted-foreground font-mono mt-0.5">
-              {host.domains[0]}
-              {host.domains.length > 1 && (
-                <span className="ml-1 text-muted-foreground">+{host.domains.length - 1}</span>
-              )}
-            </p>
-          </div>
-        </div>
+      render: (host) => (
+        <HStack gap={3} vAlign="center">
+          <Icon icon={Globe} size="sm" color={host.enabled ? "success" : "disabled"} />
+          <VStack gap={0}>
+            <Text type="body" size="sm" weight="semibold">
+              {host.name}
+            </Text>
+            <Text type="code" size="xsm" color="secondary">
+              {summarize(host.domains)}
+            </Text>
+          </VStack>
+        </HStack>
       ),
     },
     {
       id: "target",
       label: "Upstream",
       sortKey: "upstreams",
-      render: (host: ProxyHost) => (
-        <div className="flex items-center gap-1.5">
-          <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-          <span className="text-sm font-mono font-medium text-foreground/80">
-            {host.upstreams[0]}
-            {host.upstreams.length > 1 && (
-              <span className="ml-1 text-muted-foreground">+{host.upstreams.length - 1}</span>
-            )}
-          </span>
-        </div>
+      render: (host) => (
+        <HStack gap={2} vAlign="center">
+          <Icon icon={ArrowRight} size="xsm" color="secondary" />
+          <Text type="code" size="sm" weight="medium">
+            {summarize(host.upstreams)}
+          </Text>
+        </HStack>
       ),
     },
     {
       id: "features",
       label: "Features",
-      render: (host: ProxyHost) => {
-        const badges = [
-          host.certificateId && (
-            <Badge key="tls" variant="info" className="text-[10px] px-1.5 py-0">TLS</Badge>
-          ),
-          host.accessListId && (
-            <Badge key="auth" variant="warning" className="text-[10px] px-1.5 py-0">
-              <Shield className="h-2.5 w-2.5 mr-0.5" />Auth
-            </Badge>
-          ),
-          host.authentik?.enabled && (
-            <Badge key="authentik" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <UserCheck className="h-2.5 w-2.5 mr-0.5" />Authentik
-            </Badge>
-          ),
-          host.cpmForwardAuth?.enabled && (
-            <Badge key="forward-auth" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <LogIn className="h-2.5 w-2.5 mr-0.5" />Forward Auth
-            </Badge>
-          ),
-          host.waf?.enabled && (
-            <Badge key="waf" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <Bug className="h-2.5 w-2.5 mr-0.5" />WAF
-            </Badge>
-          ),
-          host.geoblock?.enabled && (
-            <Badge key="geo" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <MapPin className="h-2.5 w-2.5 mr-0.5" />Geo
-            </Badge>
-          ),
-          host.loadBalancer?.enabled && (
-            <Badge key="lb" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <Scale className="h-2.5 w-2.5 mr-0.5" />LB
-            </Badge>
-          ),
-          host.mtls?.enabled && (
-            <Badge key="mtls" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <KeyRound className="h-2.5 w-2.5 mr-0.5" />mTLS
-            </Badge>
-          ),
-          host.redirects?.length > 0 && (
-            <Badge key="redirects" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <CornerRightDown className="h-2.5 w-2.5 mr-0.5" />Redirects
-            </Badge>
-          ),
-          host.rewrite && (
-            <Badge key="rewrite" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <Replace className="h-2.5 w-2.5 mr-0.5" />Rewrite
-            </Badge>
-          ),
-          host.pathAllows?.length > 0 && (
-            <Badge key="path-allows" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <ShieldCheck className="h-2.5 w-2.5 mr-0.5" />Allows
-            </Badge>
-          ),
-          host.pathBlocks?.length > 0 && (
-            <Badge key="path-blocks" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <Ban className="h-2.5 w-2.5 mr-0.5" />Blocks
-            </Badge>
-          ),
-          host.pathRewrites?.length > 0 && (
-            <Badge key="path-rewrites" variant="secondary" className="text-[10px] px-1.5 py-0">
-              <GitBranch className="h-2.5 w-2.5 mr-0.5" />Path Rewrites
-            </Badge>
-          ),
-        ].filter(Boolean);
+      render: (host) => {
+        const active = FEATURES.filter((f) => f.isOn(host));
+        if (active.length === 0) {
+          return (
+            <Text type="body" size="xsm" color="secondary">
+              &mdash;
+            </Text>
+          );
+        }
         return (
-          <div className="flex flex-wrap gap-1">
-            {badges.length > 0 ? badges : <span className="text-xs text-muted-foreground">—</span>}
-          </div>
+          <HStack gap={1} wrap="wrap">
+            {active.map((f) => (
+              <Badge key={f.key} variant={f.variant} icon={f.icon} label={f.label} />
+            ))}
+          </HStack>
         );
       },
     },
@@ -209,104 +218,66 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
       label: "Status",
       sortKey: "enabled",
       width: 110,
-      render: (host: ProxyHost) => (
-        <StatusChip status={host.enabled ? "active" : "inactive"} />
-      ),
+      render: (host) => <StatusChip status={host.enabled ? "active" : "inactive"} />,
     },
     {
       id: "actions",
       label: "",
-      align: "right" as const,
-      width: 80,
-      render: (host: ProxyHost) => (
-        <div className="flex items-center gap-2 justify-end">
-          <Switch
-            checked={host.enabled}
-            onCheckedChange={(checked) => handleToggleEnabled(host.id, checked)}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Open menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setEditHost(host)}>Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setDuplicateHost(host); { setDialogKey(k => k + 1); setCreateOpen(true); }; }}>Duplicate</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setDeleteHost(host)}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      align: "right",
+      width: 120,
+      render: (host) => (
+        <HostActions
+          host={host}
+          onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
+          onEdit={() => setEditHost(host)}
+          onDuplicate={() => openDuplicate(host)}
+          onDelete={() => setDeleteHost(host)}
+        />
       ),
     },
   ];
 
   const mobileCard = (host: ProxyHost) => (
-    <Card className={[
-      "border-l-2",
-      host.enabled ? "border-l-emerald-500" : "border-l-zinc-500/30",
-    ].join(" ")}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-1 min-w-0">
-            <p className="text-sm font-semibold truncate">{host.name}</p>
-            <p className="text-xs text-muted-foreground font-mono truncate">
-              {host.domains[0]}{host.domains.length > 1 ? ` +${host.domains.length - 1}` : ""}
-              <span className="mx-1 text-muted-foreground">→</span>
-              {host.upstreams[0]}
-            </p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <StatusChip status={host.enabled ? "active" : "inactive"} />
-              {host.certificateId && <Badge variant="info" className="text-[10px] px-1.5 py-0">TLS</Badge>}
-            </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Switch
-              checked={host.enabled}
-              onCheckedChange={(checked) => handleToggleEnabled(host.id, checked)}
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setEditHost(host)}>Edit</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setDuplicateHost(host); { setDialogKey(k => k + 1); setCreateOpen(true); }; }}>Duplicate</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteHost(host)}>Delete</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </CardContent>
+    <Card>
+      <HStack justify="between" vAlign="start" gap={2}>
+        <VStack gap={1}>
+          <Text type="body" size="sm" weight="semibold" maxLines={1}>
+            {host.name}
+          </Text>
+          <Text type="code" size="xsm" color="secondary" maxLines={1}>
+            {summarize(host.domains)} &rarr; {host.upstreams[0]}
+          </Text>
+          <HStack gap={2} vAlign="center">
+            <StatusChip status={host.enabled ? "active" : "inactive"} />
+            {host.certificateId && <Badge variant="info" label="TLS" />}
+          </HStack>
+        </VStack>
+        <HostActions
+          host={host}
+          onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
+          onEdit={() => setEditHost(host)}
+          onDuplicate={() => openDuplicate(host)}
+          onDelete={() => setDeleteHost(host)}
+        />
+      </HStack>
     </Card>
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <VStack gap={6}>
       <PageHeader
         title="Proxy Hosts"
         description="Define HTTP(S) reverse proxies orchestrated by Caddy with automated certificates."
         action={{ label: "Create Host", onClick: () => { setDialogKey(k => k + 1); setCreateOpen(true); } }}
       />
 
-      <div className="flex items-center gap-2">
+      <HStack gap={2} vAlign="center">
         <SearchField
           value={searchTerm}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={handleSearchChange}
           placeholder="Search hosts..."
         />
-      </div>
+      </HStack>
 
       <DataTable
         columns={columns}
@@ -316,7 +287,7 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}
-        rowClassName={(host) => host.enabled ? "" : "opacity-75"}
+        rowStatus={(host) => (host.enabled ? null : { color: "gray", label: "Disabled" })}
       />
 
       <CreateHostDialog
@@ -358,6 +329,6 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
           onClose={() => setDeleteHost(null)}
         />
       )}
-    </div>
+    </VStack>
   );
 }

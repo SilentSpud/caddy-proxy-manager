@@ -1,25 +1,34 @@
 "use client";
 
-import { useState } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ReactNode, useState } from "react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { DateTimeInput, type ISODateTimeString } from "@astryxdesign/core/DateTimeInput";
+import { Divider } from "@astryxdesign/core/Divider";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { FileInput } from "@astryxdesign/core/FileInput";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { AppDialog } from "@/components/ui/AppDialog";
+import {
+  AUTOFILL_CURRENT_PASSWORD,
+  AUTOFILL_NEW_PASSWORD,
+} from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { authClient } from "@/src/lib/auth-client";
-import { Camera, Check, Clock, Copy, Key, Link, LogIn, Lock, LogOut, Monitor, Plus, Trash2, Unlink, User, AlertTriangle } from "lucide-react";
+import { Key, Link, LogIn, Lock, LogOut, Monitor, Plus, Trash2, Unlink, User } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
@@ -82,6 +91,35 @@ interface ProfileClientProps {
   avatar: ResolvedAvatar;
 }
 
+/** Card with an icon heading and a rule beneath it, used for every section. */
+function ProfileSection({
+  icon,
+  title,
+  action,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card padding={6}>
+      <VStack gap={4}>
+        <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
+          <HStack gap={2} vAlign="center">
+            <Icon icon={icon} color="accent" />
+            <Heading level={2}>{title}</Heading>
+          </HStack>
+          {action}
+        </HStack>
+        <Divider />
+        {children}
+      </VStack>
+    </Card>
+  );
+}
+
 export default function ProfileClient({ user, enabledProviders, apiTokens, sessions, localPasswordsEnabled = true, avatar }: ProfileClientProps) {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
@@ -93,7 +131,8 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
   const [loading, setLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatarUrl);
   const [newToken, setNewToken] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [tokenName, setTokenName] = useState("");
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<ISODateTimeString | undefined>(undefined);
 
   const hasPassword = !!user.passwordHash;
   const hasOAuth = !!user.provider && user.provider !== "credentials";
@@ -208,8 +247,8 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
     }
   };
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleAvatarUpload = async (selected: File | File[] | null) => {
+    const file = Array.isArray(selected) ? selected[0] : selected;
     if (!file) return;
 
     // Validate file type
@@ -300,14 +339,8 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
     } else {
       setNewToken(result.rawToken);
       setSuccess("API token created successfully");
-    }
-  };
-
-  const handleCopyToken = () => {
-    if (newToken) {
-      navigator.clipboard.writeText(newToken);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTokenName("");
+      setTokenExpiresAt(undefined);
     }
   };
 
@@ -332,468 +365,397 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold tracking-tight">Profile & Account Settings</h1>
+    <VStack gap={6}>
+      <Heading level={1}>Profile &amp; Account Settings</Heading>
 
       {error && (
-        <Alert variant="destructive">
-          <AlertDescription className="flex justify-between items-center">
-            {error}
-            <Button variant="ghost" size="sm" onClick={() => setError(null)} className="h-auto p-0 text-xs">Dismiss</Button>
-          </AlertDescription>
-        </Alert>
+        <Banner
+          status="error"
+          title="Something went wrong"
+          description={error}
+          isDismissable
+          onDismiss={() => setError(null)}
+        />
       )}
 
       {success && (
-        <Alert>
-          <AlertDescription className="flex justify-between items-center">
-            {success}
-            <Button variant="ghost" size="sm" onClick={() => setSuccess(null)} className="h-auto p-0 text-xs">Dismiss</Button>
-          </AlertDescription>
-        </Alert>
+        <Banner
+          status="success"
+          title={success}
+          isDismissable
+          onDismiss={() => setSuccess(null)}
+        />
       )}
 
-      <div className="flex flex-col gap-4">
-        {/* Account Information */}
-        <Card>
-          <CardContent className="flex flex-col gap-4 pt-6">
-            <div className="flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Account Information</h2>
-            </div>
-
-            <Separator />
-
-            {/* Avatar Section */}
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-muted-foreground">Profile Picture</p>
-              <div className="flex items-center gap-4">
+      <VStack gap={4}>
+        <ProfileSection icon={User} title="Account Information">
+          <VStack gap={4}>
+            <VStack gap={2}>
+              <Text type="body" size="sm" color="secondary">
+                Profile Picture
+              </Text>
+              <HStack gap={4} vAlign="center">
                 <UserAvatar
                   // avatarUrl is local state so an upload or removal shows
                   // immediately; the Gravatar and initial come from the server.
                   avatar={{ ...avatar, imageUrl: avatarUrl }}
                   alt={user.name || user.email}
-                  className="h-20 w-20"
-                  fallbackClassName="text-2xl"
+                  size="xl"
                 />
-                <div className="flex gap-2">
-                  <Button variant="outline" asChild disabled={loading}>
-                    <label className="cursor-pointer">
-                      <Camera className="h-4 w-4 mr-2" />
-                      Upload
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleAvatarUpload}
-                      />
-                    </label>
-                  </Button>
+                <HStack gap={2} vAlign="center">
+                  {/* FileInput replaces a <label>-wrapped hidden file input,
+                      and brings its own keyboard-reachable trigger. */}
+                  <FileInput
+                    label="Upload profile picture"
+                    isLabelHidden
+                    accept="image/*"
+                    value={null}
+                    onChange={handleAvatarUpload}
+                    isDisabled={loading}
+                    description="Recommended: square image, max 2MB"
+                  />
                   {avatarUrl && (
-                    <Button
+                    <IconButton
                       variant="ghost"
-                      size="icon"
-                      className="text-destructive"
+                      label="Remove profile picture"
+                      tooltip="Remove picture"
+                      icon={<Trash2 />}
+                      isDisabled={loading}
                       onClick={handleAvatarDelete}
-                      disabled={loading}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    />
                   )}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">Recommended: Square image, max 2MB</p>
-            </div>
+                </HStack>
+              </HStack>
+            </VStack>
 
-            <Separator />
+            <Divider />
 
-            <div>
-              <p className="text-sm text-muted-foreground">Email</p>
-              <p className="text-sm">{user.email}</p>
-            </div>
+            <MetadataList>
+              <MetadataListItem label="Email">{user.email}</MetadataListItem>
+              <MetadataListItem label="Name">{user.name || "Not set"}</MetadataListItem>
+              <MetadataListItem label="Role">
+                <Badge label={user.role} />
+              </MetadataListItem>
+              <MetadataListItem label="Authentication Method">
+                <Badge
+                  variant={user.provider === "credentials" ? "neutral" : "info"}
+                  label={getProviderName(user.provider ?? "")}
+                />
+              </MetadataListItem>
+              {hasPassword && (
+                <MetadataListItem label="Password">
+                  <Badge variant="success" label="Password is set" />
+                </MetadataListItem>
+              )}
+            </MetadataList>
+          </VStack>
+        </ProfileSection>
 
-            <div>
-              <p className="text-sm text-muted-foreground">Name</p>
-              <p className="text-sm">{user.name || "Not set"}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">Role</p>
-              <Badge>{user.role}</Badge>
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">Authentication Method</p>
-              <Badge variant={user.provider === "credentials" ? "secondary" : "default"}>
-                {getProviderName(user.provider ?? "")}
-              </Badge>
-            </div>
-
-            {hasPassword && (
-              <div>
-                <p className="text-sm text-muted-foreground">Password</p>
-                <p className="text-sm text-green-600 dark:text-green-400">&#10003; Password is set</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Password Management */}
         {localPasswordsEnabled && (
-        <Card>
-          <CardContent className="flex flex-col gap-4 pt-6">
-            <div className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Password Management</h2>
-            </div>
-
-            <Separator />
-
+          <ProfileSection icon={Lock} title="Password Management">
             {hasPassword ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Change your password to maintain account security</p>
-                <Button variant="outline" onClick={() => setPasswordDialogOpen(true)}>
-                  Change Password
-                </Button>
-              </div>
+              <VStack gap={2}>
+                <Text type="body" size="sm" color="secondary">
+                  Change your password to maintain account security
+                </Text>
+                <HStack>
+                  <Button
+                    variant="secondary"
+                    label="Change Password"
+                    onClick={() => setPasswordDialogOpen(true)}
+                  />
+                </HStack>
+              </VStack>
             ) : (
-              <div className="flex flex-col gap-3">
-                <Alert className="border-yellow-500/50 text-yellow-700 dark:text-yellow-400">
-                  <AlertDescription>
-                    You are using OAuth-only authentication. Setting a password will allow you to
-                    sign in with either OAuth or credentials.
-                  </AlertDescription>
-                </Alert>
-                <Button onClick={() => setPasswordDialogOpen(true)}>
-                  Set Password
-                </Button>
-              </div>
+              <VStack gap={3}>
+                <Banner
+                  status="warning"
+                  title="You are using OAuth-only authentication"
+                  description="Setting a password will allow you to sign in with either OAuth or credentials."
+                />
+                <HStack>
+                  <Button label="Set Password" onClick={() => setPasswordDialogOpen(true)} />
+                </HStack>
+              </VStack>
             )}
-          </CardContent>
-        </Card>
+          </ProfileSection>
         )}
 
-        {/* Active Sessions */}
-        <Card>
-          <CardContent className="flex flex-col gap-4 pt-6">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Monitor className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">Active Sessions</h2>
-              </div>
-              {sessions.some((s) => !s.current) && (
-                <form action={revokeOtherSessionsAction}>
-                  <Button type="submit" variant="outline" size="sm" className="text-destructive border-destructive/40">
-                    <LogOut className="h-3.5 w-3.5 mr-1.5" />
-                    Sign out all other sessions
-                  </Button>
-                </form>
-              )}
-            </div>
-
-            <Separator />
-
-            <p className="text-sm text-muted-foreground">
+        <ProfileSection
+          icon={Monitor}
+          title="Active Sessions"
+          action={
+            sessions.some((s) => !s.current) ? (
+              <form action={revokeOtherSessionsAction}>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  size="sm"
+                  icon={<LogOut />}
+                  label="Sign out all other sessions"
+                />
+              </form>
+            ) : undefined
+          }
+        >
+          <VStack gap={4}>
+            <Text type="body" size="sm" color="secondary">
               Devices currently signed in to your account. Revoke any you don&apos;t recognise.
-            </p>
+            </Text>
 
-            <div className="flex flex-col divide-y divide-border rounded-md border overflow-hidden">
+            <List hasDividers>
               {sessions.map((s) => (
-                <div key={s.id} className="flex items-center justify-between px-4 py-3 bg-muted/20">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{describeDevice(s.userAgent)}</p>
-                        {s.current && (
-                          <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                            This device
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Signed in {relativeTime(s.createdAt)}
-                        </p>
-                        {s.ipAddress && (
-                          <p className="text-xs text-muted-foreground">IP {s.ipAddress}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">Expires {formatDate(s.expiresAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-                  {!s.current && (
-                    <form action={revokeSessionAction.bind(null, s.id)}>
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        title="Revoke session"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </form>
-                  )}
-                </div>
+                <ListItem
+                  key={s.id}
+                  startContent={<Icon icon={Monitor} size="sm" color="secondary" />}
+                  label={describeDevice(s.userAgent)}
+                  description={
+                    <HStack gap={3} wrap="wrap" vAlign="center">
+                      <Text type="body" size="xsm" color="secondary">
+                        Signed in {relativeTime(s.createdAt)}
+                      </Text>
+                      {s.ipAddress && (
+                        <Text type="body" size="xsm" color="secondary">
+                          IP {s.ipAddress}
+                        </Text>
+                      )}
+                      <Text type="body" size="xsm" color="secondary">
+                        Expires {formatDate(s.expiresAt)}
+                      </Text>
+                    </HStack>
+                  }
+                  endContent={
+                    s.current ? (
+                      <Badge variant="success" label="This device" />
+                    ) : (
+                      <form action={revokeSessionAction.bind(null, s.id)}>
+                        <IconButton
+                          type="submit"
+                          variant="ghost"
+                          size="sm"
+                          label={`Revoke session on ${describeDevice(s.userAgent)}`}
+                          tooltip="Revoke session"
+                          icon={<Trash2 />}
+                        />
+                      </form>
+                    )
+                  }
+                />
               ))}
-            </div>
-          </CardContent>
-        </Card>
+            </List>
+          </VStack>
+        </ProfileSection>
 
-        {/* OAuth Management */}
         {enabledProviders.length > 0 && (
-          <Card>
-            <CardContent className="flex flex-col gap-4 pt-6">
-              <div className="flex items-center gap-2">
-                <Link className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">OAuth Connections</h2>
-              </div>
+          <ProfileSection icon={Link} title="OAuth Connections">
+            {hasOAuth ? (
+              <VStack gap={2}>
+                <Text type="body" size="sm" color="secondary">
+                  Your account is linked to {getProviderName(user.provider ?? "")}
+                </Text>
 
-              <Separator />
-
-              {hasOAuth ? (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Your account is linked to {getProviderName(user.provider ?? "")}
-                  </p>
-
-                  {!localPasswordsEnabled ? (
-                    <Alert className="border-blue-500/50 text-blue-700 dark:text-blue-400">
-                      <AlertDescription>
-                        Single sign-on is the only authentication method on this instance, so this
-                        connection cannot be unlinked.
-                      </AlertDescription>
-                    </Alert>
-                  ) : hasPassword ? (
+                {!localPasswordsEnabled ? (
+                  <Banner
+                    status="info"
+                    title="This connection cannot be unlinked"
+                    description="Single sign-on is the only authentication method on this instance."
+                  />
+                ) : hasPassword ? (
+                  <HStack>
                     <Button
-                      variant="outline"
-                      className="text-yellow-600 border-yellow-600/50"
+                      variant="secondary"
+                      icon={<Unlink />}
+                      label="Unlink OAuth Account"
                       onClick={() => setUnlinkDialogOpen(true)}
-                    >
-                      <Unlink className="h-4 w-4 mr-2" />
-                      Unlink OAuth Account
-                    </Button>
-                  ) : (
-                    <Alert className="border-blue-500/50 text-blue-700 dark:text-blue-400">
-                      <AlertDescription>
-                        To unlink OAuth, you must first set a password as a fallback authentication method.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Link an OAuth provider to enable single sign-on
-                  </p>
-
-                  <div className="flex flex-col gap-2">
-                    {enabledProviders.map((provider) => (
-                      <Button
-                        key={provider.id}
-                        variant="outline"
-                        onClick={() => handleLinkOAuth(provider.id)}
-                        className="w-full"
-                      >
-                        <LogIn className="h-4 w-4 mr-2" />
-                        Link {provider.name}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    />
+                  </HStack>
+                ) : (
+                  <Banner
+                    status="info"
+                    title="Set a password first"
+                    description="To unlink OAuth, you must first set a password as a fallback authentication method."
+                  />
+                )}
+              </VStack>
+            ) : (
+              <VStack gap={3}>
+                <Text type="body" size="sm" color="secondary">
+                  Link an OAuth provider to enable single sign-on
+                </Text>
+                <VStack gap={2}>
+                  {enabledProviders.map((provider) => (
+                    <Button
+                      key={provider.id}
+                      variant="secondary"
+                      width="100%"
+                      icon={<LogIn />}
+                      label={`Link ${provider.name}`}
+                      onClick={() => handleLinkOAuth(provider.id)}
+                    />
+                  ))}
+                </VStack>
+              </VStack>
+            )}
+          </ProfileSection>
         )}
 
-        {/* API Tokens */}
-        <Card>
-          <CardContent className="flex flex-col gap-4 pt-6">
-            <div className="flex items-center gap-2">
-              <Key className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">API Tokens</h2>
-            </div>
+        <ProfileSection icon={Key} title="API Tokens">
+          <VStack gap={4}>
+            <Text type="body" size="sm" color="secondary">
+              Create tokens for programmatic access to the API using the header
+              Authorization: Bearer &lt;token&gt;
+            </Text>
 
-            <Separator />
-
-            <p className="text-sm text-muted-foreground">
-              Create tokens for programmatic access to the API using <code className="text-xs bg-muted px-1 py-0.5 rounded">Authorization: Bearer {'<token>'}</code>
-            </p>
-
-            {/* Newly created token */}
             {newToken && (
-              <div className="rounded-lg border border-emerald-500/50 bg-emerald-500/5 p-4 flex flex-col gap-2">
-                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                  Copy this token now — it will not be shown again.
-                </p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono break-all select-all">
-                    {newToken}
-                  </code>
-                  <Button variant="outline" size="sm" className="shrink-0 h-8 gap-1.5" onClick={handleCopyToken}>
-                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? "Copied" : "Copy"}
-                  </Button>
-                </div>
-              </div>
+              <VStack gap={2}>
+                <Text type="body" size="sm" weight="semibold">
+                  Copy this token now &mdash; it will not be shown again.
+                </Text>
+                {/* CodeBlock owns the copy button, replacing the hand-built one
+                    and its two-second "Copied" flag. */}
+                <CodeBlock code={newToken} width="100%" />
+              </VStack>
             )}
 
-            {/* Existing tokens */}
             {apiTokens.length > 0 && (
-              <div className="flex flex-col divide-y divide-border rounded-md border overflow-hidden">
+              <List hasDividers>
                 {apiTokens.map((token) => {
                   const expired = isExpired(token.expiresAt);
                   return (
-                    <div
+                    <ListItem
                       key={token.id}
-                      className={`flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/40 transition-colors ${expired ? "opacity-60" : ""}`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Key className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium truncate">{token.name}</p>
-                            {expired && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
-                                <AlertTriangle className="h-2.5 w-2.5" />
-                                Expired
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-x-3 gap-y-0">
-                            <p className="text-xs text-muted-foreground">
-                              Created {formatDate(token.createdAt)}
-                            </p>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              Used {formatDate(token.lastUsedAt)}
-                            </p>
-                            {token.expiresAt && (
-                              <p className="text-xs text-muted-foreground">
-                                {expired ? "Expired" : "Expires"} {formatDate(token.expiresAt)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <form action={deleteApiTokenAction.bind(null, token.id)}>
-                        <Button type="submit" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </form>
-                    </div>
+                      startContent={<Icon icon={Key} size="sm" color="secondary" />}
+                      label={token.name}
+                      description={
+                        <HStack gap={3} wrap="wrap" vAlign="center">
+                          <Text type="body" size="xsm" color="secondary">
+                            Created {formatDate(token.createdAt)}
+                          </Text>
+                          <Text type="body" size="xsm" color="secondary">
+                            Used {formatDate(token.lastUsedAt)}
+                          </Text>
+                          {token.expiresAt && (
+                            <Text type="body" size="xsm" color="secondary">
+                              {expired ? "Expired" : "Expires"} {formatDate(token.expiresAt)}
+                            </Text>
+                          )}
+                        </HStack>
+                      }
+                      endContent={
+                        <HStack gap={2} vAlign="center">
+                          {expired && <Badge variant="error" label="Expired" />}
+                          <form action={deleteApiTokenAction.bind(null, token.id)}>
+                            <IconButton
+                              type="submit"
+                              variant="ghost"
+                              size="sm"
+                              label={`Delete token ${token.name}`}
+                              tooltip="Delete token"
+                              icon={<Trash2 />}
+                            />
+                          </form>
+                        </HStack>
+                      }
+                    />
                   );
                 })}
-              </div>
+              </List>
             )}
 
             {apiTokens.length === 0 && !newToken && (
-              <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
-                <Key className="h-4 w-4 shrink-0" />
-                No API tokens yet — create one below.
-              </div>
+              <EmptyState
+                icon={<Key />}
+                title="No API tokens yet"
+                description="Create one below."
+                isCompact
+              />
             )}
 
-            {/* Create new token */}
-            <form action={handleCreateToken} className="flex flex-col gap-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="token-name" className="text-xs">
-                    Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input id="token-name" name="name" required placeholder="e.g. CI/CD Pipeline" className="h-8 text-sm" />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="token-expires" className="text-xs">Expires at</Label>
-                  <Input id="token-expires" name="expires_at" type="datetime-local" className="h-8 text-sm" />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button type="submit" size="sm">
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  Create Token
-                </Button>
-              </div>
+            <form action={handleCreateToken}>
+              <VStack gap={3}>
+                <Grid columns={{ minWidth: 220, max: 2 }} gap={3}>
+                  <TextInput
+                    label="Name"
+                    isRequired
+                    size="sm"
+                    htmlName="name"
+                    value={tokenName}
+                    onChange={setTokenName}
+                    placeholder="e.g. CI/CD Pipeline"
+                  />
+                  <VStack gap={0}>
+                    <DateTimeInput
+                      label="Expires at"
+                      isOptional
+                      size="sm"
+                      value={tokenExpiresAt}
+                      onChange={setTokenExpiresAt}
+                    />
+                    {/* DateTimeInput has no htmlName, so the value reaches the
+                        server action through this hidden field. */}
+                    <input type="hidden" name="expires_at" value={tokenExpiresAt ?? ""} />
+                  </VStack>
+                </Grid>
+                <HStack justify="end">
+                  <Button type="submit" size="sm" icon={<Plus />} label="Create Token" />
+                </HStack>
+              </VStack>
             </form>
-          </CardContent>
-        </Card>
-      </div>
+          </VStack>
+        </ProfileSection>
+      </VStack>
 
-      {/* Change Password Dialog */}
-      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{hasPassword ? "Change Password" : "Set Password"}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 mt-2">
-            {hasPassword && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <Input
-                  id="currentPassword"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-              <p className="text-xs text-muted-foreground">Minimum 12 characters</p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handlePasswordChange} disabled={loading}>
-              {loading ? "Saving..." : hasPassword ? "Change Password" : "Set Password"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AppDialog
+        open={passwordDialogOpen}
+        onClose={() => setPasswordDialogOpen(false)}
+        title={hasPassword ? "Change Password" : "Set Password"}
+        maxWidth="sm"
+        submitLabel={hasPassword ? "Change Password" : "Set Password"}
+        onSubmit={handlePasswordChange}
+        isSubmitting={loading}
+      >
+        <VStack gap={3}>
+          {hasPassword && (
+            <TextInput
+              {...AUTOFILL_CURRENT_PASSWORD}
+              label="Current Password"
+              type="password"
+              value={currentPassword}
+              onChange={setCurrentPassword}
+            />
+          )}
+          <TextInput
+            {...AUTOFILL_NEW_PASSWORD}
+            label="New Password"
+            type="password"
+            value={newPassword}
+            onChange={setNewPassword}
+            description="Minimum 12 characters"
+          />
+          <TextInput
+            {...AUTOFILL_NEW_PASSWORD}
+            label="Confirm New Password"
+            type="password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+          />
+        </VStack>
+      </AppDialog>
 
-      {/* Unlink OAuth Dialog */}
-      <Dialog open={unlinkDialogOpen} onOpenChange={setUnlinkDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Unlink OAuth Account</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to unlink your {getProviderName(user.provider ?? "")} account?
-              You will only be able to sign in with your username and password after this.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUnlinkDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleUnlinkOAuth}
-              className="text-yellow-600 border-yellow-600/50"
-              variant="outline"
-              disabled={loading}
-            >
-              {loading ? "Unlinking..." : "Unlink OAuth"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <AppDialog
+        open={unlinkDialogOpen}
+        onClose={() => setUnlinkDialogOpen(false)}
+        title="Unlink OAuth Account"
+        maxWidth="sm"
+        submitLabel="Unlink OAuth"
+        onSubmit={handleUnlinkOAuth}
+        isSubmitting={loading}
+      >
+        <Text type="body" size="sm" color="secondary">
+          Are you sure you want to unlink your {getProviderName(user.provider ?? "")} account? You
+          will only be able to sign in with your username and password after this.
+        </Text>
+      </AppDialog>
+    </VStack>
   );
 }

@@ -3,13 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Download } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import {
@@ -50,6 +54,8 @@ function formatFingerprint(value: string): string {
   return value.match(/.{1,2}/g)?.join(":") ?? value;
 }
 
+const ISSUE_FORM = "issue-cert-form";
+
 export function IssueClientCertDialog({
   open,
   cert,
@@ -68,7 +74,21 @@ export function IssueClientCertDialog({
     exportAlgorithm: "3des" | "aes256";
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [commonName, setCommonName] = useState("");
+  const [validityDays, setValidityDays] = useState(365);
+  const [exportPassword, setExportPassword] = useState("");
+  const [compatibilityMode, setCompatibilityMode] = useState(true);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Controlled fields, so a reopened dialog starts clean rather than showing
+  // the previous issuance's export password.
+  useEffect(() => {
+    if (!open) return;
+    setCommonName("");
+    setValidityDays(365);
+    setExportPassword("");
+    setCompatibilityMode(true);
+  }, [open]);
 
   function handleClose() {
     setIssued(null);
@@ -95,15 +115,17 @@ export function IssueClientCertDialog({
   }
 
   const actions = issued ? (
-    <Button onClick={handleClose}>Done</Button>
+    <Button label="Done" onClick={handleClose} />
   ) : (
     <>
-      <Button variant="outline" onClick={handleClose} disabled={isPending}>
-        Cancel
-      </Button>
-      <Button type="submit" form="issue-cert-form" disabled={isPending}>
-        {isPending ? "Issuing..." : "Issue Certificate"}
-      </Button>
+      <Button variant="secondary" label="Cancel" onClick={handleClose} isDisabled={isPending} />
+      <Button
+        type="submit"
+        form={ISSUE_FORM}
+        label="Issue Certificate"
+        isLoading={isPending}
+        isDisabled={isPending}
+      />
     </>
   );
 
@@ -116,86 +138,78 @@ export function IssueClientCertDialog({
       actions={actions}
     >
       {issued ? (
-        <div className="flex flex-col gap-4">
-          <Alert>
-            <AlertDescription>
-              Client certificate issued. Download the .p12 bundle now. It contains the client certificate,
-              private key, and CA chain, and the private key will not be stored.
-            </AlertDescription>
-          </Alert>
-          <p className="text-sm text-muted-foreground">
-            Export format: {issued.exportAlgorithm === "3des" ? "Compatibility mode (3DES)" : "AES-256"}.
-          </p>
+        <VStack gap={4}>
+          <Banner
+            status="success"
+            title="Client certificate issued"
+            description="Download the .p12 bundle now. It contains the client certificate, private key, and CA chain, and the private key will not be stored."
+          />
+          <Text type="body" size="sm" color="secondary">
+            Export format:{" "}
+            {issued.exportAlgorithm === "3des" ? "Compatibility mode (3DES)" : "AES-256"}.
+          </Text>
           <Button
-            variant="outline"
+            variant="secondary"
+            icon={<Download />}
+            label="Download Client Certificate (.p12)"
             onClick={() =>
               downloadFile(
                 `${issued.name}.p12`,
                 new Blob([decodeBase64(issued.pkcs12Base64)], { type: "application/x-pkcs12" })
               )
             }
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Download Client Certificate (.p12)
-          </Button>
+          />
           {issued.passwordProtected && (
-            <p className="text-sm text-muted-foreground">
+            <Text type="body" size="sm" color="secondary">
               Import it using the export password you entered during issuance.
-            </p>
+            </Text>
           )}
-        </div>
+        </VStack>
       ) : (
-        <form id="issue-cert-form" ref={formRef} onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="common_name">Common Name (CN)</Label>
-              <Input
-                id="common_name"
-                name="common_name"
-                required
-                autoFocus
-                placeholder="alice"
-              />
-              <p className="text-xs text-muted-foreground">
-                Identifies this client (e.g. a username or device name)
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="validity_days">Validity</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="validity_days"
-                  name="validity_days"
-                  type="number"
-                  defaultValue={365}
-                  min={1}
-                  max={3650}
-                  className="flex-1"
-                />
-                <span className="text-sm text-muted-foreground">days</span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="export_password">Export Password</Label>
-              <Input
-                id="export_password"
-                name="export_password"
-                type="password"
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Used to protect the .p12 bundle when importing it into operating systems and browsers
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch id="compatibility_mode" name="compatibility_mode" defaultChecked />
-              <Label htmlFor="compatibility_mode">Compatibility mode</Label>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Enabled uses 3DES for broader OS/browser import compatibility. Disabled uses AES-256.
-            </p>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </div>
+        <form id={ISSUE_FORM} ref={formRef} onSubmit={handleSubmit}>
+          <VStack gap={4}>
+            <TextInput
+              {...NATIVE_REQUIRED}
+              label="Common Name (CN)"
+              htmlName="common_name"
+              value={commonName}
+              onChange={setCommonName}
+              isRequired
+              hasAutoFocus
+              placeholder="alice"
+              description="Identifies this client (e.g. a username or device name)"
+            />
+            <NumberInput
+              label="Validity"
+              htmlName="validity_days"
+              value={validityDays}
+              onChange={setValidityDays}
+              min={1}
+              max={3650}
+              isIntegerOnly
+              units="days"
+            />
+            <TextInput
+              {...NATIVE_REQUIRED}
+              label="Export Password"
+              type="password"
+              htmlName="export_password"
+              value={exportPassword}
+              onChange={setExportPassword}
+              isRequired
+              description="Used to protect the .p12 bundle when importing it into operating systems and browsers"
+            />
+            <Switch
+              label="Compatibility mode"
+              htmlName="compatibility_mode"
+              value={compatibilityMode}
+              onChange={setCompatibilityMode}
+              description="Enabled uses 3DES for broader OS/browser import compatibility. Disabled uses AES-256."
+            />
+            {error && (
+              <Banner status="error" title="Could not issue certificate" description={error} />
+            )}
+          </VStack>
         </form>
       )}
     </AppDialog>
@@ -253,80 +267,85 @@ export function ManageIssuedClientCertsDialog({
       onClose={onClose}
       title="Issued Client Certificates"
       maxWidth="md"
-      actions={
-        <Button variant="outline" onClick={onClose} disabled={isPending}>
-          Close
-        </Button>
-      }
+      actions={<Button variant="secondary" label="Close" onClick={onClose} isDisabled={isPending} />}
     >
-      <div className="flex flex-col gap-4">
-        <Alert>
-          <AlertDescription>
-            Revoking a client certificate removes it from the trusted mTLS client certificate pool for hosts using{" "}
-            <strong>{cert.name}</strong>.
-          </AlertDescription>
-        </Alert>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+      <VStack gap={4}>
+        <Banner
+          status="info"
+          title="Revoking removes trust"
+          description={`Revoking a client certificate removes it from the trusted mTLS client certificate pool for hosts using ${cert.name}.`}
+        />
+        {error && <Banner status="error" title="Could not revoke certificate" description={error} />}
         {revokedCount > 0 && (
-          <div className="flex items-center gap-2">
-            <Switch
-              id="show-revoked"
-              checked={showRevoked}
-              onCheckedChange={setShowRevoked}
-            />
-            <Label htmlFor="show-revoked">Show revoked ({revokedCount})</Label>
-          </div>
+          <Switch
+            label={`Show revoked (${revokedCount})`}
+            value={showRevoked}
+            onChange={setShowRevoked}
+          />
         )}
         {visibleItems.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <Text type="body" size="sm" color="secondary">
             {items.length === 0
               ? "No issued client certificates are currently tracked for this CA. Certificates issued from this UI will appear here and can then be revoked individually."
-              : "No active client certificates. Enable \"Show revoked\" to view revoked certificates."}
-          </p>
+              : 'No active client certificates. Enable "Show revoked" to view revoked certificates.'}
+          </Text>
         ) : (
           visibleItems.map((item) => {
             const expired = new Date(item.validTo).getTime() < Date.now();
             return (
-              <div key={item.id} className="rounded-lg border p-4 flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-base">{item.commonName}</p>
-                    <p className="text-sm text-muted-foreground">Serial {item.serialNumber}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    <Badge variant={item.revokedAt ? "secondary" : "default"}>
-                      {item.revokedAt ? "Revoked" : "Active"}
-                    </Badge>
-                    <Badge variant={expired ? "destructive" : "outline"}>
-                      {expired
-                        ? `Expired ${formatDateTime(item.validTo)}`
-                        : `Expires ${formatDateTime(item.validTo)}`}
-                    </Badge>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">Issued {formatDateTime(item.createdAt)}</p>
-                <p className="text-sm text-muted-foreground font-mono break-all">
-                  SHA-256 {formatFingerprint(item.fingerprintSha256)}
-                </p>
-                {item.revokedAt ? (
-                  <p className="text-sm text-muted-foreground">Revoked {formatDateTime(item.revokedAt)}</p>
-                ) : (
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      className="text-destructive border-destructive hover:bg-destructive/10"
-                      disabled={isPending}
-                      onClick={() => handleRevoke(item.id)}
-                    >
-                      {isPending ? "Revoking..." : "Revoke"}
-                    </Button>
-                  </div>
-                )}
-              </div>
+              <Card key={item.id}>
+                <VStack gap={3}>
+                  <HStack justify="between" gap={4} vAlign="start">
+                    <VStack gap={0}>
+                      <Text type="body" weight="semibold">
+                        {item.commonName}
+                      </Text>
+                      <Text type="body" size="sm" color="secondary">
+                        Serial {item.serialNumber}
+                      </Text>
+                    </VStack>
+                    <HStack gap={1} wrap="wrap" justify="end">
+                      <Badge
+                        variant={item.revokedAt ? "neutral" : "success"}
+                        label={item.revokedAt ? "Revoked" : "Active"}
+                      />
+                      <Badge
+                        variant={expired ? "error" : "neutral"}
+                        label={
+                          expired
+                            ? `Expired ${formatDateTime(item.validTo)}`
+                            : `Expires ${formatDateTime(item.validTo)}`
+                        }
+                      />
+                    </HStack>
+                  </HStack>
+                  <Text type="body" size="sm" color="secondary">
+                    Issued {formatDateTime(item.createdAt)}
+                  </Text>
+                  <Text type="code" size="sm" color="secondary">
+                    SHA-256 {formatFingerprint(item.fingerprintSha256)}
+                  </Text>
+                  {item.revokedAt ? (
+                    <Text type="body" size="sm" color="secondary">
+                      Revoked {formatDateTime(item.revokedAt)}
+                    </Text>
+                  ) : (
+                    <HStack justify="end">
+                      <Button
+                        variant="destructive"
+                        label="Revoke"
+                        isLoading={isPending}
+                        isDisabled={isPending}
+                        onClick={() => handleRevoke(item.id)}
+                      />
+                    </HStack>
+                  )}
+                </VStack>
+              </Card>
             );
           })
         )}
-      </div>
+      </VStack>
     </AppDialog>
   );
 }
@@ -363,26 +382,24 @@ export function DeleteCaCertDialog({
       maxWidth="sm"
       actions={
         <>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>
-            Cancel
-          </Button>
+          <Button variant="secondary" label="Cancel" onClick={onClose} isDisabled={isPending} />
           <Button
             variant="destructive"
+            label="Delete"
             onClick={handleDelete}
-            disabled={isPending}
-          >
-            {isPending ? "Deleting..." : "Delete"}
-          </Button>
+            isLoading={isPending}
+            isDisabled={isPending}
+          />
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-muted-foreground">
-          Delete CA certificate <strong className="text-foreground">{cert.name}</strong>? This cannot be undone.
-          Proxy hosts using this CA for mTLS will stop requiring client certificates.
-        </p>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
+      <VStack gap={4}>
+        <Text type="body" size="sm" color="secondary">
+          Delete CA certificate <strong>{cert.name}</strong>? This cannot be undone. Proxy hosts
+          using this CA for mTLS will stop requiring client certificates.
+        </Text>
+        {error && <Banner status="error" title="Could not delete certificate" description={error} />}
+      </VStack>
     </AppDialog>
   );
 }

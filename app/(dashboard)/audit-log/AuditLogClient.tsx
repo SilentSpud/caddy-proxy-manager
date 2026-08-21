@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/DataTable";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Card } from "@astryxdesign/core/Card";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
 import { PageHeader } from "@/components/ui/PageHeader";
 
@@ -54,65 +56,64 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
     };
   }, []);
 
-  const columns = [
+  const columns: Column<EventRow>[] = [
     {
       id: "created_at",
       label: "Time",
       width: 180,
-      render: (r: EventRow) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
+      render: (r) => (
+        <Text type="body" size="sm" color="secondary">
           {new Date(r.createdAt).toLocaleString()}
-        </span>
+        </Text>
       ),
     },
     {
       id: "user",
       label: "User",
       width: 160,
-      render: (r: EventRow) => (
-        <Badge variant="outline">{r.user}</Badge>
-      ),
+      render: (r) => <Badge label={r.user} />,
     },
     {
       id: "summary",
       label: "Event",
-      render: (r: EventRow) => (
-        <p className="text-sm">{r.summary}</p>
+      render: (r) => (
+        <Text type="body" size="sm">
+          {r.summary}
+        </Text>
       ),
     },
   ];
 
   const mobileCard = (r: EventRow) => (
     <Card>
-      <CardContent className="p-3 flex flex-col gap-1">
-        <div className="flex justify-between items-center">
-          <Badge variant="outline">{r.user}</Badge>
-          <span className="text-xs text-muted-foreground">
+      <VStack gap={1}>
+        <HStack justify="between" vAlign="center" gap={2}>
+          <Badge label={r.user} />
+          <Text type="body" size="xsm" color="secondary">
             {new Date(r.createdAt).toLocaleString()}
-          </span>
-        </div>
-        <p className="text-sm">{r.summary}</p>
-      </CardContent>
+          </Text>
+        </HStack>
+        <Text type="body" size="sm">
+          {r.summary}
+        </Text>
+      </VStack>
     </Card>
   );
 
   return (
-    <div className="flex flex-col gap-6 w-full">
-      <PageHeader
-        title="Audit Log"
-        description="Review configuration changes and user activity."
-      />
+    <VStack gap={6}>
+      <PageHeader title="Audit Log" description="Review configuration changes and user activity." />
 
-      <div className="flex items-center gap-2">
-      <SearchField
-        value={searchTerm}
-        onChange={(e) => {
-          setSearchTerm(e.target.value);
-          updateSearch(e.target.value);
-        }}
-        placeholder="Search audit log..."
-      />
-      </div>
+      <HStack gap={2} vAlign="center">
+        <SearchField
+          value={searchTerm}
+          onChange={(next) => {
+            setSearchTerm(next);
+            updateSearch(next);
+          }}
+          placeholder="Search audit log..."
+        />
+      </HStack>
 
       <DataTable
         columns={columns}
@@ -122,6 +123,6 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
         pagination={pagination}
         mobileCard={mobileCard}
       />
-    </div>
+    </VStack>
   );
 }
