@@ -21,6 +21,7 @@ export default async function LoginPage() {
     <LoginClient
       enabledProviders={enabledProviders}
       localLoginEnabled={!config.auth.disableLocalUsers}
+      appName={config.appName}
     />
   );
 }

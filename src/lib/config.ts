@@ -8,6 +8,14 @@ const DISALLOWED_SESSION_SECRETS = new Set([
 const DEFAULT_CADDY_URL = process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019";
 const MIN_SESSION_SECRET_LENGTH = 32;
 const MIN_ADMIN_PASSWORD_LENGTH = 12;
+const DEFAULT_APP_NAME = "Caddy Proxy Manager";
+
+/**
+ * Display name shown in the sidebar, on the login card, and as the suffix on
+ * every page title. A page that should not carry the suffix opts out itself
+ * with `title: { absolute: ... }` — see app/layout.tsx.
+ */
+const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
 
 /**
  * OIDC-only mode: CPM creates and authenticates no local accounts at all.
@@ -175,6 +183,7 @@ export const config = {
   },
   caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
+  appName: APP_NAME,
   get adminUsername() {
     return getAdminCredentials().username;
   },

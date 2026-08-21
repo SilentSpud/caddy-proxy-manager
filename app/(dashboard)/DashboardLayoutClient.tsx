@@ -54,9 +54,10 @@ function ThemeToggle() {
   );
 }
 
-function NavContent({ pathname, user, onNavigate }: {
+function NavContent({ pathname, user, appName, onNavigate }: {
   pathname: string;
   user: User;
+  appName: string;
   onNavigate?: () => void;
 }) {
   const router = useRouter();
@@ -70,7 +71,7 @@ function NavContent({ pathname, user, onNavigate }: {
         <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center shrink-0">
           <span className="text-primary-foreground font-bold text-xs">C</span>
         </div>
-        <p className="font-semibold text-sm tracking-tight">Caddy Proxy Manager</p>
+        <p className="font-semibold text-sm tracking-tight">{appName}</p>
       </div>
       <Separator />
 
@@ -142,7 +143,7 @@ function NavContent({ pathname, user, onNavigate }: {
   );
 }
 
-export default function DashboardLayoutClient({ user, children }: { user: User; children: ReactNode }) {
+export default function DashboardLayoutClient({ user, appName, children }: { user: User; appName: string; children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -151,7 +152,7 @@ export default function DashboardLayoutClient({ user, children }: { user: User; 
     <div className="flex min-h-screen">
       {/* Desktop sidebar — fixed, hidden on mobile */}
       <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-border bg-card z-30">
-        <NavContent pathname={pathname} user={user} />
+        <NavContent pathname={pathname} user={user} appName={appName} />
       </aside>
 
       {/* Mobile top bar */}
@@ -159,7 +160,7 @@ export default function DashboardLayoutClient({ user, children }: { user: User; 
         <Button variant="ghost" size="icon" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
           <Menu className="h-5 w-5" />
         </Button>
-        <span className="font-semibold text-sm">Caddy Proxy Manager</span>
+        <span className="font-semibold text-sm">{appName}</span>
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <Button variant="ghost" size="icon" aria-label="Go to profile" onClick={() => router.push("/profile")}>
@@ -176,7 +177,7 @@ export default function DashboardLayoutClient({ user, children }: { user: User; 
       {/* Mobile Sheet drawer */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-64 sm:max-w-[256px] p-0">
-          <NavContent pathname={pathname} user={user} onNavigate={() => setMobileOpen(false)} />
+          <NavContent pathname={pathname} user={user} appName={appName} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
 

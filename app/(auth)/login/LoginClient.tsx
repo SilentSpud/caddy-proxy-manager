@@ -15,9 +15,15 @@ interface LoginClientProps {
   enabledProviders: Array<{ id: string; name: string }>;
   /** False in OIDC-only mode: there are no local accounts to sign in with. */
   localLoginEnabled?: boolean;
+  /** Display name from APP_NAME, so a rebranded instance is named consistently. */
+  appName?: string;
 }
 
-export default function LoginClient({ enabledProviders = [], localLoginEnabled = true }: LoginClientProps) {
+export default function LoginClient({
+  enabledProviders = [],
+  localLoginEnabled = true,
+  appName = "Caddy Proxy Manager",
+}: LoginClientProps) {
   const router = useRouter();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
@@ -80,7 +86,7 @@ export default function LoginClient({ enabledProviders = [], localLoginEnabled =
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center space-y-1">
-          <CardTitle className="text-2xl font-bold">Caddy Proxy Manager</CardTitle>
+          <CardTitle className="text-2xl font-bold">{appName}</CardTitle>
           <CardDescription>
             {!localLoginEnabled
               ? "Sign in with single sign-on"

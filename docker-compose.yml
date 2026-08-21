@@ -36,6 +36,10 @@ services:
       # NextAuth configuration
       NEXTAUTH_URL: ${BASE_URL:-http://localhost:3000}
 
+      # Branding. Renames the app in the sidebar, on the login card, and as the
+      # suffix on every page title ("Users · <APP_NAME>").
+      APP_NAME: ${APP_NAME:-}
+
       # REQUIRED unless AUTH_DISABLE_LOCAL_USERS=true: admin credentials for login
       # SECURITY: You MUST set these to secure values in production!
       # Password must be 12+ chars with uppercase, lowercase, numbers, and special chars
