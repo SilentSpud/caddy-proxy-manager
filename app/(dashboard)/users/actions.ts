@@ -11,12 +11,17 @@ import {
   type User,
 } from "@/src/lib/models/user";
 import { logAuditEvent } from "@/src/lib/audit";
+import { config } from "@/src/lib/config";
 
 const VALID_ROLES = new Set<User["role"]>(["admin", "user", "viewer"]);
 
 export async function createUserAction(formData: FormData) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
+
+  if (config.auth.disableLocalUsers) {
+    throw new Error("Local user creation is disabled. Users are provisioned by the OIDC provider.");
+  }
 
   const email = String(formData.get("email") ?? "").trim();
   const name = formData.get("name") ? String(formData.get("name")).trim() : null;

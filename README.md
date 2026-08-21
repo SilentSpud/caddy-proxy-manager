@@ -54,7 +54,7 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 - **REST API** - Full REST API under `/api/v1/` with Bearer token authentication, covering all resources. Interactive OpenAPI 3.1.0 docs at `/api-docs`
 - **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
 - **Instance Sync** - Master/slave configuration sync for multi-instance deployments. The master pushes proxy hosts, certificates, access lists, and settings to slaves on every change
-- **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page
+- **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, Spaceship, deSEC, Dynu, and acme-dns. Credentials encrypted at rest. Per-certificate provider override supported
 - **Settings** - ACME email, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
@@ -71,8 +71,8 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `SESSION_SECRET` | Session encryption key (32+ chars) | None | **Yes** |
-| `ADMIN_USERNAME` | Admin login username | `admin` | **Yes** |
-| `ADMIN_PASSWORD` | Admin password (see requirements below) | `admin` (dev only) | **Yes** |
+| `ADMIN_USERNAME` | Admin login username | `admin` | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
+| `ADMIN_PASSWORD` | Admin password (see requirements below) | `admin` (dev only) | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
 | `BASE_URL` | Public URL where users access the dashboard.<br/>**Required for OAuth** - must match redirect URI | `http://localhost:3000` | **Yes** (if using OAuth) |
 | `CADDY_API_URL` | Caddy Admin API endpoint | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
 | `DATABASE_URL` | SQLite database URL | `file:/app/data/caddy-proxy-manager.db` | No |
@@ -89,9 +89,19 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 | `OAUTH_TOKEN_URL` | Optional OAuth token endpoint override | Auto-discovered from `OAUTH_ISSUER` | No |
 | `OAUTH_USERINFO_URL` | Optional OAuth userinfo endpoint override | Auto-discovered from `OAUTH_ISSUER` | No |
 | `OAUTH_ALLOW_AUTO_LINKING` | Allow auto-linking OAuth identities to existing users | `false` | No |
+| `OAUTH_SCOPES` | Scopes requested from the provider. Group claims usually need an extra scope | `openid email profile` | No |
+| `OAUTH_GROUPS_CLAIM` | Claim holding the user's groups. Dots address nested claims (`resource_access.cpm.roles`) | `groups` | No |
+| `OAUTH_GROUP_PREFIX` | Prefix marking CPM-relevant groups, e.g. `CPM_` | None | No |
+| `OAUTH_ROLE_MAPPING` | Assign CPM roles from the group claim | `false` | No |
+| `OAUTH_ADMIN_GROUP` | Group(s) granting admin, comma-separated. Takes precedence over the prefix | `<prefix>Admin` | No |
+| `OAUTH_USER_GROUP` | Group(s) granting user, comma-separated. Takes precedence over the prefix | `<prefix>User` | No |
+| `OAUTH_VIEWER_GROUP` | Group(s) granting viewer, comma-separated. Takes precedence over the prefix | `<prefix>Viewer` | No |
+| `OAUTH_DEFAULT_ROLE` | Role assigned when no role group matches | `user` | No |
+| `OAUTH_SYNC_GROUPS` | Mirror the remaining prefixed IdP groups into CPM groups | `false` | No |
 | `AUTH_TRUST_HOST` | Trust the Host header for URL construction (only behind proxies that rewrite Host) | `false` | No |
 | `AUTH_ALLOW_SELF_REGISTRATION` | Allow public email/password account registration | `false` | No |
-| `AUTH_ALLOW_OAUTH_REGISTRATION` | Allow first-time OAuth/OIDC identities to create user accounts | `false` | No |
+| `AUTH_ALLOW_OAUTH_REGISTRATION` | Allow first-time OAuth/OIDC identities to create user accounts | `false` (`true` when `AUTH_DISABLE_LOCAL_USERS=true`) | No |
+| `AUTH_DISABLE_LOCAL_USERS` | OIDC-only mode: no local accounts, no credential sign-in, no bootstrap admin | `false` | No |
 | `AUTH_RATE_LIMIT_ENABLED` | Enable Better Auth rate limiting | `true` | No |
 | `AUTH_RATE_LIMIT_WINDOW` | Rate limit window in seconds | `60` | No |
 | `AUTH_RATE_LIMIT_MAX` | Max requests per window | `5` | No |
@@ -107,7 +117,7 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 
 **Production Requirements:**
 - `SESSION_SECRET`: 32+ characters (`openssl rand -base64 32`)
-- `ADMIN_PASSWORD`: 12+ chars with uppercase, lowercase, numbers, and special characters
+- `ADMIN_PASSWORD`: 12+ chars with uppercase, lowercase, numbers, and special characters — not required when `AUTH_DISABLE_LOCAL_USERS=true`
 
 Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credentials.
 
@@ -120,7 +130,7 @@ Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credent
 - 32+ character session secrets required
 - Login rate limiting: 5 attempts per 60 seconds
 - Audit trail for all configuration changes
-- Supports OAuth2/OIDC for SSO
+- Supports OAuth2/OIDC for SSO, including group-based roles and an OIDC-only mode with no local accounts
 
 **Production Setup:**
 ```bash
@@ -344,6 +354,108 @@ The `BASE_URL` environment variable must match exactly where users access your d
 > **Upgrading from < 1.0-RC:** The old callback URL (`/api/auth/callback/oauth2`) no longer works. Update your OAuth provider's redirect URI to the new format shown in **Settings → OAuth Providers**.
 
 OAuth login appears on the login page alongside credentials. Users can link OAuth to existing accounts from the Profile page.
+
+### Group-Based Roles
+
+CPM can take a user's role from their identity provider's group claim instead of
+managing it by hand. Configure it per provider in **Settings → OAuth Providers →
+Group mapping**, or with the `OAUTH_*` variables for the env-configured provider.
+
+There are two equivalent ways to say which groups grant which role. Use whichever
+matches how your directory is already organised.
+
+**Name the groups directly.** Each role takes any number of groups, comma-separated,
+written exactly as your provider reports them:
+
+```bash
+OAUTH_SCOPES="openid email profile groups"   # ask the IdP for the claim
+OAUTH_GROUPS_CLAIM=groups                    # dots address nested claims
+OAUTH_ROLE_MAPPING=true
+OAUTH_ADMIN_GROUP="platform-owners, sre-oncall"
+OAUTH_USER_GROUP="staff"
+OAUTH_VIEWER_GROUP="auditors, contractors"
+OAUTH_DEFAULT_ROLE=user
+```
+
+Membership of *any one* of a role's groups grants it, so several unrelated groups can
+map to the same role.
+
+**Or use a prefix**, if your groups already share one. CPM then derives all three
+names for you:
+
+| Group (prefix `CPM_`) | CPM role |
+|----------------------|----------|
+| `CPM_Admin` | admin |
+| `CPM_User` | user |
+| `CPM_Viewer` | viewer |
+
+```bash
+OAUTH_GROUP_PREFIX=CPM_
+OAUTH_ROLE_MAPPING=true
+```
+
+The two mix freely: a role with its own group names ignores the prefix, and a role
+left unset falls back to it. So `OAUTH_GROUP_PREFIX=CPM_` together with
+`OAUTH_ADMIN_GROUP=platform-owners` means admins come from `platform-owners` while
+users and viewers still come from `CPM_User` and `CPM_Viewer`.
+
+`OAUTH_DEFAULT_ROLE` decides the role for users in none of the role groups.
+
+Notes:
+
+- **The IdP becomes authoritative.** With role mapping on, a user who loses
+  `CPM_Admin` is demoted at their next sign-in. The last remaining active admin is
+  never demoted, so a mistake in the IdP cannot lock you out.
+- **Roles are applied at sign-in**, not continuously. A group change in the IdP
+  takes effect when the user signs in again.
+- **Matching is case-insensitive** and tolerates Keycloak-style group paths
+  (`/Parent/CPM_Admin` matches `CPM_Admin`).
+- **The most privileged match wins.** A user in both the admin and viewer groups is
+  an admin.
+- The claim may be an array of strings, an array of objects, a comma-separated
+  string, or a JSON-encoded array. Nested claims use a dotted path, e.g.
+  `resource_access.cpm.roles`.
+- Groups are read from the ID token, falling back to the userinfo endpoint when the
+  claim is not in the token. Remember to request the scope that carries it.
+
+### Mirroring Groups
+
+With `OAUTH_SYNC_GROUPS=true` (or the **Mirror groups into CPM groups** switch), the
+remaining prefixed groups become CPM groups with the prefix stripped —
+`CPM_Devs` → `Devs` — so IdP groups can drive [forward auth](#forward-auth-portal)
+access control. Membership of these groups is reconciled on every sign-in. Groups
+you created yourself keep `source=ui` and are never modified by the sync; if a
+mirrored name matches one of them, the user is added to it but never removed.
+
+### OIDC-Only Mode
+
+Set `AUTH_DISABLE_LOCAL_USERS=true` to hand identity entirely to your IdP:
+
+- No bootstrap admin is created, and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are no
+  longer required at startup — even in production.
+- Credential sign-in is turned off in Better Auth, and the username/password form
+  disappears from both the login page and the forward auth portal.
+- Creating local users and setting or changing passwords is rejected in the UI and
+  the REST API.
+- OAuth self-provisioning defaults to enabled, since the IdP is the only way an
+  account can come into existence. Set `AUTH_ALLOW_OAUTH_REGISTRATION=false` to
+  restrict sign-in to accounts that already exist.
+
+```bash
+AUTH_DISABLE_LOCAL_USERS=true
+OAUTH_ENABLED=true
+OAUTH_ISSUER=https://auth.example.com/application/o/cpm/
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+OAUTH_SCOPES="openid email profile groups"
+OAUTH_GROUP_PREFIX=CPM_
+OAUTH_ROLE_MAPPING=true
+```
+
+> Configure and verify the provider **before** enabling this. With no enabled OAuth
+> provider there is no way to sign in; CPM logs a warning at startup, and the only
+> recovery is to fix the provider through the `OAUTH_*` environment variables.
+
 
 ---
 

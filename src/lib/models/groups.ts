@@ -7,6 +7,8 @@ export type Group = {
   id: number;
   name: string;
   description: string | null;
+  /** "ui" for operator-managed groups, "oidc" for groups an IdP sync created. */
+  source: string;
   members: GroupMember[];
   createdAt: string;
   updatedAt: string;
@@ -31,6 +33,7 @@ function toGroup(row: GroupRow, members: GroupMember[]): Group {
     id: row.id,
     name: row.name,
     description: row.description,
+    source: row.source,
     members,
     createdAt: toIso(row.createdAt)!,
     updatedAt: toIso(row.updatedAt)!

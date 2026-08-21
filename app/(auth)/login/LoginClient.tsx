@@ -13,9 +13,11 @@ import { Separator } from "@/components/ui/separator";
 
 interface LoginClientProps {
   enabledProviders: Array<{ id: string; name: string }>;
+  /** False in OIDC-only mode: there are no local accounts to sign in with. */
+  localLoginEnabled?: boolean;
 }
 
-export default function LoginClient({ enabledProviders = [] }: LoginClientProps) {
+export default function LoginClient({ enabledProviders = [], localLoginEnabled = true }: LoginClientProps) {
   const router = useRouter();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
@@ -80,9 +82,11 @@ export default function LoginClient({ enabledProviders = [] }: LoginClientProps)
         <CardHeader className="text-center space-y-1">
           <CardTitle className="text-2xl font-bold">Caddy Proxy Manager</CardTitle>
           <CardDescription>
-            {enabledProviders.length > 0
-              ? "Sign in to your account"
-              : "Sign in with your credentials"}
+            {!localLoginEnabled
+              ? "Sign in with single sign-on"
+              : enabledProviders.length > 0
+                ? "Sign in to your account"
+                : "Sign in with your credentials"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -115,49 +119,62 @@ export default function LoginClient({ enabledProviders = [] }: LoginClientProps)
                   );
                 })}
               </div>
-              <div className="relative">
-                <Separator />
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-                  Or sign in with credentials
-                </span>
-              </div>
+              {localLoginEnabled && (
+                <div className="relative">
+                  <Separator />
+                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                    Or sign in with credentials
+                  </span>
+                </div>
+              )}
             </>
           )}
 
-          <form onSubmit={handleSignIn} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                name="username"
-                required
-                autoComplete="username"
-                autoFocus={enabledProviders.length === 0}
-                disabled={disabled}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                disabled={disabled}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={disabled}>
-              {loginPending ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                  Signing in…
-                </>
-              ) : (
-                "Sign in"
-              )}
-            </Button>
-          </form>
+          {!localLoginEnabled && enabledProviders.length === 0 && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Single sign-on is the only way to sign in, but no provider is configured.
+                Configure one with the OAUTH_* environment variables.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {localLoginEnabled && (
+            <form onSubmit={handleSignIn} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  required
+                  autoComplete="username"
+                  autoFocus={enabledProviders.length === 0}
+                  disabled={disabled}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  disabled={disabled}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={disabled}>
+                {loginPending ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                    Signing in…
+                  </>
+                ) : (
+                  "Sign in"
+                )}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

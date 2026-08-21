@@ -97,6 +97,21 @@ export const oauthProviders = sqliteTable(
     autoLink: integer("autoLink", { mode: "boolean" }).notNull().default(false),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     source: text("source").notNull().default("ui"),
+    // ── OIDC group mapping ────────────────────────────────────────────────
+    // Claim holding the user's groups. Dot-separated paths are supported for
+    // nested claims (e.g. "resource_access.cpm.roles").
+    groupsClaim: text("groupsClaim").notNull().default("groups"),
+    // Convention prefix: with "CPM_", membership of "CPM_Admin" grants admin.
+    groupPrefix: text("groupPrefix"),
+    roleMappingEnabled: integer("roleMappingEnabled", { mode: "boolean" }).notNull().default(false),
+    // Explicit overrides; when unset they are derived from groupPrefix.
+    adminGroup: text("adminGroup"),
+    userGroup: text("userGroup"),
+    viewerGroup: text("viewerGroup"),
+    // Role assigned when no role group matched.
+    defaultRole: text("defaultRole").notNull().default("user"),
+    // Mirror the remaining prefixed IdP groups into CPM groups.
+    syncGroups: integer("syncGroups", { mode: "boolean" }).notNull().default(false),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull()
   },
@@ -374,6 +389,9 @@ export const groups = sqliteTable(
     name: text("name").notNull(),
     description: text("description"),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
+    // "ui" for operator-managed groups, "oidc" for groups created by an IdP
+    // group sync. Only membership of "oidc" groups is reconciled on sign-in.
+    source: text("source").notNull().default("ui"),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull()
   },

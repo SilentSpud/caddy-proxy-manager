@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Users, Plus, Trash2, UserPlus, UserMinus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ type Group = {
   id: number;
   name: string;
   description: string | null;
+  source: string;
   members: GroupMember[];
   createdAt: string;
   updatedAt: string;
@@ -117,7 +119,17 @@ export default function GroupsClient({ groups, users }: Props) {
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-base">{group.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-base">{group.name}</h3>
+                      {group.source === "oidc" && (
+                        <Badge
+                          variant="info"
+                          title="Membership is reconciled from the identity provider on every sign-in"
+                        >
+                          IdP-managed
+                        </Badge>
+                      )}
+                    </div>
                     {group.description && (
                       <p className="text-sm text-muted-foreground">{group.description}</p>
                     )}
@@ -142,7 +154,11 @@ export default function GroupsClient({ groups, users }: Props) {
                       size="icon"
                       className="h-7 w-7 text-destructive"
                       onClick={async () => {
-                        if (confirm(`Delete group "${group.name}"?`)) {
+                        const warning =
+                          group.source === "oidc"
+                            ? `Delete group "${group.name}"? It is managed by an identity provider and will be recreated the next time a member signs in.`
+                            : `Delete group "${group.name}"?`;
+                        if (confirm(warning)) {
                           await deleteGroupAction(group.id);
                           router.refresh();
                         }

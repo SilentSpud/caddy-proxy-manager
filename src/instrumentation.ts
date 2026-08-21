@@ -26,6 +26,28 @@ export async function register() {
       // Don't throw - let the app start anyway, errors will surface when users try to use features
     }
 
+    // With local users disabled, an OAuth provider is the only way in. Warn
+    // loudly rather than throwing: an operator locked out of the UI can only
+    // recover by configuring a provider through OAUTH_* environment variables,
+    // which needs the app to keep starting.
+    const { config: appConfig } = await import("./lib/config");
+    if (appConfig.auth.disableLocalUsers) {
+      try {
+        const { listEnabledOAuthProviders } = await import("./lib/models/oauth-providers");
+        const providers = await listEnabledOAuthProviders();
+        if (providers.length === 0) {
+          console.error(
+            "WARNING: AUTH_DISABLE_LOCAL_USERS=true but no OAuth provider is enabled — " +
+            "no one can sign in. Configure a provider with the OAUTH_* environment variables."
+          );
+        } else {
+          console.log(`Local user management disabled — sign-in via ${providers.map((p) => p.name).join(", ")}`);
+        }
+      } catch (error) {
+        console.error("Failed to check OAuth provider availability:", error);
+      }
+    }
+
     // Apply Caddy configuration from database on startup
     const { applyCaddyConfig } = await import("./lib/caddy");
     try {

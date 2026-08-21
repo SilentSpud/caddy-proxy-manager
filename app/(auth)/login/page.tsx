@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
+import { config } from "@/src/lib/config";
 import LoginClient from "./LoginClient";
 
 export default async function LoginPage() {
@@ -11,5 +12,10 @@ export default async function LoginPage() {
 
   const enabledProviders = await getProviderDisplayList();
 
-  return <LoginClient enabledProviders={enabledProviders} />;
+  return (
+    <LoginClient
+      enabledProviders={enabledProviders}
+      localLoginEnabled={!config.auth.disableLocalUsers}
+    />
+  );
 }

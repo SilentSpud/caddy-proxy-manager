@@ -33,6 +33,8 @@ type UserEntry = {
 
 type Props = {
   users: UserEntry[];
+  /** False in OIDC-only mode: accounts come from the IdP, not from this page. */
+  localUsersEnabled?: boolean;
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -46,7 +48,7 @@ const STATUS_COLORS: Record<string, string> = {
   disabled: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
 };
 
-export default function UsersClient({ users }: Props) {
+export default function UsersClient({ users, localUsersEnabled = true }: Props) {
   const router = useRouter();
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -79,13 +81,15 @@ export default function UsersClient({ users }: Props) {
         <span className="text-sm text-muted-foreground ml-auto">
           {filtered.length} user{filtered.length !== 1 ? "s" : ""}
         </span>
-        <Button onClick={() => setShowCreate(!showCreate)} variant="outline" size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Create User
-        </Button>
+        {localUsersEnabled && (
+          <Button onClick={() => setShowCreate(!showCreate)} variant="outline" size="sm">
+            <Plus className="h-4 w-4 mr-1" />
+            Create User
+          </Button>
+        )}
       </div>
 
-      {showCreate && (
+      {localUsersEnabled && showCreate && (
         <Card>
           <CardContent className="pt-4">
             <form

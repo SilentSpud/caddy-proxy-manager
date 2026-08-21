@@ -3,8 +3,22 @@ import db, { nowIso } from "../db";
 import { oauthProviders } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { encryptSecret, decryptSecret } from "../secret";
+import type { AppRole } from "../oidc-groups";
+import { isAppRole } from "../oidc-groups";
 
-export type OAuthProvider = {
+/** Per-provider OIDC group mapping, shared by the type, create and update paths. */
+export type OAuthGroupMapping = {
+  groupsClaim: string;
+  groupPrefix: string | null;
+  roleMappingEnabled: boolean;
+  adminGroup: string | null;
+  userGroup: string | null;
+  viewerGroup: string | null;
+  defaultRole: AppRole;
+  syncGroups: boolean;
+};
+
+export type OAuthProvider = OAuthGroupMapping & {
   id: string;
   name: string;
   type: string;
@@ -39,6 +53,14 @@ function parseDbProvider(row: DbProvider): OAuthProvider {
     autoLink: row.autoLink,
     enabled: row.enabled,
     source: row.source,
+    groupsClaim: row.groupsClaim,
+    groupPrefix: row.groupPrefix,
+    roleMappingEnabled: row.roleMappingEnabled,
+    adminGroup: row.adminGroup,
+    userGroup: row.userGroup,
+    viewerGroup: row.viewerGroup,
+    defaultRole: isAppRole(row.defaultRole) ? row.defaultRole : "user",
+    syncGroups: row.syncGroups,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -57,7 +79,7 @@ export async function createOAuthProvider(data: {
   autoLink?: boolean;
   enabled?: boolean;
   source?: string;
-}): Promise<OAuthProvider> {
+} & Partial<OAuthGroupMapping>): Promise<OAuthProvider> {
   const now = nowIso();
   const id = randomUUID();
 
@@ -77,6 +99,14 @@ export async function createOAuthProvider(data: {
       autoLink: data.autoLink ?? false,
       enabled: data.enabled ?? true,
       source: data.source ?? "ui",
+      groupsClaim: data.groupsClaim?.trim() || "groups",
+      groupPrefix: data.groupPrefix?.trim() || null,
+      roleMappingEnabled: data.roleMappingEnabled ?? false,
+      adminGroup: data.adminGroup?.trim() || null,
+      userGroup: data.userGroup?.trim() || null,
+      viewerGroup: data.viewerGroup?.trim() || null,
+      defaultRole: isAppRole(data.defaultRole) ? data.defaultRole : "user",
+      syncGroups: data.syncGroups ?? false,
       createdAt: now,
       updatedAt: now,
     })
@@ -128,7 +158,7 @@ export async function updateOAuthProvider(
     scopes: string;
     autoLink: boolean;
     enabled: boolean;
-  }>
+  }> & Partial<OAuthGroupMapping>
 ): Promise<OAuthProvider | null> {
   const now = nowIso();
 
@@ -145,6 +175,14 @@ export async function updateOAuthProvider(
   if (data.scopes !== undefined) updates.scopes = data.scopes;
   if (data.autoLink !== undefined) updates.autoLink = data.autoLink;
   if (data.enabled !== undefined) updates.enabled = data.enabled;
+  if (data.groupsClaim !== undefined) updates.groupsClaim = data.groupsClaim.trim() || "groups";
+  if (data.groupPrefix !== undefined) updates.groupPrefix = data.groupPrefix?.trim() || null;
+  if (data.roleMappingEnabled !== undefined) updates.roleMappingEnabled = data.roleMappingEnabled;
+  if (data.adminGroup !== undefined) updates.adminGroup = data.adminGroup?.trim() || null;
+  if (data.userGroup !== undefined) updates.userGroup = data.userGroup?.trim() || null;
+  if (data.viewerGroup !== undefined) updates.viewerGroup = data.viewerGroup?.trim() || null;
+  if (data.defaultRole !== undefined) updates.defaultRole = isAppRole(data.defaultRole) ? data.defaultRole : "user";
+  if (data.syncGroups !== undefined) updates.syncGroups = data.syncGroups;
 
   const [row] = await db
     .update(oauthProviders)

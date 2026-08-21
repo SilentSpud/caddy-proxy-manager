@@ -67,6 +67,7 @@ export default async function SettingsPage() {
       globalGeoBlock={globalGeoBlock}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
+      localUsersDisabled={config.auth.disableLocalUsers}
       baseUrl={config.baseUrl}
       instanceSync={{
         mode: instanceMode,

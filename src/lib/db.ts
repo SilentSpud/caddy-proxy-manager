@@ -14,6 +14,28 @@ type GlobalForDrizzle = typeof globalThis & {
   __MIGRATIONS_RAN__?: boolean;
 };
 
+/**
+ * A `file:` URL always exposes its path with a leading slash, so a Windows
+ * absolute path round-trips as "/C:/data/app.db". Left alone, that resolves
+ * against the current drive root and yields "C:\C:\data" — so drop the slash
+ * when a drive letter follows it.
+ *
+ * This mirrors what `fileURLToPath` does, but cannot use it: on Windows that
+ * helper rejects POSIX-style file URLs outright, and `file:/app/data/app.db`
+ * is the documented default for Docker deployments. On POSIX "/C:/x" really is
+ * a path under a directory named "C:", so the rewrite is Windows-only.
+ *
+ * Exported for tests; `platform` is a parameter so both behaviours can be
+ * covered from either host.
+ */
+export function stripLeadingSlashBeforeDriveLetter(
+  pathname: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  if (platform !== "win32") return pathname;
+  return /^\/[A-Za-z]:[/\\]/.test(pathname) ? pathname.slice(1) : pathname;
+}
+
 function resolveSqlitePath(rawUrl: string): string {
   if (!rawUrl) {
     return ":memory:";
@@ -33,7 +55,7 @@ function resolveSqlitePath(rawUrl: string): string {
       if (fileUrl.host && fileUrl.host !== "localhost") {
         throw new Error("Remote SQLite hosts are not supported.");
       }
-      return decodeURIComponent(fileUrl.pathname);
+      return stripLeadingSlashBeforeDriveLetter(decodeURIComponent(fileUrl.pathname));
     } catch {
       const remainder = rawUrl.slice("file:".length);
       if (!remainder) {
@@ -365,7 +387,28 @@ function runEnvProviderSync() {
   if (sqlitePath === ":memory:") return;
 
   // Lazy import to avoid circular dependency at module load
-  let config: { oauth: { enabled: boolean; providerName: string; clientId: string | null; clientSecret: string | null; issuer: string | null; authorizationUrl: string | null; tokenUrl: string | null; userinfoUrl: string | null; allowAutoLinking: boolean } };
+  let config: {
+    oauth: {
+      enabled: boolean;
+      providerName: string;
+      clientId: string | null;
+      clientSecret: string | null;
+      issuer: string | null;
+      authorizationUrl: string | null;
+      tokenUrl: string | null;
+      userinfoUrl: string | null;
+      allowAutoLinking: boolean;
+      scopes: string | null;
+      groupsClaim: string | null;
+      groupPrefix: string | null;
+      roleMappingEnabled: boolean;
+      adminGroup: string | null;
+      userGroup: string | null;
+      viewerGroup: string | null;
+      defaultRole: string | null;
+      syncGroups: boolean;
+    };
+  };
   try {
     config = require("./config").config; // eslint-disable-line @typescript-eslint/no-require-imports
   } catch {
@@ -388,6 +431,21 @@ function runEnvProviderSync() {
   const providerId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "oauth";
   const existing = db.select().from(oauthProviders).where(eq(oauthProviders.name, name)).get();
 
+  const validRoles = new Set(["admin", "user", "viewer"]);
+  const defaultRole = config.oauth.defaultRole && validRoles.has(config.oauth.defaultRole)
+    ? config.oauth.defaultRole
+    : "user";
+  const groupMapping = {
+    groupsClaim: config.oauth.groupsClaim ?? "groups",
+    groupPrefix: config.oauth.groupPrefix ?? null,
+    roleMappingEnabled: config.oauth.roleMappingEnabled,
+    adminGroup: config.oauth.adminGroup ?? null,
+    userGroup: config.oauth.userGroup ?? null,
+    viewerGroup: config.oauth.viewerGroup ?? null,
+    defaultRole,
+    syncGroups: config.oauth.syncGroups,
+  };
+
   const now = new Date().toISOString();
   if (existing && existing.source === "env") {
     db.update(oauthProviders).set({
@@ -397,7 +455,9 @@ function runEnvProviderSync() {
       authorizationUrl: config.oauth.authorizationUrl ?? null,
       tokenUrl: config.oauth.tokenUrl ?? null,
       userinfoUrl: config.oauth.userinfoUrl ?? null,
+      scopes: config.oauth.scopes ?? existing.scopes,
       autoLink: config.oauth.allowAutoLinking,
+      ...groupMapping,
       updatedAt: now,
     }).where(eq(oauthProviders.id, existing.id)).run();
   } else if (!existing) {
@@ -411,8 +471,9 @@ function runEnvProviderSync() {
       authorizationUrl: config.oauth.authorizationUrl ?? null,
       tokenUrl: config.oauth.tokenUrl ?? null,
       userinfoUrl: config.oauth.userinfoUrl ?? null,
-      scopes: "openid email profile",
+      scopes: config.oauth.scopes ?? "openid email profile",
       autoLink: config.oauth.allowAutoLinking,
+      ...groupMapping,
       enabled: true,
       source: "env",
       createdAt: now,

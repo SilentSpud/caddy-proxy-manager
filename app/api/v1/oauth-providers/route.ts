@@ -50,6 +50,14 @@ export async function POST(request: NextRequest) {
       userinfoUrl: body.userinfoUrl ?? null,
       scopes: body.scopes ?? "openid email profile",
       autoLink: body.autoLink ?? false,
+      groupsClaim: body.groupsClaim ?? undefined,
+      groupPrefix: body.groupPrefix ?? null,
+      roleMappingEnabled: body.roleMappingEnabled ?? false,
+      adminGroup: body.adminGroup ?? null,
+      userGroup: body.userGroup ?? null,
+      viewerGroup: body.viewerGroup ?? null,
+      defaultRole: body.defaultRole ?? undefined,
+      syncGroups: body.syncGroups ?? false,
       source: "ui",
     });
 

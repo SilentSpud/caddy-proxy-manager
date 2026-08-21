@@ -27,7 +27,11 @@ import {
 interface OAuthProvidersSectionProps {
   initialProviders: OAuthProvider[];
   baseUrl: string;
+  /** True when AUTH_DISABLE_LOCAL_USERS=true — SSO is the only way in. */
+  localUsersDisabled?: boolean;
 }
+
+type AppRole = "admin" | "user" | "viewer";
 
 type FormData = {
   name: string;
@@ -40,6 +44,14 @@ type FormData = {
   userinfoUrl: string;
   scopes: string;
   autoLink: boolean;
+  groupsClaim: string;
+  groupPrefix: string;
+  roleMappingEnabled: boolean;
+  adminGroup: string;
+  userGroup: string;
+  viewerGroup: string;
+  defaultRole: AppRole;
+  syncGroups: boolean;
 };
 
 const emptyForm: FormData = {
@@ -53,9 +65,21 @@ const emptyForm: FormData = {
   userinfoUrl: "",
   scopes: "openid email profile",
   autoLink: false,
+  groupsClaim: "groups",
+  groupPrefix: "",
+  roleMappingEnabled: false,
+  adminGroup: "",
+  userGroup: "",
+  viewerGroup: "",
+  defaultRole: "user",
+  syncGroups: false,
 };
 
-export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAuthProvidersSectionProps) {
+export default function OAuthProvidersSection({
+  initialProviders,
+  baseUrl,
+  localUsersDisabled = false,
+}: OAuthProvidersSectionProps) {
   const [providers, setProviders] = useState(initialProviders);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<OAuthProvider | null>(null);
@@ -90,6 +114,14 @@ export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAu
       userinfoUrl: provider.userinfoUrl ?? "",
       scopes: provider.scopes,
       autoLink: provider.autoLink,
+      groupsClaim: provider.groupsClaim,
+      groupPrefix: provider.groupPrefix ?? "",
+      roleMappingEnabled: provider.roleMappingEnabled,
+      adminGroup: provider.adminGroup ?? "",
+      userGroup: provider.userGroup ?? "",
+      viewerGroup: provider.viewerGroup ?? "",
+      defaultRole: provider.defaultRole,
+      syncGroups: provider.syncGroups,
     });
     setError(null);
     setDialogOpen(true);
@@ -117,6 +149,14 @@ export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAu
           userinfoUrl: form.userinfoUrl.trim() || null,
           scopes: form.scopes.trim() || "openid email profile",
           autoLink: form.autoLink,
+          groupsClaim: form.groupsClaim.trim() || "groups",
+          groupPrefix: form.groupPrefix.trim() || null,
+          roleMappingEnabled: form.roleMappingEnabled,
+          adminGroup: form.adminGroup.trim() || null,
+          userGroup: form.userGroup.trim() || null,
+          viewerGroup: form.viewerGroup.trim() || null,
+          defaultRole: form.defaultRole,
+          syncGroups: form.syncGroups,
         });
         if (updated) {
           setProviders((prev) =>
@@ -135,6 +175,14 @@ export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAu
           userinfoUrl: form.userinfoUrl.trim() || undefined,
           scopes: form.scopes.trim() || undefined,
           autoLink: form.autoLink,
+          groupsClaim: form.groupsClaim.trim() || undefined,
+          groupPrefix: form.groupPrefix.trim() || null,
+          roleMappingEnabled: form.roleMappingEnabled,
+          adminGroup: form.adminGroup.trim() || null,
+          userGroup: form.userGroup.trim() || null,
+          viewerGroup: form.viewerGroup.trim() || null,
+          defaultRole: form.defaultRole,
+          syncGroups: form.syncGroups,
         });
         setProviders((prev) => [...prev, created]);
       }
@@ -184,6 +232,23 @@ export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAu
 
   return (
     <div className="flex flex-col gap-3">
+      {localUsersDisabled && (
+        <Alert
+          className={
+            providers.some((p) => p.enabled)
+              ? "border-blue-500/30 bg-blue-500/5 text-blue-700 dark:text-blue-400"
+              : "border-destructive/50 bg-destructive/5 text-destructive"
+          }
+        >
+          <AlertDescription>
+            Local user management is disabled (<code className="font-mono">AUTH_DISABLE_LOCAL_USERS=true</code>).
+            {providers.some((p) => p.enabled)
+              ? " All accounts are provisioned by the providers below."
+              : " No provider is enabled, so nobody can sign in."}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {providers.length === 0 && (
         <Alert className="border-blue-500/30 bg-blue-500/5 text-blue-700 dark:text-blue-400 [&>svg]:text-blue-500">
           <AlertDescription>
@@ -204,6 +269,16 @@ export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAu
               <Badge variant={provider.source === "env" ? "info" : "secondary"}>
                 {provider.source === "env" ? "ENV" : "UI"}
               </Badge>
+              {provider.roleMappingEnabled && (
+                <Badge variant="secondary" title="Roles are assigned from this provider's group claim">
+                  Group roles
+                </Badge>
+              )}
+              {provider.syncGroups && (
+                <Badge variant="secondary" title="CPM groups are mirrored from this provider">
+                  Group sync
+                </Badge>
+              )}
               {!provider.enabled && (
                 <Badge variant="warning">Disabled</Badge>
               )}
@@ -427,6 +502,136 @@ export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAu
             <p className="text-xs text-muted-foreground -mt-1">
               Automatically link OAuth accounts to existing users with the same email address.
             </p>
+
+            <div className="rounded-md border p-3 flex flex-col gap-3">
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-semibold">Group mapping</p>
+                <p className="text-xs text-muted-foreground">
+                  Derive CPM roles and groups from the identity provider&apos;s group claim.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="oauth-groups-claim">Groups claim</Label>
+                <Input
+                  id="oauth-groups-claim"
+                  value={form.groupsClaim}
+                  onChange={(e) => updateField("groupsClaim", e.target.value)}
+                  placeholder="groups"
+                  className="h-8 text-sm font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Claim holding the user&apos;s groups. Use dots for nested claims, e.g.{" "}
+                  <code className="font-mono">resource_access.cpm.roles</code>. Remember to request a
+                  matching scope above.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="oauth-group-prefix">Group prefix</Label>
+                <Input
+                  id="oauth-group-prefix"
+                  value={form.groupPrefix}
+                  onChange={(e) => updateField("groupPrefix", e.target.value)}
+                  placeholder="CPM_"
+                  className="h-8 text-sm font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shorthand for naming the role groups: with prefix{" "}
+                  <code className="font-mono">CPM_</code>, members of{" "}
+                  <code className="font-mono">CPM_Admin</code> become admins,{" "}
+                  <code className="font-mono">CPM_User</code> users and{" "}
+                  <code className="font-mono">CPM_Viewer</code> viewers. Optional — name the groups
+                  below instead if they do not share a prefix.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="oauth-role-mapping"
+                  checked={form.roleMappingEnabled}
+                  onCheckedChange={(v) => updateField("roleMappingEnabled", v)}
+                />
+                <Label htmlFor="oauth-role-mapping">Assign roles from groups</Label>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-1">
+                The provider becomes authoritative: a user who loses the admin group is demoted on their
+                next sign-in. The last remaining admin is never demoted.
+              </p>
+
+              {form.roleMappingEnabled && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="oauth-admin-group" className="text-xs">Admin groups</Label>
+                      <Input
+                        id="oauth-admin-group"
+                        value={form.adminGroup}
+                        onChange={(e) => updateField("adminGroup", e.target.value)}
+                        placeholder={form.groupPrefix ? `${form.groupPrefix}Admin` : "platform-owners"}
+                        className="h-8 text-sm font-mono"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="oauth-user-group" className="text-xs">User groups</Label>
+                      <Input
+                        id="oauth-user-group"
+                        value={form.userGroup}
+                        onChange={(e) => updateField("userGroup", e.target.value)}
+                        placeholder={form.groupPrefix ? `${form.groupPrefix}User` : "staff"}
+                        className="h-8 text-sm font-mono"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="oauth-viewer-group" className="text-xs">Viewer groups</Label>
+                      <Input
+                        id="oauth-viewer-group"
+                        value={form.viewerGroup}
+                        onChange={(e) => updateField("viewerGroup", e.target.value)}
+                        placeholder={form.groupPrefix ? `${form.groupPrefix}Viewer` : "auditors"}
+                        className="h-8 text-sm font-mono"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground -mt-1">
+                    Name the groups exactly as your provider reports them. Separate several with
+                    commas — <code className="font-mono">platform-owners, sre-oncall</code> — and any
+                    one of them grants the role. A role left blank falls back to the prefix above, so
+                    the two styles can be mixed. The most privileged match wins.
+                  </p>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="oauth-default-role">Role when no group matches</Label>
+                    <Select
+                      value={form.defaultRole}
+                      onValueChange={(v) => updateField("defaultRole", v as AppRole)}
+                    >
+                      <SelectTrigger id="oauth-default-role" className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="oauth-sync-groups"
+                  checked={form.syncGroups}
+                  onCheckedChange={(v) => updateField("syncGroups", v)}
+                />
+                <Label htmlFor="oauth-sync-groups">Mirror groups into CPM groups</Label>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Creates CPM groups from the remaining prefixed claims (with the prefix stripped) for
+                forward-auth access control. Groups you created yourself are never modified.
+              </p>
+            </div>
 
             {editingProvider && (
               <div className="flex flex-col gap-1.5 pt-1">

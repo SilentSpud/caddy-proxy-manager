@@ -36,15 +36,21 @@ services:
       # NextAuth configuration
       NEXTAUTH_URL: ${BASE_URL:-http://localhost:3000}
 
-      # REQUIRED: Admin credentials for login
+      # REQUIRED unless AUTH_DISABLE_LOCAL_USERS=true: admin credentials for login
       # SECURITY: You MUST set these to secure values in production!
       # Password must be 12+ chars with uppercase, lowercase, numbers, and special chars
-      ADMIN_USERNAME: ${ADMIN_USERNAME:?ERROR - ADMIN_USERNAME is required}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ERROR - ADMIN_PASSWORD is required}
+      # The app refuses to start in production if these are missing or weak, so they
+      # are not enforced here — an OIDC-only deployment has no local admin to seed
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
 
       # Self-registration is disabled unless explicitly enabled
       AUTH_ALLOW_SELF_REGISTRATION: ${AUTH_ALLOW_SELF_REGISTRATION:-false}
       AUTH_ALLOW_OAUTH_REGISTRATION: ${AUTH_ALLOW_OAUTH_REGISTRATION:-false}
+
+      # OIDC-only mode: no local accounts, no credential sign-in, no bootstrap admin.
+      # Only enable this once an OAuth provider below is configured and working.
+      AUTH_DISABLE_LOCAL_USERS: ${AUTH_DISABLE_LOCAL_USERS:-false}
 
       # OAuth2/OIDC Authentication (Optional - works with Authentik, Authelia, Keycloak, etc.)
       OAUTH_ENABLED: ${OAUTH_ENABLED:-false}
@@ -56,6 +62,19 @@ services:
       OAUTH_TOKEN_URL: ${OAUTH_TOKEN_URL:-}
       OAUTH_USERINFO_URL: ${OAUTH_USERINFO_URL:-}
       OAUTH_ALLOW_AUTO_LINKING: ${OAUTH_ALLOW_AUTO_LINKING:-false}
+      OAUTH_SCOPES: ${OAUTH_SCOPES:-}
+
+      # Group-based roles. Either name each role's group(s) below (comma-separated,
+      # any one grants the role), or set a prefix and let CPM derive <prefix>Admin,
+      # <prefix>User and <prefix>Viewer. A role left unset falls back to the prefix.
+      OAUTH_ROLE_MAPPING: ${OAUTH_ROLE_MAPPING:-false}
+      OAUTH_GROUPS_CLAIM: ${OAUTH_GROUPS_CLAIM:-}
+      OAUTH_GROUP_PREFIX: ${OAUTH_GROUP_PREFIX:-}
+      OAUTH_ADMIN_GROUP: ${OAUTH_ADMIN_GROUP:-}
+      OAUTH_USER_GROUP: ${OAUTH_USER_GROUP:-}
+      OAUTH_VIEWER_GROUP: ${OAUTH_VIEWER_GROUP:-}
+      OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
+      OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
 
       # ClickHouse analytics database (optional — omit CLICKHOUSE_PASSWORD to disable analytics)
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}

@@ -961,6 +961,14 @@ export async function createOAuthProviderAction(data: {
   userinfoUrl?: string;
   scopes?: string;
   autoLink?: boolean;
+  groupsClaim?: string;
+  groupPrefix?: string | null;
+  roleMappingEnabled?: boolean;
+  adminGroup?: string | null;
+  userGroup?: string | null;
+  viewerGroup?: string | null;
+  defaultRole?: "admin" | "user" | "viewer";
+  syncGroups?: boolean;
 }) {
   const session = await requireAdmin();
   const { createOAuthProvider } = await import("@/src/lib/models/oauth-providers");
@@ -994,6 +1002,14 @@ export async function updateOAuthProviderAction(
     scopes: string;
     autoLink: boolean;
     enabled: boolean;
+    groupsClaim: string;
+    groupPrefix: string | null;
+    roleMappingEnabled: boolean;
+    adminGroup: string | null;
+    userGroup: string | null;
+    viewerGroup: string | null;
+    defaultRole: "admin" | "user" | "viewer";
+    syncGroups: boolean;
   }>
 ) {
   const session = await requireAdmin();

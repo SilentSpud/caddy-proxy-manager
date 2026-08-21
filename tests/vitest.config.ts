@@ -1,8 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 
 const root = resolve(__dirname, '..');
+
+/**
+ * Builds an absolute test-discovery pattern rooted at this directory.
+ *
+ * Glob syntax is POSIX on every platform: a backslash is an escape character,
+ * not a separator. A pattern built with `resolve()` alone therefore matches
+ * nothing on Windows — `tests\unit\**\*.test.ts` reads as escaped literals — and
+ * Vitest exits with "No test files found" having silently run zero tests.
+ * Normalising the separators is a no-op on POSIX.
+ */
+const testGlob = (pattern: string) => resolve(__dirname, pattern).split(sep).join('/');
 
 export default defineConfig({
   plugins: [tsconfigPaths({ root })],
@@ -26,8 +37,8 @@ export default defineConfig({
       NODE_ENV: 'test',
     },
     include: [
-      resolve(__dirname, 'unit/**/*.test.ts'),
-      resolve(__dirname, 'integration/**/*.test.ts'),
+      testGlob('unit/**/*.test.ts'),
+      testGlob('integration/**/*.test.ts'),
     ],
     // Suppress console output from production code during tests (e.g. expected
     // warn/error calls when intentionally feeding bad input to parsers).

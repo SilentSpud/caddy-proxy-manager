@@ -22,6 +22,7 @@ export async function syncEnvOAuthProviders(): Promise<void> {
   const name = config.oauth.providerName;
   const existing = await getOAuthProviderByName(name);
 
+  const validRoles = new Set(["admin", "user", "viewer"]);
   const data = {
     type: "oidc" as const,
     clientId: config.oauth.clientId,
@@ -31,6 +32,17 @@ export async function syncEnvOAuthProviders(): Promise<void> {
     tokenUrl: config.oauth.tokenUrl ?? null,
     userinfoUrl: config.oauth.userinfoUrl ?? null,
     autoLink: config.oauth.allowAutoLinking,
+    scopes: config.oauth.scopes ?? "openid email profile",
+    groupsClaim: config.oauth.groupsClaim ?? "groups",
+    groupPrefix: config.oauth.groupPrefix ?? null,
+    roleMappingEnabled: config.oauth.roleMappingEnabled,
+    adminGroup: config.oauth.adminGroup ?? null,
+    userGroup: config.oauth.userGroup ?? null,
+    viewerGroup: config.oauth.viewerGroup ?? null,
+    defaultRole: (config.oauth.defaultRole && validRoles.has(config.oauth.defaultRole)
+      ? config.oauth.defaultRole
+      : "user") as "admin" | "user" | "viewer",
+    syncGroups: config.oauth.syncGroups,
   };
 
   if (existing && existing.source === "env") {

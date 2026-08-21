@@ -15,6 +15,8 @@ interface PortalLoginFormProps {
   hasRedirect: boolean;
   targetDomain: string;
   enabledProviders?: Array<{ id: string; name: string }>;
+  /** False in OIDC-only mode: there are no local accounts to sign in with. */
+  localLoginEnabled?: boolean;
   existingSession?: { userId: string; name: string | null; email: string | null } | null;
 }
 
@@ -23,6 +25,7 @@ export default function PortalLoginForm({
   hasRedirect,
   targetDomain,
   enabledProviders = [],
+  localLoginEnabled = true,
   existingSession,
 }: PortalLoginFormProps) {
   const [error, setError] = useState<string | null>(null);
@@ -177,43 +180,55 @@ export default function PortalLoginForm({
                   );
                 })}
               </div>
-              <div className="relative">
-                <Separator />
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-                  or
-                </span>
-              </div>
+              {localLoginEnabled && (
+                <div className="relative">
+                  <Separator />
+                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                    or
+                  </span>
+                </div>
+              )}
             </>
           )}
 
-          <form onSubmit={handleCredentialSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                name="username"
-                type="text"
-                autoComplete="username"
-                autoFocus={enabledProviders.length === 0}
-                disabled={disabled}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                disabled={disabled}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={disabled}>
-              {pending ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
+          {!localLoginEnabled && enabledProviders.length === 0 && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Single sign-on is the only way to sign in, but no provider is configured.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {localLoginEnabled && (
+            <form onSubmit={handleCredentialSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  autoFocus={enabledProviders.length === 0}
+                  disabled={disabled}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  disabled={disabled}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={disabled}>
+                {pending ? "Signing in..." : "Sign in"}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -391,6 +391,7 @@ type Props = {
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProvider[];
+  localUsersDisabled: boolean;
   baseUrl: string;
   instanceSync: {
     mode: "standalone" | "master" | "slave";
@@ -445,6 +446,7 @@ export default function SettingsClient({
   globalGeoBlock,
   globalErrorPages,
   oauthProviders,
+  localUsersDisabled,
   baseUrl,
   instanceSync,
 }: Props) {
@@ -627,6 +629,7 @@ export default function SettingsClient({
               {active === "oauth" && (
                 <OAuthSection
                   oauthProviders={oauthProviders}
+                  localUsersDisabled={localUsersDisabled}
                   baseUrl={baseUrl}
                 />
               )}
@@ -1580,14 +1583,20 @@ function AuthentikSection({
 
 function OAuthSection({
   oauthProviders,
+  localUsersDisabled,
   baseUrl,
 }: {
   oauthProviders: OAuthProvider[];
+  localUsersDisabled: boolean;
   baseUrl: string;
 }) {
   return (
     <FormCard>
-      <OAuthProvidersSection initialProviders={oauthProviders} baseUrl={baseUrl} />
+      <OAuthProvidersSection
+        initialProviders={oauthProviders}
+        baseUrl={baseUrl}
+        localUsersDisabled={localUsersDisabled}
+      />
     </FormCard>
   );
 }

@@ -1,6 +1,7 @@
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { isForwardAuthDomain, createRedirectIntent } from "@/src/lib/models/forward-auth";
+import { config } from "@/src/lib/config";
 import PortalLoginForm from "./PortalLoginForm";
 
 interface PortalPageProps {
@@ -44,6 +45,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       hasRedirect={!!redirectUri || !!existingRid}
       targetDomain={targetDomain}
       enabledProviders={enabledProviders}
+      localLoginEnabled={!config.auth.disableLocalUsers}
       existingSession={session ? { userId: session.user.id, name: session.user.name ?? null, email: session.user.email ?? null } : null}
     />
   );

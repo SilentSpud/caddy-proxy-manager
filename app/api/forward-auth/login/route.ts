@@ -24,6 +24,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Credential sign-in does not exist in OIDC-only mode; the portal falls
+    // back to the provider buttons.
+    if (config.auth.disableLocalUsers) {
+      return NextResponse.json(
+        { error: "Password sign-in is disabled. Use single sign-on." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";

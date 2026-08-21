@@ -9,6 +9,13 @@ const DEFAULT_CADDY_URL = process.env.NODE_ENV === "development" ? "http://local
 const MIN_SESSION_SECRET_LENGTH = 32;
 const MIN_ADMIN_PASSWORD_LENGTH = 12;
 
+/**
+ * OIDC-only mode: CPM creates and authenticates no local accounts at all.
+ * The bootstrap admin is neither created nor required, credential sign-in is
+ * turned off, and every identity comes from an OAuth/OIDC provider.
+ */
+const LOCAL_USERS_DISABLED = process.env.AUTH_DISABLE_LOCAL_USERS === "true";
+
 const isProduction = process.env.NODE_ENV === "production";
 const isNodeRuntime = process.env.NEXT_RUNTIME === "nodejs";
 const isDevelopment = process.env.NODE_ENV === "development";
@@ -67,7 +74,14 @@ function resolveSessionSecret(): string {
   return finalSecret;
 }
 
-function resolveAdminCredentials() {
+function resolveAdminCredentials(): { username: string | null; password: string | null } {
+  // With local users disabled there is no bootstrap admin to seed, so the
+  // credentials are not just unused — demanding them would block startup for a
+  // deployment that has deliberately handed identity to its IdP.
+  if (LOCAL_USERS_DISABLED) {
+    return { username: null, password: null };
+  }
+
   const rawUsername = process.env.ADMIN_USERNAME ?? null;
   const rawPassword = process.env.ADMIN_PASSWORD ?? null;
   const username = rawUsername?.trim() || DEFAULT_ADMIN_USERNAME;
@@ -138,7 +152,7 @@ function resolveAdminCredentials() {
 }
 
 // Lazy initialization to avoid executing during build time
-let _adminCredentials: { username: string; password: string } | null = null;
+let _adminCredentials: { username: string | null; password: string | null } | null = null;
 let _sessionSecret: string | null = null;
 
 function getAdminCredentials() {
@@ -168,10 +182,18 @@ export const config = {
     return getAdminCredentials().password;
   },
   auth: {
-    allowSelfRegistration: process.env.AUTH_ALLOW_SELF_REGISTRATION === "true",
+    // OIDC-only mode. Disables credential sign-in, local account creation,
+    // password management, and the bootstrap admin seed.
+    disableLocalUsers: LOCAL_USERS_DISABLED,
+    allowSelfRegistration:
+      !LOCAL_USERS_DISABLED && process.env.AUTH_ALLOW_SELF_REGISTRATION === "true",
     // Separate from credential self-registration: gates whether an OAuth
-    // sign-in may implicitly create a brand-new account. Defaults to closed.
-    allowOauthRegistration: process.env.AUTH_ALLOW_OAUTH_REGISTRATION === "true",
+    // sign-in may implicitly create a brand-new account. Defaults to closed —
+    // except in OIDC-only mode, where the IdP is the only way an account can
+    // ever come into existence, so it defaults open unless explicitly refused.
+    allowOauthRegistration: LOCAL_USERS_DISABLED
+      ? process.env.AUTH_ALLOW_OAUTH_REGISTRATION !== "false"
+      : process.env.AUTH_ALLOW_OAUTH_REGISTRATION === "true",
     // When true, an OAuth IdP's profile claims may set a new user's role/status.
     // Defaults to false: role/status are forced to safe defaults regardless of
     // claims. Only enable if you control the IdP and want it to manage roles.
@@ -187,6 +209,18 @@ export const config = {
     tokenUrl: process.env.OAUTH_TOKEN_URL ?? null,
     userinfoUrl: process.env.OAUTH_USERINFO_URL ?? null,
     allowAutoLinking: process.env.OAUTH_ALLOW_AUTO_LINKING === "true",
+    // Scopes for the env-configured provider. Group claims usually need an
+    // extra scope (e.g. "openid email profile groups").
+    scopes: process.env.OAUTH_SCOPES?.trim() || null,
+    // ── Group-based roles (env-configured provider) ─────────────────────────
+    groupsClaim: process.env.OAUTH_GROUPS_CLAIM?.trim() || null,
+    groupPrefix: process.env.OAUTH_GROUP_PREFIX?.trim() || null,
+    roleMappingEnabled: process.env.OAUTH_ROLE_MAPPING === "true",
+    adminGroup: process.env.OAUTH_ADMIN_GROUP?.trim() || null,
+    userGroup: process.env.OAUTH_USER_GROUP?.trim() || null,
+    viewerGroup: process.env.OAUTH_VIEWER_GROUP?.trim() || null,
+    defaultRole: process.env.OAUTH_DEFAULT_ROLE?.trim() || null,
+    syncGroups: process.env.OAUTH_SYNC_GROUPS === "true",
   },
   forwardAuthInternalUrl: process.env.FORWARD_AUTH_INTERNAL_URL ?? null,
 };
@@ -201,6 +235,8 @@ export function validateProductionConfig() {
     // Force validation by accessing the config values
     // This will throw if defaults are being used in production
     void config.sessionSecret;
+    // Admin credentials are only validated when local users exist at all —
+    // resolveAdminCredentials() short-circuits in OIDC-only mode.
     void config.adminUsername;
     void config.adminPassword;
   }

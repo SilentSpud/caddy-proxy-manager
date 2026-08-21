@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
+import { config } from "@/src/lib/config";
 
 const VALID_ROLES = new Set(["admin", "user", "viewer"]);
 
@@ -23,6 +24,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await requireApiAdmin(request);
+
+    if (config.auth.disableLocalUsers) {
+      return NextResponse.json(
+        { error: "Local user creation is disabled. Users are provisioned by the OIDC provider." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     const email = String(body.email ?? "").trim();

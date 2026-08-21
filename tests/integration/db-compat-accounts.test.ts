@@ -62,6 +62,12 @@ describe('database compatibility for accounts schema', () => {
     const tempDir = mkdtempSync(join(process.cwd(), 'tmp-db-compat-'));
     const dbPath = join(tempDir, 'compat.db');
 
+    // Both handles must be closed before the temp directory can be removed:
+    // Windows refuses to delete a file that is still open, and the db module
+    // keeps its connection for the lifetime of the module.
+    let appSqlite: { close: () => void } | null = null;
+    let reader: InstanceType<typeof Database> | null = null;
+
     try {
       createBrokenAccountsDatabase(dbPath);
 
@@ -69,6 +75,7 @@ describe('database compatibility for accounts schema', () => {
       resetDbModuleState();
 
       const { createUser } = await import('@/src/lib/models/user');
+      appSqlite = (await import('@/src/lib/db')).sqlite;
       await createUser({
         email: 'compat-user@example.com',
         name: 'Compat User',
@@ -78,8 +85,8 @@ describe('database compatibility for accounts schema', () => {
         passwordHash: 'hash123',
       });
 
-      const sqlite = new Database(dbPath, { readonly: true });
-      const accountColumns = sqlite.prepare('PRAGMA table_info("accounts")').all() as Array<{
+      reader = new Database(dbPath, { readonly: true });
+      const accountColumns = reader.prepare('PRAGMA table_info("accounts")').all() as Array<{
         name: string;
         type: string;
         pk: number;
@@ -89,10 +96,10 @@ describe('database compatibility for accounts schema', () => {
       expect(idColumn?.type.toUpperCase()).toBe('INTEGER');
       expect(idColumn?.pk).toBe(1);
 
-      const user = sqlite.prepare('SELECT id FROM users WHERE email = ?').get('compat-user@example.com') as { id: number } | undefined;
+      const user = reader.prepare('SELECT id FROM users WHERE email = ?').get('compat-user@example.com') as { id: number } | undefined;
       expect(user?.id).toBeDefined();
 
-      const account = sqlite.prepare(
+      const account = reader.prepare(
         'SELECT id, providerId, accountId, password FROM accounts WHERE userId = ? AND providerId = ?'
       ).get(user!.id, 'credential') as {
         id: number;
@@ -106,9 +113,9 @@ describe('database compatibility for accounts schema', () => {
       expect(account?.providerId).toBe('credential');
       expect(account?.accountId).toBe(String(user!.id));
       expect(account?.password).toBe('hash123');
-
-      sqlite.close();
     } finally {
+      reader?.close();
+      appSqlite?.close();
       rmSync(tempDir, { recursive: true, force: true });
     }
   });

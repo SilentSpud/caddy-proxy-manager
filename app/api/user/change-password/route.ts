@@ -3,6 +3,7 @@ import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { getUserById, updateUserPassword } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
+import { config } from "@/src/lib/config";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
@@ -13,6 +14,15 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // No local passwords exist in OIDC-only mode — setting one would create a
+    // credential path around the IdP.
+    if (config.auth.disableLocalUsers) {
+      return NextResponse.json(
+        { error: "Password management is disabled. Sign-in is handled by the OIDC provider." },
+        { status: 403 }
+      );
     }
 
     // Rate limit password change attempts to prevent brute-forcing current password

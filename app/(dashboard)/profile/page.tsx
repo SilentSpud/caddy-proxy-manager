@@ -3,6 +3,7 @@ import { getUserById } from "@/src/lib/models/user";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { listApiTokens } from "@/src/lib/models/api-tokens";
 import { listUserSessions } from "@/src/lib/models/sessions";
+import { config } from "@/src/lib/config";
 import ProfileClient from "./ProfileClient";
 import { redirect } from "next/navigation";
 
@@ -30,6 +31,7 @@ export default async function ProfilePage() {
       enabledProviders={enabledProviders}
       apiTokens={apiTokens}
       sessions={sessions}
+      localPasswordsEnabled={!config.auth.disableLocalUsers}
     />
   );
 }

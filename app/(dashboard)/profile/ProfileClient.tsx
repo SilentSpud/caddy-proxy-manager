@@ -75,9 +75,11 @@ interface ProfileClientProps {
   enabledProviders: Array<{ id: string; name: string }>;
   apiTokens: ApiToken[];
   sessions: ActiveSession[];
+  /** False in OIDC-only mode: local passwords do not exist. */
+  localPasswordsEnabled?: boolean;
 }
 
-export default function ProfileClient({ user, enabledProviders, apiTokens, sessions }: ProfileClientProps) {
+export default function ProfileClient({ user, enabledProviders, apiTokens, sessions, localPasswordsEnabled = true }: ProfileClientProps) {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -432,6 +434,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
         </Card>
 
         {/* Password Management */}
+        {localPasswordsEnabled && (
         <Card>
           <CardContent className="flex flex-col gap-4 pt-6">
             <div className="flex items-center gap-2">
@@ -463,6 +466,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Active Sessions */}
         <Card>
@@ -550,7 +554,14 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
                     Your account is linked to {getProviderName(user.provider ?? "")}
                   </p>
 
-                  {hasPassword ? (
+                  {!localPasswordsEnabled ? (
+                    <Alert className="border-blue-500/50 text-blue-700 dark:text-blue-400">
+                      <AlertDescription>
+                        Single sign-on is the only authentication method on this instance, so this
+                        connection cannot be unlinked.
+                      </AlertDescription>
+                    </Alert>
+                  ) : hasPassword ? (
                     <Button
                       variant="outline"
                       className="text-yellow-600 border-yellow-600/50"

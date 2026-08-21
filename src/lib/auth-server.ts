@@ -7,6 +7,15 @@ import { config } from "./config";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
 import type { OAuthProvider } from "./models/oauth-providers";
 import type { GenericOAuthConfig } from "better-auth/plugins";
+import {
+  extractGroups,
+  mapGroupsToLocalGroups,
+  mapGroupsToRole,
+  needsGroupClaims,
+  toGroupMappingConfig,
+} from "./oidc-groups";
+import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
+import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedAuth: any = null;
@@ -36,6 +45,48 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
       cfg.discoveryUrl = p.issuer.replace(/\/$/, "") + "/.well-known/openid-configuration";
     }
   }
+
+  const mapping = toGroupMappingConfig(p);
+  if (needsGroupClaims(mapping)) {
+    // Resolve claims ourselves so the group claim is found whether the IdP puts
+    // it in the ID token or only on userinfo — better-auth's default stops at
+    // the ID token as soon as it has a sub and an email.
+    cfg.getUserInfo = async (tokens) => {
+      const claims = await fetchOidcClaims(
+        { issuer: p.issuer, userinfoUrl: p.userinfoUrl },
+        { idToken: tokens.idToken, accessToken: tokens.accessToken },
+        mapping.groupsClaim
+      );
+      if (!claims) return null;
+      // The raw claims ride along so mapProfileToUser can read the group claim;
+      // better-auth's OAuth2UserInfo type only declares the standard fields.
+      return toOAuthUserInfo(claims) as unknown as Awaited<
+        ReturnType<NonNullable<GenericOAuthConfig["getUserInfo"]>>
+      >;
+    };
+
+    // Runs on every sign-in through this provider, for new and existing users
+    // alike. It only parks the result: the user id isn't known here, so the
+    // mapping is applied once the sign-in reaches session creation.
+    cfg.mapProfileToUser = (profile: Record<string, unknown>) => {
+      const subject = profile.sub ?? profile.id;
+      if (subject !== undefined && subject !== null) {
+        const claimedGroups = extractGroups(profile, mapping.groupsClaim);
+        recordPendingOidcSync({
+          providerId: p.id,
+          subject: String(subject),
+          providerName: p.name,
+          role: mapGroupsToRole(claimedGroups, mapping),
+          localGroups: mapGroupsToLocalGroups(claimedGroups, mapping),
+          syncGroups: mapping.syncGroups,
+        });
+      }
+      // Privileged fields are never taken from the profile — see
+      // enforceSafeUserDefaults below. The role is applied by the sync instead.
+      return {};
+    };
+  }
+
   return cfg;
 }
 
@@ -64,6 +115,14 @@ function loadProvidersSync(): GenericOAuthConfig[] {
       autoLink: row.autoLink,
       enabled: row.enabled,
       source: row.source,
+      groupsClaim: row.groupsClaim,
+      groupPrefix: row.groupPrefix,
+      roleMappingEnabled: row.roleMappingEnabled,
+      adminGroup: row.adminGroup,
+      userGroup: row.userGroup,
+      viewerGroup: row.viewerGroup,
+      defaultRole: row.defaultRole === "admin" || row.defaultRole === "viewer" ? row.defaultRole : "user",
+      syncGroups: row.syncGroups,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }));
@@ -140,7 +199,9 @@ function createAuth(): any {
     account: { modelName: "accounts" },
     verification: { modelName: "verifications" },
     emailAndPassword: {
-      enabled: true,
+      // OIDC-only mode turns credential sign-in off entirely — there are no
+      // local accounts to sign in with.
+      enabled: !config.auth.disableLocalUsers,
       disableSignUp: !config.auth.allowSelfRegistration,
       password: {
         async hash(password: string) {
@@ -191,10 +252,21 @@ function createAuth(): any {
       session: {
         create: {
           after: async (session) => {
+            const userId = typeof session.userId === "string" ? Number(session.userId) : session.userId;
+
+            // Apply the IdP's group claim now that the user and their account
+            // row exist. Runs before the audit entry so a role change is in
+            // effect for anything that reads the session afterwards.
+            try {
+              await reconcileOidcUserAfterSignIn(userId);
+            } catch (error) {
+              console.warn("[auth-server] OIDC group sync failed:", error);
+            }
+
             try {
               const { createAuditEvent } = await import("./models/audit");
               await createAuditEvent({
-                userId: typeof session.userId === "string" ? Number(session.userId) : session.userId,
+                userId,
                 action: "login_success",
                 entityType: "session",
                 entityId: null,
