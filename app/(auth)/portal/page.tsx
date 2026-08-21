@@ -3,10 +3,17 @@ import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { isForwardAuthDomain, createRedirectIntent } from "@/src/lib/models/forward-auth";
 import { config } from "@/src/lib/config";
 import PortalLoginForm from "./PortalLoginForm";
+import type { Metadata } from "next";
 
 interface PortalPageProps {
   searchParams: Promise<{ rd?: string; rid?: string }>;
 }
+
+export const metadata: Metadata = {
+  // Absolute: the portal fronts other people's apps, so it does not
+  // announce the product in the tab title the way the dashboard does.
+  title: { absolute: "Authentication Required" },
+};
 
 export default async function PortalPage({ searchParams }: PortalPageProps) {
   const params = await searchParams;

@@ -1,12 +1,17 @@
 import L4ProxyHostsClient from "./L4ProxyHostsClient";
 import { listL4ProxyHostsPaginated, countL4ProxyHosts } from "@/src/lib/models/l4-proxy-hosts";
 import { requireAdmin } from "@/src/lib/auth";
+import type { Metadata } from "next";
 
 const PER_PAGE = 25;
 
 interface PageProps {
   searchParams: Promise<{ page?: string; search?: string; sortBy?: string; sortDir?: string }>;
 }
+
+export const metadata: Metadata = {
+  title: "L4 Proxy Hosts",
+};
 
 export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   await requireAdmin();

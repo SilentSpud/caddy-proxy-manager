@@ -2,12 +2,17 @@ import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
 import { peekLinkingToken, verifyLinkingToken } from "@/src/lib/services/account-linking";
 import LinkAccountClient from "./LinkAccountClient";
+import type { Metadata } from "next";
 
 interface LinkAccountPageProps {
   searchParams: {
     error?: string;
   };
 }
+
+export const metadata: Metadata = {
+  title: "Link Account",
+};
 
 export default async function LinkAccountPage({ searchParams }: LinkAccountPageProps) {
   const session = await auth();

@@ -12,6 +12,7 @@ import { ArrowLeftRight, ShieldCheck, KeyRound } from "lucide-react";
 import { ReactNode } from "react";
 import { getAnalyticsSummary } from "@/src/lib/analytics-db";
 import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
+import type { Metadata } from "next";
 
 type StatCard = {
   label: string;
@@ -74,6 +75,10 @@ async function loadStats(): Promise<StatCard[]> {
     { label: "Access Lists", icon: <KeyRound className="h-4 w-4" />, count: accessListsCount, href: "/access-lists" }
   ];
 }
+
+export const metadata: Metadata = {
+  title: "Overview",
+};
 
 export default async function OverviewPage() {
   const session = await requireUser();

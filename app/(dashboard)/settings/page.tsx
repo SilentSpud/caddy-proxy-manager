@@ -6,6 +6,11 @@ import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Settings",
+};
 
 export default async function SettingsPage() {
   await requireAdmin();

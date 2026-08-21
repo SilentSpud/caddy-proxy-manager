@@ -2,6 +2,11 @@ import UsersClient from "./UsersClient";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Users",
+};
 
 export default async function UsersPage() {
   await requireAdmin();

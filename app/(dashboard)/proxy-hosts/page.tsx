@@ -10,12 +10,17 @@ import { listUsers } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { requireAdmin } from "@/src/lib/auth";
+import type { Metadata } from "next";
 
 const PER_PAGE = 25;
 
 interface PageProps {
   searchParams: Promise<{ page?: string; search?: string; sortBy?: string; sortDir?: string }>;
 }
+
+export const metadata: Metadata = {
+  title: "Proxy Hosts",
+};
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
   await requireAdmin();

@@ -3,6 +3,11 @@ import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { config } from "@/src/lib/config";
 import LoginClient from "./LoginClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Sign In",
+};
 
 export default async function LoginPage() {
   const session = await auth();

@@ -5,6 +5,7 @@ import { listWafEvents, countWafEvents, getWafEventStats, getWafRuleMessages } f
 import { getWafSettings } from "@/src/lib/settings";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { requireAdmin } from "@/src/lib/auth";
+import type { Metadata } from "next";
 
 const PER_PAGE = 50;
 const RANGE_SECONDS = {
@@ -37,6 +38,10 @@ function parseRange(searchParams: { range?: string; from?: string; to?: string }
 interface PageProps {
   searchParams: Promise<{ page?: string; search?: string; range?: string; from?: string; to?: string }>;
 }
+
+export const metadata: Metadata = {
+  title: "WAF",
+};
 
 export default async function WafPage({ searchParams }: PageProps) {
   await requireAdmin();

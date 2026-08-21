@@ -2,12 +2,17 @@ import AuditLogClient from "./AuditLogClient";
 import { listAuditEvents, countAuditEvents } from "@/src/lib/models/audit";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
+import type { Metadata } from "next";
 
 const PER_PAGE = 50;
 
 interface PageProps {
   searchParams: Promise<{ page?: string; search?: string }>;
 }
+
+export const metadata: Metadata = {
+  title: "Audit Log",
+};
 
 export default async function AuditLogPage({ searchParams }: PageProps) {
   await requireAdmin();

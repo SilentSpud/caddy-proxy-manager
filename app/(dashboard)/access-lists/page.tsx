@@ -1,6 +1,11 @@
 import AccessListsClient from "./AccessListsClient";
 import { listAccessLists, getAccessListUsageMap } from "@/src/lib/models/access-lists";
 import { requireAdmin } from "@/src/lib/auth";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Access Lists",
+};
 
 export default async function AccessListsPage() {
   await requireAdmin();

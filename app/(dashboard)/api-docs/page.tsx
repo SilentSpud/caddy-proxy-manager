@@ -1,7 +1,8 @@
 import { requireAdmin } from "@/src/lib/auth";
 import ApiDocsClient from "./ApiDocsClient";
+import type { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "API Docs",
 };
 

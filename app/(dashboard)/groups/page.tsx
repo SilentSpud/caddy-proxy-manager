@@ -2,6 +2,11 @@ import GroupsClient from "./GroupsClient";
 import { listGroups } from "@/src/lib/models/groups";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Groups",
+};
 
 export default async function GroupsPage() {
   await requireAdmin();

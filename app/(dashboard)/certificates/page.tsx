@@ -9,6 +9,7 @@ import { listIssuedClientCertificates, type IssuedClientCertificate } from '@/sr
 import { listMtlsRoles, type MtlsRole } from '@/src/lib/models/mtls-roles';
 import { isDomainCoveredByCert } from '@/src/lib/cert-domain-match';
 import { countHealthyAcmeHosts } from './certificate-summary';
+import type { Metadata } from "next";
 
 export type { CaCertificate };
 export type { IssuedClientCertificate };
@@ -80,6 +81,10 @@ function getExpiryStatus(validToIso: string): CertExpiryStatus {
   return 'ok';
 }
 
+
+export const metadata: Metadata = {
+  title: "Certificates",
+};
 
 export default async function CertificatesPage({ searchParams }: PageProps) {
   await requireAdmin();
