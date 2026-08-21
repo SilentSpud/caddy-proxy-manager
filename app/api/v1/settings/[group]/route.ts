@@ -13,10 +13,12 @@ import {
   getGeoBlockSettings, saveGeoBlockSettings,
   getWafSettings, saveWafSettings,
   getErrorPagesSettings, saveErrorPagesSettings,
+  getDefaultResponseSettings, saveDefaultResponseSettings,
   getTrustedProxiesSettings, saveTrustedProxiesSettings,
 } from "@/src/lib/settings";
 import { getInstanceMode, setInstanceMode, getSlaveMasterToken, setSlaveMasterToken } from "@/src/lib/instance-sync";
 import { applyCaddyConfig } from "@/src/lib/caddy";
+import { DefaultResponseValidationError } from "@/src/lib/caddy-default-response";
 
 type SettingsHandler = {
   get: () => Promise<unknown>;
@@ -37,6 +39,11 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
   geoblock: { get: getGeoBlockSettings, save: saveGeoBlockSettings as (data: never) => Promise<void>, applyCaddy: true },
   waf: { get: getWafSettings, save: saveWafSettings as (data: never) => Promise<void>, applyCaddy: true },
   "error-pages": { get: getErrorPagesSettings, save: saveErrorPagesSettings as (data: never) => Promise<void>, applyCaddy: true },
+  "default-response": {
+    get: async () => (await getDefaultResponseSettings()) ?? { mode: "caddy" },
+    save: saveDefaultResponseSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
   "trusted-proxies": { get: getTrustedProxiesSettings, save: saveTrustedProxiesSettings as (data: never) => Promise<void>, applyCaddy: true },
 };
 
@@ -108,7 +115,17 @@ export async function PUT(
       return NextResponse.json({ error: "Unknown settings group" }, { status: 404 });
     }
 
-    await handler.save(body as never);
+    try {
+      await handler.save(body as never);
+    } catch (error) {
+      if (error instanceof DefaultResponseValidationError) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 400 }
+        );
+      }
+      throw error;
+    }
 
     if (handler.applyCaddy) {
       try {

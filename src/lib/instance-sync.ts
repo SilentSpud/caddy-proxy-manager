@@ -21,6 +21,8 @@ export type SyncSettings = {
   geoblock: unknown | null;
   error_pages: unknown | null;
   trusted_proxies: unknown | null;
+  /** Optional for backward compatibility with payloads from older masters. */
+  default_response?: unknown | null;
 };
 
 export type SyncPayload = {
@@ -264,6 +266,7 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
     geoblock: await getSetting("geoblock"),
     error_pages: await getSetting("error_pages"),
     trusted_proxies: await getSetting("trusted_proxies"),
+    default_response: await getSetting("default_response"),
   };
 
   const sanitizedAccessLists = accessListRows.map((row) => ({
@@ -441,6 +444,7 @@ export async function applySyncPayload(payload: SyncPayload) {
   await setSyncedSetting("geoblock", payload.settings.geoblock ?? null);
   await setSyncedSetting("error_pages", payload.settings.error_pages ?? null);
   await setSyncedSetting("trusted_proxies", payload.settings.trusted_proxies ?? null);
+  await setSyncedSetting("default_response", payload.settings.default_response ?? null);
 
   // better-sqlite3 is synchronous, so transaction callback must be synchronous
   db.transaction((tx) => {

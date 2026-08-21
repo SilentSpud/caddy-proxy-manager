@@ -4,7 +4,7 @@ import { useState, useActionState, useEffect, type ReactNode } from "react";
 import {
   Cloud, Globe, Network, Pin, Activity,
   ScrollText, Settings2, UserCheck, MapPin, KeyRound,
-  Search, ChevronRight, FileWarning, ShieldCheck, Waypoints,
+  Search, ChevronRight, FileWarning, ShieldCheck, Waypoints, Server,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,7 @@ import type {
   GeoBlockSettings,
   ErrorPagesSettings,
   TrustedProxiesSettings,
+  DefaultResponseSettings,
 } from "@/lib/settings";
 import type { DnsProviderDefinition } from "@/src/lib/dns-providers";
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
@@ -61,6 +62,7 @@ import {
   updateGeoBlockSettingsAction,
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
+  updateDefaultResponseSettingsAction,
 } from "./actions";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +89,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
       { id: "sync", name: "Instance Sync", desc: "Standalone, master, or slave coordination", icon: <Network className="h-4 w-4" /> },
       { id: "general", name: "General", desc: "Primary domain and ACME contact email", icon: <Settings2 className="h-4 w-4" /> },
       { id: "acme", name: "ACME Server", desc: "Custom ACME directory URL for internal CAs", icon: <ShieldCheck className="h-4 w-4" /> },
+      { id: "default-response", name: "Default Response", desc: "Handle requests for unknown hosts and direct IP access", icon: <Server className="h-4 w-4" /> },
     ],
   },
   {
@@ -388,6 +391,7 @@ type Props = {
   dns: DnsSettings | null;
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   trustedProxies: TrustedProxiesSettings | null;
+  defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProvider[];
@@ -406,6 +410,7 @@ type Props = {
       dns: boolean;
       upstreamDnsResolution: boolean;
       trustedProxies: boolean;
+      defaultResponse: boolean;
     };
     slave: {
       hasToken: boolean;
@@ -442,6 +447,7 @@ export default function SettingsClient({
   dns,
   upstreamDnsResolution,
   trustedProxies,
+  defaultResponse,
   globalGeoBlock,
   globalErrorPages,
   oauthProviders,
@@ -483,6 +489,7 @@ export default function SettingsClient({
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
   const [errorPagesState, errorPagesFormAction] = useActionState(updateErrorPagesSettingsAction, null);
   const [trustedProxiesState, trustedProxiesFormAction] = useActionState(updateTrustedProxiesSettingsAction, null);
+  const [defaultResponseState, defaultResponseFormAction] = useActionState(updateDefaultResponseSettingsAction, null);
 
   const isSlave = instanceSync.mode === "slave";
   const isMaster = instanceSync.mode === "master";
@@ -497,6 +504,7 @@ export default function SettingsClient({
     instanceSync.overrides.upstreamDnsResolution
   );
   const [trustedProxiesOverride, setTrustedProxiesOverride] = useState(instanceSync.overrides.trustedProxies);
+  const [defaultResponseOverride, setDefaultResponseOverride] = useState(instanceSync.overrides.defaultResponse);
 
   return (
     <div className="flex min-h-[calc(100vh-3rem)] md:min-h-screen">
@@ -554,6 +562,16 @@ export default function SettingsClient({
                   isSlave={isSlave}
                   acmeOverride={acmeOverride}
                   setAcmeOverride={setAcmeOverride}
+                />
+              )}
+              {active === "default-response" && (
+                <DefaultResponseSection
+                  defaultResponse={defaultResponse}
+                  defaultResponseState={defaultResponseState}
+                  defaultResponseFormAction={defaultResponseFormAction}
+                  isSlave={isSlave}
+                  defaultResponseOverride={defaultResponseOverride}
+                  setDefaultResponseOverride={setDefaultResponseOverride}
                 />
               )}
               {active === "dns-providers" && (
@@ -933,6 +951,171 @@ function GeneralSection({
         </div>
       </form>
     </FormCard>
+  );
+}
+
+// ─── Section: Default Response ──────────────────────────────────────────────
+
+function DefaultResponseSection({
+  defaultResponse,
+  defaultResponseState,
+  defaultResponseFormAction,
+  isSlave,
+  defaultResponseOverride,
+  setDefaultResponseOverride,
+}: {
+  defaultResponse: DefaultResponseSettings | null;
+  defaultResponseState: { success: boolean; message?: string } | null;
+  defaultResponseFormAction: (payload: FormData) => void;
+  isSlave: boolean;
+  defaultResponseOverride: boolean;
+  setDefaultResponseOverride: (v: boolean) => void;
+}) {
+  const [mode, setMode] = useState(defaultResponse?.mode ?? "caddy");
+  const disabled = isSlave && !defaultResponseOverride;
+  const initialHeaders = Object.entries(defaultResponse?.headers ?? {})
+    .map(([name, value]) => `${name}: ${value}`)
+    .join("\n");
+
+  return (
+    <>
+      <FormCard title="Unknown Host Handling">
+        <form action={defaultResponseFormAction} className="flex flex-col gap-3">
+          {defaultResponseState?.message && (
+            <StatusAlert message={defaultResponseState.message} success={defaultResponseState.success} />
+          )}
+          {isSlave && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="default-response-override"
+                name="overrideEnabled"
+                checked={defaultResponseOverride}
+                onCheckedChange={(value) => setDefaultResponseOverride(!!value)}
+              />
+              <Label htmlFor="default-response-override">Override master settings</Label>
+            </div>
+          )}
+
+          <FormRow label="Behavior" hint="Applied only when no configured proxy host matches the request.">
+            <Select
+              name="mode"
+              value={mode}
+              onValueChange={(value) => setMode(value as DefaultResponseSettings["mode"])}
+              disabled={disabled}
+            >
+              <SelectTrigger className="w-full sm:w-72" aria-label="Default response behavior">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="caddy">Caddy native behavior</SelectItem>
+                <SelectItem value="respond">Custom HTTP response</SelectItem>
+                <SelectItem value="redirect">Redirect</SelectItem>
+                <SelectItem value="abort">No response (abort connection)</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormRow>
+
+          {mode === "respond" && (
+            <>
+              <FormRow label="Status code" hint="Any final HTTP status from 200 through 599.">
+                <Input
+                  key="default-response-status"
+                  name="status"
+                  type="number"
+                  min={200}
+                  max={599}
+                  defaultValue={defaultResponse?.mode === "respond" ? defaultResponse.status ?? 404 : 404}
+                  required
+                  disabled={disabled}
+                  className="h-8 w-28 font-mono"
+                />
+              </FormRow>
+              <FormRow label="Response body" hint="Plain text, JSON, or custom HTML. Empty is allowed.">
+                <Textarea
+                  name="body"
+                  defaultValue={defaultResponse?.mode === "respond" ? defaultResponse.body ?? "" : ""}
+                  rows={8}
+                  disabled={disabled}
+                  placeholder="Not Found"
+                  className="font-mono text-sm"
+                />
+              </FormRow>
+            </>
+          )}
+
+          {mode === "redirect" && (
+            <>
+              <FormRow label="Redirect status" hint="307 and 308 preserve the original request method.">
+                <Select
+                  name="status"
+                  defaultValue={String(defaultResponse?.mode === "redirect" ? defaultResponse.status ?? 302 : 302)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="w-44" aria-label="Default redirect status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="301">301 Permanent</SelectItem>
+                    <SelectItem value="302">302 Temporary</SelectItem>
+                    <SelectItem value="303">303 See Other</SelectItem>
+                    <SelectItem value="307">307 Temporary</SelectItem>
+                    <SelectItem value="308">308 Permanent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormRow>
+              <FormRow label="Redirect URL" hint="Absolute, relative, and Caddy placeholder-based targets are supported.">
+                <Input
+                  name="redirectUrl"
+                  defaultValue={defaultResponse?.mode === "redirect" ? defaultResponse.redirectUrl ?? "" : ""}
+                  required
+                  disabled={disabled}
+                  placeholder="https://example.com{http.request.uri}"
+                  className="h-8 font-mono text-sm"
+                />
+              </FormRow>
+            </>
+          )}
+
+          {(mode === "respond" || mode === "redirect") && (
+            <FormRow
+              label="Response headers"
+              hint="Optional Name: value pairs, one per line. For custom HTML, set Content-Type: text/html; charset=utf-8."
+            >
+              <Textarea
+                key={`default-response-headers-${mode}`}
+                name="headers"
+                defaultValue={
+                  defaultResponse?.mode === mode
+                    ? initialHeaders
+                    : mode === "respond"
+                      ? "Content-Type: text/plain; charset=utf-8"
+                      : ""
+                }
+                rows={4}
+                disabled={disabled}
+                placeholder={"Content-Type: text/html; charset=utf-8\nCache-Control: no-store"}
+                className="font-mono text-sm"
+              />
+            </FormRow>
+          )}
+
+          {mode === "abort" && (
+            <WarnAlert>
+              Caddy will close unmatched HTTP connections without writing a status line or body. This is the native
+              equivalent of a “444 / no response” policy.
+            </WarnAlert>
+          )}
+
+          <div className="flex justify-end">
+            <Button type="submit" size="sm">Save default response</Button>
+          </div>
+        </form>
+      </FormCard>
+      <InfoAlert>
+        Configured hosts always run before this catch-all. For HTTPS, the response can only be sent after a TLS
+        certificate successfully completes the handshake; an unknown hostname or direct IP may fail earlier.
+      </InfoAlert>
+    </>
   );
 }
 

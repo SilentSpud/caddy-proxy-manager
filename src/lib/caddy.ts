@@ -36,6 +36,7 @@ import {
   getGeoBlockSettings,
   getWafSettings,
   getErrorPagesSettings,
+  getDefaultResponseSettings,
   getTrustedProxiesSettings,
   setSetting,
   type AcmeSettings,
@@ -46,6 +47,7 @@ import {
   type WafSettings,
   type TrustedProxiesSettings
 } from "./settings";
+import { buildDefaultResponseRoute } from "./caddy-default-response";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { syncInstances } from "./instance-sync";
 import {
@@ -2518,14 +2520,15 @@ export async function buildCaddyDocument() {
   ]);
 
   const { usage: certificateUsage, autoManagedDomains } = collectCertificateUsage(proxyHostRows, certificateMap);
-  const [generalSettings, acmeSettings, dnsSettings, upstreamDnsResolutionSettings, globalGeoBlock, globalWaf, trustedProxiesSettings] = await Promise.all([
+  const [generalSettings, acmeSettings, dnsSettings, upstreamDnsResolutionSettings, globalGeoBlock, globalWaf, trustedProxiesSettings, defaultResponseSettings] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsSettings(),
     getUpstreamDnsResolutionSettings(),
     getGeoBlockSettings(),
     getWafSettings(),
-    getTrustedProxiesSettings()
+    getTrustedProxiesSettings(),
+    getDefaultResponseSettings()
   ]);
 
   // Optionally seed the global geoblock trusted-proxy list from the server-level
@@ -2572,6 +2575,12 @@ export async function buildCaddyDocument() {
     }
   );
 
+  // An administrator-configured matcher-less route replaces Caddy's native
+  // unmatched-request behavior and must remain last so it cannot shadow any
+  // managed proxy host.
+  const defaultResponseRoute = buildDefaultResponseRoute(defaultResponseSettings);
+  const mainRoutes = defaultResponseRoute ? [...httpRoutes, defaultResponseRoute] : httpRoutes;
+
   // Server-level error routes (Caddy handle_errors): per-host rules first so they
   // take precedence, then global rules act as a fallback for any unmatched host/status.
   const globalErrorPages = await getErrorPagesSettings();
@@ -2598,10 +2607,10 @@ export async function buildCaddyDocument() {
   const serverTrustedProxies = buildServerTrustedProxies(trustedProxiesSettings);
 
   // Main HTTP/HTTPS server for proxy hosts
-  if (httpRoutes.length > 0) {
+  if (mainRoutes.length > 0) {
     servers.cpm = {
       listen: hasTls ? [":80", ":443"] : [":80"],
-      routes: httpRoutes,
+      routes: mainRoutes,
       // Only disable automatic HTTPS if we have TLS automation policies
       // This allows Caddy to handle HTTP-01 challenges for managed certificates
       ...(tlsApp ? {} : { automatic_https: { disable: true } }),

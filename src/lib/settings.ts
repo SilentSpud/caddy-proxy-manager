@@ -2,6 +2,12 @@ import db, { nowIso } from "./db";
 import { settings } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { sanitizeErrorPageRules, type ErrorPageRule } from "./models/proxy-hosts";
+import {
+  normalizeDefaultResponseSettings,
+  type DefaultResponseSettings,
+} from "./caddy-default-response";
+
+export type { DefaultResponseSettings } from "./caddy-default-response";
 
 export type SettingValue<T> = T | null;
 
@@ -316,4 +322,22 @@ export async function getErrorPagesSettings(): Promise<ErrorPagesSettings | null
 
 export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<void> {
   await setSetting("error_pages", { rules: sanitizeErrorPageRules(s?.rules) });
+}
+
+// Response for requests that do not match any configured proxy host. A missing
+// setting (or mode "caddy") preserves Caddy's native routing/HTTPS behavior.
+export async function getDefaultResponseSettings(): Promise<DefaultResponseSettings | null> {
+  const value = await getEffectiveSetting<unknown>("default_response");
+  if (value === null) return null;
+
+  try {
+    return normalizeDefaultResponseSettings(value);
+  } catch (error) {
+    console.warn("Ignoring invalid default response settings", error);
+    return null;
+  }
+}
+
+export async function saveDefaultResponseSettings(value: DefaultResponseSettings): Promise<void> {
+  await setSetting("default_response", normalizeDefaultResponseSettings(value));
 }

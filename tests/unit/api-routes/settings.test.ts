@@ -27,6 +27,8 @@ vi.mock('@/src/lib/settings', () => ({
   saveErrorPagesSettings: vi.fn(),
   getTrustedProxiesSettings: vi.fn(),
   saveTrustedProxiesSettings: vi.fn(),
+  getDefaultResponseSettings: vi.fn(),
+  saveDefaultResponseSettings: vi.fn(),
 }));
 
 vi.mock('@/src/lib/instance-sync', () => ({
@@ -72,10 +74,12 @@ import {
   getGeoBlockSettings, saveGeoBlockSettings,
   getWafSettings, saveWafSettings,
   getTrustedProxiesSettings, saveTrustedProxiesSettings,
+  getDefaultResponseSettings, saveDefaultResponseSettings,
 } from '@/src/lib/settings';
 import { getInstanceMode, setInstanceMode, getSlaveMasterToken, setSlaveMasterToken } from '@/src/lib/instance-sync';
 import { applyCaddyConfig } from '@/src/lib/caddy';
 import { requireApiAdmin } from '@/src/lib/api-auth';
+import { DefaultResponseValidationError } from '@/src/lib/caddy-default-response';
 
 const mockGetGeneral = vi.mocked(getGeneralSettings);
 const mockSaveGeneral = vi.mocked(saveGeneralSettings);
@@ -99,6 +103,8 @@ const mockGetWaf = vi.mocked(getWafSettings);
 const mockSaveWaf = vi.mocked(saveWafSettings);
 const mockGetTrustedProxies = vi.mocked(getTrustedProxiesSettings);
 const mockSaveTrustedProxies = vi.mocked(saveTrustedProxiesSettings);
+const mockGetDefaultResponse = vi.mocked(getDefaultResponseSettings);
+const mockSaveDefaultResponse = vi.mocked(saveDefaultResponseSettings);
 const mockGetInstanceMode = vi.mocked(getInstanceMode);
 const mockSetInstanceMode = vi.mocked(setInstanceMode);
 const mockGetSlaveMasterToken = vi.mocked(getSlaveMasterToken);
@@ -140,6 +146,26 @@ describe('GET /api/v1/settings/[group]', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({});
+  });
+
+  it('returns default response settings', async () => {
+    const settings = { mode: 'respond', status: 404, body: 'Not Found' } as const;
+    mockGetDefaultResponse.mockResolvedValue(settings);
+
+    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'default-response' }) });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(settings);
+    expect(mockGetDefaultResponse).toHaveBeenCalled();
+  });
+
+  it('returns explicit Caddy mode when default response settings are unset', async () => {
+    mockGetDefaultResponse.mockResolvedValue(null);
+
+    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'default-response' }) });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ mode: 'caddy' });
   });
 
   it('returns instance mode', async () => {
@@ -201,6 +227,52 @@ describe('PUT /api/v1/settings/[group]', () => {
     expect(data).toEqual({ ok: true });
     expect(mockSaveGeneral).toHaveBeenCalledWith(body);
     expect(mockApplyCaddyConfig).toHaveBeenCalled();
+  });
+
+  it('saves default response settings and applies the Caddy config', async () => {
+    const body = {
+      mode: 'respond',
+      status: 418,
+      body: 'CPM_DEFAULT_RESPONSE',
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    };
+    mockSaveDefaultResponse.mockResolvedValue(undefined);
+
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'default-response' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(mockSaveDefaultResponse).toHaveBeenCalledWith(body);
+    expect(mockApplyCaddyConfig).toHaveBeenCalled();
+  });
+
+  it('returns 400 when default response validation fails', async () => {
+    mockSaveDefaultResponse.mockRejectedValueOnce(
+      new DefaultResponseValidationError('Default response status must be an integer from 200 to 599')
+    );
+
+    const response = await PUT(createMockRequest({ method: 'PUT', body: { mode: 'respond', status: 103 } }), {
+      params: Promise.resolve({ group: 'default-response' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Default response status must be an integer from 200 to 599',
+    });
+    expect(mockApplyCaddyConfig).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 when storing default response settings fails', async () => {
+    mockSaveDefaultResponse.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const response = await PUT(createMockRequest({ method: 'PUT', body: { mode: 'abort' } }), {
+      params: Promise.resolve({ group: 'default-response' }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(mockApplyCaddyConfig).not.toHaveBeenCalled();
   });
 
   it('sets instance mode', async () => {

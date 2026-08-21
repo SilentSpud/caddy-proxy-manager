@@ -5,7 +5,7 @@ import { requireAdmin } from "@/src/lib/auth";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { getInstanceMode, getSlaveMasterToken, setInstanceMode, setSlaveMasterToken, syncInstances } from "@/src/lib/instance-sync";
 import { createInstance, deleteInstance, updateInstance } from "@/src/lib/models/instances";
-import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings } from "@/src/lib/settings";
+import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings, saveDefaultResponseSettings, type DefaultResponseSettings } from "@/src/lib/settings";
 import { listProxyHosts, updateProxyHost, sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import type { CloudflareSettings, DnsProviderSettings, GeoBlockSettings, WafSettings } from "@/src/lib/settings";
@@ -854,6 +854,86 @@ export async function updateErrorPagesSettingsAction(_prevState: ActionResult | 
   } catch (error) {
     console.error("Failed to save error pages settings:", error);
     return { success: false, message: error instanceof Error ? error.message : "Failed to save error pages settings" };
+  }
+}
+
+function parseDefaultResponseHeaders(value: FormDataEntryValue | null): Record<string, string> | undefined {
+  if (typeof value !== "string" || value.trim().length === 0) return undefined;
+
+  const headers: Record<string, string> = {};
+  for (const rawLine of value.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const separator = line.indexOf(":");
+    if (separator <= 0) {
+      throw new Error(`Invalid response header line: ${rawLine}`);
+    }
+    headers[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+  }
+  return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
+export async function updateDefaultResponseSettingsAction(
+  _prevState: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const mode = await getInstanceMode();
+    const overrideEnabled = formData.get("overrideEnabled") === "on";
+    if (mode === "slave" && !overrideEnabled) {
+      await clearSetting("default_response");
+      try {
+        await applyCaddyConfig();
+        revalidatePath("/settings");
+        return { success: true, message: "Default response reset to master settings" };
+      } catch (error) {
+        console.error("Failed to apply Caddy config:", error);
+        revalidatePath("/settings");
+        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        await syncInstances();
+        return { success: true, message: `Settings reset, but could not apply to Caddy: ${errorMsg}` };
+      }
+    }
+
+    const responseMode = String(formData.get("mode") ?? "caddy");
+    let next: DefaultResponseSettings;
+    if (responseMode === "caddy" || responseMode === "abort") {
+      next = { mode: responseMode };
+    } else if (responseMode === "respond") {
+      next = {
+        mode: "respond",
+        status: Number(formData.get("status") ?? 404),
+        body: String(formData.get("body") ?? ""),
+        headers: parseDefaultResponseHeaders(formData.get("headers")),
+      };
+    } else if (responseMode === "redirect") {
+      next = {
+        mode: "redirect",
+        status: Number(formData.get("status") ?? 302),
+        redirectUrl: String(formData.get("redirectUrl") ?? ""),
+        headers: parseDefaultResponseHeaders(formData.get("headers")),
+      };
+    } else {
+      return { success: false, message: "Invalid default response mode" };
+    }
+
+    await saveDefaultResponseSettings(next);
+
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: "Default response saved and applied successfully" };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      await syncInstances();
+      return { success: true, message: `Settings saved, but could not apply to Caddy: ${errorMsg}` };
+    }
+  } catch (error) {
+    console.error("Failed to save default response settings:", error);
+    return { success: false, message: error instanceof Error ? error.message : "Failed to save default response settings" };
   }
 }
 

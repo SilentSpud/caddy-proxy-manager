@@ -171,6 +171,7 @@ describe('buildSyncPayload', () => {
     expect(payload.settings.waf).toBeNull();
     expect(payload.settings.geoblock).toBeNull();
     expect(payload.settings.trusted_proxies).toBeNull();
+    expect(payload.settings.default_response).toBeNull();
   });
 
   it('includes stored trusted proxies settings in the sync payload', async () => {
@@ -191,6 +192,16 @@ describe('buildSyncPayload', () => {
     });
     const payload = await buildSyncPayload();
     expect(payload.settings.acme).toEqual({ caUrl: 'https://ca.internal.example.com/acme/acme/directory' });
+  });
+
+  it('includes stored default response settings in the sync payload', async () => {
+    await ctx.db.insert(schema.settings).values({
+      key: 'default_response',
+      value: JSON.stringify({ mode: 'respond', status: 404, body: 'Not Found' }),
+      updatedAt: nowIso(),
+    });
+    const payload = await buildSyncPayload();
+    expect(payload.settings.default_response).toEqual({ mode: 'respond', status: 404, body: 'Not Found' });
   });
 
   it('includes generated_at as an ISO date string', async () => {
@@ -299,6 +310,7 @@ describe('applySyncPayload', () => {
         geoblock: null,
         error_pages: null,
         trusted_proxies: null,
+        default_response: null,
       },
       data: {
         certificates: [],
@@ -463,6 +475,19 @@ describe('applySyncPayload', () => {
     });
     expect(row).toBeDefined();
     expect(JSON.parse(row!.value)).toEqual({ ranges: ['private_ranges'], default_geoblock: true });
+  });
+
+  it('stores synced default response settings with synced: prefix', async () => {
+    const payload = emptyPayload();
+    payload.settings.default_response = { mode: 'abort' };
+
+    await applySyncPayload(payload);
+
+    const row = await ctx.db.query.settings.findFirst({
+      where: (t, { eq }) => eq(t.key, 'synced:default_response'),
+    });
+    expect(row).toBeDefined();
+    expect(JSON.parse(row!.value)).toEqual({ mode: 'abort' });
   });
 
   it('stores null settings as JSON null value', async () => {
