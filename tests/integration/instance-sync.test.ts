@@ -171,6 +171,7 @@ describe('buildSyncPayload', () => {
     expect(payload.settings.waf).toBeNull();
     expect(payload.settings.geoblock).toBeNull();
     expect(payload.settings.trusted_proxies).toBeNull();
+    expect(payload.settings.avatars).toBeNull();
   });
 
   it('includes stored trusted proxies settings in the sync payload', async () => {
@@ -181,6 +182,16 @@ describe('buildSyncPayload', () => {
     });
     const payload = await buildSyncPayload();
     expect(payload.settings.trusted_proxies).toEqual({ ranges: ['172.21.0.1/32'], strict: true });
+  });
+
+  it('includes stored avatar settings in the sync payload', async () => {
+    await ctx.db.insert(schema.settings).values({
+      key: 'avatars',
+      value: JSON.stringify({ gravatarEnabled: false }),
+      updatedAt: nowIso(),
+    });
+    const payload = await buildSyncPayload();
+    expect(payload.settings.avatars).toEqual({ gravatarEnabled: false });
   });
 
   it('includes stored ACME settings in the sync payload', async () => {
@@ -298,6 +309,7 @@ describe('applySyncPayload', () => {
         waf: null,
         geoblock: null,
         error_pages: null,
+        avatars: null,
         trusted_proxies: null,
       },
       data: {

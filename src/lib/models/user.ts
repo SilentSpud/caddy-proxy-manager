@@ -130,7 +130,10 @@ export async function updateUserProfile(userId: number, data: { email?: string; 
     .set({
       email: data.email ?? current.email,
       name: data.name ?? current.name,
-      avatarUrl: data.avatarUrl ?? current.avatarUrl,
+      // Distinguish "not supplied" from "cleared": an explicit null removes the
+      // icon so the user falls back to their Gravatar or initial. Collapsing
+      // both with `??` made "remove profile picture" a silent no-op.
+      avatarUrl: data.avatarUrl === undefined ? current.avatarUrl : data.avatarUrl,
       updatedAt: now
     })
     .where(eq(users.id, userId))

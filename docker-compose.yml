@@ -40,6 +40,13 @@ services:
       # suffix on every page title ("Users · <APP_NAME>").
       APP_NAME: ${APP_NAME:-}
 
+      # User icons fall back to Gravatar when a user has no icon of their own and
+      # has a routable email address. Their browser contacts gravatar.com directly.
+      # Set false to disable and pin it, locking the Settings toggle; leave unset
+      # to let Settings → User Avatars decide. That toggle is synced from master
+      # to slaves, so pin it here on any instance that must not reach the network.
+      AVATAR_GRAVATAR:
+
       # REQUIRED unless AUTH_DISABLE_LOCAL_USERS=true: admin credentials for login
       # SECURITY: You MUST set these to secure values in production!
       # Password must be 12+ chars with uppercase, lowercase, numbers, and special chars

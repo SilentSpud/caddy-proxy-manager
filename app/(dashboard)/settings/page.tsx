@@ -1,5 +1,5 @@
 import SettingsClient from "./SettingsClient";
-import { getGeneralSettings, getAcmeSettings, getAuthentikSettings, getMetricsSettings, getLoggingSettings, getDnsSettings, getDnsProviderSettings, getSetting, getUpstreamDnsResolutionSettings, getGeoBlockSettings, getErrorPagesSettings, getTrustedProxiesSettings } from "@/src/lib/settings";
+import { getGeneralSettings, getAcmeSettings, getAuthentikSettings, getMetricsSettings, getLoggingSettings, getDnsSettings, getDnsProviderSettings, getSetting, getUpstreamDnsResolutionSettings, getGeoBlockSettings, getErrorPagesSettings, getTrustedProxiesSettings, getAvatarSettings } from "@/src/lib/settings";
 import { getInstanceMode, getSlaveLastSync, getSlaveMasterToken, isInstanceModeFromEnv, isSyncTokenFromEnv, getEnvSlaveInstances } from "@/src/lib/instance-sync";
 import { listInstances } from "@/src/lib/models/instances";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
@@ -19,7 +19,7 @@ export default async function SettingsPage() {
   const modeFromEnv = isInstanceModeFromEnv();
   const tokenFromEnv = isSyncTokenFromEnv();
 
-  const [general, acme, dnsProvider, authentik, metrics, logging, dns, upstreamDnsResolution, instanceMode, globalGeoBlock, globalErrorPages, trustedProxies, oauthProviders] = await Promise.all([
+  const [general, acme, dnsProvider, authentik, metrics, logging, dns, upstreamDnsResolution, instanceMode, globalGeoBlock, globalErrorPages, trustedProxies, oauthProviders, avatarSettings] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsProviderSettings(),
@@ -33,9 +33,10 @@ export default async function SettingsPage() {
     getErrorPagesSettings(),
     getTrustedProxiesSettings(),
     listOAuthProviders(),
+    getAvatarSettings(),
   ]);
 
-  const [overrideGeneral, overrideAcme, overrideDnsProvider, overrideAuthentik, overrideMetrics, overrideLogging, overrideDns, overrideUpstreamDnsResolution, overrideTrustedProxies] =
+  const [overrideGeneral, overrideAcme, overrideDnsProvider, overrideAuthentik, overrideMetrics, overrideLogging, overrideDns, overrideUpstreamDnsResolution, overrideTrustedProxies, overrideAvatars] =
     instanceMode === "slave"
       ? await Promise.all([
           getSetting("general"),
@@ -46,9 +47,10 @@ export default async function SettingsPage() {
           getSetting("logging"),
           getSetting("dns"),
           getSetting("upstream_dns_resolution"),
-          getSetting("trusted_proxies")
+          getSetting("trusted_proxies"),
+          getSetting("avatars")
         ])
-      : [null, null, null, null, null, null, null, null, null];
+      : [null, null, null, null, null, null, null, null, null, null];
 
   const [slaveToken, slaveLastSync] = instanceMode === "slave"
     ? await Promise.all([getSlaveMasterToken(), getSlaveLastSync()])
@@ -73,6 +75,11 @@ export default async function SettingsPage() {
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
       localUsersDisabled={config.auth.disableLocalUsers}
+      avatars={{
+        // The stored toggle only applies when AVATAR_GRAVATAR leaves the choice open.
+        gravatarEnabled: config.avatars.gravatarFromEnv ?? avatarSettings?.gravatarEnabled ?? true,
+        fromEnv: config.avatars.gravatarFromEnv !== null,
+      }}
       baseUrl={config.baseUrl}
       instanceSync={{
         mode: instanceMode,
@@ -87,7 +94,8 @@ export default async function SettingsPage() {
           logging: overrideLogging !== null,
           dns: overrideDns !== null,
           upstreamDnsResolution: overrideUpstreamDnsResolution !== null,
-          trustedProxies: overrideTrustedProxies !== null
+          trustedProxies: overrideTrustedProxies !== null,
+          avatars: overrideAvatars !== null
         },
         slave: instanceMode === "slave" ? {
           hasToken: Boolean(slaveToken),

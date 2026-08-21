@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/src/components/UserAvatar";
+import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -77,9 +78,11 @@ interface ProfileClientProps {
   sessions: ActiveSession[];
   /** False in OIDC-only mode: local passwords do not exist. */
   localPasswordsEnabled?: boolean;
+  /** Icon sources resolved on the server, including the Gravatar fallback. */
+  avatar: ResolvedAvatar;
 }
 
-export default function ProfileClient({ user, enabledProviders, apiTokens, sessions, localPasswordsEnabled = true }: ProfileClientProps) {
+export default function ProfileClient({ user, enabledProviders, apiTokens, sessions, localPasswordsEnabled = true, avatar }: ProfileClientProps) {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -365,12 +368,14 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
             <div className="flex flex-col gap-2">
               <p className="text-sm text-muted-foreground">Profile Picture</p>
               <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={avatarUrl || undefined} alt={user.name || user.email} />
-                  <AvatarFallback className="text-2xl">
-                    {(!avatarUrl && user.name) ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  // avatarUrl is local state so an upload or removal shows
+                  // immediately; the Gravatar and initial come from the server.
+                  avatar={{ ...avatar, imageUrl: avatarUrl }}
+                  alt={user.name || user.email}
+                  className="h-20 w-20"
+                  fallbackClassName="text-2xl"
+                />
                 <div className="flex gap-2">
                   <Button variant="outline" asChild disabled={loading}>
                     <label className="cursor-pointer">

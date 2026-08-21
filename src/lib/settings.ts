@@ -16,6 +16,11 @@ export type GeneralSettings = {
   acmeEmail?: string;
 };
 
+export type AvatarSettings = {
+  /** Fall back to Gravatar for users who have no icon of their own. */
+  gravatarEnabled: boolean;
+};
+
 export type AcmeSettings = {
   /** Custom ACME directory URL (e.g. an internal CA). Empty = Let's Encrypt default. */
   caUrl?: string;
@@ -201,6 +206,28 @@ export async function getGeneralSettings(): Promise<GeneralSettings | null> {
 
 export async function saveGeneralSettings(settings: GeneralSettings): Promise<void> {
   await setSetting("general", settings);
+}
+
+export async function getAvatarSettings(): Promise<AvatarSettings | null> {
+  // Effective, so a slave inherits its master's choice unless it has stored a
+  // local override of its own.
+  return await getEffectiveSetting<AvatarSettings>("avatars");
+}
+
+export async function saveAvatarSettings(settings: AvatarSettings): Promise<void> {
+  await setSetting("avatars", settings);
+}
+
+/**
+ * Whether user icons may fall back to Gravatar. AVATAR_GRAVATAR wins when set,
+ * so an operator can guarantee the behaviour regardless of what an admin does
+ * in the UI; otherwise the stored toggle decides, defaulting to enabled.
+ */
+export async function isGravatarEnabled(): Promise<boolean> {
+  const { config } = await import("./config");
+  if (config.avatars.gravatarFromEnv !== null) return config.avatars.gravatarFromEnv;
+  const stored = await getAvatarSettings();
+  return stored?.gravatarEnabled ?? true;
 }
 
 export async function getAcmeSettings(): Promise<AcmeSettings | null> {

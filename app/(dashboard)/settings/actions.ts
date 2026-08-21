@@ -5,11 +5,12 @@ import { requireAdmin } from "@/src/lib/auth";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { getInstanceMode, getSlaveMasterToken, setInstanceMode, setSlaveMasterToken, syncInstances } from "@/src/lib/instance-sync";
 import { createInstance, deleteInstance, updateInstance } from "@/src/lib/models/instances";
-import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings } from "@/src/lib/settings";
+import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings, saveAvatarSettings } from "@/src/lib/settings";
 import { listProxyHosts, updateProxyHost, sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import type { CloudflareSettings, DnsProviderSettings, GeoBlockSettings, WafSettings } from "@/src/lib/settings";
 import { getProviderDefinition, encryptProviderCredentials } from "@/src/lib/dns-providers";
+import { config } from "@/src/lib/config";
 
 type ActionResult = {
   success: boolean;
@@ -318,6 +319,48 @@ export async function updateAuthentikSettingsAction(_prevState: ActionResult | n
   } catch (error) {
     console.error("Failed to save Authentik settings:", error);
     return { success: false, message: error instanceof Error ? error.message : "Failed to save Authentik settings" };
+  }
+}
+
+export async function updateAvatarSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    // AVATAR_GRAVATAR pins the behaviour; refuse rather than silently storing a
+    // preference the environment overrides.
+    if (config.avatars.gravatarFromEnv !== null) {
+      return {
+        success: false,
+        message: "Gravatar is controlled by the AVATAR_GRAVATAR environment variable and cannot be changed here.",
+      };
+    }
+
+    const mode = await getInstanceMode();
+    const overrideEnabled = formData.get("overrideEnabled") === "on";
+    if (mode === "slave" && !overrideEnabled) {
+      await clearSetting("avatars");
+      revalidatePath("/settings");
+      revalidatePath("/users");
+      revalidatePath("/profile");
+      return { success: true, message: "Avatar settings reset to master defaults" };
+    }
+
+    const gravatarEnabled = formData.get("gravatarEnabled") === "on";
+    await saveAvatarSettings({ gravatarEnabled });
+    await syncInstances();
+
+    revalidatePath("/settings");
+    revalidatePath("/users");
+    revalidatePath("/profile");
+    return {
+      success: true,
+      message: gravatarEnabled
+        ? "Gravatar fallback enabled"
+        : "Gravatar fallback disabled — users without an icon show their initial",
+    };
+  } catch (error) {
+    console.error("Failed to save avatar settings:", error);
+    return { success: false, message: error instanceof Error ? error.message : "Failed to save avatar settings" };
   }
 }
 

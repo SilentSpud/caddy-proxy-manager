@@ -4,7 +4,7 @@ import { useState, useActionState, useEffect, type ReactNode } from "react";
 import {
   Cloud, Globe, Network, Pin, Activity,
   ScrollText, Settings2, UserCheck, MapPin, KeyRound,
-  Search, ChevronRight, FileWarning, ShieldCheck, Waypoints,
+  Search, ChevronRight, FileWarning, ShieldCheck, Waypoints, UserCircle,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,7 @@ import {
   updateAcmeSettingsAction,
   updateAuthentikSettingsAction,
   updateMetricsSettingsAction,
+  updateAvatarSettingsAction,
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
   updateUpstreamDnsResolutionSettingsAction,
@@ -87,6 +88,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
       { id: "sync", name: "Instance Sync", desc: "Standalone, master, or slave coordination", icon: <Network className="h-4 w-4" /> },
       { id: "general", name: "General", desc: "Primary domain and ACME contact email", icon: <Settings2 className="h-4 w-4" /> },
       { id: "acme", name: "ACME Server", desc: "Custom ACME directory URL for internal CAs", icon: <ShieldCheck className="h-4 w-4" /> },
+      { id: "avatars", name: "User Avatars", desc: "Gravatar fallback for users without an icon", icon: <UserCircle className="h-4 w-4" /> },
     ],
   },
   {
@@ -392,6 +394,7 @@ type Props = {
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProvider[];
   localUsersDisabled: boolean;
+  avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   baseUrl: string;
   instanceSync: {
     mode: "standalone" | "master" | "slave";
@@ -407,6 +410,7 @@ type Props = {
       dns: boolean;
       upstreamDnsResolution: boolean;
       trustedProxies: boolean;
+      avatars: boolean;
     };
     slave: {
       hasToken: boolean;
@@ -447,6 +451,7 @@ export default function SettingsClient({
   globalErrorPages,
   oauthProviders,
   localUsersDisabled,
+  avatars,
   baseUrl,
   instanceSync,
 }: Props) {
@@ -473,6 +478,7 @@ export default function SettingsClient({
   const configuredProviders = dnsProvider?.providers ? Object.keys(dnsProvider.providers) : [];
   const [authentikState, authentikFormAction] = useActionState(updateAuthentikSettingsAction, null);
   const [metricsState, metricsFormAction] = useActionState(updateMetricsSettingsAction, null);
+  const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
   const [loggingState, loggingFormAction] = useActionState(updateLoggingSettingsAction, null);
   const [dnsState, dnsFormAction] = useActionState(updateDnsSettingsAction, null);
   const [upstreamDnsResolutionState, upstreamDnsResolutionFormAction] = useActionState(
@@ -493,6 +499,7 @@ export default function SettingsClient({
   const [dnsProviderOverride, setDnsProviderOverride] = useState(instanceSync.overrides.dnsProvider);
   const [authentikOverride, setAuthentikOverride] = useState(instanceSync.overrides.authentik);
   const [metricsOverride, setMetricsOverride] = useState(instanceSync.overrides.metrics);
+  const [avatarsOverride, setAvatarsOverride] = useState(instanceSync.overrides.avatars);
   const [loggingOverride, setLoggingOverride] = useState(instanceSync.overrides.logging);
   const [dnsOverride, setDnsOverride] = useState(instanceSync.overrides.dns);
   const [upstreamDnsResolutionOverride, setUpstreamDnsResolutionOverride] = useState(
@@ -631,6 +638,16 @@ export default function SettingsClient({
                   oauthProviders={oauthProviders}
                   localUsersDisabled={localUsersDisabled}
                   baseUrl={baseUrl}
+                />
+              )}
+              {active === "avatars" && (
+                <AvatarsSection
+                  avatars={avatars}
+                  avatarsState={avatarsState}
+                  avatarsFormAction={avatarsFormAction}
+                  isSlave={isSlave}
+                  avatarsOverride={avatarsOverride}
+                  setAvatarsOverride={setAvatarsOverride}
                 />
               )}
               {active === "metrics" && (
@@ -1602,6 +1619,70 @@ function OAuthSection({
 }
 
 // ─── Section: Metrics & Monitoring ───────────────────────────────────────────
+
+// ─── Section: User Avatars ───────────────────────────────────────────────────
+
+function AvatarsSection({
+  avatars,
+  avatarsState,
+  avatarsFormAction,
+  isSlave,
+  avatarsOverride,
+  setAvatarsOverride,
+}: {
+  avatars: { gravatarEnabled: boolean; fromEnv: boolean };
+  avatarsState: { success: boolean; message?: string } | null;
+  avatarsFormAction: (payload: FormData) => void;
+  isSlave: boolean;
+  avatarsOverride: boolean;
+  setAvatarsOverride: (v: boolean) => void;
+}) {
+  return (
+    <FormCard title="Fallback icon">
+      <form action={avatarsFormAction} className="flex flex-col gap-3">
+        {avatars.fromEnv && (
+          <InfoAlert>
+            Gravatar is configured via the AVATAR_GRAVATAR environment variable and cannot be
+            changed here.
+          </InfoAlert>
+        )}
+        {avatarsState?.message && (
+          <StatusAlert message={avatarsState.message} success={avatarsState.success} />
+        )}
+        {isSlave && !avatars.fromEnv && (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="avatars-override"
+              name="overrideEnabled"
+              checked={avatarsOverride}
+              onCheckedChange={(v) => setAvatarsOverride(!!v)}
+            />
+            <Label htmlFor="avatars-override">Override master settings</Label>
+          </div>
+        )}
+        <FormRow
+          label="Gravatar fallback"
+          hint="For users with no icon of their own, look one up from gravatar.com by their email address. Their browser contacts gravatar.com directly, which discloses their IP and a hash of their address to a third party. Accounts with a local-only address are never looked up, and anyone without a Gravatar falls back to their initial."
+        >
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="avatars-gravatar"
+              name="gravatarEnabled"
+              defaultChecked={avatars.gravatarEnabled}
+              disabled={avatars.fromEnv || (isSlave && !avatarsOverride)}
+            />
+            <Label htmlFor="avatars-gravatar">Use Gravatar when a user has no icon</Label>
+          </div>
+        </FormRow>
+        <div className="flex justify-end">
+          <Button type="submit" size="sm" disabled={avatars.fromEnv}>
+            Save avatar settings
+          </Button>
+        </div>
+      </form>
+    </FormCard>
+  );
+}
 
 function MetricsSection({
   metrics,

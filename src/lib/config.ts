@@ -18,6 +18,20 @@ const DEFAULT_APP_NAME = "Caddy Proxy Manager";
 const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
 
 /**
+ * Gravatar fallback for users with no icon of their own.
+ *
+ * `null` means the operator has not expressed a preference, leaving the choice
+ * to the Settings toggle. Setting AVATAR_GRAVATAR pins it and locks the toggle,
+ * which is how an air-gapped or privacy-sensitive deployment guarantees no
+ * browser ever reaches out to gravatar.com.
+ */
+function resolveGravatarEnv(): boolean | null {
+  const raw = process.env.AVATAR_GRAVATAR?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return null;
+  return raw !== "false" && raw !== "0" && raw !== "no";
+}
+
+/**
  * OIDC-only mode: CPM creates and authenticates no local accounts at all.
  * The bootstrap admin is neither created nor required, credential sign-in is
  * turned off, and every identity comes from an OAuth/OIDC provider.
@@ -184,6 +198,10 @@ export const config = {
   caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
   appName: APP_NAME,
+  avatars: {
+    /** true/false when AVATAR_GRAVATAR pins it, null when the setting decides. */
+    gravatarFromEnv: resolveGravatarEnv(),
+  },
   get adminUsername() {
     return getAdminCredentials().username;
   },

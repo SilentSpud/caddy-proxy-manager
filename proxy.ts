@@ -27,7 +27,11 @@ function buildCsp(nonce: string): string {
     // style-src still needs 'unsafe-inline' for React JSX inline style props
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob:",
+    // gravatar.com is listed so user icons can fall back to Gravatar. It is
+    // named explicitly rather than opening img-src to all of https: — a
+    // provider's `picture` claim is also a remote URL and stays blocked, in
+    // which case the avatar steps down to the Gravatar or the initial.
+    "img-src 'self' data: blob: https://www.gravatar.com https://secure.gravatar.com",
     // 'self' is needed by maplibre-gl v6, which loads its tile worker from a
     // bundled /_next/static asset instead of the blob: URL it used in v5.
     "worker-src 'self' blob:",

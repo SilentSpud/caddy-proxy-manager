@@ -21,6 +21,7 @@ export type SyncSettings = {
   geoblock: unknown | null;
   error_pages: unknown | null;
   trusted_proxies: unknown | null;
+  avatars: unknown | null;
 };
 
 export type SyncPayload = {
@@ -264,6 +265,7 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
     geoblock: await getSetting("geoblock"),
     error_pages: await getSetting("error_pages"),
     trusted_proxies: await getSetting("trusted_proxies"),
+    avatars: await getSetting("avatars"),
   };
 
   const sanitizedAccessLists = accessListRows.map((row) => ({
@@ -441,6 +443,9 @@ export async function applySyncPayload(payload: SyncPayload) {
   await setSyncedSetting("geoblock", payload.settings.geoblock ?? null);
   await setSyncedSetting("error_pages", payload.settings.error_pages ?? null);
   await setSyncedSetting("trusted_proxies", payload.settings.trusted_proxies ?? null);
+  // ?? null so a master running an older build, whose payload omits the key,
+  // clears the synced value instead of leaving a stale one behind.
+  await setSyncedSetting("avatars", payload.settings.avatars ?? null);
 
   // better-sqlite3 is synchronous, so transaction callback must be synchronous
   db.transaction((tx) => {

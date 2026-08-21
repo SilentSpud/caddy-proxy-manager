@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/src/components/UserAvatar";
+import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -54,9 +55,10 @@ function ThemeToggle() {
   );
 }
 
-function NavContent({ pathname, user, appName, onNavigate }: {
+function NavContent({ pathname, user, avatar, appName, onNavigate }: {
   pathname: string;
   user: User;
+  avatar: ResolvedAvatar;
   appName: string;
   onNavigate?: () => void;
 }) {
@@ -112,12 +114,12 @@ function NavContent({ pathname, user, appName, onNavigate }: {
             className="flex-1 justify-start gap-3 px-2 h-auto py-2 min-w-0"
             onClick={() => { router.push("/profile"); onNavigate?.(); }}
           >
-            <Avatar className="h-8 w-8 shrink-0">
-              <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
-              <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                {(user.name?.[0] ?? "U").toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              avatar={avatar}
+              alt={user.name ?? "User"}
+              className="h-8 w-8 shrink-0"
+              fallbackClassName="text-xs"
+            />
             <div className="flex flex-col items-start overflow-hidden min-w-0">
               <span className="text-sm font-medium truncate w-full">{user.name ?? "Administrator"}</span>
               <span className="text-xs text-muted-foreground truncate w-full">{user.email}</span>
@@ -143,7 +145,7 @@ function NavContent({ pathname, user, appName, onNavigate }: {
   );
 }
 
-export default function DashboardLayoutClient({ user, appName, children }: { user: User; appName: string; children: ReactNode }) {
+export default function DashboardLayoutClient({ user, avatar, appName, children }: { user: User; avatar: ResolvedAvatar; appName: string; children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -152,7 +154,7 @@ export default function DashboardLayoutClient({ user, appName, children }: { use
     <div className="flex min-h-screen">
       {/* Desktop sidebar — fixed, hidden on mobile */}
       <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-border bg-card z-30">
-        <NavContent pathname={pathname} user={user} appName={appName} />
+        <NavContent pathname={pathname} user={user} avatar={avatar} appName={appName} />
       </aside>
 
       {/* Mobile top bar */}
@@ -164,12 +166,12 @@ export default function DashboardLayoutClient({ user, appName, children }: { use
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <Button variant="ghost" size="icon" aria-label="Go to profile" onClick={() => router.push("/profile")}>
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={user.image ?? undefined} />
-              <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
-                {(user.name?.[0] ?? "U").toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              avatar={avatar}
+              alt={user.name ?? "User"}
+              className="h-6 w-6"
+              fallbackClassName="text-[10px]"
+            />
           </Button>
         </div>
       </header>
@@ -177,7 +179,7 @@ export default function DashboardLayoutClient({ user, appName, children }: { use
       {/* Mobile Sheet drawer */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-64 sm:max-w-[256px] p-0">
-          <NavContent pathname={pathname} user={user} appName={appName} onNavigate={() => setMobileOpen(false)} />
+          <NavContent pathname={pathname} user={user} avatar={avatar} appName={appName} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
 

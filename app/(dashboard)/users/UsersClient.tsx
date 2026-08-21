@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/src/components/UserAvatar";
+import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import {
@@ -29,6 +31,7 @@ type UserEntry = {
   status: string;
   createdAt: string;
   updatedAt: string;
+  avatar: ResolvedAvatar;
 };
 
 type Props = {
@@ -190,9 +193,12 @@ function UserRow({
 
   return (
     <div className="flex items-center gap-3">
-      <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center text-sm font-medium shrink-0">
-        {(user.name ?? user.email)[0]?.toUpperCase()}
-      </div>
+      <UserAvatar
+        avatar={user.avatar}
+        alt={user.name ?? user.email}
+        className="h-9 w-9 shrink-0"
+        fallbackClassName="bg-muted text-foreground text-sm font-medium"
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">
