@@ -1,17 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-// Use the real caddy module (it is globally mocked in setup.vitest.ts).
-vi.unmock('@/src/lib/caddy');
-
-// Avoid touching the real DB: buildTlsAutomation calls getDnsProviderSettings()
-// unconditionally. Everything else is supplied via options.
-vi.mock('@/src/lib/settings', async (orig) => {
-  const actual = await orig<typeof import('@/src/lib/settings')>();
-  return { ...actual, getDnsProviderSettings: vi.fn().mockResolvedValue(null) };
-});
 
 import { buildTlsAutomation } from '@/src/lib/caddy';
 import type { AcmeSettings } from '@/src/lib/settings';

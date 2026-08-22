@@ -39,6 +39,7 @@ import {
   getTrustedProxiesSettings,
   setSetting,
   type AcmeSettings,
+  type DnsProviderSettings,
   type DnsSettings,
   type UpstreamDnsAddressFamily,
   type UpstreamDnsResolutionSettings,
@@ -683,6 +684,42 @@ export function buildBlockerHandler(config: GeoBlockSettings): Record<string, un
   return handler;
 }
 
+function buildGeoBlockMatcher(config: GeoBlockSettings): Record<string, unknown> {
+  const matcher: Record<string, unknown> = {
+    geoip_db: "/usr/share/GeoIP/GeoLite2-Country.mmdb",
+    asn_db: "/usr/share/GeoIP/GeoLite2-ASN.mmdb",
+  };
+
+  if (config.block_countries?.length) matcher.block_countries = config.block_countries;
+  if (config.block_continents?.length) matcher.block_continents = config.block_continents;
+  if (config.block_asns?.length) matcher.block_asns = config.block_asns;
+  if (config.block_cidrs?.length) matcher.block_cidrs = config.block_cidrs;
+  if (config.block_ips?.length) matcher.block_ips = config.block_ips;
+
+  if (config.allow_countries?.length) matcher.allow_countries = config.allow_countries;
+  if (config.allow_continents?.length) matcher.allow_continents = config.allow_continents;
+  if (config.allow_asns?.length) matcher.allow_asns = config.allow_asns;
+  if (config.allow_cidrs?.length) matcher.allow_cidrs = config.allow_cidrs;
+  if (config.allow_ips?.length) matcher.allow_ips = config.allow_ips;
+
+  return matcher;
+}
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function attachHostToRoute(route: CaddyHttpRoute, host: string | string[]): CaddyHttpRoute {
+  const routeMatches = (route.match as Array<Record<string, unknown>> | undefined) ?? [];
+  return {
+    ...route,
+    match: routeMatches.map((match) => ({
+      ...match,
+      host,
+    })),
+  };
+}
+
 /**
  * Normalize the configured trusted-proxy ranges: trim, drop blanks, and expand
  * the "private_ranges" shorthand into concrete CIDRs (matching how the geoblock
@@ -730,7 +767,10 @@ export function buildServerTrustedProxies(
   return out;
 }
 
-type BuildProxyRoutesOptions = {
+type CaddyBuildContext = {
+  rows: ProxyHostRow[];
+  accessAccounts: Map<number, AccessListEntryRow[]>;
+  tlsReadyCertificates: Set<number>;
   globalDnsSettings: DnsSettings | null;
   globalUpstreamDnsResolutionSettings: UpstreamDnsResolutionSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
@@ -816,12 +856,252 @@ export function buildErrorPageRoute(rule: ErrorPageRule, hosts?: string[]): Cadd
   return route;
 }
 
-async function buildProxyRoutes(
-  rows: ProxyHostRow[],
-  accessAccounts: Map<number, AccessListEntryRow[]>,
-  tlsReadyCertificates: Set<number>,
-  options: BuildProxyRoutesOptions
-): Promise<{ routes: CaddyHttpRoute[]; errorRoutes: CaddyHttpRoute[] }> {
+function appendLocationRoutes(options: {
+  hostRoutes: CaddyHttpRoute[];
+  domainGroup: string[];
+  locationRules: LocationRuleMeta[];
+  skipHttpsHostnameValidation: boolean;
+  preserveHostHeader: boolean;
+  handlers: Record<string, unknown>[];
+  extraHandlers?: Record<string, unknown>[];
+  expression?: string;
+}) {
+  const {
+    hostRoutes,
+    domainGroup,
+    locationRules,
+    skipHttpsHostnameValidation,
+    preserveHostHeader,
+    handlers,
+    extraHandlers = [],
+    expression,
+  } = options;
+
+  for (const rule of locationRules) {
+    const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
+      rule,
+      skipHttpsHostnameValidation,
+      preserveHostHeader
+    );
+    if (!safePath) continue;
+
+    const matcher: Record<string, unknown> = {
+      host: domainGroup,
+      path: [safePath],
+    };
+    if (expression) matcher.expression = expression;
+
+    hostRoutes.push({
+      match: [matcher],
+      handle: [...handlers, ...extraHandlers, locationProxy],
+      terminal: true,
+    });
+  }
+}
+
+type PathAuthMode =
+  | { type: "protected"; paths: string[] }
+  | { type: "excluded"; paths: string[] }
+  | { type: "full" };
+
+type MtlsPathMode =
+  | { type: "protected"; paths: string[] }
+  | { type: "excluded"; paths: string[] }
+  | { type: "full" };
+
+function resolvePathAuthMode(protectedPaths?: string[] | null, excludedPaths?: string[] | null): PathAuthMode {
+  if (protectedPaths && protectedPaths.length > 0) {
+    return { type: "protected", paths: protectedPaths };
+  }
+  if (excludedPaths && excludedPaths.length > 0) {
+    return { type: "excluded", paths: excludedPaths };
+  }
+  return { type: "full" };
+}
+
+function resolveMtlsPathMode(protectedPaths?: string[] | null, excludedPaths?: string[] | null): MtlsPathMode {
+  if (protectedPaths && protectedPaths.length > 0) {
+    return { type: "protected", paths: protectedPaths };
+  }
+  if (excludedPaths && excludedPaths.length > 0) {
+    return { type: "excluded", paths: excludedPaths };
+  }
+  return { type: "full" };
+}
+
+function appendForwardAuthPathModeRoutes(options: {
+  hostRoutes: CaddyHttpRoute[];
+  domainGroups: string[][];
+  authMode: PathAuthMode;
+  baseHandlers: Record<string, unknown>[];
+  authHandler: Record<string, unknown>;
+  reverseProxyHandler: Record<string, unknown>;
+  locationRules: LocationRuleMeta[];
+  skipHttpsHostnameValidation: boolean;
+  preserveHostHeader: boolean;
+  preDomainRoute?: CaddyHttpRoute | null;
+  protectedModePreRoutePlacement?: "before" | "after";
+}) {
+  const {
+    hostRoutes,
+    domainGroups,
+    authMode,
+    baseHandlers,
+    authHandler,
+    reverseProxyHandler,
+    locationRules,
+    skipHttpsHostnameValidation,
+    preserveHostHeader,
+    preDomainRoute,
+    protectedModePreRoutePlacement = "before",
+  } = options;
+
+  for (const domainGroup of domainGroups) {
+    const pushPreDomainRoute = () => {
+      if (preDomainRoute) {
+        hostRoutes.push(attachHostToRoute(preDomainRoute, domainGroup));
+      }
+    };
+
+    if (authMode.type === "protected") {
+      if (protectedModePreRoutePlacement === "before") pushPreDomainRoute();
+
+      for (const protectedPath of authMode.paths) {
+        hostRoutes.push({
+          match: [{ host: domainGroup, path: [protectedPath] }],
+          handle: [...baseHandlers, authHandler, cloneJson(reverseProxyHandler)],
+          terminal: true,
+        });
+      }
+
+      if (protectedModePreRoutePlacement === "after") pushPreDomainRoute();
+
+      // In whitelist mode, location rules and catch-all stay unprotected.
+      appendLocationRoutes({
+        hostRoutes,
+        domainGroup,
+        locationRules,
+        skipHttpsHostnameValidation,
+        preserveHostHeader,
+        handlers: baseHandlers,
+      });
+      hostRoutes.push({
+        match: [{ host: domainGroup }],
+        handle: [...baseHandlers, reverseProxyHandler],
+        terminal: true,
+      });
+      continue;
+    }
+
+    // Excluded and full-site modes share auth-protected location/catch-all.
+    pushPreDomainRoute();
+
+    if (authMode.type === "excluded") {
+      for (const excludedPath of authMode.paths) {
+        hostRoutes.push({
+          match: [{ host: domainGroup, path: [excludedPath] }],
+          handle: [...baseHandlers, cloneJson(reverseProxyHandler)],
+          terminal: true,
+        });
+      }
+    }
+
+    appendLocationRoutes({
+      hostRoutes,
+      domainGroup,
+      locationRules,
+      skipHttpsHostnameValidation,
+      preserveHostHeader,
+      handlers: baseHandlers,
+      extraHandlers: [authHandler],
+    });
+    hostRoutes.push({
+      match: [{ host: domainGroup }],
+      handle: [...baseHandlers, authHandler, reverseProxyHandler],
+      terminal: true,
+    });
+  }
+}
+
+function appendMtlsPathModeRoutes(options: {
+  hostRoutes: CaddyHttpRoute[];
+  domainGroups: string[][];
+  authMode: MtlsPathMode;
+  locationRules: LocationRuleMeta[];
+  handlers: Record<string, unknown>[];
+  reverseProxyHandler: Record<string, unknown>;
+  hostTrustedFingerprintExpression: string;
+  skipHttpsHostnameValidation: boolean;
+  preserveHostHeader: boolean;
+  buildProtectedPathRoute: (domainGroup: string[], path: string) => CaddyHttpRoute[];
+  buildExcludedPathRoute: (domainGroup: string[], path: string) => CaddyHttpRoute[];
+  buildProtectedCatchAll: (domainGroup: string[]) => CaddyHttpRoute[];
+}) {
+  const {
+    hostRoutes,
+    domainGroups,
+    authMode,
+    locationRules,
+    handlers,
+    reverseProxyHandler,
+    hostTrustedFingerprintExpression,
+    skipHttpsHostnameValidation,
+    preserveHostHeader,
+    buildProtectedPathRoute,
+    buildExcludedPathRoute,
+    buildProtectedCatchAll,
+  } = options;
+
+  for (const domainGroup of domainGroups) {
+    if (authMode.type === "protected") {
+      for (const protectedPath of authMode.paths) {
+        hostRoutes.push(...buildProtectedPathRoute(domainGroup, protectedPath));
+      }
+
+      appendLocationRoutes({
+        hostRoutes,
+        domainGroup,
+        locationRules,
+        skipHttpsHostnameValidation,
+        preserveHostHeader,
+        handlers,
+      });
+
+      hostRoutes.push(...buildProtectedCatchAll(domainGroup));
+      continue;
+    }
+
+    if (authMode.type === "excluded") {
+      for (const excludedPath of authMode.paths) {
+        hostRoutes.push(...buildExcludedPathRoute(domainGroup, excludedPath));
+      }
+    }
+
+    for (const rule of locationRules) {
+      const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
+        rule,
+        skipHttpsHostnameValidation,
+        preserveHostHeader
+      );
+      if (!safePath) continue;
+      hostRoutes.push({
+        match: [{ host: domainGroup, path: [safePath], expression: hostTrustedFingerprintExpression }],
+        handle: [...handlers, locationProxy],
+        terminal: true,
+      });
+      hostRoutes.push({
+        match: [{ host: domainGroup, path: [safePath] }],
+        handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
+        terminal: true,
+      });
+    }
+
+    hostRoutes.push(...buildProtectedCatchAll(domainGroup));
+  }
+}
+
+async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: CaddyHttpRoute[]; errorRoutes: CaddyHttpRoute[] }> {
+  const { rows, accessAccounts, tlsReadyCertificates } = context;
   const routes: CaddyHttpRoute[] = [];
   const errorRoutes: CaddyHttpRoute[] = [];
   const validClientCertExpression = buildValidClientCertCelExpression();
@@ -855,10 +1135,11 @@ async function buildProxyRoutes(
     const meta = parseJson<ProxyHostMeta>(row.meta, {});
     const authentik = parseAuthentikConfig(meta.authentik);
     const cpmForwardAuth = meta.cpm_forward_auth?.enabled ? meta.cpm_forward_auth : null;
+    const locationRules = meta.location_rules ?? [];
     const hostRoutes: CaddyHttpRoute[] = [];
 
     const effectiveGeoBlock = resolveEffectiveGeoBlock(
-      options.globalGeoBlock ?? null,
+      context.globalGeoBlock ?? null,
       { geoblock: meta.geoblock ?? null, geoblock_mode: meta.geoblock_mode ?? "merge" }
     );
     if (effectiveGeoBlock?.enabled) {
@@ -866,7 +1147,7 @@ async function buildProxyRoutes(
     }
 
     const effectiveWaf = resolveEffectiveWaf(
-      options.globalWaf ?? null,
+      context.globalWaf ?? null,
       meta.waf
     );
     if (effectiveWaf?.enabled && effectiveWaf.mode !== 'Off') {
@@ -1004,14 +1285,14 @@ async function buildProxyRoutes(
     const dnsConfig = parseDnsResolverConfig(meta.dns_resolver);
     const hostDnsResolutionConfig = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
     const effectiveDnsResolution = resolveEffectiveUpstreamDnsResolution(
-      options.globalUpstreamDnsResolutionSettings,
+      context.globalUpstreamDnsResolutionSettings,
       hostDnsResolutionConfig
     );
     const resolvedUpstreams = await resolveUpstreamDials(
       row,
       upstreams,
       dnsConfig,
-      options.globalDnsSettings,
+      context.globalDnsSettings,
       effectiveDnsResolution
     );
 
@@ -1237,150 +1518,21 @@ async function buildProxyRoutes(
         forwardAuthHandler.trusted_proxies = trustedProxies;
       }
 
-      // Path-based authentication support
-      if (authentik.protectedPaths && authentik.protectedPaths.length > 0) {
-        // Whitelist mode: only specified paths get auth
-        for (const domainGroup of domainGroups) {
-          // Create separate routes for each protected path
-          for (const protectedPath of authentik.protectedPaths) {
-            const protectedHandlers: Record<string, unknown>[] = [...handlers];
-            const protectedReverseProxy = JSON.parse(JSON.stringify(reverseProxyHandler));
+      const authMode = resolvePathAuthMode(authentik.protectedPaths, authentik.excludedPaths);
 
-            protectedHandlers.push(forwardAuthHandler);
-            protectedHandlers.push(protectedReverseProxy);
-
-            hostRoutes.push({
-              match: [
-                {
-                  host: domainGroup,
-                  path: [protectedPath]
-                }
-              ],
-              handle: protectedHandlers,
-              terminal: true
-            });
-          }
-
-          if (outpostRoute) {
-            const outpostMatches = (outpostRoute.match as Array<Record<string, unknown>> | undefined) ?? [];
-            hostRoutes.push({
-              ...outpostRoute,
-              match: outpostMatches.map((match) => ({
-                ...match,
-                host: domainGroup
-              }))
-            });
-          }
-
-          // Location rules are unprotected (no forwardAuthHandler), matching the catch-all
-          // behavior when protected_paths is configured — only explicitly protected paths get auth.
-          const locationRules = meta.location_rules ?? [];
-          for (const rule of locationRules) {
-            const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-              rule,
-              Boolean(row.skipHttpsHostnameValidation),
-              Boolean(row.preserveHostHeader)
-            );
-            if (!safePath) continue;
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [safePath] }],
-              handle: [...handlers, locationProxy],
-              terminal: true,
-            });
-          }
-
-          const unprotectedHandlers: Record<string, unknown>[] = [...handlers, reverseProxyHandler];
-
-          hostRoutes.push({
-            match: [{ host: domainGroup }],
-            handle: unprotectedHandlers,
-            terminal: true
-          });
-        }
-      } else if (authentik.excludedPaths && authentik.excludedPaths.length > 0) {
-        // Exclusion mode: protect everything EXCEPT specified paths
-        const locationRules = meta.location_rules ?? [];
-        for (const domainGroup of domainGroups) {
-          if (outpostRoute) {
-            const outpostMatches = (outpostRoute.match as Array<Record<string, unknown>> | undefined) ?? [];
-            hostRoutes.push({
-              ...outpostRoute,
-              match: outpostMatches.map((match) => ({
-                ...match,
-                host: domainGroup
-              }))
-            });
-          }
-
-          // Create unprotected routes for each excluded path (before the catch-all)
-          for (const excludedPath of authentik.excludedPaths) {
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [excludedPath] }],
-              handle: [...handlers, JSON.parse(JSON.stringify(reverseProxyHandler))],
-              terminal: true
-            });
-          }
-
-          // Location rules get auth (same as full-site mode)
-          for (const rule of locationRules) {
-            const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-              rule,
-              Boolean(row.skipHttpsHostnameValidation),
-              Boolean(row.preserveHostHeader)
-            );
-            if (!safePath) continue;
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [safePath] }],
-              handle: [...handlers, forwardAuthHandler, locationProxy],
-              terminal: true,
-            });
-          }
-
-          // Catch-all with auth (everything not excluded)
-          hostRoutes.push({
-            match: [{ host: domainGroup }],
-            handle: [...handlers, forwardAuthHandler, reverseProxyHandler],
-            terminal: true
-          });
-        }
-      } else {
-        // Full-site mode: protect everything
-        const locationRules = meta.location_rules ?? [];
-        for (const domainGroup of domainGroups) {
-          if (outpostRoute) {
-            const outpostMatches = (outpostRoute.match as Array<Record<string, unknown>> | undefined) ?? [];
-            hostRoutes.push({
-              ...outpostRoute,
-              match: outpostMatches.map((match) => ({
-                ...match,
-                host: domainGroup
-              }))
-            });
-          }
-
-          for (const rule of locationRules) {
-            const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-              rule,
-              Boolean(row.skipHttpsHostnameValidation),
-              Boolean(row.preserveHostHeader)
-            );
-            if (!safePath) continue;
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [safePath] }],
-              handle: [...handlers, forwardAuthHandler, locationProxy],
-              terminal: true,
-            });
-          }
-
-          const routeHandlers: Record<string, unknown>[] = [...handlers, forwardAuthHandler, reverseProxyHandler];
-          const route: CaddyHttpRoute = {
-            match: [{ host: domainGroup }],
-            handle: routeHandlers,
-            terminal: true
-          };
-          hostRoutes.push(route);
-        }
-      }
+      appendForwardAuthPathModeRoutes({
+        hostRoutes,
+        domainGroups,
+        authMode,
+        baseHandlers: handlers,
+        authHandler: forwardAuthHandler,
+        reverseProxyHandler,
+        locationRules,
+        skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
+        preserveHostHeader: Boolean(row.preserveHostHeader),
+        preDomainRoute: outpostRoute,
+        protectedModePreRoutePlacement: "after",
+      });
     } else if (cpmForwardAuth) {
       // ── CPM Forward Auth ────────────────────────────────────────────
       // Uses CPM itself as the auth provider (replaces Authentik)
@@ -1505,135 +1657,31 @@ async function buildProxyRoutes(
         };
 
         const locationRules = meta.location_rules ?? [];
+        const authMode = resolvePathAuthMode(cpmForwardAuth.protected_paths, cpmForwardAuth.excluded_paths);
 
-        if (cpmForwardAuth.protected_paths && cpmForwardAuth.protected_paths.length > 0) {
-          // Whitelist mode: only specified paths get auth
-          for (const domainGroup of domainGroups) {
-            // Add callback route (unprotected)
-            hostRoutes.push({
-              ...cpmCallbackRoute,
-              match: [{ host: domainGroup, path: ["/.cpm-auth/callback"] }]
-            });
-
-            // Protected paths
-            for (const protectedPath of cpmForwardAuth.protected_paths) {
-              const protectedHandlers: Record<string, unknown>[] = [...cpmHandlers];
-              const protectedReverseProxy = JSON.parse(JSON.stringify(reverseProxyHandler));
-              protectedHandlers.push(cpmForwardAuthHandler);
-              protectedHandlers.push(protectedReverseProxy);
-
-              hostRoutes.push({
-                match: [{ host: domainGroup, path: [protectedPath] }],
-                handle: protectedHandlers,
-                terminal: true
-              });
-            }
-
-            // Location rules (unprotected)
-            for (const rule of locationRules) {
-              const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-                rule,
-                Boolean(row.skipHttpsHostnameValidation),
-                Boolean(row.preserveHostHeader)
-              );
-              if (!safePath) continue;
-              hostRoutes.push({
-                match: [{ host: domainGroup, path: [safePath] }],
-                handle: [...cpmHandlers, locationProxy],
-                terminal: true
-              });
-            }
-
-            // Unprotected catch-all
-            hostRoutes.push({
-              match: [{ host: domainGroup }],
-              handle: [...cpmHandlers, reverseProxyHandler],
-              terminal: true
-            });
-          }
-        } else if (cpmForwardAuth.excluded_paths && cpmForwardAuth.excluded_paths.length > 0) {
-          // Exclusion mode: protect everything EXCEPT specified paths
-          for (const domainGroup of domainGroups) {
-            // Callback route first (unprotected)
-            hostRoutes.push({
-              ...cpmCallbackRoute,
-              match: [{ host: domainGroup, path: ["/.cpm-auth/callback"] }]
-            });
-
-            // Excluded paths — unprotected, before the catch-all
-            for (const excludedPath of cpmForwardAuth.excluded_paths) {
-              hostRoutes.push({
-                match: [{ host: domainGroup, path: [excludedPath] }],
-                handle: [...cpmHandlers, JSON.parse(JSON.stringify(reverseProxyHandler))],
-                terminal: true
-              });
-            }
-
-            // Location rules with forward auth
-            for (const rule of locationRules) {
-              const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-                rule,
-                Boolean(row.skipHttpsHostnameValidation),
-                Boolean(row.preserveHostHeader)
-              );
-              if (!safePath) continue;
-              hostRoutes.push({
-                match: [{ host: domainGroup, path: [safePath] }],
-                handle: [...cpmHandlers, cpmForwardAuthHandler, locationProxy],
-                terminal: true
-              });
-            }
-
-            // Catch-all with auth (everything not excluded)
-            hostRoutes.push({
-              match: [{ host: domainGroup }],
-              handle: [...cpmHandlers, cpmForwardAuthHandler, reverseProxyHandler],
-              terminal: true
-            });
-          }
-        } else {
-          // Full-site mode: protect everything
-          for (const domainGroup of domainGroups) {
-            // Callback route first (unprotected)
-            hostRoutes.push({
-              ...cpmCallbackRoute,
-              match: [{ host: domainGroup, path: ["/.cpm-auth/callback"] }]
-            });
-
-            // Location rules with forward auth
-            for (const rule of locationRules) {
-              const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-                rule,
-                Boolean(row.skipHttpsHostnameValidation),
-                Boolean(row.preserveHostHeader)
-              );
-              if (!safePath) continue;
-              hostRoutes.push({
-                match: [{ host: domainGroup, path: [safePath] }],
-                handle: [...cpmHandlers, cpmForwardAuthHandler, locationProxy],
-                terminal: true
-              });
-            }
-
-            // Main route with forward auth
-            hostRoutes.push({
-              match: [{ host: domainGroup }],
-              handle: [...cpmHandlers, cpmForwardAuthHandler, reverseProxyHandler],
-              terminal: true
-            });
-          }
-        }
+        appendForwardAuthPathModeRoutes({
+          hostRoutes,
+          domainGroups,
+          authMode,
+          baseHandlers: cpmHandlers,
+          authHandler: cpmForwardAuthHandler,
+          reverseProxyHandler,
+          locationRules,
+          skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
+          preserveHostHeader: Boolean(row.preserveHostHeader),
+          preDomainRoute: cpmCallbackRoute,
+          protectedModePreRoutePlacement: "before",
+        });
       }
     } else {
-      const locationRules = meta.location_rules ?? [];
       const mtls = meta.mtls?.enabled ? meta.mtls : null;
       const mtlsProtectedPaths = mtls?.protected_paths?.length ? mtls.protected_paths : null;
       const mtlsExcludedPaths = mtls?.excluded_paths?.length ? mtls.excluded_paths : null;
+      const mtlsPathMode = resolveMtlsPathMode(mtlsProtectedPaths, mtlsExcludedPaths);
 
-      // Check for mTLS RBAC access rules for this proxy host
-      const hostAccessRules = options.mtlsRbac?.accessRulesByHost.get(row.id);
+      const hostAccessRules = context.mtlsRbac?.accessRulesByHost.get(row.id);
       const hasMtlsRbac = hostAccessRules && hostAccessRules.length > 0
-        && options.mtlsRbac?.roleFingerprintMap && options.mtlsRbac?.certFingerprintMap;
+        && context.mtlsRbac?.roleFingerprintMap && context.mtlsRbac?.certFingerprintMap;
       const hostTrustedFingerprints = mtls
         ? resolveAllowedFingerprints(
             {
@@ -1642,183 +1690,96 @@ async function buildProxyRoutes(
               allowedCertIds: mtls.trusted_client_cert_ids ?? [],
               denyAll: false,
             },
-            options.mtlsRbac?.roleFingerprintMap ?? new Map(),
-            options.mtlsRbac?.certFingerprintMap ?? new Map()
+            context.mtlsRbac?.roleFingerprintMap ?? new Map(),
+            context.mtlsRbac?.certFingerprintMap ?? new Map()
           )
         : new Set<string>();
       const hostTrustedFingerprintExpression = hostTrustedFingerprints.size > 0
         ? buildFingerprintCelExpression(hostTrustedFingerprints)
         : validClientCertExpression;
 
-      for (const domainGroup of domainGroups) {
-        const pushProtectedCatchAllRoute = () => {
-          if (hasMtlsRbac) {
-            const rbacSubroutes = buildMtlsRbacSubroutes(
-              hostAccessRules,
-              options.mtlsRbac!.roleFingerprintMap,
-              options.mtlsRbac!.certFingerprintMap,
-              handlers,
-              reverseProxyHandler,
-              true,
-              hostTrustedFingerprints
-            );
-            if (rbacSubroutes) {
-              hostRoutes.push({
-                match: [{ host: domainGroup }],
-                handle: [{ handler: "subroute", routes: rbacSubroutes }],
-                terminal: true,
-              });
-              return;
-            }
-          }
-
-          hostRoutes.push({
-            match: [{ host: domainGroup, expression: hostTrustedFingerprintExpression }],
-            handle: [...handlers, reverseProxyHandler],
-            terminal: true,
-          });
-          hostRoutes.push({
-            match: [{ host: domainGroup }],
-            handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
-            terminal: true,
-          });
-        };
-
-        if (mtlsProtectedPaths) {
-          for (const protectedPath of mtlsProtectedPaths) {
-            if (hasMtlsRbac) {
-              const rbacSubroutes = buildMtlsRbacSubroutes(
-                hostAccessRules,
-                options.mtlsRbac!.roleFingerprintMap,
-                options.mtlsRbac!.certFingerprintMap,
-                handlers,
-                reverseProxyHandler,
-                true,
-                hostTrustedFingerprints
-              );
-              if (rbacSubroutes) {
-                hostRoutes.push({
-                  match: [{ host: domainGroup, path: [protectedPath] }],
-                  handle: [{ handler: "subroute", routes: rbacSubroutes }],
-                  terminal: true,
-                });
-                continue;
-              }
-            }
-
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [protectedPath], expression: hostTrustedFingerprintExpression }],
-              handle: [...handlers, JSON.parse(JSON.stringify(reverseProxyHandler))],
-              terminal: true,
-            });
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [protectedPath] }],
-              handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
-              terminal: true,
-            });
-          }
-
-          for (const rule of locationRules) {
-            const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-              rule,
-              Boolean(row.skipHttpsHostnameValidation),
-              Boolean(row.preserveHostHeader)
-            );
-            if (!safePath) continue;
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [safePath] }],
-              handle: [...handlers, locationProxy],
-              terminal: true,
-            });
-          }
-
-          hostRoutes.push({
-            match: [{ host: domainGroup }],
-            handle: [...handlers, reverseProxyHandler],
-            terminal: true,
-          });
-          continue;
-        }
-
-        if (mtlsExcludedPaths) {
-          for (const excludedPath of mtlsExcludedPaths) {
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [excludedPath] }],
-              handle: [...handlers, JSON.parse(JSON.stringify(reverseProxyHandler))],
-              terminal: true,
-            });
-          }
-
-          for (const rule of locationRules) {
-            const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-              rule,
-              Boolean(row.skipHttpsHostnameValidation),
-              Boolean(row.preserveHostHeader)
-            );
-            if (!safePath) continue;
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [safePath], expression: hostTrustedFingerprintExpression }],
-              handle: [...handlers, locationProxy],
-              terminal: true,
-            });
-            hostRoutes.push({
-              match: [{ host: domainGroup, path: [safePath] }],
-              handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
-              terminal: true,
-            });
-          }
-
-          pushProtectedCatchAllRoute();
-          continue;
-        }
-
-        for (const rule of locationRules) {
-          const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-            rule,
-            Boolean(row.skipHttpsHostnameValidation),
-            Boolean(row.preserveHostHeader)
-          );
-          if (!safePath) continue;
-          hostRoutes.push({
-            match: [{ host: domainGroup, path: [safePath] }],
-            handle: [...handlers, locationProxy],
-            terminal: true,
-          });
-        }
-
+      const buildProtectedPathRoute = (domainGroup: string[], path: string) => {
         if (hasMtlsRbac) {
           const rbacSubroutes = buildMtlsRbacSubroutes(
             hostAccessRules,
-            options.mtlsRbac!.roleFingerprintMap,
-            options.mtlsRbac!.certFingerprintMap,
+            context.mtlsRbac!.roleFingerprintMap,
+            context.mtlsRbac!.certFingerprintMap,
             handlers,
-            reverseProxyHandler
+            reverseProxyHandler,
+            true,
+            hostTrustedFingerprints
           );
           if (rbacSubroutes) {
-            hostRoutes.push({
-              match: [{ host: domainGroup }],
-              handle: [{
-                handler: "subroute",
-                routes: rbacSubroutes,
-              }],
+            return [{
+              match: [{ host: domainGroup, path: [path] }],
+              handle: [{ handler: "subroute", routes: rbacSubroutes }],
               terminal: true,
-            });
-          } else {
-            hostRoutes.push({
-              match: [{ host: domainGroup }],
-              handle: [...handlers, reverseProxyHandler],
-              terminal: true,
-            });
+            }];
           }
-        } else {
-          const route: CaddyHttpRoute = {
-            match: [{ host: domainGroup }],
-            handle: [...handlers, reverseProxyHandler],
-            terminal: true,
-          };
-          hostRoutes.push(route);
         }
-      }
+
+        return [{
+          match: [{ host: domainGroup, path: [path], expression: hostTrustedFingerprintExpression }],
+          handle: [...handlers, cloneJson(reverseProxyHandler)],
+          terminal: true,
+        }, {
+          match: [{ host: domainGroup, path: [path] }],
+          handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
+          terminal: true,
+        }];
+      };
+
+      const buildExcludedPathRoute = (domainGroup: string[], path: string) => [{
+        match: [{ host: domainGroup, path: [path] }],
+        handle: [...handlers, cloneJson(reverseProxyHandler)],
+        terminal: true,
+      }];
+
+      const buildProtectedCatchAll = (domainGroup: string[]) => {
+        if (hasMtlsRbac) {
+          const rbacSubroutes = buildMtlsRbacSubroutes(
+            hostAccessRules,
+            context.mtlsRbac!.roleFingerprintMap,
+            context.mtlsRbac!.certFingerprintMap,
+            handlers,
+            reverseProxyHandler,
+            true,
+            hostTrustedFingerprints
+          );
+          if (rbacSubroutes) {
+            return [{
+              match: [{ host: domainGroup }],
+              handle: [{ handler: "subroute", routes: rbacSubroutes }],
+              terminal: true,
+            }];
+          }
+        }
+
+        return [{
+          match: [{ host: domainGroup, expression: hostTrustedFingerprintExpression }],
+          handle: [...handlers, reverseProxyHandler],
+          terminal: true,
+        }, {
+          match: [{ host: domainGroup }],
+          handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
+          terminal: true,
+        }];
+      };
+
+      appendMtlsPathModeRoutes({
+        hostRoutes,
+        domainGroups,
+        authMode: mtlsPathMode,
+        locationRules,
+        handlers,
+        reverseProxyHandler,
+        hostTrustedFingerprintExpression,
+        skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
+        preserveHostHeader: Boolean(row.preserveHostHeader),
+        buildProtectedPathRoute,
+        buildExcludedPathRoute,
+        buildProtectedCatchAll,
+      });
     }
 
     routes.push(...hostRoutes);
@@ -1835,17 +1796,30 @@ async function buildProxyRoutes(
   return { routes: sortRoutesByHostPriority(routes), errorRoutes };
 }
 
-function buildTlsConnectionPolicies(
-  usage: Map<number, CertificateUsage>,
-  managedCertificatesWithAutomation: Set<number>,
-  autoManagedDomains: Set<string>,
-  mTlsDomainMap: Map<string, number[]>,
-  caCertMap: Map<number, { id: number; certificatePem: string }>,
-  issuedClientCertMap: Map<number, string[]>,
-  cAsWithAnyIssuedCerts: Set<number>,
-  mTlsDomainLeafOverride: Map<string, string[]>,
-  mTlsOptionalAuthDomains: Set<string>
-) {
+type TlsConnectionPolicyContext = {
+  usage: Map<number, CertificateUsage>;
+  managedCertificatesWithAutomation: Set<number>;
+  autoManagedDomains: Set<string>;
+  mTlsDomainMap: Map<string, number[]>;
+  caCertMap: Map<number, { id: number; certificatePem: string }>;
+  issuedClientCertMap: Map<number, string[]>;
+  cAsWithAnyIssuedCerts: Set<number>;
+  mTlsDomainLeafOverride: Map<string, string[]>;
+  mTlsOptionalAuthDomains: Set<string>;
+};
+
+function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
+  const {
+    usage,
+    managedCertificatesWithAutomation,
+    autoManagedDomains,
+    mTlsDomainMap,
+    caCertMap,
+    issuedClientCertMap,
+    cAsWithAnyIssuedCerts,
+    mTlsDomainLeafOverride,
+    mTlsOptionalAuthDomains,
+  } = context;
   const policies: Record<string, unknown>[] = [];
   const readyCertificates = new Set<number>();
   const importedCertPems: { certificate: string; key: string }[] = [];
@@ -1956,11 +1930,45 @@ function buildTlsConnectionPolicies(
   };
 }
 
+type TlsAutomationContext = {
+  usage: Map<number, CertificateUsage>;
+  autoManagedDomains: Set<string>;
+  options: {
+    acmeEmail?: string;
+    dnsSettings?: DnsSettings | null;
+    dnsProviderSettings?: DnsProviderSettings | null;
+    acmeSettings?: AcmeSettings | null;
+  };
+};
+
 export async function buildTlsAutomation(
-  usage: Map<number, CertificateUsage>,
-  autoManagedDomains: Set<string>,
-  options: { acmeEmail?: string; dnsSettings?: DnsSettings | null; acmeSettings?: AcmeSettings | null }
-) {
+  usageOrContext: Map<number, CertificateUsage> | TlsAutomationContext,
+  autoManagedDomainsOrOptions?: Set<string> | {
+    acmeEmail?: string;
+    dnsSettings?: DnsSettings | null;
+    dnsProviderSettings?: DnsProviderSettings | null;
+    acmeSettings?: AcmeSettings | null;
+  },
+  maybeOptions?: {
+    acmeEmail?: string;
+    dnsSettings?: DnsSettings | null;
+    dnsProviderSettings?: DnsProviderSettings | null;
+    acmeSettings?: AcmeSettings | null;
+  }
+): Promise<{ tlsApp?: { automation: { policies: Record<string, unknown>[] } }; managedCertificateIds: Set<number> }> {
+  const usage = usageOrContext instanceof Map ? usageOrContext : usageOrContext.usage;
+  const autoManagedDomains = usageOrContext instanceof Map ? (autoManagedDomainsOrOptions instanceof Set ? autoManagedDomainsOrOptions : new Set<string>()) : usageOrContext.autoManagedDomains;
+  const options = usageOrContext instanceof Map
+    ? (
+        autoManagedDomainsOrOptions && !(autoManagedDomainsOrOptions instanceof Set)
+          ? autoManagedDomainsOrOptions
+          : (maybeOptions ?? {})
+      )
+    : ({
+        ...(usageOrContext as TlsAutomationContext).options,
+        ...(maybeOptions ?? {}),
+      });
+
   const managedEntries = Array.from(usage.values()).filter(
     (entry) => entry.certificate.type === "managed" && Boolean(entry.certificate.autoRenew)
   );
@@ -1969,40 +1977,33 @@ export async function buildTlsAutomation(
 
   if (managedEntries.length === 0 && !hasAutoManagedDomains) {
     return {
-      managedCertificateIds: new Set<number>()
+      managedCertificateIds: new Set<number>(),
+      tlsApp: undefined,
     };
   }
 
-  const dnsProviderSettings = await getDnsProviderSettings();
+  const dnsProviderSettings = options.dnsProviderSettings;
   const globalDnsProvider: DnsProviderCredentials | null =
     dnsProviderSettings?.default && dnsProviderSettings.providers[dnsProviderSettings.default]
       ? { provider: dnsProviderSettings.default, credentials: dnsProviderSettings.providers[dnsProviderSettings.default] }
       : null;
 
-  const dnsSettings = options.dnsSettings ?? await getDnsSettings();
-  const hasDnsResolvers = dnsSettings && dnsSettings.enabled && dnsSettings.resolvers && dnsSettings.resolvers.length > 0;
-
-  // Build DNS resolvers list (primary + fallbacks)
+  const dnsSettings = options.dnsSettings;
   const dnsResolvers: string[] = [];
-  if (hasDnsResolvers) {
+  if (dnsSettings?.enabled && Array.isArray(dnsSettings.resolvers) && dnsSettings.resolvers.length > 0) {
     dnsResolvers.push(...dnsSettings.resolvers);
-    if (dnsSettings.fallbacks && dnsSettings.fallbacks.length > 0) {
-      dnsResolvers.push(...dnsSettings.fallbacks);
-    }
   }
 
-  const managedCertificateIds = new Set<number>();
   const policies: Record<string, unknown>[] = [];
-
-  // Custom ACME directory URL + trusted root for internal CAs (OpenBao, Step-CA, etc.)
-  const acmeSettings = options.acmeSettings ?? await getAcmeSettings();
-  const customAcmeUrl = acmeSettings?.caUrl?.trim() || null;
-  const acmeRootPath = syncAcmeCaRootFile(acmeSettings?.caRootPem);
+  const managedCertificateIds = new Set<number>();
 
   const applyAcmeOverrides = (issuer: Record<string, unknown>) => {
+    const customAcmeUrl = (options.acmeSettings?.caUrl ?? "").trim();
     if (customAcmeUrl) {
       issuer.ca = customAcmeUrl;
     }
+
+    const acmeRootPath = syncAcmeCaRootFile(options.acmeSettings?.caRootPem);
     if (acmeRootPath) {
       issuer.trusted_roots_pem_files = [acmeRootPath];
     }
@@ -2011,9 +2012,7 @@ export async function buildTlsAutomation(
   // Add policy for auto-managed domains (certificateId = null)
   if (hasAutoManagedDomains) {
     for (const subjects of groupHostPatternsByPriority(Array.from(autoManagedDomains))) {
-      const issuer: Record<string, unknown> = {
-        module: "acme"
-      };
+      const issuer: Record<string, unknown> = { module: "acme" };
       applyAcmeOverrides(issuer);
 
       if (options.acmeEmail) {
@@ -2047,7 +2046,6 @@ export async function buildTlsAutomation(
 
     managedCertificateIds.add(entry.certificate.id);
 
-    // Per-certificate provider override, falling back to global default
     let effectiveProvider = globalDnsProvider;
     const certOptions = entry.certificate.providerOptions as { provider?: string } | null;
     if (certOptions?.provider && dnsProviderSettings?.providers[certOptions.provider]) {
@@ -2058,9 +2056,7 @@ export async function buildTlsAutomation(
     }
 
     for (const subjectGroup of groupHostPatternsByPriority(subjects)) {
-      const issuer: Record<string, unknown> = {
-        module: "acme"
-      };
+      const issuer: Record<string, unknown> = { module: "acme" };
       applyAcmeOverrides(issuer);
 
       if (options.acmeEmail) {
@@ -2087,7 +2083,8 @@ export async function buildTlsAutomation(
 
   if (policies.length === 0) {
     return {
-      managedCertificateIds
+      managedCertificateIds,
+      tlsApp: undefined,
     };
   }
 
@@ -2097,23 +2094,19 @@ export async function buildTlsAutomation(
         policies: sortAutomationPoliciesBySubjectPriority(policies)
       }
     },
-    managedCertificateIds
+    managedCertificateIds,
   };
 }
 
-async function buildL4Servers(): Promise<Record<string, unknown> | null> {
+type L4BuildContext = Pick<CaddyBuildContext, "globalDnsSettings" | "globalUpstreamDnsResolutionSettings" | "globalGeoBlock">;
+
+async function buildL4Servers(context: L4BuildContext): Promise<Record<string, unknown> | null> {
   const l4Hosts = await db
     .select()
     .from(l4ProxyHosts)
     .where(eq(l4ProxyHosts.enabled, true));
 
   if (l4Hosts.length === 0) return null;
-
-  const [globalDnsSettings, globalUpstreamDnsResolutionSettings, globalGeoBlock] = await Promise.all([
-    getDnsSettings(),
-    getUpstreamDnsResolutionSettings(),
-    getGeoBlockSettings(),
-  ]);
 
   // Group hosts by listen address — multiple hosts on the same port share routes in one server
   const serverMap = new Map<string, typeof l4Hosts>();
@@ -2185,7 +2178,7 @@ async function buildL4Servers(): Promise<Record<string, unknown> | null> {
       // Upstream DNS resolution (pinning)
       const hostDnsResolution = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
       const effectiveDnsResolution = resolveEffectiveUpstreamDnsResolution(
-        globalUpstreamDnsResolutionSettings,
+        context.globalUpstreamDnsResolutionSettings,
         hostDnsResolution
       );
 
@@ -2209,11 +2202,11 @@ async function buildL4Servers(): Promise<Record<string, unknown> | null> {
       let resolvedDials = upstreams;
       if (effectiveDnsResolution.enabled) {
         const resolver = new Resolver();
-        const lookupServers = getLookupServers(dnsConfig, globalDnsSettings);
+        const lookupServers = getLookupServers(dnsConfig, context.globalDnsSettings);
         if (lookupServers.length > 0) {
           try { resolver.setServers(lookupServers); } catch { /* ignore invalid servers */ }
         }
-        const timeoutMs = getLookupTimeoutMs(dnsConfig, globalDnsSettings);
+        const timeoutMs = getLookupTimeoutMs(dnsConfig, context.globalDnsSettings);
 
         const pinned: string[] = [];
         for (const upstream of upstreams) {
@@ -2256,25 +2249,12 @@ async function buildL4Servers(): Promise<Record<string, unknown> | null> {
       // Geo blocking: add a blocking route BEFORE the proxy route.
       // At L4, the blocker is a matcher (layer4.matchers.blocker) — blocked connections
       // match this route and are closed. Non-blocked connections fall through to the proxy route.
-      const effectiveGeoBlock = resolveEffectiveGeoBlock(globalGeoBlock, {
+      const effectiveGeoBlock = resolveEffectiveGeoBlock(context.globalGeoBlock ?? null, {
         geoblock: meta.geoblock ?? null,
         geoblock_mode: meta.geoblock_mode ?? "merge",
       });
       if (effectiveGeoBlock) {
-        const blockerMatcher: Record<string, unknown> = {
-          geoip_db: "/usr/share/GeoIP/GeoLite2-Country.mmdb",
-          asn_db: "/usr/share/GeoIP/GeoLite2-ASN.mmdb",
-        };
-        if (effectiveGeoBlock.block_countries?.length) blockerMatcher.block_countries = effectiveGeoBlock.block_countries;
-        if (effectiveGeoBlock.block_continents?.length) blockerMatcher.block_continents = effectiveGeoBlock.block_continents;
-        if (effectiveGeoBlock.block_asns?.length) blockerMatcher.block_asns = effectiveGeoBlock.block_asns;
-        if (effectiveGeoBlock.block_cidrs?.length) blockerMatcher.block_cidrs = effectiveGeoBlock.block_cidrs;
-        if (effectiveGeoBlock.block_ips?.length) blockerMatcher.block_ips = effectiveGeoBlock.block_ips;
-        if (effectiveGeoBlock.allow_countries?.length) blockerMatcher.allow_countries = effectiveGeoBlock.allow_countries;
-        if (effectiveGeoBlock.allow_continents?.length) blockerMatcher.allow_continents = effectiveGeoBlock.allow_continents;
-        if (effectiveGeoBlock.allow_asns?.length) blockerMatcher.allow_asns = effectiveGeoBlock.allow_asns;
-        if (effectiveGeoBlock.allow_cidrs?.length) blockerMatcher.allow_cidrs = effectiveGeoBlock.allow_cidrs;
-        if (effectiveGeoBlock.allow_ips?.length) blockerMatcher.allow_ips = effectiveGeoBlock.allow_ips;
+        const blockerMatcher = buildGeoBlockMatcher(effectiveGeoBlock);
 
         // Build the same route matcher as the proxy route (if any)
         const blockRoute: Record<string, unknown> = {
@@ -2518,10 +2498,11 @@ export async function buildCaddyDocument() {
   ]);
 
   const { usage: certificateUsage, autoManagedDomains } = collectCertificateUsage(proxyHostRows, certificateMap);
-  const [generalSettings, acmeSettings, dnsSettings, upstreamDnsResolutionSettings, globalGeoBlock, globalWaf, trustedProxiesSettings] = await Promise.all([
+  const [generalSettings, acmeSettings, dnsSettings, dnsProviderSettings, upstreamDnsResolutionSettings, globalGeoBlock, globalWaf, trustedProxiesSettings] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsSettings(),
+    getDnsProviderSettings(),
     getUpstreamDnsResolutionSettings(),
     getGeoBlockSettings(),
     getWafSettings(),
@@ -2538,14 +2519,19 @@ export async function buildCaddyDocument() {
       effectiveGlobalGeoBlock = { ...globalGeoBlock, trusted_proxies: serverRanges };
     }
   }
-  const { tlsApp, managedCertificateIds } = await buildTlsAutomation(certificateUsage, autoManagedDomains, {
-    acmeEmail: generalSettings?.acmeEmail,
-    dnsSettings,
-    acmeSettings
+  const { tlsApp, managedCertificateIds } = await buildTlsAutomation({
+    usage: certificateUsage,
+    autoManagedDomains,
+    options: {
+      acmeEmail: generalSettings?.acmeEmail,
+      dnsSettings,
+      dnsProviderSettings,
+      acmeSettings
+    }
   });
-  const { policies: tlsConnectionPolicies, readyCertificates, importedCertPems } = buildTlsConnectionPolicies(
-    certificateUsage,
-    managedCertificateIds,
+  const { policies: tlsConnectionPolicies, readyCertificates, importedCertPems } = buildTlsConnectionPolicies({
+    usage: certificateUsage,
+    managedCertificatesWithAutomation: managedCertificateIds,
     autoManagedDomains,
     mTlsDomainMap,
     caCertMap,
@@ -2553,24 +2539,24 @@ export async function buildCaddyDocument() {
     cAsWithAnyIssuedCerts,
     mTlsDomainLeafOverride,
     mTlsOptionalAuthDomains
-  );
+  });
 
-  const { routes: httpRoutes, errorRoutes: hostErrorRoutes } = await buildProxyRoutes(
-    proxyHostRows,
-    accessMap,
-    readyCertificates,
-    {
-      globalDnsSettings: dnsSettings,
-      globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
-      globalGeoBlock: effectiveGlobalGeoBlock,
-      globalWaf,
-      mtlsRbac: {
-        roleFingerprintMap,
-        certFingerprintMap,
-        accessRulesByHost,
-      },
-    }
-  );
+  const caddyBuildContext: CaddyBuildContext = {
+    rows: proxyHostRows,
+    accessAccounts: accessMap,
+    tlsReadyCertificates: readyCertificates,
+    globalDnsSettings: dnsSettings,
+    globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
+    globalGeoBlock: effectiveGlobalGeoBlock,
+    globalWaf,
+    mtlsRbac: {
+      roleFingerprintMap,
+      certFingerprintMap,
+      accessRulesByHost,
+    },
+  };
+
+  const { routes: httpRoutes, errorRoutes: hostErrorRoutes } = await buildProxyRoutes(caddyBuildContext);
 
   // Server-level error routes (Caddy handle_errors): per-host rules first so they
   // take precedence, then global rules act as a fallback for any unmatched host/status.
@@ -2674,7 +2660,11 @@ export async function buildCaddyDocument() {
   const loggingApp = { logging: { logs: loggingLogs } };
 
   // Build L4 (TCP/UDP) proxy servers
-  const l4Servers = await buildL4Servers();
+  const l4Servers = await buildL4Servers({
+    globalDnsSettings: dnsSettings,
+    globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
+    globalGeoBlock: effectiveGlobalGeoBlock
+  });
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 
   return {
