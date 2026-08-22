@@ -3,9 +3,7 @@
  * (src/lib/caddy.ts) and the sanitizeErrorPageRules input sanitizer
  * (src/lib/models/proxy-hosts.ts).
  */
-import { describe, it, expect, vi } from 'vitest';
-
-vi.unmock('@/src/lib/caddy');
+import { describe, it, expect } from 'vitest';
 
 import { buildErrorPageRoute } from '@/src/lib/caddy';
 import { sanitizeErrorPageRules } from '@/src/lib/models/proxy-hosts';

@@ -25,7 +25,6 @@ vi.mock('../../src/lib/db', async () => ({
   nowIso: () => new Date().toISOString(),
   toIso: (v: string | null) => v,
 }));
-vi.mock('../../src/lib/caddy', () => ({ applyCaddyConfig: vi.fn() }));
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 let userId: number;

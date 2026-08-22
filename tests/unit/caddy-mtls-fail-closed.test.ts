@@ -31,12 +31,6 @@ vi.mock('../../src/lib/db', async () => {
   };
 });
 
-// Keep the real buildCaddyDocument; stub only the network apply.
-vi.mock('../../src/lib/caddy', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/caddy')>();
-  return { ...actual, applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }) };
-});
-
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';

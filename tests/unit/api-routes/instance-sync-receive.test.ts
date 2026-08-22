@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
+// Not network suppression (the global guard covers that): this route test mocks
+// every dependency wholesale and never sets up a test database, so the real
+// caddy module's import graph — src/lib/db, the certs directory — must stay out.
 vi.mock('@/src/lib/caddy', () => ({
   applyCaddyConfig: vi.fn(),
 }));

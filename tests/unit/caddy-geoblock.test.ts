@@ -1,6 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-
-vi.unmock('@/src/lib/caddy');
+import { describe, it, expect } from 'vitest';
 
 import { buildBlockerHandler, resolveEffectiveGeoBlock } from '@/src/lib/caddy';
 import type { GeoBlockSettings } from '@/src/lib/settings';

@@ -3,9 +3,7 @@
  * Monitors Caddy for restarts/crashes and automatically reapplies configuration
  */
 
-import http from "node:http";
-import https from "node:https";
-import { config } from "./config";
+import { caddyAdminRequest } from "./caddy-admin";
 import { applyCaddyConfig } from "./caddy";
 
 type CaddyMonitorState = {
@@ -35,29 +33,15 @@ let isMonitoring = false;
  */
 async function getCaddyConfigId(): Promise<string | null> {
   try {
-    const response = await new Promise<{ status: number; text: string; etag: string | null }>((resolve, reject) => {
-      const parsed = new URL(`${config.caddyApiUrl}/config/`);
-      const lib = parsed.protocol === "https:" ? https : http;
-      const req = lib.request(
-        { hostname: parsed.hostname, port: parsed.port, path: parsed.pathname, method: "GET" },
-        (res) => {
-          let data = "";
-          res.on("data", (chunk) => (data += chunk));
-          res.on("end", () => resolve({ status: res.statusCode ?? 0, text: data, etag: res.headers.etag ?? null }));
-        }
-      );
-      req.setTimeout(5000, () => { req.destroy(); reject(new Error("timeout")); });
-      req.on("error", reject);
-      req.end();
-    });
+    const response = await caddyAdminRequest({ path: "/config/", method: "GET", timeoutMs: 5000 });
 
     if (response.status < 200 || response.status >= 300) {
       return null;
     }
 
     // Use ETag or compute a simple hash from the response
-    const etag = response.etag;
-    if (etag) {
+    const etag = response.headers.etag;
+    if (typeof etag === "string" && etag) {
       return etag;
     }
 

@@ -24,7 +24,6 @@ vi.mock('@/src/lib/models/proxy-hosts', () => ({
 }));
 
 // Stub other transitive deps of actions.ts that we don't exercise.
-vi.mock('@/src/lib/caddy', () => ({ applyCaddyConfig: vi.fn() }));
 vi.mock('@/src/lib/instance-sync', () => ({
   getInstanceMode: vi.fn(),
   getSlaveMasterToken: vi.fn(),

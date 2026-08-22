@@ -26,11 +26,6 @@ vi.mock('../../src/lib/db', async () => {
   };
 });
 
-vi.mock('../../src/lib/caddy', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/caddy')>();
-  return { ...actual, applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }) };
-});
-
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { createProxyHost, updateProxyHost, getProxyHost } from '../../src/lib/models/proxy-hosts';

@@ -28,19 +28,8 @@ vi.mock('../../src/lib/db', async () => {
   };
 });
 
-// Keep the real buildCaddyDocument but stub the network apply so createProxyHost
-// doesn't try to reach a live Caddy admin API.
-vi.mock('../../src/lib/caddy', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/caddy')>();
-  return { ...actual, applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }) };
-});
-
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
-// Import order matters: the model/settings modules (which pull in the mocked
-// caddy via a relative "../caddy" specifier) must load before we import from
-// caddy directly, otherwise createProxyHost's applyCaddyConfig can resolve to
-// the un-stubbed module and try to reach a live Caddy admin API.
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { saveTrustedProxiesSettings, saveGeoBlockSettings, type GeoBlockSettings } from '../../src/lib/settings';
 import { buildServerTrustedProxies, buildBlockerHandler, resolveEffectiveGeoBlock, buildCaddyDocument } from '../../src/lib/caddy';

@@ -20,8 +20,6 @@ import {
   sortRoutesByHostPriority,
   sortTlsPoliciesBySniPriority,
 } from "./host-pattern-priority";
-import http from "node:http";
-import https from "node:https";
 import db, { nowIso } from "./db";
 import { eq, isNull } from "drizzle-orm";
 import { config } from "./config";
@@ -49,6 +47,7 @@ import {
 } from "./settings";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { syncInstances } from "./instance-sync";
+import { caddyAdminRequest } from "./caddy-admin";
 import {
   accessListEntries,
   certificates,
@@ -1029,13 +1028,17 @@ function appendMtlsPathModeRoutes(options: {
   authMode: MtlsPathMode;
   locationRules: LocationRuleMeta[];
   handlers: Record<string, unknown>[];
-  reverseProxyHandler: Record<string, unknown>;
   hostTrustedFingerprintExpression: string;
   skipHttpsHostnameValidation: boolean;
   preserveHostHeader: boolean;
   buildProtectedPathRoute: (domainGroup: string[], path: string) => CaddyHttpRoute[];
   buildExcludedPathRoute: (domainGroup: string[], path: string) => CaddyHttpRoute[];
+  /** Excluded-paths mode: anything not excluded needs a trusted client cert. */
   buildProtectedCatchAll: (domainGroup: string[]) => CaddyHttpRoute[];
+  /** Whitelist mode: only the listed paths are gated, so the catch-all stays open. */
+  buildUnprotectedCatchAll: (domainGroup: string[]) => CaddyHttpRoute[];
+  /** Full-site mode: RBAC subroutes when configured, otherwise an open catch-all. */
+  buildDefaultCatchAll: (domainGroup: string[]) => CaddyHttpRoute[];
 }) {
   const {
     hostRoutes,
@@ -1043,13 +1046,14 @@ function appendMtlsPathModeRoutes(options: {
     authMode,
     locationRules,
     handlers,
-    reverseProxyHandler,
     hostTrustedFingerprintExpression,
     skipHttpsHostnameValidation,
     preserveHostHeader,
     buildProtectedPathRoute,
     buildExcludedPathRoute,
     buildProtectedCatchAll,
+    buildUnprotectedCatchAll,
+    buildDefaultCatchAll,
   } = options;
 
   for (const domainGroup of domainGroups) {
@@ -1058,6 +1062,8 @@ function appendMtlsPathModeRoutes(options: {
         hostRoutes.push(...buildProtectedPathRoute(domainGroup, protectedPath));
       }
 
+      // Whitelist mode: only the explicitly listed paths require a certificate,
+      // so location rules and the catch-all are left unprotected.
       appendLocationRoutes({
         hostRoutes,
         domainGroup,
@@ -1067,7 +1073,7 @@ function appendMtlsPathModeRoutes(options: {
         handlers,
       });
 
-      hostRoutes.push(...buildProtectedCatchAll(domainGroup));
+      hostRoutes.push(...buildUnprotectedCatchAll(domainGroup));
       continue;
     }
 
@@ -1075,28 +1081,45 @@ function appendMtlsPathModeRoutes(options: {
       for (const excludedPath of authMode.paths) {
         hostRoutes.push(...buildExcludedPathRoute(domainGroup, excludedPath));
       }
+
+      // Everything outside the exclusion list is protected, location rules included:
+      // an allow route gated on the trusted fingerprints, then a 403 for the rest.
+      for (const rule of locationRules) {
+        const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
+          rule,
+          skipHttpsHostnameValidation,
+          preserveHostHeader
+        );
+        if (!safePath) continue;
+        hostRoutes.push({
+          match: [{ host: domainGroup, path: [safePath], expression: hostTrustedFingerprintExpression }],
+          handle: [...handlers, locationProxy],
+          terminal: true,
+        });
+        hostRoutes.push({
+          match: [{ host: domainGroup, path: [safePath] }],
+          handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
+          terminal: true,
+        });
+      }
+
+      hostRoutes.push(...buildProtectedCatchAll(domainGroup));
+      continue;
     }
 
-    for (const rule of locationRules) {
-      const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
-        rule,
-        skipHttpsHostnameValidation,
-        preserveHostHeader
-      );
-      if (!safePath) continue;
-      hostRoutes.push({
-        match: [{ host: domainGroup, path: [safePath], expression: hostTrustedFingerprintExpression }],
-        handle: [...handlers, locationProxy],
-        terminal: true,
-      });
-      hostRoutes.push({
-        match: [{ host: domainGroup, path: [safePath] }],
-        handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
-        terminal: true,
-      });
-    }
+    // Full-site mode: there are no path carve-outs to enforce here. Hosts with mTLS
+    // disabled land here too, so nothing may be gated ahead of the catch-all — the
+    // catch-all (or its RBAC subroutes) is what decides the requirement.
+    appendLocationRoutes({
+      hostRoutes,
+      domainGroup,
+      locationRules,
+      skipHttpsHostnameValidation,
+      preserveHostHeader,
+      handlers,
+    });
 
-    hostRoutes.push(...buildProtectedCatchAll(domainGroup));
+    hostRoutes.push(...buildDefaultCatchAll(domainGroup));
   }
 }
 
@@ -1766,19 +1789,53 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         }];
       };
 
+      // Open catch-all: no client certificate required. Used by whitelist mode (where
+      // only the listed paths are gated) and as the full-site fallback.
+      const buildUnprotectedCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => [{
+        match: [{ host: domainGroup }],
+        handle: [...handlers, reverseProxyHandler],
+        terminal: true,
+      }];
+
+      // Full-site mode. RBAC rules, when present, carry their own per-path allow/deny
+      // decisions; requireValidClientCertByDefault stays false so paths without an
+      // explicit rule are proxied rather than denied. With no RBAC rules — including
+      // every host that has mTLS switched off entirely — the host is simply open.
+      const buildDefaultCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => {
+        if (hasMtlsRbac) {
+          const rbacSubroutes = buildMtlsRbacSubroutes(
+            hostAccessRules,
+            context.mtlsRbac!.roleFingerprintMap,
+            context.mtlsRbac!.certFingerprintMap,
+            handlers,
+            reverseProxyHandler
+          );
+          if (rbacSubroutes) {
+            return [{
+              match: [{ host: domainGroup }],
+              handle: [{ handler: "subroute", routes: rbacSubroutes }],
+              terminal: true,
+            }];
+          }
+        }
+
+        return buildUnprotectedCatchAll(domainGroup);
+      };
+
       appendMtlsPathModeRoutes({
         hostRoutes,
         domainGroups,
         authMode: mtlsPathMode,
         locationRules,
         handlers,
-        reverseProxyHandler,
         hostTrustedFingerprintExpression,
         skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
         preserveHostHeader: Boolean(row.preserveHostHeader),
         buildProtectedPathRoute,
         buildExcludedPathRoute,
         buildProtectedCatchAll,
+        buildUnprotectedCatchAll,
+        buildDefaultCatchAll,
       });
     }
 
@@ -1989,21 +2046,30 @@ export async function buildTlsAutomation(
       : null;
 
   const dnsSettings = options.dnsSettings;
+  // Primary resolvers first, then the configured fallbacks, so DNS-01 validation
+  // still has somewhere to go when the primary resolver is unreachable.
   const dnsResolvers: string[] = [];
   if (dnsSettings?.enabled && Array.isArray(dnsSettings.resolvers) && dnsSettings.resolvers.length > 0) {
     dnsResolvers.push(...dnsSettings.resolvers);
+    if (dnsSettings.fallbacks && dnsSettings.fallbacks.length > 0) {
+      dnsResolvers.push(...dnsSettings.fallbacks);
+    }
   }
 
   const policies: Record<string, unknown>[] = [];
   const managedCertificateIds = new Set<number>();
 
+  // Custom ACME directory URL + trusted root for internal CAs (OpenBao, Step-CA, etc.).
+  // Resolved once per build: syncAcmeCaRootFile touches the filesystem, and it is
+  // applied to every issuer across every subject group.
+  const customAcmeUrl = (options.acmeSettings?.caUrl ?? "").trim();
+  const acmeRootPath = syncAcmeCaRootFile(options.acmeSettings?.caRootPem);
+
   const applyAcmeOverrides = (issuer: Record<string, unknown>) => {
-    const customAcmeUrl = (options.acmeSettings?.caUrl ?? "").trim();
     if (customAcmeUrl) {
       issuer.ca = customAcmeUrl;
     }
 
-    const acmeRootPath = syncAcmeCaRootFile(options.acmeSettings?.caRootPem);
     if (acmeRootPath) {
       issuer.trusted_roots_pem_files = [acmeRootPath];
     }
@@ -2686,37 +2752,6 @@ export async function buildCaddyDocument() {
   };
 }
 
-/**
- * Plain HTTP/HTTPS request to the Caddy admin API using node:http.
- * Avoids browser-security headers (Sec-Fetch-*) that native fetch sends,
- * which would trigger Caddy's CORS origin enforcement.
- */
-function caddyRequest(url: string, method: string, body?: string): Promise<{ status: number; text: string }> {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const lib = parsed.protocol === "https:" ? https : http;
-    const req = lib.request(
-      {
-        hostname: parsed.hostname,
-        port: parsed.port,
-        path: parsed.pathname + parsed.search,
-        method,
-        headers: {
-          ...(body ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } : {})
-        }
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, text: data }));
-      }
-    );
-    req.on("error", reject);
-    if (body) req.write(body);
-    req.end();
-  });
-}
-
 export async function applyCaddyConfig() {
   const document = await buildCaddyDocument();
   const payload = JSON.stringify(document);
@@ -2724,7 +2759,7 @@ export async function applyCaddyConfig() {
   setSetting("caddy_config_hash", { hash, updatedAt: nowIso() });
 
   try {
-    const response = await caddyRequest(`${config.caddyApiUrl}/load`, "POST", payload);
+    const response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
 
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`Caddy config load failed: ${response.status} ${response.text}`);

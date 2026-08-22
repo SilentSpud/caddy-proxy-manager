@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// The model module imports caddy/audit; keep those inert for this unit test.
-vi.mock('@/src/lib/caddy', () => ({ applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }) }));
+// The model module imports audit; keep it inert for this unit test.
 vi.mock('@/src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 vi.mock('@/src/lib/settings', async (orig) => {

@@ -32,13 +32,6 @@ vi.mock('../../src/lib/db', async () => {
   };
 });
 
-// Keep the real buildCaddyDocument (pure config builder) but stub the network
-// apply so createProxyHost doesn't try to reach a live Caddy admin API.
-vi.mock('../../src/lib/caddy', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/caddy')>();
-  return { ...actual, applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }) };
-});
-
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';

@@ -28,10 +28,6 @@ vi.mock('../../src/lib/db', async () => {
   };
 });
 
-vi.mock('../../src/lib/caddy', () => ({
-  applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }),
-}));
-
 vi.mock('../../src/lib/audit', () => ({
   logAuditEvent: vi.fn(),
 }));

@@ -1,10 +1,27 @@
-import { vi } from 'vitest';
+import { vi, beforeEach } from 'vitest';
+import { installFakeCaddy } from './helpers/caddy-admin';
 
-// Keep the real Caddy builder implementation available to unit tests.
-// The Caddy container and the web container are separate runtime boundaries, so
-// tests that exercise the config builder should use a spoofed "Caddy instance"
-// by stubbing only the network apply path where needed, rather than replacing the
-// entire module at global scope.
+/**
+ * Caddy network guard.
+ *
+ * The Caddy container and the web container are separate runtime boundaries, so
+ * the seam we stub is the admin-API transport (src/lib/caddy-admin.ts) — not the
+ * whole caddy module. Every builder stays real and fully testable; only the
+ * socket is replaced, by a spoofed Caddy instance that accepts config loads and
+ * serves them back.
+ *
+ * Installed here for every test file, and reinstalled before each test so state
+ * never leaks between them. A test that wants to assert on what was sent, or to
+ * simulate Caddy failing, should call installFakeCaddy() itself and keep the
+ * handle — from beforeEach or the test body, not beforeAll, since this hook runs
+ * before each test and would otherwise replace it. Should anything swap the real
+ * transport back in, the HTTP adapter throws rather than opening a socket — see
+ * httpCaddyAdminTransport.
+ */
+installFakeCaddy();
+beforeEach(() => {
+  installFakeCaddy();
+});
 
 // Mock NextAuth so API route tests can control session state
 vi.mock('@/src/lib/auth', () => ({

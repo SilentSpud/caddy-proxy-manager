@@ -89,3 +89,41 @@ describe('buildTlsAutomation — custom ACME directory', () => {
     expect(issuer.ca).toBe('https://ca.internal.example.com/acme/acme/directory');
   });
 });
+
+/**
+ * Regression: DNS-01 challenges must keep their fallback resolvers.
+ *
+ * The resolver list feeds Caddy's ACME DNS challenge. Dropping `fallbacks` leaves
+ * validation with a single resolver, so an unreachable primary silently breaks
+ * certificate issuance and renewal.
+ */
+describe('buildTlsAutomation — DNS-01 challenge resolvers', () => {
+  const DNS_PROVIDER = {
+    default: 'cloudflare',
+    providers: { cloudflare: { api_token: 'test-token' } },
+  } as never;
+
+  async function dnsChallenge(dnsSettings: unknown) {
+    const result = await buildTlsAutomation(new Map(), new Set(['example.com']), {
+      acmeEmail: 'admin@example.com',
+      dnsSettings: dnsSettings as never,
+      dnsProviderSettings: DNS_PROVIDER,
+    });
+    const policies = (result.tlsApp as any).automation.policies as any[];
+    return policies[0].issuers[0].challenges.dns as { resolvers?: string[] };
+  }
+
+  it('appends fallback resolvers after the primaries', async () => {
+    const challenge = await dnsChallenge({
+      enabled: true,
+      resolvers: ['1.1.1.1', '8.8.8.8'],
+      fallbacks: ['9.9.9.9'],
+    });
+    expect(challenge.resolvers).toEqual(['1.1.1.1', '8.8.8.8', '9.9.9.9']);
+  });
+
+  it('omits resolvers entirely when DNS settings are disabled', async () => {
+    const challenge = await dnsChallenge({ enabled: false, resolvers: ['1.1.1.1'], fallbacks: ['9.9.9.9'] });
+    expect(challenge.resolvers).toBeUndefined();
+  });
+});
