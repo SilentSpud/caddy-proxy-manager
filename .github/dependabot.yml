@@ -7,8 +7,6 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
-    reviewers:
-      - "fuomag9"
     labels:
       - "dependencies"
       - "github-actions"
@@ -24,8 +22,6 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
-    reviewers:
-      - "fuomag9"
     labels:
       - "dependencies"
       - "bun"
@@ -54,8 +50,6 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    reviewers:
-      - "fuomag9"
     labels:
       - "dependencies"
       - "docker"
@@ -69,8 +63,6 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    reviewers:
-      - "fuomag9"
     labels:
       - "dependencies"
       - "docker"

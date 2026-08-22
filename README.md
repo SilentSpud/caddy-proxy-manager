@@ -1,25 +1,25 @@
 # Caddy Proxy Manager
 
-Web interface for managing [Caddy Server](https://caddyserver.com/) reverse proxies and certificates.
+Web interface for managing [Caddy Server](https://caddyserver.com/) reverse proxies and certificates. This fork is for redoing the original UI in a way that I like and trying to make the application as lightweight as possible. **THE CONFIG SETTINGS ON THIS PAGE HAVEN'T BEEN UPDATED, AND THEY WON'T BE UNTIL I'M SATISFIED WITH THE NEW CONFIG SETUP. IN THE MEANTIME, USE AT YOUR OWN RISK.** (As long as this message is here, I'm still not satisfied)
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://mit-license.org)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 
-[Report Bug](https://github.com/fuomag9/caddy-proxy-manager/issues) • [Request Feature](https://github.com/fuomag9/caddy-proxy-manager/issues)
+[Report Bug](https://github.com/silentspud/caddy-proxy-manager/issues) • [Request Feature](https://github.com/silentspud/caddy-proxy-manager/issues)
 
 <img width="100%" alt="Dashboard" src="site/assets/screenshots/dashboard-main.png" />
 
 ## Overview
 
-This project provides a web UI for Caddy Server, eliminating the need to manually edit JSON configurations or Caddyfiles. It handles reverse proxies, access lists, and certificate management through a shadcn/ui interface. Built with Next.js 16, React 19, shadcn/ui, Tailwind CSS, Drizzle ORM, and TypeScript. Analytics data (traffic events, WAF events) is stored in ClickHouse for fast aggregation queries, with automatic retention via TTL (30 days by default, configurable).
+This project provides a web UI for Caddy Server, eliminating the need to manually edit JSON configurations or Caddyfiles. It handles reverse proxies, access lists, and certificate management through a Astryx interface. Built with Vinext version whatever, React 19, Astryx, Tailwind CSS, Drizzle ORM, and TypeScript. Analytics data (traffic events, WAF events) is stored in ClickHouse for fast aggregation queries, with automatic retention via TTL (30 days by default, configurable).
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/fuomag9/caddy-proxy-manager.git
+git clone https://github.com/silentspud/caddy-proxy-manager.git
 cd caddy-proxy-manager
 cp .env.example .env
 # Edit .env with your credentials
@@ -69,7 +69,7 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 ### Environment Variables
 
 | Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
+| -------- | ----------- | ------- | -------- |
 | `SESSION_SECRET` | Session encryption key (32+ chars) | None | **Yes** |
 | `ADMIN_USERNAME` | Admin login username | `admin` | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
 | `ADMIN_PASSWORD` | Admin password (see requirements below) | `admin` (dev only) | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
@@ -118,13 +118,13 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 | `CLICKHOUSE_DB` | ClickHouse database name | `analytics` | No |
 
 **Production Requirements:**
+
 - `SESSION_SECRET`: 32+ characters (`openssl rand -base64 32`)
 - `ADMIN_PASSWORD`: 12+ chars with uppercase, lowercase, numbers, and special characters — not required when `AUTH_DISABLE_LOCAL_USERS=true`
 
 Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credentials.
 
 ---
-
 
 ## Security
 
@@ -135,6 +135,7 @@ Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credent
 - Supports OAuth2/OIDC for SSO, including group-based roles and an OIDC-only mode with no local accounts
 
 **Production Setup:**
+
 ```bash
 export SESSION_SECRET=$(openssl rand -base64 32)
 export ADMIN_USERNAME="admin"
@@ -143,6 +144,7 @@ docker compose up -d
 ```
 
 **Limitations:**
+
 - Certificate private keys stored unencrypted in SQLite
 - In-memory rate limiting (not suitable for multi-instance deployments)
 
@@ -153,7 +155,7 @@ docker compose up -d
 CPM has three roles with increasing privileges:
 
 | Capability | Viewer | User | Admin |
-|------------|:------:|:----:|:-----:|
+| ---------- | ------ | ---- | ----- |
 | Log in to the dashboard | Yes | Yes | Yes |
 | View own profile | Yes | Yes | Yes |
 | Access forward-auth-protected apps (when granted) | Yes | Yes | Yes |
@@ -186,7 +188,7 @@ Geo blocking is configured per proxy host. It requires MaxMind GeoLite2 database
 ### Rule types
 
 | Type | Example | Description |
-|------|---------|-------------|
+| ---- | ------- | ----------- |
 | Country | `DE` | ISO 3166-1 alpha-2 country code |
 | Continent | `EU` | `AF`, `AN`, `AS`, `EU`, `NA`, `OC`, `SA` |
 | ASN | `24940` | Autonomous System Number |
@@ -202,11 +204,14 @@ Geo blocking requires MaxMind GeoLite2 Country and/or ASN databases. Use the bun
 1. Register for a free MaxMind account at [maxmind.com](https://www.maxmind.com/)
 2. Generate a license key with `GeoLite2-Country` and `GeoLite2-ASN` permissions
 3. Add to your `.env`:
-   ```
+
+   ```env
    GEOIPUPDATE_ACCOUNT_ID=your-account-id
    GEOIPUPDATE_LICENSE_KEY=your-license-key
    ```
+
 4. Start with the `geoipupdate` profile:
+
    ```bash
    docker compose --profile geoipupdate up -d
    ```
@@ -262,6 +267,7 @@ GEOIPUPDATE_LICENSE_KEY=…
 The WAF is powered by [Coraza](https://coraza.io/) and integrates the OWASP Core Rule Set.
 
 Enable globally in **WAF → Settings**, then optionally override per proxy host. Two modes:
+
 - **Block** — requests matching rules are rejected with 403
 - **Detect** — requests are logged but not blocked
 
@@ -270,7 +276,8 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 **Rule suppression** — suppress noisy rules globally or per host from the event detail drawer or the Suppressed Rules tab.
 
 **Custom directives** — any ModSecurity SecLang syntax is accepted, e.g.:
-```
+
+```text
 SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
 ```
 
@@ -303,6 +310,7 @@ See the [Environment Variables Reference](https://github.com/fuomag9/caddy-proxy
 You can enable upstream DNS pinning globally (**Settings → Upstream DNS Pinning**) and override per host (**Proxy Host → Upstream DNS Pinning**).
 
 When enabled, hostname upstreams are resolved during config save/reload and written to Caddy as concrete IP dials. Address family selection supports:
+
 - `both` (preferred, resolves AAAA then A with IPv6 preference)
 - `ipv6`
 - `ipv4`
@@ -341,13 +349,15 @@ OAUTH_ISSUER=https://auth.example.com/application/o/app/
 **Redirect URI Configuration:**
 
 The callback URL format is:
-```
+
+```text
 {BASE_URL}/api/auth/oauth2/callback/{provider-id}
 ```
 
 For environment-configured providers, the provider ID is derived from `OAUTH_PROVIDER_NAME` (lowercased, non-alphanumeric replaced with `-`). The exact callback URL is shown in **Settings → OAuth Providers** after the provider is synced.
 
 Examples:
+
 - `https://caddy-manager.example.com/api/auth/oauth2/callback/authentik-QXV0aG` (production)
 - `http://localhost:3000/api/auth/oauth2/callback/authentik-QXV0aG` (development)
 
@@ -386,7 +396,7 @@ map to the same role.
 names for you:
 
 | Group (prefix `CPM_`) | CPM role |
-|----------------------|----------|
+| --------------------- | -------- |
 | `CPM_Admin` | admin |
 | `CPM_User` | user |
 | `CPM_Viewer` | viewer |
@@ -458,7 +468,6 @@ OAUTH_ROLE_MAPPING=true
 > provider there is no way to sign in; CPM logs a warning at startup, and the only
 > recovery is to fix the provider through the `OAUTH_*` environment variables.
 
-
 ---
 
 ## Forward Auth Portal
@@ -484,7 +493,7 @@ Each forward-auth-protected host has its own access list of allowed users and/or
 
 ## Roadmap
 
-[Open an issue](https://github.com/fuomag9/caddy-proxy-manager/issues) for feature requests.
+[Open an issue](https://github.com/silentspud/caddy-proxy-manager/issues) for feature requests.
 
 ---
 
@@ -507,8 +516,8 @@ Contributions welcome:
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/fuomag9/caddy-proxy-manager/issues) for bugs and feature requests
-- **Discussions:** [GitHub Discussions](https://github.com/fuomag9/caddy-proxy-manager/discussions) for questions and ideas
+- **Issues:** [GitHub Issues](https://github.com/silentspud/caddy-proxy-manager/issues) for bugs and feature requests
+- **Discussions:** [GitHub Discussions](https://github.com/silentspud/caddy-proxy-manager/discussions) for questions and ideas
 
 ---
 
@@ -523,7 +532,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[Caddy Server](https://caddyserver.com/)** – The amazing web server that powers this project
 - **[Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager)** – The original project
 - **[Next.js](https://nextjs.org/)** – React framework for production
-- **[shadcn/ui](https://ui.shadcn.com/)** – Beautifully designed components built on Radix UI and Tailwind CSS
+- **[Astryx](https://ui.shadcn.com/)** – Beautifully designed components built on Radix UI and Tailwind CSS
 - **[Drizzle ORM](https://orm.drizzle.team/)** – Lightweight SQL migrations and type-safe queries
 
 ---
