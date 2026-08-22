@@ -1,6 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { rmSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 
 const COMPOSE_ARGS = [
   'compose',
@@ -20,7 +23,7 @@ export default async function globalTeardown() {
     console.warn('[global-teardown-no-ch] docker compose down failed:', err);
   }
 
-  const authDir = resolve(__dirname, '.auth');
+  const authDir = resolve(moduleDir, '.auth');
   if (existsSync(authDir)) {
     rmSync(authDir, { recursive: true, force: true });
     console.log('[global-teardown-no-ch] Removed', authDir);

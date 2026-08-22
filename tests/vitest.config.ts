@@ -1,8 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { resolve, sep } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = resolve(__dirname, '..');
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+
+const root = resolve(moduleDir, '..');
 
 /**
  * Builds an absolute test-discovery pattern rooted at this directory.
@@ -13,7 +16,7 @@ const root = resolve(__dirname, '..');
  * Vitest exits with "No test files found" having silently run zero tests.
  * Normalising the separators is a no-op on POSIX.
  */
-const testGlob = (pattern: string) => resolve(__dirname, pattern).split(sep).join('/');
+const testGlob = (pattern: string) => resolve(moduleDir, pattern).split(sep).join('/');
 
 export default defineConfig({
   plugins: [tsconfigPaths({ root })],
@@ -23,14 +26,14 @@ export default defineConfig({
       // the protocol import and the drizzle bun-sqlite adapter to their better-sqlite3
       // equivalents so tests that transitively import src/lib/db.ts don't crash.
       // Tests that need a real database use tests/helpers/db.ts (better-sqlite3 directly).
-      'bun:sqlite': resolve(__dirname, 'helpers/bun-sqlite-compat.ts'),
+      'bun:sqlite': resolve(moduleDir, 'helpers/bun-sqlite-compat.ts'),
       'drizzle-orm/bun-sqlite/migrator': 'drizzle-orm/better-sqlite3/migrator',
       'drizzle-orm/bun-sqlite': 'drizzle-orm/better-sqlite3',
     },
   },
   test: {
     environment: 'node',
-    setupFiles: [resolve(__dirname, 'setup.vitest.ts')],
+    setupFiles: [resolve(moduleDir, 'setup.vitest.ts')],
     env: {
       DATABASE_URL: ':memory:',
       SESSION_SECRET: 'test-session-secret-for-vitest-unit-tests-12345',

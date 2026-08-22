@@ -13,9 +13,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SCRIPT_PATH = resolve(__dirname, '../../docker/l4-port-manager/entrypoint.sh');
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+
+const SCRIPT_PATH = resolve(moduleDir, '../../docker/l4-port-manager/entrypoint.sh');
 const script = readFileSync(SCRIPT_PATH, 'utf-8');
 const lines = script.split('\n');
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   copyMaplibreWorker,
   WORKER_PUBLIC_PATH,
@@ -16,7 +17,8 @@ import {
  */
 
 const require = createRequire(import.meta.url);
-const projectRoot = resolve(__dirname, '../..');
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const projectRoot = resolve(moduleDir, '../..');
 const distDir = dirname(require.resolve('maplibre-gl/dist/maplibre-gl-worker.mjs'));
 const stagedDir = join(projectRoot, 'public', 'maplibre');
 

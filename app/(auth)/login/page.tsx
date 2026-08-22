@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { config } from "@/src/lib/config";
-import LoginClient from "./LoginClient";
+import LoginClient from "@/src/components/auth/LoginClient";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

@@ -10,12 +10,15 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const BANNER_PATH = resolve(__dirname, '../../src/components/l4-proxy-hosts/L4PortsApplyBanner.tsx');
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+
+const BANNER_PATH = resolve(moduleDir, '../../src/components/l4-proxy-hosts/L4PortsApplyBanner.tsx');
 const banner = readFileSync(BANNER_PATH, 'utf-8');
 
-const CLIENT_PATH = resolve(__dirname, '../../app/(dashboard)/l4-proxy-hosts/L4ProxyHostsClient.tsx');
+const CLIENT_PATH = resolve(moduleDir, '../../app/(dashboard)/l4-proxy-hosts/L4ProxyHostsClient.tsx');
 const client = readFileSync(CLIENT_PATH, 'utf-8');
 
 describe('L4PortsApplyBanner', () => {

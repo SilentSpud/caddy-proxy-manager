@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
 import { peekLinkingToken, verifyLinkingToken } from "@/src/lib/services/account-linking";
-import LinkAccountClient from "./LinkAccountClient";
+import LinkAccountClient from "@/src/components/auth/LinkAccountClient";
 import type { Metadata } from "next";
 
 interface LinkAccountPageProps {

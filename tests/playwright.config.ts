@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   testDir: './e2e',
@@ -12,7 +15,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:3000',
-    storageState: resolve(__dirname, '.auth/admin.json'),
+    storageState: resolve(moduleDir, '.auth/admin.json'),
     trace: 'on-first-retry',
   },
   projects: [

@@ -1,7 +1,10 @@
 import { chromium } from '@playwright/test';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 
 const COMPOSE_ARGS = [
   'compose',
@@ -9,7 +12,7 @@ const COMPOSE_ARGS = [
   '-f', 'tests/docker-compose.test.yml',
 ];
 const HEALTH_URL = 'http://localhost:3000/api/health';
-export const AUTH_DIR = resolve(__dirname, '.auth');
+export const AUTH_DIR = resolve(moduleDir, '.auth');
 export const AUTH_FILE = resolve(AUTH_DIR, 'admin.json');
 const MAX_WAIT_MS = 180_000;
 const POLL_INTERVAL_MS = 3_000;

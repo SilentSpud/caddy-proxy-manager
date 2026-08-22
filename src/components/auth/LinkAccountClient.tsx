@@ -10,7 +10,7 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
-import { AUTOFILL_CURRENT_PASSWORD } from "@/components/ui/native-input-attrs";
+import { AUTOFILL_CURRENT_PASSWORD } from "@/src/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
 
 interface LinkAccountClientProps {
@@ -22,7 +22,7 @@ interface LinkAccountClientProps {
 export default function LinkAccountClient({
   provider,
   email,
-  linkingId
+  linkingId,
 }: LinkAccountClientProps) {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -38,7 +38,7 @@ export default function LinkAccountClient({
       const response = await fetch("/api/auth/link-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linkingId, password })
+        body: JSON.stringify({ linkingId, password }),
       });
 
       const data = await response.json();

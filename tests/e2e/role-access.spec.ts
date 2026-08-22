@@ -14,6 +14,10 @@
  */
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 
 const COMPOSE_ARGS = [
   'compose',
@@ -297,7 +301,7 @@ test.describe('Role-based access control', () => {
     testInfo.setTimeout(90_000);
     // Use the pre-authenticated admin state from global-setup
     const adminContext = await browser.newContext({
-      storageState: require('path').resolve(__dirname, '../.auth/admin.json'),
+      storageState: resolve(moduleDir, '../.auth/admin.json'),
     });
     try {
       for (const path of ALL_DASHBOARD_PAGES) {
@@ -315,7 +319,7 @@ test.describe('Role-based access control', () => {
 
   test('admin role: sidebar shows all nav items', async ({ browser }) => {
     const adminContext = await browser.newContext({
-      storageState: require('path').resolve(__dirname, '../.auth/admin.json'),
+      storageState: resolve(moduleDir, '../.auth/admin.json'),
     });
     try {
       const page = await adminContext.newPage();
