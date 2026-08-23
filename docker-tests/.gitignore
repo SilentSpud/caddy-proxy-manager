@@ -1,0 +1,3 @@
+# Byte-compiled artefacts from syntax-checking the helper scripts on the host.
+__pycache__/
+*.pyc

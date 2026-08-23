@@ -13,6 +13,8 @@ import {
   formatDialAddress,
   parseUpstreamTarget,
   toDurationMs,
+  canonicalHeaderName,
+  upstreamHeaderPlaceholder,
 } from "./caddy-utils";
 import {
   groupHostPatternsByPriority,
@@ -1469,15 +1471,19 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         }
       ];
 
-      // Add header copying for each configured header
-      for (const headerName of authentik.copyHeaders) {
+      // Add header copying for each configured header. The name is canonicalised
+      // because the placeholder that reads the value back is matched literally
+      // against Go's canonical header key — see upstreamHeaderPlaceholder.
+      for (const rawHeaderName of authentik.copyHeaders) {
+        const headerName = canonicalHeaderName(rawHeaderName);
+        const placeholder = upstreamHeaderPlaceholder(headerName);
         handleResponseRoutes.push({
           handle: [
             {
               handler: "headers",
               request: {
                 set: {
-                  [headerName]: [`{http.reverse_proxy.header.${headerName}}`]
+                  [headerName]: [placeholder]
                 }
               }
             } as Record<string, unknown>
@@ -1487,7 +1493,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
               not: [
                 {
                   vars: {
-                    [`{http.reverse_proxy.header.${headerName}}`]: [""]
+                    [placeholder]: [""]
                   }
                 }
               ]
@@ -1561,11 +1567,18 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
       // Uses CPM itself as the auth provider (replaces Authentik)
       const cpmDialAddress = getCpmDialAddress();
       if (cpmDialAddress) {
+        // Canonical (Go MIME) casing is required, not cosmetic: the copy step
+        // below reads each value back through
+        // `{http.reverse_proxy.header.<name>}`, and Caddy resolves that by
+        // indexing the response header map with the literal name. Go stores
+        // the key canonicalised, so spelling these "X-CPM-User" resolves to
+        // nothing and every upstream behind forward auth sees an anonymous
+        // request. See upstreamHeaderPlaceholder in caddy-utils.
         const CPM_COPY_HEADERS = [
-          "X-CPM-User",
-          "X-CPM-Email",
-          "X-CPM-Groups",
-          "X-CPM-User-Id"
+          "X-Cpm-User",
+          "X-Cpm-Email",
+          "X-Cpm-Groups",
+          "X-Cpm-User-Id"
         ];
 
         // Security: strip any client-supplied CPM identity headers from the
@@ -1594,18 +1607,19 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
           { handle: [{ handler: "vars" }] }
         ];
         for (const headerName of CPM_COPY_HEADERS) {
+          const placeholder = upstreamHeaderPlaceholder(headerName);
           cpmHandleResponseRoutes.push({
             handle: [
               {
                 handler: "headers",
                 request: {
-                  set: { [headerName]: [`{http.reverse_proxy.header.${headerName}}`] }
+                  set: { [headerName]: [placeholder] }
                 }
               } as Record<string, unknown>
             ],
             match: [
               {
-                not: [{ vars: { [`{http.reverse_proxy.header.${headerName}}`]: [""] } }]
+                not: [{ vars: { [placeholder]: [""] } }]
               }
             ]
           });

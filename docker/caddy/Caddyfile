@@ -1,7 +1,14 @@
 {
 	# Bound to 0.0.0.0 within the Docker network so the web container can reach it.
-	# Port 2019 must NOT be published to the host in docker-compose.yml.
-	# The origins directive restricts which Host header values are accepted.
+	# Port 2019 must NOT be published to the host in docker-compose.yml — that
+	# is the boundary this relies on.
+	#
+	# `origins` rejects requests carrying an Origin header that is not listed,
+	# which is what stops a page in the operator's browser from reconfiguring
+	# the proxy. It does NOT restrict the Host header here: binding to an open
+	# interface makes Caddy log "admin endpoint on open interface; host checking
+	# disabled" and skip Host validation, so any name that resolves to this
+	# container reaches the API.
 	admin 0.0.0.0:2019 {
 		origins caddy:2019 localhost:2019 localhost
 	}

@@ -1,0 +1,370 @@
+# Full-stack integration test rig for caddy-proxy-manager.
+#
+# Everything runs on one *internal* bridge network: containers can talk to each
+# other and to nothing else. No host ports are published, so the rig cannot be
+# reached from outside and cannot reach the internet — certificates come from a
+# Pebble ACME server inside the network, not Let's Encrypt.
+#
+# Static IPs are assigned because two components need to know an address before
+# the container exists: dnsmasq answers every *.cpm.test query with Caddy's
+# address, and Pebble is pointed at dnsmasq so its HTTP-01 validation resolves
+# test domains the same way the client does.
+name: cpm-docker-tests
+
+networks:
+  cpm-test:
+    name: cpm-test
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
+volumes:
+  cpm-data:      # web: sqlite database
+  caddy-data:    # caddy: certificate storage
+  caddy-config:  # caddy: autosave.json
+  caddy-logs:    # shared: access log + coraza audit log (web parses these)
+  acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
+  test-certs:    # certgen output: pebble server cert, https-origin cert
+  cpm-data-slave:
+  caddy-data-slave:
+  caddy-config-slave:
+  caddy-logs-slave:
+  acme-ca-slave:
+
+services:
+  # ── Test PKI ────────────────────────────────────────────────────────────
+  # One-shot. Mints the CA that signs Pebble's own HTTPS endpoint (Caddy has to
+  # trust it to talk ACME) and a deliberately-mismatched cert for the HTTPS
+  # origin, so upstream hostname verification has something to fail on.
+  certgen:
+    build:
+      context: ./images/runner
+    image: cpm-test/runner:latest
+    container_name: cpm-test-certgen
+    command: ["bash", "/certgen/gen-certs.sh"]
+    volumes:
+      - ./certgen:/certgen:ro
+      - test-certs:/certs
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.4
+
+  # ── DNS ─────────────────────────────────────────────────────────────────
+  # *.cpm.test resolves to Caddy. Everything else is forwarded to Docker's
+  # embedded resolver so container names still work.
+  dns:
+    build:
+      context: ./images/dns
+    image: cpm-test/dns:latest
+    container_name: cpm-test-dns
+    volumes:
+      - ./config/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf:ro
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.5
+    healthcheck:
+      # A-only: dnsmasq has no AAAA to give for these names, and busybox
+      # nslookup waits out the full timeout on the empty answer.
+      test: ["CMD", "nslookup", "-type=a", "probe.cpm.test", "127.0.0.1"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  # ── ACME certificate authority ──────────────────────────────────────────
+  # Validates HTTP-01/TLS-ALPN-01 against Caddy on the standard ports, which is
+  # why httpPort/tlsPort are overridden from Pebble's defaults.
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:latest
+    container_name: cpm-test-pebble
+    command:
+      - -config
+      - /pebble/config.json
+      - -dnsserver
+      - 172.28.0.5:53
+    environment:
+      # Pebble's defaults exist to shake out non-compliant ACME clients. They
+      # make a test suite flaky, so: no validation delay, never reject a nonce.
+      PEBBLE_VA_NOSLEEP: "1"
+      PEBBLE_WFE_NONCEREJECT: "0"
+    volumes:
+      - ./config/pebble/config.json:/pebble/config.json:ro
+      - test-certs:/certs:ro
+    depends_on:
+      certgen:
+        condition: service_completed_successfully
+      dns:
+        condition: service_healthy
+    dns:
+      - 172.28.0.5
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.30
+
+  # ── System under test ───────────────────────────────────────────────────
+  caddy:
+    build:
+      context: ..
+      dockerfile: docker/caddy/Dockerfile
+    image: cpm-test/caddy:latest
+    container_name: cpm-test-caddy
+    environment:
+      PRIMARY_DOMAIN: cpm.test
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+      - caddy-logs:/logs
+      - acme-ca:/acme-ca:ro
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.10
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web/Dockerfile
+    image: cpm-test/web:latest
+    container_name: cpm-test-web
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: test-session-secret-not-for-production-use-0123456789
+      CADDY_API_URL: http://caddy:2019
+      BASE_URL: http://web:3000
+      NEXTAUTH_URL: http://web:3000
+      DATABASE_PATH: /app/data/cpm.db
+      DATABASE_URL: file:/app/data/cpm.db
+      APP_NAME: CPM Docker Test
+      AVATAR_GRAVATAR: "false"
+      ADMIN_USERNAME: cpmadmin
+      ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
+      AUTH_ALLOW_SELF_REGISTRATION: "false"
+      AUTH_ALLOW_OAUTH_REGISTRATION: "false"
+      AUTH_DISABLE_LOCAL_USERS: "false"
+      OAUTH_ENABLED: "false"
+      # Master → slave replication normally refuses plaintext targets. The rig
+      # has no public CA to issue a certificate for web-slave and the network
+      # is isolated, so the guard is lifted here and nowhere else.
+      INSTANCE_SYNC_ALLOW_HTTP: "true"
+      # No ClickHouse in the rig — an empty password disables analytics.
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - cpm-data:/app/data
+      - caddy-logs:/logs
+      - acme-ca:/acme-ca
+    depends_on:
+      caddy:
+        condition: service_healthy
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.11
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  # ── Simulated proxy destinations ────────────────────────────────────────
+  # L7 (HTTP) origins. origin-a and origin-b are identical apart from the id
+  # they report, which is how load-balancing tests tell them apart.
+  origin-a:
+    build:
+      context: ./images/backend
+    image: cpm-test/backend:latest
+    container_name: cpm-test-origin-a
+    command: ["http", "8080"]
+    environment:
+      ORIGIN_ID: origin-a
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.20
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/__health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  origin-b:
+    image: cpm-test/backend:latest
+    container_name: cpm-test-origin-b
+    command: ["http", "8080"]
+    environment:
+      ORIGIN_ID: origin-b
+    depends_on:
+      origin-a:
+        condition: service_started
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.21
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/__health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # HTTPS origin whose certificate deliberately does NOT match its hostname,
+  # so `skipHttpsHostnameValidation` has a real failure to suppress.
+  origin-tls:
+    image: cpm-test/backend:latest
+    container_name: cpm-test-origin-tls
+    command: ["https", "8443", "/certs/origin-tls.crt.pem", "/certs/origin-tls.key.pem"]
+    environment:
+      ORIGIN_ID: origin-tls
+    volumes:
+      - test-certs:/certs:ro
+    depends_on:
+      certgen:
+        condition: service_completed_successfully
+      origin-a:
+        condition: service_started
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.22
+
+  # L4 destinations: raw TCP and UDP endpoints with no HTTP awareness at all.
+  origin-tcp:
+    image: cpm-test/backend:latest
+    container_name: cpm-test-origin-tcp
+    command: ["tcp", "9000"]
+    environment:
+      ORIGIN_ID: origin-tcp
+    depends_on:
+      origin-a:
+        condition: service_started
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.23
+
+  origin-udp:
+    image: cpm-test/backend:latest
+    container_name: cpm-test-origin-udp
+    command: ["udp", "9001"]
+    environment:
+      ORIGIN_ID: origin-udp
+    depends_on:
+      origin-a:
+        condition: service_started
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.24
+
+  # ── Second CPM instance, for master → slave replication ─────────────────
+  # The generated Caddy config pins the admin API's accepted Host headers to
+  # `caddy:2019 / localhost:2019 / localhost`, and only one container on the
+  # network can answer to "caddy". The slave pair therefore shares a network
+  # namespace, so web-slave reaches its own Caddy on localhost:2019 — an
+  # accepted origin — while the address 172.28.0.13 belongs to the pair.
+  web-slave:
+    image: cpm-test/web:latest
+    container_name: cpm-test-web-slave
+    profiles: [sync]
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: test-session-secret-not-for-production-use-9876543210
+      CADDY_API_URL: http://localhost:2019
+      BASE_URL: http://web-slave:3000
+      NEXTAUTH_URL: http://web-slave:3000
+      DATABASE_PATH: /app/data/cpm.db
+      DATABASE_URL: file:/app/data/cpm.db
+      ADMIN_USERNAME: cpmadmin
+      ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - cpm-data-slave:/app/data
+      - caddy-logs-slave:/logs
+      - acme-ca-slave:/acme-ca
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.13
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  caddy-slave:
+    image: cpm-test/caddy:latest
+    container_name: cpm-test-caddy-slave
+    profiles: [sync]
+    # Shares web-slave's network namespace; see the note above.
+    network_mode: "service:web-slave"
+    environment:
+      PRIMARY_DOMAIN: slave.cpm.test
+    volumes:
+      - caddy-data-slave:/data
+      - caddy-config-slave:/config
+      - caddy-logs-slave:/logs
+      - acme-ca-slave:/acme-ca:ro
+    depends_on:
+      web-slave:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ── Simulated client ────────────────────────────────────────────────────
+  # The only container that drives the tests. It resolves test domains through
+  # dnsmasq exactly as a browser would, and reaches Caddy over TLS by name.
+  runner:
+    build:
+      context: ./images/runner
+    image: cpm-test/runner:latest
+    container_name: cpm-test-runner
+    command: ["sleep", "infinity"]
+    environment:
+      CPM_API: http://web:3000
+      CPM_ADMIN_USER: cpmadmin
+      CPM_ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
+      CPM_SLAVE_API: http://web-slave:3000
+      TEST_DOMAIN: cpm.test
+      CADDY_IP: 172.28.0.10
+      CLIENT_IP: 172.28.0.40
+      PEBBLE_DIRECTORY: https://pebble:14000/dir
+      PEBBLE_MGMT: https://pebble:15000
+      TEST_SYNC: ${CPM_TEST_SYNC:-0}
+      TEST_GEOBLOCK: ${CPM_TEST_GEOBLOCK:-1}
+      TEST_WAF: ${CPM_TEST_WAF:-1}
+    volumes:
+      - ./suite:/suite:ro
+      - test-certs:/certs:ro
+    depends_on:
+      web:
+        condition: service_healthy
+      dns:
+        condition: service_healthy
+      pebble:
+        condition: service_started
+      origin-a:
+        condition: service_healthy
+      origin-b:
+        condition: service_healthy
+      origin-tls:
+        condition: service_started
+      origin-tcp:
+        condition: service_started
+      origin-udp:
+        condition: service_started
+    dns:
+      - 172.28.0.5
+    networks:
+      cpm-test:
+        ipv4_address: 172.28.0.40

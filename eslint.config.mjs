@@ -6,7 +6,19 @@ export default [
   {
     // public/maplibre holds maplibre-gl's minified worker bundle, staged from
     // node_modules at build time by scripts/copy-maplibre-worker.mjs.
-    ignores: ['.next/**', 'out/**', 'build/**', 'next-env.d.ts', '.claude/**', 'public/maplibre/**'],
+    // `dist/**` and `coverage/**` are build/report output. They were not listed
+    // before, so running `bun run build` (which emits dist/standalone) and then
+    // `bun run lint` reported tens of thousands of errors in bundled code.
+    ignores: [
+      '.next/**',
+      'dist/**',
+      'coverage/**',
+      'out/**',
+      'build/**',
+      'next-env.d.ts',
+      '.claude/**',
+      'public/maplibre/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

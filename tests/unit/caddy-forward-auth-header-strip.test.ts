@@ -65,7 +65,12 @@ function isCpmStrip(h: unknown): boolean {
   if (handler?.handler !== 'headers') return false;
   const del = (handler.request as { delete?: string[] } | undefined)?.delete;
   if (!Array.isArray(del)) return false;
-  return CPM_HEADERS.every((name) => del.includes(name));
+  // Compared case-insensitively on purpose. What matters is that these headers
+  // are deleted; Caddy's delete goes through Go's canonicalising Header.Del, so
+  // the spelling in the config is free to change (and did, so the copy-back
+  // placeholder would resolve — see caddy-forward-auth-copy-headers.test.ts).
+  const lowered = del.map((name) => name.toLowerCase());
+  return CPM_HEADERS.every((name) => lowered.includes(name.toLowerCase()));
 }
 
 beforeEach(async () => {

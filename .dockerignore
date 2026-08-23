@@ -49,3 +49,7 @@ caddy-config/
 # Docker files
 docker-compose.yml
 docker-compose.*.yml
+
+# Docker-based integration test rig — its own build contexts live inside it,
+# and the web/caddy images never need any of it.
+docker-tests

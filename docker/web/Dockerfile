@@ -35,14 +35,13 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
     groupadd -g ${PGID} nodejs && \
     useradd -r -u ${PUID} -g nodejs nextjs
 
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+# vinext emits a self-contained bundle under dist/standalone: server.js, the
+# client and server chunks it loads, the public assets, and the pruned
+# node_modules it needs. Copying that directory verbatim preserves the relative
+# layout server.js expects, so nothing else from the build stage is required.
+COPY --from=builder --chown=nextjs:nodejs /app/dist/standalone ./
 
-COPY --from=builder --chown=nextjs:nodejs /app/.next/server/instrumentation.js ./.next/server/instrumentation.js
-COPY --from=builder --chown=nextjs:nodejs /app/.next/server/instrumentation ./.next/server/instrumentation
-COPY --from=builder --chown=nextjs:nodejs /app/.next/server/chunks/ ./.next/server/chunks/
+# Migrations are read at startup and live outside the bundle.
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data

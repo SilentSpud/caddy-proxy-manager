@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         **Are you in the right place?**
-        - If you are looking for support, please use [Discussions](https://github.com/fuomag9/caddy-proxy-manager/discussions).
+        - If you are looking for support, please use [Discussions](https://github.com/silentspud/caddy-proxy-manager/discussions).
         - If you think you found a bug with Caddy Proxy Manager, you are in the *right place*.
 
   - type: checkboxes

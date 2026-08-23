@@ -23,6 +23,38 @@ export function expandPrivateRanges(proxies: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Header names
+// ---------------------------------------------------------------------------
+
+/**
+ * Rewrites a header name into Go's canonical MIME form: each hyphen-separated
+ * word capitalised, the rest lower-cased. "X-CPM-User" becomes "X-Cpm-User".
+ *
+ * This matters for `{http.reverse_proxy.header.<name>}`. Go stores response
+ * headers under the canonical key and Caddy resolves that placeholder by
+ * indexing the map with the literal name from the placeholder — no
+ * case-folding — so a non-canonical spelling silently resolves to nothing and
+ * the placeholder text reaches the upstream verbatim (or, behind an
+ * emptiness guard, the header is dropped entirely).
+ */
+export function canonicalHeaderName(name: string): string {
+  return name
+    .split("-")
+    .map((part) =>
+      part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : part
+    )
+    .join("-");
+}
+
+/**
+ * The `{http.reverse_proxy.header.*}` placeholder for a response header, safe
+ * to use regardless of how the caller spelled the header name.
+ */
+export function upstreamHeaderPlaceholder(name: string): string {
+  return `{http.reverse_proxy.header.${canonicalHeaderName(name)}}`;
+}
+
+// ---------------------------------------------------------------------------
 // Type helpers
 // ---------------------------------------------------------------------------
 

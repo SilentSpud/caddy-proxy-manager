@@ -31,3 +31,4 @@ playwright-report/
 /public/maplibre/
 /geoip-data
 .vinext/
+/coverage

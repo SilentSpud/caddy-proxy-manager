@@ -49,5 +49,49 @@ export default defineConfig({
     onConsoleLog() {
       return false;
     },
+    coverage: {
+      provider: 'v8',
+      reportsDirectory: resolve(root, 'coverage'),
+      reporter: [
+        ['text', { maxCols: 120 }],   // terminal summary
+        'html',                        // coverage/index.html, line-by-line
+        'lcov',                        // for CI annotations / external tools
+        'json-summary',                // coverage/coverage-summary.json, for badges
+      ],
+
+      // Scoped to the code this suite is responsible for: the server-side
+      // library and the API route handlers. The dashboard UI is deliberately
+      // out of scope — it is exercised by Playwright (`bun run test:e2e`) and by
+      // the docker suite, and folding hundreds of untested component lines in
+      // here would turn the number into noise rather than a signal.
+      include: [
+        'src/lib/**/*.{ts,tsx}',
+        'src/instrumentation.ts',
+        'app/api/**/*.ts',
+      ],
+      exclude: [
+        '**/*.d.ts',
+        // Type-only and generated modules have no executable statements to
+        // cover; leaving them in only drags the denominator around.
+        'src/lib/db/schema.ts',
+        'app/api/v1/openapi.json/**',
+      ],
+
+      // Note there is no `all: true` here — Vitest 4 dropped the option because
+      // `include` already governs it: every matching file is reported whether or
+      // not a test imported it. That is the behaviour we want, since a module
+      // with no tests at all is exactly the case worth seeing.
+
+      // A ratchet, not an aspiration: these sit just under the numbers the
+      // suite actually achieves today (54.2 / 50.6 / 54.6 / 54.5), so a real
+      // drop fails the run while ordinary churn does not. Raise them as
+      // coverage improves; do not lower them to make a build pass.
+      thresholds: {
+        statements: 53,
+        branches: 49,
+        functions: 53,
+        lines: 53,
+      },
+    },
   },
 });
