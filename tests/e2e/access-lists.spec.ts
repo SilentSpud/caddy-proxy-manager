@@ -15,10 +15,10 @@ const API = 'http://localhost:3000/api/v1/access-lists';
 async function apiCreateList(
   page: Page,
   name: string,
-  opts?: { description?: string; users?: { username: string; password: string }[] }
+  opts?: { description?: string; users?: { username: string; password: string }[] },
 ) {
   const res = await page.request.post(API, {
-    headers: { 'Content-Type': 'application/json', 'Origin': 'http://localhost:3000' },
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3000' },
     data: {
       name,
       description: opts?.description ?? null,
@@ -33,9 +33,11 @@ async function apiCreateList(
 /** Helper: delete an access list via the REST API (silent on 404). */
 async function apiDeleteList(page: Page, id: number) {
   if (id < 0) return;
-  await page.request.delete(`${API}/${id}`, {
-    headers: { 'Origin': 'http://localhost:3000' },
-  }).catch(() => undefined);
+  await page.request
+    .delete(`${API}/${id}`, {
+      headers: { Origin: 'http://localhost:3000' },
+    })
+    .catch(() => undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +83,7 @@ test.describe('Access Lists — empty state', () => {
   test('shows "Select an access list" when no list is selected', async ({ page }) => {
     // Delete all lists first to ensure empty state
     const res = await page.request.get(API);
-    const lists = await res.json() as { id: number }[];
+    const lists = (await res.json()) as { id: number }[];
     for (const l of lists) {
       await apiDeleteList(page, l.id);
     }
@@ -136,7 +138,7 @@ test.describe('Access Lists — create dialog', () => {
 
     // Cleanup
     const res = await page.request.get(API);
-    const lists = await res.json() as { id: number; name: string }[];
+    const lists = (await res.json()) as { id: number; name: string }[];
     const created = lists.find((l) => l.name === listName);
     if (created) await apiDeleteList(page, created.id);
   });
@@ -156,7 +158,7 @@ test.describe('Access Lists — create dialog', () => {
 
     // Cleanup
     const res = await page.request.get(API);
-    const lists = await res.json() as { id: number; name: string }[];
+    const lists = (await res.json()) as { id: number; name: string }[];
     const created = lists.find((l) => l.name === listName);
     if (created) await apiDeleteList(page, created.id);
   });
@@ -174,11 +176,13 @@ test.describe('Access Lists — create dialog', () => {
 
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     // Detail header should show "1 member" badge
-    await expect(page.getByText('1 member', { exact: false }).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('1 member', { exact: false }).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Cleanup
     const res = await page.request.get(API);
-    const lists = await res.json() as { id: number; name: string }[];
+    const lists = (await res.json()) as { id: number; name: string }[];
     const created = lists.find((l) => l.name === listName);
     if (created) await apiDeleteList(page, created.id);
   });
@@ -525,7 +529,10 @@ test.describe('Access Lists — members tab', () => {
     await headerCheckbox.check();
     await expect(page.getByText('2 selected')).toBeVisible();
 
-    await page.getByRole('button', { name: /remove/i }).first().click();
+    await page
+      .getByRole('button', { name: /remove/i })
+      .first()
+      .click();
 
     await expect(page.getByText('0 members').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('No members yet')).toBeVisible();
@@ -703,7 +710,7 @@ test.describe('Access Lists — used-by tab', () => {
     const proxyApi = 'http://localhost:3000/api/v1/proxy-hosts';
 
     const hostRes = await page.request.post(proxyApi, {
-      headers: { 'Content-Type': 'application/json', 'Origin': 'http://localhost:3000' },
+      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3000' },
       data: {
         name: 'E2E Usage Host',
         domains: ['usage-test.local'],
@@ -712,7 +719,7 @@ test.describe('Access Lists — used-by tab', () => {
       },
     });
     expect(hostRes.ok()).toBeTruthy();
-    const host = await hostRes.json() as { id: number };
+    const host = (await hostRes.json()) as { id: number };
 
     try {
       await page.goto('/access-lists');
@@ -724,7 +731,7 @@ test.describe('Access Lists — used-by tab', () => {
       await expect(page.getByText('active')).toBeVisible();
     } finally {
       await page.request.delete(`${proxyApi}/${host.id}`, {
-        headers: { 'Origin': 'http://localhost:3000' },
+        headers: { Origin: 'http://localhost:3000' },
       });
     }
   });

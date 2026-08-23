@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import db, { nowIso } from "@/src/lib/db";
 import { pendingOAuthLinks } from "@/src/lib/db/schema";
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (rateLimitResult.blocked) {
       return NextResponse.json(
         { error: "Too many OAuth linking attempts. Please try again later." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -48,12 +48,9 @@ export async function POST(request: NextRequest) {
 
     // Delete any existing pending link for THIS USER and this provider
     // (unique index will prevent duplicates, but we delete explicitly for clarity)
-    await db.delete(pendingOAuthLinks).where(
-      and(
-        eq(pendingOAuthLinks.userId, userId),
-        eq(pendingOAuthLinks.provider, provider)
-      )
-    );
+    await db
+      .delete(pendingOAuthLinks)
+      .where(and(eq(pendingOAuthLinks.userId, userId), eq(pendingOAuthLinks.provider, provider)));
 
     // Insert new pending link record for THIS USER only
     await db.insert(pendingOAuthLinks).values({
@@ -61,15 +58,12 @@ export async function POST(request: NextRequest) {
       provider,
       userEmail,
       createdAt: nowIso(),
-      expiresAt: expiresAt.toISOString()
+      expiresAt: expiresAt.toISOString(),
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("OAuth linking start error:", error);
-    return NextResponse.json(
-      { error: "Failed to start OAuth linking" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to start OAuth linking" }, { status: 500 });
   }
 }

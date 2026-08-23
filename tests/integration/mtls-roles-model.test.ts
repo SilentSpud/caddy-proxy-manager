@@ -5,11 +5,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestDb, type TestDb } from '../helpers/db';
-import {
-  issuedClientCertificates,
-  caCertificates,
-  users,
-} from '../../src/lib/db/schema';
+import { issuedClientCertificates, caCertificates, users } from '../../src/lib/db/schema';
 
 let db: TestDb;
 
@@ -17,7 +13,9 @@ let db: TestDb;
 vi.mock('../../src/lib/db', async () => {
   // This gets re-evaluated per test via beforeEach
   return {
-    get default() { return db; },
+    get default() {
+      return db;
+    },
     nowIso: () => new Date().toISOString(),
     toIso: (v: string | null) => v,
   };
@@ -31,41 +29,83 @@ beforeEach(async () => {
   vi.clearAllMocks();
   // Seed a user to satisfy FK constraints on createdBy
   const now = new Date().toISOString();
-  const [user] = await db.insert(users).values({
-    email: 'admin@test', name: 'Admin', role: 'admin',
-    provider: 'credentials', subject: 'admin@test', status: 'active',
-    createdAt: now, updatedAt: now,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: 'admin@test',
+      name: 'Admin',
+      role: 'admin',
+      provider: 'credentials',
+      subject: 'admin@test',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   userId = user.id;
 });
 
-function nowIso() { return new Date().toISOString(); }
+function nowIso() {
+  return new Date().toISOString();
+}
 
 async function seedCaAndCerts() {
   const now = nowIso();
-  const [ca] = await db.insert(caCertificates).values({
-    name: 'Test CA',
-    certificatePem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----',
-    createdAt: now, updatedAt: now,
-  }).returning();
+  const [ca] = await db
+    .insert(caCertificates)
+    .values({
+      name: 'Test CA',
+      certificatePem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  const [cert1] = await db.insert(issuedClientCertificates).values({
-    caCertificateId: ca.id, commonName: 'alice', serialNumber: '001',
-    fingerprintSha256: 'AA:BB:CC:DD', certificatePem: '-----BEGIN CERTIFICATE-----\nALICE\n-----END CERTIFICATE-----',
-    validFrom: now, validTo: now, createdAt: now, updatedAt: now,
-  }).returning();
+  const [cert1] = await db
+    .insert(issuedClientCertificates)
+    .values({
+      caCertificateId: ca.id,
+      commonName: 'alice',
+      serialNumber: '001',
+      fingerprintSha256: 'AA:BB:CC:DD',
+      certificatePem: '-----BEGIN CERTIFICATE-----\nALICE\n-----END CERTIFICATE-----',
+      validFrom: now,
+      validTo: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  const [cert2] = await db.insert(issuedClientCertificates).values({
-    caCertificateId: ca.id, commonName: 'bob', serialNumber: '002',
-    fingerprintSha256: 'EE:FF:00:11', certificatePem: '-----BEGIN CERTIFICATE-----\nBOB\n-----END CERTIFICATE-----',
-    validFrom: now, validTo: now, createdAt: now, updatedAt: now,
-  }).returning();
+  const [cert2] = await db
+    .insert(issuedClientCertificates)
+    .values({
+      caCertificateId: ca.id,
+      commonName: 'bob',
+      serialNumber: '002',
+      fingerprintSha256: 'EE:FF:00:11',
+      certificatePem: '-----BEGIN CERTIFICATE-----\nBOB\n-----END CERTIFICATE-----',
+      validFrom: now,
+      validTo: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
-  const [revokedCert] = await db.insert(issuedClientCertificates).values({
-    caCertificateId: ca.id, commonName: 'revoked-user', serialNumber: '003',
-    fingerprintSha256: '99:88:77:66', certificatePem: '-----BEGIN CERTIFICATE-----\nREVOKED\n-----END CERTIFICATE-----',
-    validFrom: now, validTo: now, revokedAt: now, createdAt: now, updatedAt: now,
-  }).returning();
+  const [revokedCert] = await db
+    .insert(issuedClientCertificates)
+    .values({
+      caCertificateId: ca.id,
+      commonName: 'revoked-user',
+      serialNumber: '003',
+      fingerprintSha256: '99:88:77:66',
+      certificatePem: '-----BEGIN CERTIFICATE-----\nREVOKED\n-----END CERTIFICATE-----',
+      validFrom: now,
+      validTo: now,
+      revokedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
 
   return { ca, cert1, cert2, revokedCert };
 }
@@ -219,7 +259,7 @@ describe('mtls-roles certificate assignments', () => {
 
     const roles = await getCertificateRoles(cert1.id);
     expect(roles).toHaveLength(2);
-    expect(roles.map(r => r.name).sort()).toEqual(['admin', 'viewer']);
+    expect(roles.map((r) => r.name).sort()).toEqual(['admin', 'viewer']);
   });
 
   it('getCertificateRoles returns empty array for cert with no roles', async () => {

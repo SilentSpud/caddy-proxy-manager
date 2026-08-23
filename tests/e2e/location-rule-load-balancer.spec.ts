@@ -11,7 +11,9 @@ import { test, expect } from '@playwright/test';
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 
 test.describe('Location rule load balancer', () => {
-  test('creates and reads back a location rule with load balancer + health checks', async ({ page }) => {
+  test('creates and reads back a location rule with load balancer + health checks', async ({
+    page,
+  }) => {
     await page.goto('/proxy-hosts');
     const origin = new URL(page.url()).origin;
     const headers = { Origin: origin };
@@ -29,8 +31,20 @@ test.describe('Location rule load balancer', () => {
             policy: 'round_robin',
             tryDuration: '5s',
             retries: 3,
-            activeHealthCheck: { enabled: true, uri: '/health', port: 8081, interval: '30s', timeout: '5s', status: 200 },
-            passiveHealthCheck: { enabled: true, failDuration: '30s', maxFails: 5, unhealthyStatus: [500, 502, 503] },
+            activeHealthCheck: {
+              enabled: true,
+              uri: '/health',
+              port: 8081,
+              interval: '30s',
+              timeout: '5s',
+              status: 200,
+            },
+            passiveHealthCheck: {
+              enabled: true,
+              failDuration: '30s',
+              maxFails: 5,
+              unhealthyStatus: [500, 502, 503],
+            },
           },
         },
       ],

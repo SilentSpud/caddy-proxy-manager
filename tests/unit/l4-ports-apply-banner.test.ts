@@ -15,10 +15,16 @@ import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-const BANNER_PATH = resolve(moduleDir, '../../src/components/l4-proxy-hosts/L4PortsApplyBanner.tsx');
+const BANNER_PATH = resolve(
+  moduleDir,
+  '../../src/components/l4-proxy-hosts/L4PortsApplyBanner.tsx',
+);
 const banner = readFileSync(BANNER_PATH, 'utf-8');
 
-const CLIENT_PATH = resolve(moduleDir, '../../app/(dashboard)/l4-proxy-hosts/L4ProxyHostsClient.tsx');
+const CLIENT_PATH = resolve(
+  moduleDir,
+  '../../app/(dashboard)/l4-proxy-hosts/L4ProxyHostsClient.tsx',
+);
 const client = readFileSync(CLIENT_PATH, 'utf-8');
 
 describe('L4PortsApplyBanner', () => {

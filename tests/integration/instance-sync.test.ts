@@ -153,11 +153,15 @@ describe('buildSyncPayload', () => {
   });
 
   it('includes multiple L4 proxy hosts', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ name: 'PG', listenAddress: ':5432' }));
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ name: 'MySQL', listenAddress: ':3306' }));
+    await ctx.db
+      .insert(schema.l4ProxyHosts)
+      .values(makeL4Host({ name: 'PG', listenAddress: ':5432' }));
+    await ctx.db
+      .insert(schema.l4ProxyHosts)
+      .values(makeL4Host({ name: 'MySQL', listenAddress: ':3306' }));
     const payload = await buildSyncPayload();
     expect(payload.data.l4ProxyHosts).toHaveLength(2);
-    const addresses = payload.data.l4ProxyHosts!.map(h => h.listenAddress).sort();
+    const addresses = payload.data.l4ProxyHosts!.map((h) => h.listenAddress).sort();
     expect(addresses).toEqual([':3306', ':5432']);
   });
 
@@ -201,7 +205,9 @@ describe('buildSyncPayload', () => {
       updatedAt: nowIso(),
     });
     const payload = await buildSyncPayload();
-    expect(payload.settings.acme).toEqual({ caUrl: 'https://ca.internal.example.com/acme/acme/directory' });
+    expect(payload.settings.acme).toEqual({
+      caUrl: 'https://ca.internal.example.com/acme/acme/directory',
+    });
   });
 
   it('includes generated_at as an ISO date string', async () => {
@@ -222,9 +228,9 @@ describe('buildSyncPayload', () => {
   });
 
   it('includes proxy host data fields correctly', async () => {
-    await ctx.db.insert(schema.proxyHosts).values(
-      makeProxyHost({ name: 'My Host', domains: JSON.stringify(['myhost.example.com']) })
-    );
+    await ctx.db
+      .insert(schema.proxyHosts)
+      .values(makeProxyHost({ name: 'My Host', domains: JSON.stringify(['myhost.example.com']) }));
     const payload = await buildSyncPayload();
     expect(payload.data.proxyHosts[0].name).toBe('My Host');
     expect(JSON.parse(payload.data.proxyHosts[0].domains)).toEqual(['myhost.example.com']);
@@ -267,13 +273,16 @@ describe('buildSyncPayload', () => {
 
   it('includes access list entries unchanged', async () => {
     const now = nowIso();
-    const [list] = await ctx.db.insert(schema.accessLists).values({
-      name: 'List A',
-      description: null,
-      createdBy: null,
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [list] = await ctx.db
+      .insert(schema.accessLists)
+      .values({
+        name: 'List A',
+        description: null,
+        createdBy: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
     await ctx.db.insert(schema.accessListEntries).values({
       accessListId: list.id,
       username: 'user1',
@@ -461,7 +470,9 @@ describe('applySyncPayload', () => {
       where: (t, { eq }) => eq(t.key, 'synced:acme'),
     });
     expect(row).toBeDefined();
-    expect(JSON.parse(row!.value)).toEqual({ caUrl: 'https://ca.internal.example.com/acme/acme/directory' });
+    expect(JSON.parse(row!.value)).toEqual({
+      caUrl: 'https://ca.internal.example.com/acme/acme/directory',
+    });
   });
 
   it('stores synced trusted proxies settings with synced: prefix', async () => {
@@ -494,10 +505,24 @@ describe('applySyncPayload', () => {
     const now = nowIso();
     const payload = emptyPayload();
     payload.data.accessLists = [
-      { id: 1, name: 'Synced List', description: null, createdBy: null, createdAt: now, updatedAt: now },
+      {
+        id: 1,
+        name: 'Synced List',
+        description: null,
+        createdBy: null,
+        createdAt: now,
+        updatedAt: now,
+      },
     ];
     payload.data.accessListEntries = [
-      { id: 1, accessListId: 1, username: 'synceduser', passwordHash: '$2b$10$fakehash', createdAt: now, updatedAt: now },
+      {
+        id: 1,
+        accessListId: 1,
+        username: 'synceduser',
+        passwordHash: '$2b$10$fakehash',
+        createdAt: now,
+        updatedAt: now,
+      },
     ];
 
     await applySyncPayload(payload);
@@ -558,7 +583,9 @@ describe('applySyncPayload', () => {
   });
 
   it('replaces existing L4 proxy hosts with payload contents', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ name: 'Old L4', listenAddress: ':9999' }));
+    await ctx.db
+      .insert(schema.l4ProxyHosts)
+      .values(makeL4Host({ name: 'Old L4', listenAddress: ':9999' }));
 
     const now = nowIso();
     const payload = emptyPayload();
@@ -639,7 +666,10 @@ describe('applySyncPayload', () => {
   it('does not write trigger file when L4 ports already match after sync', async () => {
     const { writeFileSync } = await import('node:fs');
     // Pre-write override file matching the incoming payload port
-    writeFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), `services:\n  caddy:\n    ports:\n      - "5432:5432"\n`);
+    writeFileSync(
+      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
+      `services:\n  caddy:\n    ports:\n      - "5432:5432"\n`,
+    );
 
     const now = nowIso();
     const payload = emptyPayload();

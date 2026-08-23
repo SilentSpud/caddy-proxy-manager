@@ -115,11 +115,16 @@ describe('suppressWafRuleForHostAction port normalization', () => {
 
   it('appends to existing excluded_rule_ids without duplicating', async () => {
     listProxyHostsMock.mockResolvedValueOnce([
-      { ...fakeHost, waf: { enabled: true, waf_mode: 'merge' as const, excluded_rule_ids: [941100, 920100] } },
+      {
+        ...fakeHost,
+        waf: { enabled: true, waf_mode: 'merge' as const, excluded_rule_ids: [941100, 920100] },
+      },
     ]);
     const result = await suppressWafRuleForHostAction(941100, 'app.example.com:443');
     expect(result.success).toBe(true);
-    const updateArg = updateProxyHostMock.mock.calls[0]![1] as { waf: { excluded_rule_ids: number[] } };
+    const updateArg = updateProxyHostMock.mock.calls[0]![1] as {
+      waf: { excluded_rule_ids: number[] };
+    };
     expect(updateArg.waf.excluded_rule_ids.sort()).toEqual([920100, 941100]);
   });
 });

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/src/lib/db";
 import { config } from "@/src/lib/config";
@@ -6,7 +6,7 @@ import {
   createForwardAuthSession,
   createExchangeCode,
   checkHostAccessByDomain,
-  consumeRedirectIntent
+  consumeRedirectIntent,
 } from "@/src/lib/models/forward-auth";
 import { logAuditEvent } from "@/src/lib/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     if (config.auth.disableLocalUsers) {
       return NextResponse.json(
         { error: "Password sign-in is disabled. Use single sign-on." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -54,14 +54,14 @@ export async function POST(request: NextRequest) {
     if (rateLimitResult.blocked) {
       return NextResponse.json(
         { error: "Too many login attempts. Please try again later." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     // Authenticate using the same logic as the credentials provider
     const email = `${username}@localhost`;
     const user = await db.query.users.findFirst({
-      where: (table, operators) => operators.eq(table.email, email)
+      where: (table, operators) => operators.eq(table.email, email),
     });
 
     if (!user || user.status !== "active" || !user.passwordHash) {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         userId: null,
         action: "forward_auth_login_failed",
         entityType: "user",
-        summary: `Forward auth login failed for username: ${username}`
+        summary: `Forward auth login failed for username: ${username}`,
       });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         action: "forward_auth_login_failed",
         entityType: "user",
         entityId: user.id,
-        summary: `Forward auth login failed for user ${user.email}`
+        summary: `Forward auth login failed for user ${user.email}`,
       });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
@@ -95,7 +95,10 @@ export async function POST(request: NextRequest) {
     // This is a one-time operation: the intent is deleted after consumption.
     const redirectUri = await consumeRedirectIntent(rid);
     if (!redirectUri) {
-      return NextResponse.json({ error: "Invalid or expired redirect intent. Please try again." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid or expired redirect intent. Please try again." },
+        { status: 400 },
+      );
     }
 
     const targetUrl = new URL(redirectUri);
@@ -107,11 +110,11 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         action: "forward_auth_access_denied",
         entityType: "proxy_host",
-        summary: `Forward auth access denied for user ${user.email} to host ${targetUrl.hostname}`
+        summary: `Forward auth access denied for user ${user.email} to host ${targetUrl.hostname}`,
       });
       return NextResponse.json(
         { error: "You do not have access to this application." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -124,7 +127,7 @@ export async function POST(request: NextRequest) {
       action: "forward_auth_login",
       entityType: "user",
       entityId: user.id,
-      summary: `Forward auth login for user ${user.email} to ${targetUrl.hostname}`
+      summary: `Forward auth login for user ${user.email} to ${targetUrl.hostname}`,
     });
 
     // Build callback URL on the target domain

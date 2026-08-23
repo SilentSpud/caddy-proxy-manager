@@ -36,8 +36,11 @@ type RuleRow = typeof mtlsAccessRules.$inferSelect;
 function parseJsonIds(raw: string): number[] {
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.filter((n: unknown) => typeof n === "number" && Number.isFinite(n));
-  } catch { /* ignore */ }
+    if (Array.isArray(parsed))
+      return parsed.filter((n: unknown) => typeof n === "number" && Number.isFinite(n));
+  } catch {
+    /* ignore */
+  }
   return [];
 }
 
@@ -76,7 +79,7 @@ export async function getMtlsAccessRule(id: number): Promise<MtlsAccessRule | nu
 
 export async function createMtlsAccessRule(
   input: MtlsAccessRuleInput,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<MtlsAccessRule> {
   const now = nowIso();
   const [record] = await db
@@ -112,7 +115,7 @@ export async function createMtlsAccessRule(
 export async function updateMtlsAccessRule(
   id: number,
   input: Partial<Omit<MtlsAccessRuleInput, "proxyHostId">>,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<MtlsAccessRule> {
   const existing = await db.query.mtlsAccessRules.findFirst({
     where: (table, { eq: cmpEq }) => cmpEq(table.id, id),
@@ -123,8 +126,10 @@ export async function updateMtlsAccessRule(
   const updates: Partial<typeof mtlsAccessRules.$inferInsert> = { updatedAt: now };
 
   if (input.pathPattern !== undefined) updates.pathPattern = input.pathPattern.trim();
-  if (input.allowedRoleIds !== undefined) updates.allowedRoleIds = JSON.stringify(input.allowedRoleIds);
-  if (input.allowedCertIds !== undefined) updates.allowedCertIds = JSON.stringify(input.allowedCertIds);
+  if (input.allowedRoleIds !== undefined)
+    updates.allowedRoleIds = JSON.stringify(input.allowedRoleIds);
+  if (input.allowedCertIds !== undefined)
+    updates.allowedCertIds = JSON.stringify(input.allowedCertIds);
   if (input.denyAll !== undefined) updates.denyAll = input.denyAll;
   if (input.priority !== undefined) updates.priority = input.priority;
   if (input.description !== undefined) updates.description = input.description ?? null;
@@ -143,10 +148,7 @@ export async function updateMtlsAccessRule(
   return (await getMtlsAccessRule(id))!;
 }
 
-export async function deleteMtlsAccessRule(
-  id: number,
-  actorUserId: number
-): Promise<void> {
+export async function deleteMtlsAccessRule(id: number, actorUserId: number): Promise<void> {
   const existing = await db.query.mtlsAccessRules.findFirst({
     where: (table, { eq: cmpEq }) => cmpEq(table.id, id),
   });
@@ -170,7 +172,7 @@ export async function deleteMtlsAccessRule(
  * Used during Caddy config generation.
  */
 export async function getAccessRulesForHosts(
-  proxyHostIds: number[]
+  proxyHostIds: number[],
 ): Promise<Map<number, MtlsAccessRule[]>> {
   if (proxyHostIds.length === 0) return new Map();
 

@@ -40,9 +40,7 @@ export function expandPrivateRanges(proxies: string[]): string[] {
 export function canonicalHeaderName(name: string): string {
   return name
     .split("-")
-    .map((part) =>
-      part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : part
-    )
+    .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : part))
     .join("-");
 }
 
@@ -66,10 +64,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 // Deep merge (prototype-pollution safe)
 // ---------------------------------------------------------------------------
 
-export function mergeDeep(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>
-) {
+export function mergeDeep(target: Record<string, unknown>, source: Record<string, unknown>) {
   for (const [key, value] of Object.entries(source)) {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       continue;
@@ -107,9 +102,7 @@ export function parseOptionalJson(value: string | null | undefined) {
   }
 }
 
-export function parseCustomHandlers(
-  value: string | null | undefined
-): Record<string, unknown>[] {
+export function parseCustomHandlers(value: string | null | undefined): Record<string, unknown>[] {
   const parsed = parseOptionalJson(value);
   if (!parsed) return [];
   const list = Array.isArray(parsed) ? parsed : [parsed];
@@ -132,9 +125,7 @@ export function formatDialAddress(host: string, port: string) {
   return isIP(host) === 6 ? `[${host}]:${port}` : `${host}:${port}`;
 }
 
-export function parseHostPort(
-  value: string
-): { host: string; port: string } | null {
+export function parseHostPort(value: string): { host: string; port: string } | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
 

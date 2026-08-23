@@ -10,7 +10,9 @@ test.describe('Profile', () => {
   test('profile page shows username or email', async ({ page }) => {
     await page.goto('/profile');
     // Use first() since username appears in sidebar + profile body
-    await expect(page.locator('text=/testadmin|testadmin@/i').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=/testadmin|testadmin@/i').first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('Change Password button is visible', async ({ page }) => {
@@ -28,7 +30,10 @@ test.describe('Profile', () => {
     await page.getByLabel('New Password', { exact: true }).fill('NewPassword2026!');
     await page.getByLabel('Confirm New Password', { exact: true }).fill('NewPassword2026!');
 
-    await page.getByRole('button', { name: /change password|set password/i }).last().click();
+    await page
+      .getByRole('button', { name: /change password|set password/i })
+      .last()
+      .click();
 
     // Should show an error alert
     await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 10000 });
@@ -43,7 +48,10 @@ test.describe('Profile', () => {
     await page.getByLabel('New Password', { exact: true }).fill('short');
     await page.getByLabel('Confirm New Password', { exact: true }).fill('short');
 
-    await page.getByRole('button', { name: /change password|set password/i }).last().click();
+    await page
+      .getByRole('button', { name: /change password|set password/i })
+      .last()
+      .click();
 
     await expect(page.locator('text=/at least 12 characters/i')).toBeVisible({ timeout: 5000 });
   });

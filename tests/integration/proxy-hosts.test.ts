@@ -15,21 +15,24 @@ function nowIso() {
 
 async function insertProxyHost(overrides: Partial<typeof proxyHosts.$inferInsert> = {}) {
   const now = nowIso();
-  const [host] = await db.insert(proxyHosts).values({
-    name: 'Test Host',
-    domains: JSON.stringify(['example.com']),
-    upstreams: JSON.stringify(['localhost:8080']),
-    sslForced: true,
-    hstsEnabled: true,
-    hstsSubdomains: false,
-    allowWebsocket: true,
-    preserveHostHeader: true,
-    skipHttpsHostnameValidation: false,
-    enabled: true,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [host] = await db
+    .insert(proxyHosts)
+    .values({
+      name: 'Test Host',
+      domains: JSON.stringify(['example.com']),
+      upstreams: JSON.stringify(['localhost:8080']),
+      sslForced: true,
+      hstsEnabled: true,
+      hstsSubdomains: false,
+      allowWebsocket: true,
+      preserveHostHeader: true,
+      skipHttpsHostnameValidation: false,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return host;
 }
 
@@ -43,7 +46,10 @@ describe('proxy-hosts integration', () => {
 
   it('inserts proxy host with upstreams array — retrieved correctly', async () => {
     const upstreams = ['app1:8080', 'app2:8080'];
-    const host = await insertProxyHost({ upstreams: JSON.stringify(upstreams), name: 'Load Balanced' });
+    const host = await insertProxyHost({
+      upstreams: JSON.stringify(upstreams),
+      name: 'Load Balanced',
+    });
     const row = await db.query.proxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
     expect(JSON.parse(row!.upstreams)).toEqual(upstreams);
   });
@@ -128,7 +134,10 @@ describe('proxy-hosts integration', () => {
     const row = await db.query.proxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
     const meta = JSON.parse(row!.meta ?? '{}');
     expect(meta.location_rules).toHaveLength(2);
-    expect(meta.location_rules[0]).toMatchObject({ path: '/ws/*', upstreams: ['ws-backend:8080', 'ws-backend2:8080'] });
+    expect(meta.location_rules[0]).toMatchObject({
+      path: '/ws/*',
+      upstreams: ['ws-backend:8080', 'ws-backend2:8080'],
+    });
     expect(meta.location_rules[1]).toMatchObject({ path: '/api/*', upstreams: ['api:3000'] });
   });
 
@@ -153,10 +162,10 @@ describe('proxy-hosts integration', () => {
 
   it('filters out invalid redirect rules on parse', async () => {
     const redirects = [
-      { from: '', to: '/valid', status: 301 },        // missing from — invalid
-      { from: '/valid', to: '', status: 301 },         // missing to — invalid
-      { from: '/ok', to: '/dest', status: 999 },       // bad status — invalid
-      { from: '/good', to: '/dest', status: 302 },     // valid
+      { from: '', to: '/valid', status: 301 }, // missing from — invalid
+      { from: '/valid', to: '', status: 301 }, // missing to — invalid
+      { from: '/ok', to: '/dest', status: 999 }, // bad status — invalid
+      { from: '/good', to: '/dest', status: 302 }, // valid
     ];
     const host = await insertProxyHost({
       name: 'test-filter',
@@ -166,7 +175,7 @@ describe('proxy-hosts integration', () => {
     // Simulate parseMeta sanitization: only valid rules have non-empty from/to and valid status
     const meta = JSON.parse(row!.meta ?? '{}');
     const valid = (meta.redirects as typeof redirects).filter(
-      (r) => r.from.trim() && r.to.trim() && [301, 302, 307, 308].includes(r.status)
+      (r) => r.from.trim() && r.to.trim() && [301, 302, 307, 308].includes(r.status),
     );
     expect(valid).toHaveLength(1);
     expect(valid[0].from).toBe('/good');

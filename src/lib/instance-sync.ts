@@ -1,5 +1,13 @@
 import db, { nowIso } from "./db";
-import { accessListEntries, accessLists, caCertificates, certificates, issuedClientCertificates, l4ProxyHosts, proxyHosts } from "./db/schema";
+import {
+  accessListEntries,
+  accessLists,
+  caCertificates,
+  certificates,
+  issuedClientCertificates,
+  l4ProxyHosts,
+  proxyHosts,
+} from "./db/schema";
 import { getSetting, setSetting } from "./settings";
 import { recordInstanceSyncResult, updateInstance } from "./models/instances";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
@@ -167,7 +175,9 @@ export async function getInstanceMode(): Promise<InstanceMode> {
 export async function setInstanceMode(mode: InstanceMode): Promise<void> {
   // If mode is set via environment, don't allow changing it
   if (isInstanceModeFromEnv()) {
-    console.warn("Instance mode is configured via INSTANCE_MODE environment variable and cannot be changed at runtime");
+    console.warn(
+      "Instance mode is configured via INSTANCE_MODE environment variable and cannot be changed at runtime",
+    );
     return;
   }
   await setSetting(INSTANCE_MODE_KEY, mode);
@@ -204,7 +214,9 @@ export async function getSlaveMasterToken(): Promise<string | null> {
 export async function setSlaveMasterToken(token: string | null): Promise<void> {
   // If token is set via environment, don't allow changing it
   if (isSyncTokenFromEnv()) {
-    console.warn("Sync token is configured via INSTANCE_SYNC_TOKEN environment variable and cannot be changed at runtime");
+    console.warn(
+      "Sync token is configured via INSTANCE_SYNC_TOKEN environment variable and cannot be changed at runtime",
+    );
     return;
   }
   const next = token ? encryptSecret(token) : "";
@@ -214,18 +226,21 @@ export async function setSlaveMasterToken(token: string | null): Promise<void> {
 export async function getSlaveLastSync(): Promise<{ at: string | null; error: string | null }> {
   const [at, error] = await Promise.all([
     getSetting<string>(SLAVE_LAST_SYNC_AT_KEY),
-    getSetting<string>(SLAVE_LAST_SYNC_ERROR_KEY)
+    getSetting<string>(SLAVE_LAST_SYNC_ERROR_KEY),
   ]);
 
   return {
     at: at ?? null,
-    error: error && error.length > 0 ? error : null
+    error: error && error.length > 0 ? error : null,
   };
 }
 
 export async function setSlaveLastSync(result: { ok: boolean; error?: string | null }) {
   await setSetting(SLAVE_LAST_SYNC_AT_KEY, nowIso());
-  await setSetting(SLAVE_LAST_SYNC_ERROR_KEY, result.ok ? "" : result.error ?? "Unknown sync error");
+  await setSetting(
+    SLAVE_LAST_SYNC_ERROR_KEY,
+    result.ok ? "" : (result.error ?? "Unknown sync error"),
+  );
 }
 
 export async function getSyncedSetting<T>(key: string): Promise<T | null> {
@@ -241,7 +256,15 @@ export async function clearSyncedSetting(key: string): Promise<void> {
 }
 
 export async function buildSyncPayload(): Promise<SyncPayload> {
-  const [certRows, caCertRows, issuedClientCertRows, accessListRows, accessEntryRows, proxyRows, l4Rows] = await Promise.all([
+  const [
+    certRows,
+    caCertRows,
+    issuedClientCertRows,
+    accessListRows,
+    accessEntryRows,
+    proxyRows,
+    l4Rows,
+  ] = await Promise.all([
     db.select().from(certificates),
     db.select().from(caCertificates),
     db.select().from(issuedClientCertificates),
@@ -270,32 +293,32 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
 
   const sanitizedAccessLists = accessListRows.map((row) => ({
     ...row,
-    createdBy: null
+    createdBy: null,
   }));
 
   const sanitizedCertificates = certRows.map((row) => ({
     ...row,
-    createdBy: null
+    createdBy: null,
   }));
 
   const sanitizedCaCertificates = caCertRows.map((row) => ({
     ...row,
-    createdBy: null
+    createdBy: null,
   }));
 
   const sanitizedIssuedClientCertificates = issuedClientCertRows.map((row) => ({
     ...row,
-    createdBy: null
+    createdBy: null,
   }));
 
   const sanitizedProxyHosts = proxyRows.map((row) => ({
     ...row,
-    ownerUserId: null
+    ownerUserId: null,
   }));
 
   const sanitizedL4ProxyHosts = l4Rows.map((row) => ({
     ...row,
-    ownerUserId: null
+    ownerUserId: null,
   }));
 
   return {
@@ -309,11 +332,16 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
       accessListEntries: accessEntryRows,
       proxyHosts: sanitizedProxyHosts,
       l4ProxyHosts: sanitizedL4ProxyHosts,
-    }
+    },
   };
 }
 
-export async function syncInstances(): Promise<{ total: number; success: number; failed: number; skippedHttp: number }> {
+export async function syncInstances(): Promise<{
+  total: number;
+  success: number;
+  failed: number;
+  skippedHttp: number;
+}> {
   const mode = await getInstanceMode();
   if (mode !== "master") {
     return { total: 0, success: 0, failed: 0, skippedHttp: 0 };
@@ -321,7 +349,7 @@ export async function syncInstances(): Promise<{ total: number; success: number;
 
   // Get database-configured instances
   const dbTargets = await db.query.instances.findMany({
-    where: (table, operators) => operators.eq(table.enabled, true)
+    where: (table, operators) => operators.eq(table.enabled, true),
   });
 
   // Get environment-configured instances
@@ -350,13 +378,17 @@ export async function syncInstances(): Promise<{ total: number; success: number;
         token = decryptSecret(instance.apiToken);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        await recordInstanceSyncResult(instance.id, { ok: false, error: `Token decrypt failed: ${message}` });
+        await recordInstanceSyncResult(instance.id, {
+          ok: false,
+          error: `Token decrypt failed: ${message}`,
+        });
         return { ok: false, skippedHttp: false };
       }
 
       // Check for HTTP URL
       if (isHttpUrl(instance.baseUrl) && !httpAllowed) {
-        const message = "HTTP sync blocked. Set INSTANCE_SYNC_ALLOW_HTTP=true to allow insecure sync.";
+        const message =
+          "HTTP sync blocked. Set INSTANCE_SYNC_ALLOW_HTTP=true to allow insecure sync.";
         console.warn(`Skipping sync to "${instance.name}": ${message}`);
         await recordInstanceSyncResult(instance.id, { ok: false, error: message });
         return { ok: false, skippedHttp: true };
@@ -367,9 +399,9 @@ export async function syncInstances(): Promise<{ total: number; success: number;
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
@@ -384,7 +416,7 @@ export async function syncInstances(): Promise<{ total: number; success: number;
         await recordInstanceSyncResult(instance.id, { ok: false, error: message });
         return { ok: false, skippedHttp: false };
       }
-    })
+    }),
   );
 
   // Sync environment-configured instances
@@ -392,7 +424,9 @@ export async function syncInstances(): Promise<{ total: number; success: number;
     envTargets.map(async (instance) => {
       // Check for HTTP URL
       if (isHttpUrl(instance.url) && !httpAllowed) {
-        console.warn(`Skipping sync to env-configured instance "${instance.name}": HTTP sync blocked. Set INSTANCE_SYNC_ALLOW_HTTP=true to allow insecure sync.`);
+        console.warn(
+          `Skipping sync to env-configured instance "${instance.name}": HTTP sync blocked. Set INSTANCE_SYNC_ALLOW_HTTP=true to allow insecure sync.`,
+        );
         return { ok: false, skippedHttp: true };
       }
 
@@ -401,9 +435,9 @@ export async function syncInstances(): Promise<{ total: number; success: number;
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${instance.token}`
+            Authorization: `Bearer ${instance.token}`,
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
@@ -418,7 +452,7 @@ export async function syncInstances(): Promise<{ total: number; success: number;
         console.error(`Sync to env-configured instance "${instance.name}" failed:`, message);
         return { ok: false, skippedHttp: false };
       }
-    })
+    }),
   );
 
   const allResults = [...dbResults, ...envResults];
@@ -438,7 +472,10 @@ export async function applySyncPayload(payload: SyncPayload) {
   await setSyncedSetting("metrics", payload.settings.metrics);
   await setSyncedSetting("logging", payload.settings.logging);
   await setSyncedSetting("dns", payload.settings.dns);
-  await setSyncedSetting("upstream_dns_resolution", payload.settings.upstream_dns_resolution ?? null);
+  await setSyncedSetting(
+    "upstream_dns_resolution",
+    payload.settings.upstream_dns_resolution ?? null,
+  );
   await setSyncedSetting("waf", payload.settings.waf ?? null);
   await setSyncedSetting("geoblock", payload.settings.geoblock ?? null);
   await setSyncedSetting("error_pages", payload.settings.error_pages ?? null);

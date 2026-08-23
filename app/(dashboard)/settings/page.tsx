@@ -1,6 +1,27 @@
 import SettingsClient from "./SettingsClient";
-import { getGeneralSettings, getAcmeSettings, getAuthentikSettings, getMetricsSettings, getLoggingSettings, getDnsSettings, getDnsProviderSettings, getSetting, getUpstreamDnsResolutionSettings, getGeoBlockSettings, getErrorPagesSettings, getTrustedProxiesSettings, getAvatarSettings } from "@/src/lib/settings";
-import { getInstanceMode, getSlaveLastSync, getSlaveMasterToken, isInstanceModeFromEnv, isSyncTokenFromEnv, getEnvSlaveInstances } from "@/src/lib/instance-sync";
+import {
+  getGeneralSettings,
+  getAcmeSettings,
+  getAuthentikSettings,
+  getMetricsSettings,
+  getLoggingSettings,
+  getDnsSettings,
+  getDnsProviderSettings,
+  getSetting,
+  getUpstreamDnsResolutionSettings,
+  getGeoBlockSettings,
+  getErrorPagesSettings,
+  getTrustedProxiesSettings,
+  getAvatarSettings,
+} from "@/src/lib/settings";
+import {
+  getInstanceMode,
+  getSlaveLastSync,
+  getSlaveMasterToken,
+  isInstanceModeFromEnv,
+  isSyncTokenFromEnv,
+  getEnvSlaveInstances,
+} from "@/src/lib/instance-sync";
 import { listInstances } from "@/src/lib/models/instances";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
@@ -19,7 +40,22 @@ export default async function SettingsPage() {
   const modeFromEnv = isInstanceModeFromEnv();
   const tokenFromEnv = isSyncTokenFromEnv();
 
-  const [general, acme, dnsProvider, authentik, metrics, logging, dns, upstreamDnsResolution, instanceMode, globalGeoBlock, globalErrorPages, trustedProxies, oauthProviders, avatarSettings] = await Promise.all([
+  const [
+    general,
+    acme,
+    dnsProvider,
+    authentik,
+    metrics,
+    logging,
+    dns,
+    upstreamDnsResolution,
+    instanceMode,
+    globalGeoBlock,
+    globalErrorPages,
+    trustedProxies,
+    oauthProviders,
+    avatarSettings,
+  ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsProviderSettings(),
@@ -36,7 +72,18 @@ export default async function SettingsPage() {
     getAvatarSettings(),
   ]);
 
-  const [overrideGeneral, overrideAcme, overrideDnsProvider, overrideAuthentik, overrideMetrics, overrideLogging, overrideDns, overrideUpstreamDnsResolution, overrideTrustedProxies, overrideAvatars] =
+  const [
+    overrideGeneral,
+    overrideAcme,
+    overrideDnsProvider,
+    overrideAuthentik,
+    overrideMetrics,
+    overrideLogging,
+    overrideDns,
+    overrideUpstreamDnsResolution,
+    overrideTrustedProxies,
+    overrideAvatars,
+  ] =
     instanceMode === "slave"
       ? await Promise.all([
           getSetting("general"),
@@ -48,13 +95,14 @@ export default async function SettingsPage() {
           getSetting("dns"),
           getSetting("upstream_dns_resolution"),
           getSetting("trusted_proxies"),
-          getSetting("avatars")
+          getSetting("avatars"),
         ])
       : [null, null, null, null, null, null, null, null, null, null];
 
-  const [slaveToken, slaveLastSync] = instanceMode === "slave"
-    ? await Promise.all([getSlaveMasterToken(), getSlaveLastSync()])
-    : [null, null];
+  const [slaveToken, slaveLastSync] =
+    instanceMode === "slave"
+      ? await Promise.all([getSlaveMasterToken(), getSlaveLastSync()])
+      : [null, null];
 
   const instances = instanceMode === "master" ? await listInstances() : [];
   const envInstances = instanceMode === "master" ? getEnvSlaveInstances() : [];
@@ -95,14 +143,17 @@ export default async function SettingsPage() {
           dns: overrideDns !== null,
           upstreamDnsResolution: overrideUpstreamDnsResolution !== null,
           trustedProxies: overrideTrustedProxies !== null,
-          avatars: overrideAvatars !== null
+          avatars: overrideAvatars !== null,
         },
-        slave: instanceMode === "slave" ? {
-          hasToken: Boolean(slaveToken),
-          lastSyncAt: slaveLastSync?.at ?? null,
-          lastSyncError: slaveLastSync?.error ?? null
-        } : null,
-        master: instanceMode === "master" ? { instances, envInstances } : null
+        slave:
+          instanceMode === "slave"
+            ? {
+                hasToken: Boolean(slaveToken),
+                lastSyncAt: slaveLastSync?.at ?? null,
+                lastSyncError: slaveLastSync?.error ?? null,
+              }
+            : null,
+        master: instanceMode === "master" ? { instances, envInstances } : null,
       }}
     />
   );

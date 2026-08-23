@@ -1,6 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireApiUser, requireApiAdmin, apiErrorResponse, ApiAuthError } from "@/src/lib/api-auth";
-import { getUserById, updateUserProfile, updateUserRole, updateUserStatus, deleteUser } from "@/src/lib/models/user";
+import { type NextRequest, NextResponse } from "next/server";
+import {
+  requireApiUser,
+  requireApiAdmin,
+  apiErrorResponse,
+  ApiAuthError,
+} from "@/src/lib/api-auth";
+import {
+  getUserById,
+  updateUserProfile,
+  updateUserRole,
+  updateUserStatus,
+  deleteUser,
+} from "@/src/lib/models/user";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;
@@ -8,10 +19,7 @@ function stripPasswordHash(user: Record<string, unknown>) {
   return rest;
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireApiUser(request);
     const { id } = await params;
@@ -32,10 +40,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireApiAdmin(request);
     const { id } = await params;
@@ -64,7 +69,10 @@ export async function PUT(
     if (body.name !== undefined) profileFields.name = body.name;
     if (body.avatarUrl !== undefined) profileFields.avatarUrl = body.avatarUrl;
     if (Object.keys(profileFields).length > 0) {
-      await updateUserProfile(targetId, profileFields as { email?: string; name?: string | null; avatarUrl?: string | null });
+      await updateUserProfile(
+        targetId,
+        profileFields as { email?: string; name?: string | null; avatarUrl?: string | null },
+      );
     }
 
     const user = await getUserById(targetId);
@@ -79,7 +87,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const auth = await requireApiAdmin(request);

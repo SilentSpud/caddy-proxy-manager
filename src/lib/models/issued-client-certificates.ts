@@ -42,7 +42,7 @@ function parseIssuedClientCertificate(row: IssuedClientCertificateRow): IssuedCl
     validTo: toIso(row.validTo)!,
     revokedAt: toIso(row.revokedAt),
     createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!
+    updatedAt: toIso(row.updatedAt)!,
   };
 }
 
@@ -54,16 +54,18 @@ export async function listIssuedClientCertificates(): Promise<IssuedClientCertif
   return rows.map(parseIssuedClientCertificate);
 }
 
-export async function getIssuedClientCertificate(id: number): Promise<IssuedClientCertificate | null> {
+export async function getIssuedClientCertificate(
+  id: number,
+): Promise<IssuedClientCertificate | null> {
   const record = await db.query.issuedClientCertificates.findFirst({
-    where: (table, { eq: compareEq }) => compareEq(table.id, id)
+    where: (table, { eq: compareEq }) => compareEq(table.id, id),
   });
   return record ? parseIssuedClientCertificate(record) : null;
 }
 
 export async function createIssuedClientCertificate(
   input: IssuedClientCertificateInput,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<IssuedClientCertificate> {
   const now = nowIso();
   const [record] = await db
@@ -78,7 +80,7 @@ export async function createIssuedClientCertificate(
       validTo: input.validTo,
       createdBy: actorUserId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning();
 
@@ -94,8 +96,8 @@ export async function createIssuedClientCertificate(
     summary: `Issued client certificate ${input.commonName}`,
     data: {
       caCertificateId: input.caCertificateId,
-      serialNumber: input.serialNumber
-    }
+      serialNumber: input.serialNumber,
+    },
   });
   await applyCaddyConfig();
   return (await getIssuedClientCertificate(record.id))!;
@@ -103,7 +105,7 @@ export async function createIssuedClientCertificate(
 
 export async function revokeIssuedClientCertificate(
   id: number,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<IssuedClientCertificate> {
   const existing = await getIssuedClientCertificate(id);
   if (!existing) {
@@ -118,7 +120,7 @@ export async function revokeIssuedClientCertificate(
     .update(issuedClientCertificates)
     .set({
       revokedAt,
-      updatedAt: revokedAt
+      updatedAt: revokedAt,
     })
     .where(eq(issuedClientCertificates.id, id));
 
@@ -130,8 +132,8 @@ export async function revokeIssuedClientCertificate(
     summary: `Revoked client certificate ${existing.commonName}`,
     data: {
       caCertificateId: existing.caCertificateId,
-      serialNumber: existing.serialNumber
-    }
+      serialNumber: existing.serialNumber,
+    },
   });
   await applyCaddyConfig();
   return (await getIssuedClientCertificate(id))!;

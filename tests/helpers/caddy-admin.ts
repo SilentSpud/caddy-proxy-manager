@@ -11,7 +11,11 @@
  * tests/setup.vitest.ts. Tests that want to assert on what was sent, or to
  * simulate Caddy misbehaving, should create their own via `installFakeCaddy()`.
  */
-import type { CaddyAdminRequest, CaddyAdminResponse, CaddyAdminTransport } from '../../src/lib/caddy-admin';
+import type {
+  CaddyAdminRequest,
+  CaddyAdminResponse,
+  CaddyAdminTransport,
+} from '../../src/lib/caddy-admin';
 import { setCaddyAdminTransport } from '../../src/lib/caddy-admin';
 
 export type RecordedRequest = {
@@ -46,15 +50,25 @@ function createFakeCaddy(): FakeCaddy {
   const requests: RecordedRequest[] = [];
   const loads: RecordedRequest[] = [];
 
-  const transport: CaddyAdminTransport = async (request: CaddyAdminRequest): Promise<CaddyAdminResponse> => {
-    const record: RecordedRequest = { path: request.path, method: request.method, body: request.body };
+  const transport: CaddyAdminTransport = async (
+    request: CaddyAdminRequest,
+  ): Promise<CaddyAdminResponse> => {
+    const record: RecordedRequest = {
+      path: request.path,
+      method: request.method,
+      body: request.body,
+    };
     requests.push(record);
 
     if (networkError) {
       // Shape mirrors what node:http surfaces, so the error-mapping branch in
       // applyCaddyConfig sees what it would see in production.
-      const error = new Error(`connect ${networkError}`) as Error & { cause?: NodeJS.ErrnoException };
-      error.cause = Object.assign(new Error(networkError), { code: networkError }) as NodeJS.ErrnoException;
+      const error = new Error(`connect ${networkError}`) as Error & {
+        cause?: NodeJS.ErrnoException;
+      };
+      error.cause = Object.assign(new Error(networkError), {
+        code: networkError,
+      }) as NodeJS.ErrnoException;
       throw error;
     }
 
@@ -84,9 +98,15 @@ function createFakeCaddy(): FakeCaddy {
     requests,
     loads,
     lastConfig: () => loadedConfig,
-    failWith: (status, text = '') => { failure = { status, text }; },
-    failWithNetworkError: (code) => { networkError = code; },
-    setConfigEtag: (etag) => { configEtag = etag; },
+    failWith: (status, text = '') => {
+      failure = { status, text };
+    },
+    failWithNetworkError: (code) => {
+      networkError = code;
+    },
+    setConfigEtag: (etag) => {
+      configEtag = etag;
+    },
     reset: () => {
       requests.length = 0;
       loads.length = 0;

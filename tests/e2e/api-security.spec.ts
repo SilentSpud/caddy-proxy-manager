@@ -15,11 +15,7 @@ import { execFileSync } from 'node:child_process';
 const BASE = 'http://localhost:3000/api/v1';
 const ORIGIN = 'http://localhost:3000';
 
-const COMPOSE_ARGS = [
-  'compose',
-  '-f', 'docker-compose.yml',
-  '-f', 'tests/docker-compose.test.yml',
-];
+const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 // ── Endpoint definitions ────────────────────────────────────────────────
 
@@ -36,42 +32,82 @@ type Endpoint = {
 const ENDPOINTS: Endpoint[] = [
   // proxy-hosts
   { method: 'GET', path: '/proxy-hosts', auth: 'admin' },
-  { method: 'POST', path: '/proxy-hosts', auth: 'admin', body: { name: 'x', domains: ['x.test'], upstreams: ['127.0.0.1:80'] } },
+  {
+    method: 'POST',
+    path: '/proxy-hosts',
+    auth: 'admin',
+    body: { name: 'x', domains: ['x.test'], upstreams: ['127.0.0.1:80'] },
+  },
   { method: 'GET', path: '/proxy-hosts/999', auth: 'admin' },
   { method: 'PUT', path: '/proxy-hosts/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/proxy-hosts/999', auth: 'admin' },
   { method: 'GET', path: '/proxy-hosts/999/forward-auth-access', auth: 'admin' },
-  { method: 'PUT', path: '/proxy-hosts/999/forward-auth-access', auth: 'admin', body: { userIds: [], groupIds: [] } },
+  {
+    method: 'PUT',
+    path: '/proxy-hosts/999/forward-auth-access',
+    auth: 'admin',
+    body: { userIds: [], groupIds: [] },
+  },
   { method: 'GET', path: '/proxy-hosts/999/mtls-access-rules', auth: 'admin' },
-  { method: 'POST', path: '/proxy-hosts/999/mtls-access-rules', auth: 'admin', body: { pathPattern: '/', allowedRoleIds: [] } },
+  {
+    method: 'POST',
+    path: '/proxy-hosts/999/mtls-access-rules',
+    auth: 'admin',
+    body: { pathPattern: '/', allowedRoleIds: [] },
+  },
   { method: 'GET', path: '/proxy-hosts/999/mtls-access-rules/999', auth: 'admin' },
-  { method: 'PUT', path: '/proxy-hosts/999/mtls-access-rules/999', auth: 'admin', body: { pathPattern: '/' } },
+  {
+    method: 'PUT',
+    path: '/proxy-hosts/999/mtls-access-rules/999',
+    auth: 'admin',
+    body: { pathPattern: '/' },
+  },
   { method: 'DELETE', path: '/proxy-hosts/999/mtls-access-rules/999', auth: 'admin' },
 
   // l4-proxy-hosts
   { method: 'GET', path: '/l4-proxy-hosts', auth: 'admin' },
-  { method: 'POST', path: '/l4-proxy-hosts', auth: 'admin', body: { name: 'x', protocol: 'tcp', listenAddress: ':9999', upstreams: ['127.0.0.1:80'] } },
+  {
+    method: 'POST',
+    path: '/l4-proxy-hosts',
+    auth: 'admin',
+    body: { name: 'x', protocol: 'tcp', listenAddress: ':9999', upstreams: ['127.0.0.1:80'] },
+  },
   { method: 'GET', path: '/l4-proxy-hosts/999', auth: 'admin' },
   { method: 'PUT', path: '/l4-proxy-hosts/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/l4-proxy-hosts/999', auth: 'admin' },
 
   // certificates
   { method: 'GET', path: '/certificates', auth: 'admin' },
-  { method: 'POST', path: '/certificates', auth: 'admin', body: { name: 'x', type: 'custom', domainNames: ['x.test'] } },
+  {
+    method: 'POST',
+    path: '/certificates',
+    auth: 'admin',
+    body: { name: 'x', type: 'custom', domainNames: ['x.test'] },
+  },
   { method: 'GET', path: '/certificates/999', auth: 'admin' },
   { method: 'PUT', path: '/certificates/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/certificates/999', auth: 'admin' },
 
   // ca-certificates
   { method: 'GET', path: '/ca-certificates', auth: 'admin' },
-  { method: 'POST', path: '/ca-certificates', auth: 'admin', body: { name: 'x', certificatePem: 'x' } },
+  {
+    method: 'POST',
+    path: '/ca-certificates',
+    auth: 'admin',
+    body: { name: 'x', certificatePem: 'x' },
+  },
   { method: 'GET', path: '/ca-certificates/999', auth: 'admin' },
   { method: 'PUT', path: '/ca-certificates/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/ca-certificates/999', auth: 'admin' },
 
   // client-certificates
   { method: 'GET', path: '/client-certificates', auth: 'admin' },
-  { method: 'POST', path: '/client-certificates', auth: 'admin', body: { caCertificateId: 999, commonName: 'x' } },
+  {
+    method: 'POST',
+    path: '/client-certificates',
+    auth: 'admin',
+    body: { caCertificateId: 999, commonName: 'x' },
+  },
   { method: 'GET', path: '/client-certificates/999', auth: 'admin' },
   { method: 'DELETE', path: '/client-certificates/999', auth: 'admin' },
   { method: 'GET', path: '/client-certificates/999/roles', auth: 'admin' },
@@ -82,7 +118,12 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'GET', path: '/access-lists/999', auth: 'admin' },
   { method: 'PUT', path: '/access-lists/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/access-lists/999', auth: 'admin' },
-  { method: 'POST', path: '/access-lists/999/entries', auth: 'admin', body: { username: 'x', password: 'x' } },
+  {
+    method: 'POST',
+    path: '/access-lists/999/entries',
+    auth: 'admin',
+    body: { username: 'x', password: 'x' },
+  },
   { method: 'DELETE', path: '/access-lists/999/entries/999', auth: 'admin' },
 
   // mtls-roles
@@ -91,7 +132,12 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'GET', path: '/mtls-roles/999', auth: 'admin' },
   { method: 'PUT', path: '/mtls-roles/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/mtls-roles/999', auth: 'admin' },
-  { method: 'POST', path: '/mtls-roles/999/certificates', auth: 'admin', body: { issuedClientCertificateId: 999 } },
+  {
+    method: 'POST',
+    path: '/mtls-roles/999/certificates',
+    auth: 'admin',
+    body: { issuedClientCertificateId: 999 },
+  },
   { method: 'DELETE', path: '/mtls-roles/999/certificates/999', auth: 'admin' },
 
   // groups
@@ -109,7 +155,12 @@ const ENDPOINTS: Endpoint[] = [
 
   // instances
   { method: 'GET', path: '/instances', auth: 'admin' },
-  { method: 'POST', path: '/instances', auth: 'admin', body: { name: 'x', baseUrl: 'http://x.test', apiToken: 'x' } },
+  {
+    method: 'POST',
+    path: '/instances',
+    auth: 'admin',
+    body: { name: 'x', baseUrl: 'http://x.test', apiToken: 'x' },
+  },
   { method: 'DELETE', path: '/instances/999', auth: 'admin' },
   { method: 'POST', path: '/instances/sync', auth: 'admin' },
 
@@ -126,7 +177,12 @@ const ENDPOINTS: Endpoint[] = [
 
   // oauth-providers
   { method: 'GET', path: '/oauth-providers', auth: 'admin' },
-  { method: 'POST', path: '/oauth-providers', auth: 'admin', body: { name: 'x', clientId: 'x', clientSecret: 'x' } },
+  {
+    method: 'POST',
+    path: '/oauth-providers',
+    auth: 'admin',
+    body: { name: 'x', clientId: 'x', clientSecret: 'x' },
+  },
   { method: 'GET', path: '/oauth-providers/999', auth: 'admin' },
   { method: 'PUT', path: '/oauth-providers/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/oauth-providers/999', auth: 'admin' },
@@ -163,7 +219,7 @@ function ensureTestUser(username: string, password: string, role: string) {
       if (acc) {
         db.run("UPDATE accounts SET password = ?, updatedAt = ? WHERE id = ?", [hash, now, acc.id]);
       } else {
-        db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+        db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
           [existing.id, String(existing.id), hash, now, now]);
       }
     } else {
@@ -172,7 +228,7 @@ function ensureTestUser(username: string, password: string, role: string) {
         [email, "${username}", hash, "${role}", "${username}", "${username}", now, now]
       );
       const user = db.query("SELECT id FROM users WHERE email = ?").get(email);
-      db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+      db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
         [user.id, String(user.id), hash, now, now]);
     }
   `;
@@ -215,11 +271,11 @@ async function apiRequest(
   const url = `${BASE}${endpoint.path}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Origin': ORIGIN,
+    Origin: ORIGIN,
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  let res;
+  let res: Awaited<ReturnType<typeof request.get>>;
   switch (endpoint.method) {
     case 'GET':
       res = await request.get(url, { headers });
@@ -258,7 +314,7 @@ test.beforeAll(async () => {
       break;
     } catch (e) {
       if (i === 2) throw e;
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 2000));
     }
   }
 
@@ -281,8 +337,8 @@ test.describe('Unauthenticated API access', () => {
 // ── User role ───────────────────────────────────────────────────────────
 
 test.describe('User role API access', () => {
-  const adminOnly = ENDPOINTS.filter(ep => ep.auth === 'admin');
-  const userAllowed = ENDPOINTS.filter(ep => ep.auth === 'user');
+  const adminOnly = ENDPOINTS.filter((ep) => ep.auth === 'admin');
+  const userAllowed = ENDPOINTS.filter((ep) => ep.auth === 'user');
 
   for (const ep of adminOnly) {
     test(`${ep.method} ${ep.path} → 403`, async ({ request }) => {
@@ -303,8 +359,8 @@ test.describe('User role API access', () => {
 // ── Viewer role ─────────────────────────────────────────────────────────
 
 test.describe('Viewer role API access', () => {
-  const adminOnly = ENDPOINTS.filter(ep => ep.auth === 'admin');
-  const userAllowed = ENDPOINTS.filter(ep => ep.auth === 'user');
+  const adminOnly = ENDPOINTS.filter((ep) => ep.auth === 'admin');
+  const userAllowed = ENDPOINTS.filter((ep) => ep.auth === 'user');
 
   for (const ep of adminOnly) {
     test(`${ep.method} ${ep.path} → 403`, async ({ request }) => {
@@ -337,60 +393,84 @@ test.describe('Admin role API access', () => {
 // ── Cross-user isolation ────────────────────────────────────────────────
 
 test.describe('Cross-user isolation', () => {
-  test('user cannot GET another user\'s profile', async ({ request }) => {
+  test("user cannot GET another user's profile", async ({ request }) => {
     // apisec-user tries to read admin (user ID 1)
-    const status = await apiRequest(request, { method: 'GET', path: '/users/1', auth: 'user' }, userToken);
+    const status = await apiRequest(
+      request,
+      { method: 'GET', path: '/users/1', auth: 'user' },
+      userToken,
+    );
     expect(status).toBe(403);
   });
 
-  test('user cannot PUT another user\'s profile', async ({ request }) => {
-    const status = await apiRequest(request, { method: 'PUT', path: '/users/1', auth: 'user', body: { name: 'hacked' } }, userToken);
+  test("user cannot PUT another user's profile", async ({ request }) => {
+    const status = await apiRequest(
+      request,
+      { method: 'PUT', path: '/users/1', auth: 'user', body: { name: 'hacked' } },
+      userToken,
+    );
     expect(status).toBe(403);
   });
 
   test('user cannot DELETE another user', async ({ request }) => {
-    const status = await apiRequest(request, { method: 'DELETE', path: '/users/1', auth: 'user' }, userToken);
+    const status = await apiRequest(
+      request,
+      { method: 'DELETE', path: '/users/1', auth: 'user' },
+      userToken,
+    );
     expect(status).toBe(403);
   });
 
-  test('viewer cannot GET another user\'s profile', async ({ request }) => {
-    const status = await apiRequest(request, { method: 'GET', path: '/users/1', auth: 'user' }, viewerToken);
+  test("viewer cannot GET another user's profile", async ({ request }) => {
+    const status = await apiRequest(
+      request,
+      { method: 'GET', path: '/users/1', auth: 'user' },
+      viewerToken,
+    );
     expect(status).toBe(403);
   });
 
-  test('viewer cannot PUT another user\'s profile', async ({ request }) => {
-    const status = await apiRequest(request, { method: 'PUT', path: '/users/1', auth: 'user', body: { name: 'hacked' } }, viewerToken);
+  test("viewer cannot PUT another user's profile", async ({ request }) => {
+    const status = await apiRequest(
+      request,
+      { method: 'PUT', path: '/users/1', auth: 'user', body: { name: 'hacked' } },
+      viewerToken,
+    );
     expect(status).toBe(403);
   });
 
   test('viewer cannot DELETE another user', async ({ request }) => {
-    const status = await apiRequest(request, { method: 'DELETE', path: '/users/1', auth: 'user' }, viewerToken);
+    const status = await apiRequest(
+      request,
+      { method: 'DELETE', path: '/users/1', auth: 'user' },
+      viewerToken,
+    );
     expect(status).toBe(403);
   });
 
   test('user can GET their own profile', async ({ request }) => {
     // First find the user's own ID
     await request.get(`${ORIGIN}/api/auth/get-session`, {
-      headers: { 'Authorization': `Bearer ${userToken}` },
+      headers: { Authorization: `Bearer ${userToken}` },
     });
     // Bearer tokens go through our api-auth, not Better Auth session — use a different approach
     // Just verify they CAN'T access admin user, which we tested above.
     // Self-access is implicitly tested by tokens endpoint (user-level, always works).
   });
 
-  test('admin CAN access other users\' profiles', async ({ request }) => {
+  test("admin CAN access other users' profiles", async ({ request }) => {
     // Admin reads apisec-user's profile — should work
     // We need apisec-user's ID. Use the /users list endpoint.
     const res = await request.get(`${BASE}/users`, {
-      headers: { 'Authorization': `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
     });
     expect(res.status()).toBe(200);
     const users: Array<{ id: number; email: string }> = await res.json();
-    const apisecUser = users.find(u => u.email === 'apisec-user@localhost');
+    const apisecUser = users.find((u) => u.email === 'apisec-user@localhost');
     expect(apisecUser).toBeTruthy();
 
     const profileRes = await request.get(`${BASE}/users/${apisecUser!.id}`, {
-      headers: { 'Authorization': `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
     });
     expect(profileRes.status()).toBe(200);
   });

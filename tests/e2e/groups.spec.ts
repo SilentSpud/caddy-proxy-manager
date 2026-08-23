@@ -13,7 +13,9 @@ test.describe('Groups page', () => {
 
   test('page loads with Groups heading', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Groups' })).toBeVisible();
-    await expect(page.getByText('Organize users into groups for forward auth access control.')).toBeVisible();
+    await expect(
+      page.getByText('Organize users into groups for forward auth access control.'),
+    ).toBeVisible();
   });
 
   test('New Group button is visible', async ({ page }) => {

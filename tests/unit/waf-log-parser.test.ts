@@ -3,8 +3,16 @@ import { describe, it, expect, vi } from 'vitest';
 // Mock heavy dependencies before importing
 vi.mock('@/src/lib/db', () => ({
   default: {
-    select: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }) }) }),
-    insert: vi.fn().mockReturnValue({ values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) }) }),
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }),
+      }),
+    }),
+    insert: vi.fn().mockReturnValue({
+      values: vi
+        .fn()
+        .mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) }),
+    }),
     delete: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ run: vi.fn() }) }),
     run: vi.fn(),
   },
@@ -34,15 +42,15 @@ import { extractBracketField, parseLine, ruleInfoFromAuditEntry } from '@/src/li
  */
 describe('rule attribution from the audit entry itself', () => {
   const CRS_XSS =
-    '[client "1.2.3.4"] Coraza: Warning. XSS Attack Detected '
-    + '[file "@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf"] [line "123"] '
-    + '[id "941100"] [rev ""] [msg "XSS Attack Detected"] [severity "CRITICAL"] '
-    + '[unique_id "tx-xss"]';
+    '[client "1.2.3.4"] Coraza: Warning. XSS Attack Detected ' +
+    '[file "@owasp_crs/REQUEST-941-APPLICATION-ATTACK-XSS.conf"] [line "123"] ' +
+    '[id "941100"] [rev ""] [msg "XSS Attack Detected"] [severity "CRITICAL"] ' +
+    '[unique_id "tx-xss"]';
   const CRS_ANOMALY =
-    '[client "1.2.3.4"] Coraza: Access denied (phase 2). Inbound Anomaly Score Exceeded '
-    + '[file "@owasp_crs/REQUEST-949-BLOCKING-EVALUATION.conf"] [line "7663"] '
-    + '[id "949110"] [msg "Inbound Anomaly Score Exceeded"] [severity "CRITICAL"] '
-    + '[unique_id "tx-xss"]';
+    '[client "1.2.3.4"] Coraza: Access denied (phase 2). Inbound Anomaly Score Exceeded ' +
+    '[file "@owasp_crs/REQUEST-949-BLOCKING-EVALUATION.conf"] [line "7663"] ' +
+    '[id "949110"] [msg "Inbound Anomaly Score Exceeded"] [severity "CRITICAL"] ' +
+    '[unique_id "tx-xss"]';
 
   function auditLine(opts: { interrupted: boolean; messages?: unknown[] }): string {
     return JSON.stringify({
@@ -60,7 +68,7 @@ describe('rule attribution from the audit entry itself', () => {
   it('keeps a detected-but-not-blocked event when the rules-log join misses', () => {
     const row = parseLine(
       auditLine({ interrupted: false, messages: [{ error_message: CRS_XSS }] }),
-      new Map()
+      new Map(),
     );
 
     expect(row).not.toBeNull();
@@ -72,8 +80,11 @@ describe('rule attribution from the audit entry itself', () => {
 
   it('attributes a blocked event to the attack rule, not the anomaly evaluation rule', () => {
     const row = parseLine(
-      auditLine({ interrupted: true, messages: [{ error_message: CRS_XSS }, { error_message: CRS_ANOMALY }] }),
-      new Map()
+      auditLine({
+        interrupted: true,
+        messages: [{ error_message: CRS_XSS }, { error_message: CRS_ANOMALY }],
+      }),
+      new Map(),
     );
 
     expect(row?.rule_id).toBe(941100);
@@ -81,8 +92,11 @@ describe('rule attribution from the audit entry itself', () => {
 
   it('skips a leading anomaly-evaluation rule to find the real attack rule', () => {
     const row = parseLine(
-      auditLine({ interrupted: true, messages: [{ error_message: CRS_ANOMALY }, { error_message: CRS_XSS }] }),
-      new Map()
+      auditLine({
+        interrupted: true,
+        messages: [{ error_message: CRS_ANOMALY }, { error_message: CRS_XSS }],
+      }),
+      new Map(),
     );
 
     expect(row?.rule_id).toBe(941100);
@@ -95,7 +109,9 @@ describe('rule attribution from the audit entry itself', () => {
   });
 
   it('falls back to the rules-log join when Coraza emits no messages', () => {
-    const ruleMap = new Map([['tx-xss', { ruleId: 941100, ruleMessage: 'XSS Attack Detected', severity: 'CRITICAL' }]]);
+    const ruleMap = new Map([
+      ['tx-xss', { ruleId: 941100, ruleMessage: 'XSS Attack Detected', severity: 'CRITICAL' }],
+    ]);
     const row = parseLine(auditLine({ interrupted: false }), ruleMap);
 
     expect(row?.rule_id).toBe(941100);
@@ -150,9 +166,7 @@ describe('extractBracketField', () => {
 });
 
 describe('parseLine host header contract', () => {
-  const ruleMap = new Map([
-    ['tx-1', { ruleId: 941100, ruleMessage: 'XSS', severity: 'critical' }],
-  ]);
+  const ruleMap = new Map([['tx-1', { ruleId: 941100, ruleMessage: 'XSS', severity: 'critical' }]]);
 
   function makeAuditLine(hostHeader: string): string {
     return JSON.stringify({

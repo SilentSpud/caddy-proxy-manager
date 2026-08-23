@@ -23,14 +23,14 @@
  * Runs from next.config.mjs so it covers `next dev`, `next build` and the Docker
  * build alike, under both Node and Bun, with no extra lifecycle script wiring.
  */
-import { createRequire } from 'node:module';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { createRequire } from "node:module";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
 
-export const PUBLIC_DIR = 'maplibre';
-export const WORKER_ENTRY = 'maplibre-gl-worker.mjs';
+export const PUBLIC_DIR = "maplibre";
+export const WORKER_ENTRY = "maplibre-gl-worker.mjs";
 /** URL the browser loads the worker from — keep in sync with WorldMapInner.tsx. */
 export const WORKER_PUBLIC_PATH = `/${PUBLIC_DIR}/${WORKER_ENTRY}`;
 
@@ -43,6 +43,8 @@ function relativeImports(source) {
   const specifiers = new Set();
   const re = /\b(?:from|import)\s*\(?\s*['"](\.[^'"]*)['"]/g;
   let match;
+  // The assignment is what advances the regex over the source on each pass.
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard exec() loop
   while ((match = re.exec(source)) !== null) specifiers.add(match[1]);
   return specifiers;
 }
@@ -52,8 +54,8 @@ function relativeImports(source) {
  * @returns {string[]} names of the files that were copied
  */
 export function copyMaplibreWorker(projectRoot) {
-  const distDir = dirname(require.resolve('maplibre-gl/dist/maplibre-gl-worker.mjs'));
-  const outDir = resolve(projectRoot, 'public', PUBLIC_DIR);
+  const distDir = dirname(require.resolve("maplibre-gl/dist/maplibre-gl-worker.mjs"));
+  const outDir = resolve(projectRoot, "public", PUBLIC_DIR);
   mkdirSync(outDir, { recursive: true });
 
   const copied = [];
@@ -68,7 +70,7 @@ export function copyMaplibreWorker(projectRoot) {
     if (!existsSync(from)) {
       throw new Error(
         `maplibre-gl worker chunk "${name}" is missing from ${distDir}; ` +
-          'scripts/copy-maplibre-worker.mjs needs updating for this maplibre-gl version.',
+          "scripts/copy-maplibre-worker.mjs needs updating for this maplibre-gl version.",
       );
     }
 
@@ -85,12 +87,12 @@ export function copyMaplibreWorker(projectRoot) {
       copied.push(name);
     }
 
-    for (const specifier of relativeImports(readFileSync(from, 'utf8'))) {
-      const dep = specifier.replace(/^\.\//, '');
-      if (dep.includes('/')) {
+    for (const specifier of relativeImports(readFileSync(from, "utf8"))) {
+      const dep = specifier.replace(/^\.\//, "");
+      if (dep.includes("/")) {
         throw new Error(
           `maplibre-gl worker imports "${specifier}" from a subdirectory; ` +
-            'scripts/copy-maplibre-worker.mjs needs updating.',
+            "scripts/copy-maplibre-worker.mjs needs updating.",
         );
       }
       if (!seen.has(dep)) {

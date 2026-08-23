@@ -2,8 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { createCaCertificate, deleteCaCertificate, updateCaCertificate, getCaCertificatePrivateKey } from "@/src/lib/models/ca-certificates";
-import { createIssuedClientCertificate, revokeIssuedClientCertificate } from "@/src/lib/models/issued-client-certificates";
+import {
+  createCaCertificate,
+  deleteCaCertificate,
+  updateCaCertificate,
+  getCaCertificatePrivateKey,
+} from "@/src/lib/models/ca-certificates";
+import {
+  createIssuedClientCertificate,
+  revokeIssuedClientCertificate,
+} from "@/src/lib/models/issued-client-certificates";
 import { X509Certificate } from "node:crypto";
 import forge from "node-forge";
 
@@ -33,20 +41,28 @@ export async function updateCaCertificateAction(id: number, formData: FormData) 
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   const name = formData.get("name") ? String(formData.get("name")).trim() : undefined;
-  const certificatePem = formData.get("certificate_pem") ? String(formData.get("certificate_pem")).trim() : undefined;
+  const certificatePem = formData.get("certificate_pem")
+    ? String(formData.get("certificate_pem")).trim()
+    : undefined;
 
   if (certificatePem) {
     validatePem(certificatePem);
   }
 
-  await updateCaCertificate(id, {
-    ...(name ? { name } : {}),
-    ...(certificatePem ? { certificatePem: certificatePem } : {})
-  }, userId);
+  await updateCaCertificate(
+    id,
+    {
+      ...(name ? { name } : {}),
+      ...(certificatePem ? { certificatePem: certificatePem } : {}),
+    },
+    userId,
+  );
   revalidatePath("/certificates");
 }
 
-export async function deleteCaCertificateAction(id: number): Promise<{ success: boolean; error?: string }> {
+export async function deleteCaCertificateAction(
+  id: number,
+): Promise<{ success: boolean; error?: string }> {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   try {
@@ -54,7 +70,10 @@ export async function deleteCaCertificateAction(id: number): Promise<{ success: 
     revalidatePath("/certificates");
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Failed to delete CA certificate" };
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to delete CA certificate",
+    };
   }
 }
 
@@ -63,7 +82,10 @@ export async function generateCaCertificateAction(formData: FormData): Promise<{
   const userId = Number(session.user.id);
   const name = String(formData.get("name") ?? "").trim();
   const commonName = String(formData.get("common_name") ?? name).trim() || name;
-  const validityDays = Math.min(3650, Math.max(1, parseInt(String(formData.get("validity_days") ?? "3650"), 10) || 3650));
+  const validityDays = Math.min(
+    3650,
+    Math.max(1, parseInt(String(formData.get("validity_days") ?? "3650"), 10) || 3650),
+  );
 
   if (!name) throw new Error("Name is required");
 
@@ -92,7 +114,10 @@ export async function generateCaCertificateAction(formData: FormData): Promise<{
   const certificatePem = forge.pki.certificateToPem(cert);
   const privateKeyPem = forge.pki.privateKeyToPem(keypair.privateKey);
 
-  const record = await createCaCertificate({ name, certificatePem: certificatePem, privateKeyPem: privateKeyPem }, userId);
+  const record = await createCaCertificate(
+    { name, certificatePem: certificatePem, privateKeyPem: privateKeyPem },
+    userId,
+  );
   revalidatePath("/certificates");
   return { id: record.id };
 }
@@ -105,23 +130,31 @@ export type IssuedClientCert = {
 
 export async function issueClientCertificateAction(
   caCertId: number,
-  formData: FormData
+  formData: FormData,
 ): Promise<IssuedClientCert> {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   const commonName = String(formData.get("common_name") ?? "").trim();
-  const validityDays = Math.min(3650, Math.max(1, parseInt(String(formData.get("validity_days") ?? "365"), 10) || 365));
+  const validityDays = Math.min(
+    3650,
+    Math.max(1, parseInt(String(formData.get("validity_days") ?? "365"), 10) || 365),
+  );
   const exportPassword = String(formData.get("export_password") ?? "");
   const compatibilityMode = formData.get("compatibility_mode") === "on";
-  const exportAlgorithm: IssuedClientCert["exportAlgorithm"] = compatibilityMode ? "3des" : "aes256";
+  const exportAlgorithm: IssuedClientCert["exportAlgorithm"] = compatibilityMode
+    ? "3des"
+    : "aes256";
 
   if (!commonName) throw new Error("Common name is required");
   if (!exportPassword) throw new Error("Export password is required");
 
   const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
-  if (!caPrivateKeyPem) throw new Error("This CA has no stored private key — cannot issue client certificates");
+  if (!caPrivateKeyPem)
+    throw new Error("This CA has no stored private key — cannot issue client certificates");
 
-  const caCertRecord = await import("@/src/lib/models/ca-certificates").then(m => m.getCaCertificate(caCertId));
+  const caCertRecord = await import("@/src/lib/models/ca-certificates").then((m) =>
+    m.getCaCertificate(caCertId),
+  );
   if (!caCertRecord) throw new Error("CA certificate not found");
 
   const caKey = forge.pki.privateKeyFromPem(caPrivateKeyPem);
@@ -155,21 +188,16 @@ export async function issueClientCertificateAction(
       fingerprintSha256: certificate.fingerprint256,
       certificatePem: certificatePem,
       validFrom: new Date(certificate.validFrom).toISOString(),
-      validTo: new Date(certificate.validTo).toISOString()
+      validTo: new Date(certificate.validTo).toISOString(),
     },
-    userId
+    userId,
   );
   revalidatePath("/certificates");
 
-  const pkcs12Asn1 = forge.pkcs12.toPkcs12Asn1(
-    keypair.privateKey,
-    [cert, caCert],
-    exportPassword,
-    {
-      algorithm: exportAlgorithm,
-      friendlyName: commonName,
-    }
-  );
+  const pkcs12Asn1 = forge.pkcs12.toPkcs12Asn1(keypair.privateKey, [cert, caCert], exportPassword, {
+    algorithm: exportAlgorithm,
+    friendlyName: commonName,
+  });
   const pkcs12Der = forge.asn1.toDer(pkcs12Asn1).getBytes();
 
   return {
@@ -179,7 +207,9 @@ export async function issueClientCertificateAction(
   };
 }
 
-export async function revokeIssuedClientCertificateAction(id: number): Promise<{ revokedAt: string }> {
+export async function revokeIssuedClientCertificateAction(
+  id: number,
+): Promise<{ revokedAt: string }> {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   const record = await revokeIssuedClientCertificate(id, userId);

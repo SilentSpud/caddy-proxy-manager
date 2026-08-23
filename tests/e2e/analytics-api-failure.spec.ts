@@ -50,7 +50,9 @@ test.describe('Analytics API failures', () => {
     expect(errors, `uncaught errors crashed the page: ${JSON.stringify(errors)}`).toEqual([]);
   });
 
-  test('error banner still appears when the server sends an empty error message', async ({ page }) => {
+  test('error banner still appears when the server sends an empty error message', async ({
+    page,
+  }) => {
     // @clickhouse/client throws an AggregateError with an empty `message` on
     // ECONNREFUSED, which reaches the browser as {"error":""}. An empty string
     // is falsy, so a naive `{error && <Banner/>}` renders nothing and the user

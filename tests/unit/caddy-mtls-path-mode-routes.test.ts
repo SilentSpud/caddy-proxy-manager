@@ -50,12 +50,15 @@ type Route = { match?: Matcher[]; handle?: Record<string, unknown>[] };
 
 /** Every route whose host matcher covers `domain`, in document order. */
 function routesFor(doc: unknown, domain: string): Route[] {
-  const all = (doc as { apps?: { http?: { servers?: { cpm?: { routes?: Route[] } } } } })
-    ?.apps?.http?.servers?.cpm?.routes ?? [];
-  return all.filter((r) => (r.match ?? []).some((m) => {
-    const host = m.host as string[] | undefined;
-    return Array.isArray(host) && host.includes(domain);
-  }));
+  const all =
+    (doc as { apps?: { http?: { servers?: { cpm?: { routes?: Route[] } } } } })?.apps?.http?.servers
+      ?.cpm?.routes ?? [];
+  return all.filter((r) =>
+    (r.match ?? []).some((m) => {
+      const host = m.host as string[] | undefined;
+      return Array.isArray(host) && host.includes(domain);
+    }),
+  );
 }
 
 /** The HTTP→HTTPS redirect carries its own expression; it is not an mTLS gate. */
@@ -64,9 +67,13 @@ function isSchemeRedirect(route: Route): boolean {
 }
 
 function mtlsGatedRoutes(routes: Route[]): Route[] {
-  return routes.filter((r) => !isSchemeRedirect(r)
-    && (r.match ?? []).some((m) => typeof m.expression === 'string'
-      && (m.expression as string).includes('tls.client')));
+  return routes.filter(
+    (r) =>
+      !isSchemeRedirect(r) &&
+      (r.match ?? []).some(
+        (m) => typeof m.expression === 'string' && (m.expression as string).includes('tls.client'),
+      ),
+  );
 }
 
 function denyRoutes(routes: Route[]): Route[] {
@@ -75,15 +82,20 @@ function denyRoutes(routes: Route[]): Route[] {
 
 /** Routes matching only the host (the catch-all), ignoring path-scoped routes. */
 function catchAllRoutes(routes: Route[]): Route[] {
-  return routes.filter((r) => !isSchemeRedirect(r)
-    && (r.match ?? []).some((m) => m.host !== undefined && m.path === undefined));
+  return routes.filter(
+    (r) =>
+      !isSchemeRedirect(r) &&
+      (r.match ?? []).some((m) => m.host !== undefined && m.path === undefined),
+  );
 }
 
 function routeForPath(routes: Route[], path: string): Route[] {
-  return routes.filter((r) => (r.match ?? []).some((m) => {
-    const p = m.path as string[] | undefined;
-    return Array.isArray(p) && p.includes(path);
-  }));
+  return routes.filter((r) =>
+    (r.match ?? []).some((m) => {
+      const p = m.path as string[] | undefined;
+      return Array.isArray(p) && p.includes(path);
+    }),
+  );
 }
 
 beforeEach(async () => {
@@ -105,10 +117,7 @@ beforeEach(async () => {
 describe('proxy host with mTLS disabled', () => {
   it('serves a plain catch-all with no client-cert gate and no 403', async () => {
     const domain = 'plain.example.com';
-    await createProxyHost(
-      { name: 'plain', domains: [domain], upstreams: ['10.0.0.5:8080'] },
-      1
-    );
+    await createProxyHost({ name: 'plain', domains: [domain], upstreams: ['10.0.0.5:8080'] }, 1);
 
     const routes = routesFor(await buildCaddyDocument(), domain);
 
@@ -129,7 +138,7 @@ describe('proxy host with mTLS disabled', () => {
         upstreams: ['10.0.0.5:8080'],
         locationRules: [{ path: '/api', upstreams: ['10.0.0.9:9000'] }],
       },
-      1
+      1,
     );
 
     const routes = routesFor(await buildCaddyDocument(), domain);
@@ -150,7 +159,7 @@ describe('mTLS full-site mode', () => {
         upstreams: ['10.0.0.5:8080'],
         mtls: { enabled: true, trusted_role_ids: [EMPTY_ROLE_ID] },
       },
-      1
+      1,
     );
 
     const routes = routesFor(await buildCaddyDocument(), domain);
@@ -172,7 +181,7 @@ describe('mTLS whitelist mode (protected_paths)', () => {
         upstreams: ['10.0.0.5:8080'],
         mtls: { enabled: true, trusted_role_ids: [EMPTY_ROLE_ID], protected_paths: ['/admin/*'] },
       },
-      1
+      1,
     );
 
     const routes = routesFor(await buildCaddyDocument(), domain);
@@ -200,7 +209,7 @@ describe('mTLS exclusion mode (excluded_paths)', () => {
         upstreams: ['10.0.0.5:8080'],
         mtls: { enabled: true, trusted_role_ids: [EMPTY_ROLE_ID], excluded_paths: ['/health'] },
       },
-      1
+      1,
     );
 
     const routes = routesFor(await buildCaddyDocument(), domain);

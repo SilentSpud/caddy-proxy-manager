@@ -44,7 +44,10 @@ async function countRows(
 // TTL deletion is lazy (background merges). Force it synchronously so the test
 // is deterministic: MATERIALIZE TTL recomputes TTL info and drops expired rows,
 // and mutations_sync=2 makes the command block until that mutation finishes.
-async function forceTtl(ch: ClickHouseClient, table: 'traffic_events' | 'waf_events'): Promise<void> {
+async function forceTtl(
+  ch: ClickHouseClient,
+  table: 'traffic_events' | 'waf_events',
+): Promise<void> {
   await ch.command({ query: `ALTER TABLE ${table} MATERIALIZE TTL SETTINGS mutations_sync = 2` });
   await ch.command({ query: `OPTIMIZE TABLE ${table} FINAL` });
 }
@@ -83,8 +86,30 @@ test.describe('ClickHouse retention TTL', () => {
         table: 'traffic_events',
         format: 'JSONEachRow',
         values: [
-          { ts: chDateTime(expiredTs), client_ip: '203.0.113.1', host: marker, method: 'GET', uri: '/expired', status: 200, proto: 'HTTP/1.1', bytes_sent: 1, user_agent: 'ttl-test', is_blocked: 0 },
-          { ts: chDateTime(freshTs), client_ip: '203.0.113.2', host: marker, method: 'GET', uri: '/fresh', status: 200, proto: 'HTTP/1.1', bytes_sent: 1, user_agent: 'ttl-test', is_blocked: 0 },
+          {
+            ts: chDateTime(expiredTs),
+            client_ip: '203.0.113.1',
+            host: marker,
+            method: 'GET',
+            uri: '/expired',
+            status: 200,
+            proto: 'HTTP/1.1',
+            bytes_sent: 1,
+            user_agent: 'ttl-test',
+            is_blocked: 0,
+          },
+          {
+            ts: chDateTime(freshTs),
+            client_ip: '203.0.113.2',
+            host: marker,
+            method: 'GET',
+            uri: '/fresh',
+            status: 200,
+            proto: 'HTTP/1.1',
+            bytes_sent: 1,
+            user_agent: 'ttl-test',
+            is_blocked: 0,
+          },
         ],
       });
 
@@ -98,10 +123,14 @@ test.describe('ClickHouse retention TTL', () => {
       expect(await countRows(ch, 'traffic_events', marker, retentionBoundary)).toBe(0);
       expect(await countRows(ch, 'traffic_events', marker)).toBe(1);
     } finally {
-      await ch.command({
-        query: `ALTER TABLE traffic_events DELETE WHERE host = {h:String} SETTINGS mutations_sync = 2`,
-        query_params: { h: marker },
-      }).catch(() => { /* best-effort cleanup */ });
+      await ch
+        .command({
+          query: `ALTER TABLE traffic_events DELETE WHERE host = {h:String} SETTINGS mutations_sync = 2`,
+          query_params: { h: marker },
+        })
+        .catch(() => {
+          /* best-effort cleanup */
+        });
       await ch.close();
     }
   });
@@ -119,8 +148,24 @@ test.describe('ClickHouse retention TTL', () => {
         table: 'waf_events',
         format: 'JSONEachRow',
         values: [
-          { ts: chDateTime(expiredTs), host: marker, client_ip: '203.0.113.1', method: 'GET', uri: '/expired', rule_id: 1, blocked: 1 },
-          { ts: chDateTime(freshTs), host: marker, client_ip: '203.0.113.2', method: 'GET', uri: '/fresh', rule_id: 1, blocked: 1 },
+          {
+            ts: chDateTime(expiredTs),
+            host: marker,
+            client_ip: '203.0.113.1',
+            method: 'GET',
+            uri: '/expired',
+            rule_id: 1,
+            blocked: 1,
+          },
+          {
+            ts: chDateTime(freshTs),
+            host: marker,
+            client_ip: '203.0.113.2',
+            method: 'GET',
+            uri: '/fresh',
+            rule_id: 1,
+            blocked: 1,
+          },
         ],
       });
 
@@ -131,10 +176,14 @@ test.describe('ClickHouse retention TTL', () => {
       expect(await countRows(ch, 'waf_events', marker, retentionBoundary)).toBe(0);
       expect(await countRows(ch, 'waf_events', marker)).toBe(1);
     } finally {
-      await ch.command({
-        query: `ALTER TABLE waf_events DELETE WHERE host = {h:String} SETTINGS mutations_sync = 2`,
-        query_params: { h: marker },
-      }).catch(() => { /* best-effort cleanup */ });
+      await ch
+        .command({
+          query: `ALTER TABLE waf_events DELETE WHERE host = {h:String} SETTINGS mutations_sync = 2`,
+          query_params: { h: marker },
+        })
+        .catch(() => {
+          /* best-effort cleanup */
+        });
       await ch.close();
     }
   });

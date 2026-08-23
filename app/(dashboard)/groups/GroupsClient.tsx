@@ -23,7 +23,7 @@ import {
   createGroupAction,
   deleteGroupAction,
   addGroupMemberAction,
-  removeGroupMemberAction
+  removeGroupMemberAction,
 } from "./actions";
 
 type GroupMember = {
@@ -155,9 +155,7 @@ export default function GroupsClient({ groups, users }: Props) {
                   <VStack gap={0}>
                     <HStack gap={2} vAlign="center">
                       <Heading level={3}>{group.name}</Heading>
-                      {group.source === "oidc" && (
-                        <Badge variant="info" label="IdP-managed" />
-                      )}
+                      {group.source === "oidc" && <Badge variant="info" label="IdP-managed" />}
                     </HStack>
                     {group.source === "oidc" && (
                       <Text type="body" size="xsm" color="secondary">

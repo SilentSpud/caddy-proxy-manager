@@ -35,7 +35,7 @@ export default function ApiDocsClient() {
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js";
     script.onload = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: injected onto window by the swagger-ui bundle loaded above, so untyped by construction
       const SwaggerUIBundle = (window as any).SwaggerUIBundle;
       if (SwaggerUIBundle && containerRef.current) {
         SwaggerUIBundle({

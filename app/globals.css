@@ -44,13 +44,21 @@
 }
 
 @keyframes accordion-down {
-  from { height: 0; }
-  to { height: var(--radix-accordion-content-height); }
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
 }
 
 @keyframes accordion-up {
-  from { height: var(--radix-accordion-content-height); }
-  to { height: 0; }
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
 }
 
 @layer base {
@@ -89,7 +97,7 @@
     --secondary: oklch(0.28 0.008 286.033);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.28 0.008 286.033);
-    --muted-foreground: oklch(0.85 0.010 286.067);
+    --muted-foreground: oklch(0.85 0.01 286.067);
     --accent: oklch(0.28 0.008 286.033);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
@@ -119,6 +127,8 @@
    */
   [data-masked-input="true"] textarea {
     -webkit-text-security: disc;
+    /* biome-ignore lint/correctness/noUnknownProperty: unprefixed counterpart to
+       -webkit-text-security above, for engines that ship it unprefixed. */
     text-security: disc;
   }
 }

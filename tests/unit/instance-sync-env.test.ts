@@ -78,9 +78,9 @@ describe('getEnvSlaveInstances', () => {
   it('filters out entries missing required fields', () => {
     process.env.INSTANCE_SLAVES = JSON.stringify([
       { name: 'slave1', url: 'https://slave1.example.com', token: 'tok1' }, // valid
-      { name: 'slave2', url: 'https://slave2.example.com' },                // missing token
-      { name: 'slave3', token: 'tok3' },                                    // missing url
-      { url: 'https://slave4.example.com', token: 'tok4' },                 // missing name
+      { name: 'slave2', url: 'https://slave2.example.com' }, // missing token
+      { name: 'slave3', token: 'tok3' }, // missing url
+      { url: 'https://slave4.example.com', token: 'tok4' }, // missing name
     ]);
     const result = getEnvSlaveInstances();
     expect(result).toHaveLength(1);

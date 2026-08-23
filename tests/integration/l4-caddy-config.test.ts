@@ -21,21 +21,24 @@ function nowIso() {
 
 async function insertL4Host(overrides: Partial<typeof l4ProxyHosts.$inferInsert> = {}) {
   const now = nowIso();
-  const [host] = await db.insert(l4ProxyHosts).values({
-    name: 'Test L4 Host',
-    protocol: 'tcp',
-    listenAddress: ':5432',
-    upstreams: JSON.stringify(['10.0.0.1:5432']),
-    matcherType: 'none',
-    matcherValue: null,
-    tlsTermination: false,
-    proxyProtocolVersion: null,
-    proxyProtocolReceive: false,
-    enabled: true,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [host] = await db
+    .insert(l4ProxyHosts)
+    .values({
+      name: 'Test L4 Host',
+      protocol: 'tcp',
+      listenAddress: ':5432',
+      upstreams: JSON.stringify(['10.0.0.1:5432']),
+      matcherType: 'none',
+      matcherValue: null,
+      tlsTermination: false,
+      proxyProtocolVersion: null,
+      proxyProtocolReceive: false,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return host;
 }
 
@@ -44,7 +47,7 @@ async function insertL4Host(overrides: Partial<typeof l4ProxyHosts.$inferInsert>
  * from a set of L4 proxy host rows. This mirrors the logic in caddy.ts.
  */
 function buildExpectedL4Config(rows: (typeof l4ProxyHosts.$inferSelect)[]) {
-  const enabledRows = rows.filter(r => r.enabled);
+  const enabledRows = rows.filter((r) => r.enabled);
   if (enabledRows.length === 0) return null;
 
   const serverMap = new Map<string, typeof enabledRows>();
@@ -57,9 +60,9 @@ function buildExpectedL4Config(rows: (typeof l4ProxyHosts.$inferSelect)[]) {
   const servers: Record<string, unknown> = {};
   let serverIdx = 0;
   for (const [listenAddr, hosts] of serverMap) {
-    const routes = hosts.map(host => {
+    const routes = hosts.map((host) => {
       const route: Record<string, unknown> = {};
-      const matcherValues = host.matcherValue ? JSON.parse(host.matcherValue) as string[] : [];
+      const matcherValues = host.matcherValue ? (JSON.parse(host.matcherValue) as string[]) : [];
 
       if (host.matcherType === 'tls_sni' && matcherValues.length > 0) {
         route.match = [{ tls: { sni: matcherValues } }];
@@ -76,7 +79,7 @@ function buildExpectedL4Config(rows: (typeof l4ProxyHosts.$inferSelect)[]) {
       const upstreams = JSON.parse(host.upstreams) as string[];
       const proxyHandler: Record<string, unknown> = {
         handler: 'proxy',
-        upstreams: upstreams.map(u => ({ dial: [u] })),
+        upstreams: upstreams.map((u) => ({ dial: [u] })),
       };
       if (host.proxyProtocolVersion) proxyHandler.proxy_protocol = host.proxyProtocolVersion;
 
@@ -101,9 +104,12 @@ function buildExpectedL4Config(rows: (typeof l4ProxyHosts.$inferSelect)[]) {
           }
           if (lb.passive_health_check?.enabled) {
             const passive: Record<string, unknown> = {};
-            if (lb.passive_health_check.fail_duration) passive.fail_duration = lb.passive_health_check.fail_duration;
-            if (lb.passive_health_check.max_fails != null) passive.max_fails = lb.passive_health_check.max_fails;
-            if (lb.passive_health_check.unhealthy_latency) passive.unhealthy_latency = lb.passive_health_check.unhealthy_latency;
+            if (lb.passive_health_check.fail_duration)
+              passive.fail_duration = lb.passive_health_check.fail_duration;
+            if (lb.passive_health_check.max_fails != null)
+              passive.max_fails = lb.passive_health_check.max_fails;
+            if (lb.passive_health_check.unhealthy_latency)
+              passive.unhealthy_latency = lb.passive_health_check.unhealthy_latency;
             if (Object.keys(passive).length > 0) healthChecks.passive = passive;
           }
           if (Object.keys(healthChecks).length > 0) proxyHandler.health_checks = healthChecks;
@@ -155,9 +161,7 @@ describe('L4 Caddy config generation', () => {
         listen: [':5432'],
         routes: [
           {
-            handle: [
-              { handler: 'proxy', upstreams: [{ dial: ['10.0.0.1:5432'] }] },
-            ],
+            handle: [{ handler: 'proxy', upstreams: [{ dial: ['10.0.0.1:5432'] }] }],
           },
         ],
       },
@@ -317,9 +321,21 @@ describe('L4 Caddy config generation', () => {
   });
 
   it('different ports create separate servers', async () => {
-    await insertL4Host({ name: 'PG', listenAddress: ':5432', upstreams: JSON.stringify(['10.0.0.1:5432']) });
-    await insertL4Host({ name: 'MySQL', listenAddress: ':3306', upstreams: JSON.stringify(['10.0.0.2:3306']) });
-    await insertL4Host({ name: 'Redis', listenAddress: ':6379', upstreams: JSON.stringify(['10.0.0.3:6379']) });
+    await insertL4Host({
+      name: 'PG',
+      listenAddress: ':5432',
+      upstreams: JSON.stringify(['10.0.0.1:5432']),
+    });
+    await insertL4Host({
+      name: 'MySQL',
+      listenAddress: ':3306',
+      upstreams: JSON.stringify(['10.0.0.2:3306']),
+    });
+    await insertL4Host({
+      name: 'Redis',
+      listenAddress: ':6379',
+      upstreams: JSON.stringify(['10.0.0.3:6379']),
+    });
 
     const rows = await db.select().from(l4ProxyHosts);
     const config = buildExpectedL4Config(rows)!;
@@ -365,7 +381,11 @@ describe('L4 Caddy config generation', () => {
     const rows = await db.select().from(l4ProxyHosts);
     const config = buildExpectedL4Config(rows)!;
     const route = (config.l4_server_0 as any).routes[0];
-    expect(route.match[0].tls.sni).toEqual(['db1.example.com', 'db2.example.com', 'db3.example.com']);
+    expect(route.match[0].tls.sni).toEqual([
+      'db1.example.com',
+      'db2.example.com',
+      'db3.example.com',
+    ]);
   });
 
   it('load balancer with round_robin policy', async () => {
@@ -536,8 +556,15 @@ describe('L4 Caddy config generation', () => {
         geoblock: {
           enabled: false,
           block_countries: ['CN'],
-          block_continents: [], block_asns: [], block_cidrs: [], block_ips: [],
-          allow_countries: [], allow_continents: [], allow_asns: [], allow_cidrs: [], allow_ips: [],
+          block_continents: [],
+          block_asns: [],
+          block_cidrs: [],
+          block_ips: [],
+          allow_countries: [],
+          allow_continents: [],
+          allow_asns: [],
+          allow_cidrs: [],
+          allow_ips: [],
         },
       }),
     });

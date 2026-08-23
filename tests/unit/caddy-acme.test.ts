@@ -32,7 +32,7 @@ describe('buildTlsAutomation — custom ACME directory', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('uses the Let\'s Encrypt default (no ca field) when caUrl is unset', async () => {
+  it("uses the Let's Encrypt default (no ca field) when caUrl is unset", async () => {
     const issuer = await firstIssuer({});
     expect(issuer.module).toBe('acme');
     expect(issuer).not.toHaveProperty('ca');
@@ -40,7 +40,9 @@ describe('buildTlsAutomation — custom ACME directory', () => {
   });
 
   it('injects ca with a custom directory URL', async () => {
-    const issuer = await firstIssuer({ caUrl: 'https://ca.internal.example.com/acme/acme/directory' });
+    const issuer = await firstIssuer({
+      caUrl: 'https://ca.internal.example.com/acme/acme/directory',
+    });
     expect(issuer.ca).toBe('https://ca.internal.example.com/acme/acme/directory');
   });
 
@@ -123,7 +125,11 @@ describe('buildTlsAutomation — DNS-01 challenge resolvers', () => {
   });
 
   it('omits resolvers entirely when DNS settings are disabled', async () => {
-    const challenge = await dnsChallenge({ enabled: false, resolvers: ['1.1.1.1'], fallbacks: ['9.9.9.9'] });
+    const challenge = await dnsChallenge({
+      enabled: false,
+      resolvers: ['1.1.1.1'],
+      fallbacks: ['9.9.9.9'],
+    });
     expect(challenge.resolvers).toBeUndefined();
   });
 });

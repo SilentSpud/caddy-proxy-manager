@@ -27,9 +27,15 @@ afterEach(() => {
 describe('AUTH_DISABLE_LOCAL_USERS', () => {
   it('is off unless set to exactly "true"', async () => {
     expect((await loadAuthConfig({})).disableLocalUsers).toBe(false);
-    expect((await loadAuthConfig({ AUTH_DISABLE_LOCAL_USERS: 'false' })).disableLocalUsers).toBe(false);
-    expect((await loadAuthConfig({ AUTH_DISABLE_LOCAL_USERS: 'TRUE' })).disableLocalUsers).toBe(false);
-    expect((await loadAuthConfig({ AUTH_DISABLE_LOCAL_USERS: 'true' })).disableLocalUsers).toBe(true);
+    expect((await loadAuthConfig({ AUTH_DISABLE_LOCAL_USERS: 'false' })).disableLocalUsers).toBe(
+      false,
+    );
+    expect((await loadAuthConfig({ AUTH_DISABLE_LOCAL_USERS: 'TRUE' })).disableLocalUsers).toBe(
+      false,
+    );
+    expect((await loadAuthConfig({ AUTH_DISABLE_LOCAL_USERS: 'true' })).disableLocalUsers).toBe(
+      true,
+    );
   });
 
   it('forces credential self-registration off, even if it was requested', async () => {

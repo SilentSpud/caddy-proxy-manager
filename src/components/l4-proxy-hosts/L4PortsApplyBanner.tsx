@@ -57,8 +57,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
 
   useEffect(() => {
     if (!data) return;
-    const shouldPoll =
-      data.status.state === "pending" || data.status.state === "applying";
+    const shouldPoll = data.status.state === "pending" || data.status.state === "applying";
     if (shouldPoll && !polling) {
       setPolling(true);
       const interval = setInterval(fetchStatus, 2000);

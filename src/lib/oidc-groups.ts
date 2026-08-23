@@ -187,11 +187,8 @@ export function resolveRoleGroups(cfg: GroupMappingConfig): Record<AppRole, stri
   const result = {} as Record<AppRole, string[]>;
   for (const role of APP_ROLES) {
     const names = parseGroupNames(configured[role]);
-    result[role] = names.length > 0
-      ? names
-      : cfg.groupPrefix
-        ? [`${cfg.groupPrefix}${ROLE_SUFFIX[role]}`]
-        : [];
+    result[role] =
+      names.length > 0 ? names : cfg.groupPrefix ? [`${cfg.groupPrefix}${ROLE_SUFFIX[role]}`] : [];
   }
   return result;
 }
@@ -222,7 +219,7 @@ export function mapGroupsToLocalGroups(groups: string[], cfg: GroupMappingConfig
   if (!cfg.syncGroups) return [];
 
   const roleGroupNames = new Set(
-    Object.values(resolveRoleGroups(cfg)).flat().map(comparableGroupName)
+    Object.values(resolveRoleGroups(cfg)).flat().map(comparableGroupName),
   );
 
   const prefix = cfg.groupPrefix;

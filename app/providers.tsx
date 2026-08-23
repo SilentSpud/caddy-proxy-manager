@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import NextLink from "next/link";
 import { ThemeProvider, useTheme } from "next-themes";
 import { Toaster } from "sonner";
@@ -31,7 +31,13 @@ function AstryxTheme({ children }: { children: ReactNode }) {
 
 export default function Providers({ children, nonce }: { children: ReactNode; nonce?: string }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange nonce={nonce}>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      nonce={nonce}
+    >
       <AstryxTheme>
         {/* Every Astryx component that renders a link (Button, Link, Tab,
             ClickableCard, ...) routes through this, so an href stays a

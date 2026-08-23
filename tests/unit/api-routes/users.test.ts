@@ -12,7 +12,11 @@ vi.mock('@/src/lib/models/user', () => ({
 vi.mock('@/src/lib/api-auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
-    constructor(msg: string, status: number) { super(msg); this.status = status; this.name = 'ApiAuthError'; }
+    constructor(msg: string, status: number) {
+      super(msg);
+      this.status = status;
+      this.name = 'ApiAuthError';
+    }
   };
   return {
     requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
@@ -22,7 +26,10 @@ vi.mock('@/src/lib/api-auth', () => {
       if (error instanceof ApiAuthError) {
         return NR.json({ error: error.message }, { status: error.status });
       }
-      return NR.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
+      return NR.json(
+        { error: error instanceof Error ? error.message : 'Internal server error' },
+        { status: 500 },
+      );
     }),
     ApiAuthError,
   };
@@ -139,7 +146,9 @@ describe('PUT /api/v1/users/[id]', () => {
     mockUpdateUserProfile.mockResolvedValue(updated as any);
     mockGetUserById.mockResolvedValue(updated as any);
 
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ id: '1' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -151,7 +160,9 @@ describe('PUT /api/v1/users/[id]', () => {
   it('returns 404 when updating non-existent user', async () => {
     mockGetUserById.mockResolvedValue(null as any);
 
-    const response = await PUT(createMockRequest({ method: 'PUT', body: { name: 'X' } }), { params: Promise.resolve({ id: '999' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body: { name: 'X' } }), {
+      params: Promise.resolve({ id: '999' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(404);

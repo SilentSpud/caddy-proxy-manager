@@ -85,7 +85,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
         (u) =>
           u.name?.toLowerCase().includes(search.toLowerCase()) ||
           u.email.toLowerCase().includes(search.toLowerCase()) ||
-          u.role.includes(search.toLowerCase())
+          u.role.includes(search.toLowerCase()),
       )
     : users;
 
@@ -94,7 +94,12 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
       <PageHeader title="Users" description="Manage user accounts, roles, and access." />
 
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
-        <SearchField value={search} onChange={setSearch} placeholder="Search users..." label="Search users" />
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search users..."
+          label="Search users"
+        />
         <HStack gap={3} vAlign="center">
           <Text type="body" size="sm" color="secondary">
             {filtered.length} user{filtered.length !== 1 ? "s" : ""}

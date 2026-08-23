@@ -53,9 +53,7 @@
       "indexes": {
         "access_list_entries_list_idx": {
           "name": "access_list_entries_list_idx",
-          "columns": [
-            "access_list_id"
-          ],
+          "columns": ["access_list_id"],
           "isUnique": false
         }
       },
@@ -63,13 +61,9 @@
         "access_list_entries_access_list_id_access_lists_id_fk": {
           "name": "access_list_entries_access_list_id_access_lists_id_fk",
           "tableFrom": "access_list_entries",
-          "columnsFrom": [
-            "access_list_id"
-          ],
+          "columnsFrom": ["access_list_id"],
           "tableTo": "access_lists",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -129,13 +123,9 @@
         "access_lists_created_by_users_id_fk": {
           "name": "access_lists_created_by_users_id_fk",
           "tableFrom": "access_lists",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -200,9 +190,7 @@
       "indexes": {
         "api_tokens_token_hash_unique": {
           "name": "api_tokens_token_hash_unique",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         }
       },
@@ -210,13 +198,9 @@
         "api_tokens_created_by_users_id_fk": {
           "name": "api_tokens_created_by_users_id_fk",
           "tableFrom": "api_tokens",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -290,13 +274,9 @@
         "audit_events_user_id_users_id_fk": {
           "name": "audit_events_user_id_users_id_fk",
           "tableFrom": "audit_events",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -392,13 +372,9 @@
         "certificates_created_by_users_id_fk": {
           "name": "certificates_created_by_users_id_fk",
           "tableFrom": "certificates",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -478,9 +454,7 @@
       "indexes": {
         "instances_base_url_unique": {
           "name": "instances_base_url_unique",
-          "columns": [
-            "base_url"
-          ],
+          "columns": ["base_url"],
           "isUnique": true
         }
       },
@@ -538,9 +512,7 @@
       "indexes": {
         "oauth_state_unique": {
           "name": "oauth_state_unique",
-          "columns": [
-            "state"
-          ],
+          "columns": ["state"],
           "isUnique": true
         }
       },
@@ -598,10 +570,7 @@
       "indexes": {
         "pending_oauth_user_provider_unique": {
           "name": "pending_oauth_user_provider_unique",
-          "columns": [
-            "user_id",
-            "provider"
-          ],
+          "columns": ["user_id", "provider"],
           "isUnique": true
         }
       },
@@ -609,13 +578,9 @@
         "pending_oauth_links_user_id_users_id_fk": {
           "name": "pending_oauth_links_user_id_users_id_fk",
           "tableFrom": "pending_oauth_links",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -782,39 +747,27 @@
         "proxy_hosts_certificate_id_certificates_id_fk": {
           "name": "proxy_hosts_certificate_id_certificates_id_fk",
           "tableFrom": "proxy_hosts",
-          "columnsFrom": [
-            "certificate_id"
-          ],
+          "columnsFrom": ["certificate_id"],
           "tableTo": "certificates",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "proxy_hosts_access_list_id_access_lists_id_fk": {
           "name": "proxy_hosts_access_list_id_access_lists_id_fk",
           "tableFrom": "proxy_hosts",
-          "columnsFrom": [
-            "access_list_id"
-          ],
+          "columnsFrom": ["access_list_id"],
           "tableTo": "access_lists",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "proxy_hosts_owner_user_id_users_id_fk": {
           "name": "proxy_hosts_owner_user_id_users_id_fk",
           "tableFrom": "proxy_hosts",
-          "columnsFrom": [
-            "owner_user_id"
-          ],
+          "columnsFrom": ["owner_user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -905,13 +858,9 @@
         "redirect_hosts_created_by_users_id_fk": {
           "name": "redirect_hosts_created_by_users_id_fk",
           "tableFrom": "redirect_hosts",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -962,9 +911,7 @@
       "indexes": {
         "sessions_token_unique": {
           "name": "sessions_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         }
       },
@@ -972,13 +919,9 @@
         "sessions_user_id_users_id_fk": {
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1104,17 +1047,12 @@
       "indexes": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         },
         "users_provider_subject_idx": {
           "name": "users_provider_subject_idx",
-          "columns": [
-            "provider",
-            "subject"
-          ],
+          "columns": ["provider", "subject"],
           "isUnique": false
         }
       },

@@ -118,11 +118,9 @@ describe('resolveAvatar honours the decision', () => {
 
   it('still shows a user their own icon when Gravatar is off', async () => {
     const { resolveAvatar } = await import('../../src/lib/avatar');
-    const resolved = resolveAvatar(
-      { ...user, avatarUrl: 'data:image/png;base64,AAAA' },
-      72,
-      { gravatar: false }
-    );
+    const resolved = resolveAvatar({ ...user, avatarUrl: 'data:image/png;base64,AAAA' }, 72, {
+      gravatar: false,
+    });
     expect(resolved.imageUrl).toBe('data:image/png;base64,AAAA');
     expect(resolved.gravatarUrl).toBeNull();
   });

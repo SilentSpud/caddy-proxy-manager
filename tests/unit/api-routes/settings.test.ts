@@ -43,7 +43,11 @@ vi.mock('@/src/lib/caddy', () => ({
 vi.mock('@/src/lib/api-auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
-    constructor(msg: string, status: number) { super(msg); this.status = status; this.name = 'ApiAuthError'; }
+    constructor(msg: string, status: number) {
+      super(msg);
+      this.status = status;
+      this.name = 'ApiAuthError';
+    }
   };
   return {
     requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
@@ -53,7 +57,10 @@ vi.mock('@/src/lib/api-auth', () => {
       if (error instanceof ApiAuthError) {
         return NR.json({ error: error.message }, { status: error.status });
       }
-      return NR.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
+      return NR.json(
+        { error: error instanceof Error ? error.message : 'Internal server error' },
+        { status: 500 },
+      );
     }),
     ApiAuthError,
   };
@@ -61,19 +68,35 @@ vi.mock('@/src/lib/api-auth', () => {
 
 import { GET, PUT } from '@/app/api/v1/settings/[group]/route';
 import {
-  getGeneralSettings, saveGeneralSettings,
-  getAcmeSettings, saveAcmeSettings,
-  getCloudflareSettings, saveCloudflareSettings,
-  getAuthentikSettings, saveAuthentikSettings,
-  getMetricsSettings, saveMetricsSettings,
-  getLoggingSettings, saveLoggingSettings,
-  getDnsSettings, saveDnsSettings,
-  getUpstreamDnsResolutionSettings, saveUpstreamDnsResolutionSettings,
-  getGeoBlockSettings, saveGeoBlockSettings,
-  getWafSettings, saveWafSettings,
-  getTrustedProxiesSettings, saveTrustedProxiesSettings,
+  getGeneralSettings,
+  saveGeneralSettings,
+  getAcmeSettings,
+  saveAcmeSettings,
+  getCloudflareSettings,
+  saveCloudflareSettings,
+  getAuthentikSettings,
+  saveAuthentikSettings,
+  getMetricsSettings,
+  saveMetricsSettings,
+  getLoggingSettings,
+  saveLoggingSettings,
+  getDnsSettings,
+  saveDnsSettings,
+  getUpstreamDnsResolutionSettings,
+  saveUpstreamDnsResolutionSettings,
+  getGeoBlockSettings,
+  saveGeoBlockSettings,
+  getWafSettings,
+  saveWafSettings,
+  getTrustedProxiesSettings,
+  saveTrustedProxiesSettings,
 } from '@/src/lib/settings';
-import { getInstanceMode, setInstanceMode, getSlaveMasterToken, setSlaveMasterToken } from '@/src/lib/instance-sync';
+import {
+  getInstanceMode,
+  setInstanceMode,
+  getSlaveMasterToken,
+  setSlaveMasterToken,
+} from '@/src/lib/instance-sync';
 import { applyCaddyConfig } from '@/src/lib/caddy';
 import { requireApiAdmin } from '@/src/lib/api-auth';
 
@@ -125,7 +148,9 @@ describe('GET /api/v1/settings/[group]', () => {
     const settings = { site_name: 'My Proxy', admin_email: 'admin@example.com' };
     mockGetGeneral.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'general' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'general' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -135,7 +160,9 @@ describe('GET /api/v1/settings/[group]', () => {
   it('returns empty object when settings are null', async () => {
     mockGetGeneral.mockResolvedValue(null as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'general' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'general' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -145,7 +172,9 @@ describe('GET /api/v1/settings/[group]', () => {
   it('returns instance mode', async () => {
     mockGetInstanceMode.mockResolvedValue('standalone' as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'instance-mode' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'instance-mode' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -155,7 +184,9 @@ describe('GET /api/v1/settings/[group]', () => {
   it('returns sync-token status', async () => {
     mockGetSlaveMasterToken.mockResolvedValue('some-token' as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'sync-token' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'sync-token' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -165,7 +196,9 @@ describe('GET /api/v1/settings/[group]', () => {
   it('returns has_token false when no token', async () => {
     mockGetSlaveMasterToken.mockResolvedValue(null as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'sync-token' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'sync-token' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -173,7 +206,9 @@ describe('GET /api/v1/settings/[group]', () => {
   });
 
   it('returns 404 for unknown settings group', async () => {
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'unknown' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'unknown' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -184,7 +219,9 @@ describe('GET /api/v1/settings/[group]', () => {
     const { ApiAuthError } = await import('@/src/lib/api-auth');
     mockRequireApiAdmin.mockRejectedValue(new ApiAuthError('Unauthorized', 401));
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'general' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'general' }),
+    });
     expect(response.status).toBe(401);
   });
 });
@@ -194,7 +231,9 @@ describe('PUT /api/v1/settings/[group]', () => {
     mockSaveGeneral.mockResolvedValue(undefined);
 
     const body = { site_name: 'Updated Proxy' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'general' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'general' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -207,7 +246,9 @@ describe('PUT /api/v1/settings/[group]', () => {
     mockSetInstanceMode.mockResolvedValue(undefined as any);
 
     const body = { mode: 'master' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'instance-mode' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'instance-mode' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -220,7 +261,9 @@ describe('PUT /api/v1/settings/[group]', () => {
 
     const validToken = 'a]b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
     const body = { token: validToken };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'sync-token' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'sync-token' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -232,7 +275,9 @@ describe('PUT /api/v1/settings/[group]', () => {
     mockSetSlaveMasterToken.mockResolvedValue(undefined as any);
 
     const body = {};
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'sync-token' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'sync-token' }),
+    });
     await response.json();
 
     expect(response.status).toBe(200);
@@ -240,7 +285,9 @@ describe('PUT /api/v1/settings/[group]', () => {
   });
 
   it('returns 404 for unknown settings group', async () => {
-    const response = await PUT(createMockRequest({ method: 'PUT', body: {} }), { params: Promise.resolve({ group: 'unknown' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body: {} }), {
+      params: Promise.resolve({ group: 'unknown' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -251,7 +298,9 @@ describe('PUT /api/v1/settings/[group]', () => {
     mockSaveGeneral.mockResolvedValue(undefined);
     mockApplyCaddyConfig.mockRejectedValue(new Error('caddy down'));
 
-    const response = await PUT(createMockRequest({ method: 'PUT', body: { site_name: 'Test' } }), { params: Promise.resolve({ group: 'general' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body: { site_name: 'Test' } }), {
+      params: Promise.resolve({ group: 'general' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -278,7 +327,9 @@ describe('PUT acme settings', () => {
     mockSaveAcme.mockResolvedValue(undefined);
 
     const body = { caUrl: 'https://ca.internal.example.com/acme/acme/directory' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'acme' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'acme' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -293,7 +344,9 @@ describe('GET cloudflare settings', () => {
     const settings = { apiToken: 'cf-token-xxx', zoneId: 'zone123', accountId: 'acc456' };
     mockGetCloudflare.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'cloudflare' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'cloudflare' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -307,7 +360,9 @@ describe('PUT cloudflare settings', () => {
     mockSaveCloudflare.mockResolvedValue(undefined);
 
     const body = { apiToken: 'new-token' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'cloudflare' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'cloudflare' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -319,10 +374,16 @@ describe('PUT cloudflare settings', () => {
 
 describe('GET authentik settings', () => {
   it('returns authentik settings', async () => {
-    const settings = { outpostDomain: 'auth.example.com', outpostUpstream: 'http://authentik:9000', authEndpoint: '/outpost.goauthentik.io/auth/caddy' };
+    const settings = {
+      outpostDomain: 'auth.example.com',
+      outpostUpstream: 'http://authentik:9000',
+      authEndpoint: '/outpost.goauthentik.io/auth/caddy',
+    };
     mockGetAuthentik.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'authentik' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'authentik' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -335,8 +396,14 @@ describe('PUT authentik settings', () => {
   it('saves authentik settings and applies caddy config', async () => {
     mockSaveAuthentik.mockResolvedValue(undefined);
 
-    const body = { outpostDomain: 'auth.example.com', outpostUpstream: 'http://authentik:9000', authEndpoint: '/outpost.goauthentik.io/auth/caddy' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'authentik' }) });
+    const body = {
+      outpostDomain: 'auth.example.com',
+      outpostUpstream: 'http://authentik:9000',
+      authEndpoint: '/outpost.goauthentik.io/auth/caddy',
+    };
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'authentik' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -351,7 +418,9 @@ describe('GET metrics settings', () => {
     const settings = { enabled: true, port: 9090 };
     mockGetMetrics.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'metrics' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'metrics' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -365,7 +434,9 @@ describe('PUT metrics settings', () => {
     mockSaveMetrics.mockResolvedValue(undefined);
 
     const body = { enabled: false };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'metrics' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'metrics' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -380,7 +451,9 @@ describe('GET logging settings', () => {
     const settings = { enabled: true, format: 'json' };
     mockGetLogging.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'logging' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'logging' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -394,7 +467,9 @@ describe('PUT logging settings', () => {
     mockSaveLogging.mockResolvedValue(undefined);
 
     const body = { enabled: true, format: 'console' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'logging' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'logging' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -406,7 +481,12 @@ describe('PUT logging settings', () => {
 
 describe('GET dns settings', () => {
   it('returns dns settings', async () => {
-    const settings = { enabled: true, resolvers: ['1.1.1.1', '8.8.8.8'], fallbacks: ['9.9.9.9'], timeout: '5s' };
+    const settings = {
+      enabled: true,
+      resolvers: ['1.1.1.1', '8.8.8.8'],
+      fallbacks: ['9.9.9.9'],
+      timeout: '5s',
+    };
     mockGetDns.mockResolvedValue(settings as any);
 
     const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'dns' }) });
@@ -422,8 +502,15 @@ describe('PUT dns settings', () => {
   it('saves dns settings and applies caddy config', async () => {
     mockSaveDns.mockResolvedValue(undefined);
 
-    const body = { enabled: true, resolvers: ['1.1.1.1', '8.8.8.8'], fallbacks: ['9.9.9.9'], timeout: '5s' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'dns' }) });
+    const body = {
+      enabled: true,
+      resolvers: ['1.1.1.1', '8.8.8.8'],
+      fallbacks: ['9.9.9.9'],
+      timeout: '5s',
+    };
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'dns' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -438,7 +525,9 @@ describe('GET upstream-dns settings', () => {
     const settings = { enabled: true, family: 'ipv4' };
     mockGetUpstreamDns.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'upstream-dns' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'upstream-dns' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -452,7 +541,9 @@ describe('PUT upstream-dns settings', () => {
     mockSaveUpstreamDns.mockResolvedValue(undefined);
 
     const body = { enabled: true, family: 'both' };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'upstream-dns' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'upstream-dns' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -485,7 +576,9 @@ describe('GET geoblock settings', () => {
     };
     mockGetGeoBlock.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'geoblock' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'geoblock' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -517,7 +610,9 @@ describe('PUT geoblock settings', () => {
       response_headers: {},
       redirect_url: '',
     };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'geoblock' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'geoblock' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -529,7 +624,13 @@ describe('PUT geoblock settings', () => {
 
 describe('GET waf settings', () => {
   it('returns waf settings', async () => {
-    const settings = { enabled: true, mode: 'On', load_owasp_crs: true, custom_directives: '', excluded_rule_ids: [920350] };
+    const settings = {
+      enabled: true,
+      mode: 'On',
+      load_owasp_crs: true,
+      custom_directives: '',
+      excluded_rule_ids: [920350],
+    };
     mockGetWaf.mockResolvedValue(settings as any);
 
     const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'waf' }) });
@@ -545,8 +646,16 @@ describe('PUT waf settings', () => {
   it('saves waf settings and applies caddy config', async () => {
     mockSaveWaf.mockResolvedValue(undefined);
 
-    const body = { enabled: true, mode: 'On', load_owasp_crs: true, custom_directives: '', excluded_rule_ids: [920350] };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'waf' }) });
+    const body = {
+      enabled: true,
+      mode: 'On',
+      load_owasp_crs: true,
+      custom_directives: '',
+      excluded_rule_ids: [920350],
+    };
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'waf' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -558,10 +667,17 @@ describe('PUT waf settings', () => {
 
 describe('GET trusted-proxies settings', () => {
   it('returns trusted-proxies settings', async () => {
-    const settings = { ranges: ['172.21.0.1/32'], client_ip_headers: ['Cf-Connecting-Ip'], strict: true, default_geoblock: false };
+    const settings = {
+      ranges: ['172.21.0.1/32'],
+      client_ip_headers: ['Cf-Connecting-Ip'],
+      strict: true,
+      default_geoblock: false,
+    };
     mockGetTrustedProxies.mockResolvedValue(settings as any);
 
-    const response = await GET(createMockRequest(), { params: Promise.resolve({ group: 'trusted-proxies' }) });
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'trusted-proxies' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -575,7 +691,9 @@ describe('PUT trusted-proxies settings', () => {
     mockSaveTrustedProxies.mockResolvedValue(undefined);
 
     const body = { ranges: ['private_ranges'], default_geoblock: true };
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ group: 'trusted-proxies' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'trusted-proxies' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);

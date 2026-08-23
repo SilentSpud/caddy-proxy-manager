@@ -17,7 +17,7 @@ import {
 import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
 let cachedAuth: any = null;
 let cachedProviders: GenericOAuthConfig[] | null = null;
 
@@ -39,7 +39,12 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
   if (p.tokenUrl) cfg.tokenUrl = p.tokenUrl;
   if (p.userinfoUrl) cfg.userInfoUrl = p.userinfoUrl;
   if (p.issuer) {
-    cfg.issuer = p.issuer;
+    // better-auth 1.7 renamed `issuer` to `accountIssuer`: the stable namespace
+    // paired with the provider account id. Discovery providers fall back to the
+    // issuer found in the discovery document, but providers configured with
+    // explicit endpoints have none, so setting it keeps account identity stable
+    // across both shapes.
+    cfg.accountIssuer = p.issuer;
     // Only use discovery when explicit URLs are not provided
     if (!p.authorizationUrl && !p.tokenUrl) {
       cfg.discoveryUrl = p.issuer.replace(/\/$/, "") + "/.well-known/openid-configuration";
@@ -55,7 +60,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
       const claims = await fetchOidcClaims(
         { issuer: p.issuer, userinfoUrl: p.userinfoUrl },
         { idToken: tokens.idToken, accessToken: tokens.accessToken },
-        mapping.groupsClaim
+        mapping.groupsClaim,
       );
       if (!claims) return null;
       // The raw claims ride along so mapProfileToUser can read the group claim;
@@ -99,8 +104,11 @@ function loadProvidersSync(): GenericOAuthConfig[] {
 
   // If cache is empty from a failed attempt, retry on every call until it succeeds
   try {
-    const rows = db.select().from(schema.oauthProviders)
-      .where(eq(schema.oauthProviders.enabled, true)).all();
+    const rows = db
+      .select()
+      .from(schema.oauthProviders)
+      .where(eq(schema.oauthProviders.enabled, true))
+      .all();
     const providers: OAuthProvider[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -121,7 +129,8 @@ function loadProvidersSync(): GenericOAuthConfig[] {
       adminGroup: row.adminGroup,
       userGroup: row.userGroup,
       viewerGroup: row.viewerGroup,
-      defaultRole: row.defaultRole === "admin" || row.defaultRole === "viewer" ? row.defaultRole : "user",
+      defaultRole:
+        row.defaultRole === "admin" || row.defaultRole === "viewer" ? row.defaultRole : "user",
       syncGroups: row.syncGroups,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -151,11 +160,13 @@ function loadProvidersSync(): GenericOAuthConfig[] {
  * unaffected. `provider`/`subject` are informational, not access-control, and
  * are intentionally left untouched.
  */
-export function enforceSafeUserDefaults<T extends object>(user: T): T & { role: string; status: string } {
+export function enforceSafeUserDefaults<T extends object>(
+  user: T,
+): T & { role: string; status: string } {
   return { ...user, role: "user", status: "active" };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above — the return type depends on a plugin list only known at runtime
 function createAuth(): any {
   const oauthConfigs = loadProvidersSync();
 
@@ -242,9 +253,12 @@ function createAuth(): any {
         update: {
           before: async (account) => {
             const data = { ...account };
-            if (data.accessToken && !isEncryptedSecret(data.accessToken)) data.accessToken = encryptSecret(data.accessToken);
-            if (data.refreshToken && !isEncryptedSecret(data.refreshToken)) data.refreshToken = encryptSecret(data.refreshToken);
-            if (data.idToken && !isEncryptedSecret(data.idToken)) data.idToken = encryptSecret(data.idToken);
+            if (data.accessToken && !isEncryptedSecret(data.accessToken))
+              data.accessToken = encryptSecret(data.accessToken);
+            if (data.refreshToken && !isEncryptedSecret(data.refreshToken))
+              data.refreshToken = encryptSecret(data.refreshToken);
+            if (data.idToken && !isEncryptedSecret(data.idToken))
+              data.idToken = encryptSecret(data.idToken);
             return { data };
           },
         },
@@ -252,7 +266,8 @@ function createAuth(): any {
       session: {
         create: {
           after: async (session) => {
-            const userId = typeof session.userId === "string" ? Number(session.userId) : session.userId;
+            const userId =
+              typeof session.userId === "string" ? Number(session.userId) : session.userId;
 
             // Apply the IdP's group claim now that the user and their account
             // row exist. Runs before the audit entry so a role change is in

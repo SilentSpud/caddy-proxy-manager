@@ -13,7 +13,11 @@ vi.mock('@/src/lib/instance-sync', () => ({
 vi.mock('@/src/lib/api-auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
-    constructor(msg: string, status: number) { super(msg); this.status = status; this.name = 'ApiAuthError'; }
+    constructor(msg: string, status: number) {
+      super(msg);
+      this.status = status;
+      this.name = 'ApiAuthError';
+    }
   };
   return {
     requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
@@ -23,7 +27,10 @@ vi.mock('@/src/lib/api-auth', () => {
       if (error instanceof ApiAuthError) {
         return NR.json({ error: error.message }, { status: error.status });
       }
-      return NR.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
+      return NR.json(
+        { error: error instanceof Error ? error.message : 'Internal server error' },
+        { status: 500 },
+      );
     }),
     ApiAuthError,
   };
@@ -102,7 +109,9 @@ describe('DELETE /api/v1/instances/[id]', () => {
   it('deletes an instance', async () => {
     mockDelete.mockResolvedValue(undefined as any);
 
-    const response = await DELETE(createMockRequest({ method: 'DELETE' }), { params: Promise.resolve({ id: '1' }) });
+    const response = await DELETE(createMockRequest({ method: 'DELETE' }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);

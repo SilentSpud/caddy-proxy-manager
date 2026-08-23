@@ -6,7 +6,14 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
-import type { AcmeHost, CaCertificateView, CertExpiryStatus, ImportedCertView, ManagedCertView, MtlsRole } from "./page";
+import type {
+  AcmeHost,
+  CaCertificateView,
+  CertExpiryStatus,
+  ImportedCertView,
+  ManagedCertView,
+  MtlsRole,
+} from "./page";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { StatusSummaryBar } from "./components/StatusSummaryBar";
 import { AcmeTab } from "./components/AcmeTab";
@@ -49,8 +56,22 @@ export default function CertificatesClient({
   const { expired, expiringSoon, healthy: importedHealthy } = countExpiry(importedStatuses);
   const healthy = importedHealthy + healthyAcmeTotal;
 
-  const search = activeTab === "acme" ? searchAcme : activeTab === "imported" ? searchImported : activeTab === "roles" ? searchRoles : searchCa;
-  const setSearch = activeTab === "acme" ? setSearchAcme : activeTab === "imported" ? setSearchImported : activeTab === "roles" ? setSearchRoles : setSearchCa;
+  const search =
+    activeTab === "acme"
+      ? searchAcme
+      : activeTab === "imported"
+        ? searchImported
+        : activeTab === "roles"
+          ? searchRoles
+          : searchCa;
+  const setSearch =
+    activeTab === "acme"
+      ? setSearchAcme
+      : activeTab === "imported"
+        ? setSearchImported
+        : activeTab === "roles"
+          ? setSearchRoles
+          : setSearchCa;
 
   function handleTabChange(value: string) {
     setActiveTab(value as TabId);

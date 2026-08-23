@@ -35,7 +35,7 @@ function buildEntry(row: AccessListEntryRow): AccessListEntry {
     id: row.id,
     username: row.username,
     createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!
+    updatedAt: toIso(row.updatedAt)!,
   };
 }
 
@@ -49,13 +49,13 @@ function toAccessList(row: AccessListRow, entries: AccessListEntryRow[]): Access
       .sort((a, b) => a.username.localeCompare(b.username))
       .map(buildEntry),
     createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!
+    updatedAt: toIso(row.updatedAt)!,
   };
 }
 
 export async function listAccessLists(): Promise<AccessList[]> {
   const lists = await db.query.accessLists.findMany({
-    orderBy: (table) => asc(table.name)
+    orderBy: (table) => asc(table.name),
   });
 
   if (lists.length === 0) {
@@ -83,7 +83,10 @@ export async function countAccessLists(): Promise<number> {
   return row?.value ?? 0;
 }
 
-export async function listAccessListsPaginated(limit: number, offset: number): Promise<AccessList[]> {
+export async function listAccessListsPaginated(
+  limit: number,
+  offset: number,
+): Promise<AccessList[]> {
   const lists = await db.query.accessLists.findMany({
     orderBy: (table) => asc(table.name),
     limit,
@@ -110,7 +113,7 @@ export async function listAccessListsPaginated(limit: number, offset: number): P
 
 export async function getAccessList(id: number): Promise<AccessList | null> {
   const list = await db.query.accessLists.findFirst({
-    where: (table, operators) => operators.eq(table.id, id)
+    where: (table, operators) => operators.eq(table.id, id),
   });
   if (!list) {
     return null;
@@ -133,7 +136,7 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
       description: input.description ?? null,
       createdBy: actorUserId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning();
 
@@ -148,8 +151,8 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
         username: account.username,
         passwordHash: bcrypt.hashSync(account.password, 10),
         createdAt: now,
-        updatedAt: now
-      }))
+        updatedAt: now,
+      })),
     );
   }
 
@@ -158,7 +161,7 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
     action: "create",
     entityType: "access_list",
     entityId: accessList.id,
-    summary: `Created access list ${input.name}`
+    summary: `Created access list ${input.name}`,
   });
 
   await applyCaddyConfig();
@@ -168,7 +171,7 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
 export async function updateAccessList(
   id: number,
   input: { name?: string; description?: string | null },
-  actorUserId: number
+  actorUserId: number,
 ) {
   const existing = await getAccessList(id);
   if (!existing) {
@@ -181,7 +184,7 @@ export async function updateAccessList(
     .set({
       name: input.name ?? existing.name,
       description: input.description ?? existing.description,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(accessLists.id, id));
 
@@ -190,7 +193,7 @@ export async function updateAccessList(
     action: "update",
     entityType: "access_list",
     entityId: id,
-    summary: `Updated access list ${input.name ?? existing.name}`
+    summary: `Updated access list ${input.name ?? existing.name}`,
   });
 
   await applyCaddyConfig();
@@ -200,10 +203,10 @@ export async function updateAccessList(
 export async function addAccessListEntry(
   accessListId: number,
   entry: { username: string; password: string },
-  actorUserId: number
+  actorUserId: number,
 ) {
   const list = await db.query.accessLists.findFirst({
-    where: (table, operators) => operators.eq(table.id, accessListId)
+    where: (table, operators) => operators.eq(table.id, accessListId),
   });
   if (!list) {
     throw new Error("Access list not found");
@@ -216,7 +219,7 @@ export async function addAccessListEntry(
     username: entry.username,
     passwordHash: hash,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   });
 
   logAuditEvent({
@@ -224,15 +227,19 @@ export async function addAccessListEntry(
     action: "create",
     entityType: "access_list_entry",
     entityId: accessListId,
-    summary: `Added user ${entry.username} to access list ${list.name}`
+    summary: `Added user ${entry.username} to access list ${list.name}`,
   });
   await applyCaddyConfig();
   return (await getAccessList(accessListId))!;
 }
 
-export async function removeAccessListEntry(accessListId: number, entryId: number, actorUserId: number) {
+export async function removeAccessListEntry(
+  accessListId: number,
+  entryId: number,
+  actorUserId: number,
+) {
   const list = await db.query.accessLists.findFirst({
-    where: (table, operators) => operators.eq(table.id, accessListId)
+    where: (table, operators) => operators.eq(table.id, accessListId),
   });
   if (!list) {
     throw new Error("Access list not found");
@@ -245,7 +252,7 @@ export async function removeAccessListEntry(accessListId: number, entryId: numbe
     action: "delete",
     entityType: "access_list_entry",
     entityId: entryId,
-    summary: `Removed entry from access list ${list.name}`
+    summary: `Removed entry from access list ${list.name}`,
   });
   await applyCaddyConfig();
   return (await getAccessList(accessListId))!;
@@ -253,7 +260,7 @@ export async function removeAccessListEntry(accessListId: number, entryId: numbe
 
 export async function deleteAccessList(id: number, actorUserId: number) {
   const existing = await db.query.accessLists.findFirst({
-    where: (table, operators) => operators.eq(table.id, id)
+    where: (table, operators) => operators.eq(table.id, id),
   });
   if (!existing) {
     throw new Error("Access list not found");
@@ -266,7 +273,7 @@ export async function deleteAccessList(id: number, actorUserId: number) {
     action: "delete",
     entityType: "access_list",
     entityId: id,
-    summary: `Deleted access list ${existing.name}`
+    summary: `Deleted access list ${existing.name}`,
   });
   await applyCaddyConfig();
 }

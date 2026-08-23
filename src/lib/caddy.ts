@@ -45,7 +45,7 @@ import {
   type UpstreamDnsResolutionSettings,
   type GeoBlockSettings,
   type WafSettings,
-  type TrustedProxiesSettings
+  type TrustedProxiesSettings,
 } from "./settings";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { syncInstances } from "./instance-sync";
@@ -56,11 +56,34 @@ import {
   caCertificates,
   issuedClientCertificates,
   proxyHosts,
-  l4ProxyHosts
+  l4ProxyHosts,
 } from "./db/schema";
-import { type GeoBlockMode, type WafHostConfig, type MtlsConfig, type RedirectRule, type RewriteConfig, type LocationRuleMeta, type PathAllowRule, type PathBlockRule, type PathRewriteRule, type ErrorPageRule } from "./models/proxy-hosts";
-import { buildClientAuthentication, groupMtlsDomainsByCaSet, buildMtlsRbacSubroutes, buildFingerprintCelExpression, buildValidClientCertCelExpression, resolveAllowedFingerprints, type MtlsAccessRuleLike } from "./caddy-mtls";
-import { buildRoleFingerprintMap, buildCertFingerprintMap, buildRoleCertIdMap } from "./models/mtls-roles";
+import type {
+  GeoBlockMode,
+  WafHostConfig,
+  MtlsConfig,
+  RedirectRule,
+  RewriteConfig,
+  LocationRuleMeta,
+  PathAllowRule,
+  PathBlockRule,
+  PathRewriteRule,
+  ErrorPageRule,
+} from "./models/proxy-hosts";
+import {
+  buildClientAuthentication,
+  groupMtlsDomainsByCaSet,
+  buildMtlsRbacSubroutes,
+  buildFingerprintCelExpression,
+  buildValidClientCertCelExpression,
+  resolveAllowedFingerprints,
+  type MtlsAccessRuleLike,
+} from "./caddy-mtls";
+import {
+  buildRoleFingerprintMap,
+  buildCertFingerprintMap,
+  buildRoleCertIdMap,
+} from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
 
@@ -114,11 +137,10 @@ const DEFAULT_AUTHENTIK_HEADERS = [
   "X-Authentik-Meta-Outpost",
   "X-Authentik-Meta-Provider",
   "X-Authentik-Meta-App",
-  "X-Authentik-Meta-Version"
+  "X-Authentik-Meta-Version",
 ];
 
 const DEFAULT_AUTHENTIK_TRUSTED_PROXIES = ["private_ranges"];
-
 
 type ProxyHostRow = {
   id: number;
@@ -312,14 +334,15 @@ type EffectiveUpstreamDnsResolution = {
 };
 
 function parseUpstreamDnsResolutionConfig(
-  meta: UpstreamDnsResolutionMeta | undefined | null
+  meta: UpstreamDnsResolutionMeta | undefined | null,
 ): UpstreamDnsResolutionRouteConfig | null {
   if (!meta) {
     return null;
   }
 
   const enabled = typeof meta.enabled === "boolean" ? meta.enabled : null;
-  const family = meta.family && VALID_UPSTREAM_DNS_FAMILIES.includes(meta.family) ? meta.family : null;
+  const family =
+    meta.family && VALID_UPSTREAM_DNS_FAMILIES.includes(meta.family) ? meta.family : null;
 
   if (enabled === null && family === null) {
     return null;
@@ -327,26 +350,30 @@ function parseUpstreamDnsResolutionConfig(
 
   return {
     enabled,
-    family
+    family,
   };
 }
 
 function resolveEffectiveUpstreamDnsResolution(
   globalSetting: UpstreamDnsResolutionSettings | null,
-  hostSetting: UpstreamDnsResolutionRouteConfig | null
+  hostSetting: UpstreamDnsResolutionRouteConfig | null,
 ): EffectiveUpstreamDnsResolution {
-  const globalFamily = globalSetting?.family && VALID_UPSTREAM_DNS_FAMILIES.includes(globalSetting.family)
-    ? globalSetting.family
-    : "both";
+  const globalFamily =
+    globalSetting?.family && VALID_UPSTREAM_DNS_FAMILIES.includes(globalSetting.family)
+      ? globalSetting.family
+      : "both";
   const globalEnabled = Boolean(globalSetting?.enabled);
 
   return {
     enabled: hostSetting?.enabled ?? globalEnabled,
-    family: hostSetting?.family ?? globalFamily
+    family: hostSetting?.family ?? globalFamily,
   };
 }
 
-function getLookupServers(dnsConfig: DnsResolverRouteConfig | null, globalDnsSettings: DnsSettings | null): string[] {
+function getLookupServers(
+  dnsConfig: DnsResolverRouteConfig | null,
+  globalDnsSettings: DnsSettings | null,
+): string[] {
   if (dnsConfig && dnsConfig.enabled && dnsConfig.resolvers.length > 0) {
     const servers = [...dnsConfig.resolvers];
     if (dnsConfig.fallbacks && dnsConfig.fallbacks.length > 0) {
@@ -355,7 +382,11 @@ function getLookupServers(dnsConfig: DnsResolverRouteConfig | null, globalDnsSet
     return servers;
   }
 
-  if (globalDnsSettings?.enabled && Array.isArray(globalDnsSettings.resolvers) && globalDnsSettings.resolvers.length > 0) {
+  if (
+    globalDnsSettings?.enabled &&
+    Array.isArray(globalDnsSettings.resolvers) &&
+    globalDnsSettings.resolvers.length > 0
+  ) {
     const servers = [...globalDnsSettings.resolvers];
     if (Array.isArray(globalDnsSettings.fallbacks) && globalDnsSettings.fallbacks.length > 0) {
       servers.push(...globalDnsSettings.fallbacks);
@@ -366,7 +397,10 @@ function getLookupServers(dnsConfig: DnsResolverRouteConfig | null, globalDnsSet
   return [];
 }
 
-function getLookupTimeoutMs(dnsConfig: DnsResolverRouteConfig | null, globalDnsSettings: DnsSettings | null): number | null {
+function getLookupTimeoutMs(
+  dnsConfig: DnsResolverRouteConfig | null,
+  globalDnsSettings: DnsSettings | null,
+): number | null {
   const hostTimeout = toDurationMs(dnsConfig?.timeout ?? null);
   if (hostTimeout !== null) {
     return hostTimeout;
@@ -382,7 +416,11 @@ function getLookupTimeoutMs(dnsConfig: DnsResolverRouteConfig | null, globalDnsS
   return null;
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number | null, timeoutLabel: string): Promise<T> {
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number | null,
+  timeoutLabel: string,
+): Promise<T> {
   if (!timeoutMs || timeoutMs <= 0) {
     return promise;
   }
@@ -395,7 +433,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number | null, tim
         timeoutHandle = setTimeout(() => {
           reject(new Error(`${timeoutLabel} timed out after ${timeoutMs}ms`));
         }, timeoutMs);
-      })
+      }),
     ]);
   } finally {
     if (timeoutHandle) {
@@ -408,7 +446,7 @@ async function resolveHostnameAddresses(
   resolver: Resolver,
   hostname: string,
   family: UpstreamDnsAddressFamily,
-  timeoutMs: number | null
+  timeoutMs: number | null,
 ): Promise<string[]> {
   const errors: string[] = [];
   const resolved: string[] = [];
@@ -416,7 +454,11 @@ async function resolveHostnameAddresses(
 
   const resolve6 = async () => {
     try {
-      return await withTimeout(resolver.resolve6(hostname), timeoutMs, `AAAA lookup for ${hostname}`);
+      return await withTimeout(
+        resolver.resolve6(hostname),
+        timeoutMs,
+        `AAAA lookup for ${hostname}`,
+      );
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
       return [];
@@ -468,7 +510,7 @@ async function resolveUpstreamDials(
   upstreams: string[],
   dnsConfig: DnsResolverRouteConfig | null,
   globalDnsSettings: DnsSettings | null,
-  dnsResolution: EffectiveUpstreamDnsResolution
+  dnsResolution: EffectiveUpstreamDnsResolution,
 ): Promise<ResolveUpstreamsResult> {
   const parsedTargets = upstreams.map(parseUpstreamTarget);
   const hasHttpsUpstream = parsedTargets.some((target) => target.scheme === "https");
@@ -477,21 +519,24 @@ async function resolveUpstreamDials(
     return {
       upstreams: parsedTargets.map((target) => ({ dial: target.dial })),
       hasHttpsUpstream,
-      httpsTlsServerName: null
+      httpsTlsServerName: null,
     };
   }
 
   const httpsHostnames = Array.from(
     new Set(
       parsedTargets
-        .filter((target) => target.scheme === "https" && target.host && target.port && isIP(target.host) === 0)
-        .map((target) => target.host as string)
-    )
+        .filter(
+          (target) =>
+            target.scheme === "https" && target.host && target.port && isIP(target.host) === 0,
+        )
+        .map((target) => target.host as string),
+    ),
   );
   const canResolveHttps = httpsHostnames.length <= 1;
   if (!canResolveHttps) {
     console.warn(
-      `[caddy] Skipping DNS pinning for HTTPS upstreams on host "${row.name}" because multiple TLS server names are configured.`
+      `[caddy] Skipping DNS pinning for HTTPS upstreams on host "${row.name}" because multiple TLS server names are configured.`,
     );
   }
 
@@ -519,7 +564,12 @@ async function resolveUpstreamDials(
     }
 
     try {
-      const addresses = await resolveHostnameAddresses(resolver, target.host, dnsResolution.family, timeoutMs);
+      const addresses = await resolveHostnameAddresses(
+        resolver,
+        target.host,
+        dnsResolution.family,
+        timeoutMs,
+      );
       if (addresses.length === 0) {
         dials.push(target.dial);
         continue;
@@ -530,7 +580,7 @@ async function resolveUpstreamDials(
     } catch (error) {
       console.warn(
         `[caddy] Failed to resolve upstream "${target.original}" for host "${row.name}", falling back to hostname dial.`,
-        error
+        error,
       );
       dials.push(target.dial);
     }
@@ -548,7 +598,7 @@ async function resolveUpstreamDials(
   return {
     upstreams: dedupedDials,
     hasHttpsUpstream,
-    httpsTlsServerName: canResolveHttps && httpsHostnames.length === 1 ? httpsHostnames[0] : null
+    httpsTlsServerName: canResolveHttps && httpsHostnames.length === 1 ? httpsHostnames[0] : null,
   };
 }
 
@@ -561,7 +611,9 @@ function collectCertificateUsage(rows: ProxyHostRow[], certificates: Map<number,
       continue;
     }
 
-    const domains = parseJson<string[]>(row.domains, []).map((domain) => domain?.trim().toLowerCase());
+    const domains = parseJson<string[]>(row.domains, []).map((domain) =>
+      domain?.trim().toLowerCase(),
+    );
     const filteredDomains = domains.filter((domain): domain is string => Boolean(domain));
     if (filteredDomains.length === 0) {
       continue;
@@ -583,7 +635,7 @@ function collectCertificateUsage(rows: ProxyHostRow[], certificates: Map<number,
     if (!usage.has(cert.id)) {
       usage.set(cert.id, {
         certificate: cert,
-        domains: new Set()
+        domains: new Set(),
       });
     }
 
@@ -596,10 +648,7 @@ function collectCertificateUsage(rows: ProxyHostRow[], certificates: Map<number,
   return { usage, autoManagedDomains };
 }
 
-function mergeGeoBlockSettings(
-  global: GeoBlockSettings,
-  host: GeoBlockSettings
-): GeoBlockSettings {
+function mergeGeoBlockSettings(global: GeoBlockSettings, host: GeoBlockSettings): GeoBlockSettings {
   return {
     enabled: host.enabled || global.enabled,
     block_countries: [...(global.block_countries ?? []), ...(host.block_countries ?? [])],
@@ -624,7 +673,7 @@ function mergeGeoBlockSettings(
 
 export function resolveEffectiveGeoBlock(
   global: GeoBlockSettings | null,
-  host: { geoblock: GeoBlockSettings | null; geoblock_mode: GeoBlockMode }
+  host: { geoblock: GeoBlockSettings | null; geoblock_mode: GeoBlockMode },
 ): GeoBlockSettings | null {
   const hostConfig = host.geoblock;
   const globalConfig = global;
@@ -669,7 +718,8 @@ export function buildBlockerHandler(config: GeoBlockSettings): Record<string, un
   if (config.allow_cidrs?.length) handler.allow_cidrs = config.allow_cidrs;
   if (config.allow_ips?.length) handler.allow_ips = config.allow_ips;
 
-  if (config.trusted_proxies?.length) handler.trusted_proxies = expandPrivateRanges(config.trusted_proxies);
+  if (config.trusted_proxies?.length)
+    handler.trusted_proxies = expandPrivateRanges(config.trusted_proxies);
   if (config.fail_closed) handler.fail_closed = true;
 
   if (config.redirect_url) {
@@ -739,9 +789,7 @@ export function normalizeTrustedProxyRanges(ranges: string[] | undefined | null)
  * Returns an empty object (nothing emitted, current behaviour preserved) unless
  * at least one range is configured.
  */
-export function buildServerTrustedProxies(
-  settings: TrustedProxiesSettings | null | undefined
-): {
+export function buildServerTrustedProxies(settings: TrustedProxiesSettings | null | undefined): {
   trusted_proxies?: { source: string; ranges: string[] };
   client_ip_headers?: string[];
   trusted_proxies_strict?: number;
@@ -756,7 +804,7 @@ export function buildServerTrustedProxies(
     client_ip_headers?: string[];
     trusted_proxies_strict?: number;
   } = {
-    trusted_proxies: { source: "static", ranges }
+    trusted_proxies: { source: "static", ranges },
   };
 
   const headers = (settings.client_ip_headers ?? []).map((h) => h.trim()).filter(Boolean);
@@ -786,7 +834,7 @@ type CaddyBuildContext = {
 export function buildLocationReverseProxy(
   rule: LocationRuleMeta,
   skipHttpsValidation: boolean,
-  preserveHostHeader: boolean
+  preserveHostHeader: boolean,
 ): { safePath: string; reverseProxyHandler: Record<string, unknown> } {
   const parsedTargets = rule.upstreams.map(parseUpstreamTarget);
   const hasHttps = parsedTargets.some((t) => t.scheme === "https");
@@ -882,7 +930,7 @@ function appendLocationRoutes(options: {
     const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
       rule,
       skipHttpsHostnameValidation,
-      preserveHostHeader
+      preserveHostHeader,
     );
     if (!safePath) continue;
 
@@ -910,7 +958,10 @@ type MtlsPathMode =
   | { type: "excluded"; paths: string[] }
   | { type: "full" };
 
-function resolvePathAuthMode(protectedPaths?: string[] | null, excludedPaths?: string[] | null): PathAuthMode {
+function resolvePathAuthMode(
+  protectedPaths?: string[] | null,
+  excludedPaths?: string[] | null,
+): PathAuthMode {
   if (protectedPaths && protectedPaths.length > 0) {
     return { type: "protected", paths: protectedPaths };
   }
@@ -920,7 +971,10 @@ function resolvePathAuthMode(protectedPaths?: string[] | null, excludedPaths?: s
   return { type: "full" };
 }
 
-function resolveMtlsPathMode(protectedPaths?: string[] | null, excludedPaths?: string[] | null): MtlsPathMode {
+function resolveMtlsPathMode(
+  protectedPaths?: string[] | null,
+  excludedPaths?: string[] | null,
+): MtlsPathMode {
   if (protectedPaths && protectedPaths.length > 0) {
     return { type: "protected", paths: protectedPaths };
   }
@@ -1090,11 +1144,13 @@ function appendMtlsPathModeRoutes(options: {
         const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
           rule,
           skipHttpsHostnameValidation,
-          preserveHostHeader
+          preserveHostHeader,
         );
         if (!safePath) continue;
         hostRoutes.push({
-          match: [{ host: domainGroup, path: [safePath], expression: hostTrustedFingerprintExpression }],
+          match: [
+            { host: domainGroup, path: [safePath], expression: hostTrustedFingerprintExpression },
+          ],
           handle: [...handlers, locationProxy],
           terminal: true,
         });
@@ -1125,7 +1181,9 @@ function appendMtlsPathModeRoutes(options: {
   }
 }
 
-async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: CaddyHttpRoute[]; errorRoutes: CaddyHttpRoute[] }> {
+async function buildProxyRoutes(
+  context: CaddyBuildContext,
+): Promise<{ routes: CaddyHttpRoute[]; errorRoutes: CaddyHttpRoute[] }> {
   const { rows, accessAccounts, tlsReadyCertificates } = context;
   const routes: CaddyHttpRoute[] = [];
   const errorRoutes: CaddyHttpRoute[] = [];
@@ -1163,19 +1221,16 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
     const locationRules = meta.location_rules ?? [];
     const hostRoutes: CaddyHttpRoute[] = [];
 
-    const effectiveGeoBlock = resolveEffectiveGeoBlock(
-      context.globalGeoBlock ?? null,
-      { geoblock: meta.geoblock ?? null, geoblock_mode: meta.geoblock_mode ?? "merge" }
-    );
+    const effectiveGeoBlock = resolveEffectiveGeoBlock(context.globalGeoBlock ?? null, {
+      geoblock: meta.geoblock ?? null,
+      geoblock_mode: meta.geoblock_mode ?? "merge",
+    });
     if (effectiveGeoBlock?.enabled) {
       handlers.unshift(buildBlockerHandler(effectiveGeoBlock));
     }
 
-    const effectiveWaf = resolveEffectiveWaf(
-      context.globalWaf ?? null,
-      meta.waf
-    );
-    if (effectiveWaf?.enabled && effectiveWaf.mode !== 'Off') {
+    const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
+    if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off") {
       handlers.unshift(buildWafHandlerEntry(effectiveWaf, Boolean(row.allowWebsocket)));
     }
 
@@ -1185,9 +1240,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         handler: "headers",
         response: {
           set: {
-            "Strict-Transport-Security": [value]
-          }
-        }
+            "Strict-Transport-Security": [value],
+          },
+        },
       });
     }
 
@@ -1197,19 +1252,19 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
           match: [
             {
               host: domainGroup,
-              expression: '{http.request.scheme} == "http"'
-            }
+              expression: '{http.request.scheme} == "http"',
+            },
           ],
           handle: [
             {
               handler: "static_response",
               status_code: 308,
               headers: {
-                Location: ["https://{http.request.host}{http.request.uri}"]
-              }
-            }
+                Location: ["https://{http.request.host}{http.request.uri}"],
+              },
+            },
           ],
-          terminal: true
+          terminal: true,
         });
       }
     }
@@ -1229,12 +1284,12 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
     const pathRewrites = meta.path_rewrites ?? [];
     if (pathBlocks.length > 0 || pathRewrites.length > 0) {
       const allowPatterns = pathAllows
-        .map((a) => a.path.replace(/\{[^}]*\}/g, ''))
+        .map((a) => a.path.replace(/\{[^}]*\}/g, ""))
         .filter((p) => p.length > 0);
       const pathRoutes: CaddyHttpRoute[] = [];
       for (const block of pathBlocks) {
         // Sanitize path to prevent Caddy placeholder injection
-        const safePath = block.path.replace(/\{[^}]*\}/g, '');
+        const safePath = block.path.replace(/\{[^}]*\}/g, "");
         if (!safePath) continue;
         const handle: Record<string, unknown> = {
           handler: "static_response",
@@ -1254,15 +1309,17 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         });
       }
       for (const rw of pathRewrites) {
-        const safeFrom = rw.from.replace(/\{[^}]*\}/g, '');
-        const safeTo = rw.to.replace(/\{[^}]*\}/g, '');
+        const safeFrom = rw.from.replace(/\{[^}]*\}/g, "");
+        const safeTo = rw.to.replace(/\{[^}]*\}/g, "");
         if (!safeFrom || !safeTo) continue;
         pathRoutes.push({
           match: [{ path: [safeFrom] }],
-          handle: [{
-            handler: "rewrite",
-            uri: safeTo,
-          }],
+          handle: [
+            {
+              handler: "rewrite",
+              uri: safeTo,
+            },
+          ],
         });
       }
       if (pathRoutes.length > 0) {
@@ -1277,11 +1334,13 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
     if (meta.redirects && meta.redirects.length > 0) {
       const redirectRoutes = meta.redirects.map((rule) => ({
         match: [{ path: [rule.from] }],
-        handle: [{
-          handler: "static_response",
-          status_code: rule.status,
-          headers: { Location: [rule.to] },
-        }],
+        handle: [
+          {
+            handler: "static_response",
+            status_code: rule.status,
+            headers: { Location: [rule.to] },
+          },
+        ],
       }));
       handlers.push({
         handler: "subroute",
@@ -1298,10 +1357,10 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
             http_basic: {
               accounts: accounts.map((entry) => ({
                 username: entry.username,
-                password: entry.passwordHash
-              }))
-            }
-          }
+                password: entry.passwordHash,
+              })),
+            },
+          },
         });
       }
     }
@@ -1311,19 +1370,19 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
     const hostDnsResolutionConfig = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
     const effectiveDnsResolution = resolveEffectiveUpstreamDnsResolution(
       context.globalUpstreamDnsResolutionSettings,
-      hostDnsResolutionConfig
+      hostDnsResolutionConfig,
     );
     const resolvedUpstreams = await resolveUpstreamDials(
       row,
       upstreams,
       dnsConfig,
       context.globalDnsSettings,
-      effectiveDnsResolution
+      effectiveDnsResolution,
     );
 
     const reverseProxyHandler: Record<string, unknown> = {
       handler: "reverse_proxy",
-      upstreams: resolvedUpstreams.upstreams
+      upstreams: resolvedUpstreams.upstreams,
     };
 
     // Authentik outpost handler will be added later after protected paths
@@ -1344,18 +1403,18 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         handler: "reverse_proxy",
         upstreams: [
           {
-            dial: outpostDial
-          }
-        ]
+            dial: outpostDial,
+          },
+        ],
       };
 
       if (authentik.setOutpostHostHeader) {
         outpostHandler.headers = {
           request: {
             set: {
-              Host: ["{http.reverse_proxy.upstream.host}"]
-            }
-          }
+              Host: ["{http.reverse_proxy.upstream.host}"],
+            },
+          },
         };
       }
 
@@ -1363,11 +1422,16 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         match: [
           {
             // Sanitize outpostDomain to prevent path traversal and placeholder injection
-            path: [`/${authentik.outpostDomain.replace(/\.\./g, '').replace(/\{[^}]*\}/g, '').replace(/\/+/g, '/')}/*`]
-          }
+            path: [
+              `/${authentik.outpostDomain
+                .replace(/\.\./g, "")
+                .replace(/\{[^}]*\}/g, "")
+                .replace(/\/+/g, "/")}/*`,
+            ],
+          },
         ],
         handle: [outpostHandler],
-        terminal: true
+        terminal: true,
       };
     }
 
@@ -1375,9 +1439,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
       reverseProxyHandler.headers = {
         request: {
           set: {
-            Host: ["{http.request.host}"]
-          }
-        }
+            Host: ["{http.request.host}"],
+          },
+        },
       };
     }
 
@@ -1385,7 +1449,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
     if (resolvedUpstreams.hasHttpsUpstream) {
       const tlsTransport: Record<string, unknown> = row.skipHttpsHostnameValidation
         ? {
-            insecure_skip_verify: true
+            insecure_skip_verify: true,
           }
         : {};
       if (resolvedUpstreams.httpsTlsServerName) {
@@ -1394,7 +1458,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
 
       reverseProxyHandler.transport = {
         protocol: "http",
-        tls: tlsTransport
+        tls: tlsTransport,
       };
     }
 
@@ -1418,14 +1482,15 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         if (reverseProxyHandler.transport) {
           (reverseProxyHandler.transport as Record<string, unknown>).resolver = resolverConfig;
           if (dnsConfig.timeout) {
-            (reverseProxyHandler.transport as Record<string, unknown>).dial_timeout = dnsConfig.timeout;
+            (reverseProxyHandler.transport as Record<string, unknown>).dial_timeout =
+              dnsConfig.timeout;
           }
         } else {
           // No existing transport, create one with resolver
           reverseProxyHandler.transport = {
             protocol: "http",
             resolver: resolverConfig,
-            ...(dnsConfig.timeout ? { dial_timeout: dnsConfig.timeout } : {})
+            ...(dnsConfig.timeout ? { dial_timeout: dnsConfig.timeout } : {}),
           };
         }
       }
@@ -1439,14 +1504,17 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
       if (isPlainObject(customReverseProxy)) {
         mergeDeep(reverseProxyHandler, customReverseProxy as Record<string, unknown>);
       } else {
-        console.warn("Ignoring custom reverse proxy JSON because it is not an object", customReverseProxy);
+        console.warn(
+          "Ignoring custom reverse proxy JSON because it is not an object",
+          customReverseProxy,
+        );
       }
     }
 
     // Structured path prefix rewrite
     // Sanitize path_prefix to prevent Caddy placeholder injection
     if (meta.rewrite?.path_prefix) {
-      const safePrefix = meta.rewrite.path_prefix.replace(/\{[^}]*\}/g, '');
+      const safePrefix = meta.rewrite.path_prefix.replace(/\{[^}]*\}/g, "");
       if (safePrefix) {
         handlers.push({
           handler: "rewrite",
@@ -1467,8 +1535,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
       // Build handle_response routes for copying headers on 2xx status
       const handleResponseRoutes: Record<string, unknown>[] = [
         {
-          handle: [{ handler: "vars" }]
-        }
+          handle: [{ handler: "vars" }],
+        },
       ];
 
       // Add header copying for each configured header. The name is canonicalised
@@ -1483,22 +1551,22 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
               handler: "headers",
               request: {
                 set: {
-                  [headerName]: [placeholder]
-                }
-              }
-            } as Record<string, unknown>
+                  [headerName]: [placeholder],
+                },
+              },
+            } as Record<string, unknown>,
           ],
           match: [
             {
               not: [
                 {
                   vars: {
-                    [placeholder]: [""]
-                  }
-                }
-              ]
-            }
-          ]
+                    [placeholder]: [""],
+                  },
+                },
+              ],
+            },
+          ],
         });
       }
 
@@ -1518,29 +1586,29 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         handler: "reverse_proxy",
         upstreams: [
           {
-            dial: dialAddress
-          }
+            dial: dialAddress,
+          },
         ],
         rewrite: {
           method: "GET",
-          uri: authentik.authEndpoint
+          uri: authentik.authEndpoint,
         },
         headers: {
           request: {
             set: {
               "X-Forwarded-Method": ["{http.request.method}"],
-              "X-Forwarded-Uri": ["{http.request.uri}"]
-            }
-          }
+              "X-Forwarded-Uri": ["{http.request.uri}"],
+            },
+          },
         },
         handle_response: [
           {
             match: {
-              status_code: [2]
+              status_code: [2],
             },
-            routes: handleResponseRoutes
-          }
-        ]
+            routes: handleResponseRoutes,
+          },
+        ],
       };
 
       if (trustedProxies.length > 0) {
@@ -1574,12 +1642,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         // the key canonicalised, so spelling these "X-CPM-User" resolves to
         // nothing and every upstream behind forward auth sees an anonymous
         // request. See upstreamHeaderPlaceholder in caddy-utils.
-        const CPM_COPY_HEADERS = [
-          "X-Cpm-User",
-          "X-Cpm-Email",
-          "X-Cpm-Groups",
-          "X-Cpm-User-Id"
-        ];
+        const CPM_COPY_HEADERS = ["X-Cpm-User", "X-Cpm-Email", "X-Cpm-Groups", "X-Cpm-User-Id"];
 
         // Security: strip any client-supplied CPM identity headers from the
         // inbound request before it ever reaches the upstream. These headers
@@ -1595,8 +1658,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
         const cpmStripHeadersHandler: Record<string, unknown> = {
           handler: "headers",
           request: {
-            delete: [...CPM_COPY_HEADERS]
-          }
+            delete: [...CPM_COPY_HEADERS],
+          },
         };
         // Prepend the strip handler to the shared handler chain for all CPM
         // forward-auth routes.
@@ -1604,7 +1667,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
 
         // Build handle_response routes for copying user headers on 2xx
         const cpmHandleResponseRoutes: Record<string, unknown>[] = [
-          { handle: [{ handler: "vars" }] }
+          { handle: [{ handler: "vars" }] },
         ];
         for (const headerName of CPM_COPY_HEADERS) {
           const placeholder = upstreamHeaderPlaceholder(headerName);
@@ -1613,15 +1676,15 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
               {
                 handler: "headers",
                 request: {
-                  set: { [headerName]: [placeholder] }
-                }
-              } as Record<string, unknown>
+                  set: { [headerName]: [placeholder] },
+                },
+              } as Record<string, unknown>,
             ],
             match: [
               {
-                not: [{ vars: { [placeholder]: [""] } }]
-              }
-            ]
+                not: [{ vars: { [placeholder]: [""] } }],
+              },
+            ],
           });
         }
 
@@ -1631,7 +1694,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
           upstreams: [{ dial: cpmDialAddress }],
           rewrite: {
             method: "GET",
-            uri: "/api/forward-auth/verify"
+            uri: "/api/forward-auth/verify",
           },
           headers: {
             request: {
@@ -1639,14 +1702,14 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
                 "X-Forwarded-Method": ["{http.request.method}"],
                 "X-Forwarded-Uri": ["{http.request.uri}"],
                 "X-Forwarded-Host": ["{http.request.host}"],
-                "X-Forwarded-Proto": ["{http.request.scheme}"]
-              }
-            }
+                "X-Forwarded-Proto": ["{http.request.scheme}"],
+              },
+            },
           },
           handle_response: [
             {
               match: { status_code: [2] },
-              routes: cpmHandleResponseRoutes
+              routes: cpmHandleResponseRoutes,
             },
             {
               match: { status_code: [401, 403] },
@@ -1658,16 +1721,23 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
                       status_code: 302,
                       headers: {
                         Location: [
-                          `${config.baseUrl}/portal?rd={http.request.scheme}://{http.request.host}{http.request.uri}`
-                        ]
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
+                          `${config.baseUrl}/portal?rd={http.request.scheme}://{http.request.host}{http.request.uri}`,
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
           ],
-          trusted_proxies: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fd00::/8", "::1/128"]
+          trusted_proxies: [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "127.0.0.0/8",
+            "fd00::/8",
+            "::1/128",
+          ],
         };
 
         // Callback route — unprotected, so it goes before forward_auth
@@ -1678,23 +1748,26 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
               handler: "reverse_proxy",
               upstreams: [{ dial: cpmDialAddress }],
               rewrite: {
-                uri: "/api/forward-auth/callback?{http.request.uri.query}"
+                uri: "/api/forward-auth/callback?{http.request.uri.query}",
               },
               headers: {
                 request: {
                   set: {
                     "X-Forwarded-Host": ["{http.request.host}"],
-                    "X-Forwarded-Proto": ["{http.request.scheme}"]
-                  }
-                }
-              }
-            }
+                    "X-Forwarded-Proto": ["{http.request.scheme}"],
+                  },
+                },
+              },
+            },
           ],
-          terminal: true
+          terminal: true,
         };
 
         const locationRules = meta.location_rules ?? [];
-        const authMode = resolvePathAuthMode(cpmForwardAuth.protected_paths, cpmForwardAuth.excluded_paths);
+        const authMode = resolvePathAuthMode(
+          cpmForwardAuth.protected_paths,
+          cpmForwardAuth.excluded_paths,
+        );
 
         appendForwardAuthPathModeRoutes({
           hostRoutes,
@@ -1717,8 +1790,11 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
       const mtlsPathMode = resolveMtlsPathMode(mtlsProtectedPaths, mtlsExcludedPaths);
 
       const hostAccessRules = context.mtlsRbac?.accessRulesByHost.get(row.id);
-      const hasMtlsRbac = hostAccessRules && hostAccessRules.length > 0
-        && context.mtlsRbac?.roleFingerprintMap && context.mtlsRbac?.certFingerprintMap;
+      const hasMtlsRbac =
+        hostAccessRules &&
+        hostAccessRules.length > 0 &&
+        context.mtlsRbac?.roleFingerprintMap &&
+        context.mtlsRbac?.certFingerprintMap;
       const hostTrustedFingerprints = mtls
         ? resolveAllowedFingerprints(
             {
@@ -1728,12 +1804,13 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
               denyAll: false,
             },
             context.mtlsRbac?.roleFingerprintMap ?? new Map(),
-            context.mtlsRbac?.certFingerprintMap ?? new Map()
+            context.mtlsRbac?.certFingerprintMap ?? new Map(),
           )
         : new Set<string>();
-      const hostTrustedFingerprintExpression = hostTrustedFingerprints.size > 0
-        ? buildFingerprintCelExpression(hostTrustedFingerprints)
-        : validClientCertExpression;
+      const hostTrustedFingerprintExpression =
+        hostTrustedFingerprints.size > 0
+          ? buildFingerprintCelExpression(hostTrustedFingerprints)
+          : validClientCertExpression;
 
       const buildProtectedPathRoute = (domainGroup: string[], path: string) => {
         if (hasMtlsRbac) {
@@ -1744,33 +1821,44 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
             handlers,
             reverseProxyHandler,
             true,
-            hostTrustedFingerprints
+            hostTrustedFingerprints,
           );
           if (rbacSubroutes) {
-            return [{
-              match: [{ host: domainGroup, path: [path] }],
-              handle: [{ handler: "subroute", routes: rbacSubroutes }],
-              terminal: true,
-            }];
+            return [
+              {
+                match: [{ host: domainGroup, path: [path] }],
+                handle: [{ handler: "subroute", routes: rbacSubroutes }],
+                terminal: true,
+              },
+            ];
           }
         }
 
-        return [{
-          match: [{ host: domainGroup, path: [path], expression: hostTrustedFingerprintExpression }],
-          handle: [...handlers, cloneJson(reverseProxyHandler)],
-          terminal: true,
-        }, {
-          match: [{ host: domainGroup, path: [path] }],
-          handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
-          terminal: true,
-        }];
+        return [
+          {
+            match: [
+              { host: domainGroup, path: [path], expression: hostTrustedFingerprintExpression },
+            ],
+            handle: [...handlers, cloneJson(reverseProxyHandler)],
+            terminal: true,
+          },
+          {
+            match: [{ host: domainGroup, path: [path] }],
+            handle: [
+              { handler: "static_response", status_code: "403", body: "mTLS access denied" },
+            ],
+            terminal: true,
+          },
+        ];
       };
 
-      const buildExcludedPathRoute = (domainGroup: string[], path: string) => [{
-        match: [{ host: domainGroup, path: [path] }],
-        handle: [...handlers, cloneJson(reverseProxyHandler)],
-        terminal: true,
-      }];
+      const buildExcludedPathRoute = (domainGroup: string[], path: string) => [
+        {
+          match: [{ host: domainGroup, path: [path] }],
+          handle: [...handlers, cloneJson(reverseProxyHandler)],
+          terminal: true,
+        },
+      ];
 
       const buildProtectedCatchAll = (domainGroup: string[]) => {
         if (hasMtlsRbac) {
@@ -1781,35 +1869,44 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
             handlers,
             reverseProxyHandler,
             true,
-            hostTrustedFingerprints
+            hostTrustedFingerprints,
           );
           if (rbacSubroutes) {
-            return [{
-              match: [{ host: domainGroup }],
-              handle: [{ handler: "subroute", routes: rbacSubroutes }],
-              terminal: true,
-            }];
+            return [
+              {
+                match: [{ host: domainGroup }],
+                handle: [{ handler: "subroute", routes: rbacSubroutes }],
+                terminal: true,
+              },
+            ];
           }
         }
 
-        return [{
-          match: [{ host: domainGroup, expression: hostTrustedFingerprintExpression }],
-          handle: [...handlers, reverseProxyHandler],
-          terminal: true,
-        }, {
-          match: [{ host: domainGroup }],
-          handle: [{ handler: "static_response", status_code: "403", body: "mTLS access denied" }],
-          terminal: true,
-        }];
+        return [
+          {
+            match: [{ host: domainGroup, expression: hostTrustedFingerprintExpression }],
+            handle: [...handlers, reverseProxyHandler],
+            terminal: true,
+          },
+          {
+            match: [{ host: domainGroup }],
+            handle: [
+              { handler: "static_response", status_code: "403", body: "mTLS access denied" },
+            ],
+            terminal: true,
+          },
+        ];
       };
 
       // Open catch-all: no client certificate required. Used by whitelist mode (where
       // only the listed paths are gated) and as the full-site fallback.
-      const buildUnprotectedCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => [{
-        match: [{ host: domainGroup }],
-        handle: [...handlers, reverseProxyHandler],
-        terminal: true,
-      }];
+      const buildUnprotectedCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => [
+        {
+          match: [{ host: domainGroup }],
+          handle: [...handlers, reverseProxyHandler],
+          terminal: true,
+        },
+      ];
 
       // Full-site mode. RBAC rules, when present, carry their own per-path allow/deny
       // decisions; requireValidClientCertByDefault stays false so paths without an
@@ -1822,14 +1919,16 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<{ routes: C
             context.mtlsRbac!.roleFingerprintMap,
             context.mtlsRbac!.certFingerprintMap,
             handlers,
-            reverseProxyHandler
+            reverseProxyHandler,
           );
           if (rbacSubroutes) {
-            return [{
-              match: [{ host: domainGroup }],
-              handle: [{ handler: "subroute", routes: rbacSubroutes }],
-              terminal: true,
-            }];
+            return [
+              {
+                match: [{ host: domainGroup }],
+                handle: [{ handler: "subroute", routes: rbacSubroutes }],
+                terminal: true,
+              },
+            ];
           }
         }
 
@@ -1895,8 +1994,19 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
   const readyCertificates = new Set<number>();
   const importedCertPems: { certificate: string; key: string }[] = [];
 
-  const buildAuth = (domains: string[], mode: "require_and_verify" | "verify_if_given" | "request") =>
-    buildClientAuthentication(domains, mTlsDomainMap, caCertMap, issuedClientCertMap, cAsWithAnyIssuedCerts, mTlsDomainLeafOverride, mode);
+  const buildAuth = (
+    domains: string[],
+    mode: "require_and_verify" | "verify_if_given" | "request",
+  ) =>
+    buildClientAuthentication(
+      domains,
+      mTlsDomainMap,
+      caCertMap,
+      issuedClientCertMap,
+      cAsWithAnyIssuedCerts,
+      mTlsDomainLeafOverride,
+      mode,
+    );
 
   /**
    * Pushes one TLS policy per unique CA set found in `mTlsDomains`.
@@ -1933,8 +2043,8 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
   if (autoManagedDomains.size > 0) {
     const domains = Array.from(autoManagedDomains);
     // Split first so mTLS domains always get their own policy, regardless of auth result.
-    const mTlsDomains = domains.filter(d => mTlsDomainMap.has(d));
-    const nonMTlsDomains = domains.filter(d => !mTlsDomainMap.has(d));
+    const mTlsDomains = domains.filter((d) => mTlsDomainMap.has(d));
+    const nonMTlsDomains = domains.filter((d) => !mTlsDomainMap.has(d));
 
     if (mTlsDomains.length > 0) {
       pushMtlsPolicies(mTlsDomains);
@@ -1958,11 +2068,11 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
       // Collect PEMs for tls.certificates.load_pem (inline, no shared filesystem needed)
       importedCertPems.push({
         certificate: entry.certificate.certificatePem.trim(),
-        key: entry.certificate.privateKeyPem.trim()
+        key: entry.certificate.privateKeyPem.trim(),
       });
 
-      const mTlsDomains = domains.filter(d => mTlsDomainMap.has(d));
-      const nonMTlsDomains = domains.filter(d => !mTlsDomainMap.has(d));
+      const mTlsDomains = domains.filter((d) => mTlsDomainMap.has(d));
+      const nonMTlsDomains = domains.filter((d) => !mTlsDomainMap.has(d));
 
       if (mTlsDomains.length > 0) {
         pushMtlsPolicies(mTlsDomains);
@@ -1980,8 +2090,8 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
         continue;
       }
 
-      const mTlsDomains = domains.filter(d => mTlsDomainMap.has(d));
-      const nonMTlsDomains = domains.filter(d => !mTlsDomainMap.has(d));
+      const mTlsDomains = domains.filter((d) => mTlsDomainMap.has(d));
+      const nonMTlsDomains = domains.filter((d) => !mTlsDomainMap.has(d));
 
       if (mTlsDomains.length > 0) {
         pushMtlsPolicies(mTlsDomains);
@@ -1997,7 +2107,7 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
   return {
     policies: sortTlsPoliciesBySniPriority(policies),
     readyCertificates,
-    importedCertPems
+    importedCertPems,
   };
 }
 
@@ -2014,34 +2124,43 @@ type TlsAutomationContext = {
 
 export async function buildTlsAutomation(
   usageOrContext: Map<number, CertificateUsage> | TlsAutomationContext,
-  autoManagedDomainsOrOptions?: Set<string> | {
-    acmeEmail?: string;
-    dnsSettings?: DnsSettings | null;
-    dnsProviderSettings?: DnsProviderSettings | null;
-    acmeSettings?: AcmeSettings | null;
-  },
+  autoManagedDomainsOrOptions?:
+    | Set<string>
+    | {
+        acmeEmail?: string;
+        dnsSettings?: DnsSettings | null;
+        dnsProviderSettings?: DnsProviderSettings | null;
+        acmeSettings?: AcmeSettings | null;
+      },
   maybeOptions?: {
     acmeEmail?: string;
     dnsSettings?: DnsSettings | null;
     dnsProviderSettings?: DnsProviderSettings | null;
     acmeSettings?: AcmeSettings | null;
-  }
-): Promise<{ tlsApp?: { automation: { policies: Record<string, unknown>[] } }; managedCertificateIds: Set<number> }> {
+  },
+): Promise<{
+  tlsApp?: { automation: { policies: Record<string, unknown>[] } };
+  managedCertificateIds: Set<number>;
+}> {
   const usage = usageOrContext instanceof Map ? usageOrContext : usageOrContext.usage;
-  const autoManagedDomains = usageOrContext instanceof Map ? (autoManagedDomainsOrOptions instanceof Set ? autoManagedDomainsOrOptions : new Set<string>()) : usageOrContext.autoManagedDomains;
-  const options = usageOrContext instanceof Map
-    ? (
-        autoManagedDomainsOrOptions && !(autoManagedDomainsOrOptions instanceof Set)
-          ? autoManagedDomainsOrOptions
-          : (maybeOptions ?? {})
-      )
-    : ({
-        ...(usageOrContext as TlsAutomationContext).options,
-        ...(maybeOptions ?? {}),
-      });
+  const autoManagedDomains =
+    usageOrContext instanceof Map
+      ? autoManagedDomainsOrOptions instanceof Set
+        ? autoManagedDomainsOrOptions
+        : new Set<string>()
+      : usageOrContext.autoManagedDomains;
+  const options =
+    usageOrContext instanceof Map
+      ? autoManagedDomainsOrOptions && !(autoManagedDomainsOrOptions instanceof Set)
+        ? autoManagedDomainsOrOptions
+        : (maybeOptions ?? {})
+      : {
+          ...(usageOrContext as TlsAutomationContext).options,
+          ...(maybeOptions ?? {}),
+        };
 
   const managedEntries = Array.from(usage.values()).filter(
-    (entry) => entry.certificate.type === "managed" && Boolean(entry.certificate.autoRenew)
+    (entry) => entry.certificate.type === "managed" && Boolean(entry.certificate.autoRenew),
   );
 
   const hasAutoManagedDomains = autoManagedDomains.size > 0;
@@ -2056,14 +2175,21 @@ export async function buildTlsAutomation(
   const dnsProviderSettings = options.dnsProviderSettings;
   const globalDnsProvider: DnsProviderCredentials | null =
     dnsProviderSettings?.default && dnsProviderSettings.providers[dnsProviderSettings.default]
-      ? { provider: dnsProviderSettings.default, credentials: dnsProviderSettings.providers[dnsProviderSettings.default] }
+      ? {
+          provider: dnsProviderSettings.default,
+          credentials: dnsProviderSettings.providers[dnsProviderSettings.default],
+        }
       : null;
 
   const dnsSettings = options.dnsSettings;
   // Primary resolvers first, then the configured fallbacks, so DNS-01 validation
   // still has somewhere to go when the primary resolver is unreachable.
   const dnsResolvers: string[] = [];
-  if (dnsSettings?.enabled && Array.isArray(dnsSettings.resolvers) && dnsSettings.resolvers.length > 0) {
+  if (
+    dnsSettings?.enabled &&
+    Array.isArray(dnsSettings.resolvers) &&
+    dnsSettings.resolvers.length > 0
+  ) {
     dnsResolvers.push(...dnsSettings.resolvers);
     if (dnsSettings.fallbacks && dnsSettings.fallbacks.length > 0) {
       dnsResolvers.push(...dnsSettings.fallbacks);
@@ -2103,7 +2229,7 @@ export async function buildTlsAutomation(
         const dnsChallenge = buildDnsChallengeConfig(
           globalDnsProvider.provider,
           globalDnsProvider.credentials,
-          dnsResolvers
+          dnsResolvers,
         );
         if (dnsChallenge) {
           issuer.challenges = { dns: dnsChallenge };
@@ -2112,7 +2238,7 @@ export async function buildTlsAutomation(
 
       policies.push({
         subjects,
-        issuers: [issuer]
+        issuers: [issuer],
       });
     }
   }
@@ -2147,7 +2273,7 @@ export async function buildTlsAutomation(
         const dnsChallenge = buildDnsChallengeConfig(
           effectiveProvider.provider,
           effectiveProvider.credentials,
-          dnsResolvers
+          dnsResolvers,
         );
         if (dnsChallenge) {
           issuer.challenges = { dns: dnsChallenge };
@@ -2156,7 +2282,7 @@ export async function buildTlsAutomation(
 
       policies.push({
         subjects: subjectGroup,
-        issuers: [issuer]
+        issuers: [issuer],
       });
     }
   }
@@ -2171,20 +2297,20 @@ export async function buildTlsAutomation(
   return {
     tlsApp: {
       automation: {
-        policies: sortAutomationPoliciesBySubjectPriority(policies)
-      }
+        policies: sortAutomationPoliciesBySubjectPriority(policies),
+      },
     },
     managedCertificateIds,
   };
 }
 
-type L4BuildContext = Pick<CaddyBuildContext, "globalDnsSettings" | "globalUpstreamDnsResolutionSettings" | "globalGeoBlock">;
+type L4BuildContext = Pick<
+  CaddyBuildContext,
+  "globalDnsSettings" | "globalUpstreamDnsResolutionSettings" | "globalGeoBlock"
+>;
 
 async function buildL4Servers(context: L4BuildContext): Promise<Record<string, unknown> | null> {
-  const l4Hosts = await db
-    .select()
-    .from(l4ProxyHosts)
-    .where(eq(l4ProxyHosts.enabled, true));
+  const l4Hosts = await db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true));
 
   if (l4Hosts.length === 0) return null;
 
@@ -2233,22 +2359,26 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
           tryDuration: lbMeta.try_duration ?? null,
           tryInterval: lbMeta.try_interval ?? null,
           retries: lbMeta.retries ?? null,
-          activeHealthCheck: lbMeta.active_health_check?.enabled ? {
-            enabled: true,
-            uri: null,
-            port: lbMeta.active_health_check.port ?? null,
-            interval: lbMeta.active_health_check.interval ?? null,
-            timeout: lbMeta.active_health_check.timeout ?? null,
-            status: null,
-            body: null,
-          } : null,
-          passiveHealthCheck: lbMeta.passive_health_check?.enabled ? {
-            enabled: true,
-            failDuration: lbMeta.passive_health_check.fail_duration ?? null,
-            maxFails: lbMeta.passive_health_check.max_fails ?? null,
-            unhealthyStatus: null,
-            unhealthyLatency: lbMeta.passive_health_check.unhealthy_latency ?? null,
-          } : null,
+          activeHealthCheck: lbMeta.active_health_check?.enabled
+            ? {
+                enabled: true,
+                uri: null,
+                port: lbMeta.active_health_check.port ?? null,
+                interval: lbMeta.active_health_check.interval ?? null,
+                timeout: lbMeta.active_health_check.timeout ?? null,
+                status: null,
+                body: null,
+              }
+            : null,
+          passiveHealthCheck: lbMeta.passive_health_check?.enabled
+            ? {
+                enabled: true,
+                failDuration: lbMeta.passive_health_check.fail_duration ?? null,
+                maxFails: lbMeta.passive_health_check.max_fails ?? null,
+                unhealthyStatus: null,
+                unhealthyLatency: lbMeta.passive_health_check.unhealthy_latency ?? null,
+              }
+            : null,
         };
       }
 
@@ -2259,7 +2389,7 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
       const hostDnsResolution = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
       const effectiveDnsResolution = resolveEffectiveUpstreamDnsResolution(
         context.globalUpstreamDnsResolutionSettings,
-        hostDnsResolution
+        hostDnsResolution,
       );
 
       // Build handler chain
@@ -2284,19 +2414,34 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
         const resolver = new Resolver();
         const lookupServers = getLookupServers(dnsConfig, context.globalDnsSettings);
         if (lookupServers.length > 0) {
-          try { resolver.setServers(lookupServers); } catch { /* ignore invalid servers */ }
+          try {
+            resolver.setServers(lookupServers);
+          } catch {
+            /* ignore invalid servers */
+          }
         }
         const timeoutMs = getLookupTimeoutMs(dnsConfig, context.globalDnsSettings);
 
         const pinned: string[] = [];
         for (const upstream of upstreams) {
           const colonIdx = upstream.lastIndexOf(":");
-          if (colonIdx <= 0) { pinned.push(upstream); continue; }
+          if (colonIdx <= 0) {
+            pinned.push(upstream);
+            continue;
+          }
           const hostPart = upstream.substring(0, colonIdx);
           const portPart = upstream.substring(colonIdx + 1);
-          if (isIP(hostPart) !== 0) { pinned.push(upstream); continue; }
+          if (isIP(hostPart) !== 0) {
+            pinned.push(upstream);
+            continue;
+          }
           try {
-            const addresses = await resolveHostnameAddresses(resolver, hostPart, effectiveDnsResolution.family, timeoutMs);
+            const addresses = await resolveHostnameAddresses(
+              resolver,
+              hostPart,
+              effectiveDnsResolution.family,
+              timeoutMs,
+            );
             for (const addr of addresses) {
               pinned.push(addr.includes(":") ? `[${addr}]:${portPart}` : `${addr}:${portPart}`);
             }
@@ -2367,7 +2512,14 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
 }
 
 export async function buildCaddyDocument() {
-  const [proxyHostRecords, certRows, accessListEntryRecords, caCertRows, issuedClientCertRows, allIssuedCaCertIds] = await Promise.all([
+  const [
+    proxyHostRecords,
+    certRows,
+    accessListEntryRecords,
+    caCertRows,
+    issuedClientCertRows,
+    allIssuedCaCertIds,
+  ] = await Promise.all([
     db
       .select({
         id: proxyHosts.id,
@@ -2383,7 +2535,7 @@ export async function buildCaddyDocument() {
         preserveHostHeader: proxyHosts.preserveHostHeader,
         skipHttpsHostnameValidation: proxyHosts.skipHttpsHostnameValidation,
         meta: proxyHosts.meta,
-        enabled: proxyHosts.enabled
+        enabled: proxyHosts.enabled,
       })
       .from(proxyHosts),
     db
@@ -2395,27 +2547,27 @@ export async function buildCaddyDocument() {
         certificatePem: certificates.certificatePem,
         privateKeyPem: certificates.privateKeyPem,
         autoRenew: certificates.autoRenew,
-        providerOptions: certificates.providerOptions
+        providerOptions: certificates.providerOptions,
       })
       .from(certificates),
     db
       .select({
         accessListId: accessListEntries.accessListId,
         username: accessListEntries.username,
-        passwordHash: accessListEntries.passwordHash
+        passwordHash: accessListEntries.passwordHash,
       })
       .from(accessListEntries),
     db
       .select({
         id: caCertificates.id,
-        certificatePem: caCertificates.certificatePem
+        certificatePem: caCertificates.certificatePem,
       })
       .from(caCertificates),
     db
       .select({
         id: issuedClientCertificates.id,
         caCertificateId: issuedClientCertificates.caCertificateId,
-        certificatePem: issuedClientCertificates.certificatePem
+        certificatePem: issuedClientCertificates.certificatePem,
       })
       .from(issuedClientCertificates)
       .where(isNull(issuedClientCertificates.revokedAt)),
@@ -2424,7 +2576,7 @@ export async function buildCaddyDocument() {
     // (trust any cert signed by that CA).
     db
       .selectDistinct({ caCertificateId: issuedClientCertificates.caCertificateId })
-      .from(issuedClientCertificates)
+      .from(issuedClientCertificates),
   ]);
 
   const proxyHostRows: ProxyHostRow[] = proxyHostRecords.map((h) => ({
@@ -2441,10 +2593,10 @@ export async function buildCaddyDocument() {
     preserveHostHeader: h.preserveHostHeader ? 1 : 0,
     skipHttpsHostnameValidation: h.skipHttpsHostnameValidation ? 1 : 0,
     meta: h.meta,
-    enabled: h.enabled ? 1 : 0
+    enabled: h.enabled ? 1 : 0,
   }));
 
-  const certRowsMapped: CertificateRow[] = certRows.map((c: typeof certRows[0]) => ({
+  const certRowsMapped: CertificateRow[] = certRows.map((c: (typeof certRows)[0]) => ({
     id: c.id,
     name: c.name,
     type: c.type as "managed" | "imported",
@@ -2452,13 +2604,13 @@ export async function buildCaddyDocument() {
     certificatePem: c.certificatePem,
     privateKeyPem: c.privateKeyPem,
     autoRenew: c.autoRenew ? 1 : 0,
-    providerOptions: c.providerOptions
+    providerOptions: c.providerOptions,
   }));
 
   const accessListEntryRows: AccessListEntryRow[] = accessListEntryRecords.map((entry) => ({
     accessListId: entry.accessListId,
     username: entry.username,
-    passwordHash: entry.passwordHash
+    passwordHash: entry.passwordHash,
   }));
 
   const certificateMap = new Map(certRowsMapped.map((cert) => [cert.id, cert]));
@@ -2469,7 +2621,7 @@ export async function buildCaddyDocument() {
     map.set(record.caCertificateId, current);
     return map;
   }, new Map());
-  const cAsWithAnyIssuedCerts = new Set(allIssuedCaCertIds.map(r => r.caCertificateId));
+  const cAsWithAnyIssuedCerts = new Set(allIssuedCaCertIds.map((r) => r.caCertificateId));
   const accessMap = accessListEntryRows.reduce<Map<number, AccessListEntryRow[]>>((map, entry) => {
     if (!map.has(entry.accessListId)) {
       map.set(entry.accessListId, []);
@@ -2479,7 +2631,7 @@ export async function buildCaddyDocument() {
   }, new Map());
 
   // Build a lookup: issued cert ID → { id, caCertificateId, certificatePem } (active only)
-  const issuedCertById = new Map(issuedClientCertRows.map(r => [r.id, r]));
+  const issuedCertById = new Map(issuedClientCertRows.map((r) => [r.id, r]));
 
   // Resolve role IDs → cert IDs for trusted_role_ids in mTLS config
   const roleCertIdMap = await buildRoleCertIdMap();
@@ -2496,7 +2648,9 @@ export async function buildCaddyDocument() {
     const meta = parseJson<{ mtls?: MtlsConfig }>(row.meta, {});
     if (!meta.mtls?.enabled) continue;
 
-    const domains = parseJson<string[]>(row.domains, []).map(d => d.trim().toLowerCase()).filter(Boolean);
+    const domains = parseJson<string[]>(row.domains, [])
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean);
     if (domains.length === 0) continue;
 
     if (meta.mtls.protected_paths?.length || meta.mtls.excluded_paths?.length) {
@@ -2577,8 +2731,20 @@ export async function buildCaddyDocument() {
     getAccessRulesForHosts(enabledProxyHostIds),
   ]);
 
-  const { usage: certificateUsage, autoManagedDomains } = collectCertificateUsage(proxyHostRows, certificateMap);
-  const [generalSettings, acmeSettings, dnsSettings, dnsProviderSettings, upstreamDnsResolutionSettings, globalGeoBlock, globalWaf, trustedProxiesSettings] = await Promise.all([
+  const { usage: certificateUsage, autoManagedDomains } = collectCertificateUsage(
+    proxyHostRows,
+    certificateMap,
+  );
+  const [
+    generalSettings,
+    acmeSettings,
+    dnsSettings,
+    dnsProviderSettings,
+    upstreamDnsResolutionSettings,
+    globalGeoBlock,
+    globalWaf,
+    trustedProxiesSettings,
+  ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsSettings(),
@@ -2586,7 +2752,7 @@ export async function buildCaddyDocument() {
     getUpstreamDnsResolutionSettings(),
     getGeoBlockSettings(),
     getWafSettings(),
-    getTrustedProxiesSettings()
+    getTrustedProxiesSettings(),
   ]);
 
   // Optionally seed the global geoblock trusted-proxy list from the server-level
@@ -2595,7 +2761,7 @@ export async function buildCaddyDocument() {
   let effectiveGlobalGeoBlock = globalGeoBlock;
   if (trustedProxiesSettings?.default_geoblock && globalGeoBlock) {
     const serverRanges = (trustedProxiesSettings.ranges ?? []).map((r) => r.trim()).filter(Boolean);
-    if (serverRanges.length > 0 && !(globalGeoBlock.trusted_proxies?.length)) {
+    if (serverRanges.length > 0 && !globalGeoBlock.trusted_proxies?.length) {
       effectiveGlobalGeoBlock = { ...globalGeoBlock, trusted_proxies: serverRanges };
     }
   }
@@ -2606,10 +2772,14 @@ export async function buildCaddyDocument() {
       acmeEmail: generalSettings?.acmeEmail,
       dnsSettings,
       dnsProviderSettings,
-      acmeSettings
-    }
+      acmeSettings,
+    },
   });
-  const { policies: tlsConnectionPolicies, readyCertificates, importedCertPems } = buildTlsConnectionPolicies({
+  const {
+    policies: tlsConnectionPolicies,
+    readyCertificates,
+    importedCertPems,
+  } = buildTlsConnectionPolicies({
     usage: certificateUsage,
     managedCertificatesWithAutomation: managedCertificateIds,
     autoManagedDomains,
@@ -2618,7 +2788,7 @@ export async function buildCaddyDocument() {
     issuedClientCertMap,
     cAsWithAnyIssuedCerts,
     mTlsDomainLeafOverride,
-    mTlsOptionalAuthDomains
+    mTlsOptionalAuthDomains,
   });
 
   const caddyBuildContext: CaddyBuildContext = {
@@ -2636,12 +2806,15 @@ export async function buildCaddyDocument() {
     },
   };
 
-  const { routes: httpRoutes, errorRoutes: hostErrorRoutes } = await buildProxyRoutes(caddyBuildContext);
+  const { routes: httpRoutes, errorRoutes: hostErrorRoutes } =
+    await buildProxyRoutes(caddyBuildContext);
 
   // Server-level error routes (Caddy handle_errors): per-host rules first so they
   // take precedence, then global rules act as a fallback for any unmatched host/status.
   const globalErrorPages = await getErrorPagesSettings();
-  const globalErrorRoutes = (globalErrorPages?.rules ?? []).map((rule) => buildErrorPageRoute(rule));
+  const globalErrorRoutes = (globalErrorPages?.rules ?? []).map((rule) =>
+    buildErrorPageRoute(rule),
+  );
   const errorRoutes: CaddyHttpRoute[] = [...hostErrorRoutes, ...globalErrorRoutes];
 
   const hasTls = tlsConnectionPolicies.length > 0;
@@ -2677,7 +2850,7 @@ export async function buildCaddyDocument() {
       // Trusted proxies / client_ip_headers / trusted_proxies_strict (issue #222)
       ...serverTrustedProxies,
       // Enable access logging if configured
-      ...(loggingEnabled ? { logs: { default_logger_name: "http_access" } } : {})
+      ...(loggingEnabled ? { logs: { default_logger_name: "http_access" } } : {}),
     };
   }
 
@@ -2692,12 +2865,12 @@ export async function buildCaddyDocument() {
               handler: "reverse_proxy",
               upstreams: [{ dial: "localhost:2019" }],
               rewrite: {
-                uri: "/metrics"
-              }
-            }
-          ]
-        }
-      ]
+                uri: "/metrics",
+              },
+            },
+          ],
+        },
+      ],
     };
   }
 
@@ -2714,7 +2887,7 @@ export async function buildCaddyDocument() {
     roll_size_mb: 100,
     roll_gzip: true,
     roll_keep: 10,
-    roll_keep_days: 30
+    roll_keep_days: 30,
   };
   const loggingLogs: Record<string, unknown> = {
     // WAF rule match logs. Modern Coraza puts the matched rules directly in the
@@ -2727,14 +2900,14 @@ export async function buildCaddyDocument() {
       writer: { output: "file", filename: "/logs/waf-rules.log", mode: "0640", ...rollSettings },
       encoder: { format: "json" },
       include: ["http.handlers.waf"],
-      level: "ERROR"
-    }
+      level: "ERROR",
+    },
   };
   if (loggingEnabled) {
     loggingLogs.http_access = {
       writer: { output: "file", filename: "/logs/access.log", mode: "0640", ...rollSettings },
       encoder: { format: loggingFormat },
-      include: ["http.log.access", "http.handlers.blocker"]
+      include: ["http.log.access", "http.handlers.blocker"],
     };
   }
   const loggingApp = { logging: { logs: loggingLogs } };
@@ -2743,26 +2916,30 @@ export async function buildCaddyDocument() {
   const l4Servers = await buildL4Servers({
     globalDnsSettings: dnsSettings,
     globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
-    globalGeoBlock: effectiveGlobalGeoBlock
+    globalGeoBlock: effectiveGlobalGeoBlock,
   });
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 
   return {
     admin: {
       listen: "0.0.0.0:2019",
-      origins: ["caddy:2019", "localhost:2019", "localhost"]
+      origins: ["caddy:2019", "localhost:2019", "localhost"],
     },
     ...loggingApp,
     apps: {
       ...httpApp,
-      ...(tlsApp || importedCertPems.length > 0 ? {
-        tls: {
-          ...(tlsApp ?? {}),
-          ...(importedCertPems.length > 0 ? { certificates: { load_pem: importedCertPems } } : {})
-        }
-      } : {}),
-      ...l4App
-    }
+      ...(tlsApp || importedCertPems.length > 0
+        ? {
+            tls: {
+              ...(tlsApp ?? {}),
+              ...(importedCertPems.length > 0
+                ? { certificates: { load_pem: importedCertPems } }
+                : {}),
+            },
+          }
+        : {}),
+      ...l4App,
+    },
   };
 }
 
@@ -2790,7 +2967,7 @@ export async function applyCaddyConfig() {
     if (causeCode === "ENOTFOUND" || causeCode === "ECONNREFUSED") {
       throw new Error(
         `Unable to reach Caddy API at ${config.caddyApiUrl}. Ensure Caddy is running and accessible.`,
-        { cause: error }
+        { cause: error },
       );
     }
 
@@ -2815,7 +2992,11 @@ function getCpmDialAddress(): string | null {
   // and use the web service name directly
   try {
     const caddyUrl = new URL(config.caddyApiUrl);
-    if (caddyUrl.hostname !== "localhost" && caddyUrl.hostname !== "127.0.0.1" && caddyUrl.hostname !== "::1") {
+    if (
+      caddyUrl.hostname !== "localhost" &&
+      caddyUrl.hostname !== "127.0.0.1" &&
+      caddyUrl.hostname !== "::1"
+    ) {
       // Caddy is on a Docker network — CPM is the "web" service on port 3000
       return "web:3000";
     }
@@ -2833,13 +3014,16 @@ function getCpmDialAddress(): string | null {
   }
 }
 
-function parseAuthentikConfig(meta: ProxyHostAuthentikMeta | undefined | null): AuthentikRouteConfig | null {
+function parseAuthentikConfig(
+  meta: ProxyHostAuthentikMeta | undefined | null,
+): AuthentikRouteConfig | null {
   if (!meta || !meta.enabled) {
     return null;
   }
 
   const outpostDomain = typeof meta.outpost_domain === "string" ? meta.outpost_domain.trim() : "";
-  const outpostUpstream = typeof meta.outpost_upstream === "string" ? meta.outpost_upstream.trim() : "";
+  const outpostUpstream =
+    typeof meta.outpost_upstream === "string" ? meta.outpost_upstream.trim() : "";
   if (!outpostDomain || !outpostUpstream) {
     return null;
   }
@@ -2849,12 +3033,16 @@ function parseAuthentikConfig(meta: ProxyHostAuthentikMeta | undefined | null): 
 
   const copyHeaders =
     Array.isArray(meta.copy_headers) && meta.copy_headers.length > 0
-      ? meta.copy_headers.map((header) => header?.trim()).filter((header): header is string => Boolean(header))
+      ? meta.copy_headers
+          .map((header) => header?.trim())
+          .filter((header): header is string => Boolean(header))
       : DEFAULT_AUTHENTIK_HEADERS;
 
   const trustedProxies =
     Array.isArray(meta.trusted_proxies) && meta.trusted_proxies.length > 0
-      ? meta.trusted_proxies.map((item) => item?.trim()).filter((item): item is string => Boolean(item))
+      ? meta.trusted_proxies
+          .map((item) => item?.trim())
+          .filter((item): item is string => Boolean(item))
       : DEFAULT_AUTHENTIK_TRUSTED_PROXIES;
 
   const setOutpostHostHeader =
@@ -2862,12 +3050,16 @@ function parseAuthentikConfig(meta: ProxyHostAuthentikMeta | undefined | null): 
 
   const protectedPaths =
     Array.isArray(meta.protected_paths) && meta.protected_paths.length > 0
-      ? meta.protected_paths.map((path) => path?.trim()).filter((path): path is string => Boolean(path))
+      ? meta.protected_paths
+          .map((path) => path?.trim())
+          .filter((path): path is string => Boolean(path))
       : null;
 
   const excludedPaths =
     Array.isArray(meta.excluded_paths) && meta.excluded_paths.length > 0
-      ? meta.excluded_paths.map((path) => path?.trim()).filter((path): path is string => Boolean(path))
+      ? meta.excluded_paths
+          .map((path) => path?.trim())
+          .filter((path): path is string => Boolean(path))
       : null;
 
   return {
@@ -2879,56 +3071,104 @@ function parseAuthentikConfig(meta: ProxyHostAuthentikMeta | undefined | null): 
     trustedProxies,
     setOutpostHostHeader,
     protectedPaths,
-    excludedPaths
+    excludedPaths,
   };
 }
 
-const VALID_LB_POLICIES = ["random", "round_robin", "least_conn", "ip_hash", "first", "header", "cookie", "uri_hash"];
+const VALID_LB_POLICIES = [
+  "random",
+  "round_robin",
+  "least_conn",
+  "ip_hash",
+  "first",
+  "header",
+  "cookie",
+  "uri_hash",
+];
 
-function parseLoadBalancerConfig(meta: LoadBalancerMeta | undefined | null): LoadBalancerRouteConfig | null {
+function parseLoadBalancerConfig(
+  meta: LoadBalancerMeta | undefined | null,
+): LoadBalancerRouteConfig | null {
   if (!meta || !meta.enabled) {
     return null;
   }
 
   const policy = meta.policy && VALID_LB_POLICIES.includes(meta.policy) ? meta.policy : "random";
-  const policyHeaderField = typeof meta.policy_header_field === "string" ? meta.policy_header_field.trim() || null : null;
-  const policyCookieName = typeof meta.policy_cookie_name === "string" ? meta.policy_cookie_name.trim() || null : null;
-  const policyCookieSecret = typeof meta.policy_cookie_secret === "string" ? meta.policy_cookie_secret.trim() || null : null;
-  const tryDuration = typeof meta.try_duration === "string" ? meta.try_duration.trim() || null : null;
-  const tryInterval = typeof meta.try_interval === "string" ? meta.try_interval.trim() || null : null;
-  const retries = typeof meta.retries === "number" && Number.isFinite(meta.retries) && meta.retries >= 0 ? meta.retries : null;
+  const policyHeaderField =
+    typeof meta.policy_header_field === "string" ? meta.policy_header_field.trim() || null : null;
+  const policyCookieName =
+    typeof meta.policy_cookie_name === "string" ? meta.policy_cookie_name.trim() || null : null;
+  const policyCookieSecret =
+    typeof meta.policy_cookie_secret === "string" ? meta.policy_cookie_secret.trim() || null : null;
+  const tryDuration =
+    typeof meta.try_duration === "string" ? meta.try_duration.trim() || null : null;
+  const tryInterval =
+    typeof meta.try_interval === "string" ? meta.try_interval.trim() || null : null;
+  const retries =
+    typeof meta.retries === "number" && Number.isFinite(meta.retries) && meta.retries >= 0
+      ? meta.retries
+      : null;
 
   let activeHealthCheck: LoadBalancerRouteConfig["activeHealthCheck"] = null;
   if (meta.active_health_check && meta.active_health_check.enabled) {
     activeHealthCheck = {
       enabled: true,
-      uri: typeof meta.active_health_check.uri === "string" ? meta.active_health_check.uri.trim() || null : null,
-      port: typeof meta.active_health_check.port === "number" && Number.isFinite(meta.active_health_check.port) && meta.active_health_check.port > 0
-        ? meta.active_health_check.port
-        : null,
-      interval: typeof meta.active_health_check.interval === "string" ? meta.active_health_check.interval.trim() || null : null,
-      timeout: typeof meta.active_health_check.timeout === "string" ? meta.active_health_check.timeout.trim() || null : null,
-      status: typeof meta.active_health_check.status === "number" && Number.isFinite(meta.active_health_check.status) && meta.active_health_check.status >= 100
-        ? meta.active_health_check.status
-        : null,
-      body: typeof meta.active_health_check.body === "string" ? meta.active_health_check.body.trim() || null : null
+      uri:
+        typeof meta.active_health_check.uri === "string"
+          ? meta.active_health_check.uri.trim() || null
+          : null,
+      port:
+        typeof meta.active_health_check.port === "number" &&
+        Number.isFinite(meta.active_health_check.port) &&
+        meta.active_health_check.port > 0
+          ? meta.active_health_check.port
+          : null,
+      interval:
+        typeof meta.active_health_check.interval === "string"
+          ? meta.active_health_check.interval.trim() || null
+          : null,
+      timeout:
+        typeof meta.active_health_check.timeout === "string"
+          ? meta.active_health_check.timeout.trim() || null
+          : null,
+      status:
+        typeof meta.active_health_check.status === "number" &&
+        Number.isFinite(meta.active_health_check.status) &&
+        meta.active_health_check.status >= 100
+          ? meta.active_health_check.status
+          : null,
+      body:
+        typeof meta.active_health_check.body === "string"
+          ? meta.active_health_check.body.trim() || null
+          : null,
     };
   }
 
   let passiveHealthCheck: LoadBalancerRouteConfig["passiveHealthCheck"] = null;
   if (meta.passive_health_check && meta.passive_health_check.enabled) {
     const unhealthyStatus = Array.isArray(meta.passive_health_check.unhealthy_status)
-      ? meta.passive_health_check.unhealthy_status.filter((s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100)
+      ? meta.passive_health_check.unhealthy_status.filter(
+          (s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100,
+        )
       : null;
 
     passiveHealthCheck = {
       enabled: true,
-      failDuration: typeof meta.passive_health_check.fail_duration === "string" ? meta.passive_health_check.fail_duration.trim() || null : null,
-      maxFails: typeof meta.passive_health_check.max_fails === "number" && Number.isFinite(meta.passive_health_check.max_fails) && meta.passive_health_check.max_fails >= 0
-        ? meta.passive_health_check.max_fails
-        : null,
+      failDuration:
+        typeof meta.passive_health_check.fail_duration === "string"
+          ? meta.passive_health_check.fail_duration.trim() || null
+          : null,
+      maxFails:
+        typeof meta.passive_health_check.max_fails === "number" &&
+        Number.isFinite(meta.passive_health_check.max_fails) &&
+        meta.passive_health_check.max_fails >= 0
+          ? meta.passive_health_check.max_fails
+          : null,
       unhealthyStatus: unhealthyStatus && unhealthyStatus.length > 0 ? unhealthyStatus : null,
-      unhealthyLatency: typeof meta.passive_health_check.unhealthy_latency === "string" ? meta.passive_health_check.unhealthy_latency.trim() || null : null
+      unhealthyLatency:
+        typeof meta.passive_health_check.unhealthy_latency === "string"
+          ? meta.passive_health_check.unhealthy_latency.trim() || null
+          : null,
     };
   }
 
@@ -2942,7 +3182,7 @@ function parseLoadBalancerConfig(meta: LoadBalancerMeta | undefined | null): Loa
     tryInterval,
     retries,
     activeHealthCheck,
-    passiveHealthCheck
+    passiveHealthCheck,
   };
 }
 
@@ -3027,7 +3267,10 @@ function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string
     if (config.passiveHealthCheck.maxFails !== null) {
       passive.max_fails = config.passiveHealthCheck.maxFails;
     }
-    if (config.passiveHealthCheck.unhealthyStatus && config.passiveHealthCheck.unhealthyStatus.length > 0) {
+    if (
+      config.passiveHealthCheck.unhealthyStatus &&
+      config.passiveHealthCheck.unhealthyStatus.length > 0
+    ) {
       passive.unhealthy_status = config.passiveHealthCheck.unhealthyStatus;
     }
     if (config.passiveHealthCheck.unhealthyLatency) {
@@ -3042,7 +3285,9 @@ function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string
   return Object.keys(healthChecks).length > 0 ? healthChecks : null;
 }
 
-function parseDnsResolverConfig(meta: DnsResolverMeta | undefined | null): DnsResolverRouteConfig | null {
+function parseDnsResolverConfig(
+  meta: DnsResolverMeta | undefined | null,
+): DnsResolverRouteConfig | null {
   if (!meta || !meta.enabled) {
     return null;
   }
@@ -3065,7 +3310,7 @@ function parseDnsResolverConfig(meta: DnsResolverMeta | undefined | null): DnsRe
     enabled: true,
     resolvers,
     fallbacks: fallbacks && fallbacks.length > 0 ? fallbacks : null,
-    timeout
+    timeout,
   };
 }
 

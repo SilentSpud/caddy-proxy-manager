@@ -73,7 +73,7 @@ function getPathPriority(paths: string[]) {
 
       return best;
     },
-    { hasPath: false, wildcard: true, length: 0 }
+    { hasPath: false, wildcard: true, length: 0 },
   );
 }
 
@@ -190,7 +190,9 @@ export function sortTlsPoliciesBySniPriority<T extends TlsPolicyLike>(policies: 
   });
 }
 
-export function sortAutomationPoliciesBySubjectPriority<T extends AutomationPolicyLike>(policies: T[]) {
+export function sortAutomationPoliciesBySubjectPriority<T extends AutomationPolicyLike>(
+  policies: T[],
+) {
   return [...policies].sort((left, right) => {
     const leftSubjects = left.subjects ?? [];
     const rightSubjects = right.subjects ?? [];

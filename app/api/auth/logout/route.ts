@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getAuth } from "@/src/lib/auth-server";
 import { checkSameOrigin } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";

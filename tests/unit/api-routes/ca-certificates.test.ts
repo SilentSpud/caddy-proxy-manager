@@ -11,7 +11,11 @@ vi.mock('@/src/lib/models/ca-certificates', () => ({
 vi.mock('@/src/lib/api-auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
-    constructor(msg: string, status: number) { super(msg); this.status = status; this.name = 'ApiAuthError'; }
+    constructor(msg: string, status: number) {
+      super(msg);
+      this.status = status;
+      this.name = 'ApiAuthError';
+    }
   };
   return {
     requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
@@ -21,7 +25,10 @@ vi.mock('@/src/lib/api-auth', () => {
       if (error instanceof ApiAuthError) {
         return NR.json({ error: error.message }, { status: error.status });
       }
-      return NR.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
+      return NR.json(
+        { error: error instanceof Error ? error.message : 'Internal server error' },
+        { status: 500 },
+      );
     }),
     ApiAuthError,
   };
@@ -29,7 +36,13 @@ vi.mock('@/src/lib/api-auth', () => {
 
 import { GET as listGET, POST } from '@/app/api/v1/ca-certificates/route';
 import { GET as getGET, PUT, DELETE } from '@/app/api/v1/ca-certificates/[id]/route';
-import { listCaCertificates, createCaCertificate, getCaCertificate, updateCaCertificate, deleteCaCertificate } from '@/src/lib/models/ca-certificates';
+import {
+  listCaCertificates,
+  createCaCertificate,
+  getCaCertificate,
+  updateCaCertificate,
+  deleteCaCertificate,
+} from '@/src/lib/models/ca-certificates';
 import { requireApiAdmin } from '@/src/lib/api-auth';
 
 const mockList = vi.mocked(listCaCertificates);
@@ -122,7 +135,9 @@ describe('PUT /api/v1/ca-certificates/[id]', () => {
     const body = { name: 'Updated CA' };
     mockUpdate.mockResolvedValue({ ...sampleCaCert, name: 'Updated CA' } as any);
 
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ id: '1' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -133,7 +148,9 @@ describe('PUT /api/v1/ca-certificates/[id]', () => {
   it('returns 500 when CA certificate not found', async () => {
     mockUpdate.mockRejectedValue(new Error('not found'));
 
-    const response = await PUT(createMockRequest({ method: 'PUT', body: { name: 'X' } }), { params: Promise.resolve({ id: '999' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body: { name: 'X' } }), {
+      params: Promise.resolve({ id: '999' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -145,7 +162,9 @@ describe('DELETE /api/v1/ca-certificates/[id]', () => {
   it('deletes a CA certificate', async () => {
     mockDelete.mockResolvedValue(undefined as any);
 
-    const response = await DELETE(createMockRequest({ method: 'DELETE' }), { params: Promise.resolve({ id: '1' }) });
+    const response = await DELETE(createMockRequest({ method: 'DELETE' }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -156,7 +175,9 @@ describe('DELETE /api/v1/ca-certificates/[id]', () => {
   it('returns 500 when CA certificate not found', async () => {
     mockDelete.mockRejectedValue(new Error('not found'));
 
-    const response = await DELETE(createMockRequest({ method: 'DELETE' }), { params: Promise.resolve({ id: '999' }) });
+    const response = await DELETE(createMockRequest({ method: 'DELETE' }), {
+      params: Promise.resolve({ id: '999' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(500);

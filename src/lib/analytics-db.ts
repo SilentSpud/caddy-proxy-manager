@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs';
-import db from './db';
-import { proxyHosts } from './db/schema';
+import { existsSync } from "node:fs";
+import db from "./db";
+import { proxyHosts } from "./db/schema";
 import {
   querySummary,
   queryTimeline,
@@ -17,20 +17,20 @@ import {
   type UAStats,
   type BlockedEvent,
   type BlockedPage,
-} from './clickhouse/client';
+} from "./clickhouse/client";
 
 export type { TimelineBucket, CountryStats, ProtoStats, UAStats, BlockedEvent, BlockedPage };
 
-export type Interval = '1h' | '12h' | '24h' | '7d' | '30d';
+export type Interval = "1h" | "12h" | "24h" | "7d" | "30d";
 
-const LOG_FILE = '/logs/access.log';
+const LOG_FILE = "/logs/access.log";
 
 export const INTERVAL_SECONDS: Record<Interval, number> = {
-  '1h': 3600,
-  '12h': 43200,
-  '24h': 86400,
-  '7d': 7 * 86400,
-  '30d': 30 * 86400,
+  "1h": 3600,
+  "12h": 43200,
+  "24h": 86400,
+  "7d": 7 * 86400,
+  "30d": 30 * 86400,
 };
 
 // ── Summary ──────────────────────────────────────────────────────────────────
@@ -40,7 +40,11 @@ export interface AnalyticsSummary extends CHSummary {
   analyticsDisabled: boolean;
 }
 
-export async function getAnalyticsSummary(from: number, to: number, hosts: string[]): Promise<AnalyticsSummary> {
+export async function getAnalyticsSummary(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<AnalyticsSummary> {
   const loggingDisabled = !existsSync(LOG_FILE);
   const analyticsDisabled = !isAnalyticsEnabled();
   const summary = await querySummary(from, to, hosts);
@@ -49,31 +53,52 @@ export async function getAnalyticsSummary(from: number, to: number, hosts: strin
 
 // ── Timeline ─────────────────────────────────────────────────────────────────
 
-export async function getAnalyticsTimeline(from: number, to: number, hosts: string[]): Promise<TimelineBucket[]> {
+export async function getAnalyticsTimeline(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<TimelineBucket[]> {
   return queryTimeline(from, to, hosts);
 }
 
 // ── Countries ────────────────────────────────────────────────────────────────
 
-export async function getAnalyticsCountries(from: number, to: number, hosts: string[]): Promise<CountryStats[]> {
+export async function getAnalyticsCountries(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<CountryStats[]> {
   return queryCountries(from, to, hosts);
 }
 
 // ── Protocols ────────────────────────────────────────────────────────────────
 
-export async function getAnalyticsProtocols(from: number, to: number, hosts: string[]): Promise<ProtoStats[]> {
+export async function getAnalyticsProtocols(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<ProtoStats[]> {
   return queryProtocols(from, to, hosts);
 }
 
 // ── User Agents ──────────────────────────────────────────────────────────────
 
-export async function getAnalyticsUserAgents(from: number, to: number, hosts: string[]): Promise<UAStats[]> {
+export async function getAnalyticsUserAgents(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<UAStats[]> {
   return queryUserAgents(from, to, hosts);
 }
 
 // ── Blocked events ───────────────────────────────────────────────────────────
 
-export async function getAnalyticsBlocked(from: number, to: number, hosts: string[], page: number): Promise<BlockedPage> {
+export async function getAnalyticsBlocked(
+  from: number,
+  to: number,
+  hosts: string[],
+  page: number,
+): Promise<BlockedPage> {
   return queryBlocked(from, to, hosts, page);
 }
 
@@ -105,12 +130,14 @@ export async function getAnalyticsHosts(): Promise<AnalyticsHost[]> {
           configured.add(trimmed);
         }
       }
-    } catch { /* ignore malformed rows */ }
+    } catch {
+      /* ignore malformed rows */
+    }
   }
 
   const isIp = (h: string) => /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(h);
   return Array.from(hostSet)
-    .filter(h => !isIp(h))
+    .filter((h) => !isIp(h))
     .sort()
-    .map(host => ({ host, configured: configured.has(host.toLowerCase()) }));
+    .map((host) => ({ host, configured: configured.has(host.toLowerCase()) }));
 }

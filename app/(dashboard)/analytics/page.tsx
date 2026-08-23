@@ -1,5 +1,5 @@
-import { requireAdmin } from '@/src/lib/auth';
-import AnalyticsClient from './AnalyticsClient';
+import { requireAdmin } from "@/src/lib/auth";
+import AnalyticsClient from "./AnalyticsClient";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

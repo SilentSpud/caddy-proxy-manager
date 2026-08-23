@@ -104,7 +104,7 @@ describe('proxy host geoblockMode persistence', () => {
         upstreams: ['10.0.0.5:8080'],
         geoblock: baseGeoblock,
       },
-      1
+      1,
     );
     const fetched = await getProxyHost(host.id);
     expect(fetched?.geoblockMode).toBe('merge');
@@ -119,7 +119,7 @@ describe('proxy host geoblockMode persistence', () => {
         geoblock: baseGeoblock,
         geoblockMode: 'merge',
       },
-      1
+      1,
     );
     expect((await getProxyHost(host.id))?.geoblockMode).toBe('merge');
 
@@ -136,7 +136,7 @@ describe('proxy host geoblockMode persistence', () => {
         geoblock: baseGeoblock,
         geoblockMode: 'override',
       },
-      1
+      1,
     );
     expect((await getProxyHost(host.id))?.geoblockMode).toBe('override');
 

@@ -36,9 +36,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
         createdAt: event.createdAt,
         summary: event.summary ?? `${event.action} on ${event.entityType}`,
         user: event.userId
-          ? userMap.get(event.userId)?.name ??
-            userMap.get(event.userId)?.email ??
-            "System"
+          ? (userMap.get(event.userId)?.name ?? userMap.get(event.userId)?.email ?? "System")
           : "System",
       }))}
       pagination={{ total, page, perPage: PER_PAGE }}

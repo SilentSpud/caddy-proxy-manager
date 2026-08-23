@@ -1,6 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { getOAuthProvider, updateOAuthProvider, deleteOAuthProvider } from "@/src/lib/models/oauth-providers";
+import {
+  getOAuthProvider,
+  updateOAuthProvider,
+  deleteOAuthProvider,
+} from "@/src/lib/models/oauth-providers";
 import type { OAuthProvider } from "@/src/lib/models/oauth-providers";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { invalidateProviderCache } from "@/src/lib/auth-server";
@@ -14,10 +18,7 @@ function redactSecrets(provider: OAuthProvider) {
   };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireApiAdmin(request);
     const { id } = await params;
@@ -31,10 +32,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await requireApiAdmin(request);
     const { id } = await params;
@@ -53,7 +51,7 @@ export async function PUT(
       if (disallowed.length > 0) {
         return NextResponse.json(
           { error: `Environment-sourced providers can only update: ${allowedKeys.join(", ")}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -82,7 +80,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { userId } = await requireApiAdmin(request);
@@ -96,7 +94,7 @@ export async function DELETE(
     if (existing.source === "env") {
       return NextResponse.json(
         { error: "Cannot delete an environment-sourced OAuth provider" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 

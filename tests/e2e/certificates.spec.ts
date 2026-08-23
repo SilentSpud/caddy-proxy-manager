@@ -14,8 +14,8 @@ test.describe('Certificates', () => {
     // Should have some kind of Add button or tab UI
     await expect(page.locator('body')).toBeVisible();
     // Look for tabs or buttons
-    const hasAddButton = await page.getByRole('button', { name: /add|new|create/i }).count() > 0;
-    const hasTab = await page.getByRole('tab').count() > 0;
+    const hasAddButton = (await page.getByRole('button', { name: /add|new|create/i }).count()) > 0;
+    const hasTab = (await page.getByRole('tab').count()) > 0;
     expect(hasAddButton || hasTab).toBe(true);
   });
 
@@ -27,7 +27,7 @@ test.describe('Certificates', () => {
   test('wildcard cert covers subdomain — no duplicate in ACME tab', async ({ page }) => {
     const BASE_URL = 'http://localhost:3000';
     const API = `${BASE_URL}/api/v1`;
-    const headers = { 'Content-Type': 'application/json', 'Origin': BASE_URL };
+    const headers = { 'Content-Type': 'application/json', Origin: BASE_URL };
     const domain = `wc-test-${Date.now()}.example`;
 
     // 1. Create a managed certificate with wildcard + base domain
@@ -74,13 +74,15 @@ test.describe('Certificates', () => {
   test('ACME wildcard host hides subdomain ACME hosts in certificates page', async ({ page }) => {
     const BASE_URL = 'http://localhost:3000';
     const API = `${BASE_URL}/api/v1`;
-    const headers = { 'Content-Type': 'application/json', 'Origin': BASE_URL };
+    const headers = { 'Content-Type': 'application/json', Origin: BASE_URL };
     const domain = `acme-wc-${Date.now()}.example`;
 
     // Auto-managed wildcard hosts require a DNS provider (ACME DNS-01 challenge).
     // Configure one for this test and restore the original afterwards.
     const dnsProviderUrl = `${API}/settings/dns-provider`;
-    const originalDns = await (await page.request.get(dnsProviderUrl, { headers: { Origin: BASE_URL } })).json();
+    const originalDns = await (
+      await page.request.get(dnsProviderUrl, { headers: { Origin: BASE_URL } })
+    ).json();
     const setDnsRes = await page.request.put(dnsProviderUrl, {
       data: { providers: { duckdns: { api_token: 'e2e-fake-token' } }, default: 'duckdns' },
       headers,
@@ -129,7 +131,10 @@ test.describe('Certificates', () => {
       if (subHostId) await page.request.delete(`${API}/proxy-hosts/${subHostId}`, { headers });
       if (wcHostId) await page.request.delete(`${API}/proxy-hosts/${wcHostId}`, { headers });
       await page.request.put(dnsProviderUrl, {
-        data: originalDns && Object.keys(originalDns).length ? originalDns : { providers: {}, default: null },
+        data:
+          originalDns && Object.keys(originalDns).length
+            ? originalDns
+            : { providers: {}, default: null },
         headers,
       });
     }
@@ -138,7 +143,7 @@ test.describe('Certificates', () => {
   test('deletes an imported certificate from the Imported tab (#151)', async ({ page }) => {
     const BASE_URL = 'http://localhost:3000';
     const API = `${BASE_URL}/api/v1`;
-    const headers = { 'Content-Type': 'application/json', 'Origin': BASE_URL };
+    const headers = { 'Content-Type': 'application/json', Origin: BASE_URL };
     const domain = `import-delete-${Date.now()}.example`;
     const certName = `Imported Delete ${domain}`;
     const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate(domain, [domain]);
@@ -155,7 +160,7 @@ test.describe('Certificates', () => {
       headers,
     });
     expect(certRes.status()).toBe(201);
-    const cert = await certRes.json() as { id: number };
+    const cert = (await certRes.json()) as { id: number };
 
     try {
       await page.goto('/certificates');
@@ -163,7 +168,10 @@ test.describe('Certificates', () => {
 
       await expect(page.getByText(certName).last()).toBeVisible({ timeout: 10_000 });
 
-      await page.getByRole('button', { name: `Actions for certificate ${certName}` }).last().click();
+      await page
+        .getByRole('button', { name: `Actions for certificate ${certName}` })
+        .last()
+        .click();
       await page.getByRole('menuitem', { name: /^delete$/i }).click();
 
       const dialog = page.getByRole('dialog', { name: /delete imported certificate/i });
@@ -173,17 +181,21 @@ test.describe('Certificates', () => {
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
       await expect(page.getByText(certName)).not.toBeVisible({ timeout: 10_000 });
 
-      const getRes = await page.request.get(`${API}/certificates/${cert.id}`, { headers: { Origin: BASE_URL } });
+      const getRes = await page.request.get(`${API}/certificates/${cert.id}`, {
+        headers: { Origin: BASE_URL },
+      });
       expect(getRes.status()).toBe(404);
     } finally {
-      await page.request.delete(`${API}/certificates/${cert.id}`, { headers }).catch(() => undefined);
+      await page.request
+        .delete(`${API}/certificates/${cert.id}`, { headers })
+        .catch(() => undefined);
     }
   });
 
   test('imports a certificate via the UI form preserving PEM newlines (#157)', async ({ page }) => {
     const BASE_URL = 'http://localhost:3000';
     const API = `${BASE_URL}/api/v1`;
-    const headers = { 'Content-Type': 'application/json', 'Origin': BASE_URL };
+    const headers = { 'Content-Type': 'application/json', Origin: BASE_URL };
     const domain = `import-ui-${Date.now()}.example`;
     const certName = `UI Import ${domain}`;
     const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate(domain, [domain]);
@@ -199,7 +211,10 @@ test.describe('Certificates', () => {
 
       // Open the Import drawer. The "Add"/"Import" trigger varies by viewport,
       // so match any button that opens the import flow.
-      await page.getByRole('button', { name: /import certificate|add certificate|^import$|^add$/i }).first().click();
+      await page
+        .getByRole('button', { name: /import certificate|add certificate|^import$|^add$/i })
+        .first()
+        .click();
 
       const drawer = page.getByRole('dialog');
       await expect(drawer).toBeVisible();
@@ -222,9 +237,15 @@ test.describe('Certificates', () => {
 
       // Verify via the API that the persisted PEM still contains its original
       // newlines — this is what would fail if the password-input regressed.
-      const listRes = await page.request.get(`${API}/certificates`, { headers: { Origin: BASE_URL } });
+      const listRes = await page.request.get(`${API}/certificates`, {
+        headers: { Origin: BASE_URL },
+      });
       expect(listRes.ok()).toBe(true);
-      const list = await listRes.json() as Array<{ id: number; name: string; privateKeyPem: string | null }>;
+      const list = (await listRes.json()) as Array<{
+        id: number;
+        name: string;
+        privateKeyPem: string | null;
+      }>;
       const created = list.find((c) => c.name === certName);
       expect(created).toBeTruthy();
       createdId = created!.id;
@@ -235,7 +256,9 @@ test.describe('Certificates', () => {
       expect(created!.privateKeyPem!.trimEnd()).toBe(privateKeyPem.trimEnd());
     } finally {
       if (createdId !== null) {
-        await page.request.delete(`${API}/certificates/${createdId}`, { headers }).catch(() => undefined);
+        await page.request
+          .delete(`${API}/certificates/${createdId}`, { headers })
+          .catch(() => undefined);
       }
     }
   });

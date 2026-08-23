@@ -42,7 +42,7 @@ function parseCertificate(row: CertificateRow): Certificate {
     certificatePem: row.certificatePem,
     privateKeyPem: row.privateKeyPem,
     createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!
+    updatedAt: toIso(row.updatedAt)!,
   };
 }
 
@@ -53,7 +53,7 @@ export async function listCertificates(): Promise<Certificate[]> {
 
 export async function getCertificate(id: number): Promise<Certificate | null> {
   const cert = await db.query.certificates.findFirst({
-    where: (table, { eq }) => eq(table.id, id)
+    where: (table, { eq }) => eq(table.id, id),
   });
   return cert ? parseCertificate(cert) : null;
 }
@@ -78,7 +78,7 @@ export async function createCertificate(input: CertificateInput, actorUserId: nu
       name: input.name.trim(),
       type: input.type,
       domainNames: JSON.stringify(
-        Array.from(new Set(input.domainNames.map((domain) => domain.trim().toLowerCase())))
+        Array.from(new Set(input.domainNames.map((domain) => domain.trim().toLowerCase()))),
       ),
       autoRenew: input.autoRenew ?? true,
       providerOptions: input.providerOptions ? JSON.stringify(input.providerOptions) : null,
@@ -86,7 +86,7 @@ export async function createCertificate(input: CertificateInput, actorUserId: nu
       privateKeyPem: input.privateKeyPem ?? null,
       createdAt: now,
       updatedAt: now,
-      createdBy: actorUserId
+      createdBy: actorUserId,
     })
     .returning();
 
@@ -99,13 +99,17 @@ export async function createCertificate(input: CertificateInput, actorUserId: nu
     action: "create",
     entityType: "certificate",
     entityId: record.id,
-    summary: `Created certificate ${input.name}`
+    summary: `Created certificate ${input.name}`,
   });
   await applyCaddyConfig();
   return (await getCertificate(record.id))!;
 }
 
-export async function updateCertificate(id: number, input: Partial<CertificateInput>, actorUserId: number) {
+export async function updateCertificate(
+  id: number,
+  input: Partial<CertificateInput>,
+  actorUserId: number,
+) {
   const existing = await getCertificate(id);
   if (!existing) {
     throw new Error("Certificate not found");
@@ -118,7 +122,7 @@ export async function updateCertificate(id: number, input: Partial<CertificateIn
     autoRenew: input.autoRenew ?? existing.autoRenew,
     providerOptions: input.providerOptions ?? existing.providerOptions,
     certificatePem: input.certificatePem ?? existing.certificatePem,
-    privateKeyPem: input.privateKeyPem ?? existing.privateKeyPem
+    privateKeyPem: input.privateKeyPem ?? existing.privateKeyPem,
   };
 
   validateCertificateInput(merged);
@@ -134,7 +138,7 @@ export async function updateCertificate(id: number, input: Partial<CertificateIn
       providerOptions: merged.providerOptions ? JSON.stringify(merged.providerOptions) : null,
       certificatePem: merged.certificatePem ?? null,
       privateKeyPem: merged.privateKeyPem ?? null,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(certificates.id, id));
 
@@ -143,7 +147,7 @@ export async function updateCertificate(id: number, input: Partial<CertificateIn
     action: "update",
     entityType: "certificate",
     entityId: id,
-    summary: `Updated certificate ${merged.name}`
+    summary: `Updated certificate ${merged.name}`,
   });
   await applyCaddyConfig();
   return (await getCertificate(id))!;
@@ -161,7 +165,7 @@ export async function deleteCertificate(id: number, actorUserId: number) {
     action: "delete",
     entityType: "certificate",
     entityId: id,
-    summary: `Deleted certificate ${existing.name}`
+    summary: `Deleted certificate ${existing.name}`,
   });
   await applyCaddyConfig();
 }

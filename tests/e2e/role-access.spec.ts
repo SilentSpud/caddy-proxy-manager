@@ -19,11 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-const COMPOSE_ARGS = [
-  'compose',
-  '-f', 'docker-compose.yml',
-  '-f', 'tests/docker-compose.test.yml',
-];
+const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 // Pages that require admin role (via requireAdmin in their own page.tsx)
 const ADMIN_ONLY_PAGES = [
@@ -41,10 +37,7 @@ const ADMIN_ONLY_PAGES = [
 ];
 
 // Pages accessible to any authenticated user
-const USER_ACCESSIBLE_PAGES = [
-  '/',
-  '/profile',
-];
+const USER_ACCESSIBLE_PAGES = ['/', '/profile'];
 
 // All dashboard pages (union of both sets)
 const ALL_DASHBOARD_PAGES = [...USER_ACCESSIBLE_PAGES, ...ADMIN_ONLY_PAGES];
@@ -69,7 +62,7 @@ function ensureTestUser(username: string, password: string, role: string) {
       if (acc) {
         db.run("UPDATE accounts SET password = ?, updatedAt = ? WHERE id = ?", [hash, now, acc.id]);
       } else {
-        db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+        db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
           [existing.id, String(existing.id), hash, now, now]);
       }
     } else {
@@ -79,7 +72,7 @@ function ensureTestUser(username: string, password: string, role: string) {
       );
       const user = db.query("SELECT id FROM users WHERE email = ?").get(email);
       // Create credential account for Better Auth
-      db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+      db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
         [user.id, String(user.id), hash, now, now]);
     }
   `;
@@ -95,7 +88,7 @@ function ensureTestUser(username: string, password: string, role: string) {
 async function loginAs(
   browser: import('@playwright/test').Browser,
   username: string,
-  password: string
+  password: string,
 ): Promise<BrowserContext> {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -166,7 +159,9 @@ test.describe('Role-based access control', () => {
       await page.goto('/');
       await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5_000 });
       // Non-admin gets empty stats — no Proxy Hosts / Certificates / Access Lists cards
-      await expect(page.getByRole('link', { name: /proxy hosts/i })).not.toBeVisible({ timeout: 3_000 });
+      await expect(page.getByRole('link', { name: /proxy hosts/i })).not.toBeVisible({
+        timeout: 3_000,
+      });
     } finally {
       await page.close();
     }
@@ -217,7 +212,9 @@ test.describe('Role-based access control', () => {
     try {
       await page.goto('/');
       await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5_000 });
-      await expect(page.getByRole('link', { name: /proxy hosts/i })).not.toBeVisible({ timeout: 3_000 });
+      await expect(page.getByRole('link', { name: /proxy hosts/i })).not.toBeVisible({
+        timeout: 3_000,
+      });
     } finally {
       await page.close();
     }
@@ -262,8 +259,10 @@ test.describe('Role-based access control', () => {
         const isBlocked =
           status >= 400 ||
           url.includes('/login') ||
-          await page.getByText(/administrator privileges|error|forbidden|not authorized/i)
-            .isVisible({ timeout: 3_000 }).catch(() => false);
+          (await page
+            .getByText(/administrator privileges|error|forbidden|not authorized/i)
+            .isVisible({ timeout: 3_000 })
+            .catch(() => false));
 
         expect(isBlocked).toBe(true);
       } finally {
@@ -285,8 +284,10 @@ test.describe('Role-based access control', () => {
         const isBlocked =
           status >= 400 ||
           url.includes('/login') ||
-          await page.getByText(/administrator privileges|error|forbidden|not authorized/i)
-            .isVisible({ timeout: 3_000 }).catch(() => false);
+          (await page
+            .getByText(/administrator privileges|error|forbidden|not authorized/i)
+            .isVisible({ timeout: 3_000 })
+            .catch(() => false));
 
         expect(isBlocked).toBe(true);
       } finally {

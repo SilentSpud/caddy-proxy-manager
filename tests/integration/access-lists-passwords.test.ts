@@ -26,20 +26,26 @@ function nowIso() {
 
 async function insertList(name = 'Test List') {
   const now = nowIso();
-  const [list] = await db.insert(accessLists).values({ name, description: null, createdAt: now, updatedAt: now }).returning();
+  const [list] = await db
+    .insert(accessLists)
+    .values({ name, description: null, createdAt: now, updatedAt: now })
+    .returning();
   return list;
 }
 
 async function insertEntry(accessListId: number, username: string, rawPassword: string) {
   const now = nowIso();
   const hash = bcrypt.hashSync(rawPassword, 10);
-  const [entry] = await db.insert(accessListEntries).values({
-    accessListId,
-    username,
-    passwordHash: hash,
-    createdAt: now,
-    updatedAt: now,
-  }).returning();
+  const [entry] = await db
+    .insert(accessListEntries)
+    .values({
+      accessListId,
+      username,
+      passwordHash: hash,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return entry;
 }
 
@@ -52,7 +58,9 @@ describe('access-lists password hashing', () => {
     const list = await insertList();
     const entry = await insertEntry(list.id, 'alice', 'S3cr3tP@ss!');
 
-    const row = await db.query.accessListEntries.findFirst({ where: (t, { eq }) => eq(t.id, entry.id) });
+    const row = await db.query.accessListEntries.findFirst({
+      where: (t, { eq }) => eq(t.id, entry.id),
+    });
     expect(row).toBeDefined();
     expect(row!.passwordHash).not.toBe('S3cr3tP@ss!');
     expect(row!.passwordHash).toMatch(/^\$2[aby]\$/);
@@ -84,7 +92,10 @@ describe('access-lists password hashing', () => {
     await insertEntry(list.id, 'user1', 'SharedPassword!');
     await insertEntry(list.id, 'user2', 'SharedPassword!');
 
-    const entries = await db.select().from(accessListEntries).where(eq(accessListEntries.accessListId, list.id));
+    const entries = await db
+      .select()
+      .from(accessListEntries)
+      .where(eq(accessListEntries.accessListId, list.id));
     expect(entries.length).toBe(2);
     // Hashes must differ due to random salt
     expect(entries[0].passwordHash).not.toBe(entries[1].passwordHash);
@@ -109,8 +120,12 @@ describe('access-lists password hashing', () => {
     await insertEntry(list1.id, 'shared-user', 'passA');
     await insertEntry(list2.id, 'shared-user', 'passB');
 
-    const a = await db.query.accessListEntries.findFirst({ where: (t, { eq }) => eq(t.accessListId, list1.id) });
-    const b = await db.query.accessListEntries.findFirst({ where: (t, { eq }) => eq(t.accessListId, list2.id) });
+    const a = await db.query.accessListEntries.findFirst({
+      where: (t, { eq }) => eq(t.accessListId, list1.id),
+    });
+    const b = await db.query.accessListEntries.findFirst({
+      where: (t, { eq }) => eq(t.accessListId, list2.id),
+    });
     expect(bcrypt.compareSync('passA', a!.passwordHash)).toBe(true);
     expect(bcrypt.compareSync('passB', b!.passwordHash)).toBe(true);
     // Different passwords → different hashes

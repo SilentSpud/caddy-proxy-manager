@@ -64,7 +64,7 @@ test.describe('Authentication', () => {
     // A non-existent hyphenated user should get 401 (wrong credentials), not 422 (invalid username).
     const res = await page.request.post('http://localhost:3000/api/auth/sign-in/username', {
       data: { username: 'test-hyphen', password: 'SomePassword123!' },
-      headers: { 'Content-Type': 'application/json', 'Origin': 'http://localhost:3000' },
+      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3000' },
     });
     // 401 = passed validation, user not found → correct
     // 422 = username rejected by validator → bug
@@ -78,7 +78,7 @@ test.describe('Authentication', () => {
         email: `self-registration-${Date.now()}@test.invalid`,
         password: 'SelfRegistration2026!',
       },
-      headers: { 'Content-Type': 'application/json', 'Origin': 'http://localhost:3000' },
+      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3000' },
     });
 
     expect(res.status()).toBe(400);
@@ -87,7 +87,9 @@ test.describe('Authentication', () => {
     });
   });
 
-  test('email self-registration can be enabled with AUTH_ALLOW_SELF_REGISTRATION', async ({ playwright }) => {
+  test('email self-registration can be enabled with AUTH_ALLOW_SELF_REGISTRATION', async ({
+    playwright,
+  }) => {
     const request = await playwright.request.newContext({
       baseURL: 'http://localhost:3001',
       extraHTTPHeaders: { Origin: 'http://localhost:3001' },

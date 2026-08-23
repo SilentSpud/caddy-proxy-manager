@@ -36,13 +36,13 @@ function toGroup(row: GroupRow, members: GroupMember[]): Group {
     source: row.source,
     members,
     createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!
+    updatedAt: toIso(row.updatedAt)!,
   };
 }
 
 export async function listGroups(): Promise<Group[]> {
   const allGroups = await db.query.groups.findMany({
-    orderBy: (table) => asc(table.name)
+    orderBy: (table) => asc(table.name),
   });
 
   if (allGroups.length === 0) return [];
@@ -54,7 +54,7 @@ export async function listGroups(): Promise<Group[]> {
       userId: groupMembers.userId,
       email: users.email,
       name: users.name,
-      createdAt: groupMembers.createdAt
+      createdAt: groupMembers.createdAt,
     })
     .from(groupMembers)
     .innerJoin(users, eq(groupMembers.userId, users.id))
@@ -67,7 +67,7 @@ export async function listGroups(): Promise<Group[]> {
       userId: m.userId,
       email: m.email,
       name: m.name,
-      createdAt: toIso(m.createdAt)!
+      createdAt: toIso(m.createdAt)!,
     });
     membersByGroup.set(m.groupId, bucket);
   }
@@ -82,7 +82,7 @@ export async function countGroups(): Promise<number> {
 
 export async function getGroup(id: number): Promise<Group | null> {
   const group = await db.query.groups.findFirst({
-    where: (table, operators) => operators.eq(table.id, id)
+    where: (table, operators) => operators.eq(table.id, id),
   });
   if (!group) return null;
 
@@ -91,7 +91,7 @@ export async function getGroup(id: number): Promise<Group | null> {
       userId: groupMembers.userId,
       email: users.email,
       name: users.name,
-      createdAt: groupMembers.createdAt
+      createdAt: groupMembers.createdAt,
     })
     .from(groupMembers)
     .innerJoin(users, eq(groupMembers.userId, users.id))
@@ -103,8 +103,8 @@ export async function getGroup(id: number): Promise<Group | null> {
       userId: m.userId,
       email: m.email,
       name: m.name,
-      createdAt: toIso(m.createdAt)!
-    }))
+      createdAt: toIso(m.createdAt)!,
+    })),
   );
 }
 
@@ -118,7 +118,7 @@ export async function createGroup(input: GroupInput, actorUserId: number): Promi
       description: input.description ?? null,
       createdBy: actorUserId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning();
 
@@ -129,7 +129,7 @@ export async function createGroup(input: GroupInput, actorUserId: number): Promi
     action: "create",
     entityType: "group",
     entityId: row.id,
-    summary: `Created group ${input.name}`
+    summary: `Created group ${input.name}`,
   });
 
   return (await getGroup(row.id))!;
@@ -138,10 +138,10 @@ export async function createGroup(input: GroupInput, actorUserId: number): Promi
 export async function updateGroup(
   id: number,
   input: { name?: string; description?: string | null },
-  actorUserId: number
+  actorUserId: number,
 ): Promise<Group> {
   const existing = await db.query.groups.findFirst({
-    where: (table, operators) => operators.eq(table.id, id)
+    where: (table, operators) => operators.eq(table.id, id),
   });
   if (!existing) throw new Error("Group not found");
 
@@ -150,7 +150,7 @@ export async function updateGroup(
     .set({
       name: input.name ?? existing.name,
       description: input.description !== undefined ? input.description : existing.description,
-      updatedAt: nowIso()
+      updatedAt: nowIso(),
     })
     .where(eq(groups.id, id));
 
@@ -159,7 +159,7 @@ export async function updateGroup(
     action: "update",
     entityType: "group",
     entityId: id,
-    summary: `Updated group ${input.name ?? existing.name}`
+    summary: `Updated group ${input.name ?? existing.name}`,
   });
 
   return (await getGroup(id))!;
@@ -167,7 +167,7 @@ export async function updateGroup(
 
 export async function deleteGroup(id: number, actorUserId: number): Promise<void> {
   const existing = await db.query.groups.findFirst({
-    where: (table, operators) => operators.eq(table.id, id)
+    where: (table, operators) => operators.eq(table.id, id),
   });
   if (!existing) throw new Error("Group not found");
 
@@ -178,24 +178,24 @@ export async function deleteGroup(id: number, actorUserId: number): Promise<void
     action: "delete",
     entityType: "group",
     entityId: id,
-    summary: `Deleted group ${existing.name}`
+    summary: `Deleted group ${existing.name}`,
   });
 }
 
 export async function addGroupMember(
   groupId: number,
   userId: number,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<Group> {
   const group = await db.query.groups.findFirst({
-    where: (table, operators) => operators.eq(table.id, groupId)
+    where: (table, operators) => operators.eq(table.id, groupId),
   });
   if (!group) throw new Error("Group not found");
 
   await db.insert(groupMembers).values({
     groupId,
     userId,
-    createdAt: nowIso()
+    createdAt: nowIso(),
   });
 
   logAuditEvent({
@@ -203,7 +203,7 @@ export async function addGroupMember(
     action: "create",
     entityType: "group_member",
     entityId: groupId,
-    summary: `Added user ${userId} to group ${group.name}`
+    summary: `Added user ${userId} to group ${group.name}`,
   });
 
   return (await getGroup(groupId))!;
@@ -212,19 +212,16 @@ export async function addGroupMember(
 export async function removeGroupMember(
   groupId: number,
   userId: number,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<Group> {
   const group = await db.query.groups.findFirst({
-    where: (table, operators) => operators.eq(table.id, groupId)
+    where: (table, operators) => operators.eq(table.id, groupId),
   });
   if (!group) throw new Error("Group not found");
 
   const member = await db.query.groupMembers.findFirst({
     where: (table, operators) =>
-      operators.and(
-        operators.eq(table.groupId, groupId),
-        operators.eq(table.userId, userId)
-      )
+      operators.and(operators.eq(table.groupId, groupId), operators.eq(table.userId, userId)),
   });
   if (!member) throw new Error("Member not found in group");
 
@@ -235,7 +232,7 @@ export async function removeGroupMember(
     action: "delete",
     entityType: "group_member",
     entityId: groupId,
-    summary: `Removed user ${userId} from group ${group.name}`
+    summary: `Removed user ${userId} from group ${group.name}`,
   });
 
   return (await getGroup(groupId))!;

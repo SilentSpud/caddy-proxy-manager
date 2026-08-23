@@ -8,7 +8,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { ProxyHost } from "@/lib/models/proxy-hosts";
+import type { ProxyHost } from "@/lib/models/proxy-hosts";
 
 export function DnsResolverFields({
   dnsResolver,

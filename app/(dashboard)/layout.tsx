@@ -12,7 +12,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const avatar = resolveAvatar(
     { name: session.user.name, email: session.user.email, avatarUrl: session.user.image },
     64,
-    { gravatar: await isGravatarEnabled() }
+    { gravatar: await isGravatarEnabled() },
   );
   return (
     <DashboardLayoutClient user={session.user} avatar={avatar} appName={config.appName}>

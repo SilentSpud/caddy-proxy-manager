@@ -19,7 +19,9 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
   it('uses leaf override PEMs when mTlsDomainLeafOverride is provided', () => {
     const mTlsDomainMap = new Map([['app.example.com', [1]]]);
     const caCertMap = makeCaCertMap([1, 'CA_A']);
-    const leafOverride = new Map([['app.example.com', [makeCaPem('USER_CERT_1'), makeCaPem('USER_CERT_2')]]]);
+    const leafOverride = new Map([
+      ['app.example.com', [makeCaPem('USER_CERT_1'), makeCaPem('USER_CERT_2')]],
+    ]);
 
     const result = buildClientAuthentication(
       ['app.example.com'],
@@ -27,7 +29,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       new Map(),
       new Set(),
-      leafOverride
+      leafOverride,
     );
 
     expect(result).not.toBeNull();
@@ -50,7 +52,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       issuedClientCertMap,
       cAsWithAnyIssuedCerts,
-      leafOverride
+      leafOverride,
     );
 
     expect(result).not.toBeNull();
@@ -71,7 +73,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       new Map(),
       new Set(),
-      leafOverride
+      leafOverride,
     );
 
     // Falls back to unmanaged CA: no leaf certs
@@ -81,9 +83,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
   });
 
   it('includes CAs from multiple domains in leaf override', () => {
-    const mTlsDomainMap = new Map([
-      ['app.example.com', [1, 2]],
-    ]);
+    const mTlsDomainMap = new Map([['app.example.com', [1, 2]]]);
     const caCertMap = makeCaCertMap([1, 'CA_A'], [2, 'CA_B']);
     const leafOverride = new Map([['app.example.com', [makeCaPem('USER_1')]]]);
 
@@ -93,7 +93,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       new Map(),
       new Set(),
-      leafOverride
+      leafOverride,
     );
 
     expect(result).not.toBeNull();
@@ -120,7 +120,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       new Map(),
       new Set(),
-      leafOverride
+      leafOverride,
     );
 
     expect(result).not.toBeNull();
@@ -142,7 +142,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       new Map(),
       new Set(),
-      leafOverride
+      leafOverride,
     );
 
     expect(result).toBeNull();
@@ -158,7 +158,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       new Map(),
       new Set(),
-      new Map()
+      new Map(),
     );
 
     // No override → unmanaged CA logic
@@ -177,7 +177,7 @@ describe('buildClientAuthentication with leaf override (new cert-based model)', 
       caCertMap,
       new Map(),
       new Set(),
-      undefined
+      undefined,
     );
 
     expect(result).not.toBeNull();

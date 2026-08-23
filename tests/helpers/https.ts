@@ -20,7 +20,7 @@ export function httpsGet(
   domain: string,
   path = '/',
   tlsIdentity: ClientTlsIdentity = {},
-  extraHeaders: Record<string, string> = {}
+  extraHeaders: Record<string, string> = {},
 ): Promise<HttpsResponse> {
   return new Promise((resolve, reject) => {
     const req = https.request(
@@ -45,9 +45,9 @@ export function httpsGet(
             status: res.statusCode ?? 0,
             headers: res.headers as HttpsResponse['headers'],
             body,
-          })
+          }),
         );
-      }
+      },
     );
 
     req.setTimeout(10_000, () => {
@@ -62,7 +62,7 @@ export async function httpsGetOutcome(
   domain: string,
   path = '/',
   tlsIdentity: ClientTlsIdentity = {},
-  extraHeaders: Record<string, string> = {}
+  extraHeaders: Record<string, string> = {},
 ): Promise<HttpsOutcome> {
   try {
     const response = await httpsGet(domain, path, tlsIdentity, extraHeaders);
@@ -75,7 +75,7 @@ export async function httpsGetOutcome(
 export async function waitForHttpsRoute(
   domain: string,
   tlsIdentity: ClientTlsIdentity = {},
-  timeoutMs = 20_000
+  timeoutMs = 20_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastStatus = 0;
@@ -96,6 +96,6 @@ export async function waitForHttpsRoute(
   }
 
   throw new Error(
-    `HTTPS route for "${domain}" not ready after ${timeoutMs}ms (last status: ${lastStatus}, last error: ${lastError || 'none'})`
+    `HTTPS route for "${domain}" not ready after ${timeoutMs}ms (last status: ${lastStatus}, last error: ${lastError || 'none'})`,
   );
 }

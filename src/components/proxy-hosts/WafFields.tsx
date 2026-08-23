@@ -13,7 +13,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { type WafHostConfig } from "@/lib/models/proxy-hosts";
+import type { WafHostConfig } from "@/lib/models/proxy-hosts";
 import { WafRuleExclusions } from "./WafRuleExclusions";
 
 type WafMode = "merge" | "override";
@@ -44,7 +44,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [wafMode, setWafMode] = useState<WafMode>(value?.waf_mode ?? "merge");
   const [engineMode, setEngineMode] = useState<EngineMode>(
-    value?.mode === "Off" || value?.mode === "On" ? value.mode : "inherit"
+    value?.mode === "Off" || value?.mode === "On" ? value.mode : "inherit",
   );
   const [loadCrs, setLoadCrs] = useState(value?.load_owasp_crs ?? true);
   const [customDirectives, setCustomDirectives] = useState(value?.custom_directives ?? "");

@@ -10,10 +10,10 @@ import { sanitizeErrorPageRules } from '@/src/lib/models/proxy-hosts';
 
 describe('buildErrorPageRoute', () => {
   it('builds a per-host route with host matcher and status expression', () => {
-    const route = buildErrorPageRoute(
-      { statuses: [502, 503], body: '<h1>down</h1>' },
-      ['a.example.com', 'b.example.com']
-    );
+    const route = buildErrorPageRoute({ statuses: [502, 503], body: '<h1>down</h1>' }, [
+      'a.example.com',
+      'b.example.com',
+    ]);
 
     expect(route.match).toEqual([
       {
@@ -49,7 +49,11 @@ describe('buildErrorPageRoute', () => {
   });
 
   it('honors a custom content type', () => {
-    const route = buildErrorPageRoute({ statuses: [], body: '{}', contentType: 'application/json' });
+    const route = buildErrorPageRoute({
+      statuses: [],
+      body: '{}',
+      contentType: 'application/json',
+    });
     const handle = (route.handle as Array<Record<string, unknown>>)[0];
     expect(handle.headers).toEqual({ 'Content-Type': ['application/json'] });
   });

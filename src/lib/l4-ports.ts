@@ -152,11 +152,15 @@ ${portLines}
 
   // Write trigger to signal sidecar
   const triggeredAt = new Date().toISOString();
-  writeFileSync(triggerPath, JSON.stringify({
-    triggeredAt,
-    hash: hashPorts(requiredPorts),
-    ports: requiredPorts,
-  }), "utf-8");
+  writeFileSync(
+    triggerPath,
+    JSON.stringify({
+      triggeredAt,
+      hash: hashPorts(requiredPorts),
+      ports: requiredPorts,
+    }),
+    "utf-8",
+  );
 
   return {
     state: "pending",

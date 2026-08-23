@@ -8,7 +8,11 @@ vi.mock('@/src/lib/models/audit', () => ({
 vi.mock('@/src/lib/api-auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
-    constructor(msg: string, status: number) { super(msg); this.status = status; this.name = 'ApiAuthError'; }
+    constructor(msg: string, status: number) {
+      super(msg);
+      this.status = status;
+      this.name = 'ApiAuthError';
+    }
   };
   return {
     requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
@@ -18,7 +22,10 @@ vi.mock('@/src/lib/api-auth', () => {
       if (error instanceof ApiAuthError) {
         return NR.json({ error: error.message }, { status: error.status });
       }
-      return NR.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
+      return NR.json(
+        { error: error instanceof Error ? error.message : 'Internal server error' },
+        { status: 500 },
+      );
     }),
     ApiAuthError,
   };
@@ -36,14 +43,29 @@ function createMockRequest(options: { searchParams?: string } = {}): any {
   return {
     headers: { get: () => null },
     method: 'GET',
-    nextUrl: { pathname: '/api/v1/audit-log', searchParams: new URLSearchParams(options.searchParams ?? '') },
+    nextUrl: {
+      pathname: '/api/v1/audit-log',
+      searchParams: new URLSearchParams(options.searchParams ?? ''),
+    },
     json: async () => ({}),
   };
 }
 
 const sampleEvents = [
-  { id: 1, action: 'proxy_host.create', user_id: 1, details: '{}', created_at: '2026-01-01T00:00:00Z' },
-  { id: 2, action: 'certificate.create', user_id: 1, details: '{}', created_at: '2026-01-01T01:00:00Z' },
+  {
+    id: 1,
+    action: 'proxy_host.create',
+    user_id: 1,
+    details: '{}',
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 2,
+    action: 'certificate.create',
+    user_id: 1,
+    details: '{}',
+    created_at: '2026-01-01T01:00:00Z',
+  },
 ];
 
 beforeEach(() => {

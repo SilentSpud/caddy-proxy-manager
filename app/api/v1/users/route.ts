@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
 import { config } from "@/src/lib/config";
@@ -15,7 +15,9 @@ export async function GET(request: NextRequest) {
   try {
     await requireApiAdmin(request);
     const users = await listUsers();
-    return NextResponse.json(users.map(u => stripPasswordHash(u as unknown as Record<string, unknown>)));
+    return NextResponse.json(
+      users.map((u) => stripPasswordHash(u as unknown as Record<string, unknown>)),
+    );
   } catch (error) {
     return apiErrorResponse(error);
   }
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
     if (config.auth.disableLocalUsers) {
       return NextResponse.json(
         { error: "Local user creation is disabled. Users are provisioned by the OIDC provider." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -55,7 +57,9 @@ export async function POST(request: NextRequest) {
       passwordHash,
     });
 
-    return NextResponse.json(stripPasswordHash(user as unknown as Record<string, unknown>), { status: 201 });
+    return NextResponse.json(stripPasswordHash(user as unknown as Record<string, unknown>), {
+      status: 201,
+    });
   } catch (error) {
     return apiErrorResponse(error);
   }

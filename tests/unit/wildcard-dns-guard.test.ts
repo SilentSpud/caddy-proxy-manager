@@ -21,7 +21,7 @@ describe('assertWildcardIssuable', () => {
   it('rejects an auto-managed wildcard host when no DNS provider is configured', async () => {
     mockGetDnsProviderSettings.mockResolvedValue(null);
     await expect(assertWildcardIssuable(['*.example.com'], null)).rejects.toThrow(
-      /Wildcard domain "\*\.example\.com" requires a DNS provider/
+      /Wildcard domain "\*\.example\.com" requires a DNS provider/,
     );
   });
 

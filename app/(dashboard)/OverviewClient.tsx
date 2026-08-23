@@ -1,7 +1,7 @@
 "use client";
 
 import { Activity, ArrowLeftRight, BarChart2, KeyRound, ShieldCheck } from "lucide-react";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Card } from "@astryxdesign/core/Card";
 import { ClickableCard } from "@astryxdesign/core/ClickableCard";
 import { Grid } from "@astryxdesign/core/Grid";
@@ -28,6 +28,9 @@ export type StatCard = {
 };
 
 type RecentEvent = {
+  // The audit row's primary key, so the list keys on real identity rather than
+  // on its position in the page's snapshot.
+  id: number;
   summary: string;
   createdAt: string;
 };
@@ -50,7 +53,10 @@ const CARD_VARIANTS = ["purple", "green", "orange"] as const;
  * an event was. StatusDot carries a label too, so the distinction is now
  * available to screen readers rather than being colour-only.
  */
-function getEventStatus(summary: string): { variant: "success" | "error" | "accent"; label: string } {
+function getEventStatus(summary: string): {
+  variant: "success" | "error" | "accent";
+  label: string;
+} {
   const lower = summary.toLowerCase();
   if (lower.startsWith("delete") || lower.startsWith("remove")) {
     return { variant: "error", label: "Removal" };
@@ -103,7 +109,7 @@ export default function OverviewClient({
   stats,
   trafficSummary,
   recentEvents,
-  isAdmin = true
+  isAdmin = true,
 }: {
   userName: string;
   stats: StatCard[];
@@ -138,7 +144,12 @@ export default function OverviewClient({
         ))}
 
         {isAdmin && (
-          <ClickableCard label="Traffic in the last 24 hours" href="/analytics" variant="cyan" padding={5}>
+          <ClickableCard
+            label="Traffic in the last 24 hours"
+            href="/analytics"
+            variant="cyan"
+            padding={5}
+          >
             <StatTile
               icon={<Icon icon={BarChart2} />}
               value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "—"}
@@ -173,11 +184,11 @@ export default function OverviewClient({
               </Text>
             ) : (
               <List hasDividers>
-                {recentEvents.map((event, index) => {
+                {recentEvents.map((event) => {
                   const status = getEventStatus(event.summary);
                   return (
                     <ListItem
-                      key={`${event.createdAt}-${index}`}
+                      key={event.id}
                       startContent={<StatusDot variant={status.variant} label={status.label} />}
                       label={event.summary}
                       endContent={

@@ -96,7 +96,7 @@ describe('L4 proxy host geoblockMode persistence', () => {
         geoblock: baseGeoblock,
         geoblockMode: 'merge',
       },
-      1
+      1,
     );
     expect((await getL4ProxyHost(host.id))?.geoblockMode).toBe('merge');
 
@@ -113,7 +113,7 @@ describe('L4 proxy host geoblockMode persistence', () => {
         listenAddress: ':5434',
         upstreams: ['10.0.0.5:5434'],
       },
-      1
+      1,
     );
     expect((await getL4ProxyHost(host.id))?.geoblock).toBeNull();
 

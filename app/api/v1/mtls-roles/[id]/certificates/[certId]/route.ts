@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { removeRoleFromCertificate } from "@/src/lib/models/mtls-roles";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; certId: string }> }
+  { params }: { params: Promise<{ id: string; certId: string }> },
 ) {
   try {
     const { userId } = await requireApiAdmin(request);

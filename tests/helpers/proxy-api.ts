@@ -13,13 +13,13 @@ import { injectFormFields } from './http';
 export interface ProxyHostConfig {
   name: string;
   domain: string;
-  upstream: string;        // e.g. "echo-server:8080"
+  upstream: string; // e.g. "echo-server:8080"
   accessListName?: string; // name of an existing access list to attach
   certificateName?: string;
   mtlsCaNames?: string[];
   mtlsProtectedPaths?: string[];
   mtlsExcludedPaths?: string[];
-  enableWaf?: boolean;     // enable WAF with OWASP CRS in blocking mode
+  enableWaf?: boolean; // enable WAF with OWASP CRS in blocking mode
   wafMode?: 'merge' | 'override';
   wafLoadOwaspCrs?: boolean;
   wafCustomDirectives?: string;
@@ -71,9 +71,15 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
   await page.getByLabel(/domains/i).fill(config.domain);
 
   // Support multiple upstreams separated by newlines.
-  const upstreamList = config.upstream.split('\n').map((u) => u.trim()).filter(Boolean);
+  const upstreamList = config.upstream
+    .split('\n')
+    .map((u) => u.trim())
+    .filter(Boolean);
   // Fill the first (always-present) upstream input
-  await page.getByPlaceholder('10.0.0.5:8080').first().fill(upstreamList[0] ?? '');
+  await page
+    .getByPlaceholder('10.0.0.5:8080')
+    .first()
+    .fill(upstreamList[0] ?? '');
   // Add additional upstreams via the "Add Upstream" button
   for (let i = 1; i < upstreamList.length; i++) {
     await page.getByRole('button', { name: /add upstream/i }).click();
@@ -136,7 +142,7 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
     Object.assign(extraFields, {
       wafPresent: 'on',
       wafEnabled: 'on',
-      wafEngineMode: 'On',    // blocking mode (the host form only accepts On/Off)
+      wafEngineMode: 'On', // blocking mode (the host form only accepts On/Off)
       wafLoadOwaspCrs: config.wafLoadOwaspCrs === false ? '' : 'on',
       wafMode: config.wafMode ?? 'override',
       wafCustomDirectives: config.wafCustomDirectives ?? '',
@@ -150,7 +156,10 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
   await expect(page.getByRole('table').getByText(config.name)).toBeVisible({ timeout: 10_000 });
 }
 
-export async function importCertificate(page: Page, config: ImportedCertificateConfig): Promise<void> {
+export async function importCertificate(
+  page: Page,
+  config: ImportedCertificateConfig,
+): Promise<void> {
   await openCertificatesTab(page, /^Imported/i);
   await page.getByRole('button', { name: /import certificate/i }).click();
   await expect(page.getByRole('heading', { name: /^import certificate$/i })).toBeVisible();
@@ -163,9 +172,13 @@ export async function importCertificate(page: Page, config: ImportedCertificateC
   await page.getByRole('button', { name: /^import certificate$/i }).click();
 
   // Wait for the import sheet to close, then verify the cert appears in the table
-  await expect(page.getByRole('heading', { name: /^import certificate$/i })).not.toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: /^import certificate$/i })).not.toBeVisible({
+    timeout: 10_000,
+  });
   await page.waitForTimeout(500); // allow page to revalidate
-  await expect(page.locator('table').getByText(config.name).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table').getByText(config.name).first()).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 export async function generateCaCertificate(page: Page, config: GeneratedCaConfig): Promise<void> {
@@ -175,29 +188,41 @@ export async function generateCaCertificate(page: Page, config: GeneratedCaConfi
 
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(config.name);
   if (config.commonName) {
-    await page.getByRole('textbox', { name: 'Common Name (CN)', exact: true }).fill(config.commonName);
+    await page
+      .getByRole('textbox', { name: 'Common Name (CN)', exact: true })
+      .fill(config.commonName);
   }
   if (config.validityDays !== undefined) {
-    await page.getByRole('spinbutton', { name: 'Validity', exact: true }).fill(String(config.validityDays));
+    await page
+      .getByRole('spinbutton', { name: 'Validity', exact: true })
+      .fill(String(config.validityDays));
   }
 
   await page.getByRole('button', { name: /generate ca certificate/i }).click();
-  await expect(page.getByRole('heading', { name: /^add ca certificate$/i })).not.toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('table').getByText(config.name).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: /^add ca certificate$/i })).not.toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.locator('table').getByText(config.name).first()).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 export async function issueClientCertificate(
   page: Page,
-  config: IssuedClientCertificateConfig
+  config: IssuedClientCertificateConfig,
 ): Promise<Buffer> {
   await openCertificatesTab(page, /^CA \/ mTLS/i);
   await expandCaRow(page, config.caName);
   await page.getByRole('button', { name: /^issue cert$/i }).click();
   await expect(page.getByRole('dialog', { name: /issue client certificate/i })).toBeVisible();
 
-  await page.getByRole('textbox', { name: 'Common Name (CN)', exact: true }).fill(config.commonName);
+  await page
+    .getByRole('textbox', { name: 'Common Name (CN)', exact: true })
+    .fill(config.commonName);
   if (config.validityDays !== undefined) {
-    await page.getByRole('spinbutton', { name: 'Validity', exact: true }).fill(String(config.validityDays));
+    await page
+      .getByRole('spinbutton', { name: 'Validity', exact: true })
+      .fill(String(config.validityDays));
   }
   await page.getByLabel(/export password/i).fill(config.exportPassword);
 
@@ -208,7 +233,9 @@ export async function issueClientCertificate(
   }
 
   await page.getByRole('button', { name: /issue certificate/i }).click();
-  await expect(page.getByRole('button', { name: /download client certificate/i })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: /download client certificate/i })).toBeVisible({
+    timeout: 15_000,
+  });
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: /download client certificate/i }).click();
@@ -216,12 +243,18 @@ export async function issueClientCertificate(
   const downloadPath = await saveDownload(download);
 
   await page.getByRole('button', { name: /^done$/i }).click();
-  await expect(page.getByRole('dialog', { name: /issue client certificate/i })).not.toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('dialog', { name: /issue client certificate/i })).not.toBeVisible({
+    timeout: 10_000,
+  });
 
   return readFile(downloadPath);
 }
 
-export async function revokeIssuedClientCertificate(page: Page, caName: string, commonName: string): Promise<void> {
+export async function revokeIssuedClientCertificate(
+  page: Page,
+  caName: string,
+  commonName: string,
+): Promise<void> {
   await openCertificatesTab(page, /^CA \/ mTLS/i);
   await expandCaRow(page, caName);
   await page.getByRole('button', { name: /^manage$/i }).click();
@@ -233,8 +266,13 @@ export async function revokeIssuedClientCertificate(page: Page, caName: string, 
   await expect(certCard).toBeVisible({ timeout: 10_000 });
   await certCard.getByRole('button', { name: /^revoke$/i }).click();
   // After revoking, the cert should no longer be visible (hidden by default, only shown with "Show revoked")
-  await expect(certCard.getByRole('button', { name: /^revoke$/i })).not.toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: /^close$/i }).first().click();
+  await expect(certCard.getByRole('button', { name: /^revoke$/i })).not.toBeVisible({
+    timeout: 15_000,
+  });
+  await page
+    .getByRole('button', { name: /^close$/i })
+    .first()
+    .click();
 }
 
 async function saveDownload(download: Download): Promise<string> {
@@ -257,7 +295,7 @@ export interface AccessListUser {
 export async function createAccessList(
   page: Page,
   name: string,
-  users: AccessListUser[]
+  users: AccessListUser[],
 ): Promise<void> {
   await page.goto('/access-lists');
 

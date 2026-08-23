@@ -55,10 +55,20 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
         </HStack>
         <HStack gap={2}>
           {ca.hasPrivateKey && (
-            <Button size="sm" variant="secondary" label="Issue Cert" onClick={() => setIssueCaOpen(true)} />
+            <Button
+              size="sm"
+              variant="secondary"
+              label="Issue Cert"
+              onClick={() => setIssueCaOpen(true)}
+            />
           )}
           {ca.issuedCerts.length > 0 && (
-            <Button size="sm" variant="secondary" label="Manage" onClick={() => setManageOpen(true)} />
+            <Button
+              size="sm"
+              variant="secondary"
+              label="Manage"
+              onClick={() => setManageOpen(true)}
+            />
           )}
         </HStack>
       </HStack>
@@ -233,9 +243,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
             />
           </HStack>
           <HStack gap={2} wrap="wrap" vAlign="center">
-            {ca.hasPrivateKey && (
-              <Badge variant="success" icon={<KeyRound />} label="Key stored" />
-            )}
+            {ca.hasPrivateKey && <Badge variant="success" icon={<KeyRound />} label="Key stored" />}
             {ca.issuedCerts.length > 0 && (
               <Badge
                 variant={activeCount(ca) > 0 ? "info" : "neutral"}
@@ -269,7 +277,9 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
       {filtered.length === 0 ? (
         <Card>
           <EmptyState
-            title={search || statusFilter ? "No CA certificates match" : "No CA certificates configured"}
+            title={
+              search || statusFilter ? "No CA certificates match" : "No CA certificates configured"
+            }
           />
         </Card>
       ) : (

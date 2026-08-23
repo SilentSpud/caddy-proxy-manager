@@ -4,16 +4,14 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestDb, type TestDb } from '../helpers/db';
-import {
-  mtlsAccessRules,
-  proxyHosts,
-  users,
-} from '../../src/lib/db/schema';
+import { mtlsAccessRules, proxyHosts, users } from '../../src/lib/db/schema';
 
 let db: TestDb;
 
 vi.mock('../../src/lib/db', async () => ({
-  get default() { return db; },
+  get default() {
+    return db;
+  },
   nowIso: () => new Date().toISOString(),
   toIso: (v: string | null) => v,
 }));
@@ -25,22 +23,38 @@ beforeEach(async () => {
   db = createTestDb();
   vi.clearAllMocks();
   const now = new Date().toISOString();
-  const [user] = await db.insert(users).values({
-    email: 'admin@test', name: 'Admin', role: 'admin',
-    provider: 'credentials', subject: 'admin@test', status: 'active',
-    createdAt: now, updatedAt: now,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: 'admin@test',
+      name: 'Admin',
+      role: 'admin',
+      provider: 'credentials',
+      subject: 'admin@test',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   userId = user.id;
 });
 
-function nowIso() { return new Date().toISOString(); }
+function nowIso() {
+  return new Date().toISOString();
+}
 
 async function insertHost(name = 'test-host') {
   const now = nowIso();
-  const [host] = await db.insert(proxyHosts).values({
-    name, domains: '["test.example.com"]', upstreams: '["http://localhost:8080"]',
-    createdAt: now, updatedAt: now,
-  }).returning();
+  const [host] = await db
+    .insert(proxyHosts)
+    .values({
+      name,
+      domains: '["test.example.com"]',
+      upstreams: '["http://localhost:8080"]',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return host;
 }
 
@@ -56,14 +70,17 @@ const {
 describe('mtls-access-rules CRUD', () => {
   it('createMtlsAccessRule creates a rule', async () => {
     const host = await insertHost();
-    const rule = await createMtlsAccessRule({
-      proxyHostId: host.id,
-      pathPattern: '/admin/*',
-      allowedRoleIds: [1, 2],
-      allowedCertIds: [10],
-      priority: 5,
-      description: 'admin only',
-    }, userId);
+    const rule = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '/admin/*',
+        allowedRoleIds: [1, 2],
+        allowedCertIds: [10],
+        priority: 5,
+        description: 'admin only',
+      },
+      userId,
+    );
 
     expect(rule.proxyHostId).toBe(host.id);
     expect(rule.pathPattern).toBe('/admin/*');
@@ -76,19 +93,25 @@ describe('mtls-access-rules CRUD', () => {
 
   it('createMtlsAccessRule trims pathPattern', async () => {
     const host = await insertHost();
-    const rule = await createMtlsAccessRule({
-      proxyHostId: host.id,
-      pathPattern: '  /api/*  ',
-    }, userId);
+    const rule = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '  /api/*  ',
+      },
+      userId,
+    );
     expect(rule.pathPattern).toBe('/api/*');
   });
 
   it('createMtlsAccessRule defaults arrays to empty', async () => {
     const host = await insertHost();
-    const rule = await createMtlsAccessRule({
-      proxyHostId: host.id,
-      pathPattern: '*',
-    }, userId);
+    const rule = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '*',
+      },
+      userId,
+    );
     expect(rule.allowedRoleIds).toEqual([]);
     expect(rule.allowedCertIds).toEqual([]);
     expect(rule.denyAll).toBe(false);
@@ -97,11 +120,14 @@ describe('mtls-access-rules CRUD', () => {
 
   it('createMtlsAccessRule with denyAll', async () => {
     const host = await insertHost();
-    const rule = await createMtlsAccessRule({
-      proxyHostId: host.id,
-      pathPattern: '/blocked/*',
-      denyAll: true,
-    }, userId);
+    const rule = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '/blocked/*',
+        denyAll: true,
+      },
+      userId,
+    );
     expect(rule.denyAll).toBe(true);
   });
 
@@ -113,9 +139,9 @@ describe('mtls-access-rules CRUD', () => {
 
     const rules = await listMtlsAccessRules(host.id);
     expect(rules).toHaveLength(3);
-    expect(rules[0].pathPattern).toBe('/a');    // priority 10 (highest)
-    expect(rules[1].pathPattern).toBe('/b');    // priority 1, path /b
-    expect(rules[2].pathPattern).toBe('/c');    // priority 1, path /c
+    expect(rules[0].pathPattern).toBe('/a'); // priority 10 (highest)
+    expect(rules[1].pathPattern).toBe('/b'); // priority 1, path /b
+    expect(rules[2].pathPattern).toBe('/c'); // priority 1, path /c
   });
 
   it('listMtlsAccessRules returns empty array for host with no rules', async () => {
@@ -137,9 +163,13 @@ describe('mtls-access-rules CRUD', () => {
 
   it('getMtlsAccessRule returns a single rule', async () => {
     const host = await insertHost();
-    const created = await createMtlsAccessRule({
-      proxyHostId: host.id, pathPattern: '/test',
-    }, userId);
+    const created = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '/test',
+      },
+      userId,
+    );
 
     const fetched = await getMtlsAccessRule(created.id);
     expect(fetched).not.toBeNull();
@@ -153,17 +183,26 @@ describe('mtls-access-rules CRUD', () => {
 
   it('updateMtlsAccessRule updates fields', async () => {
     const host = await insertHost();
-    const rule = await createMtlsAccessRule({
-      proxyHostId: host.id, pathPattern: '/old', priority: 0,
-    }, userId);
+    const rule = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '/old',
+        priority: 0,
+      },
+      userId,
+    );
 
-    const updated = await updateMtlsAccessRule(rule.id, {
-      pathPattern: '/new',
-      priority: 99,
-      allowedRoleIds: [5],
-      denyAll: true,
-      description: 'updated',
-    }, userId);
+    const updated = await updateMtlsAccessRule(
+      rule.id,
+      {
+        pathPattern: '/new',
+        priority: 99,
+        allowedRoleIds: [5],
+        denyAll: true,
+        description: 'updated',
+      },
+      userId,
+    );
 
     expect(updated.pathPattern).toBe('/new');
     expect(updated.priority).toBe(99);
@@ -174,10 +213,16 @@ describe('mtls-access-rules CRUD', () => {
 
   it('updateMtlsAccessRule partial update leaves other fields unchanged', async () => {
     const host = await insertHost();
-    const rule = await createMtlsAccessRule({
-      proxyHostId: host.id, pathPattern: '/test',
-      allowedRoleIds: [1], priority: 5, description: 'original',
-    }, userId);
+    const rule = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '/test',
+        allowedRoleIds: [1],
+        priority: 5,
+        description: 'original',
+      },
+      userId,
+    );
 
     const updated = await updateMtlsAccessRule(rule.id, { priority: 10 }, userId);
     expect(updated.pathPattern).toBe('/test');
@@ -192,9 +237,13 @@ describe('mtls-access-rules CRUD', () => {
 
   it('deleteMtlsAccessRule removes the rule', async () => {
     const host = await insertHost();
-    const rule = await createMtlsAccessRule({
-      proxyHostId: host.id, pathPattern: '/test',
-    }, userId);
+    const rule = await createMtlsAccessRule(
+      {
+        proxyHostId: host.id,
+        pathPattern: '/test',
+      },
+      userId,
+    );
 
     await deleteMtlsAccessRule(rule.id, 1);
     expect(await getMtlsAccessRule(rule.id)).toBeNull();
@@ -248,9 +297,9 @@ describe('getAccessRulesForHosts (bulk query)', () => {
 
     const map = await getAccessRulesForHosts([h.id]);
     const rules = map.get(h.id)!;
-    expect(rules[0].pathPattern).toBe('/m');  // priority 10, path /m
-    expect(rules[1].pathPattern).toBe('/z');  // priority 10, path /z
-    expect(rules[2].pathPattern).toBe('/a');  // priority 1
+    expect(rules[0].pathPattern).toBe('/m'); // priority 10, path /m
+    expect(rules[1].pathPattern).toBe('/z'); // priority 10, path /z
+    expect(rules[2].pathPattern).toBe('/a'); // priority 1
   });
 });
 
@@ -260,9 +309,12 @@ describe('JSON parsing edge cases in access rules', () => {
     const now = nowIso();
     // Insert directly with bad JSON
     await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id, pathPattern: '/test',
-      allowedRoleIds: 'not-json', allowedCertIds: '[]',
-      createdAt: now, updatedAt: now,
+      proxyHostId: host.id,
+      pathPattern: '/test',
+      allowedRoleIds: 'not-json',
+      allowedCertIds: '[]',
+      createdAt: now,
+      updatedAt: now,
     });
 
     const rules = await listMtlsAccessRules(host.id);
@@ -273,9 +325,12 @@ describe('JSON parsing edge cases in access rules', () => {
     const host = await insertHost();
     const now = nowIso();
     await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id, pathPattern: '/test',
-      allowedRoleIds: '[1, "hello", null, 3]', allowedCertIds: '[]',
-      createdAt: now, updatedAt: now,
+      proxyHostId: host.id,
+      pathPattern: '/test',
+      allowedRoleIds: '[1, "hello", null, 3]',
+      allowedCertIds: '[]',
+      createdAt: now,
+      updatedAt: now,
     });
 
     const rules = await listMtlsAccessRules(host.id);
@@ -286,9 +341,12 @@ describe('JSON parsing edge cases in access rules', () => {
     const host = await insertHost();
     const now = nowIso();
     await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id, pathPattern: '/test',
-      allowedRoleIds: '{"foo": 1}', allowedCertIds: '"string"',
-      createdAt: now, updatedAt: now,
+      proxyHostId: host.id,
+      pathPattern: '/test',
+      allowedRoleIds: '{"foo": 1}',
+      allowedCertIds: '"string"',
+      createdAt: now,
+      updatedAt: now,
     });
 
     const rules = await listMtlsAccessRules(host.id);

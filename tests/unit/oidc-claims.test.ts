@@ -13,8 +13,7 @@ import {
 } from '../../src/lib/oidc-claims';
 
 function makeIdToken(payload: Record<string, unknown>): string {
-  const encode = (value: object) =>
-    Buffer.from(JSON.stringify(value)).toString('base64url');
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
   return `${encode({ alg: 'RS256' })}.${encode(payload)}.signature`;
 }
 
@@ -89,7 +88,7 @@ describe('fetchOidcClaims', () => {
     const claims = await fetchOidcClaims(
       cfg,
       { idToken: makeIdToken({ sub: 'u1', email: 'u1@example.com', groups: ['CPM_Admin'] }) },
-      'groups'
+      'groups',
     );
 
     expect(claims).toMatchObject({ sub: 'u1', groups: ['CPM_Admin'] });
@@ -103,7 +102,7 @@ describe('fetchOidcClaims', () => {
     const claims = await fetchOidcClaims(
       cfg,
       { idToken: makeIdToken({ sub: 'u1', email: 'u1@example.com' }), accessToken: 'token-123' },
-      'groups'
+      'groups',
     );
 
     expect(claims).toMatchObject({ sub: 'u1', email: 'u1@example.com', groups: ['CPM_Admin'] });
@@ -114,7 +113,9 @@ describe('fetchOidcClaims', () => {
   it('works with no ID token at all, from userinfo only', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(jsonResponse({ sub: 'u2', email: 'u2@example.com', groups: ['CPM_User'] }));
+      .mockResolvedValue(
+        jsonResponse({ sub: 'u2', email: 'u2@example.com', groups: ['CPM_User'] }),
+      );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const claims = await fetchOidcClaims(cfg, { accessToken: 'token-123' }, 'groups');
@@ -123,12 +124,14 @@ describe('fetchOidcClaims', () => {
   });
 
   it('keeps the identity from the ID token when userinfo cannot be reached', async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down')) as unknown as typeof fetch;
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(new Error('network down')) as unknown as typeof fetch;
 
     const claims = await fetchOidcClaims(
       cfg,
       { idToken: makeIdToken({ sub: 'u1', email: 'u1@example.com' }), accessToken: 'token-123' },
-      'groups'
+      'groups',
     );
 
     expect(claims).toMatchObject({ sub: 'u1', email: 'u1@example.com' });
@@ -154,7 +157,7 @@ describe('fetchOidcClaims', () => {
           resource_access: { cpm: { roles: ['CPM_Admin'] } },
         }),
       },
-      'resource_access.cpm.roles'
+      'resource_access.cpm.roles',
     );
 
     expect(claims).not.toBeNull();
@@ -184,7 +187,11 @@ describe('toOAuthUserInfo', () => {
   });
 
   it('falls back to preferred_username when no name claim is present', () => {
-    const info = toOAuthUserInfo({ sub: 'u1', email: 'u1@example.com', preferred_username: 'uone' });
+    const info = toOAuthUserInfo({
+      sub: 'u1',
+      email: 'u1@example.com',
+      preferred_username: 'uone',
+    });
     expect(info.name).toBe('uone');
     expect(info.emailVerified).toBe(false);
   });

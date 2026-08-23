@@ -61,7 +61,7 @@ export function buildClientAuthentication(
   issuedClientCertMap: Map<number, string[]>,
   cAsWithAnyIssuedCerts: Set<number>,
   mTlsDomainLeafOverride?: Map<string, string[]>,
-  mode: "require_and_verify" | "verify_if_given" | "request" = "require_and_verify"
+  mode: "require_and_verify" | "verify_if_given" | "request" = "require_and_verify",
 ): Record<string, unknown> | null {
   if (mode === "request") {
     return { mode: "request" };
@@ -159,7 +159,7 @@ export function buildValidClientCertCelExpression(): string {
  */
 export function groupMtlsDomainsByCaSet(
   domains: string[],
-  mTlsDomainMap: Map<string, number[]>
+  mTlsDomainMap: Map<string, number[]>,
 ): Map<string, string[]> {
   const groups = new Map<string, string[]>();
   for (const domain of domains) {
@@ -182,7 +182,7 @@ export function groupMtlsDomainsByCaSet(
 export function resolveAllowedFingerprints(
   rule: MtlsAccessRuleLike,
   roleFingerprintMap: Map<number, Set<string>>,
-  certFingerprintMap: Map<number, string>
+  certFingerprintMap: Map<number, string>,
 ): Set<string> {
   const allowed = new Set<string>();
 
@@ -232,7 +232,7 @@ export function buildMtlsRbacSubroutes(
   baseHandlers: Record<string, unknown>[],
   reverseProxyHandler: Record<string, unknown>,
   requireValidClientCertByDefault = false,
-  defaultAllowedFingerprints?: Set<string>
+  defaultAllowedFingerprints?: Set<string>,
 ): Record<string, unknown>[] | null {
   if (accessRules.length === 0) return null;
 
@@ -244,11 +244,13 @@ export function buildMtlsRbacSubroutes(
       // Explicit deny: any request matching this path gets 403
       subroutes.push({
         match: [{ path: [rule.pathPattern] }],
-        handle: [{
-          handler: "static_response",
-          status_code: "403",
-          body: "mTLS access denied",
-        }],
+        handle: [
+          {
+            handler: "static_response",
+            status_code: "403",
+            body: "mTLS access denied",
+          },
+        ],
         terminal: true,
       });
       continue;
@@ -260,11 +262,13 @@ export function buildMtlsRbacSubroutes(
       // Rule exists but no certs match → deny all for this path
       subroutes.push({
         match: [{ path: [rule.pathPattern] }],
-        handle: [{
-          handler: "static_response",
-          status_code: "403",
-          body: "mTLS access denied",
-        }],
+        handle: [
+          {
+            handler: "static_response",
+            status_code: "403",
+            body: "mTLS access denied",
+          },
+        ],
         terminal: true,
       });
       continue;
@@ -281,19 +285,22 @@ export function buildMtlsRbacSubroutes(
     // Deny route: path matches but fingerprint didn't → 403
     subroutes.push({
       match: [{ path: [rule.pathPattern] }],
-      handle: [{
-        handler: "static_response",
-        status_code: "403",
-        body: "mTLS access denied",
-      }],
+      handle: [
+        {
+          handler: "static_response",
+          status_code: "403",
+          body: "mTLS access denied",
+        },
+      ],
       terminal: true,
     });
   }
 
   if (requireValidClientCertByDefault) {
-    const defaultExpression = defaultAllowedFingerprints && defaultAllowedFingerprints.size > 0
-      ? buildFingerprintCelExpression(defaultAllowedFingerprints)
-      : buildValidClientCertCelExpression();
+    const defaultExpression =
+      defaultAllowedFingerprints && defaultAllowedFingerprints.size > 0
+        ? buildFingerprintCelExpression(defaultAllowedFingerprints)
+        : buildValidClientCertCelExpression();
 
     subroutes.push({
       match: [{ expression: defaultExpression }],
@@ -301,11 +308,13 @@ export function buildMtlsRbacSubroutes(
       terminal: true,
     });
     subroutes.push({
-      handle: [{
-        handler: "static_response",
-        status_code: "403",
-        body: "mTLS access denied",
-      }],
+      handle: [
+        {
+          handler: "static_response",
+          status_code: "403",
+          body: "mTLS access denied",
+        },
+      ],
       terminal: true,
     });
   } else {

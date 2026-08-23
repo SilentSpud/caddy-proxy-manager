@@ -4,11 +4,27 @@ import { SignJWT, jwtVerify } from "jose";
 import { config } from "../config";
 import { findUserByEmail, getUserById } from "../models/user";
 import db from "../db";
-import { users, linkingTokens, accounts } from "../db/schema";
+import { users, linkingTokens, accounts, oauthProviders } from "../db/schema";
 import { and, eq, lt } from "drizzle-orm";
 import { nowIso } from "../db";
+import { accountIssuerFor } from "../account-issuer";
 
 const LINKING_TOKEN_EXPIRY = 5 * 60; // 5 minutes in seconds
+
+/**
+ * The issuer to stamp on a linked OAuth account row. From better-auth 1.7 an
+ * account is keyed by (issuer, accountId), so a link written here has to carry
+ * the same issuer the provider will present at sign-in — otherwise the link
+ * exists but never resolves.
+ */
+async function issuerForProvider(providerId: string): Promise<string> {
+  const row = await db
+    .select({ issuer: oauthProviders.issuer })
+    .from(oauthProviders)
+    .where(eq(oauthProviders.id, providerId))
+    .get();
+  return accountIssuerFor(providerId, row?.issuer);
+}
 
 export type LinkingDecision = {
   action: "auto_link" | "require_manual_link" | "create_new" | "signin_existing";
@@ -30,15 +46,21 @@ export type LinkingTokenPayload = {
 export async function decideLinkingStrategy(
   provider: string,
   providerAccountId: string,
-  email: string
+  email: string,
 ): Promise<LinkingDecision> {
   // Check accounts table for existing OAuth connection
-  const existingAccount = await db.select().from(accounts).where(
-    and(eq(accounts.providerId, provider), eq(accounts.accountId, providerAccountId))
-  ).limit(1);
+  const existingAccount = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.providerId, provider), eq(accounts.accountId, providerAccountId)))
+    .limit(1);
 
   if (existingAccount.length > 0) {
-    return { action: "signin_existing", userId: existingAccount[0].userId, reason: "OAuth account already linked" };
+    return {
+      action: "signin_existing",
+      userId: existingAccount[0].userId,
+      reason: "OAuth account already linked",
+    };
   }
 
   // Check if email matches existing user
@@ -46,7 +68,7 @@ export async function decideLinkingStrategy(
   if (!existingEmailUser) {
     return {
       action: "create_new",
-      reason: "No existing account with this email"
+      reason: "No existing account with this email",
     };
   }
 
@@ -56,7 +78,7 @@ export async function decideLinkingStrategy(
     return {
       action: "require_manual_link",
       userId: existingEmailUser.id,
-      reason: "Account has password - requires manual linking"
+      reason: "Account has password - requires manual linking",
     };
   }
 
@@ -65,14 +87,14 @@ export async function decideLinkingStrategy(
     return {
       action: "auto_link",
       userId: existingEmailUser.id,
-      reason: "Account has no password - auto-linking enabled"
+      reason: "Account has no password - auto-linking enabled",
     };
   }
 
   return {
     action: "require_manual_link",
     userId: existingEmailUser.id,
-    reason: "Auto-linking disabled"
+    reason: "Auto-linking disabled",
   };
 }
 
@@ -83,7 +105,7 @@ export async function createLinkingToken(
   userId: number,
   provider: string,
   providerAccountId: string,
-  email: string
+  email: string,
 ): Promise<string> {
   const secret = new TextEncoder().encode(config.sessionSecret);
 
@@ -91,7 +113,7 @@ export async function createLinkingToken(
     userId,
     provider,
     providerAccountId,
-    email
+    email,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime(`${LINKING_TOKEN_EXPIRY}s`)
@@ -114,7 +136,7 @@ export async function verifyLinkingToken(token: string): Promise<LinkingTokenPay
       provider: payload.provider as string,
       providerAccountId: payload.providerAccountId as string,
       email: payload.email as string,
-      exp: payload.exp as number
+      exp: payload.exp as number,
     };
   } catch (error) {
     console.error("Token verification failed:", error);
@@ -138,7 +160,7 @@ export async function storeLinkingToken(token: string): Promise<string> {
     id,
     token,
     createdAt: now,
-    expiresAt
+    expiresAt,
   });
   return id;
 }
@@ -151,9 +173,7 @@ export async function storeLinkingToken(token: string): Promise<string> {
  */
 export async function peekLinkingToken(id: string): Promise<string | null> {
   const now = nowIso();
-  const rows = await db.select().from(linkingTokens)
-    .where(eq(linkingTokens.id, id))
-    .limit(1);
+  const rows = await db.select().from(linkingTokens).where(eq(linkingTokens.id, id)).limit(1);
   if (rows.length === 0 || rows[0].expiresAt < now) {
     return null;
   }
@@ -166,9 +186,7 @@ export async function peekLinkingToken(id: string): Promise<string | null> {
  */
 export async function retrieveLinkingToken(id: string): Promise<string | null> {
   const now = nowIso();
-  const rows = await db.select().from(linkingTokens)
-    .where(eq(linkingTokens.id, id))
-    .limit(1);
+  const rows = await db.select().from(linkingTokens).where(eq(linkingTokens.id, id)).limit(1);
   if (rows.length === 0 || rows[0].expiresAt < now) {
     return null;
   }
@@ -184,7 +202,7 @@ export async function verifyAndLinkOAuth(
   userId: number,
   password: string,
   provider: string,
-  providerAccountId: string
+  providerAccountId: string,
 ): Promise<boolean> {
   const user = await getUserById(userId);
   if (!user || !user.passwordHash) {
@@ -202,8 +220,9 @@ export async function verifyAndLinkOAuth(
     userId,
     accountId: providerAccountId,
     providerId: provider,
+    issuer: await issuerForProvider(provider),
     createdAt: nowIso(),
-    updatedAt: nowIso()
+    updatedAt: nowIso(),
   });
 
   return true;
@@ -216,7 +235,7 @@ export async function autoLinkOAuth(
   userId: number,
   provider: string,
   providerAccountId: string,
-  avatarUrl?: string | null
+  avatarUrl?: string | null,
 ): Promise<boolean> {
   const user = await getUserById(userId);
   if (!user) {
@@ -234,16 +253,14 @@ export async function autoLinkOAuth(
     userId,
     accountId: providerAccountId,
     providerId: provider,
+    issuer: await issuerForProvider(provider),
     createdAt: nowIso(),
-    updatedAt: nowIso()
+    updatedAt: nowIso(),
   });
 
   // Update avatar if provided
   if (avatarUrl) {
-    await db
-      .update(users)
-      .set({ avatarUrl, updatedAt: nowIso() })
-      .where(eq(users.id, userId));
+    await db.update(users).set({ avatarUrl, updatedAt: nowIso() }).where(eq(users.id, userId));
   }
 
   return true;
@@ -257,7 +274,7 @@ export async function linkOAuthAuthenticated(
   userId: number,
   provider: string,
   providerAccountId: string,
-  avatarUrl?: string | null
+  avatarUrl?: string | null,
 ): Promise<boolean> {
   const user = await getUserById(userId);
   if (!user) {
@@ -269,16 +286,14 @@ export async function linkOAuthAuthenticated(
     userId,
     accountId: providerAccountId,
     providerId: provider,
+    issuer: await issuerForProvider(provider),
     createdAt: nowIso(),
-    updatedAt: nowIso()
+    updatedAt: nowIso(),
   });
 
   // Update avatar if provided
   if (avatarUrl) {
-    await db
-      .update(users)
-      .set({ avatarUrl, updatedAt: nowIso() })
-      .where(eq(users.id, userId));
+    await db.update(users).set({ avatarUrl, updatedAt: nowIso() }).where(eq(users.id, userId));
   }
 
   return true;

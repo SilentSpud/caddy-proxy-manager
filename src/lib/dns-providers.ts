@@ -65,9 +65,21 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     docsUrl: "https://github.com/caddy-dns/route53",
     modulePath: "github.com/caddy-dns/route53",
     fields: [
-      { key: "access_key_id", label: "Access Key ID", type: "string", required: false, placeholder: "AKIA..." },
+      {
+        key: "access_key_id",
+        label: "Access Key ID",
+        type: "string",
+        required: false,
+        placeholder: "AKIA...",
+      },
       { key: "secret_access_key", label: "Secret Access Key", type: "password", required: false },
-      { key: "region", label: "AWS Region", type: "string", required: false, placeholder: "us-east-1" },
+      {
+        key: "region",
+        label: "AWS Region",
+        type: "string",
+        required: false,
+        placeholder: "us-east-1",
+      },
       {
         key: "hosted_zone_id",
         label: "Hosted Zone ID",
@@ -84,9 +96,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "DigitalOcean DNS API",
     docsUrl: "https://github.com/caddy-dns/digitalocean",
     modulePath: "github.com/caddy-dns/digitalocean",
-    fields: [
-      { key: "api_token", label: "API Token", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
   },
   {
     name: "duckdns",
@@ -94,9 +104,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Duck DNS dynamic DNS service",
     docsUrl: "https://github.com/caddy-dns/duckdns",
     modulePath: "github.com/caddy-dns/duckdns",
-    fields: [
-      { key: "api_token", label: "Token", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "Token", type: "password", required: true }],
   },
   {
     name: "hetzner",
@@ -104,9 +112,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Hetzner DNS API",
     docsUrl: "https://github.com/caddy-dns/hetzner",
     modulePath: "github.com/caddy-dns/hetzner",
-    fields: [
-      { key: "api_token", label: "API Token", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
   },
   {
     name: "vultr",
@@ -114,9 +120,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Vultr DNS API",
     docsUrl: "https://github.com/caddy-dns/vultr",
     modulePath: "github.com/caddy-dns/vultr",
-    fields: [
-      { key: "api_token", label: "API Key", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "API Key", type: "password", required: true }],
   },
   {
     name: "porkbun",
@@ -177,7 +181,13 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     docsUrl: "https://github.com/caddy-dns/ionos",
     modulePath: "github.com/caddy-dns/ionos",
     fields: [
-      { key: "auth_api_token", label: "API Token", type: "password", required: true, placeholder: "prefix.secret" },
+      {
+        key: "auth_api_token",
+        label: "API Token",
+        type: "password",
+        required: true,
+        placeholder: "prefix.secret",
+      },
     ],
   },
   {
@@ -186,9 +196,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Linode/Akamai DNS API",
     docsUrl: "https://github.com/caddy-dns/linode",
     modulePath: "github.com/caddy-dns/linode",
-    fields: [
-      { key: "api_token", label: "API Token", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
   },
   {
     name: "njalla",
@@ -196,9 +204,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Njalla DNS API",
     docsUrl: "https://github.com/caddy-dns/njalla",
     modulePath: "github.com/caddy-dns/njalla",
-    fields: [
-      { key: "api_token", label: "API Token", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
   },
   {
     name: "spaceship",
@@ -217,9 +223,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "deSEC DNS API",
     docsUrl: "https://github.com/caddy-dns/desec",
     modulePath: "github.com/caddy-dns/desec",
-    fields: [
-      { key: "token", label: "API Token", type: "password", required: true },
-    ],
+    fields: [{ key: "token", label: "API Token", type: "password", required: true }],
   },
   {
     name: "dynu",
@@ -227,9 +231,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Dynu DNS API",
     docsUrl: "https://github.com/caddy-dns/dynu",
     modulePath: "github.com/caddy-dns/dynu",
-    fields: [
-      { key: "api_token", label: "API Token", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
   },
   {
     name: "acmedns",
@@ -256,9 +258,7 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "Infomaniak DNS API",
     docsUrl: "https://github.com/caddy-dns/infomaniak",
     modulePath: "github.com/caddy-dns/infomaniak",
-    fields: [
-      { key: "api_token", label: "API Token", type: "password", required: true },
-    ],
+    fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
   },
 ];
 
@@ -274,7 +274,7 @@ export function getProviderDefinition(name: string): DnsProviderDefinition | und
  */
 export function encryptProviderCredentials(
   providerName: string,
-  credentials: Record<string, string>
+  credentials: Record<string, string>,
 ): Record<string, string> {
   const def = getProviderDefinition(providerName);
   if (!def) return credentials;
@@ -293,7 +293,7 @@ export function encryptProviderCredentials(
  */
 export function decryptProviderCredentials(
   providerName: string,
-  credentials: Record<string, string>
+  credentials: Record<string, string>,
 ): Record<string, string> {
   const def = getProviderDefinition(providerName);
   if (!def) return credentials;
@@ -314,7 +314,7 @@ export function decryptProviderCredentials(
 export function buildDnsChallengeConfig(
   providerName: string,
   credentials: Record<string, string>,
-  dnsResolvers: string[]
+  dnsResolvers: string[],
 ): Record<string, unknown> | null {
   const def = getProviderDefinition(providerName);
   if (!def) return null;

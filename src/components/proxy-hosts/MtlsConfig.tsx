@@ -44,7 +44,7 @@ export function MtlsFields({
 }: Props) {
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [selectedCertIds, setSelectedCertIds] = useState<number[]>(
-    value?.trusted_client_cert_ids ?? []
+    value?.trusted_client_cert_ids ?? [],
   );
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>(value?.trusted_role_ids ?? []);
   const [protectedPaths, setProtectedPaths] = useState(value?.protected_paths?.join(", ") ?? "");
@@ -61,7 +61,7 @@ export function MtlsFields({
   // never resurface as selectable here.
   const knownCaIds = new Set(caCertificates.map((c) => c.id));
   const activeCerts = issuedClientCerts.filter(
-    (c) => !c.revokedAt && knownCaIds.has(c.caCertificateId)
+    (c) => !c.revokedAt && knownCaIds.has(c.caCertificateId),
   );
 
   const certsByCA = new Map<number, IssuedClientCertificate[]>();
@@ -93,16 +93,15 @@ export function MtlsFields({
     const caIds = (certsByCA.get(caId) ?? []).map((c) => c.id);
     const allSelected = caIds.every((id) => selectedCertIds.includes(id));
     setSelectedCertIds((prev) =>
-      allSelected ? prev.filter((id) => !caIds.includes(id)) : [...new Set([...prev, ...caIds])]
+      allSelected ? prev.filter((id) => !caIds.includes(id)) : [...new Set([...prev, ...caIds])],
     );
   }
 
   async function deleteRule(ruleId: number) {
     try {
-      const res = await fetch(
-        `/api/v1/proxy-hosts/${proxyHostId}/mtls-access-rules/${ruleId}`,
-        { method: "DELETE" }
-      );
+      const res = await fetch(`/api/v1/proxy-hosts/${proxyHostId}/mtls-access-rules/${ruleId}`, {
+        method: "DELETE",
+      });
       if (res.ok) setRules((prev) => prev.filter((r) => r.id !== ruleId));
     } catch {
       /* silent */
@@ -207,7 +206,7 @@ export function MtlsFields({
                     const allSelected = certs.every((c) => selectedCertIds.includes(c.id));
                     const someSelected = certs.some((c) => selectedCertIds.includes(c.id));
                     const selectedCount = certs.filter((c) =>
-                      selectedCertIds.includes(c.id)
+                      selectedCertIds.includes(c.id),
                     ).length;
 
                     return (
@@ -315,10 +314,7 @@ export function MtlsFields({
                               {rule.allowedRoleIds.map((roleId) => {
                                 const role = mtlsRoles.find((r) => r.id === roleId);
                                 return (
-                                  <Badge
-                                    key={`r-${roleId}`}
-                                    label={role?.name ?? `#${roleId}`}
-                                  />
+                                  <Badge key={`r-${roleId}`} label={role?.name ?? `#${roleId}`} />
                                 );
                               })}
                               {rule.allowedCertIds.map((certId) => {
@@ -489,18 +485,9 @@ function RuleDialog({
           />
         </HStack>
 
-        <TextInput
-          label="Description"
-          isOptional
-          value={description}
-          onChange={setDescription}
-        />
+        <TextInput label="Description" isOptional value={description} onChange={setDescription} />
 
-        <Switch
-          label="Deny all access to this path"
-          value={denyAll}
-          onChange={setDenyAll}
-        />
+        <Switch label="Deny all access to this path" value={denyAll} onChange={setDenyAll} />
 
         {/* Unmounted rather than dimmed to 30% opacity, so these are not
             reachable while the rule denies everything. */}
@@ -539,11 +526,7 @@ function RuleDialog({
                 onChange={(values) => setSelectedCertIds(values.map(Number))}
               >
                 {activeCerts.map((cert) => (
-                  <CheckboxListItem
-                    key={cert.id}
-                    value={String(cert.id)}
-                    label={cert.commonName}
-                  />
+                  <CheckboxListItem key={cert.id} value={String(cert.id)} label={cert.commonName} />
                 ))}
               </CheckboxList>
             )}

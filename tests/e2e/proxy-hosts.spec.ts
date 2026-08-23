@@ -31,7 +31,9 @@ test.describe('Proxy Hosts', () => {
 
     // Dialog should close and host appear in table
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('E2E Test Host')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('table').getByText('E2E Test Host')).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('clicking Name / Domain header sorts the table', async ({ page }) => {
@@ -73,12 +75,19 @@ test.describe('Proxy Hosts', () => {
     await page.getByRole('button', { name: /^create$/i }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Advanced Options Test')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('table').getByText('Advanced Options Test')).toBeVisible({
+      timeout: 10000,
+    });
 
     try {
       // Find the created host in the API to verify initial state
       const listResp = await page.request.get(API_PROXY_HOSTS);
-      const hosts = await listResp.json() as Array<{ id: number; name: string; hstsSubdomains: boolean; skipHttpsHostnameValidation: boolean }>;
+      const hosts = (await listResp.json()) as Array<{
+        id: number;
+        name: string;
+        hstsSubdomains: boolean;
+        skipHttpsHostnameValidation: boolean;
+      }>;
       const created = hosts.find((h) => h.name === 'Advanced Options Test');
       expect(created).toBeDefined();
       expect(created!.hstsSubdomains).toBe(true);
@@ -93,8 +102,12 @@ test.describe('Proxy Hosts', () => {
       // Locate Advanced Options toggles via their hidden _present inputs, which
       // uniquely identify each row and avoid ambiguity with ancestor divs.
       const dialog = page.getByRole('dialog');
-      const hstsSwitch = dialog.locator('div:has(> input[name="hstsSubdomainsPresent"])').getByRole('switch');
-      const skipSwitch = dialog.locator('div:has(> input[name="skipHttpsHostnameValidationPresent"])').getByRole('switch');
+      const hstsSwitch = dialog
+        .locator('div:has(> input[name="hstsSubdomainsPresent"])')
+        .getByRole('switch');
+      const skipSwitch = dialog
+        .locator('div:has(> input[name="skipHttpsHostnameValidationPresent"])')
+        .getByRole('switch');
 
       // Verify initial state matches what was saved
       await expect(hstsSwitch).toHaveAttribute('data-state', 'checked');
@@ -113,7 +126,10 @@ test.describe('Proxy Hosts', () => {
 
       // Verify via API that the settings were actually persisted
       const afterResp = await page.request.get(`${API_PROXY_HOSTS}/${created!.id}`);
-      const after = await afterResp.json() as { hstsSubdomains: boolean; skipHttpsHostnameValidation: boolean };
+      const after = (await afterResp.json()) as {
+        hstsSubdomains: boolean;
+        skipHttpsHostnameValidation: boolean;
+      };
       expect(after.hstsSubdomains).toBe(false);
       expect(after.skipHttpsHostnameValidation).toBe(true);
 
@@ -123,17 +139,24 @@ test.describe('Proxy Hosts', () => {
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const dialog2 = page.getByRole('dialog');
-      const hstsSwitch2 = dialog2.locator('div:has(> input[name="hstsSubdomainsPresent"])').getByRole('switch');
-      const skipSwitch2 = dialog2.locator('div:has(> input[name="skipHttpsHostnameValidationPresent"])').getByRole('switch');
+      const hstsSwitch2 = dialog2
+        .locator('div:has(> input[name="hstsSubdomainsPresent"])')
+        .getByRole('switch');
+      const skipSwitch2 = dialog2
+        .locator('div:has(> input[name="skipHttpsHostnameValidationPresent"])')
+        .getByRole('switch');
 
       await expect(hstsSwitch2).toHaveAttribute('data-state', 'unchecked');
       await expect(skipSwitch2).toHaveAttribute('data-state', 'checked');
 
-      await dialog2.getByRole('button', { name: /cancel|close/i }).first().click();
+      await dialog2
+        .getByRole('button', { name: /cancel|close/i })
+        .first()
+        .click();
     } finally {
       // Cleanup: delete the test host
       const listResp2 = await page.request.get(API_PROXY_HOSTS);
-      const hosts2 = await listResp2.json() as Array<{ id: number; name: string }>;
+      const hosts2 = (await listResp2.json()) as Array<{ id: number; name: string }>;
       const toDelete = hosts2.find((h) => h.name === 'Advanced Options Test');
       if (toDelete) {
         await page.request.delete(`${API_PROXY_HOSTS}/${toDelete.id}`);
@@ -147,7 +170,9 @@ test.describe('Proxy Hosts', () => {
    * location_rules) because they were not included in existingMeta when
    * updateProxyHost was called with only { enabled }.
    */
-  test('toggling enabled/disabled preserves redirects and rewrite config (#120)', async ({ page }) => {
+  test('toggling enabled/disabled preserves redirects and rewrite config (#120)', async ({
+    page,
+  }) => {
     const origin = new URL(page.url()).origin;
 
     // Create a host with redirect rules and a rewrite config via the REST API
@@ -162,13 +187,19 @@ test.describe('Proxy Hosts', () => {
       },
     });
     expect(createResp.ok()).toBeTruthy();
-    const created = await createResp.json() as { id: number; redirects: unknown[]; rewrite: unknown };
+    const created = (await createResp.json()) as {
+      id: number;
+      redirects: unknown[];
+      rewrite: unknown;
+    };
     expect(created.redirects).toHaveLength(1);
     expect(created.rewrite).toBeDefined();
 
     try {
       await page.reload();
-      await expect(page.getByRole('table').getByText('Toggle Persistence Test')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('table').getByText('Toggle Persistence Test')).toBeVisible({
+        timeout: 10000,
+      });
 
       // Click the Switch in the row to disable the host
       const row = page.locator('tr', { hasText: 'Toggle Persistence Test' });
@@ -178,8 +209,12 @@ test.describe('Proxy Hosts', () => {
       await expect(rowSwitch).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
 
       // Verify redirects and rewrite survive the disable toggle
-      const afterDisable = await (await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)).json() as {
-        redirects: unknown[]; rewrite: unknown; enabled: boolean
+      const afterDisable = (await (
+        await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)
+      ).json()) as {
+        redirects: unknown[];
+        rewrite: unknown;
+        enabled: boolean;
       };
       expect(afterDisable.enabled).toBe(false);
       expect(afterDisable.redirects).toHaveLength(1);
@@ -190,18 +225,26 @@ test.describe('Proxy Hosts', () => {
       await expect(rowSwitch).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
 
       // Verify redirects and rewrite survive the re-enable toggle
-      const afterEnable = await (await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)).json() as {
-        redirects: unknown[]; rewrite: unknown; enabled: boolean
+      const afterEnable = (await (
+        await page.request.get(`${API_PROXY_HOSTS}/${created.id}`)
+      ).json()) as {
+        redirects: unknown[];
+        rewrite: unknown;
+        enabled: boolean;
       };
       expect(afterEnable.enabled).toBe(true);
       expect(afterEnable.redirects).toHaveLength(1);
       expect(afterEnable.rewrite).toBeDefined();
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, { headers: { Origin: origin } });
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, {
+        headers: { Origin: origin },
+      });
     }
   });
 
-  test('create host Authentik fields are prefilled from global defaults (#141)', async ({ page }) => {
+  test('create host Authentik fields are prefilled from global defaults (#141)', async ({
+    page,
+  }) => {
     const origin = new URL(page.url()).origin;
     const defaultSettings = {
       outpostDomain: 'auth.example.test',
@@ -211,7 +254,7 @@ test.describe('Proxy Hosts', () => {
 
     const originalSettingsResp = await page.request.get(API_AUTHENTIK_SETTINGS);
     expect(originalSettingsResp.ok()).toBeTruthy();
-    const originalSettings = await originalSettingsResp.json() as Partial<typeof defaultSettings>;
+    const originalSettings = (await originalSettingsResp.json()) as Partial<typeof defaultSettings>;
 
     try {
       await page.goto('/settings');
@@ -224,7 +267,9 @@ test.describe('Proxy Hosts', () => {
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);
       await page.locator('input[name="authEndpoint"]').fill(defaultSettings.authEndpoint);
       await page.getByRole('button', { name: /save authentik defaults/i }).click();
-      await expect(page.getByText(/authentik defaults saved successfully/i)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText(/authentik defaults saved successfully/i)).toBeVisible({
+        timeout: 10000,
+      });
 
       await page.goto('/proxy-hosts');
       await page.getByRole('button', { name: /create host/i }).click();
@@ -238,9 +283,15 @@ test.describe('Proxy Hosts', () => {
       await authentikSwitch.click();
       await expect(authentikSwitch).toHaveAttribute('data-state', 'checked');
 
-      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(defaultSettings.outpostDomain);
-      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(defaultSettings.outpostUpstream);
-      await expect(dialog.locator('input[name="authentikAuthEndpoint"]')).toHaveValue(defaultSettings.authEndpoint);
+      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(
+        defaultSettings.outpostDomain,
+      );
+      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(
+        defaultSettings.outpostUpstream,
+      );
+      await expect(dialog.locator('input[name="authentikAuthEndpoint"]')).toHaveValue(
+        defaultSettings.authEndpoint,
+      );
     } finally {
       if (originalSettings.outpostDomain && originalSettings.outpostUpstream) {
         const restoreResp = await page.request.put(API_AUTHENTIK_SETTINGS, {
@@ -271,7 +322,9 @@ test.describe('Proxy Hosts', () => {
       authEndpoint: '/outpost.goauthentik.io/auth/caddy',
     };
 
-    const originalSettings = await (await page.request.get(API_AUTHENTIK_SETTINGS)).json() as Partial<typeof defaultSettings>;
+    const originalSettings = (await (
+      await page.request.get(API_AUTHENTIK_SETTINGS)
+    ).json()) as Partial<typeof defaultSettings>;
 
     // A pre-existing host with no Authentik config of its own.
     const createResp = await page.request.post(API_PROXY_HOSTS, {
@@ -283,7 +336,7 @@ test.describe('Proxy Hosts', () => {
       },
     });
     expect(createResp.ok()).toBeTruthy();
-    const created = await createResp.json() as { id: number };
+    const created = (await createResp.json()) as { id: number };
 
     try {
       const saveResp = await page.request.put(API_AUTHENTIK_SETTINGS, {
@@ -307,11 +360,19 @@ test.describe('Proxy Hosts', () => {
       await authentikSwitch.click();
       await expect(authentikSwitch).toHaveAttribute('data-state', 'checked');
 
-      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(defaultSettings.outpostDomain);
-      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(defaultSettings.outpostUpstream);
-      await expect(dialog.locator('input[name="authentikAuthEndpoint"]')).toHaveValue(defaultSettings.authEndpoint);
+      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(
+        defaultSettings.outpostDomain,
+      );
+      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(
+        defaultSettings.outpostUpstream,
+      );
+      await expect(dialog.locator('input[name="authentikAuthEndpoint"]')).toHaveValue(
+        defaultSettings.authEndpoint,
+      );
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, { headers: { Origin: origin } });
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, {
+        headers: { Origin: origin },
+      });
       if (originalSettings.outpostDomain && originalSettings.outpostUpstream) {
         await page.request.put(API_AUTHENTIK_SETTINGS, {
           headers: { Origin: origin },
@@ -330,7 +391,9 @@ test.describe('Proxy Hosts', () => {
    * Authentik config must keep it when the edit dialog opens, never be
    * overwritten by the global defaults.
    */
-  test('edit host keeps its own Authentik values instead of global defaults (#232)', async ({ page }) => {
+  test('edit host keeps its own Authentik values instead of global defaults (#232)', async ({
+    page,
+  }) => {
     const origin = new URL(page.url()).origin;
     const hostSettings = {
       outpostDomain: 'host-specific.example.test',
@@ -342,7 +405,9 @@ test.describe('Proxy Hosts', () => {
       authEndpoint: '/outpost.goauthentik.io/auth/caddy',
     };
 
-    const originalSettings = await (await page.request.get(API_AUTHENTIK_SETTINGS)).json() as Partial<typeof globalDefaults>;
+    const originalSettings = (await (
+      await page.request.get(API_AUTHENTIK_SETTINGS)
+    ).json()) as Partial<typeof globalDefaults>;
 
     const createResp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
@@ -358,7 +423,7 @@ test.describe('Proxy Hosts', () => {
       },
     });
     expect(createResp.ok()).toBeTruthy();
-    const created = await createResp.json() as {
+    const created = (await createResp.json()) as {
       id: number;
       authentik: { outpostDomain: string | null; outpostUpstream: string | null } | null;
     };
@@ -384,10 +449,16 @@ test.describe('Proxy Hosts', () => {
       await expect(dialog).toBeVisible();
 
       // Already enabled, so the fields are visible without touching the switch.
-      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(hostSettings.outpostDomain);
-      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(hostSettings.outpostUpstream);
+      await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(
+        hostSettings.outpostDomain,
+      );
+      await expect(dialog.locator('input[name="authentikOutpostUpstream"]')).toHaveValue(
+        hostSettings.outpostUpstream,
+      );
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, { headers: { Origin: origin } });
+      await page.request.delete(`${API_PROXY_HOSTS}/${created.id}`, {
+        headers: { Origin: origin },
+      });
       if (originalSettings.outpostDomain && originalSettings.outpostUpstream) {
         await page.request.put(API_AUTHENTIK_SETTINGS, {
           headers: { Origin: origin },
@@ -430,11 +501,17 @@ test.describe('Proxy Hosts', () => {
 
     await dialog.getByRole('button', { name: /^create$/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Geoblock Override Host')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('table').getByText('Geoblock Override Host')).toBeVisible({
+      timeout: 10000,
+    });
 
     // Verify the API reflects the override mode (this is what was broken).
     const listResp = await page.request.get(API_PROXY_HOSTS);
-    const hosts = (await listResp.json()) as Array<{ id: number; name: string; geoblockMode: string }>;
+    const hosts = (await listResp.json()) as Array<{
+      id: number;
+      name: string;
+      geoblockMode: string;
+    }>;
     const created = hosts.find((h) => h.name === 'Geoblock Override Host');
     expect(created).toBeDefined();
     expect(created!.geoblockMode).toBe('override');
@@ -445,13 +522,20 @@ test.describe('Proxy Hosts', () => {
     await page.getByRole('menuitem', { name: /edit/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    const editGeoCard = page.getByRole('dialog').locator('div:has(> input[name="geoblockPresent"])');
+    const editGeoCard = page
+      .getByRole('dialog')
+      .locator('div:has(> input[name="geoblockPresent"])');
     // Selected mode tile carries the highlighted "border-yellow-500" class.
-    await expect(editGeoCard.locator('div.border-yellow-500', { hasText: 'Override global' })).toBeVisible();
+    await expect(
+      editGeoCard.locator('div.border-yellow-500', { hasText: 'Override global' }),
+    ).toBeVisible();
 
     // Switch back to merge and verify that round-trips too.
     await editGeoCard.getByText('Merge with global').click();
-    await page.getByRole('dialog').getByRole('button', { name: /save changes/i }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /save changes/i })
+      .click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
 
     const listResp2 = await page.request.get(API_PROXY_HOSTS);
@@ -471,7 +555,9 @@ test.describe('Proxy Hosts', () => {
     await page.getByRole('button', { name: /^create$/i }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Host To Delete')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('table').getByText('Host To Delete')).toBeVisible({
+      timeout: 10000,
+    });
 
     // Open the dropdown menu for that row and click Delete
     const row = page.locator('tr', { hasText: 'Host To Delete' });
@@ -484,7 +570,9 @@ test.describe('Proxy Hosts', () => {
 
     // Wait for dialog to close, then verify the row is gone from the table
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.locator('tbody').getByText('Host To Delete')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.locator('tbody').getByText('Host To Delete')).not.toBeVisible({
+      timeout: 5000,
+    });
   });
 
   /**
@@ -492,7 +580,9 @@ test.describe('Proxy Hosts', () => {
    * forward auth enabled. This badge was previously missing even though the
    * feature was fully supported by the data model and edit dialog.
    */
-  test('Forward Auth feature badge shows for hosts with CPM forward auth enabled', async ({ page }) => {
+  test('Forward Auth feature badge shows for hosts with CPM forward auth enabled', async ({
+    page,
+  }) => {
     const origin = new URL(page.url()).origin;
 
     // Host WITH forward auth enabled. Note: names deliberately avoid the
@@ -508,7 +598,10 @@ test.describe('Proxy Hosts', () => {
       },
     });
     expect(withResp.ok()).toBeTruthy();
-    const withHost = await withResp.json() as { id: number; cpmForwardAuth: { enabled: boolean } | null };
+    const withHost = (await withResp.json()) as {
+      id: number;
+      cpmForwardAuth: { enabled: boolean } | null;
+    };
     expect(withHost.cpmForwardAuth?.enabled).toBe(true);
 
     // Host WITHOUT forward auth — used to confirm the badge is conditional
@@ -521,21 +614,77 @@ test.describe('Proxy Hosts', () => {
       },
     });
     expect(withoutResp.ok()).toBeTruthy();
-    const withoutHost = await withoutResp.json() as { id: number };
+    const withoutHost = (await withoutResp.json()) as { id: number };
 
     try {
       await page.reload();
 
       const enabledRow = page.locator('tr', { hasText: 'FwdAuth Badge Host' });
-      await expect(enabledRow.getByText('Forward Auth', { exact: true })).toBeVisible({ timeout: 10000 });
+      await expect(enabledRow.getByText('Forward Auth', { exact: true })).toBeVisible({
+        timeout: 10000,
+      });
 
       // The host without forward auth must NOT render the badge.
       const disabledRow = page.locator('tr', { hasText: 'Plain Proxy Host' });
       await expect(disabledRow).toBeVisible({ timeout: 10000 });
       await expect(disabledRow.getByText('Forward Auth', { exact: true })).toHaveCount(0);
     } finally {
-      await page.request.delete(`${API_PROXY_HOSTS}/${withHost.id}`, { headers: { Origin: origin } });
-      await page.request.delete(`${API_PROXY_HOSTS}/${withoutHost.id}`, { headers: { Origin: origin } });
+      await page.request.delete(`${API_PROXY_HOSTS}/${withHost.id}`, {
+        headers: { Origin: origin },
+      });
+      await page.request.delete(`${API_PROXY_HOSTS}/${withoutHost.id}`, {
+        headers: { Origin: origin },
+      });
     }
+  });
+
+  /**
+   * Regression test for the index-key row-identity bug.
+   *
+   * The add/remove field-array editors keyed their rows on the array index, so
+   * removing a row made React reconcile every later row onto its predecessor's
+   * DOM node — the deleted row's inputs stayed mounted and the *last* row's
+   * inputs were the ones torn down. Any state the input owned but had not yet
+   * pushed into React (an in-flight edit, the caret, an IME composition)
+   * therefore surfaced in a different row than the one it was typed into.
+   *
+   * Values alone cannot catch this: the inputs are controlled, so React repaints
+   * the correct text either way. The test stamps each input's DOM node with a
+   * JS expando React never touches, then checks which nodes survive the delete.
+   */
+  test('removing an upstream keeps every other row on its own DOM node', async ({ page }) => {
+    await page.getByRole('button', { name: /create host/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    const addresses = page.getByPlaceholder('10.0.0.5:8080');
+    await page.getByRole('button', { name: /add upstream/i }).click();
+    await page.getByRole('button', { name: /add upstream/i }).click();
+    await expect(addresses).toHaveCount(3);
+
+    await addresses.nth(0).fill('first:1111');
+    await addresses.nth(1).fill('second:2222');
+    await addresses.nth(2).fill('third:3333');
+
+    // Tag the live DOM nodes. An expando survives re-render untouched, so a tag
+    // that moves to a different row means React reused that row's element.
+    await addresses.evaluateAll((nodes) => {
+      nodes.forEach((node, i) => {
+        (node as HTMLElement & { __rowProbe?: string }).__rowProbe = `probe-${i}`;
+      });
+    });
+
+    await page.getByRole('button', { name: 'Remove upstream 1' }).click();
+    await expect(addresses).toHaveCount(2);
+
+    await expect(addresses.nth(0)).toHaveValue('second:2222');
+    await expect(addresses.nth(1)).toHaveValue('third:3333');
+
+    // The surviving rows must still be the elements they were typed into. With
+    // index keys these read ['probe-0', 'probe-1'] — rows 2 and 3 rendered into
+    // the nodes that belonged to rows 1 and 2.
+    const probes = await addresses.evaluateAll((nodes) =>
+      nodes.map((node) => (node as HTMLElement & { __rowProbe?: string }).__rowProbe ?? null),
+    );
+    expect(probes).toEqual(['probe-1', 'probe-2']);
   });
 });

@@ -14,11 +14,7 @@ import { execFileSync } from 'node:child_process';
 const BASE = 'http://localhost:3000';
 const API_BASE = `${BASE}/api/v1`;
 
-const COMPOSE_ARGS = [
-  'compose',
-  '-f', 'docker-compose.yml',
-  '-f', 'tests/docker-compose.test.yml',
-];
+const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 const TEST_USERNAME = 'disabletest';
 const TEST_EMAIL = `${TEST_USERNAME}@localhost`;
@@ -49,7 +45,7 @@ function ensureTestUser() {
       if (acc) {
         db.run("UPDATE accounts SET password = ?, updatedAt = ? WHERE id = ?", [hash, now, acc.id]);
       } else {
-        db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+        db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
           [existing.id, String(existing.id), hash, now, now]);
       }
     } else {
@@ -58,7 +54,7 @@ function ensureTestUser() {
         [email, "${TEST_USERNAME}", hash, "${TEST_USERNAME}", "${TEST_USERNAME}", now, now]
       );
       const user = db.query("SELECT id FROM users WHERE email = ?").get(email);
-      db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+      db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
         [user.id, String(user.id), hash, now, now]);
     }
   `;
@@ -98,7 +94,7 @@ function createApiToken(): string {
 async function loginAs(
   browser: import('@playwright/test').Browser,
   username: string,
-  password: string
+  password: string,
 ): Promise<BrowserContext> {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -125,14 +121,18 @@ test.describe('Disabled user enforcement', () => {
         break;
       } catch (e) {
         if (i === 2) throw e;
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 2000));
       }
     }
   });
 
   test.afterAll(async () => {
     // Re-enable user so it doesn't affect other tests
-    try { setUserStatus('active'); } catch { /* best effort */ }
+    try {
+      setUserStatus('active');
+    } catch {
+      /* best effort */
+    }
   });
 
   test('disabled user UI session is rejected', async ({ browser }) => {
@@ -172,8 +172,10 @@ test.describe('Disabled user enforcement', () => {
     // Should stay on login page or show an error
     await expect(async () => {
       const url = page.url();
-      const hasError = await page.getByText(/invalid|disabled|error|failed|incorrect/i)
-        .isVisible({ timeout: 1_000 }).catch(() => false);
+      const hasError = await page
+        .getByText(/invalid|disabled|error|failed|incorrect/i)
+        .isVisible({ timeout: 1_000 })
+        .catch(() => false);
       expect(url.includes('/login') || hasError).toBe(true);
     }).toPass({ timeout: 15_000 });
 
@@ -187,7 +189,7 @@ test.describe('Disabled user enforcement', () => {
     // Token should work while active
     const res1 = await request.get(`${API_BASE}/tokens`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -199,7 +201,7 @@ test.describe('Disabled user enforcement', () => {
     // Token should now be rejected
     const res2 = await request.get(`${API_BASE}/tokens`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -216,7 +218,7 @@ test.describe('Disabled user enforcement', () => {
     setUserStatus('disabled');
     const res1 = await request.get(`${API_BASE}/tokens`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -226,7 +228,7 @@ test.describe('Disabled user enforcement', () => {
     setUserStatus('active');
     const res2 = await request.get(`${API_BASE}/tokens`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });

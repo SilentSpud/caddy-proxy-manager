@@ -9,16 +9,19 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { PathBlockRule, PathBlockStatusCode } from "@/lib/models/proxy-hosts";
+import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 
 // Mirrors PATH_BLOCK_STATUS_CODES in src/lib/models/proxy-hosts.ts. Kept inline so this
 // client component does not pull the server-only model module into the bundle.
-const STATUS_CODES: readonly PathBlockStatusCode[] = [400, 401, 403, 404, 410, 418, 451, 500, 502, 503];
+const STATUS_CODES: readonly PathBlockStatusCode[] = [
+  400, 401, 403, 404, 410, 418, 451, 500, 502, 503,
+];
 const STATUS_OPTIONS = STATUS_CODES.map((s) => ({ value: String(s), label: String(s) }));
 
 type RuleState = { path: string; status: PathBlockStatusCode; body: string };
 
-function toState(rules: PathBlockRule[]): RuleState[] {
-  return rules.map((r) => ({ path: r.path, status: r.status, body: r.body ?? "" }));
+function toState(rules: PathBlockRule[]): WithRowId<RuleState>[] {
+  return withRowIds(rules.map((r) => ({ path: r.path, status: r.status, body: r.body ?? "" })));
 }
 
 function toJson(rules: RuleState[]): string {
@@ -29,19 +32,23 @@ function toJson(rules: RuleState[]): string {
         const out: PathBlockRule = { path: r.path.trim(), status: r.status };
         if (r.body.trim()) out.body = r.body;
         return out;
-      })
+      }),
   );
 }
 
 type Props = { initialData?: PathBlockRule[] };
 
 export function PathBlocksFields({ initialData = [] }: Props) {
-  const [rules, setRules] = useState<RuleState[]>(toState(initialData));
+  const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
-  const addRule = () => setRules((r) => [...r, { path: "", status: 403, body: "Forbidden" }]);
-  const removeRule = (i: number) => setRules((r) => r.filter((_, idx) => idx !== i));
-  const updateRule = (i: number, key: keyof RuleState, value: string | number) =>
-    setRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, [key]: value } : rule)));
+  const addRule = () =>
+    setRules((r) => [
+      ...r,
+      withRowId({ path: "", status: 403 as PathBlockStatusCode, body: "Forbidden" }),
+    ]);
+  const removeRule = (rowId: string) => setRules((r) => r.filter((rule) => rule.rowId !== rowId));
+  const updateRule = (rowId: string, key: keyof RuleState, value: string | number) =>
+    setRules((r) => r.map((rule) => (rule.rowId === rowId ? { ...rule, [key]: value } : rule)));
 
   return (
     <VStack gap={2}>
@@ -53,14 +60,14 @@ export function PathBlocksFields({ initialData = [] }: Props) {
       {rules.length > 0 && (
         <VStack gap={2}>
           {rules.map((rule, i) => (
-            <HStack key={i} gap={2} vAlign="end">
+            <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
                 label="Path"
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/dns-query"
                 value={rule.path}
-                onChange={(next) => updateRule(i, "path", next)}
+                onChange={(next) => updateRule(rule.rowId, "path", next)}
               />
               <Selector
                 label="Status"
@@ -69,7 +76,7 @@ export function PathBlocksFields({ initialData = [] }: Props) {
                 width={120}
                 options={STATUS_OPTIONS}
                 value={String(rule.status)}
-                onChange={(next) => updateRule(i, "status", Number(next))}
+                onChange={(next) => updateRule(rule.rowId, "status", Number(next))}
               />
               <TextInput
                 label="Body"
@@ -78,14 +85,14 @@ export function PathBlocksFields({ initialData = [] }: Props) {
                 size="sm"
                 placeholder="Forbidden"
                 value={rule.body}
-                onChange={(next) => updateRule(i, "body", next)}
+                onChange={(next) => updateRule(rule.rowId, "body", next)}
               />
               <IconButton
                 variant="ghost"
                 size="sm"
                 label={`Remove path block ${i + 1}`}
                 icon={<Trash2 />}
-                onClick={() => removeRule(i)}
+                onClick={() => removeRule(rule.rowId)}
               />
             </HStack>
           ))}
@@ -93,12 +100,18 @@ export function PathBlocksFields({ initialData = [] }: Props) {
       )}
 
       <HStack>
-        <Button variant="ghost" size="sm" label="Add Path Block" icon={<Plus />} onClick={addRule} />
+        <Button
+          variant="ghost"
+          size="sm"
+          label="Add Path Block"
+          icon={<Plus />}
+          onClick={addRule}
+        />
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">
-        Return a static response (no proxying) for matching paths. Supports Caddy path patterns
-        like /dns-query or /admin/*.
+        Return a static response (no proxying) for matching paths. Supports Caddy path patterns like
+        /dns-query or /admin/*.
       </Text>
     </VStack>
   );

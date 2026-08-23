@@ -12,7 +12,9 @@ const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const API_DNS_PROVIDER = 'http://localhost:3000/api/v1/settings/dns-provider';
 
 test.describe('Wildcard host DNS-provider guard', () => {
-  test('rejects auto-managed wildcard without a DNS provider, allows it once configured', async ({ page }) => {
+  test('rejects auto-managed wildcard without a DNS provider, allows it once configured', async ({
+    page,
+  }) => {
     await page.goto('/proxy-hosts');
     const origin = new URL(page.url()).origin;
     const headers = { Origin: origin };
@@ -33,7 +35,11 @@ test.describe('Wildcard host DNS-provider guard', () => {
 
       const rejected = await page.request.post(API_PROXY_HOSTS, {
         headers,
-        data: { name: 'Wildcard Guard', domains: ['*.e2e-wildcard.test'], upstreams: ['localhost:9999'] },
+        data: {
+          name: 'Wildcard Guard',
+          domains: ['*.e2e-wildcard.test'],
+          upstreams: ['localhost:9999'],
+        },
       });
       expect(rejected.ok()).toBeFalsy();
       expect((await rejected.json()).error).toMatch(/DNS provider/i);
@@ -41,7 +47,11 @@ test.describe('Wildcard host DNS-provider guard', () => {
       // Control: an exact-domain host is unaffected by the guard.
       const okExact = await page.request.post(API_PROXY_HOSTS, {
         headers,
-        data: { name: 'Exact Guard', domains: ['exact.e2e-wildcard.test'], upstreams: ['localhost:9999'] },
+        data: {
+          name: 'Exact Guard',
+          domains: ['exact.e2e-wildcard.test'],
+          upstreams: ['localhost:9999'],
+        },
       });
       expect(okExact.ok()).toBeTruthy();
       createdIds.push((await okExact.json()).id);
@@ -55,7 +65,11 @@ test.describe('Wildcard host DNS-provider guard', () => {
 
       const allowed = await page.request.post(API_PROXY_HOSTS, {
         headers,
-        data: { name: 'Wildcard Allowed', domains: ['*.e2e-wildcard.test'], upstreams: ['localhost:9999'] },
+        data: {
+          name: 'Wildcard Allowed',
+          domains: ['*.e2e-wildcard.test'],
+          upstreams: ['localhost:9999'],
+        },
       });
       expect(allowed.ok()).toBeTruthy();
       createdIds.push((await allowed.json()).id);
@@ -65,7 +79,8 @@ test.describe('Wildcard host DNS-provider guard', () => {
       }
       await page.request.put(API_DNS_PROVIDER, {
         headers,
-        data: original && Object.keys(original).length ? original : { providers: {}, default: null },
+        data:
+          original && Object.keys(original).length ? original : { providers: {}, default: null },
       });
     }
   });

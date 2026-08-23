@@ -75,71 +75,72 @@ async function waitForL4Terminal(
   throw new Error(`l4-port-manager did not reach a terminal state within ${timeoutMs}ms`);
 }
 
-test.describe.serial('L4 Port Manager Sidecar', () => {
-  test('apply ports reaches "applied" state', async ({ page }) => {
-    // waitForL4Terminal polls for up to 90 s; the global 60 s timeout would
-    // fire first without this override.
-    test.setTimeout(180_000);
+test.describe
+  .serial('L4 Port Manager Sidecar', () => {
+    test('apply ports reaches "applied" state', async ({ page }) => {
+      // waitForL4Terminal polls for up to 90 s; the global 60 s timeout would
+      // fire first without this override.
+      test.setTimeout(180_000);
 
-    // Trigger a fresh apply via the API (writes a new trigger file with a new
-    // timestamp, so the sidecar will process it even if ports haven't changed).
-    const res = await page.request.post('/api/l4-ports', { headers: SESSION_HEADERS });
-    expect(res.ok(), `POST /api/l4-ports failed: ${await res.text()}`).toBe(true);
+      // Trigger a fresh apply via the API (writes a new trigger file with a new
+      // timestamp, so the sidecar will process it even if ports haven't changed).
+      const res = await page.request.post('/api/l4-ports', { headers: SESSION_HEADERS });
+      expect(res.ok(), `POST /api/l4-ports failed: ${await res.text()}`).toBe(true);
 
-    const state = await waitForL4Terminal(page, 90_000);
-    expect(
-      state,
-      'Expected "applied" but got "failed". Run: docker logs caddy-proxy-manager-l4-ports',
-    ).toBe('applied');
-  });
-
-  test('TCP traffic works after explicit apply', async () => {
-    await waitForTcpRoute('127.0.0.1', TCP_PORT, 30_000);
-    const res = await tcpSend('127.0.0.1', TCP_PORT, 'sidecar-apply-check\n');
-    expect(res.connected).toBe(true);
-    expect(res.data).toContain('sidecar-apply-check');
-  });
-
-  test('auto-applies on sidecar container restart — regression #117', async ({ page }) => {
-    // Container restart + do_apply + caddy health-check can take ~60 s total;
-    // waitForL4Terminal polls for up to 90 s.  Override to avoid the 60 s global cap.
-    test.setTimeout(180_000);
-
-    // Record the current appliedAt so we can detect when a *new* apply finishes.
-    // The sidecar uses second-level timestamp precision, so sleep 1.5 s first to
-    // guarantee the new timestamp will be strictly greater.
-    const { status: before } = await fetchL4Status(page);
-    const prevAppliedAt = before?.appliedAt ?? '';
-    await page.waitForTimeout(1_500);
-
-    // Restart the sidecar container.  On startup it finds the override file and
-    // calls `docker compose up --force-recreate caddy`.  With NETWORKS: 0 in the
-    // docker-socket-proxy this always failed because docker compose needs
-    // GET /networks/{id} to inspect caddy-network before reconnecting the container.
-    // The fix adds NETWORKS: 1 so the network inspection succeeds.
-    execFileSync('docker', ['restart', L4_CONTAINER], {
-      stdio: 'inherit',
-      cwd: process.cwd(),
-      env: ENV,
+      const state = await waitForL4Terminal(page, 90_000);
+      expect(
+        state,
+        'Expected "applied" but got "failed". Run: docker logs caddy-proxy-manager-l4-ports',
+      ).toBe('applied');
     });
 
-    // Wait for the sidecar to restart, run do_apply, and write a fresh status.
-    // Caddy health-check has a 10 s start_period so allow up to 90 s total.
-    const state = await waitForL4Terminal(page, 90_000, prevAppliedAt);
-    expect(
-      state,
-      'Sidecar returned "failed" after restart. ' +
-      'Likely cause: docker-socket-proxy is missing NETWORKS: 1. ' +
-      'Run: docker logs caddy-proxy-manager-l4-ports',
-    ).toBe('applied');
-  });
+    test('TCP traffic works after explicit apply', async () => {
+      await waitForTcpRoute('127.0.0.1', TCP_PORT, 30_000);
+      const res = await tcpSend('127.0.0.1', TCP_PORT, 'sidecar-apply-check\n');
+      expect(res.connected).toBe(true);
+      expect(res.data).toContain('sidecar-apply-check');
+    });
 
-  test('TCP traffic still works after sidecar restart and auto-apply', async () => {
-    // Caddy was briefly recreated during the restart apply; waitForTcpRoute
-    // retries until it comes back up.
-    await waitForTcpRoute('127.0.0.1', TCP_PORT, 30_000);
-    const res = await tcpSend('127.0.0.1', TCP_PORT, 'after-restart-check\n');
-    expect(res.connected).toBe(true);
-    expect(res.data).toContain('after-restart-check');
+    test('auto-applies on sidecar container restart — regression #117', async ({ page }) => {
+      // Container restart + do_apply + caddy health-check can take ~60 s total;
+      // waitForL4Terminal polls for up to 90 s.  Override to avoid the 60 s global cap.
+      test.setTimeout(180_000);
+
+      // Record the current appliedAt so we can detect when a *new* apply finishes.
+      // The sidecar uses second-level timestamp precision, so sleep 1.5 s first to
+      // guarantee the new timestamp will be strictly greater.
+      const { status: before } = await fetchL4Status(page);
+      const prevAppliedAt = before?.appliedAt ?? '';
+      await page.waitForTimeout(1_500);
+
+      // Restart the sidecar container.  On startup it finds the override file and
+      // calls `docker compose up --force-recreate caddy`.  With NETWORKS: 0 in the
+      // docker-socket-proxy this always failed because docker compose needs
+      // GET /networks/{id} to inspect caddy-network before reconnecting the container.
+      // The fix adds NETWORKS: 1 so the network inspection succeeds.
+      execFileSync('docker', ['restart', L4_CONTAINER], {
+        stdio: 'inherit',
+        cwd: process.cwd(),
+        env: ENV,
+      });
+
+      // Wait for the sidecar to restart, run do_apply, and write a fresh status.
+      // Caddy health-check has a 10 s start_period so allow up to 90 s total.
+      const state = await waitForL4Terminal(page, 90_000, prevAppliedAt);
+      expect(
+        state,
+        'Sidecar returned "failed" after restart. ' +
+          'Likely cause: docker-socket-proxy is missing NETWORKS: 1. ' +
+          'Run: docker logs caddy-proxy-manager-l4-ports',
+      ).toBe('applied');
+    });
+
+    test('TCP traffic still works after sidecar restart and auto-apply', async () => {
+      // Caddy was briefly recreated during the restart apply; waitForTcpRoute
+      // retries until it comes back up.
+      await waitForTcpRoute('127.0.0.1', TCP_PORT, 30_000);
+      const res = await tcpSend('127.0.0.1', TCP_PORT, 'after-restart-check\n');
+      expect(res.connected).toBe(true);
+      expect(res.data).toContain('after-restart-check');
+    });
   });
-});

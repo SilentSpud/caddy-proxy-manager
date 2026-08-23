@@ -15,15 +15,18 @@ function nowIso() {
 
 async function insertCertificate(overrides: Partial<typeof certificates.$inferInsert> = {}) {
   const now = nowIso();
-  const [cert] = await db.insert(certificates).values({
-    name: 'Test Cert',
-    type: 'managed',
-    domainNames: JSON.stringify(['example.com']),
-    autoRenew: true,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [cert] = await db
+    .insert(certificates)
+    .values({
+      name: 'Test Cert',
+      type: 'managed',
+      domainNames: JSON.stringify(['example.com']),
+      autoRenew: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return cert;
 }
 

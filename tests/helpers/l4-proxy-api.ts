@@ -11,9 +11,9 @@ export interface L4ProxyHostConfig {
   name: string;
   protocol?: 'tcp' | 'udp';
   listenAddress: string;
-  upstream: string;          // e.g. "tcp-echo:9000"
+  upstream: string; // e.g. "tcp-echo:9000"
   matcherType?: 'none' | 'tls_sni' | 'http_host' | 'proxy_protocol';
-  matcherValue?: string;     // comma-separated
+  matcherValue?: string; // comma-separated
   tlsTermination?: boolean;
   proxyProtocolReceive?: boolean;
   proxyProtocolVersion?: 'v1' | 'v2';
@@ -48,7 +48,10 @@ export async function createL4ProxyHost(page: Page, config: L4ProxyHostConfig): 
     };
     await page.getByRole('option', { name: matcherLabels[config.matcherType] }).click();
 
-    if (config.matcherValue && (config.matcherType === 'tls_sni' || config.matcherType === 'http_host')) {
+    if (
+      config.matcherValue &&
+      (config.matcherType === 'tls_sni' || config.matcherType === 'http_host')
+    ) {
       await page.getByLabel(/hostnames/i).fill(config.matcherValue);
     }
   }

@@ -34,12 +34,13 @@ type Props = {
 
 export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
-  const activeCerts = issuedCerts.filter(c => !c.revokedAt);
+  const activeCerts = issuedCerts.filter((c) => !c.revokedAt);
 
-  const filtered = roles.filter(r =>
-    !search ||
-    r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.description?.toLowerCase().includes(search.toLowerCase())
+  const filtered = roles.filter(
+    (r) =>
+      !search ||
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.description?.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -86,18 +87,30 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
 
   async function handleCreate() {
-    if (!name.trim()) { setError("Name is required"); return; }
-    setSubmitting(true); setError("");
+    if (!name.trim()) {
+      setError("Name is required");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
     try {
       const res = await fetch("/api/v1/mtls-roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), description: description.trim() || null }),
       });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || `Failed (${res.status})`); setSubmitting(false); return; }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || `Failed (${res.status})`);
+        setSubmitting(false);
+        return;
+      }
       onClose();
       window.location.reload();
-    } catch { setError("Network error"); setSubmitting(false); }
+    } catch {
+      setError("Network error");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -158,12 +171,17 @@ function RoleCard({
 
   const loadAssignments = useCallback(() => {
     fetch(`/api/v1/mtls-roles/${role.id}`)
-      .then(r => r.ok ? r.json() : { certificate_ids: [] })
-      .then((data: MtlsRoleWithCertificates) => { setAssignedIds(new Set(data.certificateIds)); setLoaded(true); })
+      .then((r) => (r.ok ? r.json() : { certificate_ids: [] }))
+      .then((data: MtlsRoleWithCertificates) => {
+        setAssignedIds(new Set(data.certificateIds));
+        setLoaded(true);
+      })
       .catch(() => setLoaded(true));
   }, [role.id]);
 
-  useEffect(() => { loadAssignments(); }, [loadAssignments]);
+  useEffect(() => {
+    loadAssignments();
+  }, [loadAssignments]);
 
   async function handleToggle(certId: number) {
     const isAssigned = assignedIds.has(certId);
@@ -171,20 +189,29 @@ function RoleCard({
     try {
       if (isAssigned) {
         await fetch(`/api/v1/mtls-roles/${role.id}/certificates/${certId}`, { method: "DELETE" });
-        setAssignedIds(prev => { const next = new Set(prev); next.delete(certId); return next; });
+        setAssignedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(certId);
+          return next;
+        });
       } else {
         await fetch(`/api/v1/mtls-roles/${role.id}/certificates`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ certificateId: certId }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ certificateId: certId }),
         });
-        setAssignedIds(prev => new Set(prev).add(certId));
+        setAssignedIds((prev) => new Set(prev).add(certId));
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
     setToggling(null);
   }
 
   async function handleSave() {
     await fetch(`/api/v1/mtls-roles/${role.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: name.trim(), description: description.trim() || null }),
     });
     setEditing(false);
@@ -262,14 +289,10 @@ function RoleCard({
               Loading...
             </Text>
           ) : activeCerts.length === 0 ? (
-            <EmptyState
-              icon={<UserPlus />}
-              title="No client certificates issued yet."
-              isCompact
-            />
+            <EmptyState icon={<UserPlus />} title="No client certificates issued yet." isCompact />
           ) : (
             <List hasDividers>
-              {activeCerts.map(cert => (
+              {activeCerts.map((cert) => (
                 <CertAssignmentRow
                   key={cert.id}
                   cert={cert}

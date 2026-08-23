@@ -77,7 +77,10 @@ describe('normalizeGroupName', () => {
 
 describe('extractGroups', () => {
   it('reads an array of strings', () => {
-    expect(extractGroups({ groups: ['CPM_Admin', 'Other'] }, 'groups')).toEqual(['CPM_Admin', 'Other']);
+    expect(extractGroups({ groups: ['CPM_Admin', 'Other'] }, 'groups')).toEqual([
+      'CPM_Admin',
+      'Other',
+    ]);
   });
 
   it('reads an array of objects by name', () => {
@@ -112,7 +115,10 @@ describe('extractGroups', () => {
 
 describe('parseGroupNames', () => {
   it('splits on commas and trims', () => {
-    expect(parseGroupNames('platform-owners, sre-oncall')).toEqual(['platform-owners', 'sre-oncall']);
+    expect(parseGroupNames('platform-owners, sre-oncall')).toEqual([
+      'platform-owners',
+      'sre-oncall',
+    ]);
   });
 
   it('keeps spaces inside a name', () => {
@@ -189,12 +195,14 @@ describe('mapGroupsToRole', () => {
   it('falls back to the configured default when nothing matches', () => {
     expect(mapGroupsToRole(['Marketing'], base)).toBe('user');
     expect(
-      mapGroupsToRole(['Marketing'], toGroupMappingConfig({ ...base, defaultRole: 'viewer' }))
+      mapGroupsToRole(['Marketing'], toGroupMappingConfig({ ...base, defaultRole: 'viewer' })),
     ).toBe('viewer');
   });
 
   it('returns null — leaving the role untouched — when mapping is off', () => {
-    expect(mapGroupsToRole(['CPM_Admin'], toGroupMappingConfig({ groupPrefix: 'CPM_' }))).toBeNull();
+    expect(
+      mapGroupsToRole(['CPM_Admin'], toGroupMappingConfig({ groupPrefix: 'CPM_' })),
+    ).toBeNull();
   });
 
   it('does not treat an unrelated group that starts with the prefix as a role', () => {
@@ -250,9 +258,9 @@ describe('mapGroupsToLocalGroups', () => {
   });
 
   it('excludes the role groups so they do not become CPM groups', () => {
-    expect(mapGroupsToLocalGroups(['CPM_Admin', 'CPM_User', 'CPM_Viewer', 'CPM_Devs'], syncing)).toEqual([
-      'Devs',
-    ]);
+    expect(
+      mapGroupsToLocalGroups(['CPM_Admin', 'CPM_User', 'CPM_Viewer', 'CPM_Devs'], syncing),
+    ).toEqual(['Devs']);
   });
 
   it('mirrors every group verbatim when no prefix is set', () => {
@@ -268,7 +276,7 @@ describe('mapGroupsToLocalGroups', () => {
       viewerGroup: 'auditors',
     });
     expect(
-      mapGroupsToLocalGroups(['platform-owners', 'sre-oncall', 'auditors', 'Devs'], cfg)
+      mapGroupsToLocalGroups(['platform-owners', 'sre-oncall', 'auditors', 'Devs'], cfg),
     ).toEqual(['Devs']);
   });
 

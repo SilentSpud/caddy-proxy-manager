@@ -1,8 +1,23 @@
 "use client";
 
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Globe, ArrowRight, Shield, Bug, MapPin, Scale, KeyRound, UserCheck, CornerRightDown, Replace, Ban, GitBranch, ShieldCheck, LogIn } from "lucide-react";
+import {
+  Globe,
+  ArrowRight,
+  Shield,
+  Bug,
+  MapPin,
+  Scale,
+  KeyRound,
+  UserCheck,
+  CornerRightDown,
+  Replace,
+  Ban,
+  GitBranch,
+  ShieldCheck,
+  LogIn,
+} from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -22,10 +37,19 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { CreateHostDialog, EditHostDialog, DeleteHostDialog } from "@/components/proxy-hosts/HostDialogs";
+import {
+  CreateHostDialog,
+  EditHostDialog,
+  DeleteHostDialog,
+} from "@/components/proxy-hosts/HostDialogs";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
-type ForwardAuthGroup = { id: number; name: string; description: string | null; member_count: number };
+type ForwardAuthGroup = {
+  id: number;
+  name: string;
+  description: string | null;
+  member_count: number;
+};
 type ForwardAuthAccessMap = Record<number, { userIds: number[]; groupIds: number[] }>;
 
 type Props = {
@@ -57,18 +81,49 @@ const FEATURES: ReadonlyArray<{
   isOn: (host: ProxyHost) => boolean;
 }> = [
   { key: "tls", label: "TLS", variant: "info", isOn: (h) => Boolean(h.certificateId) },
-  { key: "auth", label: "Auth", icon: <Shield />, variant: "warning", isOn: (h) => Boolean(h.accessListId) },
-  { key: "authentik", label: "Authentik", icon: <UserCheck />, isOn: (h) => Boolean(h.authentik?.enabled) },
-  { key: "forward-auth", label: "Forward Auth", icon: <LogIn />, isOn: (h) => Boolean(h.cpmForwardAuth?.enabled) },
+  {
+    key: "auth",
+    label: "Auth",
+    icon: <Shield />,
+    variant: "warning",
+    isOn: (h) => Boolean(h.accessListId),
+  },
+  {
+    key: "authentik",
+    label: "Authentik",
+    icon: <UserCheck />,
+    isOn: (h) => Boolean(h.authentik?.enabled),
+  },
+  {
+    key: "forward-auth",
+    label: "Forward Auth",
+    icon: <LogIn />,
+    isOn: (h) => Boolean(h.cpmForwardAuth?.enabled),
+  },
   { key: "waf", label: "WAF", icon: <Bug />, isOn: (h) => Boolean(h.waf?.enabled) },
   { key: "geo", label: "Geo", icon: <MapPin />, isOn: (h) => Boolean(h.geoblock?.enabled) },
   { key: "lb", label: "LB", icon: <Scale />, isOn: (h) => Boolean(h.loadBalancer?.enabled) },
   { key: "mtls", label: "mTLS", icon: <KeyRound />, isOn: (h) => Boolean(h.mtls?.enabled) },
-  { key: "redirects", label: "Redirects", icon: <CornerRightDown />, isOn: (h) => h.redirects?.length > 0 },
+  {
+    key: "redirects",
+    label: "Redirects",
+    icon: <CornerRightDown />,
+    isOn: (h) => h.redirects?.length > 0,
+  },
   { key: "rewrite", label: "Rewrite", icon: <Replace />, isOn: (h) => Boolean(h.rewrite) },
-  { key: "path-allows", label: "Allows", icon: <ShieldCheck />, isOn: (h) => h.pathAllows?.length > 0 },
+  {
+    key: "path-allows",
+    label: "Allows",
+    icon: <ShieldCheck />,
+    isOn: (h) => h.pathAllows?.length > 0,
+  },
   { key: "path-blocks", label: "Blocks", icon: <Ban />, isOn: (h) => h.pathBlocks?.length > 0 },
-  { key: "path-rewrites", label: "Path Rewrites", icon: <GitBranch />, isOn: (h) => h.pathRewrites?.length > 0 },
+  {
+    key: "path-rewrites",
+    label: "Path Rewrites",
+    icon: <GitBranch />,
+    isOn: (h) => h.pathRewrites?.length > 0,
+  },
 ];
 
 /** "example.com +2" — the primary entry plus a count of the rest. */
@@ -117,7 +172,21 @@ function HostActions({
   );
 }
 
-export default function ProxyHostsClient({ hosts, certificates, accessLists, caCertificates, authentikDefaults, pagination, initialSearch, initialSort, mtlsRoles, issuedClientCerts, forwardAuthUsers, forwardAuthGroups, forwardAuthAccessMap }: Props) {
+export default function ProxyHostsClient({
+  hosts,
+  certificates,
+  accessLists,
+  caCertificates,
+  authentikDefaults,
+  pagination,
+  initialSearch,
+  initialSort,
+  mtlsRoles,
+  issuedClientCerts,
+  forwardAuthUsers,
+  forwardAuthGroups,
+  forwardAuthAccessMap,
+}: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<ProxyHost | null>(null);
@@ -268,7 +337,13 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
       <PageHeader
         title="Proxy Hosts"
         description="Define HTTP(S) reverse proxies orchestrated by Caddy with automated certificates."
-        action={{ label: "Create Host", onClick: () => { setDialogKey(k => k + 1); setCreateOpen(true); } }}
+        action={{
+          label: "Create Host",
+          onClick: () => {
+            setDialogKey((k) => k + 1);
+            setCreateOpen(true);
+          },
+        }}
       />
 
       <HStack gap={2} vAlign="center">
@@ -293,7 +368,10 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
       <CreateHostDialog
         key={dialogKey}
         open={createOpen}
-        onClose={() => { setCreateOpen(false); setTimeout(() => setDuplicateHost(null), 200); }}
+        onClose={() => {
+          setCreateOpen(false);
+          setTimeout(() => setDuplicateHost(null), 200);
+        }}
         initialData={duplicateHost}
         certificates={certificates}
         accessLists={accessLists}

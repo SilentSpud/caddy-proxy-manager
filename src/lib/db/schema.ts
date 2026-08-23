@@ -16,11 +16,11 @@ export const users = sqliteTable(
     displayUsername: text("displayUsername"),
     emailVerified: integer("emailVerified", { mode: "boolean" }).notNull().default(false),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    emailUnique: uniqueIndex("users_email_unique").on(table.email)
-  })
+    emailUnique: uniqueIndex("users_email_unique").on(table.email),
+  }),
 );
 
 // Auth tables use camelCase DB columns to match Better Auth's Kysely adapter.
@@ -36,12 +36,12 @@ export const sessions = sqliteTable(
     ipAddress: text("ipAddress"),
     userAgent: text("userAgent"),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
     tokenUnique: uniqueIndex("sessions_token_unique").on(table.token),
-    userIdx: index("sessions_user_idx").on(table.userId)
-  })
+    userIdx: index("sessions_user_idx").on(table.userId),
+  }),
 );
 
 export const accounts = sqliteTable(
@@ -53,6 +53,12 @@ export const accounts = sqliteTable(
       .notNull(),
     accountId: text("accountId").notNull(),
     providerId: text("providerId").notNull(),
+    // better-auth 1.7 scopes account identity by issuer rather than by
+    // providerId: `local:credential` for password accounts, the provider's own
+    // issuer URL for OIDC providers that have one, and `local:oauth:<id>` for
+    // plain OAuth2 providers that don't. Set by better-auth on write; see
+    // migration 0024 for how existing rows were backfilled.
+    issuer: text("issuer").notNull(),
     accessToken: text("accessToken"),
     refreshToken: text("refreshToken"),
     idToken: text("idToken"),
@@ -61,25 +67,26 @@ export const accounts = sqliteTable(
     scope: text("scope"),
     password: text("password"),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    providerAccountIdx: uniqueIndex("accounts_provider_account_idx").on(table.providerId, table.accountId),
-    userIdx: index("accounts_user_idx").on(table.userId)
-  })
+    providerAccountIdx: uniqueIndex("accounts_provider_account_idx").on(
+      table.providerId,
+      table.accountId,
+    ),
+    issuerAccountIdx: uniqueIndex("accounts_issuer_account_idx").on(table.issuer, table.accountId),
+    userIdx: index("accounts_user_idx").on(table.userId),
+  }),
 );
 
-export const verifications = sqliteTable(
-  "verifications",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    identifier: text("identifier").notNull(),
-    value: text("value").notNull(),
-    expiresAt: text("expiresAt").notNull(),
-    createdAt: text("createdAt"),
-    updatedAt: text("updatedAt")
-  }
-);
+export const verifications = sqliteTable("verifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: text("expiresAt").notNull(),
+  createdAt: text("createdAt"),
+  updatedAt: text("updatedAt"),
+});
 
 export const oauthProviders = sqliteTable(
   "oauth_providers",
@@ -113,11 +120,11 @@ export const oauthProviders = sqliteTable(
     // Mirror the remaining prefixed IdP groups into CPM groups.
     syncGroups: integer("syncGroups", { mode: "boolean" }).notNull().default(false),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    nameUnique: uniqueIndex("oauth_providers_name_unique").on(table.name)
-  })
+    nameUnique: uniqueIndex("oauth_providers_name_unique").on(table.name),
+  }),
 );
 
 export const oauthStates = sqliteTable(
@@ -128,29 +135,38 @@ export const oauthStates = sqliteTable(
     codeVerifier: text("codeVerifier").notNull(),
     redirectTo: text("redirectTo"),
     createdAt: text("createdAt").notNull(),
-    expiresAt: text("expiresAt").notNull()
+    expiresAt: text("expiresAt").notNull(),
   },
   (table) => ({
-    stateUnique: uniqueIndex("oauth_state_unique").on(table.state)
-  })
+    stateUnique: uniqueIndex("oauth_state_unique").on(table.state),
+  }),
 );
 
-export const pendingOAuthLinks = sqliteTable("pending_oauth_links", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-  provider: text("provider", { length: 50 }).notNull(),
-  userEmail: text("userEmail").notNull(), // Email of the user who initiated linking
-  createdAt: text("createdAt").notNull(),
-  expiresAt: text("expiresAt").notNull()
-}, (table) => ({
-  // Ensure only one pending link per user per provider (prevents race conditions)
-  userProviderUnique: uniqueIndex("pending_oauth_user_provider_unique").on(table.userId, table.provider)
-}));
+export const pendingOAuthLinks = sqliteTable(
+  "pending_oauth_links",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider", { length: 50 }).notNull(),
+    userEmail: text("userEmail").notNull(), // Email of the user who initiated linking
+    createdAt: text("createdAt").notNull(),
+    expiresAt: text("expiresAt").notNull(),
+  },
+  (table) => ({
+    // Ensure only one pending link per user per provider (prevents race conditions)
+    userProviderUnique: uniqueIndex("pending_oauth_user_provider_unique").on(
+      table.userId,
+      table.provider,
+    ),
+  }),
+);
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
-  updatedAt: text("updatedAt").notNull()
+  updatedAt: text("updatedAt").notNull(),
 });
 
 export const instances = sqliteTable(
@@ -164,11 +180,11 @@ export const instances = sqliteTable(
     lastSyncAt: text("lastSyncAt"),
     lastSyncError: text("lastSyncError"),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    baseUrlUnique: uniqueIndex("instances_base_url_unique").on(table.baseUrl)
-  })
+    baseUrlUnique: uniqueIndex("instances_base_url_unique").on(table.baseUrl),
+  }),
 );
 
 export const accessLists = sqliteTable("access_lists", {
@@ -177,7 +193,7 @@ export const accessLists = sqliteTable("access_lists", {
   description: text("description"),
   createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull()
+  updatedAt: text("updatedAt").notNull(),
 });
 
 export const accessListEntries = sqliteTable(
@@ -190,11 +206,11 @@ export const accessListEntries = sqliteTable(
     username: text("username").notNull(),
     passwordHash: text("passwordHash").notNull(),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    accessListIdIdx: index("access_list_entries_list_idx").on(table.accessListId)
-  })
+    accessListIdIdx: index("access_list_entries_list_idx").on(table.accessListId),
+  }),
 );
 
 export const certificates = sqliteTable("certificates", {
@@ -208,7 +224,7 @@ export const certificates = sqliteTable("certificates", {
   privateKeyPem: text("privateKeyPem"),
   createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull()
+  updatedAt: text("updatedAt").notNull(),
 });
 
 export const caCertificates = sqliteTable("ca_certificates", {
@@ -218,7 +234,7 @@ export const caCertificates = sqliteTable("ca_certificates", {
   privateKeyPem: text("privateKeyPem"),
   createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull()
+  updatedAt: text("updatedAt").notNull(),
 });
 
 export const issuedClientCertificates = sqliteTable(
@@ -237,12 +253,12 @@ export const issuedClientCertificates = sqliteTable(
     revokedAt: text("revokedAt"),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
     caCertificateIdx: index("issued_client_certificates_ca_idx").on(table.caCertificateId),
-    revokedAtIdx: index("issued_client_certificates_revoked_at_idx").on(table.revokedAt)
-  })
+    revokedAtIdx: index("issued_client_certificates_revoked_at_idx").on(table.revokedAt),
+  }),
 );
 
 export const proxyHosts = sqliteTable("proxy_hosts", {
@@ -250,7 +266,9 @@ export const proxyHosts = sqliteTable("proxy_hosts", {
   name: text("name").notNull(),
   domains: text("domains").notNull(),
   upstreams: text("upstreams").notNull(),
-  certificateId: integer("certificateId").references(() => certificates.id, { onDelete: "set null" }),
+  certificateId: integer("certificateId").references(() => certificates.id, {
+    onDelete: "set null",
+  }),
   accessListId: integer("accessListId").references(() => accessLists.id, { onDelete: "set null" }),
   ownerUserId: integer("ownerUserId").references(() => users.id, { onDelete: "set null" }),
   sslForced: integer("sslForced", { mode: "boolean" }).notNull().default(true),
@@ -264,7 +282,7 @@ export const proxyHosts = sqliteTable("proxy_hosts", {
   updatedAt: text("updatedAt").notNull(),
   skipHttpsHostnameValidation: integer("skipHttpsHostnameValidation", { mode: "boolean" })
     .notNull()
-    .default(false)
+    .default(false),
 });
 
 export const apiTokens = sqliteTable(
@@ -278,11 +296,11 @@ export const apiTokens = sqliteTable(
       .notNull(),
     createdAt: text("createdAt").notNull(),
     lastUsedAt: text("lastUsedAt"),
-    expiresAt: text("expiresAt")
+    expiresAt: text("expiresAt"),
   },
   (table) => ({
-    tokenHashUnique: uniqueIndex("api_tokens_token_hash_unique").on(table.tokenHash)
-  })
+    tokenHashUnique: uniqueIndex("api_tokens_token_hash_unique").on(table.tokenHash),
+  }),
 );
 
 export const auditEvents = sqliteTable("audit_events", {
@@ -293,27 +311,27 @@ export const auditEvents = sqliteTable("audit_events", {
   entityId: integer("entityId"),
   summary: text("summary"),
   data: text("data"),
-  createdAt: text("createdAt").notNull()
+  createdAt: text("createdAt").notNull(),
 });
 
 export const linkingTokens = sqliteTable("linking_tokens", {
   id: text("id").primaryKey(),
   token: text("token").notNull(),
   createdAt: text("createdAt").notNull(),
-  expiresAt: text("expiresAt").notNull()
+  expiresAt: text("expiresAt").notNull(),
 });
 
 // traffic_events and waf_events have been migrated to ClickHouse.
 // See src/lib/clickhouse/client.ts for the ClickHouse schema.
 
-export const logParseState = sqliteTable('log_parse_state', {
-  key: text('key').primaryKey(),
-  value: text('value').notNull(),
+export const logParseState = sqliteTable("log_parse_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
 });
 
-export const wafLogParseState = sqliteTable('waf_log_parse_state', {
-  key: text('key').primaryKey(),
-  value: text('value').notNull(),
+export const wafLogParseState = sqliteTable("waf_log_parse_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
 });
 
 // ── mTLS RBAC ──────────────────────────────────────────────────────────
@@ -326,11 +344,11 @@ export const mtlsRoles = sqliteTable(
     description: text("description"),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    nameUnique: uniqueIndex("mtls_roles_name_unique").on(table.name)
-  })
+    nameUnique: uniqueIndex("mtls_roles_name_unique").on(table.name),
+  }),
 );
 
 export const mtlsCertificateRoles = sqliteTable(
@@ -343,15 +361,15 @@ export const mtlsCertificateRoles = sqliteTable(
     mtlsRoleId: integer("mtlsRoleId")
       .references(() => mtlsRoles.id, { onDelete: "cascade" })
       .notNull(),
-    createdAt: text("createdAt").notNull()
+    createdAt: text("createdAt").notNull(),
   },
   (table) => ({
     certRoleUnique: uniqueIndex("mtls_cert_role_unique").on(
       table.issuedClientCertificateId,
-      table.mtlsRoleId
+      table.mtlsRoleId,
     ),
-    roleIdx: index("mtls_certificate_roles_role_idx").on(table.mtlsRoleId)
-  })
+    roleIdx: index("mtls_certificate_roles_role_idx").on(table.mtlsRoleId),
+  }),
 );
 
 export const mtlsAccessRules = sqliteTable(
@@ -369,15 +387,15 @@ export const mtlsAccessRules = sqliteTable(
     description: text("description"),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
     proxyHostIdx: index("mtls_access_rules_proxy_host_idx").on(table.proxyHostId),
     hostPathUnique: uniqueIndex("mtls_access_rules_host_path_unique").on(
       table.proxyHostId,
-      table.pathPattern
-    )
-  })
+      table.pathPattern,
+    ),
+  }),
 );
 
 // ── Forward Auth (IdP) ───────────────────────────────────────────────
@@ -393,11 +411,11 @@ export const groups = sqliteTable(
     // group sync. Only membership of "oidc" groups is reconciled on sign-in.
     source: text("source").notNull().default("ui"),
     createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull()
+    updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    nameUnique: uniqueIndex("groups_name_unique").on(table.name)
-  })
+    nameUnique: uniqueIndex("groups_name_unique").on(table.name),
+  }),
 );
 
 export const groupMembers = sqliteTable(
@@ -410,12 +428,12 @@ export const groupMembers = sqliteTable(
     userId: integer("userId")
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
-    createdAt: text("createdAt").notNull()
+    createdAt: text("createdAt").notNull(),
   },
   (table) => ({
     memberUnique: uniqueIndex("group_members_unique").on(table.groupId, table.userId),
-    userIdx: index("group_members_user_idx").on(table.userId)
-  })
+    userIdx: index("group_members_user_idx").on(table.userId),
+  }),
 );
 
 export const forwardAuthAccess = sqliteTable(
@@ -427,13 +445,13 @@ export const forwardAuthAccess = sqliteTable(
       .notNull(),
     userId: integer("userId").references(() => users.id, { onDelete: "cascade" }),
     groupId: integer("groupId").references(() => groups.id, { onDelete: "cascade" }),
-    createdAt: text("createdAt").notNull()
+    createdAt: text("createdAt").notNull(),
   },
   (table) => ({
     hostIdx: index("faa_host_idx").on(table.proxyHostId),
     userUnique: uniqueIndex("faa_user_unique").on(table.proxyHostId, table.userId),
-    groupUnique: uniqueIndex("faa_group_unique").on(table.proxyHostId, table.groupId)
-  })
+    groupUnique: uniqueIndex("faa_group_unique").on(table.proxyHostId, table.groupId),
+  }),
 );
 
 export const forwardAuthSessions = sqliteTable(
@@ -445,13 +463,13 @@ export const forwardAuthSessions = sqliteTable(
       .notNull(),
     tokenHash: text("tokenHash").notNull(),
     expiresAt: text("expiresAt").notNull(),
-    createdAt: text("createdAt").notNull()
+    createdAt: text("createdAt").notNull(),
   },
   (table) => ({
     tokenHashUnique: uniqueIndex("fas_token_hash_unique").on(table.tokenHash),
     userIdx: index("fas_user_idx").on(table.userId),
-    expiresIdx: index("fas_expires_idx").on(table.expiresAt)
-  })
+    expiresIdx: index("fas_expires_idx").on(table.expiresAt),
+  }),
 );
 
 export const forwardAuthExchanges = sqliteTable(
@@ -466,11 +484,11 @@ export const forwardAuthExchanges = sqliteTable(
     redirectUri: text("redirectUri").notNull(),
     expiresAt: text("expiresAt").notNull(),
     used: integer("used", { mode: "boolean" }).notNull().default(false),
-    createdAt: text("createdAt").notNull()
+    createdAt: text("createdAt").notNull(),
   },
   (table) => ({
-    codeHashUnique: uniqueIndex("fae_code_hash_unique").on(table.codeHash)
-  })
+    codeHashUnique: uniqueIndex("fae_code_hash_unique").on(table.codeHash),
+  }),
 );
 
 export const forwardAuthRedirectIntents = sqliteTable(
@@ -481,12 +499,12 @@ export const forwardAuthRedirectIntents = sqliteTable(
     redirectUri: text("redirectUri").notNull(),
     expiresAt: text("expiresAt").notNull(),
     consumed: integer("consumed", { mode: "boolean" }).notNull().default(false),
-    createdAt: text("createdAt").notNull()
+    createdAt: text("createdAt").notNull(),
   },
   (table) => ({
     ridHashUnique: uniqueIndex("fari_rid_hash_unique").on(table.ridHash),
-    expiresIdx: index("fari_expires_idx").on(table.expiresAt)
-  })
+    expiresIdx: index("fari_expires_idx").on(table.expiresAt),
+  }),
 );
 
 // ── L4 Proxy Hosts ───────────────────────────────────────────────────
@@ -501,7 +519,9 @@ export const l4ProxyHosts = sqliteTable("l4_proxy_hosts", {
   matcherValue: text("matcherValue"),
   tlsTermination: integer("tlsTermination", { mode: "boolean" }).notNull().default(false),
   proxyProtocolVersion: text("proxyProtocolVersion"),
-  proxyProtocolReceive: integer("proxyProtocolReceive", { mode: "boolean" }).notNull().default(false),
+  proxyProtocolReceive: integer("proxyProtocolReceive", { mode: "boolean" })
+    .notNull()
+    .default(false),
   ownerUserId: integer("ownerUserId").references(() => users.id, { onDelete: "set null" }),
   meta: text("meta"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),

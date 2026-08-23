@@ -19,9 +19,15 @@ const API = `${BASE_URL}/api/v1`;
 const ORIGIN = BASE_URL;
 const EVIL_EMAIL = 'evil@idp.example';
 
-interface ApiUser { id: number; email: string; role: string }
+interface ApiUser {
+  id: number;
+  email: string;
+  role: string;
+}
 
-async function findEvilUser(request: import('@playwright/test').APIRequestContext): Promise<ApiUser | undefined> {
+async function findEvilUser(
+  request: import('@playwright/test').APIRequestContext,
+): Promise<ApiUser | undefined> {
   const resp = await request.get(`${API}/users`);
   expect(resp.ok(), 'list users').toBeTruthy();
   const users = (await resp.json()) as ApiUser[];
@@ -31,13 +37,19 @@ async function findEvilUser(request: import('@playwright/test').APIRequestContex
 test.describe('OAuth — a hostile IdP cannot inject a privileged role', () => {
   test.setTimeout(90_000);
 
-  test('role:"admin" claim from the IdP does not create an admin account', async ({ page, browser }) => {
+  test('role:"admin" claim from the IdP does not create an admin account', async ({
+    page,
+    browser,
+  }) => {
     // Admin-authenticated context (storageState) used for setup + assertions.
     const admin = page.request;
 
     // Remove any leftover federated user from a previous run for determinism.
     const stale = await findEvilUser(admin);
-    if (stale) await admin.delete(`${API}/users/${stale.id}`, { headers: { Origin: ORIGIN } }).catch(() => {});
+    if (stale)
+      await admin
+        .delete(`${API}/users/${stale.id}`, { headers: { Origin: ORIGIN } })
+        .catch(() => {});
 
     // 1. Register the hostile IdP as an OAuth provider.
     //    issuer/token/userinfo use the in-network alias (also the token `iss`);
@@ -91,7 +103,7 @@ test.describe('OAuth — a hostile IdP cannot inject a privileged role', () => {
               return false;
             }
           },
-          { timeout: 30_000 }
+          { timeout: 30_000 },
         );
         expect(oauthPage.url(), 'OAuth sign-in should not error').not.toContain('error');
       } finally {
@@ -105,9 +117,13 @@ test.describe('OAuth — a hostile IdP cannot inject a privileged role', () => {
       expect(evil!.role, 'IdP-supplied role:"admin" must be ignored').toBe('user');
     } finally {
       if (createdUserId) {
-        await admin.delete(`${API}/users/${createdUserId}`, { headers: { Origin: ORIGIN } }).catch(() => {});
+        await admin
+          .delete(`${API}/users/${createdUserId}`, { headers: { Origin: ORIGIN } })
+          .catch(() => {});
       }
-      await admin.delete(`${API}/oauth-providers/${providerId}`, { headers: { Origin: ORIGIN } }).catch(() => {});
+      await admin
+        .delete(`${API}/oauth-providers/${providerId}`, { headers: { Origin: ORIGIN } })
+        .catch(() => {});
     }
   });
 });

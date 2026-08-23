@@ -1,14 +1,17 @@
-import { X509Certificate } from 'node:crypto';
-import db from '@/src/lib/db';
-import { proxyHosts, certificates } from '@/src/lib/db/schema';
-import { isNull, isNotNull } from 'drizzle-orm';
-import { requireAdmin } from '@/src/lib/auth';
-import CertificatesClient from './CertificatesClient';
-import { listCaCertificates, type CaCertificate } from '@/src/lib/models/ca-certificates';
-import { listIssuedClientCertificates, type IssuedClientCertificate } from '@/src/lib/models/issued-client-certificates';
-import { listMtlsRoles, type MtlsRole } from '@/src/lib/models/mtls-roles';
-import { isDomainCoveredByCert } from '@/src/lib/cert-domain-match';
-import { countHealthyAcmeHosts } from './certificate-summary';
+import { X509Certificate } from "node:crypto";
+import db from "@/src/lib/db";
+import { proxyHosts, certificates } from "@/src/lib/db/schema";
+import { isNull, isNotNull } from "drizzle-orm";
+import { requireAdmin } from "@/src/lib/auth";
+import CertificatesClient from "./CertificatesClient";
+import { listCaCertificates, type CaCertificate } from "@/src/lib/models/ca-certificates";
+import {
+  listIssuedClientCertificates,
+  type IssuedClientCertificate,
+} from "@/src/lib/models/issued-client-certificates";
+import { listMtlsRoles, type MtlsRole } from "@/src/lib/models/mtls-roles";
+import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
+import { countHealthyAcmeHosts } from "./certificate-summary";
 import type { Metadata } from "next";
 
 export type { CaCertificate };
@@ -19,7 +22,7 @@ export type CaCertificateView = CaCertificate & {
   issuedCerts: IssuedClientCertificate[];
 };
 
-export type CertExpiryStatus = 'ok' | 'expiring_soon' | 'expired';
+export type CertExpiryStatus = "ok" | "expiring_soon" | "expired";
 
 export type AcmeHost = {
   id: number;
@@ -48,16 +51,18 @@ interface PageProps {
   searchParams: Promise<{ page?: string }>;
 }
 
-function parsePemInfo(pem: string): { validTo: string; validFrom: string; issuer: string; sanDomains: string[] } | null {
+function parsePemInfo(
+  pem: string,
+): { validTo: string; validFrom: string; issuer: string; sanDomains: string[] } | null {
   try {
     const c = new X509Certificate(pem);
     const sanDomains =
       c.subjectAltName
-        ?.split(',')
-        .map(s => s.trim())
-        .filter(s => s.startsWith('DNS:'))
-        .map(s => s.slice(4)) ?? [];
-    const issuerLine = c.issuer ?? '';
+        ?.split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.startsWith("DNS:"))
+        .map((s) => s.slice(4)) ?? [];
+    const issuerLine = c.issuer ?? "";
     const issuer = (
       issuerLine.match(/O=([^\n,]+)/)?.[1] ??
       issuerLine.match(/CN=([^\n,]+)/)?.[1] ??
@@ -76,11 +81,10 @@ function parsePemInfo(pem: string): { validTo: string; validFrom: string; issuer
 
 function getExpiryStatus(validToIso: string): CertExpiryStatus {
   const diff = new Date(validToIso).getTime() - Date.now();
-  if (diff < 0) return 'expired';
-  if (diff < 30 * 86400 * 1000) return 'expiring_soon';
-  return 'ok';
+  if (diff < 0) return "expired";
+  if (diff < 30 * 86400 * 1000) return "expiring_soon";
+  return "ok";
 }
-
 
 export const metadata: Metadata = {
   title: "Certificates",
@@ -121,7 +125,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
       .where(isNotNull(proxyHosts.certificateId)),
   ]);
 
-  const allAcmeHosts: AcmeHost[] = allAcmeRows.map(r => ({
+  const allAcmeHosts: AcmeHost[] = allAcmeRows.map((r) => ({
     id: r.id,
     name: r.name,
     domains: JSON.parse(r.domains) as string[],
@@ -146,7 +150,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
   for (const cert of certRows) {
     const domainNames = JSON.parse(cert.domainNames) as string[];
     // For imported certs, also check PEM SANs which may include wildcards
-    if (cert.type === 'imported' && cert.certificatePem) {
+    if (cert.type === "imported" && cert.certificatePem) {
       const pemInfo = parsePemInfo(cert.certificatePem);
       if (pemInfo?.sanDomains.length) {
         certDomainMap.set(cert.id, pemInfo.sanDomains);
@@ -162,7 +166,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
   for (const host of allAcmeHosts) {
     let coveredByCertId: number | null = null;
     for (const [certId, certDomains] of certDomainMap) {
-      if (host.domains.every(d => isDomainCoveredByCert(d, certDomains))) {
+      if (host.domains.every((d) => isDomainCoveredByCert(d, certDomains))) {
         coveredByCertId = certId;
         break;
       }
@@ -179,18 +183,20 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
 
   // Among ACME auto-managed hosts, collapse subdomain hosts under wildcard hosts.
   // e.g. if *.domain.de is an ACME host, sub.domain.de should not appear separately.
-  const wildcardAcmeHosts = filteredAcmeHosts.filter(h => h.domains.some(d => d.startsWith('*.')));
-  const wildcardDomainSets = wildcardAcmeHosts.map(h => h.domains);
+  const wildcardAcmeHosts = filteredAcmeHosts.filter((h) =>
+    h.domains.some((d) => d.startsWith("*.")),
+  );
+  const wildcardDomainSets = wildcardAcmeHosts.map((h) => h.domains);
   const deduplicatedAcmeHosts: AcmeHost[] = [];
   for (const host of filteredAcmeHosts) {
     // Never collapse a host that itself has a wildcard domain
-    if (host.domains.some(d => d.startsWith('*.'))) {
+    if (host.domains.some((d) => d.startsWith("*."))) {
       deduplicatedAcmeHosts.push(host);
       continue;
     }
     // Check if all of this host's domains are covered by any wildcard ACME host
-    const coveredByWildcard = wildcardDomainSets.some(wcDomains =>
-      host.domains.every(d => isDomainCoveredByCert(d, wcDomains))
+    const coveredByWildcard = wildcardDomainSets.some((wcDomains) =>
+      host.domains.every((d) => isDomainCoveredByCert(d, wcDomains)),
     );
     if (!coveredByWildcard) {
       deduplicatedAcmeHosts.push(host);
@@ -204,12 +210,15 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
 
   const importedCerts: ImportedCertView[] = [];
   const managedCerts: ManagedCertView[] = [];
-  const issuedByCa = issuedClientCerts.reduce<Map<number, IssuedClientCertificate[]>>((map, cert) => {
-    const current = map.get(cert.caCertificateId) ?? [];
-    current.push(cert);
-    map.set(cert.caCertificateId, current);
-    return map;
-  }, new Map());
+  const issuedByCa = issuedClientCerts.reduce<Map<number, IssuedClientCertificate[]>>(
+    (map, cert) => {
+      const current = map.get(cert.caCertificateId) ?? [];
+      current.push(cert);
+      map.set(cert.caCertificateId, current);
+      return map;
+    },
+    new Map(),
+  );
   const caCertificateViews: CaCertificateView[] = caCerts.map((cert) => ({
     ...cert,
     issuedCerts: issuedByCa.get(cert.id) ?? [],
@@ -217,7 +226,7 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
 
   for (const cert of certRows) {
     const domainNames = JSON.parse(cert.domainNames) as string[];
-    if (cert.type === 'imported') {
+    if (cert.type === "imported") {
       const pemInfo = cert.certificatePem ? parsePemInfo(cert.certificatePem) : null;
       importedCerts.push({
         id: cert.id,

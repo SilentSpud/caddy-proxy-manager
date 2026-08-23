@@ -7,7 +7,7 @@ import {
   updateGroup,
   deleteGroup,
   addGroupMember,
-  removeGroupMember
+  removeGroupMember,
 } from "@/src/lib/models/groups";
 
 export async function createGroupAction(formData: FormData) {
@@ -19,7 +19,7 @@ export async function createGroupAction(formData: FormData) {
       name: String(formData.get("name") ?? ""),
       description: formData.get("description") ? String(formData.get("description")) : null,
     },
-    userId
+    userId,
   );
 
   revalidatePath("/groups");
@@ -35,7 +35,7 @@ export async function updateGroupAction(id: number, formData: FormData) {
       name: String(formData.get("name") ?? ""),
       description: formData.get("description") ? String(formData.get("description")) : null,
     },
-    userId
+    userId,
   );
 
   revalidatePath("/groups");

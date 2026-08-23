@@ -18,7 +18,7 @@ describe('stripLeadingSlashBeforeDriveLetter', () => {
     it('drops the slash a file: URL puts before the drive letter', () => {
       expect(onWindows('/C:/data/app.db')).toBe('C:/data/app.db');
       expect(onWindows('/R:/source/caddy-proxy-manager/data/app.db')).toBe(
-        'R:/source/caddy-proxy-manager/data/app.db'
+        'R:/source/caddy-proxy-manager/data/app.db',
       );
     });
 
@@ -28,7 +28,9 @@ describe('stripLeadingSlashBeforeDriveLetter', () => {
     });
 
     it('leaves a POSIX path alone — that is the Docker default', () => {
-      expect(onWindows('/app/data/caddy-proxy-manager.db')).toBe('/app/data/caddy-proxy-manager.db');
+      expect(onWindows('/app/data/caddy-proxy-manager.db')).toBe(
+        '/app/data/caddy-proxy-manager.db',
+      );
     });
 
     it('leaves an already-correct drive path alone', () => {
@@ -43,8 +45,12 @@ describe('stripLeadingSlashBeforeDriveLetter', () => {
 
   describe('on POSIX', () => {
     it('changes nothing, since a drive letter carries no meaning there', () => {
-      expect(stripLeadingSlashBeforeDriveLetter('/C:/data/app.db', 'linux')).toBe('/C:/data/app.db');
-      expect(stripLeadingSlashBeforeDriveLetter('/app/data/app.db', 'linux')).toBe('/app/data/app.db');
+      expect(stripLeadingSlashBeforeDriveLetter('/C:/data/app.db', 'linux')).toBe(
+        '/C:/data/app.db',
+      );
+      expect(stripLeadingSlashBeforeDriveLetter('/app/data/app.db', 'linux')).toBe(
+        '/app/data/app.db',
+      );
     });
   });
 });

@@ -7,12 +7,22 @@ import { join } from 'node:path';
 // reading / offset behaviour of readLines.
 vi.mock('@/src/lib/db', () => ({
   default: {
-    select: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }) }) }),
-    insert: vi.fn().mockReturnValue({ values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) }) }),
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }),
+      }),
+    }),
+    insert: vi.fn().mockReturnValue({
+      values: vi
+        .fn()
+        .mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) }),
+    }),
   },
 }));
 vi.mock('maxmind', () => ({ default: { open: vi.fn().mockResolvedValue(null) } }));
-vi.mock('@/src/lib/clickhouse/client', () => ({ insertTrafficEvents: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/src/lib/clickhouse/client', () => ({
+  insertTrafficEvents: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { readLines } from '@/src/lib/log-parser';
 

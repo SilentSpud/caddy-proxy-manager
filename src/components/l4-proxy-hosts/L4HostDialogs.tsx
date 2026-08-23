@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useActionState, useEffect, useState } from "react";
+import { type ReactNode, useActionState, useEffect, useState } from "react";
 import {
   createL4ProxyHostAction,
   deleteL4ProxyHostAction,
@@ -147,9 +147,7 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     lbActiveHealthTimeout: lb?.activeHealthCheck?.timeout ?? "",
     lbPassiveHealthFailDuration: lb?.passiveHealthCheck?.failDuration ?? "",
     lbPassiveHealthMaxFails:
-      lb?.passiveHealthCheck?.maxFails != null
-        ? String(lb.passiveHealthCheck.maxFails)
-        : "",
+      lb?.passiveHealthCheck?.maxFails != null ? String(lb.passiveHealthCheck.maxFails) : "",
     lbPassiveHealthUnhealthyLatency: lb?.passiveHealthCheck?.unhealthyLatency ?? "",
     dnsResolvers: initialData?.dnsResolver?.resolvers?.join("\n") ?? "",
     dnsFallbacks: initialData?.dnsResolver?.fallbacks?.join("\n") ?? "",
@@ -186,50 +184,45 @@ function L4HostForm({
   // needs seeded state. They are grouped rather than declared one useState at
   // a time, since there are twenty-six of them.
   const [text, setText] = useState<TextFields>(() => initialText(initialData));
-  const set = <K extends keyof TextFields>(key: K) => (value: string) =>
-    setText((prev) => ({ ...prev, [key]: value }));
+  const set =
+    <K extends keyof TextFields>(key: K) =>
+    (value: string) =>
+      setText((prev) => ({ ...prev, [key]: value }));
 
   const [tlsTermination, setTlsTermination] = useState(initialData?.tlsTermination ?? false);
   const [proxyProtocolReceive, setProxyProtocolReceive] = useState(
-    initialData?.proxyProtocolReceive ?? false
+    initialData?.proxyProtocolReceive ?? false,
   );
   const [proxyProtocolVersion, setProxyProtocolVersion] = useState<string>(
-    initialData?.proxyProtocolVersion ?? "__none__"
+    initialData?.proxyProtocolVersion ?? "__none__",
   );
   const [lbEnabled, setLbEnabled] = useState(initialData?.loadBalancer?.enabled ?? false);
-  const [lbPolicy, setLbPolicy] = useState<string>(
-    initialData?.loadBalancer?.policy ?? "random"
-  );
+  const [lbPolicy, setLbPolicy] = useState<string>(initialData?.loadBalancer?.policy ?? "random");
   const [lbActiveHealthEnabled, setLbActiveHealthEnabled] = useState(
-    initialData?.loadBalancer?.activeHealthCheck?.enabled ?? false
+    initialData?.loadBalancer?.activeHealthCheck?.enabled ?? false,
   );
   const [lbPassiveHealthEnabled, setLbPassiveHealthEnabled] = useState(
-    initialData?.loadBalancer?.passiveHealthCheck?.enabled ?? false
+    initialData?.loadBalancer?.passiveHealthCheck?.enabled ?? false,
   );
   const [dnsEnabled, setDnsEnabled] = useState(initialData?.dnsResolver?.enabled ?? false);
   const [geoblockEnabled, setGeoblockEnabled] = useState(initialData?.geoblock?.enabled ?? false);
-  const [geoblockMode, setGeoblockMode] = useState<string>(
-    initialData?.geoblockMode ?? "merge"
-  );
+  const [geoblockMode, setGeoblockMode] = useState<string>(initialData?.geoblockMode ?? "merge");
   const [upstreamDnsMode, setUpstreamDnsMode] = useState(
     initialData?.upstreamDnsResolution?.enabled === true
       ? "enabled"
       : initialData?.upstreamDnsResolution?.enabled === false
         ? "disabled"
-        : "inherit"
+        : "inherit",
   );
   const [upstreamDnsFamily, setUpstreamDnsFamily] = useState<string>(
-    initialData?.upstreamDnsResolution?.family ?? "inherit"
+    initialData?.upstreamDnsResolution?.family ?? "inherit",
   );
 
   return (
     <form id={formId} action={formAction}>
       <VStack gap={5}>
         {state.status !== "idle" && state.message && (
-          <Banner
-            status={state.status === "error" ? "error" : "success"}
-            title={state.message}
-          />
+          <Banner status={state.status === "error" ? "error" : "success"} title={state.message} />
         )}
 
         <input type="hidden" name="enabledPresent" value="1" />
@@ -249,7 +242,12 @@ function L4HostForm({
                   : "This host is disabled and will not accept connections"}
               </Text>
             </VStack>
-            <Switch label="Enable this L4 host" isLabelHidden value={enabled} onChange={setEnabled} />
+            <Switch
+              label="Enable this L4 host"
+              isLabelHidden
+              value={enabled}
+              onChange={setEnabled}
+            />
           </HStack>
         </Card>
 
@@ -299,9 +297,7 @@ function L4HostForm({
           htmlName="matcherType"
           options={MATCHER_OPTIONS}
           value={matcherType}
-          onChange={(v) =>
-            setMatcherType(v as "none" | "tls_sni" | "http_host" | "proxy_protocol")
-          }
+          onChange={(v) => setMatcherType(v as "none" | "tls_sni" | "http_host" | "proxy_protocol")}
           description="Match incoming connections before proxying. 'None' matches all connections on this port."
         />
 
@@ -654,10 +650,7 @@ export function CreateL4HostDialog({
   onClose: () => void;
   initialData?: L4ProxyHost | null;
 }) {
-  const [state, formAction] = useActionState(
-    createL4ProxyHostAction,
-    INITIAL_ACTION_STATE
-  );
+  const [state, formAction] = useActionState(createL4ProxyHostAction, INITIAL_ACTION_STATE);
 
   useEffect(() => {
     if (state.status === "success") {
@@ -673,18 +666,14 @@ export function CreateL4HostDialog({
       maxWidth="lg"
       submitLabel="Create"
       onSubmit={() => {
-        (
-          document.getElementById("create-l4-host-form") as HTMLFormElement
-        )?.requestSubmit();
+        (document.getElementById("create-l4-host-form") as HTMLFormElement)?.requestSubmit();
       }}
     >
       <L4HostForm
         formId="create-l4-host-form"
         formAction={formAction}
         state={state}
-        initialData={
-          initialData ? { ...initialData, name: `${initialData.name} (Copy)` } : null
-        }
+        initialData={initialData ? { ...initialData, name: `${initialData.name} (Copy)` } : null}
       />
     </AppDialog>
   );
@@ -701,7 +690,7 @@ export function EditL4HostDialog({
 }) {
   const [state, formAction] = useActionState(
     updateL4ProxyHostAction.bind(null, host.id),
-    INITIAL_ACTION_STATE
+    INITIAL_ACTION_STATE,
   );
 
   useEffect(() => {
@@ -718,9 +707,7 @@ export function EditL4HostDialog({
       maxWidth="lg"
       submitLabel="Save Changes"
       onSubmit={() => {
-        (
-          document.getElementById("edit-l4-host-form") as HTMLFormElement
-        )?.requestSubmit();
+        (document.getElementById("edit-l4-host-form") as HTMLFormElement)?.requestSubmit();
       }}
     >
       <L4HostForm
@@ -744,7 +731,7 @@ export function DeleteL4HostDialog({
 }) {
   const [state, formAction] = useActionState(
     deleteL4ProxyHostAction.bind(null, host.id),
-    INITIAL_ACTION_STATE
+    INITIAL_ACTION_STATE,
   );
 
   useEffect(() => {
@@ -761,18 +748,13 @@ export function DeleteL4HostDialog({
       maxWidth="lg"
       submitLabel="Delete"
       onSubmit={() => {
-        (
-          document.getElementById("delete-l4-host-form") as HTMLFormElement
-        )?.requestSubmit();
+        (document.getElementById("delete-l4-host-form") as HTMLFormElement)?.requestSubmit();
       }}
     >
       <form id="delete-l4-host-form" action={formAction}>
         <VStack gap={4}>
           {state.status !== "idle" && state.message && (
-            <Banner
-              status={state.status === "error" ? "error" : "success"}
-              title={state.message}
-            />
+            <Banner status={state.status === "error" ? "error" : "success"} title={state.message} />
           )}
           <Text type="body" size="sm">
             Are you sure you want to delete the L4 proxy host <strong>{host.name}</strong>?

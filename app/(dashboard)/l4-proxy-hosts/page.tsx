@@ -15,12 +15,17 @@ export const metadata: Metadata = {
 
 export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   await requireAdmin();
-  const { page: pageParam, search: searchParam, sortBy: sortByParam, sortDir: sortDirParam } = await searchParams;
+  const {
+    page: pageParam,
+    search: searchParam,
+    sortBy: sortByParam,
+    sortDir: sortDirParam,
+  } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
   const offset = (page - 1) * PER_PAGE;
   const sortBy = sortByParam || undefined;
-  const sortDir = (sortDirParam === "asc" || sortDirParam === "desc") ? sortDirParam : "desc";
+  const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
 
   const [hosts, total] = await Promise.all([
     listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir),

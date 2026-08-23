@@ -1,0 +1,103 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+
+  // Mirrors the ignore list the old eslint.config.mjs carried, plus generated and
+  // vendored data Biome would otherwise rewrite. public/ is all static assets:
+  // maplibre-gl's minified worker bundle, staged from node_modules at build time,
+  // and the world-atlas TopoJSON, which is minified to one line — formatting it
+  // expands a 756 KB asset into 85,000 lines. drizzle/meta holds drizzle-kit's
+  // snapshots; dist/coverage/.next are build and report output.
+  "files": {
+    "includes": [
+      "**",
+      "!node_modules",
+      "!.next",
+      "!dist",
+      "!coverage",
+      "!out",
+      "!build",
+      "!next-env.d.ts",
+      "!.claude",
+      "!public",
+      "!drizzle/meta",
+      "!skills-lock.json",
+      "!bun.lock"
+    ]
+  },
+
+  // Settings chosen to match the code that is already here rather than to impose
+  // Biome's defaults: the tree is 2-space indented with no tabs, and its 99th
+  // percentile line is 111 characters, so Biome's default width of 80 would
+  // rewrap a great deal of code that reads fine today.
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+
+  "linter": {
+    "enabled": true,
+    // Domains replace the per-plugin rule lists eslint needed. `drizzle` is the
+    // notable gain over the old setup — it catches things like an update or
+    // delete with no `where`, which this codebase is full of opportunities for.
+    "domains": {
+      "next": "recommended",
+      "react": "recommended",
+      "drizzle": "recommended"
+    },
+    "rules": {
+      "preset": "recommended",
+      // Carried over from eslint: the dashboard serves user-supplied avatars and
+      // GeoIP flags from arbitrary origins, which next/image cannot handle.
+      "performance": { "noImgElement": "off" },
+      "style": {
+        // Off deliberately, not by oversight. typescript-eslint only ships this
+        // in its `strict` preset, so the 442 non-null assertions already in this
+        // tree were never linted; turning it on would mean rewriting them all in
+        // a dependency-migration change. Worth enabling later as its own pass.
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
+
+  "javascript": {
+    "formatter": { "quoteStyle": "double", "semicolons": "always" }
+  },
+
+  // app/globals.css is Tailwind 4, whose @theme/@apply at-rules are not standard
+  // CSS. Without this the file fails to parse and is silently unchecked.
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  },
+
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        // Deliberately off. Import order is load-bearing here: src/lib/db.ts runs
+        // migrations, env provider sync and the admin bootstrap at module scope,
+        // so a module's imports are also its startup sequence. Sorting them is a
+        // silent reordering of that sequence.
+        "organizeImports": "off"
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      // The test tree writes single-quoted and leans on `any` for fixtures and
+      // on require() for module-mocking; both were already exempt under eslint.
+      "includes": ["tests/**"],
+      "javascript": { "formatter": { "quoteStyle": "single" } },
+      "linter": {
+        "domains": { "test": "recommended", "playwright": "recommended" },
+        "rules": {
+          "suspicious": { "noExplicitAny": "off" },
+          "style": { "noCommonJs": "off" }
+        }
+      }
+    }
+  ]
+}

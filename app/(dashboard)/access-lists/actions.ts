@@ -7,7 +7,7 @@ import {
   createAccessList,
   deleteAccessList,
   removeAccessListEntry,
-  updateAccessList
+  updateAccessList,
 } from "@/src/lib/models/access-lists";
 
 export async function createAccessListAction(input: {
@@ -23,7 +23,7 @@ export async function createAccessListAction(input: {
       description: input.description,
       users: input.users.filter((u) => u.username.trim() && u.password),
     },
-    userId
+    userId,
   );
   revalidatePath("/access-lists");
   return list;
@@ -31,7 +31,7 @@ export async function createAccessListAction(input: {
 
 export async function updateAccessListAction(
   id: number,
-  input: { name?: string; description?: string | null }
+  input: { name?: string; description?: string | null },
 ) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
@@ -49,7 +49,7 @@ export async function deleteAccessListAction(id: number) {
 
 export async function addAccessEntryAction(
   accessListId: number,
-  entry: { username: string; password: string }
+  entry: { username: string; password: string },
 ) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
@@ -58,10 +58,7 @@ export async function addAccessEntryAction(
   return list;
 }
 
-export async function deleteAccessEntryAction(
-  accessListId: number,
-  entryId: number
-) {
+export async function deleteAccessEntryAction(accessListId: number, entryId: number) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   const list = await removeAccessListEntry(accessListId, entryId, userId);
@@ -69,13 +66,10 @@ export async function deleteAccessEntryAction(
   return list;
 }
 
-export async function bulkDeleteEntriesAction(
-  accessListId: number,
-  entryIds: number[]
-) {
+export async function bulkDeleteEntriesAction(accessListId: number, entryIds: number[]) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
-  let list;
+  let list: Awaited<ReturnType<typeof removeAccessListEntry>> | undefined;
   for (const entryId of entryIds) {
     list = await removeAccessListEntry(accessListId, entryId, userId);
   }
@@ -86,15 +80,17 @@ export async function bulkDeleteEntriesAction(
 export async function regeneratePasswordAction(
   accessListId: number,
   entryId: number,
-  newPassword: string
+  newPassword: string,
 ) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   // Remove old entry and add new one with same username
   // We need to get the username first
-  const { removeAccessListEntry: remove, addAccessListEntry: add, getAccessList } = await import(
-    "@/src/lib/models/access-lists"
-  );
+  const {
+    removeAccessListEntry: remove,
+    addAccessListEntry: add,
+    getAccessList,
+  } = await import("@/src/lib/models/access-lists");
   const listBefore = await getAccessList(accessListId);
   if (!listBefore) throw new Error("Access list not found");
   const entry = listBefore.entries.find((e) => e.id === entryId);

@@ -32,7 +32,10 @@ async function loginViaUi(context: BrowserContext): Promise<void> {
 test.describe('Active session management', () => {
   test.setTimeout(90_000);
 
-  test('lists sessions, marks the current one, and revoking another logs it out', async ({ page, browser }) => {
+  test('lists sessions, marks the current one, and revoking another logs it out', async ({
+    page,
+    browser,
+  }) => {
     // `page` carries the admin storageState (session #1). Create a second,
     // independent session in a CLEAN context. The empty storageState is
     // required — browser.newContext() otherwise inherits the project's admin
@@ -54,7 +57,9 @@ test.describe('Active session management', () => {
       expect(list1.find((s) => s.current)!.id).not.toBe(session2Id);
 
       // Revoke session #2 from session #1.
-      const del = await page.request.delete(`${API}/sessions/${session2Id}`, { headers: { Origin: BASE_URL } });
+      const del = await page.request.delete(`${API}/sessions/${session2Id}`, {
+        headers: { Origin: BASE_URL },
+      });
       expect(del.ok()).toBeTruthy();
 
       // It's gone from the list…
@@ -70,13 +75,19 @@ test.describe('Active session management', () => {
 
   test('cannot revoke a session id that does not belong to the user', async ({ page }) => {
     // A wildly out-of-range id is not the caller's session → 404, never 200.
-    const resp = await page.request.delete(`${API}/sessions/2147483000`, { headers: { Origin: BASE_URL } });
+    const resp = await page.request.delete(`${API}/sessions/2147483000`, {
+      headers: { Origin: BASE_URL },
+    });
     expect(resp.status()).toBe(404);
   });
 
-  test('profile page renders the Active Sessions card with the current device', async ({ page }) => {
+  test('profile page renders the Active Sessions card with the current device', async ({
+    page,
+  }) => {
     await page.goto(`${BASE_URL}/profile`);
-    await expect(page.getByRole('heading', { name: /active sessions/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /active sessions/i })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByText(/this device/i).first()).toBeVisible();
   });
 });

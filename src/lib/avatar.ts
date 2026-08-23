@@ -116,7 +116,7 @@ export type ResolveAvatarOptions = {
 export function resolveAvatar(
   user: AvatarUser,
   size = 160,
-  options: ResolveAvatarOptions = {}
+  options: ResolveAvatarOptions = {},
 ): ResolvedAvatar {
   const { gravatar = true } = options;
   const imageUrl = user.avatarUrl?.trim() || null;

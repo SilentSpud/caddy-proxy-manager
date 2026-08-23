@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import db, { nowIso } from "./db";
+import { CREDENTIAL_ISSUER } from "./account-issuer";
 import { config } from "./config";
 import { users, accounts } from "./db/schema";
 import { and, eq } from "drizzle-orm";
@@ -15,7 +16,9 @@ export async function ensureAdminUser(): Promise<void> {
   // OIDC-only mode: no local accounts exist, so there is no bootstrap admin to
   // seed and no admin credentials to require. Roles come from the IdP's groups.
   if (config.auth.disableLocalUsers) {
-    console.log("Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true) — skipping admin user seed");
+    console.log(
+      "Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true) — skipping admin user seed",
+    );
     return;
   }
 
@@ -36,7 +39,7 @@ export async function ensureAdminUser(): Promise<void> {
 
   // Check if admin user already exists
   const existingUser = await db.query.users.findFirst({
-    where: (table, { eq }) => eq(table.id, adminId)
+    where: (table, { eq }) => eq(table.id, adminId),
   });
 
   if (existingUser) {
@@ -53,7 +56,7 @@ export async function ensureAdminUser(): Promise<void> {
         role: "admin",
         username: adminUsername.toLowerCase(),
         displayUsername: adminUsername,
-        updatedAt: now
+        updatedAt: now,
       })
       .where(eq(users.id, adminId));
     // Ensure credential account row exists for Better Auth
@@ -77,7 +80,7 @@ export async function ensureAdminUser(): Promise<void> {
     avatarUrl: null,
     status: "active",
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   });
 
   console.log(`Created admin user: ${adminUsername}`);
@@ -92,21 +95,27 @@ export async function ensureAdminUser(): Promise<void> {
  */
 async function ensureCredentialAccount(userId: number, passwordHash: string): Promise<void> {
   const now = nowIso();
-  const existing = await db.select().from(accounts).where(
-    and(eq(accounts.userId, userId), eq(accounts.providerId, "credential"))
-  ).get();
+  const existing = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+    .get();
 
   if (existing) {
     // Update password hash if changed
-    await db.update(accounts).set({
-      password: passwordHash,
-      updatedAt: now,
-    }).where(eq(accounts.id, existing.id));
+    await db
+      .update(accounts)
+      .set({
+        password: passwordHash,
+        updatedAt: now,
+      })
+      .where(eq(accounts.id, existing.id));
   } else {
     await db.insert(accounts).values({
       userId,
       accountId: userId.toString(),
       providerId: "credential",
+      issuer: CREDENTIAL_ISSUER,
       password: passwordHash,
       createdAt: now,
       updatedAt: now,

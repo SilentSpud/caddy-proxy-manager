@@ -1,6 +1,14 @@
 "use client";
 
-import { ReactNode, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useActionState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -35,6 +43,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
 import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
+import { withRowIds } from "@/lib/row-id";
 import {
   suppressWafRuleGloballyAction,
   suppressWafRuleForHostAction,
@@ -48,7 +57,7 @@ type Props = {
   stats: WafEventStats;
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
-  initialRange: 'all' | '24h' | '7d' | '30d' | 'custom';
+  initialRange: "all" | "24h" | "7d" | "30d" | "custom";
   initialFrom: number | null;
   initialTo: number | null;
   globalExcluded: number[];
@@ -58,16 +67,16 @@ type Props = {
   globalWaf: WafSettings | null;
 };
 
-type RangeOption = Props['initialRange'];
+type RangeOption = Props["initialRange"];
 
 function formatDateTimeLocal(unixTs: number | null): string {
-  if (!unixTs) return '';
+  if (!unixTs) return "";
   const d = new Date(unixTs * 1000);
   const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
@@ -130,7 +139,9 @@ function extractBracketField(message: string, field: string): string | null {
 }
 
 function extractBracketFields(message: string, field: string): string[] {
-  return [...message.matchAll(new RegExp(`\\[${field} "([^"]*)"\\]`, "g"))].map((match) => match[1]);
+  return [...message.matchAll(new RegExp(`\\[${field} "([^"]*)"\\]`, "g"))].map(
+    (match) => match[1],
+  );
 }
 
 function normalizeAuditMessage(message: AuditMessage): AuditMessage {
@@ -164,11 +175,11 @@ function normalizeAuditMessage(message: AuditMessage): AuditMessage {
 /** Maps a Coraza severity onto the theme's badge variants. */
 const SEVERITY_VARIANTS: Record<string, "error" | "warning" | "info"> = {
   CRITICAL: "error",
-  ERROR:    "error",
-  HIGH:     "error",
-  WARNING:  "warning",
-  NOTICE:   "info",
-  INFO:     "info",
+  ERROR: "error",
+  HIGH: "error",
+  WARNING: "warning",
+  NOTICE: "info",
+  INFO: "info",
 };
 
 /* ── Chips ───────────────────────────────────────────────────────────────── */
@@ -207,10 +218,10 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 /* ── Stats bar ────────────────────────────────────────────────────────────── */
 function StatsBar({ stats }: { stats: WafEventStats }) {
   const items = [
-    { label: "Total Events",       value: stats.total,            color: "primary" as const },
-    { label: "Blocked",            value: stats.blocked,          color: "accent" as const },
-    { label: "Critical",           value: stats.critical,         color: "accent" as const },
-    { label: "Unique Hosts",       value: stats.uniqueHosts,      color: "accent" as const },
+    { label: "Total Events", value: stats.total, color: "primary" as const },
+    { label: "Blocked", value: stats.blocked, color: "accent" as const },
+    { label: "Critical", value: stats.critical, color: "accent" as const },
+    { label: "Unique Hosts", value: stats.uniqueHosts, color: "accent" as const },
     { label: "Rule IDs Triggered", value: stats.ruleIdsTriggered, color: "accent" as const },
   ];
 
@@ -276,19 +287,30 @@ function MatchTags({ tags }: { tags: string[] }) {
 function AuditPanel({ rawData }: { rawData: string | null }) {
   const [innerTab, setInnerTab] = useState("overview");
 
-  let data: AuditData | null = null;
-  if (rawData) {
-    try { data = JSON.parse(rawData) as AuditData; } catch { /* leave null */ }
-  }
+  // Parsed once per event instead of on every render. The matched rules get
+  // their row ids here, so switching the inner tab re-keys nothing.
+  const { data, msgs } = useMemo(() => {
+    let parsed: AuditData | null = null;
+    if (rawData) {
+      try {
+        parsed = JSON.parse(rawData) as AuditData;
+      } catch {
+        /* leave null */
+      }
+    }
+    return {
+      data: parsed,
+      msgs: withRowIds((parsed?.messages ?? []).map(normalizeAuditMessage)),
+    };
+  }, [rawData]);
 
   if (!data) {
     return <EmptyState title="No audit data available for this event." isCompact />;
   }
 
-  const tx   = data.transaction ?? null;
-  const req  = tx?.request ?? null;
-  const res  = tx?.response ?? null;
-  const msgs = (data.messages ?? []).map(normalizeAuditMessage);
+  const tx = data.transaction ?? null;
+  const req = tx?.request ?? null;
+  const res = tx?.response ?? null;
 
   return (
     <VStack gap={3}>
@@ -305,16 +327,24 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
             <>
               <MetadataList columns="multi">
                 <MetadataListItem label="Transaction ID">
-                  <Text type="code" size="xsm">{tx.id ?? "—"}</Text>
+                  <Text type="code" size="xsm">
+                    {tx.id ?? "—"}
+                  </Text>
                 </MetadataListItem>
                 <MetadataListItem label="Timestamp">
-                  <Text type="body" size="sm">{tx.timestamp ?? "—"}</Text>
+                  <Text type="body" size="sm">
+                    {tx.timestamp ?? "—"}
+                  </Text>
                 </MetadataListItem>
                 <MetadataListItem label="Client">
-                  <Text type="code" size="xsm">{tx.client_ip ?? "—"}:{tx.client_port ?? 0}</Text>
+                  <Text type="code" size="xsm">
+                    {tx.client_ip ?? "—"}:{tx.client_port ?? 0}
+                  </Text>
                 </MetadataListItem>
                 <MetadataListItem label="Server">
-                  <Text type="code" size="xsm">{tx.server_id ?? "—"}:{tx.host_port ?? 0}</Text>
+                  <Text type="code" size="xsm">
+                    {tx.server_id ?? "—"}:{tx.host_port ?? 0}
+                  </Text>
                 </MetadataListItem>
               </MetadataList>
               {msgs.length > 0 && (
@@ -324,8 +354,8 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                     <Text type="label" size="3xs" weight="bold" color="secondary">
                       Matched Rules
                     </Text>
-                    {msgs.map((m, i) => (
-                      <Card key={i} variant="red" padding={3}>
+                    {msgs.map((m) => (
+                      <Card key={m.rowId} variant="red" padding={3}>
                         <VStack gap={2}>
                           <HStack gap={2} vAlign="center">
                             <Text type="code" size="xsm" weight="semibold">
@@ -333,7 +363,9 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                             </Text>
                             <SeverityChip severity={m.details?.severity ?? null} />
                           </HStack>
-                          <Text type="body" size="xsm">{m.message}</Text>
+                          <Text type="body" size="xsm">
+                            {m.message}
+                          </Text>
                           {m.details?.match && (
                             <Text type="code" size="xsm" color="secondary">
                               &#8627; {m.details.match}
@@ -359,12 +391,18 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                     <Text type="code" size="xsm" weight="semibold" color="accent">
                       {req.method}
                     </Text>
-                    <Text type="code" size="xsm">{req.uri}</Text>
+                    <Text type="code" size="xsm">
+                      {req.uri}
+                    </Text>
                   </HStack>
-                  <Text type="code" size="xsm" color="secondary">{req.protocol}</Text>
+                  <Text type="code" size="xsm" color="secondary">
+                    {req.protocol}
+                  </Text>
                 </HStack>
               </Card>
-              <DetailRow label="Headers"><HeadersGrid headers={req.headers} /></DetailRow>
+              <DetailRow label="Headers">
+                <HeadersGrid headers={req.headers} />
+              </DetailRow>
               {req.args && Object.keys(req.args).length > 0 && (
                 <DetailRow label="Query Args">
                   <HeadersGrid headers={req.args as Record<string, string>} />
@@ -376,7 +414,9 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                 </DetailRow>
               )}
               <DetailRow label="Content Length">
-                <Text type="code" size="xsm">{req.length ?? 0} bytes</Text>
+                <Text type="code" size="xsm">
+                  {req.length ?? 0} bytes
+                </Text>
               </DetailRow>
             </VStack>
           )}
@@ -395,10 +435,14 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                     }
                     label={String(res.status || "—")}
                   />
-                  <Text type="code" size="xsm" color="secondary">{res.protocol}</Text>
+                  <Text type="code" size="xsm" color="secondary">
+                    {res.protocol}
+                  </Text>
                 </HStack>
               </Card>
-              <DetailRow label="Response Headers"><HeadersGrid headers={res.headers} /></DetailRow>
+              <DetailRow label="Response Headers">
+                <HeadersGrid headers={res.headers} />
+              </DetailRow>
               {res.body && (
                 <DetailRow label="Body">
                   <CodeBlock {...bodyCode(res.body)} width="100%" isCollapsible />
@@ -409,8 +453,8 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
 
           {innerTab === "matches" && (
             <VStack gap={4}>
-              {msgs.map((m, i) => (
-                <VStack key={i} gap={2}>
+              {msgs.map((m) => (
+                <VStack key={m.rowId} gap={2}>
                   <MetadataList columns="multi">
                     <MetadataListItem label="Rule ID">
                       <Text type="code" size="xsm" weight="semibold">
@@ -421,10 +465,14 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                       <SeverityChip severity={m.details?.severity ?? null} />
                     </MetadataListItem>
                     <MetadataListItem label="Message">
-                      <Text type="body" size="xsm">{m.message}</Text>
+                      <Text type="body" size="xsm">
+                        {m.message}
+                      </Text>
                     </MetadataListItem>
                     <MetadataListItem label="Log Data">
-                      <Text type="code" size="xsm">{m.details?.logdata ?? "—"}</Text>
+                      <Text type="code" size="xsm">
+                        {m.details?.logdata ?? "—"}
+                      </Text>
                     </MetadataListItem>
                     <MetadataListItem label="File">
                       <Text type="code" size="xsm" color="secondary">
@@ -449,8 +497,20 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
         </VStack>
       </Card>
 
-      <Collapsible defaultIsOpen={false} trigger={<Text type="body" size="xsm">Raw JSON</Text>}>
-        <CodeBlock code={JSON.stringify(data, null, 2)} language="json" width="100%" isCollapsible />
+      <Collapsible
+        defaultIsOpen={false}
+        trigger={
+          <Text type="body" size="xsm">
+            Raw JSON
+          </Text>
+        }
+      >
+        <CodeBlock
+          code={JSON.stringify(data, null, 2)}
+          language="json"
+          width="100%"
+          isCollapsible
+        />
       </Collapsible>
     </VStack>
   );
@@ -475,16 +535,21 @@ function EventDetailPanel({
   const [pending, startTransition] = useTransition();
 
   const eventHostBare = event.host ? event.host.replace(/:\d+$/, "") : "";
-  const isGloballySuppressed  = event.ruleId != null && globalExcluded.includes(event.ruleId);
-  const isHostOnlySuppressed  = event.ruleId != null && !!eventHostBare && (hostWafMap[eventHostBare] ?? []).includes(event.ruleId);
-  const isHostSuppressed      = isGloballySuppressed || isHostOnlySuppressed;
+  const isGloballySuppressed = event.ruleId != null && globalExcluded.includes(event.ruleId);
+  const isHostOnlySuppressed =
+    event.ruleId != null &&
+    !!eventHostBare &&
+    (hostWafMap[eventHostBare] ?? []).includes(event.ruleId);
+  const isHostSuppressed = isGloballySuppressed || isHostOnlySuppressed;
 
   function handleSuppressGlobally() {
     if (!event.ruleId) return;
     startTransition(async () => {
       const result = await suppressWafRuleGloballyAction(event.ruleId!);
-      if (result.success) { toast.success(result.message ?? "Done"); onSuppressGlobal(event.ruleId!); }
-      else toast.error(result.message ?? "Failed");
+      if (result.success) {
+        toast.success(result.message ?? "Done");
+        onSuppressGlobal(event.ruleId!);
+      } else toast.error(result.message ?? "Failed");
     });
   }
 
@@ -492,8 +557,10 @@ function EventDetailPanel({
     if (!event.ruleId || !event.host) return;
     startTransition(async () => {
       const result = await suppressWafRuleForHostAction(event.ruleId!, event.host!);
-      if (result.success) { toast.success(result.message ?? "Done"); onSuppressHost(event.ruleId!, event.host!); }
-      else toast.error(result.message ?? "Failed");
+      if (result.success) {
+        toast.success(result.message ?? "Done");
+        onSuppressHost(event.ruleId!, event.host!);
+      } else toast.error(result.message ?? "Failed");
     });
   }
 
@@ -524,11 +591,15 @@ function EventDetailPanel({
               </Text>
             </MetadataListItem>
             <MetadataListItem label="Host">
-              <Text type="code" size="sm">{event.host || "—"}</Text>
+              <Text type="code" size="sm">
+                {event.host || "—"}
+              </Text>
             </MetadataListItem>
             <MetadataListItem label="Client IP">
               <HStack gap={2} vAlign="center" wrap="wrap">
-                <Text type="code" size="sm">{event.clientIp}</Text>
+                <Text type="code" size="sm">
+                  {event.clientIp}
+                </Text>
                 {event.countryCode && <Badge label={event.countryCode} />}
               </HStack>
             </MetadataListItem>
@@ -538,13 +609,19 @@ function EventDetailPanel({
               </Text>
             </MetadataListItem>
             <MetadataListItem label="URI">
-              <Text type="code" size="xsm" color="secondary">{event.uri || "—"}</Text>
+              <Text type="code" size="xsm" color="secondary">
+                {event.uri || "—"}
+              </Text>
             </MetadataListItem>
             <MetadataListItem label="Rule ID">
-              <Text type="code" size="sm" weight="semibold">{event.ruleId ?? "—"}</Text>
+              <Text type="code" size="sm" weight="semibold">
+                {event.ruleId ?? "—"}
+              </Text>
             </MetadataListItem>
             <MetadataListItem label="Rule Message">
-              <Text type="body" size="sm">{event.ruleMessage ?? "—"}</Text>
+              <Text type="body" size="sm">
+                {event.ruleMessage ?? "—"}
+              </Text>
             </MetadataListItem>
           </MetadataList>
         </Card>
@@ -565,9 +642,7 @@ function EventDetailPanel({
                 variant="secondary"
                 icon={<ShieldOff />}
                 label={
-                  isHostSuppressed
-                    ? `Suppressed for ${event.host}`
-                    : `Suppress for ${event.host}`
+                  isHostSuppressed ? `Suppressed for ${event.host}` : `Suppress for ${event.host}`
                 }
                 isDisabled={pending || isHostSuppressed}
                 onClick={handleSuppressForHost}
@@ -608,21 +683,28 @@ function GlobalSuppressedRules({
 
   const [addInput, setAddInput] = useState("");
   const [lookupPending, setLookupPending] = useState(false);
-  const [pendingRule, setPendingRule] = useState<{ id: number; message: string | null } | null>(null);
+  const [pendingRule, setPendingRule] = useState<{ id: number; message: string | null } | null>(
+    null,
+  );
   const [search, setSearch] = useState("");
 
   function handleRemove(ruleId: number) {
     startTransition(async () => {
       const result = await removeWafRuleGloballyAction(ruleId);
-      if (result.success) { toast.success(result.message ?? "Done"); onRemove(ruleId); }
-      else toast.error(result.message ?? "Failed");
+      if (result.success) {
+        toast.success(result.message ?? "Done");
+        onRemove(ruleId);
+      } else toast.error(result.message ?? "Failed");
     });
   }
 
   async function handleLookup() {
     const n = parseInt(addInput.trim(), 10);
     if (!Number.isInteger(n) || n <= 0) return;
-    if (excluded.includes(n)) { toast.error(`Rule ${n} is already suppressed.`); return; }
+    if (excluded.includes(n)) {
+      toast.error(`Rule ${n} is already suppressed.`);
+      return;
+    }
     setLookupPending(true);
     try {
       const result = await lookupWafRuleMessageAction(n);
@@ -680,7 +762,10 @@ function GlobalSuppressedRules({
             label="Add Rule by ID"
             size="sm"
             value={addInput}
-            onChange={(v) => { setAddInput(v); setPendingRule(null); }}
+            onChange={(v) => {
+              setAddInput(v);
+              setPendingRule(null);
+            }}
             onEnter={handleLookup}
             placeholder="Rule ID"
             isDisabled={lookupPending || pending}
@@ -718,7 +803,10 @@ function GlobalSuppressedRules({
                   variant="secondary"
                   label="Cancel"
                   isDisabled={pending}
-                  onClick={() => { setPendingRule(null); setAddInput(""); }}
+                  onClick={() => {
+                    setPendingRule(null);
+                    setAddInput("");
+                  }}
                 />
               </HStack>
             </VStack>
@@ -786,31 +874,57 @@ const RANGE_OPTIONS: { value: RangeOption; label: string }[] = [
 ];
 
 const WAF_TEMPLATES = [
-  { label: "Allow IP",             snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"` },
-  { label: "Disable WAF for path", snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"` },
-  { label: "Remove XSS rules",     snippet: `SecRuleRemoveByTag "attack-xss"` },
-  { label: "Block User-Agent",     snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"` },
+  {
+    label: "Allow IP",
+    snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
+  },
+  {
+    label: "Disable WAF for path",
+    snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
+  },
+  { label: "Remove XSS rules", snippet: `SecRuleRemoveByTag "attack-xss"` },
+  {
+    label: "Block User-Agent",
+    snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
+  },
 ];
 
-export default function WafEventsClient({ events, stats, pagination, initialSearch, initialRange, initialFrom, initialTo, globalExcluded, globalExcludedMessages, globalWafEnabled, hostWafMap, globalWaf }: Props) {
-  const router       = useRouter();
-  const pathname     = usePathname();
+export default function WafEventsClient({
+  events,
+  stats,
+  pagination,
+  initialSearch,
+  initialRange,
+  initialFrom,
+  initialTo,
+  globalExcluded,
+  globalExcludedMessages,
+  globalWafEnabled,
+  hostWafMap,
+  globalWaf,
+}: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [tab, setTab]                             = useState("events");
-  const [searchTerm, setSearchTerm]               = useState(initialSearch);
-  const [range, setRange]                         = useState<RangeOption>(initialRange);
-  const [customFrom, setCustomFrom]               = useState(formatDateTimeLocal(initialFrom));
-  const [customTo, setCustomTo]                   = useState(formatDateTimeLocal(initialTo));
-  const [selected, setSelected]                   = useState<WafEvent | null>(null);
-  const [localGlobalExcluded, setLocalGlobalExcluded]     = useState(globalExcluded);
-  const [localGlobalMessages, setLocalGlobalMessages]     = useState(globalExcludedMessages);
-  const [localHostWafMap, setLocalHostWafMap]             = useState(hostWafMap);
-  const [wafState, wafFormAction]   = useActionState(updateWafSettingsAction, null);
+  const [tab, setTab] = useState("events");
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [range, setRange] = useState<RangeOption>(initialRange);
+  const [customFrom, setCustomFrom] = useState(formatDateTimeLocal(initialFrom));
+  const [customTo, setCustomTo] = useState(formatDateTimeLocal(initialTo));
+  const [selected, setSelected] = useState<WafEvent | null>(null);
+  const [localGlobalExcluded, setLocalGlobalExcluded] = useState(globalExcluded);
+  const [localGlobalMessages, setLocalGlobalMessages] = useState(globalExcludedMessages);
+  const [localHostWafMap, setLocalHostWafMap] = useState(hostWafMap);
+  const [wafState, wafFormAction] = useActionState(updateWafSettingsAction, null);
   const [wafEnabled, setWafEnabled] = useState(globalWaf?.enabled ?? false);
-  const [wafLoadOwaspCrs, setWafLoadOwaspCrs]     = useState(globalWaf?.load_owasp_crs ?? true);
-  const [wafCustomDirectives, setWafCustomDirectives]     = useState(globalWaf?.custom_directives ?? "");
+  const [wafLoadOwaspCrs, setWafLoadOwaspCrs] = useState(globalWaf?.load_owasp_crs ?? true);
+  const [wafCustomDirectives, setWafCustomDirectives] = useState(
+    globalWaf?.custom_directives ?? "",
+  );
 
-  useEffect(() => { setSearchTerm(initialSearch); }, [initialSearch]);
+  useEffect(() => {
+    setSearchTerm(initialSearch);
+  }, [initialSearch]);
   useEffect(() => {
     setRange(initialRange);
     setCustomFrom(formatDateTimeLocal(initialFrom));
@@ -823,65 +937,80 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         const params = new URLSearchParams(searchParams.toString());
-        if (value.trim()) { params.set("search", value.trim()); } else { params.delete("search"); }
+        if (value.trim()) {
+          params.set("search", value.trim());
+        } else {
+          params.delete("search");
+        }
         params.delete("page");
         router.push(`${pathname}?${params.toString()}`);
       }, 400);
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams],
   );
 
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
 
-  const pushRange = useCallback((nextRange: RangeOption, nextFrom?: string, nextTo?: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('page');
+  const pushRange = useCallback(
+    (nextRange: RangeOption, nextFrom?: string, nextTo?: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("page");
 
-    if (nextRange === 'all') {
-      params.delete('range');
-      params.delete('from');
-      params.delete('to');
-      router.push(`${pathname}?${params.toString()}`);
-      return;
-    }
-
-    params.set('range', nextRange);
-    if (nextRange === 'custom') {
-      const fromTs = parseDateTimeLocal(nextFrom ?? '');
-      const toTs = parseDateTimeLocal(nextTo ?? '');
-      if (fromTs == null || toTs == null || fromTs >= toTs) {
-        toast.error('Choose a valid custom time range');
+      if (nextRange === "all") {
+        params.delete("range");
+        params.delete("from");
+        params.delete("to");
+        router.push(`${pathname}?${params.toString()}`);
         return;
       }
-      params.set('from', String(fromTs));
-      params.set('to', String(toTs));
-    } else {
-      params.delete('from');
-      params.delete('to');
-    }
 
-    router.push(`${pathname}?${params.toString()}`);
-  }, [pathname, router, searchParams]);
+      params.set("range", nextRange);
+      if (nextRange === "custom") {
+        const fromTs = parseDateTimeLocal(nextFrom ?? "");
+        const toTs = parseDateTimeLocal(nextTo ?? "");
+        if (fromTs == null || toTs == null || fromTs >= toTs) {
+          toast.error("Choose a valid custom time range");
+          return;
+        }
+        params.set("from", String(fromTs));
+        params.set("to", String(toTs));
+      } else {
+        params.delete("from");
+        params.delete("to");
+      }
+
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [pathname, router, searchParams],
+  );
 
   const activateCustom = useCallback(() => {
-    setRange('custom');
+    setRange("custom");
     if (!customFrom || !customTo) {
       const now = new Date();
-      const dayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+      const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       setCustomFrom(formatDateTimeLocal(Math.floor(dayAgo.getTime() / 1000)));
       setCustomTo(formatDateTimeLocal(Math.floor(now.getTime() / 1000)));
     }
   }, [customFrom, customTo]);
 
-  const handleRangeChange = useCallback((next: string) => {
-    const value = next as RangeOption;
-    if (value === 'custom') {
-      activateCustom();
-      return;
-    }
-    setRange(value);
-    pushRange(value);
-  }, [activateCustom, pushRange]);
+  const handleRangeChange = useCallback(
+    (next: string) => {
+      const value = next as RangeOption;
+      if (value === "custom") {
+        activateCustom();
+        return;
+      }
+      setRange(value);
+      pushRange(value);
+    },
+    [activateCustom, pushRange],
+  );
 
   const mobileCard = (event: WafEvent) => (
     <Card>
@@ -895,9 +1024,13 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
             <span suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</span>
           </Text>
         </HStack>
-        <Text type="code" size="xsm" color="secondary">{event.host || "—"}</Text>
+        <Text type="code" size="xsm" color="secondary">
+          {event.host || "—"}
+        </Text>
         {event.ruleId && (
-          <Text type="body" size="xsm" color="secondary">Rule #{event.ruleId}</Text>
+          <Text type="body" size="xsm" color="secondary">
+            Rule #{event.ruleId}
+          </Text>
         )}
       </VStack>
     </Card>
@@ -905,7 +1038,9 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
 
   const columns: Column<WafEvent>[] = [
     {
-      id: "ts", label: "Time", width: 150,
+      id: "ts",
+      label: "Time",
+      width: 150,
       // The timestamp renders on the server in the container's locale/timezone
       // and again in the browser's — the two never match, so this text opts out
       // of hydration checks rather than letting React discard the whole tree
@@ -917,15 +1052,21 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
       ),
     },
     {
-      id: "blocked", label: "Action", width: 90,
+      id: "blocked",
+      label: "Action",
+      width: 90,
       render: (r) => <BlockedChip blocked={r.blocked} />,
     },
     {
-      id: "severity", label: "Severity", width: 100,
+      id: "severity",
+      label: "Severity",
+      width: 100,
       render: (r) => <SeverityChip severity={r.severity} />,
     },
     {
-      id: "host", label: "Host", width: 130,
+      id: "host",
+      label: "Host",
+      width: 130,
       render: (r) =>
         r.host ? (
           <Tooltip content={r.host}>
@@ -940,16 +1081,22 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
         ),
     },
     {
-      id: "clientIp", label: "Client IP", width: 130,
+      id: "clientIp",
+      label: "Client IP",
+      width: 130,
       render: (r) => (
         <HStack gap={1} vAlign="center">
-          <Text type="code" size="xsm">{r.clientIp}</Text>
+          <Text type="code" size="xsm">
+            {r.clientIp}
+          </Text>
           {r.countryCode && <Badge label={r.countryCode} />}
         </HStack>
       ),
     },
     {
-      id: "method", label: "Request", width: 200,
+      id: "method",
+      label: "Request",
+      width: 200,
       render: (r) => (
         <HStack gap={2} vAlign="center">
           <Text type="code" size="xsm" weight="bold" color={r.method ? "accent" : "secondary"}>
@@ -964,9 +1111,13 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
       ),
     },
     {
-      id: "ruleId", label: "Rule ID", width: 80,
+      id: "ruleId",
+      label: "Rule ID",
+      width: 80,
       render: (r) => (
-        <Text type="code" size="xsm" color="secondary">{r.ruleId ?? "—"}</Text>
+        <Text type="code" size="xsm" color="secondary">
+          {r.ruleId ?? "—"}
+        </Text>
       ),
     },
   ];
@@ -982,7 +1133,10 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
 
       <TabList
         value={tab}
-        onChange={(v) => { setTab(v); if (v !== "events") setSelected(null); }}
+        onChange={(v) => {
+          setTab(v);
+          if (v !== "events") setSelected(null);
+        }}
         hasDivider
       >
         <Tab value="events" label="Events" />
@@ -1006,7 +1160,7 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
                 <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
               ))}
             </SegmentedControl>
-            {range === 'custom' && (
+            {range === "custom" && (
               <HStack gap={2} vAlign="end" wrap="wrap">
                 <DateTimeInput
                   label="From"
@@ -1023,13 +1177,16 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
                 <Button
                   size="sm"
                   label="Apply range"
-                  onClick={() => pushRange('custom', customFrom, customTo)}
+                  onClick={() => pushRange("custom", customFrom, customTo)}
                 />
               </HStack>
             )}
             <SearchField
               value={searchTerm}
-              onChange={(v) => { setSearchTerm(v); updateSearch(v); }}
+              onChange={(v) => {
+                setSearchTerm(v);
+                updateSearch(v);
+              }}
               placeholder="Search by host, IP, URI, or rule message..."
               label="Search WAF events"
               width={480}
@@ -1041,7 +1198,7 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
             keyField="id"
             emptyMessage="No WAF events found. Enable the WAF in Settings and send some traffic to see events here."
             pagination={pagination}
-            onRowClick={(row) => setSelected(prev => prev?.id === row.id ? null : row)}
+            onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
             rowStatus={(row) =>
               row.id === selected?.id ? { color: "accent", label: "Selected" } : null
             }
@@ -1054,10 +1211,15 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
               onClose={() => setSelected(null)}
               globalExcluded={localGlobalExcluded}
               hostWafMap={localHostWafMap}
-              onSuppressGlobal={(ruleId) => setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])}
+              onSuppressGlobal={(ruleId) =>
+                setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])
+              }
               onSuppressHost={(ruleId, host) => {
                 const bare = host.replace(/:\d+$/, "");
-                setLocalHostWafMap((prev) => ({ ...prev, [bare]: [...new Set([...(prev[bare] ?? []), ruleId])] }));
+                setLocalHostWafMap((prev) => ({
+                  ...prev,
+                  [bare]: [...new Set([...(prev[bare] ?? []), ruleId])],
+                }));
               }}
             />
           )}
@@ -1069,7 +1231,9 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
           excluded={localGlobalExcluded}
           messages={localGlobalMessages}
           wafEnabled={globalWafEnabled}
-          onRemove={(ruleId) => setLocalGlobalExcluded((prev) => prev.filter((id) => id !== ruleId))}
+          onRemove={(ruleId) =>
+            setLocalGlobalExcluded((prev) => prev.filter((id) => id !== ruleId))
+          }
           onAdd={(ruleId, message) => {
             setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])]);
             setLocalGlobalMessages((prev) => ({ ...prev, [ruleId]: message }));
@@ -1091,10 +1255,7 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
               <input type="hidden" name="wafEnabled" value={wafEnabled ? "on" : ""} />
               <input type="hidden" name="wafLoadOwaspCrs" value={wafLoadOwaspCrs ? "on" : ""} />
               {wafState?.message && (
-                <Banner
-                  status={wafState.success ? "success" : "error"}
-                  title={wafState.message}
-                />
+                <Banner status={wafState.success ? "success" : "error"} title={wafState.message} />
               )}
               <Switch
                 label="Enable WAF globally (blocking)"
@@ -1119,7 +1280,11 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
               />
               <Collapsible
                 defaultIsOpen={false}
-                trigger={<Text type="body" size="sm">Quick Templates</Text>}
+                trigger={
+                  <Text type="body" size="sm">
+                    Quick Templates
+                  </Text>
+                }
               >
                 <VStack gap={2}>
                   {WAF_TEMPLATES.map((t) => (
@@ -1131,16 +1296,15 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
                       icon={<Copy />}
                       label={t.label}
                       onClick={() =>
-                        setWafCustomDirectives((prev) => (prev ? `${prev}\n${t.snippet}` : t.snippet))
+                        setWafCustomDirectives((prev) =>
+                          prev ? `${prev}\n${t.snippet}` : t.snippet,
+                        )
                       }
                     />
                   ))}
                 </VStack>
               </Collapsible>
-              <Banner
-                status="info"
-                title="Rule exclusions live on the Suppressed Rules tab"
-              />
+              <Banner status="info" title="Rule exclusions live on the Suppressed Rules tab" />
               <HStack justify="end">
                 <Button type="submit" label="Save WAF settings" />
               </HStack>

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { getUserById, updateUserPassword } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (config.auth.disableLocalUsers) {
       return NextResponse.json(
         { error: "Password management is disabled. Sign-in is handled by the OIDC provider." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
     if (rateCheck.blocked) {
       return NextResponse.json(
         { error: "Too many attempts. Please try again later." },
-        { status: 429, headers: rateCheck.retryAfterMs ? { "Retry-After": String(Math.ceil(rateCheck.retryAfterMs / 1000)) } : undefined }
+        {
+          status: 429,
+          headers: rateCheck.retryAfterMs
+            ? { "Retry-After": String(Math.ceil(rateCheck.retryAfterMs / 1000)) }
+            : undefined,
+        },
       );
     }
 
@@ -42,7 +47,7 @@ export async function POST(request: NextRequest) {
     if (!newPassword || newPassword.length < 12) {
       return NextResponse.json(
         { error: "New password must be at least 12 characters long" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const complexityErrors: string[] = [];
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (complexityErrors.length > 0) {
       return NextResponse.json(
         { error: `Password ${complexityErrors.join(", ")}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -72,19 +77,13 @@ export async function POST(request: NextRequest) {
     // If user has a password, verify current password
     if (user.passwordHash) {
       if (!currentPassword) {
-        return NextResponse.json(
-          { error: "Current password is required" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Current password is required" }, { status: 400 });
       }
 
       const isValid = bcrypt.compareSync(currentPassword, user.passwordHash);
       if (!isValid) {
         registerFailedAttempt(rateLimitKey);
-        return NextResponse.json(
-          { error: "Current password is incorrect" },
-          { status: 401 }
-        );
+        return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
       }
     }
 
@@ -108,13 +107,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Password updated successfully"
+      message: "Password updated successfully",
     });
   } catch (error) {
     console.error("Password change error:", error);
-    return NextResponse.json(
-      { error: "Failed to change password" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to change password" }, { status: 500 });
   }
 }

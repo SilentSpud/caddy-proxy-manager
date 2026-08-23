@@ -15,29 +15,35 @@ function nowIso() {
 
 async function insertUser(overrides: Partial<typeof users.$inferInsert> = {}) {
   const now = nowIso();
-  const [user] = await db.insert(users).values({
-    email: `user${Math.random().toString(36).slice(2)}@localhost`,
-    name: 'Test User',
-    role: 'user',
-    provider: 'credentials',
-    subject: `test-${Date.now()}`,
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: `user${Math.random().toString(36).slice(2)}@localhost`,
+      name: 'Test User',
+      role: 'user',
+      provider: 'credentials',
+      subject: `test-${Date.now()}`,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return user;
 }
 
 async function insertGroup(overrides: Partial<typeof groups.$inferInsert> = {}) {
   const now = nowIso();
-  const [group] = await db.insert(groups).values({
-    name: `Group ${Date.now()}`,
-    description: null,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [group] = await db
+    .insert(groups)
+    .values({
+      name: `Group ${Date.now()}`,
+      description: null,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return group;
 }
 
@@ -79,7 +85,7 @@ describe('groups integration', () => {
 
     await db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now });
     await expect(
-      db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now })
+      db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now }),
     ).rejects.toThrow();
   });
 

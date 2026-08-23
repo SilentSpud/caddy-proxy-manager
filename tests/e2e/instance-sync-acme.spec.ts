@@ -31,49 +31,57 @@ async function loginContext(browser: Browser, baseURL: string): Promise<BrowserC
   return context;
 }
 
-test.describe.serial('Instance sync — ACME settings (master → slave)', () => {
-  let master: BrowserContext;
-  let slave: BrowserContext;
+test.describe
+  .serial('Instance sync — ACME settings (master → slave)', () => {
+    let master: BrowserContext;
+    let slave: BrowserContext;
 
-  test.beforeAll(async ({ browser }) => {
-    master = await loginContext(browser, MASTER);
-    slave = await loginContext(browser, SLAVE);
-  });
-
-  test.afterAll(async () => {
-    // Reset the master's ACME setting and push the cleared value to the slave.
-    await master.request.put(`${MASTER}/api/v1/settings/acme`, {
-      data: { caUrl: '', caRootPem: '' },
-      headers: { 'Content-Type': 'application/json', Origin: MASTER },
+    test.beforeAll(async ({ browser }) => {
+      master = await loginContext(browser, MASTER);
+      slave = await loginContext(browser, SLAVE);
     });
-    await master.request.post(`${MASTER}/api/v1/instances/sync`, { headers: { Origin: MASTER } });
-    await master.close();
-    await slave.close();
-  });
 
-  test('master propagates a custom ACME directory to the slave', async () => {
-    // 1. Set the custom ACME directory on the master.
-    const put = await master.request.put(`${MASTER}/api/v1/settings/acme`, {
-      data: { caUrl: CUSTOM_DIR },
-      headers: { 'Content-Type': 'application/json', Origin: MASTER },
+    test.afterAll(async () => {
+      // Reset the master's ACME setting and push the cleared value to the slave.
+      await master.request.put(`${MASTER}/api/v1/settings/acme`, {
+        data: { caUrl: '', caRootPem: '' },
+        headers: { 'Content-Type': 'application/json', Origin: MASTER },
+      });
+      await master.request.post(`${MASTER}/api/v1/instances/sync`, { headers: { Origin: MASTER } });
+      await master.close();
+      await slave.close();
     });
-    expect(put.status()).toBe(200);
 
-    // Sanity: the master reads it back.
-    const masterGet = await master.request.get(`${MASTER}/api/v1/settings/acme`);
-    expect((await masterGet.json()).caUrl).toBe(CUSTOM_DIR);
+    test('master propagates a custom ACME directory to the slave', async () => {
+      // 1. Set the custom ACME directory on the master.
+      const put = await master.request.put(`${MASTER}/api/v1/settings/acme`, {
+        data: { caUrl: CUSTOM_DIR },
+        headers: { 'Content-Type': 'application/json', Origin: MASTER },
+      });
+      expect(put.status()).toBe(200);
 
-    // 2. Trigger a push to slaves (independent of Caddy reachability).
-    const sync = await master.request.post(`${MASTER}/api/v1/instances/sync`, { headers: { Origin: MASTER } });
-    expect(sync.status()).toBe(200);
+      // Sanity: the master reads it back.
+      const masterGet = await master.request.get(`${MASTER}/api/v1/settings/acme`);
+      expect((await masterGet.json()).caUrl).toBe(CUSTOM_DIR);
 
-    // 3. The slave's effective ACME setting now reflects the master's value.
-    //    (The push itself reports the slave's Caddy-apply failure — the slave
-    //    points at an unreachable Caddy — but synced settings persist regardless.)
-    await expect.poll(async () => {
-      const res = await slave.request.get(`${SLAVE}/api/v1/settings/acme`);
-      if (res.status() !== 200) return null;
-      return (await res.json()).caUrl ?? null;
-    }, { timeout: 20_000, intervals: [500, 1000, 2000] }).toBe(CUSTOM_DIR);
+      // 2. Trigger a push to slaves (independent of Caddy reachability).
+      const sync = await master.request.post(`${MASTER}/api/v1/instances/sync`, {
+        headers: { Origin: MASTER },
+      });
+      expect(sync.status()).toBe(200);
+
+      // 3. The slave's effective ACME setting now reflects the master's value.
+      //    (The push itself reports the slave's Caddy-apply failure — the slave
+      //    points at an unreachable Caddy — but synced settings persist regardless.)
+      await expect
+        .poll(
+          async () => {
+            const res = await slave.request.get(`${SLAVE}/api/v1/settings/acme`);
+            if (res.status() !== 200) return null;
+            return (await res.json()).caUrl ?? null;
+          },
+          { timeout: 20_000, intervals: [500, 1000, 2000] },
+        )
+        .toBe(CUSTOM_DIR);
+    });
   });
-});

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiUser, apiErrorResponse } from "@/src/lib/api-auth";
 import { getCurrentSessionId } from "@/src/lib/auth";
 import { listUserSessions, revokeOtherUserSessions } from "@/src/lib/models/sessions";

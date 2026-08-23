@@ -39,10 +39,7 @@ export default defineConfig({
       SESSION_SECRET: 'test-session-secret-for-vitest-unit-tests-12345',
       NODE_ENV: 'test',
     },
-    include: [
-      testGlob('unit/**/*.test.ts'),
-      testGlob('integration/**/*.test.ts'),
-    ],
+    include: [testGlob('unit/**/*.test.ts'), testGlob('integration/**/*.test.ts')],
     // Suppress console output from production code during tests (e.g. expected
     // warn/error calls when intentionally feeding bad input to parsers).
     // Tests that need to assert on console calls can still use vi.spyOn(console, ...).
@@ -53,10 +50,10 @@ export default defineConfig({
       provider: 'v8',
       reportsDirectory: resolve(root, 'coverage'),
       reporter: [
-        ['text', { maxCols: 120 }],   // terminal summary
-        'html',                        // coverage/index.html, line-by-line
-        'lcov',                        // for CI annotations / external tools
-        'json-summary',                // coverage/coverage-summary.json, for badges
+        ['text', { maxCols: 120 }], // terminal summary
+        'html', // coverage/index.html, line-by-line
+        'lcov', // for CI annotations / external tools
+        'json-summary', // coverage/coverage-summary.json, for badges
       ],
 
       // Scoped to the code this suite is responsible for: the server-side
@@ -64,11 +61,7 @@ export default defineConfig({
       // out of scope — it is exercised by Playwright (`bun run test:e2e`) and by
       // the docker suite, and folding hundreds of untested component lines in
       // here would turn the number into noise rather than a signal.
-      include: [
-        'src/lib/**/*.{ts,tsx}',
-        'src/instrumentation.ts',
-        'app/api/**/*.ts',
-      ],
+      include: ['src/lib/**/*.{ts,tsx}', 'src/instrumentation.ts', 'app/api/**/*.ts'],
       exclude: [
         '**/*.d.ts',
         // Type-only and generated modules have no executable statements to

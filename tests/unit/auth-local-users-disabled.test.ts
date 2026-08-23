@@ -22,7 +22,9 @@ vi.mock('../../src/lib/db', async () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
-    get sqlite() { return undefined; },
+    get sqlite() {
+      return undefined;
+    },
     schema: schemaModule,
     nowIso: () => new Date().toISOString(),
     toIso: (v: string | Date | null | undefined): string | null =>

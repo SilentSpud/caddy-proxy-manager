@@ -25,7 +25,9 @@ vi.mock('../../src/lib/db', async () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
-    get sqlite() { return undefined; },
+    get sqlite() {
+      return undefined;
+    },
     schema: schemaModule,
     nowIso: () => new Date().toISOString(),
     toIso: (v: string | Date | null | undefined): string | null =>
@@ -34,7 +36,6 @@ vi.mock('../../src/lib/db', async () => {
 });
 
 vi.mock('better-auth', () => ({
-   
   betterAuth: (options: any) => ({ options }),
 }));
 vi.mock('better-auth/plugins', () => ({
@@ -46,7 +47,6 @@ import { getAuth } from '../../src/lib/auth-server';
 
 describe('OAuth role-from-claims opt-in (AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true)', () => {
   it('leaves IdP-provided role/status intact instead of forcing defaults', async () => {
-     
     const auth = getAuth() as any;
     const hook = auth.options.databaseHooks.user.create.before;
 

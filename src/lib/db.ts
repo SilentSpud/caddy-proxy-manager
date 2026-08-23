@@ -5,6 +5,7 @@ import { eq, ne, and, isNull } from "drizzle-orm";
 import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute, resolve as resolvePath } from "node:path";
 import * as schema from "./db/schema";
+import { accountIssuerFor } from "./account-issuer";
 
 const DEFAULT_SQLITE_URL = "file:./data/caddy-proxy-manager.db";
 
@@ -30,7 +31,7 @@ type GlobalForDrizzle = typeof globalThis & {
  */
 export function stripLeadingSlashBeforeDriveLetter(
   pathname: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
 ): string {
   if (platform !== "win32") return pathname;
   return /^\/[A-Za-z]:[/\\]/.test(pathname) ? pathname.slice(1) : pathname;
@@ -92,8 +93,7 @@ if (process.env.NODE_ENV !== "production") {
   globalForDrizzle.__SQLITE_CLIENT__ = sqlite;
 }
 
-export const db =
-  globalForDrizzle.__DRIZZLE_DB__ ?? drizzle(sqlite, { schema });
+export const db = globalForDrizzle.__DRIZZLE_DB__ ?? drizzle(sqlite, { schema });
 
 if (process.env.NODE_ENV !== "production") {
   globalForDrizzle.__DRIZZLE_DB__ = db;
@@ -107,7 +107,9 @@ const migrationsFolder = resolvePath(process.cwd(), "drizzle");
  */
 function renameColumnIfNeeded(table: string, from: string, to: string) {
   try {
-    const cols = db.$client.prepare(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
+    const cols = db.$client.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
+      name: string;
+    }>;
     const names = new Set(cols.map((c) => c.name));
     if (names.has(from) && !names.has(to)) {
       db.$client.prepare(`ALTER TABLE "${table}" RENAME COLUMN "${from}" TO "${to}"`).run();
@@ -123,7 +125,9 @@ function renameColumnIfNeeded(table: string, from: string, to: string) {
  */
 function addColumnIfMissing(table: string, snake: string, camel: string, definition: string) {
   try {
-    const cols = db.$client.prepare(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
+    const cols = db.$client.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
+      name: string;
+    }>;
     if (cols.length === 0) return; // table doesn't exist yet
     const names = new Set(cols.map((c) => c.name));
     if (!names.has(snake) && !names.has(camel)) {
@@ -144,7 +148,9 @@ function addColumnIfMissing(table: string, snake: string, camel: string, definit
 function fixSessionsSchema() {
   try {
     const cols = db.$client.prepare('PRAGMA table_info("sessions")').all() as Array<{
-      name: string; type: string; pk: number;
+      name: string;
+      type: string;
+      pk: number;
     }>;
     if (cols.length === 0) return; // table doesn't exist yet
     const idCol = cols.find((c) => c.name === "id");
@@ -152,7 +158,8 @@ function fixSessionsSchema() {
     // INTEGER PRIMARY KEY is an alias for rowid — auto-generates on insert
     if (idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1) return;
     // Wrong type (e.g. TEXT NOT NULL) — recreate as autoincrement
-    db.$client.prepare(`CREATE TABLE "sessions_patch" (
+    db.$client
+      .prepare(`CREATE TABLE "sessions_patch" (
       "id"        INTEGER PRIMARY KEY AUTOINCREMENT,
       "userId"    INTEGER NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
       "token"     TEXT NOT NULL,
@@ -161,12 +168,17 @@ function fixSessionsSchema() {
       "userAgent" TEXT,
       "createdAt" TEXT NOT NULL,
       "updatedAt" TEXT NOT NULL
-    )`).run();
+    )`)
+      .run();
     // Sessions are short-lived — skip copying stale rows
     db.$client.prepare('DROP TABLE "sessions"').run();
     db.$client.prepare('ALTER TABLE "sessions_patch" RENAME TO "sessions"').run();
-    db.$client.prepare('CREATE UNIQUE INDEX IF NOT EXISTS "sessions_token_unique" ON "sessions" ("token")').run();
-    db.$client.prepare('CREATE INDEX IF NOT EXISTS "sessions_user_idx" ON "sessions" ("userId")').run();
+    db.$client
+      .prepare('CREATE UNIQUE INDEX IF NOT EXISTS "sessions_token_unique" ON "sessions" ("token")')
+      .run();
+    db.$client
+      .prepare('CREATE INDEX IF NOT EXISTS "sessions_user_idx" ON "sessions" ("userId")')
+      .run();
   } catch {
     // ignore
   }
@@ -181,18 +193,33 @@ function fixSessionsSchema() {
 function fixAccountsSchema() {
   try {
     const cols = db.$client.prepare('PRAGMA table_info("accounts")').all() as Array<{
-      name: string; type: string; pk: number;
+      name: string;
+      type: string;
+      pk: number;
     }>;
     if (cols.length === 0) return;
-    const idCol = cols.find((c) => c.name === 'id');
+    const idCol = cols.find((c) => c.name === "id");
     if (!idCol) return;
-    if (idCol.type.toUpperCase() === 'INTEGER' && idCol.pk === 1) return;
+    if (idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1) return;
 
-    db.$client.prepare(`CREATE TABLE "accounts_patch" (
+    // better-auth 1.7 requires `issuer`. A table old enough to need this repair
+    // predates it, so derive the value with the same rule migration 0024 uses;
+    // if a rebuilt-but-broken table already carries the column, keep what is
+    // there rather than recomputing it.
+    const issuerSelect = cols.some((c) => c.name === "issuer")
+      ? '"issuer"'
+      : `CASE WHEN "providerId" = 'credential' THEN 'local:credential' ELSE COALESCE(
+           NULLIF((SELECT p."issuer" FROM "oauth_providers" p WHERE p."id" = "accounts"."providerId"), ''),
+           'local:oauth:' || "providerId"
+         ) END`;
+
+    db.$client
+      .prepare(`CREATE TABLE "accounts_patch" (
       "id" INTEGER PRIMARY KEY AUTOINCREMENT,
       "userId" INTEGER NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
       "accountId" TEXT NOT NULL,
       "providerId" TEXT NOT NULL,
+      "issuer" TEXT NOT NULL,
       "accessToken" TEXT,
       "refreshToken" TEXT,
       "idToken" TEXT,
@@ -202,18 +229,32 @@ function fixAccountsSchema() {
       "password" TEXT,
       "createdAt" TEXT NOT NULL,
       "updatedAt" TEXT NOT NULL
-    )`).run();
-    db.$client.prepare(`INSERT INTO "accounts_patch" (
-      "userId", "accountId", "providerId", "accessToken", "refreshToken", "idToken",
+    )`)
+      .run();
+    db.$client
+      .prepare(`INSERT INTO "accounts_patch" (
+      "userId", "accountId", "providerId", "issuer", "accessToken", "refreshToken", "idToken",
       "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope", "password", "createdAt", "updatedAt"
     ) SELECT
-      "userId", "accountId", "providerId", "accessToken", "refreshToken", "idToken",
+      "userId", "accountId", "providerId", ${issuerSelect}, "accessToken", "refreshToken", "idToken",
       "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope", "password", "createdAt", "updatedAt"
-    FROM "accounts"`).run();
+    FROM "accounts"`)
+      .run();
     db.$client.prepare('DROP TABLE "accounts"').run();
     db.$client.prepare('ALTER TABLE "accounts_patch" RENAME TO "accounts"').run();
-    db.$client.prepare('CREATE UNIQUE INDEX IF NOT EXISTS "accounts_provider_account_idx" ON "accounts" ("providerId", "accountId")').run();
-    db.$client.prepare('CREATE INDEX IF NOT EXISTS "accounts_user_idx" ON "accounts" ("userId")').run();
+    db.$client
+      .prepare(
+        'CREATE UNIQUE INDEX IF NOT EXISTS "accounts_provider_account_idx" ON "accounts" ("providerId", "accountId")',
+      )
+      .run();
+    db.$client
+      .prepare(
+        'CREATE UNIQUE INDEX IF NOT EXISTS "accounts_issuer_account_idx" ON "accounts" ("issuer", "accountId")',
+      )
+      .run();
+    db.$client
+      .prepare('CREATE INDEX IF NOT EXISTS "accounts_user_idx" ON "accounts" ("userId")')
+      .run();
   } catch {
     // ignore
   }
@@ -232,22 +273,22 @@ function patchTablesForMigration020() {
   // ── users ────────────────────────────────────────────────────────────────────
   // Columns added by 0020 that older deployments may be missing
   addColumnIfMissing("users", "email_verified", "emailVerified", "INTEGER NOT NULL DEFAULT 0");
-  addColumnIfMissing("users", "username",        "username",      "TEXT");
+  addColumnIfMissing("users", "username", "username", "TEXT");
   addColumnIfMissing("users", "display_username", "displayUsername", "TEXT");
 
   // ── accounts ─────────────────────────────────────────────────────────────────
   // 0020 should create these with camelCase; older versions used snake_case.
   // 0021 does NOT rename accounts columns, so we must fix them here.
-  renameColumnIfNeeded("accounts", "user_id",                  "userId");
-  renameColumnIfNeeded("accounts", "account_id",               "accountId");
-  renameColumnIfNeeded("accounts", "provider_id",              "providerId");
-  renameColumnIfNeeded("accounts", "access_token",             "accessToken");
-  renameColumnIfNeeded("accounts", "refresh_token",            "refreshToken");
-  renameColumnIfNeeded("accounts", "id_token",                 "idToken");
-  renameColumnIfNeeded("accounts", "access_token_expires_at",  "accessTokenExpiresAt");
+  renameColumnIfNeeded("accounts", "user_id", "userId");
+  renameColumnIfNeeded("accounts", "account_id", "accountId");
+  renameColumnIfNeeded("accounts", "provider_id", "providerId");
+  renameColumnIfNeeded("accounts", "access_token", "accessToken");
+  renameColumnIfNeeded("accounts", "refresh_token", "refreshToken");
+  renameColumnIfNeeded("accounts", "id_token", "idToken");
+  renameColumnIfNeeded("accounts", "access_token_expires_at", "accessTokenExpiresAt");
   renameColumnIfNeeded("accounts", "refresh_token_expires_at", "refreshTokenExpiresAt");
-  renameColumnIfNeeded("accounts", "created_at",               "createdAt");
-  renameColumnIfNeeded("accounts", "updated_at",               "updatedAt");
+  renameColumnIfNeeded("accounts", "created_at", "createdAt");
+  renameColumnIfNeeded("accounts", "updated_at", "updatedAt");
   fixAccountsSchema();
 
   // ── sessions ─────────────────────────────────────────────────────────────────
@@ -256,7 +297,7 @@ function patchTablesForMigration020() {
   // had `id TEXT NOT NULL`, the insert fails. Recreate the table when needed.
   // Sessions are ephemeral so data loss is acceptable.
   fixSessionsSchema();
-  renameColumnIfNeeded("sessions", "user_id",    "userId");
+  renameColumnIfNeeded("sessions", "user_id", "userId");
   renameColumnIfNeeded("sessions", "expires_at", "expiresAt");
   renameColumnIfNeeded("sessions", "ip_address", "ipAddress");
   renameColumnIfNeeded("sessions", "user_agent", "userAgent");
@@ -292,7 +333,7 @@ function runMigrations() {
       typeof error.message === "string" &&
       error.message.includes("already exists")
     ) {
-      console.log('Database tables already exist, skipping migrations');
+      console.log("Database tables already exist, skipping migrations");
       globalForDrizzle.__MIGRATIONS_RAN__ = true;
       return;
     }
@@ -306,8 +347,11 @@ try {
   console.error("Failed to run database migrations:", error);
   // In build mode, allow the build to continue even if migrations fail
   // The runtime initialization will handle migrations properly
-  if (process.env.NODE_ENV !== 'production' || process.env.NEXT_PHASE === 'phase-production-build') {
-    console.warn('Continuing despite migration error during build phase');
+  if (
+    process.env.NODE_ENV !== "production" ||
+    process.env.NEXT_PHASE === "phase-production-build"
+  ) {
+    console.warn("Continuing despite migration error during build phase");
   } else {
     throw error;
   }
@@ -321,46 +365,71 @@ try {
 function runBetterAuthDataMigration() {
   if (sqlitePath === ":memory:") return;
 
-  const { settings, users, accounts } = schema;
+  const { settings, users, accounts, oauthProviders } = schema;
 
   const flag = db.select().from(settings).where(eq(settings.key, "better_auth_migrated")).get();
   if (flag) return;
 
   const now = new Date().toISOString();
+  // Providers that declare an issuer key their accounts by it; the rest fall
+  // back to the synthetic local namespace. Read once rather than per user.
+  const providerIssuers = new Map(
+    db
+      .select({ id: oauthProviders.id, issuer: oauthProviders.issuer })
+      .from(oauthProviders)
+      .all()
+      .map((row) => [row.id, row.issuer] as const),
+  );
 
   // Migrate OAuth users: create account rows from users.provider/subject
   const oauthUsers = db.select().from(users).where(ne(users.provider, "credentials")).all();
   for (const user of oauthUsers) {
     if (!user.provider || !user.subject) continue;
-    const existing = db.select().from(accounts).where(
-      and(eq(accounts.userId, user.id), eq(accounts.providerId, user.provider), eq(accounts.accountId, user.subject))
-    ).get();
+    const existing = db
+      .select()
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.userId, user.id),
+          eq(accounts.providerId, user.provider),
+          eq(accounts.accountId, user.subject),
+        ),
+      )
+      .get();
     if (!existing) {
-      db.insert(accounts).values({
-        userId: user.id,
-        accountId: user.subject,
-        providerId: user.provider,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      }).run();
+      db.insert(accounts)
+        .values({
+          userId: user.id,
+          accountId: user.subject,
+          providerId: user.provider,
+          issuer: accountIssuerFor(user.provider, providerIssuers.get(user.provider)),
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        })
+        .run();
     }
   }
 
   // Migrate credentials users: create credential account rows
   const credentialUsers = db.select().from(users).where(eq(users.provider, "credentials")).all();
   for (const user of credentialUsers) {
-    const existing = db.select().from(accounts).where(
-      and(eq(accounts.userId, user.id), eq(accounts.providerId, "credential"))
-    ).get();
+    const existing = db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.userId, user.id), eq(accounts.providerId, "credential")))
+      .get();
     if (!existing) {
-      db.insert(accounts).values({
-        userId: user.id,
-        accountId: user.id.toString(),
-        providerId: "credential",
-        password: user.passwordHash,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      }).run();
+      db.insert(accounts)
+        .values({
+          userId: user.id,
+          accountId: user.id.toString(),
+          providerId: "credential",
+          issuer: accountIssuerFor("credential"),
+          password: user.passwordHash,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        })
+        .run();
     }
   }
 
@@ -369,10 +438,13 @@ function runBetterAuthDataMigration() {
   for (const user of usersWithoutUsername) {
     const usernameFromEmail = user.email.toLowerCase();
     const displayUsername = user.email.split("@")[0] || user.email;
-    db.update(users).set({
-      username: usernameFromEmail,
-      displayUsername,
-    }).where(eq(users.id, user.id)).run();
+    db.update(users)
+      .set({
+        username: usernameFromEmail,
+        displayUsername,
+      })
+      .where(eq(users.id, user.id))
+      .run();
   }
 
   db.insert(settings).values({ key: "better_auth_migrated", value: "true", updatedAt: now }).run();
@@ -410,7 +482,7 @@ function runEnvProviderSync() {
     };
   };
   try {
-    config = require("./config").config; // eslint-disable-line @typescript-eslint/no-require-imports
+    config = require("./config").config;
   } catch {
     return;
   }
@@ -420,21 +492,29 @@ function runEnvProviderSync() {
   const { oauthProviders } = schema;
   let encryptSecret: (v: string) => string;
   try {
-    encryptSecret = require("./secret").encryptSecret; // eslint-disable-line @typescript-eslint/no-require-imports
+    encryptSecret = require("./secret").encryptSecret;
   } catch (e) {
-    console.error("CRITICAL: Failed to load encryption module, refusing to store plaintext secrets:", e);
+    console.error(
+      "CRITICAL: Failed to load encryption module, refusing to store plaintext secrets:",
+      e,
+    );
     return;
   }
 
   const name = config.oauth.providerName;
   // Use a slug-based ID so the OAuth callback URL is predictable
-  const providerId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "oauth";
+  const providerId =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "oauth";
   const existing = db.select().from(oauthProviders).where(eq(oauthProviders.name, name)).get();
 
   const validRoles = new Set(["admin", "user", "viewer"]);
-  const defaultRole = config.oauth.defaultRole && validRoles.has(config.oauth.defaultRole)
-    ? config.oauth.defaultRole
-    : "user";
+  const defaultRole =
+    config.oauth.defaultRole && validRoles.has(config.oauth.defaultRole)
+      ? config.oauth.defaultRole
+      : "user";
   const groupMapping = {
     groupsClaim: config.oauth.groupsClaim ?? "groups",
     groupPrefix: config.oauth.groupPrefix ?? null,
@@ -448,37 +528,42 @@ function runEnvProviderSync() {
 
   const now = new Date().toISOString();
   if (existing && existing.source === "env") {
-    db.update(oauthProviders).set({
-      clientId: encryptSecret(config.oauth.clientId),
-      clientSecret: encryptSecret(config.oauth.clientSecret),
-      issuer: config.oauth.issuer ?? null,
-      authorizationUrl: config.oauth.authorizationUrl ?? null,
-      tokenUrl: config.oauth.tokenUrl ?? null,
-      userinfoUrl: config.oauth.userinfoUrl ?? null,
-      scopes: config.oauth.scopes ?? existing.scopes,
-      autoLink: config.oauth.allowAutoLinking,
-      ...groupMapping,
-      updatedAt: now,
-    }).where(eq(oauthProviders.id, existing.id)).run();
+    db.update(oauthProviders)
+      .set({
+        clientId: encryptSecret(config.oauth.clientId),
+        clientSecret: encryptSecret(config.oauth.clientSecret),
+        issuer: config.oauth.issuer ?? null,
+        authorizationUrl: config.oauth.authorizationUrl ?? null,
+        tokenUrl: config.oauth.tokenUrl ?? null,
+        userinfoUrl: config.oauth.userinfoUrl ?? null,
+        scopes: config.oauth.scopes ?? existing.scopes,
+        autoLink: config.oauth.allowAutoLinking,
+        ...groupMapping,
+        updatedAt: now,
+      })
+      .where(eq(oauthProviders.id, existing.id))
+      .run();
   } else if (!existing) {
-    db.insert(oauthProviders).values({
-      id: providerId,
-      name,
-      type: "oidc",
-      clientId: encryptSecret(config.oauth.clientId),
-      clientSecret: encryptSecret(config.oauth.clientSecret),
-      issuer: config.oauth.issuer ?? null,
-      authorizationUrl: config.oauth.authorizationUrl ?? null,
-      tokenUrl: config.oauth.tokenUrl ?? null,
-      userinfoUrl: config.oauth.userinfoUrl ?? null,
-      scopes: config.oauth.scopes ?? "openid email profile",
-      autoLink: config.oauth.allowAutoLinking,
-      ...groupMapping,
-      enabled: true,
-      source: "env",
-      createdAt: now,
-      updatedAt: now,
-    }).run();
+    db.insert(oauthProviders)
+      .values({
+        id: providerId,
+        name,
+        type: "oidc",
+        clientId: encryptSecret(config.oauth.clientId),
+        clientSecret: encryptSecret(config.oauth.clientSecret),
+        issuer: config.oauth.issuer ?? null,
+        authorizationUrl: config.oauth.authorizationUrl ?? null,
+        tokenUrl: config.oauth.tokenUrl ?? null,
+        userinfoUrl: config.oauth.userinfoUrl ?? null,
+        scopes: config.oauth.scopes ?? "openid email profile",
+        autoLink: config.oauth.allowAutoLinking,
+        ...groupMapping,
+        enabled: true,
+        source: "env",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
     console.log(`Synced OAuth provider from env: ${name}`);
   }
 }
@@ -494,14 +579,24 @@ function runCloudflareToProviderMigration() {
   const { settings: settingsTable } = schema;
 
   // Skip if migration already ran
-  const flag = db.select().from(settingsTable).where(eq(settingsTable.key, "dns_provider_migrated")).get();
+  const flag = db
+    .select()
+    .from(settingsTable)
+    .where(eq(settingsTable.key, "dns_provider_migrated"))
+    .get();
   if (flag) return;
 
   // Skip if new dns_provider setting already exists (user already configured it)
-  const existing = db.select().from(settingsTable).where(eq(settingsTable.key, "dns_provider")).get();
+  const existing = db
+    .select()
+    .from(settingsTable)
+    .where(eq(settingsTable.key, "dns_provider"))
+    .get();
   if (existing) {
     const now = new Date().toISOString();
-    db.insert(settingsTable).values({ key: "dns_provider_migrated", value: "true", updatedAt: now }).run();
+    db.insert(settingsTable)
+      .values({ key: "dns_provider_migrated", value: "true", updatedAt: now })
+      .run();
     return;
   }
 
@@ -509,19 +604,27 @@ function runCloudflareToProviderMigration() {
   const cfRow = db.select().from(settingsTable).where(eq(settingsTable.key, "cloudflare")).get();
   if (!cfRow) {
     const now = new Date().toISOString();
-    db.insert(settingsTable).values({ key: "dns_provider_migrated", value: "true", updatedAt: now }).run();
+    db.insert(settingsTable)
+      .values({ key: "dns_provider_migrated", value: "true", updatedAt: now })
+      .run();
     return;
   }
 
   try {
-    const cf = JSON.parse(cfRow.value) as { apiToken?: string; zoneId?: string; accountId?: string };
+    const cf = JSON.parse(cfRow.value) as {
+      apiToken?: string;
+      zoneId?: string;
+      accountId?: string;
+    };
     if (cf.apiToken) {
       const now = new Date().toISOString();
       const newSetting = {
         providers: { cloudflare: { api_token: cf.apiToken } },
         default: "cloudflare",
       };
-      db.insert(settingsTable).values({ key: "dns_provider", value: JSON.stringify(newSetting), updatedAt: now }).run();
+      db.insert(settingsTable)
+        .values({ key: "dns_provider", value: JSON.stringify(newSetting), updatedAt: now })
+        .run();
       console.log("Migrated legacy Cloudflare DNS settings to dns_provider format");
     }
   } catch (e) {
@@ -529,7 +632,9 @@ function runCloudflareToProviderMigration() {
   }
 
   const now = new Date().toISOString();
-  db.insert(settingsTable).values({ key: "dns_provider_migrated", value: "true", updatedAt: now }).run();
+  db.insert(settingsTable)
+    .values({ key: "dns_provider_migrated", value: "true", updatedAt: now })
+    .run();
 }
 
 try {

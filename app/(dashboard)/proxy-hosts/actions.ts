@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { actionError, actionSuccess, INITIAL_ACTION_STATE, type ActionState } from "@/src/lib/actions";
+import {
+  actionError,
+  actionSuccess,
+  INITIAL_ACTION_STATE,
+  type ActionState,
+} from "@/src/lib/actions";
 import {
   createProxyHost,
   deleteProxyHost,
@@ -23,7 +28,7 @@ import {
   type ErrorPageRule,
   type CpmForwardAuthInput,
   PATH_BLOCK_STATUS_CODES,
-  sanitizeErrorPageRules
+  sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { setForwardAuthAccess } from "@/src/lib/models/forward-auth";
@@ -40,7 +45,7 @@ import {
 
 async function validateAndSanitizeCertificateId(
   certificateId: number | null,
-  cloudflareConfigured: boolean
+  cloudflareConfigured: boolean,
 ): Promise<{ certificateId: number | null; warning?: string }> {
   // null is valid (Caddy Auto)
   if (certificateId === null) {
@@ -161,8 +166,16 @@ function parseRedirectUrl(raw: FormDataEntryValue | null): string {
   }
 }
 
-
-const VALID_LB_POLICIES: LoadBalancingPolicy[] = ["random", "round_robin", "least_conn", "ip_hash", "first", "header", "cookie", "uri_hash"];
+const VALID_LB_POLICIES: LoadBalancingPolicy[] = [
+  "random",
+  "round_robin",
+  "least_conn",
+  "ip_hash",
+  "first",
+  "header",
+  "cookie",
+  "uri_hash",
+];
 const VALID_UPSTREAM_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
 function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefined {
@@ -178,9 +191,10 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
     : undefined;
 
   const policyRaw = parseOptionalText(formData.get("lbPolicy"));
-  const policy = policyRaw && VALID_LB_POLICIES.includes(policyRaw as LoadBalancingPolicy)
-    ? (policyRaw as LoadBalancingPolicy)
-    : undefined;
+  const policy =
+    policyRaw && VALID_LB_POLICIES.includes(policyRaw as LoadBalancingPolicy)
+      ? (policyRaw as LoadBalancingPolicy)
+      : undefined;
 
   const policyHeaderField = parseOptionalText(formData.get("lbPolicyHeaderField"));
   const policyCookieName = parseOptionalText(formData.get("lbPolicyCookieName"));
@@ -196,7 +210,7 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       : false
     : undefined;
 
-  let activeHealthCheck: LoadBalancerInput["activeHealthCheck"] = undefined;
+  let activeHealthCheck: LoadBalancerInput["activeHealthCheck"];
   if (activeHealthEnabled !== undefined || formData.has("lbActiveHealthUri")) {
     activeHealthCheck = {
       enabled: activeHealthEnabled,
@@ -205,7 +219,7 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       interval: parseOptionalText(formData.get("lbActiveHealthInterval")),
       timeout: parseOptionalText(formData.get("lbActiveHealthTimeout")),
       status: parseOptionalNumber(formData.get("lbActiveHealthStatus")),
-      body: parseOptionalText(formData.get("lbActiveHealthBody"))
+      body: parseOptionalText(formData.get("lbActiveHealthBody")),
     };
   }
 
@@ -216,7 +230,7 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       : false
     : undefined;
 
-  let passiveHealthCheck: LoadBalancerInput["passiveHealthCheck"] = undefined;
+  let passiveHealthCheck: LoadBalancerInput["passiveHealthCheck"];
   if (passiveHealthEnabled !== undefined || formData.has("lbPassiveHealthFailDuration")) {
     // Parse unhealthy status codes from comma-separated input
     const unhealthyStatusRaw = parseOptionalText(formData.get("lbPassiveHealthUnhealthyStatus"));
@@ -236,7 +250,7 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       failDuration: parseOptionalText(formData.get("lbPassiveHealthFailDuration")),
       maxFails: parseOptionalNumber(formData.get("lbPassiveHealthMaxFails")),
       unhealthyStatus,
-      unhealthyLatency: parseOptionalText(formData.get("lbPassiveHealthUnhealthyLatency"))
+      unhealthyLatency: parseOptionalText(formData.get("lbPassiveHealthUnhealthyLatency")),
     };
   }
 
@@ -291,14 +305,17 @@ function parseGeoBlockConfig(formData: FormData): {
   const parseStringList = (key: string): string[] => {
     const val = formData.get(key);
     if (!val || typeof val !== "string") return [];
-    return val.split(",").map(s => s.trim()).filter(Boolean);
+    return val
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   };
 
   // Helper to parse a comma-separated string field into a number array
   const parseNumberList = (key: string): number[] => {
     return parseStringList(key)
-      .map(s => parseInt(s, 10))
-      .filter(n => !isNaN(n));
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !isNaN(n));
   };
 
   const config: GeoBlockSettings = {
@@ -350,12 +367,15 @@ function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null } {
   const engineMode: WafHostConfig["mode"] =
     rawEngineMode === "On" ? "On" : rawEngineMode === "Off" ? "Off" : undefined;
   const loadCrs = parseCheckbox(formData.get("wafLoadOwaspCrs"));
-  const customDirectives = typeof formData.get("wafCustomDirectives") === "string"
-    ? (formData.get("wafCustomDirectives") as string).trim()
-    : "";
+  const customDirectives =
+    typeof formData.get("wafCustomDirectives") === "string"
+      ? (formData.get("wafCustomDirectives") as string).trim()
+      : "";
   const rawExcl = formData.get("wafExcludedRuleIds");
   const excluded_rule_ids: number[] = rawExcl
-    ? (JSON.parse(rawExcl as string) as unknown[]).filter((x): x is number => Number.isInteger(x) && (x as number) > 0)
+    ? (JSON.parse(rawExcl as string) as unknown[]).filter(
+        (x): x is number => Number.isInteger(x) && (x as number) > 0,
+      )
     : [];
 
   if (!enabled) {
@@ -370,7 +390,7 @@ function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null } {
       custom_directives: customDirectives,
       excluded_rule_ids,
       waf_mode: wafMode,
-    }
+    },
   };
 }
 
@@ -388,7 +408,7 @@ function parseDnsResolverConfig(formData: FormData): DnsResolverInput | undefine
 
   // Parse resolvers from newline-separated input
   const resolversRaw = parseOptionalText(formData.get("dnsResolvers"));
-  let resolvers: string[] | undefined = undefined;
+  let resolvers: string[] | undefined;
   if (resolversRaw || formData.has("dnsResolvers")) {
     resolvers = resolversRaw
       ? resolversRaw
@@ -434,8 +454,14 @@ function parseMtlsConfig(formData: FormData): MtlsConfig | null {
   if (!formData.has("mtlsPresent")) return null;
   const enabled = formData.get("mtlsEnabled") === "true";
   if (!enabled) return null;
-  const certIds = formData.getAll("mtlsCertId").map(Number).filter(n => Number.isFinite(n) && n > 0);
-  const roleIds = formData.getAll("mtlsRoleId").map(Number).filter(n => Number.isFinite(n) && n > 0);
+  const certIds = formData
+    .getAll("mtlsCertId")
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const roleIds = formData
+    .getAll("mtlsRoleId")
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
   const protectedPaths = parseCsv(formData.get("mtlsProtectedPaths"));
   const excludedPaths = parseCsv(formData.get("mtlsExcludedPaths"));
   return {
@@ -458,14 +484,16 @@ function parseRedirectsConfig(formData: FormData): RedirectRule[] | null {
         r &&
         typeof r.from === "string" &&
         typeof r.to === "string" &&
-        [301, 302, 307, 308].includes(r.status)
+        [301, 302, 307, 308].includes(r.status),
     ) as RedirectRule[];
   } catch {
     return null;
   }
 }
 
-function parseLocationRulesConfig(formData: FormData): import("@/src/lib/models/proxy-hosts").LocationRuleInput[] | null {
+function parseLocationRulesConfig(
+  formData: FormData,
+): import("@/src/lib/models/proxy-hosts").LocationRuleInput[] | null {
   const raw = formData.get("locationRulesJson");
   if (!raw || typeof raw !== "string") return null;
   try {
@@ -490,7 +518,7 @@ function parsePathAllowsConfig(formData: FormData): PathAllowRule[] | null {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
     return parsed.filter(
-      (r) => r && typeof r.path === "string" && r.path.trim()
+      (r) => r && typeof r.path === "string" && r.path.trim(),
     ) as PathAllowRule[];
   } catch {
     return null;
@@ -503,13 +531,10 @@ function parsePathBlocksConfig(formData: FormData): PathBlockRule[] | null {
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
-    const valid = (PATH_BLOCK_STATUS_CODES as readonly number[]);
+    const valid = PATH_BLOCK_STATUS_CODES as readonly number[];
     return parsed.filter(
       (r) =>
-        r &&
-        typeof r.path === "string" &&
-        typeof r.status === "number" &&
-        valid.includes(r.status)
+        r && typeof r.path === "string" && typeof r.status === "number" && valid.includes(r.status),
     ) as PathBlockRule[];
   } catch {
     return null;
@@ -523,7 +548,7 @@ function parsePathRewritesConfig(formData: FormData): PathRewriteRule[] | null {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
     return parsed.filter(
-      (r) => r && typeof r.from === "string" && typeof r.to === "string"
+      (r) => r && typeof r.from === "string" && typeof r.to === "string",
     ) as PathRewriteRule[];
   } catch {
     return null;
@@ -540,7 +565,9 @@ function parseErrorPagesConfig(formData: FormData): ErrorPageRule[] | null {
   }
 }
 
-function parseUpstreamDnsResolutionConfig(formData: FormData): UpstreamDnsResolutionInput | undefined {
+function parseUpstreamDnsResolutionConfig(
+  formData: FormData,
+): UpstreamDnsResolutionInput | undefined {
   if (!formData.has("upstreamDnsResolutionPresent")) {
     return undefined;
   }
@@ -560,7 +587,9 @@ function parseUpstreamDnsResolutionConfig(formData: FormData): UpstreamDnsResolu
 
   if (familyRaw === "inherit") {
     result.family = null;
-  } else if (VALID_UPSTREAM_DNS_FAMILIES.includes(familyRaw as typeof VALID_UPSTREAM_DNS_FAMILIES[number])) {
+  } else if (
+    VALID_UPSTREAM_DNS_FAMILIES.includes(familyRaw as (typeof VALID_UPSTREAM_DNS_FAMILIES)[number])
+  ) {
     result.family = familyRaw as "ipv6" | "ipv4" | "both";
   }
 
@@ -569,7 +598,7 @@ function parseUpstreamDnsResolutionConfig(formData: FormData): UpstreamDnsResolu
 
 export async function createProxyHostAction(
   _prevState: ActionState = INITIAL_ACTION_STATE,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionState> {
   void _prevState;
   try {
@@ -581,9 +610,12 @@ export async function createProxyHostAction(
 
     // Validate certificate exists and get sanitized value
     const cloudflareSettings = await getCloudflareSettings();
-    const cloudflareConfigured = !!(cloudflareSettings?.apiToken);
+    const cloudflareConfigured = !!cloudflareSettings?.apiToken;
 
-    const { certificateId, warning } = await validateAndSanitizeCertificateId(parsedCertificateId, cloudflareConfigured);
+    const { certificateId, warning } = await validateAndSanitizeCertificateId(
+      parsedCertificateId,
+      cloudflareConfigured,
+    );
 
     // Log warning if certificate was auto-fallback
     if (warning) {
@@ -597,7 +629,9 @@ export async function createProxyHostAction(
         upstreams: parseUpstreams(formData.get("upstreams")),
         certificateId: certificateId,
         accessListId: parseAccessListId(formData.get("accessListId")),
-        sslForced: formData.has("sslForcedPresent") ? parseCheckbox(formData.get("sslForced")) : undefined,
+        sslForced: formData.has("sslForcedPresent")
+          ? parseCheckbox(formData.get("sslForced"))
+          : undefined,
         hstsSubdomains: parseCheckbox(formData.get("hstsSubdomains")),
         skipHttpsHostnameValidation: parseCheckbox(formData.get("skipHttpsHostnameValidation")),
         enabled: parseCheckbox(formData.get("enabled")),
@@ -619,12 +653,18 @@ export async function createProxyHostAction(
         pathRewrites: parsePathRewritesConfig(formData),
         errorPages: parseErrorPagesConfig(formData),
       },
-      userId
+      userId,
     );
 
     // Save forward auth access if CPM forward auth is enabled
-    const faUserIds = formData.getAll("cpmFaUserId").map((v) => Number(v)).filter((n) => n > 0);
-    const faGroupIds = formData.getAll("cpmFaGroupId").map((v) => Number(v)).filter((n) => n > 0);
+    const faUserIds = formData
+      .getAll("cpmFaUserId")
+      .map((v) => Number(v))
+      .filter((n) => n > 0);
+    const faGroupIds = formData
+      .getAll("cpmFaGroupId")
+      .map((v) => Number(v))
+      .filter((n) => n > 0);
     if (host.cpmForwardAuth?.enabled && (faUserIds.length > 0 || faGroupIds.length > 0)) {
       await setForwardAuthAccess(host.id, { userIds: faUserIds, groupIds: faGroupIds }, userId);
     }
@@ -633,7 +673,9 @@ export async function createProxyHostAction(
 
     // Return success with warning if applicable
     if (warning) {
-      return actionSuccess(`Proxy host created using Caddy Auto certificate management. ${warning}`);
+      return actionSuccess(
+        `Proxy host created using Caddy Auto certificate management. ${warning}`,
+      );
     }
     return actionSuccess("Proxy host created and queued for Caddy reload.");
   } catch (error) {
@@ -645,16 +687,17 @@ export async function createProxyHostAction(
 export async function updateProxyHostAction(
   id: number,
   _prevState: ActionState = INITIAL_ACTION_STATE,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionState> {
   void _prevState;
   try {
     const session = await requireAdmin();
     const userId = Number(session.user.id);
-    const boolField = (key: string) => (formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined);
+    const boolField = (key: string) =>
+      formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
 
     // Parse and validate certificate_id if present
-    let certificateId: number | null | undefined = undefined;
+    let certificateId: number | null | undefined;
     let warning: string | undefined;
 
     if (formData.has("certificateId")) {
@@ -662,9 +705,12 @@ export async function updateProxyHostAction(
 
       // Validate certificate exists and get sanitized value
       const cloudflareSettings = await getCloudflareSettings();
-      const cloudflareConfigured = !!(cloudflareSettings?.apiToken);
+      const cloudflareConfigured = !!cloudflareSettings?.apiToken;
 
-      const validation = await validateAndSanitizeCertificateId(parsedCertificateId, cloudflareConfigured);
+      const validation = await validateAndSanitizeCertificateId(
+        parsedCertificateId,
+        cloudflareConfigured,
+      );
       certificateId = validation.certificateId;
       warning = validation.warning;
 
@@ -679,7 +725,9 @@ export async function updateProxyHostAction(
       {
         name: formData.get("name") ? String(formData.get("name")) : undefined,
         domains: formData.get("domains") ? parseCsv(formData.get("domains")) : undefined,
-        upstreams: formData.get("upstreams") ? parseUpstreams(formData.get("upstreams")) : undefined,
+        upstreams: formData.get("upstreams")
+          ? parseUpstreams(formData.get("upstreams"))
+          : undefined,
         certificateId: certificateId,
         accessListId: formData.has("accessListId")
           ? parseAccessListId(formData.get("accessListId"))
@@ -703,19 +751,29 @@ export async function updateProxyHostAction(
         mtls: formData.has("mtlsPresent") ? parseMtlsConfig(formData) : undefined,
         redirects: formData.has("redirectsJson") ? parseRedirectsConfig(formData) : undefined,
         rewrite: formData.has("rewritePathPrefix") ? parseRewriteConfig(formData) : undefined,
-        locationRules: formData.has("locationRulesJson") ? parseLocationRulesConfig(formData) : undefined,
+        locationRules: formData.has("locationRulesJson")
+          ? parseLocationRulesConfig(formData)
+          : undefined,
         pathAllows: formData.has("pathAllowsJson") ? parsePathAllowsConfig(formData) : undefined,
         pathBlocks: formData.has("pathBlocksJson") ? parsePathBlocksConfig(formData) : undefined,
-        pathRewrites: formData.has("pathRewritesJson") ? parsePathRewritesConfig(formData) : undefined,
+        pathRewrites: formData.has("pathRewritesJson")
+          ? parsePathRewritesConfig(formData)
+          : undefined,
         errorPages: formData.has("errorPagesJson") ? parseErrorPagesConfig(formData) : undefined,
       },
-      userId
+      userId,
     );
 
     // Save forward auth access if the section is present in the form
     if (formData.has("cpmForwardAuthPresent")) {
-      const faUserIds = formData.getAll("cpmFaUserId").map((v) => Number(v)).filter((n) => n > 0);
-      const faGroupIds = formData.getAll("cpmFaGroupId").map((v) => Number(v)).filter((n) => n > 0);
+      const faUserIds = formData
+        .getAll("cpmFaUserId")
+        .map((v) => Number(v))
+        .filter((n) => n > 0);
+      const faGroupIds = formData
+        .getAll("cpmFaGroupId")
+        .map((v) => Number(v))
+        .filter((n) => n > 0);
       await setForwardAuthAccess(id, { userIds: faUserIds, groupIds: faGroupIds }, userId);
     }
 
@@ -723,7 +781,9 @@ export async function updateProxyHostAction(
 
     // Return success with warning if applicable
     if (warning) {
-      return actionSuccess(`Proxy host updated using Caddy Auto certificate management. ${warning}`);
+      return actionSuccess(
+        `Proxy host updated using Caddy Auto certificate management. ${warning}`,
+      );
     }
     return actionSuccess("Proxy host updated.");
   } catch (error) {
@@ -734,7 +794,7 @@ export async function updateProxyHostAction(
 
 export async function deleteProxyHostAction(
   id: number,
-  _prevState: ActionState = INITIAL_ACTION_STATE
+  _prevState: ActionState = INITIAL_ACTION_STATE,
 ): Promise<ActionState> {
   void _prevState;
   try {
@@ -749,10 +809,7 @@ export async function deleteProxyHostAction(
   }
 }
 
-export async function toggleProxyHostAction(
-  id: number,
-  enabled: boolean
-): Promise<ActionState> {
+export async function toggleProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
     const session = await requireAdmin();
     const userId = Number(session.user.id);

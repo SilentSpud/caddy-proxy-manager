@@ -26,7 +26,9 @@ export async function createUserAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const name = formData.get("name") ? String(formData.get("name")).trim() : null;
   const requestedRole = String(formData.get("role") ?? "user");
-  const role = VALID_ROLES.has(requestedRole as User["role"]) ? (requestedRole as User["role"]) : "user";
+  const role = VALID_ROLES.has(requestedRole as User["role"])
+    ? (requestedRole as User["role"])
+    : "user";
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {

@@ -24,21 +24,27 @@ export const metadata: Metadata = {
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
   await requireAdmin();
-  const { page: pageParam, search: searchParam, sortBy: sortByParam, sortDir: sortDirParam } = await searchParams;
+  const {
+    page: pageParam,
+    search: searchParam,
+    sortBy: sortByParam,
+    sortDir: sortDirParam,
+  } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
   const offset = (page - 1) * PER_PAGE;
   const sortBy = sortByParam || undefined;
-  const sortDir = (sortDirParam === "asc" || sortDirParam === "desc") ? sortDirParam : "desc";
+  const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
 
-  const [hosts, total, certificates, caCertificates, accessLists, authentikDefaults] = await Promise.all([
-    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir),
-    countProxyHosts(search),
-    listCertificates(),
-    listCaCertificates(),
-    listAccessLists(),
-    getAuthentikSettings(),
-  ]);
+  const [hosts, total, certificates, caCertificates, accessLists, authentikDefaults] =
+    await Promise.all([
+      listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir),
+      countProxyHosts(search),
+      listCertificates(),
+      listCaCertificates(),
+      listAccessLists(),
+      getAuthentikSettings(),
+    ]);
   // These are safe to fail if the RBAC migration hasn't been applied yet
   const [mtlsRoles, issuedClientCerts, allUsers, allGroups] = await Promise.all([
     listMtlsRoles().catch(() => []),
@@ -50,7 +56,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   // Build forward auth access map for hosts that have CPM forward auth enabled
   const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
   const faAccessEntries = await Promise.all(
-    faHosts.map((h) => getForwardAuthAccessForHost(h.id).catch(() => []))
+    faHosts.map((h) => getForwardAuthAccessForHost(h.id).catch(() => [])),
   );
   const forwardAuthAccessMap: Record<number, { userIds: number[]; groupIds: number[] }> = {};
   faHosts.forEach((h, i) => {

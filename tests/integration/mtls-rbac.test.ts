@@ -22,52 +22,64 @@ function nowIso() {
 
 async function insertCaCert(name = 'Test CA') {
   const now = nowIso();
-  const [ca] = await db.insert(caCertificates).values({
-    name,
-    certificatePem: '-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----',
-    createdAt: now,
-    updatedAt: now,
-  }).returning();
+  const [ca] = await db
+    .insert(caCertificates)
+    .values({
+      name,
+      certificatePem: '-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return ca;
 }
 
 async function insertClientCert(caCertId: number, cn = 'test-client', fingerprint = 'AABB') {
   const now = nowIso();
-  const [cert] = await db.insert(issuedClientCertificates).values({
-    caCertificateId: caCertId,
-    commonName: cn,
-    serialNumber: Date.now().toString(16),
-    fingerprintSha256: fingerprint,
-    certificatePem: '-----BEGIN CERTIFICATE-----\nCLIENT\n-----END CERTIFICATE-----',
-    validFrom: now,
-    validTo: now,
-    createdAt: now,
-    updatedAt: now,
-  }).returning();
+  const [cert] = await db
+    .insert(issuedClientCertificates)
+    .values({
+      caCertificateId: caCertId,
+      commonName: cn,
+      serialNumber: Date.now().toString(16),
+      fingerprintSha256: fingerprint,
+      certificatePem: '-----BEGIN CERTIFICATE-----\nCLIENT\n-----END CERTIFICATE-----',
+      validFrom: now,
+      validTo: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return cert;
 }
 
 async function insertRole(name = 'admin') {
   const now = nowIso();
-  const [role] = await db.insert(mtlsRoles).values({
-    name,
-    description: null,
-    createdAt: now,
-    updatedAt: now,
-  }).returning();
+  const [role] = await db
+    .insert(mtlsRoles)
+    .values({
+      name,
+      description: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return role;
 }
 
 async function insertProxyHost(name = 'test-host') {
   const now = nowIso();
-  const [host] = await db.insert(proxyHosts).values({
-    name,
-    domains: '["test.example.com"]',
-    upstreams: '["http://localhost:8080"]',
-    meta: JSON.stringify({ mtls: { enabled: true, ca_certificate_ids: [1] } }),
-    createdAt: now,
-    updatedAt: now,
-  }).returning();
+  const [host] = await db
+    .insert(proxyHosts)
+    .values({
+      name,
+      domains: '["test.example.com"]',
+      upstreams: '["http://localhost:8080"]',
+      meta: JSON.stringify({ mtls: { enabled: true, ca_certificate_ids: [1] } }),
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return host;
 }
 
@@ -87,12 +99,15 @@ describe('mtls_roles table', () => {
 
   it('supports description field', async () => {
     const now = nowIso();
-    const [role] = await db.insert(mtlsRoles).values({
-      name: 'viewer',
-      description: 'Read-only access',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [role] = await db
+      .insert(mtlsRoles)
+      .values({
+        name: 'viewer',
+        description: 'Read-only access',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
     expect(role.description).toBe('Read-only access');
   });
 });
@@ -106,11 +121,14 @@ describe('mtls_certificate_roles table', () => {
     const role = await insertRole();
 
     const now = nowIso();
-    const [assignment] = await db.insert(mtlsCertificateRoles).values({
-      issuedClientCertificateId: cert.id,
-      mtlsRoleId: role.id,
-      createdAt: now,
-    }).returning();
+    const [assignment] = await db
+      .insert(mtlsCertificateRoles)
+      .values({
+        issuedClientCertificateId: cert.id,
+        mtlsRoleId: role.id,
+        createdAt: now,
+      })
+      .returning();
 
     expect(assignment.issuedClientCertificateId).toBe(cert.id);
     expect(assignment.mtlsRoleId).toBe(role.id);
@@ -133,7 +151,7 @@ describe('mtls_certificate_roles table', () => {
         issuedClientCertificateId: cert.id,
         mtlsRoleId: role.id,
         createdAt: now,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -180,16 +198,19 @@ describe('mtls_access_rules table', () => {
   it('creates an access rule for a proxy host', async () => {
     const host = await insertProxyHost();
     const now = nowIso();
-    const [rule] = await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id,
-      pathPattern: '/admin/*',
-      allowedRoleIds: JSON.stringify([1, 2]),
-      allowedCertIds: JSON.stringify([]),
-      denyAll: false,
-      priority: 10,
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [rule] = await db
+      .insert(mtlsAccessRules)
+      .values({
+        proxyHostId: host.id,
+        pathPattern: '/admin/*',
+        allowedRoleIds: JSON.stringify([1, 2]),
+        allowedCertIds: JSON.stringify([]),
+        denyAll: false,
+        priority: 10,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(rule.pathPattern).toBe('/admin/*');
     expect(rule.priority).toBe(10);
@@ -213,7 +234,7 @@ describe('mtls_access_rules table', () => {
         pathPattern: '/admin/*',
         createdAt: now,
         updatedAt: now,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -229,12 +250,15 @@ describe('mtls_access_rules table', () => {
       updatedAt: now,
     });
 
-    const [rule2] = await db.insert(mtlsAccessRules).values({
-      proxyHostId: host2.id,
-      pathPattern: '/admin/*',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [rule2] = await db
+      .insert(mtlsAccessRules)
+      .values({
+        proxyHostId: host2.id,
+        pathPattern: '/admin/*',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(rule2.proxyHostId).toBe(host2.id);
   });
@@ -260,13 +284,16 @@ describe('mtls_access_rules table', () => {
     const host = await insertProxyHost();
     const now = nowIso();
 
-    const [rule] = await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id,
-      pathPattern: '/blocked/*',
-      denyAll: true,
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [rule] = await db
+      .insert(mtlsAccessRules)
+      .values({
+        proxyHostId: host.id,
+        pathPattern: '/blocked/*',
+        denyAll: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(rule.denyAll).toBe(true);
   });
@@ -274,12 +301,15 @@ describe('mtls_access_rules table', () => {
   it('defaults allowed_role_ids and allowed_cert_ids to "[]"', async () => {
     const host = await insertProxyHost();
     const now = nowIso();
-    const [rule] = await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id,
-      pathPattern: '/test',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [rule] = await db
+      .insert(mtlsAccessRules)
+      .values({
+        proxyHostId: host.id,
+        pathPattern: '/test',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(rule.allowedRoleIds).toBe('[]');
     expect(rule.allowedCertIds).toBe('[]');
@@ -288,12 +318,15 @@ describe('mtls_access_rules table', () => {
   it('defaults deny_all to false and priority to 0', async () => {
     const host = await insertProxyHost();
     const now = nowIso();
-    const [rule] = await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id,
-      pathPattern: '/test',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [rule] = await db
+      .insert(mtlsAccessRules)
+      .values({
+        proxyHostId: host.id,
+        pathPattern: '/test',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(rule.denyAll).toBe(false);
     expect(rule.priority).toBe(0);
@@ -302,14 +335,17 @@ describe('mtls_access_rules table', () => {
   it('stores JSON arrays with numbers in allowed_role_ids', async () => {
     const host = await insertProxyHost();
     const now = nowIso();
-    const [rule] = await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id,
-      pathPattern: '/test',
-      allowedRoleIds: JSON.stringify([1, 2, 3]),
-      allowedCertIds: JSON.stringify([10, 20]),
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [rule] = await db
+      .insert(mtlsAccessRules)
+      .values({
+        proxyHostId: host.id,
+        pathPattern: '/test',
+        allowedRoleIds: JSON.stringify([1, 2, 3]),
+        allowedCertIds: JSON.stringify([10, 20]),
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(JSON.parse(rule.allowedRoleIds)).toEqual([1, 2, 3]);
     expect(JSON.parse(rule.allowedCertIds)).toEqual([10, 20]);
@@ -318,13 +354,16 @@ describe('mtls_access_rules table', () => {
   it('supports description field', async () => {
     const host = await insertProxyHost();
     const now = nowIso();
-    const [rule] = await db.insert(mtlsAccessRules).values({
-      proxyHostId: host.id,
-      pathPattern: '/test',
-      description: 'Only for admins',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [rule] = await db
+      .insert(mtlsAccessRules)
+      .values({
+        proxyHostId: host.id,
+        pathPattern: '/test',
+        description: 'Only for admins',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(rule.description).toBe('Only for admins');
   });
@@ -333,9 +372,27 @@ describe('mtls_access_rules table', () => {
     const host = await insertProxyHost();
     const now = nowIso();
 
-    await db.insert(mtlsAccessRules).values({ proxyHostId: host.id, pathPattern: '/a', priority: 1, createdAt: now, updatedAt: now });
-    await db.insert(mtlsAccessRules).values({ proxyHostId: host.id, pathPattern: '/b', priority: 100, createdAt: now, updatedAt: now });
-    await db.insert(mtlsAccessRules).values({ proxyHostId: host.id, pathPattern: '/c', priority: 50, createdAt: now, updatedAt: now });
+    await db.insert(mtlsAccessRules).values({
+      proxyHostId: host.id,
+      pathPattern: '/a',
+      priority: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(mtlsAccessRules).values({
+      proxyHostId: host.id,
+      pathPattern: '/b',
+      priority: 100,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(mtlsAccessRules).values({
+      proxyHostId: host.id,
+      pathPattern: '/c',
+      priority: 50,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const rows = await db.select().from(mtlsAccessRules);
     expect(rows).toHaveLength(3);
@@ -379,9 +436,15 @@ describe('cross-table relationships', () => {
     const r3 = await insertRole('role-c');
     const now = nowIso();
 
-    await db.insert(mtlsCertificateRoles).values({ issuedClientCertificateId: cert.id, mtlsRoleId: r1.id, createdAt: now });
-    await db.insert(mtlsCertificateRoles).values({ issuedClientCertificateId: cert.id, mtlsRoleId: r2.id, createdAt: now });
-    await db.insert(mtlsCertificateRoles).values({ issuedClientCertificateId: cert.id, mtlsRoleId: r3.id, createdAt: now });
+    await db
+      .insert(mtlsCertificateRoles)
+      .values({ issuedClientCertificateId: cert.id, mtlsRoleId: r1.id, createdAt: now });
+    await db
+      .insert(mtlsCertificateRoles)
+      .values({ issuedClientCertificateId: cert.id, mtlsRoleId: r2.id, createdAt: now });
+    await db
+      .insert(mtlsCertificateRoles)
+      .values({ issuedClientCertificateId: cert.id, mtlsRoleId: r3.id, createdAt: now });
 
     const assignments = await db.select().from(mtlsCertificateRoles);
     expect(assignments).toHaveLength(3);
@@ -395,11 +458,20 @@ describe('cross-table relationships', () => {
     const role = await insertRole();
     const now = nowIso();
 
-    await db.insert(mtlsCertificateRoles).values({ issuedClientCertificateId: cert1.id, mtlsRoleId: role.id, createdAt: now });
-    await db.insert(mtlsCertificateRoles).values({ issuedClientCertificateId: cert2.id, mtlsRoleId: role.id, createdAt: now });
-    await db.insert(mtlsCertificateRoles).values({ issuedClientCertificateId: cert3.id, mtlsRoleId: role.id, createdAt: now });
+    await db
+      .insert(mtlsCertificateRoles)
+      .values({ issuedClientCertificateId: cert1.id, mtlsRoleId: role.id, createdAt: now });
+    await db
+      .insert(mtlsCertificateRoles)
+      .values({ issuedClientCertificateId: cert2.id, mtlsRoleId: role.id, createdAt: now });
+    await db
+      .insert(mtlsCertificateRoles)
+      .values({ issuedClientCertificateId: cert3.id, mtlsRoleId: role.id, createdAt: now });
 
-    const assignments = await db.select().from(mtlsCertificateRoles).where(eq(mtlsCertificateRoles.mtlsRoleId, role.id));
+    const assignments = await db
+      .select()
+      .from(mtlsCertificateRoles)
+      .where(eq(mtlsCertificateRoles.mtlsRoleId, role.id));
     expect(assignments).toHaveLength(3);
   });
 

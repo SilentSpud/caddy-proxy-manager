@@ -27,8 +27,10 @@ describe('L4 port manager entrypoint.sh', () => {
     // The script must call do_apply before entering the while loop.
     // This ensures L4 ports are bound after any restart, because the main
     // compose stack starts caddy without the L4 ports override file.
-    const firstApply = lines.findIndex(l => l.trim().startsWith('do_apply') || l.includes('do_apply'));
-    const whileLoop = lines.findIndex(l => l.includes('while true'));
+    const firstApply = lines.findIndex(
+      (l) => l.trim().startsWith('do_apply') || l.includes('do_apply'),
+    );
+    const whileLoop = lines.findIndex((l) => l.includes('while true'));
     expect(firstApply).toBeGreaterThan(-1);
     expect(whileLoop).toBeGreaterThan(-1);
     expect(firstApply).toBeLessThan(whileLoop);
@@ -37,16 +39,18 @@ describe('L4 port manager entrypoint.sh', () => {
   it('pre-loads LAST_TRIGGER after startup apply to avoid double-apply', () => {
     // After the startup apply, LAST_TRIGGER must be set from the current trigger
     // file content so the poll loop doesn't re-apply the same trigger again.
-    const lastTriggerInit = lines.findIndex(l => l.includes('LAST_TRIGGER=') && l.includes('TRIGGER_FILE'));
-    const whileLoop = lines.findIndex(l => l.includes('while true'));
+    const lastTriggerInit = lines.findIndex(
+      (l) => l.includes('LAST_TRIGGER=') && l.includes('TRIGGER_FILE'),
+    );
+    const whileLoop = lines.findIndex((l) => l.includes('while true'));
     expect(lastTriggerInit).toBeGreaterThan(-1);
     expect(lastTriggerInit).toBeLessThan(whileLoop);
   });
 
   it('only recreates the caddy service', () => {
     // The docker compose command should target only "caddy" — never "web" or other services
-    const composeUpLines = lines.filter(line =>
-      line.includes('docker compose') && line.includes('up')
+    const composeUpLines = lines.filter(
+      (line) => line.includes('docker compose') && line.includes('up'),
     );
     expect(composeUpLines.length).toBeGreaterThan(0);
     for (const line of composeUpLines) {
@@ -56,8 +60,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('uses --no-deps flag to prevent dependency cascades', () => {
-    const composeUpLines = lines.filter(line =>
-      line.includes('docker compose') && line.includes('up')
+    const composeUpLines = lines.filter(
+      (line) => line.includes('docker compose') && line.includes('up'),
     );
     for (const line of composeUpLines) {
       expect(line).toContain('--no-deps');
@@ -65,8 +69,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('uses --force-recreate to ensure port changes take effect', () => {
-    const composeUpLines = lines.filter(line =>
-      line.includes('docker compose') && line.includes('up')
+    const composeUpLines = lines.filter(
+      (line) => line.includes('docker compose') && line.includes('up'),
     );
     for (const line of composeUpLines) {
       expect(line).toContain('--force-recreate');
@@ -93,8 +97,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('uses --pull never to avoid registry pulls (only recreates)', () => {
-    const composeUpLines = lines.filter(line =>
-      line.includes('docker compose') && line.includes('up')
+    const composeUpLines = lines.filter(
+      (line) => line.includes('docker compose') && line.includes('up'),
     );
     for (const line of composeUpLines) {
       expect(line).toContain('--pull never');
@@ -109,7 +113,7 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('writes status for both success and failure cases', () => {
-    const statusWrites = lines.filter(l => l.trim().startsWith('write_status'));
+    const statusWrites = lines.filter((l) => l.trim().startsWith('write_status'));
     // At least: startup idle/applying, applying, applied/success, failed
     expect(statusWrites.length).toBeGreaterThanOrEqual(4);
   });
@@ -149,8 +153,11 @@ describe('L4 port manager entrypoint.sh', () => {
   it('does NOT unconditionally add --project-directory (named-volume deployments work without it)', () => {
     // Standard deployments (no override file) use named volumes — no host path
     // is needed. --project-directory must NOT be hardcoded outside the conditional.
-    const unconditional = lines.filter(l =>
-      l.includes('--project-directory') && !l.includes('COMPOSE_HOST_DIR') && !l.trim().startsWith('#')
+    const unconditional = lines.filter(
+      (l) =>
+        l.includes('--project-directory') &&
+        !l.includes('COMPOSE_HOST_DIR') &&
+        !l.trim().startsWith('#'),
     );
     expect(unconditional).toHaveLength(0);
   });
@@ -168,9 +175,7 @@ describe('L4 port manager entrypoint.sh', () => {
     // The sidecar mounts the project at /compose (COMPOSE_DIR). Whether or not
     // COMPOSE_HOST_DIR is set, all -f flags must reference container-accessible
     // paths under $COMPOSE_DIR, never the host path.
-    const composeFileFlags = lines.filter(l =>
-      l.includes('-f ') && l.includes('docker-compose')
-    );
+    const composeFileFlags = lines.filter((l) => l.includes('-f ') && l.includes('docker-compose'));
     expect(composeFileFlags.length).toBeGreaterThan(0);
     for (const line of composeFileFlags) {
       expect(line).toContain('$COMPOSE_DIR');

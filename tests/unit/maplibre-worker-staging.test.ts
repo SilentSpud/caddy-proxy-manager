@@ -3,10 +3,7 @@ import { createRequire } from 'node:module';
 import { readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  copyMaplibreWorker,
-  WORKER_PUBLIC_PATH,
-} from '../../scripts/copy-maplibre-worker.mjs';
+import { copyMaplibreWorker, WORKER_PUBLIC_PATH } from '../../scripts/copy-maplibre-worker.mjs';
 
 /**
  * maplibre-gl v6 loads its tile worker from a separate ES module that Turbopack
@@ -62,7 +59,9 @@ describe('maplibre worker staging', () => {
       join(projectRoot, 'app', '(dashboard)', 'analytics', 'WorldMapInner.tsx'),
       'utf8',
     );
-    expect(source).toContain(`setWorkerUrl('${WORKER_PUBLIC_PATH}')`);
+    // Quote-agnostic on purpose: the assertion is about which URL the client
+    // hands maplibre, not about how the formatter happens to quote it.
+    expect(source.replace(/'/g, '"')).toContain(`setWorkerUrl("${WORKER_PUBLIC_PATH}")`);
   });
 
   it("CSP allows loading the worker from 'self'", () => {

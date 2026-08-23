@@ -31,7 +31,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       const parsed = new URL(redirectUri);
       if (
         (parsed.protocol === "https:" || parsed.protocol === "http:") &&
-        await isForwardAuthDomain(parsed.hostname)
+        (await isForwardAuthDomain(parsed.hostname))
       ) {
         targetDomain = parsed.hostname;
         // Store the redirect URI server-side. The client only gets an opaque ID,
@@ -53,7 +53,15 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
       targetDomain={targetDomain}
       enabledProviders={enabledProviders}
       localLoginEnabled={!config.auth.disableLocalUsers}
-      existingSession={session ? { userId: session.user.id, name: session.user.name ?? null, email: session.user.email ?? null } : null}
+      existingSession={
+        session
+          ? {
+              userId: session.user.id,
+              name: session.user.name ?? null,
+              email: session.user.email ?? null,
+            }
+          : null
+      }
     />
   );
 }

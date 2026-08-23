@@ -24,7 +24,7 @@ export async function countAuditEvents(search?: string): Promise<number> {
         return or(
           like(auditEvents.summary, `%${escaped}%`),
           like(auditEvents.action, `%${escaped}%`),
-          like(auditEvents.entityType, `%${escaped}%`)
+          like(auditEvents.entityType, `%${escaped}%`),
         );
       })()
     : undefined;
@@ -35,7 +35,7 @@ export async function countAuditEvents(search?: string): Promise<number> {
 export async function listAuditEvents(
   limit = 100,
   offset = 0,
-  search?: string
+  search?: string,
 ): Promise<AuditEvent[]> {
   const where = search
     ? (() => {
@@ -43,7 +43,7 @@ export async function listAuditEvents(
         return or(
           like(auditEvents.summary, `%${escaped}%`),
           like(auditEvents.action, `%${escaped}%`),
-          like(auditEvents.entityType, `%${escaped}%`)
+          like(auditEvents.entityType, `%${escaped}%`),
         );
       })()
     : undefined;

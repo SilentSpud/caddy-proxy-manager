@@ -49,7 +49,10 @@ test.describe('ClickHouse internal system logs disabled', () => {
         format: 'JSONEachRow',
       });
       const present = (await result.json<{ name: string }>()).map((r) => r.name);
-      expect(present, `disabled system-log tables should not exist, found: ${present.join(', ')}`).toEqual([]);
+      expect(
+        present,
+        `disabled system-log tables should not exist, found: ${present.join(', ')}`,
+      ).toEqual([]);
     } finally {
       await ch.close();
     }

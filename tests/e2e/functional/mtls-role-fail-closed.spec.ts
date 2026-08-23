@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test';
 import { X509Certificate } from 'node:crypto';
 import forge from 'node-forge';
 import { createSelfSignedServerCertificate } from '../../helpers/certs';
-import { httpsGet, httpsGetOutcome, waitForHttpsRoute, type ClientTlsIdentity } from '../../helpers/https';
+import {
+  httpsGet,
+  httpsGetOutcome,
+  waitForHttpsRoute,
+  type ClientTlsIdentity,
+} from '../../helpers/https';
 
 /**
  * Regression (SECURITY-AUDIT H2): role-based mTLS must FAIL CLOSED when the
@@ -38,7 +43,12 @@ function makeCa(commonName: string) {
     { name: 'keyUsage', keyCertSign: true, cRLSign: true },
   ]);
   cert.sign(keys.privateKey, forge.md.sha256.create());
-  return { cert, keys, pem: forge.pki.certificateToPem(cert), keyPem: forge.pki.privateKeyToPem(keys.privateKey) };
+  return {
+    cert,
+    keys,
+    pem: forge.pki.certificateToPem(cert),
+    keyPem: forge.pki.privateKeyToPem(keys.privateKey),
+  };
 }
 
 /** Client cert signed by the CA. Returns the key too, so it can be used as a TLS identity. */
@@ -81,10 +91,13 @@ function expectMtlsBlocked(outcome: Awaited<ReturnType<typeof httpsGetOutcome>>)
 test.describe('mTLS — role-based trust fails closed on revocation', () => {
   test.setTimeout(120_000); // RSA keygen + two Caddy config reloads
 
-  test('revoking the trusted role\'s only cert denies all clients (no fail-open)', async ({ page }) => {
+  test("revoking the trusted role's only cert denies all clients (no fail-open)", async ({
+    page,
+  }) => {
     await page.goto('/proxy-hosts');
     const origin = new URL(page.url()).origin;
-    const post = (url: string, data: unknown) => page.request.post(url, { headers: { Origin: origin }, data });
+    const post = (url: string, data: unknown) =>
+      page.request.post(url, { headers: { Origin: origin }, data });
     const del = (url: string) => page.request.delete(url, { headers: { Origin: origin } });
 
     const prefix = `e2e-mtls-role-${Date.now()}`;
@@ -97,7 +110,11 @@ test.describe('mTLS — role-based trust fails closed on revocation', () => {
     const ids = { caId: 0, certId: 0, roleId: 0, serverCertId: 0, hostId: 0 };
 
     try {
-      const caResp = await post(API_CA, { name: `${prefix} CA`, certificatePem: ca.pem, privateKeyPem: ca.keyPem });
+      const caResp = await post(API_CA, {
+        name: `${prefix} CA`,
+        certificatePem: ca.pem,
+        privateKeyPem: ca.keyPem,
+      });
       expect(caResp.ok(), 'create CA').toBeTruthy();
       ids.caId = (await caResp.json()).id;
 
@@ -117,7 +134,9 @@ test.describe('mTLS — role-based trust fails closed on revocation', () => {
       expect(roleResp.ok(), 'create role').toBeTruthy();
       ids.roleId = (await roleResp.json()).id;
 
-      const assignResp = await post(`${API_ROLES}/${ids.roleId}/certificates`, { certificateId: ids.certId });
+      const assignResp = await post(`${API_ROLES}/${ids.roleId}/certificates`, {
+        certificateId: ids.certId,
+      });
       expect(assignResp.ok(), 'assign cert to role').toBeTruthy();
 
       const serverResp = await post(API_CERTS, {

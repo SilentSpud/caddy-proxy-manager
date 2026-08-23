@@ -112,8 +112,8 @@ describe('proxy host error_pages persistence', () => {
     const host = await createProxyHost(
       baseInput({
         errorPages: [
-          { statuses: [200, 502, 700], body: 'KEEP' },          // 200/700 out of range → dropped
-          { statuses: [500], body: '' },                          // no body → whole rule dropped
+          { statuses: [200, 502, 700], body: 'KEEP' }, // 200/700 out of range → dropped
+          { statuses: [500], body: '' }, // no body → whole rule dropped
           { statuses: [404], body: 'CT', contentType: 'text/html\r\nX-Evil: 1' }, // CRLF stripped
         ],
       }),

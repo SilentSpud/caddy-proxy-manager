@@ -3,12 +3,21 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  KeyRound, Plus, Users, Globe, Settings2,
-  RefreshCw, Trash2, Sparkles,
-  AlertTriangle, Clock, X,
+  KeyRound,
+  Plus,
+  Users,
+  Globe,
+  Settings2,
+  RefreshCw,
+  Trash2,
+  Sparkles,
+  AlertTriangle,
+  Clock,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessList, AccessListUsage } from "@/lib/models/access-lists";
+import { withRowId, type WithRowId } from "@/lib/row-id";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -23,7 +32,13 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
-import { Table, pixel, proportional, useTableSelection, type TableColumn } from "@astryxdesign/core/Table";
+import {
+  Table,
+  pixel,
+  proportional,
+  useTableSelection,
+  type TableColumn,
+} from "@astryxdesign/core/Table";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -63,7 +78,9 @@ function fmtRelative(iso: string | null): string {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric", month: "short", day: "numeric",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   });
 }
 
@@ -367,13 +384,7 @@ function MembersTab({
           }
         />
       ) : (
-        <Table
-          data={rows}
-          columns={columns}
-          idKey="id"
-          hasHover
-          plugins={{ selection }}
-        />
+        <Table data={rows} columns={columns} idKey="id" hasHover plugins={{ selection }} />
       )}
     </VStack>
   );
@@ -398,6 +409,10 @@ function SettingsTab({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Switching to a different list that happens to share a name and description
+  // must still reset the form and clear the confirm field, so the effect keys on
+  // the id as well even though it does not read it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: list.id is deliberate
   useEffect(() => {
     setName(list.name);
     setDesc(list.description || "");
@@ -648,6 +663,12 @@ function DetailPane({
 
 // --- New List Dialog ---
 
+type SeedMember = { username: string; password: string };
+
+function blankSeedMember(): WithRowId<SeedMember> {
+  return withRowId({ username: "", password: "" });
+}
+
 function NewListDialog({
   open,
   onClose,
@@ -659,14 +680,14 @@ function NewListDialog({
 }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
-  const [seed, setSeed] = useState([{ username: "", password: "" }]);
+  const [seed, setSeed] = useState<WithRowId<SeedMember>[]>(() => [blankSeedMember()]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setName("");
       setDesc("");
-      setSeed([{ username: "", password: "" }]);
+      setSeed([blankSeedMember()]);
     }
   }, [open]);
 
@@ -679,7 +700,9 @@ function NewListDialog({
       const list = await createAccessListAction({
         name: name.trim(),
         description: desc.trim() || null,
-        users: seed.filter((s) => s.username.trim() && s.password),
+        users: seed
+          .filter((s) => s.username.trim() && s.password)
+          .map(({ username, password }) => ({ username, password })),
       });
       onCreate(list);
       onClose();
@@ -727,7 +750,7 @@ function NewListDialog({
             Seed members (optional)
           </Text>
           {seed.map((s, i) => (
-            <HStack key={i} gap={2} vAlign="end">
+            <HStack key={s.rowId} gap={2} vAlign="end">
               <TextInput
                 {...AUTOFILL_OFF}
                 label={`Username for seed member ${i + 1}`}
@@ -735,7 +758,7 @@ function NewListDialog({
                 size="sm"
                 value={s.username}
                 onChange={(v) =>
-                  setSeed(seed.map((x, j) => (j === i ? { ...x, username: v } : x)))
+                  setSeed(seed.map((x) => (x.rowId === s.rowId ? { ...x, username: v } : x)))
                 }
                 placeholder="username"
                 width="100%"
@@ -747,7 +770,7 @@ function NewListDialog({
                 size="sm"
                 value={s.password}
                 onChange={(v) =>
-                  setSeed(seed.map((x, j) => (j === i ? { ...x, password: v } : x)))
+                  setSeed(seed.map((x) => (x.rowId === s.rowId ? { ...x, password: v } : x)))
                 }
                 placeholder="password"
                 width="100%"
@@ -759,7 +782,9 @@ function NewListDialog({
                 tooltip="Generate password"
                 icon={<Sparkles />}
                 onClick={() =>
-                  setSeed(seed.map((x, j) => (j === i ? { ...x, password: genPassword() } : x)))
+                  setSeed(
+                    seed.map((x) => (x.rowId === s.rowId ? { ...x, password: genPassword() } : x)),
+                  )
                 }
               />
               <IconButton
@@ -771,8 +796,8 @@ function NewListDialog({
                 onClick={() =>
                   setSeed(
                     seed.length === 1
-                      ? [{ username: "", password: "" }]
-                      : seed.filter((_, j) => j !== i)
+                      ? [blankSeedMember()]
+                      : seed.filter((x) => x.rowId !== s.rowId),
                   )
                 }
               />
@@ -784,7 +809,7 @@ function NewListDialog({
               size="sm"
               icon={<Plus />}
               label="Add another member"
-              onClick={() => setSeed([...seed, { username: "", password: "" }])}
+              onClick={() => setSeed([...seed, blankSeedMember()])}
             />
           </HStack>
         </VStack>
@@ -831,13 +856,14 @@ function ListsRail({
         (l) =>
           l.name.toLowerCase().includes(q) ||
           (l.description || "").toLowerCase().includes(q) ||
-          l.entries.some((e) => e.username.toLowerCase().includes(q))
+          l.entries.some((e) => e.username.toLowerCase().includes(q)),
       );
     }
     arr.sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name);
       if (sort === "members") return b.entries.length - a.entries.length;
-      if (sort === "recent") return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      if (sort === "recent")
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       if (sort === "usage") return (usage[b.id]?.length ?? 0) - (usage[a.id]?.length ?? 0);
       return 0;
     });
@@ -883,7 +909,9 @@ function ListsRail({
         <EmptyState
           title={`No lists match "${query}"`}
           isCompact
-          actions={<Button variant="ghost" size="sm" label="Clear search" onClick={() => setQuery("")} />}
+          actions={
+            <Button variant="ghost" size="sm" label="Clear search" onClick={() => setQuery("")} />
+          }
         />
       ) : (
         <List>
@@ -902,7 +930,9 @@ function ListsRail({
                 }
                 label={list.name}
                 description={`${list.entries.length} ${list.entries.length === 1 ? "member" : "members"} · ${hostCount} ${hostCount === 1 ? "host" : "hosts"}`}
-                endContent={hostCount === 0 ? <Badge variant="warning" label="unused" /> : undefined}
+                endContent={
+                  hostCount === 0 ? <Badge variant="warning" label="unused" /> : undefined
+                }
                 onClick={() => onSelect(list.id)}
               />
             );
@@ -933,10 +963,13 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
 
   const selected = lists.find((l) => l.id === selectedId) ?? null;
 
-  const handleListUpdated = useCallback((updated: AccessList) => {
-    setLists((ls) => ls.map((l) => (l.id === updated.id ? updated : l)));
-    router.refresh();
-  }, [router]);
+  const handleListUpdated = useCallback(
+    (updated: AccessList) => {
+      setLists((ls) => ls.map((l) => (l.id === updated.id ? updated : l)));
+      router.refresh();
+    },
+    [router],
+  );
 
   const handleDeleted = useCallback(() => {
     setLists((ls) => ls.filter((l) => l.id !== selectedId));
@@ -944,11 +977,14 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
     router.refresh();
   }, [selectedId, lists, router]);
 
-  const handleCreated = useCallback((list: AccessList) => {
-    setLists((ls) => [list, ...ls]);
-    setSelectedId(list.id);
-    router.refresh();
-  }, [router]);
+  const handleCreated = useCallback(
+    (list: AccessList) => {
+      setLists((ls) => [list, ...ls]);
+      setSelectedId(list.id);
+      router.refresh();
+    },
+    [router],
+  );
 
   // Keyboard shortcuts: ⌘K focuses search, N creates. Both were previously
   // wired to a raw input ref; the search box is a component now, so the
@@ -1004,11 +1040,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
         }
       />
 
-      <NewListDialog
-        open={newOpen}
-        onClose={() => setNewOpen(false)}
-        onCreate={handleCreated}
-      />
+      <NewListDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={handleCreated} />
     </>
   );
 }

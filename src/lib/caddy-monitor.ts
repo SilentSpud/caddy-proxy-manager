@@ -21,7 +21,7 @@ const monitorState: CaddyMonitorState = {
   isHealthy: false,
   lastConfigId: null,
   lastCheckTime: 0,
-  consecutiveFailures: 0
+  consecutiveFailures: 0,
 };
 
 let monitorInterval: NodeJS.Timeout | null = null;
@@ -71,7 +71,7 @@ async function checkCaddyHealth(): Promise<void> {
 
     if (monitorState.isHealthy && monitorState.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
       console.warn(
-        `[CaddyMonitor] Caddy appears to be down (${monitorState.consecutiveFailures} consecutive failures)`
+        `[CaddyMonitor] Caddy appears to be down (${monitorState.consecutiveFailures} consecutive failures)`,
       );
       monitorState.isHealthy = false;
     }
@@ -89,7 +89,9 @@ async function checkCaddyHealth(): Promise<void> {
     (wasUnhealthy && currentConfigId === "empty");
 
   if (hasRestarted) {
-    console.log("[CaddyMonitor] Caddy restart detected! Waiting before reapplying configuration...");
+    console.log(
+      "[CaddyMonitor] Caddy restart detected! Waiting before reapplying configuration...",
+    );
 
     // Wait a bit for Caddy to fully initialize
     setTimeout(async () => {
@@ -125,7 +127,9 @@ export function startCaddyMonitoring(): void {
     return;
   }
 
-  console.log(`[CaddyMonitor] Starting Caddy health monitoring (interval: ${HEALTH_CHECK_INTERVAL}ms)`);
+  console.log(
+    `[CaddyMonitor] Starting Caddy health monitoring (interval: ${HEALTH_CHECK_INTERVAL}ms)`,
+  );
   isMonitoring = true;
 
   // Do initial check immediately

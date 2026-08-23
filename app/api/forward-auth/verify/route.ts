@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { validateForwardAuthSession, checkHostAccessByDomain } from "@/src/lib/models/forward-auth";
 import { getUserById } from "@/src/lib/models/user";
 import { getGroupsForUser } from "@/src/lib/models/groups";
@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Check host access using X-Forwarded-Host header set by Caddy
-  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  const forwardedHost =
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
   if (!forwardedHost) {
     return new NextResponse(null, { status: 401 });
   }
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
       "X-CPM-User": user.name ?? user.email.split("@")[0],
       "X-CPM-Email": user.email,
       "X-CPM-Groups": groupNames,
-      "X-CPM-User-Id": String(user.id)
-    }
+      "X-CPM-User-Id": String(user.id),
+    },
   });
 }

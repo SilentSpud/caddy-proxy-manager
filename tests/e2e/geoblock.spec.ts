@@ -3,30 +3,43 @@ import { test, expect } from '@playwright/test';
 /** Empty geoblock config used to reset state between tests. */
 const EMPTY_GEOBLOCK = {
   enabled: false,
-  block_countries: [], block_continents: [], block_asns: [], block_cidrs: [], block_ips: [],
-  allow_countries: [], allow_continents: [], allow_asns: [], allow_cidrs: [], allow_ips: [],
-  trusted_proxies: [], fail_closed: false,
-  response_status: 403, response_body: 'Forbidden',
-  response_headers: {}, redirect_url: '',
+  block_countries: [],
+  block_continents: [],
+  block_asns: [],
+  block_cidrs: [],
+  block_ips: [],
+  allow_countries: [],
+  allow_continents: [],
+  allow_asns: [],
+  allow_cidrs: [],
+  allow_ips: [],
+  trusted_proxies: [],
+  fail_closed: false,
+  response_status: 403,
+  response_body: 'Forbidden',
+  response_headers: {},
+  redirect_url: '',
 };
 
 /**
  * RFC 5737 TEST-NET ranges — routable nowhere, so they won't block real
  * traffic when applied to Caddy during tests (unlike 0.0.0.0/0).
  */
-const SAFE_BLOCK_CIDR = '198.51.100.0/24';   // TEST-NET-2
-const SAFE_ALLOW_CIDR = '203.0.113.0/24';    // TEST-NET-3
-const SAFE_BLOCK_CIDR_2 = '192.0.2.0/24';    // TEST-NET-1
-const SAFE_ALLOW_CIDR_2 = '233.252.0.0/24';  // MCAST-TEST-NET
+const SAFE_BLOCK_CIDR = '198.51.100.0/24'; // TEST-NET-2
+const SAFE_ALLOW_CIDR = '203.0.113.0/24'; // TEST-NET-3
+const SAFE_BLOCK_CIDR_2 = '192.0.2.0/24'; // TEST-NET-1
+const SAFE_ALLOW_CIDR_2 = '233.252.0.0/24'; // MCAST-TEST-NET
 
 const API_GEOBLOCK = 'http://localhost:3000/api/v1/settings/geoblock';
 
 /**
  * Find the visible text input inside a TagInput component by its hidden input name.
  */
-function cidrInput(parent: ReturnType<typeof test['info']> extends never ? never : any, name: string) {
-  return parent.locator(`div:has(> input[name="${name}"])`)
-    .locator('input[type="text"]');
+function cidrInput(
+  parent: ReturnType<(typeof test)['info']> extends never ? never : any,
+  name: string,
+) {
+  return parent.locator(`div:has(> input[name="${name}"])`).locator('input[type="text"]');
 }
 
 test.describe('Geo Blocking — form persistence', () => {
@@ -55,7 +68,9 @@ test.describe('Geo Blocking — form persistence', () => {
    * Uses RFC 5737 test ranges to avoid blocking real traffic.
    */
   test('saving block rules does not wipe allow rules', async ({ page }) => {
-    const geoSection = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    const geoSection = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -77,8 +92,13 @@ test.describe('Geo Blocking — form persistence', () => {
     await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
 
     await page.reload();
-    await page.locator('aside').getByRole('button', { name: 'Global Geoblocking', exact: true }).click();
-    const fresh = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    await page
+      .locator('aside')
+      .getByRole('button', { name: 'Global Geoblocking', exact: true })
+      .click();
+    const fresh = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
 
     await fresh.getByRole('tab', { name: /block rules/i }).click();
     await expect(fresh.locator(`text=${SAFE_BLOCK_CIDR}`)).toBeVisible({ timeout: 5000 });
@@ -88,7 +108,9 @@ test.describe('Geo Blocking — form persistence', () => {
   });
 
   test('saving allow rules does not wipe block rules', async ({ page }) => {
-    const geoSection = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    const geoSection = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -110,8 +132,13 @@ test.describe('Geo Blocking — form persistence', () => {
     await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
 
     await page.reload();
-    await page.locator('aside').getByRole('button', { name: 'Global Geoblocking', exact: true }).click();
-    const fresh = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    await page
+      .locator('aside')
+      .getByRole('button', { name: 'Global Geoblocking', exact: true })
+      .click();
+    const fresh = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
 
     await fresh.getByRole('tab', { name: /block rules/i }).click();
     await expect(fresh.locator(`text=${SAFE_BLOCK_CIDR_2}`)).toBeVisible({ timeout: 5000 });
@@ -126,7 +153,9 @@ test.describe('Geo Blocking — form persistence', () => {
    * wiped when saving with the accordion collapsed.
    */
   test('advanced settings survive save when accordion is collapsed', async ({ page }) => {
-    const geoSection = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    const geoSection = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -143,11 +172,18 @@ test.describe('Geo Blocking — form persistence', () => {
     await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
 
     await page.reload();
-    await page.locator('aside').getByRole('button', { name: 'Global Geoblocking', exact: true }).click();
-    const fresh = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    await page
+      .locator('aside')
+      .getByRole('button', { name: 'Global Geoblocking', exact: true })
+      .click();
+    const fresh = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
     await fresh.getByRole('button', { name: /trusted proxies/i }).click();
-    await expect(fresh.locator('input[name="geoblockRedirectUrl"]'))
-      .toHaveValue('https://example.com/blocked', { timeout: 5000 });
+    await expect(fresh.locator('input[name="geoblockRedirectUrl"]')).toHaveValue(
+      'https://example.com/blocked',
+      { timeout: 5000 },
+    );
   });
 
   /**
@@ -155,7 +191,9 @@ test.describe('Geo Blocking — form persistence', () => {
    * This test does NOT save, so no Caddy config is affected.
    */
   test('LAN Only preset: values survive tab switching', async ({ page }) => {
-    const geoSection = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    const geoSection = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();
@@ -183,7 +221,9 @@ test.describe('Geo Blocking — form persistence', () => {
    * to minimize the window where 0.0.0.0/0 blocks all traffic.
    */
   test('LAN Only preset: values persist after save', async ({ page }) => {
-    const geoSection = page.locator('form', { has: page.getByRole('button', { name: /save geoblocking settings/i }) });
+    const geoSection = page.locator('form', {
+      has: page.getByRole('button', { name: /save geoblocking settings/i }),
+    });
     const enableSwitch = geoSection.getByRole('switch');
     if (!(await enableSwitch.isChecked())) {
       await enableSwitch.click();

@@ -36,7 +36,6 @@ vi.mock('../../src/lib/db', async () => {
 // options object, so getAuth().options is exactly the config createAuth() built
 // — including our real databaseHooks — which is what we want to assert on.
 vi.mock('better-auth', () => ({
-   
   betterAuth: (options: any) => ({ options }),
 }));
 vi.mock('better-auth/plugins', () => ({
@@ -49,7 +48,12 @@ import type { OAuthProvider } from '../../src/lib/models/oauth-providers';
 
 describe('enforceSafeUserDefaults', () => {
   it('forces role and status to safe defaults', () => {
-    const out = enforceSafeUserDefaults({ email: 'x@y.z', name: 'X', role: 'admin', status: 'active' });
+    const out = enforceSafeUserDefaults({
+      email: 'x@y.z',
+      name: 'X',
+      role: 'admin',
+      status: 'active',
+    });
     expect(out.role).toBe('user');
     expect(out.status).toBe('active');
   });
@@ -81,14 +85,12 @@ describe('enforceSafeUserDefaults', () => {
 
 describe('better-auth user.create.before hook (wired into the real config)', () => {
   it('is configured as a function', () => {
-     
     const auth = getAuth() as any;
     const hook = auth.options?.databaseHooks?.user?.create?.before;
     expect(typeof hook).toBe('function');
   });
 
   it('forces role/status to safe defaults on a malicious OAuth-style user create', async () => {
-     
     const auth = getAuth() as any;
     const hook = auth.options.databaseHooks.user.create.before;
 

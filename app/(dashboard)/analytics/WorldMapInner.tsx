@@ -1,14 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import MapGL, { Layer, Popup, Source, type MapLayerMouseEvent } from 'react-map-gl/maplibre';
-import { feature } from 'topojson-client';
-import type { Topology, GeometryCollection } from 'topojson-specification';
-import { setWorkerUrl, type ExpressionSpecification, type FillLayerSpecification, type LineLayerSpecification } from 'maplibre-gl';
-import { Skeleton } from '@astryxdesign/core/Skeleton';
-import { Text } from '@astryxdesign/core/Text';
-import { HStack } from '@astryxdesign/core/Stack';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { useState, useMemo, useCallback, useEffect } from "react";
+import MapGL, { Layer, Popup, Source, type MapLayerMouseEvent } from "react-map-gl/maplibre";
+import { feature } from "topojson-client";
+import type { Topology, GeometryCollection } from "topojson-specification";
+import {
+  setWorkerUrl,
+  type ExpressionSpecification,
+  type FillLayerSpecification,
+  type LineLayerSpecification,
+} from "maplibre-gl";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Text } from "@astryxdesign/core/Text";
+import { HStack } from "@astryxdesign/core/Stack";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 // maplibre-gl v6 loads its tile worker from a separate file resolved at runtime
 // from `import.meta.url`. Under Turbopack that lookup does not survive bundling,
@@ -16,81 +21,410 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // is staged under public/ at build time (scripts/copy-maplibre-worker.mjs) and
 // pointed at explicitly here. Requires `worker-src 'self'` in the CSP (proxy.ts) —
 // the worker is a same-origin URL now, not the blob: URL v5 used.
-if (typeof window !== 'undefined') {
-  setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
+if (typeof window !== "undefined") {
+  setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 }
 
 const A2N: Record<string, string> = {
-  AF:'4',AL:'8',DZ:'12',AD:'20',AO:'24',AG:'28',AR:'32',AM:'51',
-  AU:'36',AT:'40',AZ:'31',BS:'44',BH:'48',BD:'50',BB:'52',BY:'112',
-  BE:'56',BZ:'84',BJ:'204',BT:'64',BO:'68',BA:'70',BW:'72',BR:'76',
-  BN:'96',BG:'100',BF:'854',BI:'108',CV:'132',KH:'116',CM:'120',
-  CA:'124',CF:'140',TD:'148',CL:'152',CN:'156',CO:'170',KM:'174',
-  CG:'178',CD:'180',CR:'188',CI:'384',HR:'191',CU:'192',CY:'196',
-  CZ:'203',DK:'208',DJ:'262',DM:'212',DO:'214',EC:'218',EG:'818',
-  SV:'222',GQ:'226',ER:'232',EE:'233',SZ:'748',ET:'231',FJ:'242',
-  FI:'246',FR:'250',GA:'266',GM:'270',GE:'268',DE:'276',GH:'288',
-  GR:'300',GD:'308',GT:'320',GN:'324',GW:'624',GY:'328',HT:'332',
-  HN:'340',HU:'348',IS:'352',IN:'356',ID:'360',IR:'364',IQ:'368',
-  IE:'372',IL:'376',IT:'380',JM:'388',JP:'392',JO:'400',KZ:'398',
-  KE:'404',KI:'296',KP:'408',KR:'410',KW:'414',KG:'417',LA:'418',
-  LV:'428',LB:'422',LS:'426',LR:'430',LY:'434',LI:'438',LT:'440',
-  LU:'442',MG:'450',MW:'454',MY:'458',MV:'462',ML:'466',MT:'470',
-  MH:'584',MR:'478',MU:'480',MX:'484',FM:'583',MD:'498',MC:'492',
-  MN:'496',ME:'499',MA:'504',MZ:'508',MM:'104',NA:'516',NR:'520',
-  NP:'524',NL:'528',NZ:'554',NI:'558',NE:'562',NG:'566',NO:'578',
-  OM:'512',PK:'586',PW:'585',PA:'591',PG:'598',PY:'600',PE:'604',
-  PH:'608',PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',RW:'646',
-  KN:'659',LC:'662',VC:'670',WS:'882',SM:'674',ST:'678',SA:'682',
-  SN:'686',RS:'688',SC:'690',SL:'694',SG:'702',SK:'703',SI:'705',
-  SB:'90',SO:'706',ZA:'710',SS:'728',ES:'724',LK:'144',SD:'729',
-  SR:'740',SE:'752',CH:'756',SY:'760',TW:'158',TJ:'762',TZ:'834',
-  TH:'764',TL:'626',TG:'768',TO:'776',TT:'780',TN:'788',TR:'792',
-  TM:'795',TV:'798',UG:'800',UA:'804',AE:'784',GB:'826',US:'840',
-  UY:'858',UZ:'860',VU:'548',VE:'862',VN:'704',YE:'887',ZM:'894',
-  ZW:'716',PS:'275',
+  AF: "4",
+  AL: "8",
+  DZ: "12",
+  AD: "20",
+  AO: "24",
+  AG: "28",
+  AR: "32",
+  AM: "51",
+  AU: "36",
+  AT: "40",
+  AZ: "31",
+  BS: "44",
+  BH: "48",
+  BD: "50",
+  BB: "52",
+  BY: "112",
+  BE: "56",
+  BZ: "84",
+  BJ: "204",
+  BT: "64",
+  BO: "68",
+  BA: "70",
+  BW: "72",
+  BR: "76",
+  BN: "96",
+  BG: "100",
+  BF: "854",
+  BI: "108",
+  CV: "132",
+  KH: "116",
+  CM: "120",
+  CA: "124",
+  CF: "140",
+  TD: "148",
+  CL: "152",
+  CN: "156",
+  CO: "170",
+  KM: "174",
+  CG: "178",
+  CD: "180",
+  CR: "188",
+  CI: "384",
+  HR: "191",
+  CU: "192",
+  CY: "196",
+  CZ: "203",
+  DK: "208",
+  DJ: "262",
+  DM: "212",
+  DO: "214",
+  EC: "218",
+  EG: "818",
+  SV: "222",
+  GQ: "226",
+  ER: "232",
+  EE: "233",
+  SZ: "748",
+  ET: "231",
+  FJ: "242",
+  FI: "246",
+  FR: "250",
+  GA: "266",
+  GM: "270",
+  GE: "268",
+  DE: "276",
+  GH: "288",
+  GR: "300",
+  GD: "308",
+  GT: "320",
+  GN: "324",
+  GW: "624",
+  GY: "328",
+  HT: "332",
+  HN: "340",
+  HU: "348",
+  IS: "352",
+  IN: "356",
+  ID: "360",
+  IR: "364",
+  IQ: "368",
+  IE: "372",
+  IL: "376",
+  IT: "380",
+  JM: "388",
+  JP: "392",
+  JO: "400",
+  KZ: "398",
+  KE: "404",
+  KI: "296",
+  KP: "408",
+  KR: "410",
+  KW: "414",
+  KG: "417",
+  LA: "418",
+  LV: "428",
+  LB: "422",
+  LS: "426",
+  LR: "430",
+  LY: "434",
+  LI: "438",
+  LT: "440",
+  LU: "442",
+  MG: "450",
+  MW: "454",
+  MY: "458",
+  MV: "462",
+  ML: "466",
+  MT: "470",
+  MH: "584",
+  MR: "478",
+  MU: "480",
+  MX: "484",
+  FM: "583",
+  MD: "498",
+  MC: "492",
+  MN: "496",
+  ME: "499",
+  MA: "504",
+  MZ: "508",
+  MM: "104",
+  NA: "516",
+  NR: "520",
+  NP: "524",
+  NL: "528",
+  NZ: "554",
+  NI: "558",
+  NE: "562",
+  NG: "566",
+  NO: "578",
+  OM: "512",
+  PK: "586",
+  PW: "585",
+  PA: "591",
+  PG: "598",
+  PY: "600",
+  PE: "604",
+  PH: "608",
+  PL: "616",
+  PT: "620",
+  QA: "634",
+  RO: "642",
+  RU: "643",
+  RW: "646",
+  KN: "659",
+  LC: "662",
+  VC: "670",
+  WS: "882",
+  SM: "674",
+  ST: "678",
+  SA: "682",
+  SN: "686",
+  RS: "688",
+  SC: "690",
+  SL: "694",
+  SG: "702",
+  SK: "703",
+  SI: "705",
+  SB: "90",
+  SO: "706",
+  ZA: "710",
+  SS: "728",
+  ES: "724",
+  LK: "144",
+  SD: "729",
+  SR: "740",
+  SE: "752",
+  CH: "756",
+  SY: "760",
+  TW: "158",
+  TJ: "762",
+  TZ: "834",
+  TH: "764",
+  TL: "626",
+  TG: "768",
+  TO: "776",
+  TT: "780",
+  TN: "788",
+  TR: "792",
+  TM: "795",
+  TV: "798",
+  UG: "800",
+  UA: "804",
+  AE: "784",
+  GB: "826",
+  US: "840",
+  UY: "858",
+  UZ: "860",
+  VU: "548",
+  VE: "862",
+  VN: "704",
+  YE: "887",
+  ZM: "894",
+  ZW: "716",
+  PS: "275",
 };
 const N2A: Record<string, string> = Object.fromEntries(Object.entries(A2N).map(([a, n]) => [n, a]));
 
 const NAMES: Record<string, string> = {
-  AF:'Afghanistan',AL:'Albania',DZ:'Algeria',AD:'Andorra',AO:'Angola',AG:'Antigua & Barbuda',
-  AR:'Argentina',AM:'Armenia',AU:'Australia',AT:'Austria',AZ:'Azerbaijan',BS:'Bahamas',
-  BH:'Bahrain',BD:'Bangladesh',BB:'Barbados',BY:'Belarus',BE:'Belgium',BZ:'Belize',
-  BJ:'Benin',BT:'Bhutan',BO:'Bolivia',BA:'Bosnia & Herzegovina',BW:'Botswana',BR:'Brazil',
-  BN:'Brunei',BG:'Bulgaria',BF:'Burkina Faso',BI:'Burundi',CV:'Cape Verde',KH:'Cambodia',
-  CM:'Cameroon',CA:'Canada',CF:'Central African Rep.',TD:'Chad',CL:'Chile',CN:'China',
-  CO:'Colombia',KM:'Comoros',CG:'Congo',CD:'DR Congo',CR:'Costa Rica',CI:"Côte d'Ivoire",
-  HR:'Croatia',CU:'Cuba',CY:'Cyprus',CZ:'Czech Republic',DK:'Denmark',DJ:'Djibouti',
-  DM:'Dominica',DO:'Dominican Republic',EC:'Ecuador',EG:'Egypt',SV:'El Salvador',
-  GQ:'Equatorial Guinea',ER:'Eritrea',EE:'Estonia',SZ:'Eswatini',ET:'Ethiopia',
-  FJ:'Fiji',FI:'Finland',FR:'France',GA:'Gabon',GM:'Gambia',GE:'Georgia',DE:'Germany',
-  GH:'Ghana',GR:'Greece',GD:'Grenada',GT:'Guatemala',GN:'Guinea',GW:'Guinea-Bissau',
-  GY:'Guyana',HT:'Haiti',HN:'Honduras',HU:'Hungary',IS:'Iceland',IN:'India',ID:'Indonesia',
-  IR:'Iran',IQ:'Iraq',IE:'Ireland',IL:'Israel',IT:'Italy',JM:'Jamaica',JP:'Japan',
-  JO:'Jordan',KZ:'Kazakhstan',KE:'Kenya',KI:'Kiribati',KP:'North Korea',KR:'South Korea',
-  KW:'Kuwait',KG:'Kyrgyzstan',LA:'Laos',LV:'Latvia',LB:'Lebanon',LS:'Lesotho',LR:'Liberia',
-  LY:'Libya',LI:'Liechtenstein',LT:'Lithuania',LU:'Luxembourg',MG:'Madagascar',MW:'Malawi',
-  MY:'Malaysia',MV:'Maldives',ML:'Mali',MT:'Malta',MH:'Marshall Islands',MR:'Mauritania',
-  MU:'Mauritius',MX:'Mexico',FM:'Micronesia',MD:'Moldova',MC:'Monaco',MN:'Mongolia',
-  ME:'Montenegro',MA:'Morocco',MZ:'Mozambique',MM:'Myanmar',NA:'Namibia',NR:'Nauru',
-  NP:'Nepal',NL:'Netherlands',NZ:'New Zealand',NI:'Nicaragua',NE:'Niger',NG:'Nigeria',
-  NO:'Norway',OM:'Oman',PK:'Pakistan',PW:'Palau',PA:'Panama',PG:'Papua New Guinea',
-  PY:'Paraguay',PE:'Peru',PH:'Philippines',PL:'Poland',PT:'Portugal',QA:'Qatar',
-  RO:'Romania',RU:'Russia',RW:'Rwanda',KN:'Saint Kitts & Nevis',LC:'Saint Lucia',
-  VC:'Saint Vincent',WS:'Samoa',SM:'San Marino',ST:'São Tomé & Príncipe',SA:'Saudi Arabia',
-  SN:'Senegal',RS:'Serbia',SC:'Seychelles',SL:'Sierra Leone',SG:'Singapore',SK:'Slovakia',
-  SI:'Slovenia',SB:'Solomon Islands',SO:'Somalia',ZA:'South Africa',SS:'South Sudan',
-  ES:'Spain',LK:'Sri Lanka',SD:'Sudan',SR:'Suriname',SE:'Sweden',CH:'Switzerland',
-  SY:'Syria',TW:'Taiwan',TJ:'Tajikistan',TZ:'Tanzania',TH:'Thailand',TL:'Timor-Leste',
-  TG:'Togo',TO:'Tonga',TT:'Trinidad & Tobago',TN:'Tunisia',TR:'Turkey',TM:'Turkmenistan',
-  TV:'Tuvalu',UG:'Uganda',UA:'Ukraine',AE:'United Arab Emirates',GB:'United Kingdom',
-  US:'United States',UY:'Uruguay',UZ:'Uzbekistan',VU:'Vanuatu',VE:'Venezuela',
-  VN:'Vietnam',YE:'Yemen',ZM:'Zambia',ZW:'Zimbabwe',PS:'Palestine',
+  AF: "Afghanistan",
+  AL: "Albania",
+  DZ: "Algeria",
+  AD: "Andorra",
+  AO: "Angola",
+  AG: "Antigua & Barbuda",
+  AR: "Argentina",
+  AM: "Armenia",
+  AU: "Australia",
+  AT: "Austria",
+  AZ: "Azerbaijan",
+  BS: "Bahamas",
+  BH: "Bahrain",
+  BD: "Bangladesh",
+  BB: "Barbados",
+  BY: "Belarus",
+  BE: "Belgium",
+  BZ: "Belize",
+  BJ: "Benin",
+  BT: "Bhutan",
+  BO: "Bolivia",
+  BA: "Bosnia & Herzegovina",
+  BW: "Botswana",
+  BR: "Brazil",
+  BN: "Brunei",
+  BG: "Bulgaria",
+  BF: "Burkina Faso",
+  BI: "Burundi",
+  CV: "Cape Verde",
+  KH: "Cambodia",
+  CM: "Cameroon",
+  CA: "Canada",
+  CF: "Central African Rep.",
+  TD: "Chad",
+  CL: "Chile",
+  CN: "China",
+  CO: "Colombia",
+  KM: "Comoros",
+  CG: "Congo",
+  CD: "DR Congo",
+  CR: "Costa Rica",
+  CI: "Côte d'Ivoire",
+  HR: "Croatia",
+  CU: "Cuba",
+  CY: "Cyprus",
+  CZ: "Czech Republic",
+  DK: "Denmark",
+  DJ: "Djibouti",
+  DM: "Dominica",
+  DO: "Dominican Republic",
+  EC: "Ecuador",
+  EG: "Egypt",
+  SV: "El Salvador",
+  GQ: "Equatorial Guinea",
+  ER: "Eritrea",
+  EE: "Estonia",
+  SZ: "Eswatini",
+  ET: "Ethiopia",
+  FJ: "Fiji",
+  FI: "Finland",
+  FR: "France",
+  GA: "Gabon",
+  GM: "Gambia",
+  GE: "Georgia",
+  DE: "Germany",
+  GH: "Ghana",
+  GR: "Greece",
+  GD: "Grenada",
+  GT: "Guatemala",
+  GN: "Guinea",
+  GW: "Guinea-Bissau",
+  GY: "Guyana",
+  HT: "Haiti",
+  HN: "Honduras",
+  HU: "Hungary",
+  IS: "Iceland",
+  IN: "India",
+  ID: "Indonesia",
+  IR: "Iran",
+  IQ: "Iraq",
+  IE: "Ireland",
+  IL: "Israel",
+  IT: "Italy",
+  JM: "Jamaica",
+  JP: "Japan",
+  JO: "Jordan",
+  KZ: "Kazakhstan",
+  KE: "Kenya",
+  KI: "Kiribati",
+  KP: "North Korea",
+  KR: "South Korea",
+  KW: "Kuwait",
+  KG: "Kyrgyzstan",
+  LA: "Laos",
+  LV: "Latvia",
+  LB: "Lebanon",
+  LS: "Lesotho",
+  LR: "Liberia",
+  LY: "Libya",
+  LI: "Liechtenstein",
+  LT: "Lithuania",
+  LU: "Luxembourg",
+  MG: "Madagascar",
+  MW: "Malawi",
+  MY: "Malaysia",
+  MV: "Maldives",
+  ML: "Mali",
+  MT: "Malta",
+  MH: "Marshall Islands",
+  MR: "Mauritania",
+  MU: "Mauritius",
+  MX: "Mexico",
+  FM: "Micronesia",
+  MD: "Moldova",
+  MC: "Monaco",
+  MN: "Mongolia",
+  ME: "Montenegro",
+  MA: "Morocco",
+  MZ: "Mozambique",
+  MM: "Myanmar",
+  NA: "Namibia",
+  NR: "Nauru",
+  NP: "Nepal",
+  NL: "Netherlands",
+  NZ: "New Zealand",
+  NI: "Nicaragua",
+  NE: "Niger",
+  NG: "Nigeria",
+  NO: "Norway",
+  OM: "Oman",
+  PK: "Pakistan",
+  PW: "Palau",
+  PA: "Panama",
+  PG: "Papua New Guinea",
+  PY: "Paraguay",
+  PE: "Peru",
+  PH: "Philippines",
+  PL: "Poland",
+  PT: "Portugal",
+  QA: "Qatar",
+  RO: "Romania",
+  RU: "Russia",
+  RW: "Rwanda",
+  KN: "Saint Kitts & Nevis",
+  LC: "Saint Lucia",
+  VC: "Saint Vincent",
+  WS: "Samoa",
+  SM: "San Marino",
+  ST: "São Tomé & Príncipe",
+  SA: "Saudi Arabia",
+  SN: "Senegal",
+  RS: "Serbia",
+  SC: "Seychelles",
+  SL: "Sierra Leone",
+  SG: "Singapore",
+  SK: "Slovakia",
+  SI: "Slovenia",
+  SB: "Solomon Islands",
+  SO: "Somalia",
+  ZA: "South Africa",
+  SS: "South Sudan",
+  ES: "Spain",
+  LK: "Sri Lanka",
+  SD: "Sudan",
+  SR: "Suriname",
+  SE: "Sweden",
+  CH: "Switzerland",
+  SY: "Syria",
+  TW: "Taiwan",
+  TJ: "Tajikistan",
+  TZ: "Tanzania",
+  TH: "Thailand",
+  TL: "Timor-Leste",
+  TG: "Togo",
+  TO: "Tonga",
+  TT: "Trinidad & Tobago",
+  TN: "Tunisia",
+  TR: "Turkey",
+  TM: "Turkmenistan",
+  TV: "Tuvalu",
+  UG: "Uganda",
+  UA: "Ukraine",
+  AE: "United Arab Emirates",
+  GB: "United Kingdom",
+  US: "United States",
+  UY: "Uruguay",
+  UZ: "Uzbekistan",
+  VU: "Vanuatu",
+  VE: "Venezuela",
+  VN: "Vietnam",
+  YE: "Yemen",
+  ZM: "Zambia",
+  ZW: "Zimbabwe",
+  PS: "Palestine",
 };
 
 function flag(code: string): string {
-  if (!code || code.length !== 2) return '🌐';
-  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+  if (!code || code.length !== 2) return "🌐";
+  return String.fromCodePoint(
+    ...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
+  );
 }
 
 // Unwrap polygon rings so consecutive vertices never jump more than 180° in longitude.
@@ -111,75 +445,86 @@ function cutAntimeridian(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollecti
   }
 
   function fixGeometry(geom: GeoJSON.Geometry): GeoJSON.Geometry {
-    if (geom.type === 'Polygon') {
+    if (geom.type === "Polygon") {
       return { ...geom, coordinates: geom.coordinates.map(unwrapRing) };
     }
-    if (geom.type === 'MultiPolygon') {
-      return { ...geom, coordinates: geom.coordinates.map(p => p.map(unwrapRing)) };
+    if (geom.type === "MultiPolygon") {
+      return { ...geom, coordinates: geom.coordinates.map((p) => p.map(unwrapRing)) };
     }
     return geom;
   }
 
   return {
     ...fc,
-    features: fc.features.map(f => f.geometry ? { ...f, geometry: fixGeometry(f.geometry) } : f),
+    features: fc.features.map((f) =>
+      f.geometry ? { ...f, geometry: fixGeometry(f.geometry) } : f,
+    ),
   };
 }
 
-const OCEAN = '#0a1628';
+const OCEAN = "#0a1628";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: maplibre's StyleSpecification is far stricter than a blank base style needs
 const MAP_STYLE: any = {
   version: 8,
-  name: 'blank',
+  name: "blank",
   sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': OCEAN } }],
+  layers: [{ id: "bg", type: "background", paint: { "background-color": OCEAN } }],
 };
 
-const FILL_LAYER: Omit<FillLayerSpecification, 'source'> = {
-  id: 'countries-fill',
-  type: 'fill',
+const FILL_LAYER: Omit<FillLayerSpecification, "source"> = {
+  id: "countries-fill",
+  type: "fill",
   paint: {
-    'fill-color': [
-      'interpolate', ['linear'],
-      ['coalesce', ['get', 'norm'], 0],
-      0,     '#1e293b',  // no traffic — slate-800, clearly distinct from ocean
-      0.001, '#1e3a8a',  // any traffic
-      0.4,   '#3b82f6',
-      1,     '#93c5fd',
+    "fill-color": [
+      "interpolate",
+      ["linear"],
+      ["coalesce", ["get", "norm"], 0],
+      0,
+      "#1e293b", // no traffic — slate-800, clearly distinct from ocean
+      0.001,
+      "#1e3a8a", // any traffic
+      0.4,
+      "#3b82f6",
+      1,
+      "#93c5fd",
     ] as ExpressionSpecification,
-    'fill-opacity': 1,
+    "fill-opacity": 1,
   },
 };
 
-const SELECTED_LAYER: Omit<FillLayerSpecification, 'source'> = {
-  id: 'countries-selected',
-  type: 'fill',
+const SELECTED_LAYER: Omit<FillLayerSpecification, "source"> = {
+  id: "countries-selected",
+  type: "fill",
   paint: {
-    'fill-color': '#7dd3fc',
-    'fill-opacity': 0.45,
+    "fill-color": "#7dd3fc",
+    "fill-opacity": 0.45,
   },
 };
 
-const HOVER_LAYER: Omit<FillLayerSpecification, 'source'> = {
-  id: 'countries-hover',
-  type: 'fill',
+const HOVER_LAYER: Omit<FillLayerSpecification, "source"> = {
+  id: "countries-hover",
+  type: "fill",
   paint: {
-    'fill-color': '#7dd3fc',
-    'fill-opacity': 0.30,
+    "fill-color": "#7dd3fc",
+    "fill-opacity": 0.3,
   },
 };
 
-const OUTLINE_LAYER: Omit<LineLayerSpecification, 'source'> = {
-  id: 'countries-outline',
-  type: 'line',
+const OUTLINE_LAYER: Omit<LineLayerSpecification, "source"> = {
+  id: "countries-outline",
+  type: "line",
   paint: {
-    'line-color': 'rgba(148,163,184,0.18)',
-    'line-width': 0.6,
+    "line-color": "rgba(148,163,184,0.18)",
+    "line-width": 0.6,
   },
 };
 
-export interface CountryStats { countryCode: string; total: number; blocked: number; }
+export interface CountryStats {
+  countryCode: string;
+  total: number;
+  blocked: number;
+}
 
 interface HoverInfo {
   longitude: number;
@@ -189,22 +534,31 @@ interface HoverInfo {
   blocked: number;
 }
 
-export default function WorldMapInner({ data, selectedCountry }: { data: CountryStats[]; selectedCountry?: string | null }) {
+export default function WorldMapInner({
+  data,
+  selectedCountry,
+}: {
+  data: CountryStats[];
+  selectedCountry?: string | null;
+}) {
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
-  const countMap = useMemo(() => new Map(data.map(d => [d.countryCode, d.total])), [data]);
-  const blockedMap = useMemo(() => new Map(data.map(d => [d.countryCode, d.blocked])), [data]);
+  const countMap = useMemo(() => new Map(data.map((d) => [d.countryCode, d.total])), [data]);
+  const blockedMap = useMemo(() => new Map(data.map((d) => [d.countryCode, d.blocked])), [data]);
   const max = useMemo(() => data.reduce((m, d) => Math.max(m, d.total), 0), [data]);
 
   useEffect(() => {
-    fetch('/geo/countries-50m.json')
-      .then(r => r.json())
+    fetch("/geo/countries-50m.json")
+      .then((r) => r.json())
       .then((topo: Topology) => {
-        const fc = feature(topo, topo.objects.countries as GeometryCollection) as GeoJSON.FeatureCollection;
+        const fc = feature(
+          topo,
+          topo.objects.countries as GeometryCollection,
+        ) as GeoJSON.FeatureCollection;
         setBaseGeojson(cutAntimeridian(fc));
       })
-      .catch(() => setBaseGeojson({ type: 'FeatureCollection', features: [] }));
+      .catch(() => setBaseGeojson({ type: "FeatureCollection", features: [] }));
   }, []);
 
   const geojson = useMemo<GeoJSON.FeatureCollection | null>(() => {
@@ -212,19 +566,32 @@ export default function WorldMapInner({ data, selectedCountry }: { data: Country
     const safeMax = Math.max(max, 1);
     return {
       ...baseGeojson,
-      features: baseGeojson.features.map(f => {
+      features: baseGeojson.features.map((f) => {
         const alpha2 = N2A[String(Number(f.id ?? 0))] ?? null;
         const total = alpha2 ? (countMap.get(alpha2) ?? 0) : 0;
         const blocked = alpha2 ? (blockedMap.get(alpha2) ?? 0) : 0;
         const isSelected = alpha2 !== null && alpha2 === selectedCountry;
-        return { ...f, properties: { ...f.properties, alpha2, total, blocked, norm: total / safeMax, isSelected } };
+        return {
+          ...f,
+          properties: {
+            ...f.properties,
+            alpha2,
+            total,
+            blocked,
+            norm: total / safeMax,
+            isSelected,
+          },
+        };
       }),
     };
   }, [baseGeojson, countMap, blockedMap, max, selectedCountry]);
 
   const onHover = useCallback((event: MapLayerMouseEvent) => {
     const f = event.features?.[0];
-    if (!f) { setHoverInfo(null); return; }
+    if (!f) {
+      setHoverInfo(null);
+      return;
+    }
     const alpha2 = (f.properties?.alpha2 as string | null) ?? null;
     setHoverInfo({
       longitude: event.lngLat.lng,
@@ -238,28 +605,31 @@ export default function WorldMapInner({ data, selectedCountry }: { data: Country
   // Hover filter: only tracks mouse position, changes on every mousemove
   const hoverFilter = useMemo<ExpressionSpecification>(() => {
     const a2 = hoverInfo?.alpha2 ?? null;
-    return a2 ? ['==', ['get', 'alpha2'], a2] : ['boolean', false];
+    return a2 ? ["==", ["get", "alpha2"], a2] : ["boolean", false];
   }, [hoverInfo?.alpha2]);
 
   // Centroid popup for the table-selected country (shown when not hovering)
   const selectedInfo = useMemo(() => {
     if (!selectedCountry || !geojson) return null;
-    const feat = geojson.features.find(f => f.properties?.alpha2 === selectedCountry);
+    const feat = geojson.features.find((f) => f.properties?.alpha2 === selectedCountry);
     if (!feat?.geometry) return null;
 
     const positions: GeoJSON.Position[] = [];
     const collect = (geom: GeoJSON.Geometry) => {
-      if (geom.type === 'Polygon') geom.coordinates.forEach(r => positions.push(...r));
-      else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(p => p.forEach(r => positions.push(...r)));
+      if (geom.type === "Polygon") {
+        for (const r of geom.coordinates) positions.push(...r);
+      } else if (geom.type === "MultiPolygon") {
+        for (const p of geom.coordinates) for (const r of p) positions.push(...r);
+      }
     };
     collect(feat.geometry);
     if (positions.length === 0) return null;
 
-    const lngs = positions.map(c => c[0]);
-    const lats = positions.map(c => c[1]);
+    const lngs = positions.map((c) => c[0]);
+    const lats = positions.map((c) => c[1]);
     // Clamp longitude to [-180, 180] for the popup anchor
     const rawLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-    const longitude = ((rawLng + 180) % 360 + 360) % 360 - 180;
+    const longitude = ((((rawLng + 180) % 360) + 360) % 360) - 180;
     const latitude = Math.max(-85, Math.min(85, (Math.min(...lats) + Math.max(...lats)) / 2));
 
     return {
@@ -272,9 +642,7 @@ export default function WorldMapInner({ data, selectedCountry }: { data: Country
   }, [selectedCountry, geojson]);
 
   if (!geojson) {
-    return (
-      <Skeleton width="100%" height={400} />
-    );
+    return <Skeleton width="100%" height={400} />;
   }
 
   return (
@@ -297,73 +665,115 @@ export default function WorldMapInner({ data, selectedCountry }: { data: Country
         <MapGL
           mapStyle={MAP_STYLE}
           initialViewState={{
-            bounds: [[-168, -56], [168, 74]],
+            bounds: [
+              [-168, -56],
+              [168, 74],
+            ],
             fitBoundsOptions: { padding: 4 },
           }}
           minZoom={0.5}
-          interactiveLayerIds={['countries-fill']}
+          interactiveLayerIds={["countries-fill"]}
           onMouseMove={onHover}
           onMouseLeave={() => setHoverInfo(null)}
-          style={{ width: '100%', height: '100%' }}
+          style={{ width: "100%", height: "100%" }}
           attributionControl={false}
           dragRotate={false}
           pitchWithRotate={false}
-          cursor={hoverInfo ? 'crosshair' : 'grab'}
+          cursor={hoverInfo ? "crosshair" : "grab"}
         >
           <Source id="countries" type="geojson" data={geojson}>
             <Layer {...FILL_LAYER} source="countries" />
             {/* Selected: data-driven via isSelected property baked into geojson — reliable on click */}
-            <Layer {...SELECTED_LAYER} source="countries" filter={['==', ['get', 'isSelected'], true]} />
+            <Layer
+              {...SELECTED_LAYER}
+              source="countries"
+              filter={["==", ["get", "isSelected"], true]}
+            />
             {/* Hover: filter-driven, changes on mousemove */}
             <Layer {...HOVER_LAYER} source="countries" filter={hoverFilter} />
             <Layer {...OUTLINE_LAYER} source="countries" />
           </Source>
 
           {/* Hover popup (takes precedence) or selected-country popup */}
-          {(hoverInfo ?? selectedInfo) && (() => {
-            const info = hoverInfo ?? selectedInfo!;
-            return (
-              <Popup
-                longitude={info.longitude}
-                latitude={info.latitude}
-                offset={[0, -6] as [number, number]}
-                closeButton={false}
-                closeOnClick={false}
-                anchor="bottom"
-                className="wm-popup"
-              >
-                <div style={{ color: '#f1f5f9', fontFamily: 'inherit', fontSize: 13 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7, fontWeight: 600, fontSize: 14 }}>
-                    <span style={{ fontSize: 20, lineHeight: 1 }}>{info.alpha2 ? flag(info.alpha2) : '🌐'}</span>
-                    <span>{info.alpha2 ? (NAMES[info.alpha2] ?? info.alpha2) : 'Territory'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20 }}>
-                    <span style={{ color: '#94a3b8' }}>Requests</span>
-                    <span style={{ color: '#60a5fa', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                      {info.total.toLocaleString()}
-                    </span>
-                  </div>
-                  {info.blocked > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginTop: 3 }}>
-                      <span style={{ color: '#94a3b8' }}>Blocked</span>
-                      <span style={{ color: '#f87171', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                        {info.blocked.toLocaleString()}
+          {(hoverInfo ?? selectedInfo) &&
+            (() => {
+              const info = hoverInfo ?? selectedInfo!;
+              return (
+                <Popup
+                  longitude={info.longitude}
+                  latitude={info.latitude}
+                  offset={[0, -6] as [number, number]}
+                  closeButton={false}
+                  closeOnClick={false}
+                  anchor="bottom"
+                  className="wm-popup"
+                >
+                  <div style={{ color: "#f1f5f9", fontFamily: "inherit", fontSize: 13 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 7,
+                        marginBottom: 7,
+                        fontWeight: 600,
+                        fontSize: 14,
+                      }}
+                    >
+                      <span style={{ fontSize: 20, lineHeight: 1 }}>
+                        {info.alpha2 ? flag(info.alpha2) : "🌐"}
+                      </span>
+                      <span>{info.alpha2 ? (NAMES[info.alpha2] ?? info.alpha2) : "Territory"}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 20 }}>
+                      <span style={{ color: "#94a3b8" }}>Requests</span>
+                      <span
+                        style={{
+                          color: "#60a5fa",
+                          fontWeight: 700,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {info.total.toLocaleString()}
                       </span>
                     </div>
-                  )}
-                  {info.total === 0 && (
-                    <div style={{ color: '#475569', marginTop: 3, fontSize: 12 }}>No traffic recorded</div>
-                  )}
-                </div>
-              </Popup>
-            );
-          })()}
+                    {info.blocked > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 20,
+                          marginTop: 3,
+                        }}
+                      >
+                        <span style={{ color: "#94a3b8" }}>Blocked</span>
+                        <span
+                          style={{
+                            color: "#f87171",
+                            fontWeight: 700,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {info.blocked.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {info.total === 0 && (
+                      <div style={{ color: "#475569", marginTop: 3, fontSize: 12 }}>
+                        No traffic recorded
+                      </div>
+                    )}
+                  </div>
+                </Popup>
+              );
+            })()}
         </MapGL>
       </div>
 
       {max > 0 && (
         <HStack gap={2} vAlign="center">
-          <Text type="body" size="xsm" color="secondary">Low</Text>
+          <Text type="body" size="xsm" color="secondary">
+            Low
+          </Text>
           {/* The ramp mirrors the map's own fill-colour interpolation, so it
               stays in the map's palette rather than the theme's. */}
           <div
@@ -371,10 +781,12 @@ export default function WorldMapInner({ data, selectedCountry }: { data: Country
               flex: 1,
               height: 5,
               borderRadius: 999,
-              background: 'linear-gradient(to right, #1e3a8a, #3b82f6, #93c5fd)',
+              background: "linear-gradient(to right, #1e3a8a, #3b82f6, #93c5fd)",
             }}
           />
-          <Text type="body" size="xsm" color="secondary">High</Text>
+          <Text type="body" size="xsm" color="secondary">
+            High
+          </Text>
         </HStack>
       )}
     </div>

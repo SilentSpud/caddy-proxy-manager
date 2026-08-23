@@ -1,21 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import {
-  getGeneralSettings, saveGeneralSettings,
-  getAcmeSettings, saveAcmeSettings,
-  getCloudflareSettings, saveCloudflareSettings,
-  getAuthentikSettings, saveAuthentikSettings,
-  getMetricsSettings, saveMetricsSettings,
-  getLoggingSettings, saveLoggingSettings,
-  getDnsSettings, saveDnsSettings,
-  getDnsProviderSettings, saveDnsProviderSettings,
-  getUpstreamDnsResolutionSettings, saveUpstreamDnsResolutionSettings,
-  getGeoBlockSettings, saveGeoBlockSettings,
-  getWafSettings, saveWafSettings,
-  getErrorPagesSettings, saveErrorPagesSettings,
-  getTrustedProxiesSettings, saveTrustedProxiesSettings,
+  getGeneralSettings,
+  saveGeneralSettings,
+  getAcmeSettings,
+  saveAcmeSettings,
+  getCloudflareSettings,
+  saveCloudflareSettings,
+  getAuthentikSettings,
+  saveAuthentikSettings,
+  getMetricsSettings,
+  saveMetricsSettings,
+  getLoggingSettings,
+  saveLoggingSettings,
+  getDnsSettings,
+  saveDnsSettings,
+  getDnsProviderSettings,
+  saveDnsProviderSettings,
+  getUpstreamDnsResolutionSettings,
+  saveUpstreamDnsResolutionSettings,
+  getGeoBlockSettings,
+  saveGeoBlockSettings,
+  getWafSettings,
+  saveWafSettings,
+  getErrorPagesSettings,
+  saveErrorPagesSettings,
+  getTrustedProxiesSettings,
+  saveTrustedProxiesSettings,
 } from "@/src/lib/settings";
-import { getInstanceMode, setInstanceMode, getSlaveMasterToken, setSlaveMasterToken } from "@/src/lib/instance-sync";
+import {
+  getInstanceMode,
+  setInstanceMode,
+  getSlaveMasterToken,
+  setSlaveMasterToken,
+} from "@/src/lib/instance-sync";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 
 type SettingsHandler = {
@@ -25,24 +43,76 @@ type SettingsHandler = {
 };
 
 const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
-  general: { get: getGeneralSettings, save: saveGeneralSettings as (data: never) => Promise<void>, applyCaddy: true },
-  acme: { get: getAcmeSettings, save: saveAcmeSettings as (data: never) => Promise<void>, applyCaddy: true },
-  cloudflare: { get: getCloudflareSettings, save: saveCloudflareSettings as (data: never) => Promise<void>, applyCaddy: true },
-  authentik: { get: getAuthentikSettings, save: saveAuthentikSettings as (data: never) => Promise<void>, applyCaddy: true },
-  metrics: { get: getMetricsSettings, save: saveMetricsSettings as (data: never) => Promise<void>, applyCaddy: true },
-  logging: { get: getLoggingSettings, save: saveLoggingSettings as (data: never) => Promise<void>, applyCaddy: true },
-  dns: { get: getDnsSettings, save: saveDnsSettings as (data: never) => Promise<void>, applyCaddy: true },
-  "dns-provider": { get: getDnsProviderSettings, save: saveDnsProviderSettings as (data: never) => Promise<void>, applyCaddy: true },
-  "upstream-dns": { get: getUpstreamDnsResolutionSettings, save: saveUpstreamDnsResolutionSettings as (data: never) => Promise<void>, applyCaddy: true },
-  geoblock: { get: getGeoBlockSettings, save: saveGeoBlockSettings as (data: never) => Promise<void>, applyCaddy: true },
-  waf: { get: getWafSettings, save: saveWafSettings as (data: never) => Promise<void>, applyCaddy: true },
-  "error-pages": { get: getErrorPagesSettings, save: saveErrorPagesSettings as (data: never) => Promise<void>, applyCaddy: true },
-  "trusted-proxies": { get: getTrustedProxiesSettings, save: saveTrustedProxiesSettings as (data: never) => Promise<void>, applyCaddy: true },
+  general: {
+    get: getGeneralSettings,
+    save: saveGeneralSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  acme: {
+    get: getAcmeSettings,
+    save: saveAcmeSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  cloudflare: {
+    get: getCloudflareSettings,
+    save: saveCloudflareSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  authentik: {
+    get: getAuthentikSettings,
+    save: saveAuthentikSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  metrics: {
+    get: getMetricsSettings,
+    save: saveMetricsSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  logging: {
+    get: getLoggingSettings,
+    save: saveLoggingSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  dns: {
+    get: getDnsSettings,
+    save: saveDnsSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  "dns-provider": {
+    get: getDnsProviderSettings,
+    save: saveDnsProviderSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  "upstream-dns": {
+    get: getUpstreamDnsResolutionSettings,
+    save: saveUpstreamDnsResolutionSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  geoblock: {
+    get: getGeoBlockSettings,
+    save: saveGeoBlockSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  waf: {
+    get: getWafSettings,
+    save: saveWafSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  "error-pages": {
+    get: getErrorPagesSettings,
+    save: saveErrorPagesSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
+  "trusted-proxies": {
+    get: getTrustedProxiesSettings,
+    save: saveTrustedProxiesSettings as (data: never) => Promise<void>,
+    applyCaddy: true,
+  },
 };
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ group: string }> }
+  { params }: { params: Promise<{ group: string }> },
 ) {
   try {
     await requireApiAdmin(request);
@@ -72,7 +142,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ group: string }> }
+  { params }: { params: Promise<{ group: string }> },
 ) {
   try {
     await requireApiAdmin(request);
@@ -84,7 +154,7 @@ export async function PUT(
       if (!validModes.includes(body.mode)) {
         return NextResponse.json(
           { error: `Invalid mode. Must be one of: ${validModes.join(", ")}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
       await setInstanceMode(body.mode);
@@ -92,11 +162,14 @@ export async function PUT(
     }
 
     if (group === "sync-token") {
-      if (body.token !== null && body.token !== undefined &&
-          (typeof body.token !== "string" || body.token.length < 32)) {
+      if (
+        body.token !== null &&
+        body.token !== undefined &&
+        (typeof body.token !== "string" || body.token.length < 32)
+      ) {
         return NextResponse.json(
           { error: "Token must be null or a string of at least 32 characters" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       await setSlaveMasterToken(body.token ?? null);

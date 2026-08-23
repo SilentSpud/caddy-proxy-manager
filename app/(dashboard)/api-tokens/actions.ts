@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/src/lib/auth";
 import { createApiToken, deleteApiToken } from "@/src/lib/models/api-tokens";
 
-export async function createApiTokenAction(formData: FormData): Promise<{ rawToken: string } | { error: string }> {
+export async function createApiTokenAction(
+  formData: FormData,
+): Promise<{ rawToken: string } | { error: string }> {
   const session = await requireUser();
   const userId = Number(session.user.id);
   const name = String(formData.get("name") ?? "").trim();

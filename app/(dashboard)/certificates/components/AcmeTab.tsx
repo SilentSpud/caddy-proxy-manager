@@ -69,10 +69,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
     if (statusFilter === "ok" && !h.enabled) return false;
     if (search) {
       const q = search.toLowerCase();
-      return (
-        h.name.toLowerCase().includes(q) ||
-        h.domains.some((d) => d.toLowerCase().includes(q))
-      );
+      return h.name.toLowerCase().includes(q) || h.domains.some((d) => d.toLowerCase().includes(q));
     }
     return true;
   });

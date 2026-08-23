@@ -7,7 +7,7 @@ import {
   forwardAuthAccess,
   groups,
   users,
-  proxyHosts
+  proxyHosts,
 } from '@/src/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -31,37 +31,43 @@ function hashToken(raw: string): string {
 
 async function insertUser(overrides: Partial<typeof users.$inferInsert> = {}) {
   const now = nowIso();
-  const [user] = await db.insert(users).values({
-    email: `user${Math.random().toString(36).slice(2)}@localhost`,
-    name: 'Test User',
-    role: 'user',
-    provider: 'credentials',
-    subject: `test-${Date.now()}-${Math.random()}`,
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: `user${Math.random().toString(36).slice(2)}@localhost`,
+      name: 'Test User',
+      role: 'user',
+      provider: 'credentials',
+      subject: `test-${Date.now()}-${Math.random()}`,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return user;
 }
 
 async function insertProxyHost(overrides: Partial<typeof proxyHosts.$inferInsert> = {}) {
   const now = nowIso();
-  const [host] = await db.insert(proxyHosts).values({
-    name: 'Test Host',
-    domains: JSON.stringify(['app.example.com']),
-    upstreams: JSON.stringify(['backend:8080']),
-    sslForced: true,
-    hstsEnabled: true,
-    hstsSubdomains: false,
-    allowWebsocket: true,
-    preserveHostHeader: true,
-    skipHttpsHostnameValidation: false,
-    enabled: true,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [host] = await db
+    .insert(proxyHosts)
+    .values({
+      name: 'Test Host',
+      domains: JSON.stringify(['app.example.com']),
+      upstreams: JSON.stringify(['backend:8080']),
+      sslForced: true,
+      hstsEnabled: true,
+      hstsSubdomains: false,
+      allowWebsocket: true,
+      preserveHostHeader: true,
+      skipHttpsHostnameValidation: false,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return host;
 }
 
@@ -72,12 +78,15 @@ describe('forward auth sessions', () => {
     const tokenHash = hashToken(rawToken);
     const now = nowIso();
 
-    const [session] = await db.insert(forwardAuthSessions).values({
-      userId: user.id,
-      tokenHash,
-      expiresAt: futureIso(3600),
-      createdAt: now,
-    }).returning();
+    const [session] = await db
+      .insert(forwardAuthSessions)
+      .values({
+        userId: user.id,
+        tokenHash,
+        expiresAt: futureIso(3600),
+        createdAt: now,
+      })
+      .returning();
 
     expect(session.tokenHash).toBe(tokenHash);
     expect(session.userId).toBe(user.id);
@@ -89,13 +98,19 @@ describe('forward auth sessions', () => {
     const now = nowIso();
 
     await db.insert(forwardAuthSessions).values({
-      userId: user.id, tokenHash, expiresAt: futureIso(3600), createdAt: now,
+      userId: user.id,
+      tokenHash,
+      expiresAt: futureIso(3600),
+      createdAt: now,
     });
 
     await expect(
       db.insert(forwardAuthSessions).values({
-        userId: user.id, tokenHash, expiresAt: futureIso(3600), createdAt: now,
-      })
+        userId: user.id,
+        tokenHash,
+        expiresAt: futureIso(3600),
+        createdAt: now,
+      }),
     ).rejects.toThrow();
   });
 
@@ -122,23 +137,29 @@ describe('forward auth exchanges', () => {
     const user = await insertUser();
     const now = nowIso();
 
-    const [session] = await db.insert(forwardAuthSessions).values({
-      userId: user.id,
-      tokenHash: hashToken('session-token'),
-      expiresAt: futureIso(3600),
-      createdAt: now,
-    }).returning();
+    const [session] = await db
+      .insert(forwardAuthSessions)
+      .values({
+        userId: user.id,
+        tokenHash: hashToken('session-token'),
+        expiresAt: futureIso(3600),
+        createdAt: now,
+      })
+      .returning();
 
     const rawCode = randomBytes(32).toString('hex');
-    const [exchange] = await db.insert(forwardAuthExchanges).values({
-      sessionId: session.id,
-      codeHash: hashToken(rawCode),
-      sessionToken: 'raw-session-token',
-      redirectUri: 'https://app.example.com/path',
-      expiresAt: futureIso(60),
-      used: false,
-      createdAt: now,
-    }).returning();
+    const [exchange] = await db
+      .insert(forwardAuthExchanges)
+      .values({
+        sessionId: session.id,
+        codeHash: hashToken(rawCode),
+        sessionToken: 'raw-session-token',
+        redirectUri: 'https://app.example.com/path',
+        expiresAt: futureIso(60),
+        used: false,
+        createdAt: now,
+      })
+      .returning();
 
     expect(exchange.sessionId).toBe(session.id);
     expect(exchange.sessionToken).toBe('raw-session-token');
@@ -149,12 +170,15 @@ describe('forward auth exchanges', () => {
     const user = await insertUser();
     const now = nowIso();
 
-    const [session] = await db.insert(forwardAuthSessions).values({
-      userId: user.id,
-      tokenHash: hashToken('session2'),
-      expiresAt: futureIso(3600),
-      createdAt: now,
-    }).returning();
+    const [session] = await db
+      .insert(forwardAuthSessions)
+      .values({
+        userId: user.id,
+        tokenHash: hashToken('session2'),
+        expiresAt: futureIso(3600),
+        createdAt: now,
+      })
+      .returning();
 
     await db.insert(forwardAuthExchanges).values({
       sessionId: session.id,
@@ -179,12 +203,15 @@ describe('forward auth access', () => {
     const host = await insertProxyHost();
     const now = nowIso();
 
-    const [access] = await db.insert(forwardAuthAccess).values({
-      proxyHostId: host.id,
-      userId: user.id,
-      groupId: null,
-      createdAt: now,
-    }).returning();
+    const [access] = await db
+      .insert(forwardAuthAccess)
+      .values({
+        proxyHostId: host.id,
+        userId: user.id,
+        groupId: null,
+        createdAt: now,
+      })
+      .returning();
 
     expect(access.proxyHostId).toBe(host.id);
     expect(access.userId).toBe(user.id);
@@ -195,18 +222,24 @@ describe('forward auth access', () => {
     const host = await insertProxyHost();
     const now = nowIso();
 
-    const [group] = await db.insert(groups).values({
-      name: 'Devs',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [group] = await db
+      .insert(groups)
+      .values({
+        name: 'Devs',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
-    const [access] = await db.insert(forwardAuthAccess).values({
-      proxyHostId: host.id,
-      userId: null,
-      groupId: group.id,
-      createdAt: now,
-    }).returning();
+    const [access] = await db
+      .insert(forwardAuthAccess)
+      .values({
+        proxyHostId: host.id,
+        userId: null,
+        groupId: group.id,
+        createdAt: now,
+      })
+      .returning();
 
     expect(access.groupId).toBe(group.id);
     expect(access.userId).toBeNull();
@@ -218,13 +251,19 @@ describe('forward auth access', () => {
     const now = nowIso();
 
     await db.insert(forwardAuthAccess).values({
-      proxyHostId: host.id, userId: user.id, groupId: null, createdAt: now,
+      proxyHostId: host.id,
+      userId: user.id,
+      groupId: null,
+      createdAt: now,
     });
 
     await expect(
       db.insert(forwardAuthAccess).values({
-        proxyHostId: host.id, userId: user.id, groupId: null, createdAt: now,
-      })
+        proxyHostId: host.id,
+        userId: user.id,
+        groupId: null,
+        createdAt: now,
+      }),
     ).rejects.toThrow();
   });
 
@@ -234,7 +273,10 @@ describe('forward auth access', () => {
     const now = nowIso();
 
     await db.insert(forwardAuthAccess).values({
-      proxyHostId: host.id, userId: user.id, groupId: null, createdAt: now,
+      proxyHostId: host.id,
+      userId: user.id,
+      groupId: null,
+      createdAt: now,
     });
 
     await db.delete(proxyHosts).where(eq(proxyHosts.id, host.id));
@@ -247,12 +289,20 @@ describe('forward auth access', () => {
     const host = await insertProxyHost();
     const now = nowIso();
 
-    const [group] = await db.insert(groups).values({
-      name: 'Team', createdAt: now, updatedAt: now,
-    }).returning();
+    const [group] = await db
+      .insert(groups)
+      .values({
+        name: 'Team',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     await db.insert(forwardAuthAccess).values({
-      proxyHostId: host.id, userId: null, groupId: group.id, createdAt: now,
+      proxyHostId: host.id,
+      userId: null,
+      groupId: group.id,
+      createdAt: now,
     });
 
     await db.delete(groups).where(eq(groups.id, group.id));
@@ -266,9 +316,14 @@ describe('forward auth access', () => {
     const host = await insertProxyHost();
     const now = nowIso();
 
-    const [group] = await db.insert(groups).values({
-      name: 'Group', createdAt: now, updatedAt: now,
-    }).returning();
+    const [group] = await db
+      .insert(groups)
+      .values({
+        name: 'Group',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     await db.insert(forwardAuthAccess).values([
       { proxyHostId: host.id, userId: user.id, groupId: null, createdAt: now },

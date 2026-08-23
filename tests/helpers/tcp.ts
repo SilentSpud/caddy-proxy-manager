@@ -20,7 +20,7 @@ export function tcpSend(
   host: string,
   port: number,
   payload: string,
-  timeoutMs = 5_000
+  timeoutMs = 5_000,
 ): Promise<TcpResponse> {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -58,11 +58,7 @@ export function tcpSend(
 /**
  * Test if a TCP port is accepting connections.
  */
-export function tcpConnect(
-  host: string,
-  port: number,
-  timeoutMs = 5_000
-): Promise<boolean> {
+export function tcpConnect(host: string, port: number, timeoutMs = 5_000): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port }, () => {
       socket.destroy();
@@ -86,13 +82,13 @@ export function tcpConnect(
 export async function waitForTcpRoute(
   host: string,
   port: number,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const ok = await tcpConnect(host, port, 2000);
     if (ok) return;
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`TCP port ${host}:${port} not ready after ${timeoutMs}ms`);
 }
@@ -113,7 +109,7 @@ export function udpSend(
   host: string,
   port: number,
   payload: string,
-  timeoutMs = 5_000
+  timeoutMs = 5_000,
 ): Promise<UdpResponse> {
   return new Promise((resolve) => {
     const socket = dgram.createSocket('udp4');
@@ -149,13 +145,13 @@ export function udpSend(
 export async function waitForUdpRoute(
   host: string,
   port: number,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const res = await udpSend(host, port, 'ping', 2000);
     if (res.received) return;
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`UDP port ${host}:${port} not ready after ${timeoutMs}ms`);
 }

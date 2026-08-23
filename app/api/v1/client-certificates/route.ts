@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { listIssuedClientCertificates, createIssuedClientCertificate } from "@/src/lib/models/issued-client-certificates";
+import {
+  listIssuedClientCertificates,
+  createIssuedClientCertificate,
+} from "@/src/lib/models/issued-client-certificates";
 
 export async function GET(request: NextRequest) {
   try {

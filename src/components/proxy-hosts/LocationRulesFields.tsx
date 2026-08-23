@@ -10,6 +10,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { LocationRule, LoadBalancerConfig } from "@/lib/models/proxy-hosts";
+import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { LocationLoadBalancerFields } from "./LocationLoadBalancerFields";
 
 type UpstreamEntry = { protocol: string; address: string };
@@ -29,17 +30,27 @@ function serializeUpstream(entry: UpstreamEntry): string {
   return `${entry.protocol}${entry.address.trim()}`;
 }
 
-type RuleState = { path: string; upstreams: UpstreamEntry[]; loadBalancer: LoadBalancerConfig | null };
+// Both levels carry a row id: a rule and any one of its upstreams can be removed
+// on its own, so each needs an identity React can reconcile on.
+type RuleState = {
+  path: string;
+  upstreams: WithRowId<UpstreamEntry>[];
+  loadBalancer: LoadBalancerConfig | null;
+};
 
-function toState(rules: LocationRule[]): RuleState[] {
-  return rules.map((r) => ({
-    path: r.path,
-    upstreams:
-      r.upstreams.length > 0
-        ? r.upstreams.map(parseUpstream)
-        : [{ protocol: "http://", address: "" }],
-    loadBalancer: r.loadBalancer ?? null,
-  }));
+function blankUpstream(): WithRowId<UpstreamEntry> {
+  return withRowId({ protocol: "http://", address: "" });
+}
+
+function toState(rules: LocationRule[]): WithRowId<RuleState>[] {
+  return withRowIds(
+    rules.map((r) => ({
+      path: r.path,
+      upstreams:
+        r.upstreams.length > 0 ? withRowIds(r.upstreams.map(parseUpstream)) : [blankUpstream()],
+      loadBalancer: r.loadBalancer ?? null,
+    })),
+  );
 }
 
 function toJson(rules: RuleState[]): string {
@@ -51,74 +62,63 @@ function toJson(rules: RuleState[]): string {
         upstreams: r.upstreams.filter((u) => u.address.trim()).map(serializeUpstream),
         loadBalancer: r.loadBalancer?.enabled ? r.loadBalancer : null,
       }))
-      .filter((r) => r.upstreams.length > 0)
+      .filter((r) => r.upstreams.length > 0),
   );
 }
 
 type Props = { initialData?: LocationRule[] };
 
 export function LocationRulesFields({ initialData = [] }: Props) {
-  const [rules, setRules] = useState<RuleState[]>(toState(initialData));
+  const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
+
+  // Applies a change to the one rule with this id, leaving the others by reference.
+  const patchRule = (ruleId: string, patch: (rule: WithRowId<RuleState>) => RuleState) =>
+    setRules((r) =>
+      r.map((rule) => (rule.rowId === ruleId ? { ...patch(rule), rowId: rule.rowId } : rule)),
+    );
 
   const addRule = () =>
     setRules((r) => [
       ...r,
-      { path: "", upstreams: [{ protocol: "http://", address: "" }], loadBalancer: null },
+      withRowId({ path: "", upstreams: [blankUpstream()], loadBalancer: null }),
     ]);
 
-  const removeRule = (i: number) => setRules((r) => r.filter((_, idx) => idx !== i));
+  const removeRule = (ruleId: string) => setRules((r) => r.filter((rule) => rule.rowId !== ruleId));
 
-  const updatePath = (i: number, value: string) =>
-    setRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, path: value } : rule)));
+  const updatePath = (ruleId: string, value: string) =>
+    patchRule(ruleId, (rule) => ({ ...rule, path: value }));
 
-  const updateLoadBalancer = (i: number, value: LoadBalancerConfig | null) =>
-    setRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, loadBalancer: value } : rule)));
+  const updateLoadBalancer = (ruleId: string, value: LoadBalancerConfig | null) =>
+    patchRule(ruleId, (rule) => ({ ...rule, loadBalancer: value }));
 
-  const addUpstream = (ruleIdx: number) =>
-    setRules((r) =>
-      r.map((rule, idx) =>
-        idx === ruleIdx
-          ? { ...rule, upstreams: [...rule.upstreams, { protocol: "http://", address: "" }] }
-          : rule
-      )
+  const addUpstream = (ruleId: string) =>
+    patchRule(ruleId, (rule) => ({ ...rule, upstreams: [...rule.upstreams, blankUpstream()] }));
+
+  const removeUpstream = (ruleId: string, upId: string) =>
+    patchRule(ruleId, (rule) =>
+      rule.upstreams.length > 1
+        ? { ...rule, upstreams: rule.upstreams.filter((u) => u.rowId !== upId) }
+        : rule,
     );
 
-  const removeUpstream = (ruleIdx: number, upIdx: number) =>
-    setRules((r) =>
-      r.map((rule, idx) =>
-        idx === ruleIdx && rule.upstreams.length > 1
-          ? { ...rule, upstreams: rule.upstreams.filter((_, i) => i !== upIdx) }
-          : rule
-      )
-    );
+  const updateUpstreamProtocol = (ruleId: string, upId: string, protocol: string) =>
+    patchRule(ruleId, (rule) => ({
+      ...rule,
+      upstreams: rule.upstreams.map((u) => (u.rowId === upId ? { ...u, protocol } : u)),
+    }));
 
-  const updateUpstreamProtocol = (ruleIdx: number, upIdx: number, protocol: string) =>
-    setRules((r) =>
-      r.map((rule, idx) =>
-        idx === ruleIdx
-          ? {
-              ...rule,
-              upstreams: rule.upstreams.map((u, i) => (i === upIdx ? { ...u, protocol } : u)),
-            }
-          : rule
-      )
-    );
-
-  const updateUpstreamAddress = (ruleIdx: number, upIdx: number, address: string) =>
-    setRules((r) =>
-      r.map((rule, idx) => {
-        if (idx !== ruleIdx) return rule;
-        return {
-          ...rule,
-          upstreams: rule.upstreams.map((u, i) => {
-            if (i !== upIdx) return u;
-            if (address.startsWith("https://")) return { protocol: "https://", address: address.slice(8) };
-            if (address.startsWith("http://")) return { protocol: "http://", address: address.slice(7) };
-            return { ...u, address };
-          }),
-        };
-      })
-    );
+  const updateUpstreamAddress = (ruleId: string, upId: string, address: string) =>
+    patchRule(ruleId, (rule) => ({
+      ...rule,
+      upstreams: rule.upstreams.map((u) => {
+        if (u.rowId !== upId) return u;
+        if (address.startsWith("https://"))
+          return { ...u, protocol: "https://", address: address.slice(8) };
+        if (address.startsWith("http://"))
+          return { ...u, protocol: "http://", address: address.slice(7) };
+        return { ...u, address };
+      }),
+    }));
 
   return (
     <VStack gap={2}>
@@ -130,7 +130,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
       {rules.length > 0 && (
         <VStack gap={4}>
           {rules.map((rule, i) => (
-            <Card key={i}>
+            <Card key={rule.rowId}>
               <VStack gap={3}>
                 <HStack gap={2} vAlign="end">
                   <TextInput
@@ -138,14 +138,14 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                     size="sm"
                     placeholder="/ws/*"
                     value={rule.path}
-                    onChange={(next) => updatePath(i, next)}
+                    onChange={(next) => updatePath(rule.rowId, next)}
                   />
                   <IconButton
                     variant="ghost"
                     size="sm"
                     label={`Remove location rule ${i + 1}`}
                     icon={<Trash2 />}
-                    onClick={() => removeRule(i)}
+                    onClick={() => removeRule(rule.rowId)}
                   />
                 </HStack>
 
@@ -156,7 +156,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                   {rule.upstreams.map((up, j) => {
                     const isOnlyUpstream = rule.upstreams.length === 1;
                     return (
-                      <HStack key={j} gap={2} vAlign="end">
+                      <HStack key={up.rowId} gap={2} vAlign="end">
                         <Selector
                           label="Protocol"
                           isLabelHidden
@@ -164,14 +164,16 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                           width={120}
                           options={PROTOCOL_OPTIONS}
                           value={up.protocol}
-                          onChange={(next) => updateUpstreamProtocol(i, j, next as string)}
+                          onChange={(next) =>
+                            updateUpstreamProtocol(rule.rowId, up.rowId, next as string)
+                          }
                         />
                         <TextInput
                           label={`Upstream ${j + 1}`}
                           isLabelHidden
                           size="sm"
                           value={up.address}
-                          onChange={(next) => updateUpstreamAddress(i, j, next)}
+                          onChange={(next) => updateUpstreamAddress(rule.rowId, up.rowId, next)}
                           placeholder="10.0.0.5:8080"
                         />
                         <IconButton
@@ -183,7 +185,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                           tooltip={
                             isOnlyUpstream ? "At least one upstream is required" : "Remove upstream"
                           }
-                          onClick={() => removeUpstream(i, j)}
+                          onClick={() => removeUpstream(rule.rowId, up.rowId)}
                         />
                       </HStack>
                     );
@@ -194,14 +196,14 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                       size="sm"
                       label="Add Upstream"
                       icon={<Plus />}
-                      onClick={() => addUpstream(i)}
+                      onClick={() => addUpstream(rule.rowId)}
                     />
                   </HStack>
                 </VStack>
 
                 <LocationLoadBalancerFields
                   value={rule.loadBalancer}
-                  onChange={(value) => updateLoadBalancer(i, value)}
+                  onChange={(value) => updateLoadBalancer(rule.rowId, value)}
                 />
               </VStack>
             </Card>
@@ -210,7 +212,13 @@ export function LocationRulesFields({ initialData = [] }: Props) {
       )}
 
       <HStack>
-        <Button variant="ghost" size="sm" label="Add Location Rule" icon={<Plus />} onClick={addRule} />
+        <Button
+          variant="ghost"
+          size="sm"
+          label="Add Location Rule"
+          icon={<Plus />}
+          onClick={addRule}
+        />
       </HStack>
     </VStack>
   );

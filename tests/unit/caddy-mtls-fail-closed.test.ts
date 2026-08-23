@@ -41,8 +41,16 @@ const EMPTY_ROLE_ID = 999; // a role with no active certs (simulates all-revoked
 
 /** Collect every TLS connection policy from the document. */
 function collectConnectionPolicies(doc: unknown): Record<string, unknown>[] {
-  const servers = (doc as { apps?: { http?: { servers?: Record<string, { tls_connection_policies?: Record<string, unknown>[] }> } } })
-    ?.apps?.http?.servers ?? {};
+  const servers =
+    (
+      doc as {
+        apps?: {
+          http?: {
+            servers?: Record<string, { tls_connection_policies?: Record<string, unknown>[] }>;
+          };
+        };
+      }
+    )?.apps?.http?.servers ?? {};
   const out: Record<string, unknown>[] = [];
   for (const server of Object.values(servers)) {
     for (const p of server.tls_connection_policies ?? []) out.push(p);
@@ -91,7 +99,7 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
         upstreams: ['10.0.0.5:8080'],
         mtls: { enabled: true, trusted_role_ids: [EMPTY_ROLE_ID] },
       },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();
@@ -113,7 +121,7 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
         upstreams: ['10.0.0.5:8080'],
         mtls: { enabled: true, trusted_role_ids: [EMPTY_ROLE_ID], protected_paths: ['/admin/*'] },
       },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();
@@ -135,17 +143,14 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
           upstreams: ['10.0.0.5:8080'],
           mtls: { enabled: true },
         },
-        1
-      )
+        1,
+      ),
     ).rejects.toThrow(/no trusted client certificates, roles, or CA/i);
   });
 
   it('does not emit a drop policy for a plain (non-mTLS) host', async () => {
     const domain = 'plain.example.com';
-    await createProxyHost(
-      { name: 'plain', domains: [domain], upstreams: ['10.0.0.5:8080'] },
-      1
-    );
+    await createProxyHost({ name: 'plain', domains: [domain], upstreams: ['10.0.0.5:8080'] }, 1);
 
     const doc = await buildCaddyDocument();
     const policy = policyForDomain(doc, domain);
@@ -165,20 +170,40 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
     await ctx.db.delete(schema.issuedClientCertificates).catch(() => {});
     await ctx.db.delete(schema.caCertificates).catch(() => {});
     await ctx.db.insert(schema.caCertificates).values({
-      id: 1, name: 'CA X', certificatePem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----',
-      privateKeyPem: null, createdAt: now, updatedAt: now,
+      id: 1,
+      name: 'CA X',
+      certificatePem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----',
+      privateKeyPem: null,
+      createdAt: now,
+      updatedAt: now,
     });
     // Cert A: assigned to the host, then REVOKED.
     await ctx.db.insert(schema.issuedClientCertificates).values({
-      id: 1, caCertificateId: 1, commonName: 'alice', serialNumber: '01', fingerprintSha256: 'aa',
+      id: 1,
+      caCertificateId: 1,
+      commonName: 'alice',
+      serialNumber: '01',
+      fingerprintSha256: 'aa',
       certificatePem: '-----BEGIN CERTIFICATE-----\nA\n-----END CERTIFICATE-----',
-      validFrom: now, validTo: later, revokedAt: now, createdAt: now, updatedAt: now,
+      validFrom: now,
+      validTo: later,
+      revokedAt: now,
+      createdAt: now,
+      updatedAt: now,
     });
     // Cert B: a sibling cert of the SAME CA, still active, never assigned here.
     await ctx.db.insert(schema.issuedClientCertificates).values({
-      id: 2, caCertificateId: 1, commonName: 'bob', serialNumber: '02', fingerprintSha256: 'bb',
+      id: 2,
+      caCertificateId: 1,
+      commonName: 'bob',
+      serialNumber: '02',
+      fingerprintSha256: 'bb',
       certificatePem: '-----BEGIN CERTIFICATE-----\nB\n-----END CERTIFICATE-----',
-      validFrom: now, validTo: later, revokedAt: null, createdAt: now, updatedAt: now,
+      validFrom: now,
+      validTo: later,
+      revokedAt: null,
+      createdAt: now,
+      updatedAt: now,
     });
 
     const domain = 'm4.example.com';
@@ -189,7 +214,7 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
         upstreams: ['10.0.0.5:8080'],
         mtls: { enabled: true, trusted_client_cert_ids: [1] },
       },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();

@@ -36,7 +36,7 @@ const MAX_TOKEN_NAME_LENGTH = 100;
 export async function createApiToken(
   name: string,
   createdBy: number,
-  expiresAt?: string
+  expiresAt?: string,
 ): Promise<{ token: ApiToken; rawToken: string }> {
   const trimmedName = name.trim();
   if (trimmedName.length > MAX_TOKEN_NAME_LENGTH) {
@@ -128,7 +128,7 @@ export async function deleteApiToken(id: number, userId: number): Promise<void> 
 const LAST_USED_DEBOUNCE_MS = 60_000; // 60 seconds
 
 export async function validateToken(
-  rawToken: string
+  rawToken: string,
 ): Promise<{ token: ApiToken; user: { id: number; role: string } } | null> {
   const tokenHash = hashToken(rawToken);
 
@@ -161,10 +161,7 @@ export async function validateToken(
   const now = new Date();
   const lastUsed = row.lastUsedAt ? new Date(row.lastUsedAt) : null;
   if (!lastUsed || now.getTime() - lastUsed.getTime() > LAST_USED_DEBOUNCE_MS) {
-    await db
-      .update(apiTokens)
-      .set({ lastUsedAt: nowIso() })
-      .where(eq(apiTokens.id, row.id));
+    await db.update(apiTokens).set({ lastUsedAt: nowIso() }).where(eq(apiTokens.id, row.id));
   }
 
   return {

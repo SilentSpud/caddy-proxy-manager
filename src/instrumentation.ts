@@ -38,10 +38,12 @@ export async function register() {
         if (providers.length === 0) {
           console.error(
             "WARNING: AUTH_DISABLE_LOCAL_USERS=true but no OAuth provider is enabled — " +
-            "no one can sign in. Configure a provider with the OAUTH_* environment variables."
+              "no one can sign in. Configure a provider with the OAUTH_* environment variables.",
           );
         } else {
-          console.log(`Local user management disabled — sign-in via ${providers.map((p) => p.name).join(", ")}`);
+          console.log(
+            `Local user management disabled — sign-in via ${providers.map((p) => p.name).join(", ")}`,
+          );
         }
       } catch (error) {
         console.error("Failed to check OAuth provider availability:", error);
@@ -102,7 +104,9 @@ export async function register() {
     }
 
     // Start WAF log parser for WAF event tracking
-    const { initWafLogParser, parseNewWafLogEntries, stopWafLogParser } = await import("./lib/waf-log-parser");
+    const { initWafLogParser, parseNewWafLogEntries, stopWafLogParser } = await import(
+      "./lib/waf-log-parser"
+    );
     try {
       await initWafLogParser();
       const wafParserInterval = setInterval(async () => {
@@ -122,7 +126,9 @@ export async function register() {
     }
 
     // Start periodic instance sync if configured (master mode only)
-    const { getInstanceMode, getSyncIntervalMs, syncInstances } = await import("./lib/instance-sync");
+    const { getInstanceMode, getSyncIntervalMs, syncInstances } = await import(
+      "./lib/instance-sync"
+    );
     try {
       const mode = await getInstanceMode();
       const intervalMs = getSyncIntervalMs();

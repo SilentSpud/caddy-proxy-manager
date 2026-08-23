@@ -85,8 +85,8 @@ export type GeoBlockSettings = {
   enabled: boolean;
 
   // Block rules
-  block_countries: string[];    // ISO 3166-1 alpha-2, e.g. ["CN", "RU"]
-  block_continents: string[];   // AF, AN, AS, EU, NA, OC, SA
+  block_countries: string[]; // ISO 3166-1 alpha-2, e.g. ["CN", "RU"]
+  block_continents: string[]; // AF, AN, AS, EU, NA, OC, SA
   block_asns: number[];
   block_cidrs: string[];
   block_ips: string[];
@@ -105,10 +105,10 @@ export type GeoBlockSettings = {
   fail_closed: boolean;
 
   // Block response customization
-  response_status: number;        // default 403
-  response_body: string;          // default "Forbidden"
+  response_status: number; // default 403
+  response_body: string; // default "Forbidden"
   response_headers: Record<string, string>;
-  redirect_url: string;           // if set, 302 redirect instead of status/body
+  redirect_url: string; // if set, 302 redirect instead of status/body
 };
 
 type InstanceMode = "standalone" | "master" | "slave";
@@ -118,7 +118,7 @@ const SYNCED_PREFIX = "synced:";
 
 export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
   const setting = await db.query.settings.findFirst({
-    where: (table, { eq }) => eq(table.key, key)
+    where: (table, { eq }) => eq(table.key, key),
   });
 
   if (!setting) {
@@ -177,14 +177,14 @@ export async function setSetting<T>(key: string, value: T): Promise<void> {
     .values({
       key,
       value: payload,
-      updatedAt: now
+      updatedAt: now,
     })
     .onConflictDoUpdate({
       target: settings.key,
       set: {
         value: payload,
-        updatedAt: now
-      }
+        updatedAt: now,
+      },
     });
 }
 
@@ -301,7 +301,9 @@ export async function getUpstreamDnsResolutionSettings(): Promise<UpstreamDnsRes
   return await getEffectiveSetting<UpstreamDnsResolutionSettings>("upstream_dns_resolution");
 }
 
-export async function saveUpstreamDnsResolutionSettings(settings: UpstreamDnsResolutionSettings): Promise<void> {
+export async function saveUpstreamDnsResolutionSettings(
+  settings: UpstreamDnsResolutionSettings,
+): Promise<void> {
   await setSetting("upstream_dns_resolution", settings);
 }
 
@@ -317,7 +319,7 @@ export type WafSettings = {
   enabled: boolean;
   // Coraza's SecRuleEngine values. DetectionOnly is settable through the REST
   // API (the UI only offers Off/On); buildWafHandler rejects anything else.
-  mode: 'Off' | 'On' | 'DetectionOnly';
+  mode: "Off" | "On" | "DetectionOnly";
   load_owasp_crs: boolean;
   custom_directives: string;
   excluded_rule_ids?: number[];

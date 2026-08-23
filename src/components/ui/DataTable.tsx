@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react";
 import {
@@ -63,8 +63,11 @@ type DataTableProps<T> = {
   expandedRow?: (row: T) => ReactNode;
 };
 
-const SKELETON_ROWS = 5;
-const SKELETON_CARDS = 3;
+// Fixed-length placeholder lists. The keys are built once here rather than from
+// the map index so the loading skeleton needs no index keys of its own; nothing
+// is ever inserted into or removed from either list.
+const SKELETON_ROW_KEYS = ["row-1", "row-2", "row-3", "row-4", "row-5"];
+const SKELETON_CARD_KEYS = ["card-1", "card-2", "card-3"];
 
 const ALIGN: Record<NonNullable<Column<unknown>["align"]>, "start" | "center" | "end"> = {
   left: "start",
@@ -130,7 +133,9 @@ function SortableHeader<T>({
       variant="ghost"
       size="sm"
       label={col.label}
-      endContent={isActive ? (sort?.sortDir === "asc" ? <ArrowUp /> : <ArrowDown />) : <ArrowUpDown />}
+      endContent={
+        isActive ? sort?.sortDir === "asc" ? <ArrowUp /> : <ArrowDown /> : <ArrowUpDown />
+      }
       onClick={() => {
         const params = new URLSearchParams(searchParams.toString());
         params.set("sortBy", col.sortKey!);
@@ -165,7 +170,7 @@ export function DataTable<T>({
   // than pushed onto every model as `extends Record<string, unknown>`.
   const getStatus = useCallback(
     (row: TableRow) => (rowStatus ? rowStatus(row as T) : null),
-    [rowStatus]
+    [rowStatus],
   );
   const statusPlugin = useTableRowStatus<TableRow>({ getStatus });
 
@@ -182,7 +187,7 @@ export function DataTable<T>({
     getRowKey: useCallback((row: TableRow) => String(row[keyField as string]), [keyField]),
     renderExpanded: useCallback(
       (row: TableRow) => (expandedRow ? expandedRow(row as T) : null),
-      [expandedRow]
+      [expandedRow],
     ),
   });
 
@@ -226,8 +231,8 @@ export function DataTable<T>({
     return (
       <VStack gap={3}>
         {loading ? (
-          Array.from({ length: SKELETON_CARDS }).map((_, index) => (
-            <Card key={`skeleton-${index}`}>
+          SKELETON_CARD_KEYS.map((key) => (
+            <Card key={key}>
               <Skeleton height={80} />
             </Card>
           ))
@@ -255,8 +260,8 @@ export function DataTable<T>({
     <VStack gap={4}>
       {loading ? (
         <VStack gap={2}>
-          {Array.from({ length: SKELETON_ROWS }).map((_, index) => (
-            <Skeleton key={`skeleton-${index}`} height={40} />
+          {SKELETON_ROW_KEYS.map((key) => (
+            <Skeleton key={key} height={40} />
           ))}
         </VStack>
       ) : (

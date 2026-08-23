@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listL4ProxyHosts, createL4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 

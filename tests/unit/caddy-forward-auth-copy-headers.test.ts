@@ -130,7 +130,7 @@ describe('CPM forward auth — identity header copy', () => {
         upstreams: [UPSTREAM],
         cpmForwardAuth: { enabled: true },
       },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();
@@ -150,18 +150,13 @@ describe('CPM forward auth — identity header copy', () => {
         upstreams: [UPSTREAM],
         cpmForwardAuth: { enabled: true },
       },
-      1
+      1,
     );
 
     const routes = copyRoutes(await buildCaddyDocument());
     const copied = routes.map((r) => r.setKey.toLowerCase()).sort();
 
-    expect(copied).toEqual([
-      'x-cpm-email',
-      'x-cpm-groups',
-      'x-cpm-user',
-      'x-cpm-user-id',
-    ]);
+    expect(copied).toEqual(['x-cpm-email', 'x-cpm-groups', 'x-cpm-user', 'x-cpm-user-id']);
   });
 
   it('guards each copy with the same placeholder it copies', async () => {
@@ -172,7 +167,7 @@ describe('CPM forward auth — identity header copy', () => {
         upstreams: [UPSTREAM],
         cpmForwardAuth: { enabled: true },
       },
-      1
+      1,
     );
 
     const routes = copyRoutes(await buildCaddyDocument());
@@ -203,7 +198,7 @@ describe('Authentik forward auth — identity header copy', () => {
           copyHeaders: ['X-AUTHENTIK-USERNAME', 'x-authentik-email'],
         },
       },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();

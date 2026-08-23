@@ -10,9 +10,9 @@ test.describe('Audit Log', () => {
   test('audit log page has a table or list', async ({ page }) => {
     await page.goto('/audit-log');
     // Should have table or list structure
-    const hasTable = await page.locator('table, [role="grid"], [role="table"]').count() > 0;
-    const hasList = await page.locator('ul, ol').count() > 0;
-    const hasRows = await page.locator('tr').count() > 0;
+    const hasTable = (await page.locator('table, [role="grid"], [role="table"]').count()) > 0;
+    const hasList = (await page.locator('ul, ol').count()) > 0;
+    const hasRows = (await page.locator('tr').count()) > 0;
     expect(hasTable || hasList || hasRows).toBe(true);
   });
 
@@ -28,7 +28,9 @@ test.describe('Audit Log', () => {
 
     await page.getByRole('button', { name: /^create$/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Audit Test Host')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('table').getByText('Audit Test Host')).toBeVisible({
+      timeout: 10000,
+    });
 
     // Check audit log
     await page.goto('/audit-log');
@@ -39,9 +41,10 @@ test.describe('Audit Log', () => {
   test('audit log page has search functionality', async ({ page }) => {
     await page.goto('/audit-log');
     // Should have a search input
-    const hasSearch = await page.getByRole('searchbox').count() > 0
-      || await page.getByPlaceholder(/search/i).count() > 0
-      || await page.getByLabel(/search/i).count() > 0;
+    const hasSearch =
+      (await page.getByRole('searchbox').count()) > 0 ||
+      (await page.getByPlaceholder(/search/i).count()) > 0 ||
+      (await page.getByLabel(/search/i).count()) > 0;
     expect(hasSearch).toBe(true);
   });
 });

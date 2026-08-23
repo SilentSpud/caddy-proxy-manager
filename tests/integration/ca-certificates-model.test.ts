@@ -21,7 +21,9 @@ import { eq } from 'drizzle-orm';
 let db: TestDb;
 
 vi.mock('../../src/lib/db', async () => ({
-  get default() { return db; },
+  get default() {
+    return db;
+  },
   nowIso: () => new Date().toISOString(),
   toIso: (v: string | null) => v,
 }));
@@ -33,45 +35,68 @@ beforeEach(async () => {
   db = createTestDb();
   vi.clearAllMocks();
   const now = new Date().toISOString();
-  const [user] = await db.insert(users).values({
-    email: 'admin@test', name: 'Admin', role: 'admin',
-    provider: 'credentials', subject: 'admin@test', status: 'active',
-    createdAt: now, updatedAt: now,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: 'admin@test',
+      name: 'Admin',
+      role: 'admin',
+      provider: 'credentials',
+      subject: 'admin@test',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   userId = user.id;
 });
 
-const { createCaCertificate, deleteCaCertificate, listCaCertificates } =
-  await import('../../src/lib/models/ca-certificates');
+const { createCaCertificate, deleteCaCertificate, listCaCertificates } = await import(
+  '../../src/lib/models/ca-certificates'
+);
 
-function nowIso() { return new Date().toISOString(); }
+function nowIso() {
+  return new Date().toISOString();
+}
 
 async function seedIssuedCert(caId: number, commonName: string, serial: string) {
   const now = nowIso();
-  const [cert] = await db.insert(issuedClientCertificates).values({
-    caCertificateId: caId, commonName, serialNumber: serial,
-    fingerprintSha256: `FP:${serial}`, certificatePem: `PEM:${serial}`,
-    validFrom: now, validTo: now, createdAt: now, updatedAt: now,
-  }).returning();
+  const [cert] = await db
+    .insert(issuedClientCertificates)
+    .values({
+      caCertificateId: caId,
+      commonName,
+      serialNumber: serial,
+      fingerprintSha256: `FP:${serial}`,
+      certificatePem: `PEM:${serial}`,
+      validFrom: now,
+      validTo: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return cert;
 }
 
 async function seedMtlsHost(name: string, mtls: Record<string, unknown>) {
   const now = nowIso();
-  const [host] = await db.insert(proxyHosts).values({
-    name, domains: JSON.stringify([`${name}.local`]), upstreams: JSON.stringify(['localhost:9000']),
-    meta: JSON.stringify({ mtls: { enabled: true, ...mtls } }),
-    createdAt: now, updatedAt: now,
-  }).returning();
+  const [host] = await db
+    .insert(proxyHosts)
+    .values({
+      name,
+      domains: JSON.stringify([`${name}.local`]),
+      upstreams: JSON.stringify(['localhost:9000']),
+      meta: JSON.stringify({ mtls: { enabled: true, ...mtls } }),
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
   return host;
 }
 
 describe('deleteCaCertificate cascade', () => {
   it('deletes the CA and all of its issued client certificates', async () => {
-    const ca = await createCaCertificate(
-      { name: 'Cascade CA', certificatePem: 'PEM' },
-      userId,
-    );
+    const ca = await createCaCertificate({ name: 'Cascade CA', certificatePem: 'PEM' }, userId);
     await seedIssuedCert(ca.id, 'alice', '001');
     await seedIssuedCert(ca.id, 'bob', '002');
 
@@ -93,11 +118,18 @@ describe('deleteCaCertificate cascade', () => {
     const cert = await seedIssuedCert(ca.id, 'carol', '003');
 
     const now = nowIso();
-    const [role] = await db.insert(mtlsRoles).values({
-      name: 'admins', createdAt: now, updatedAt: now,
-    }).returning();
+    const [role] = await db
+      .insert(mtlsRoles)
+      .values({
+        name: 'admins',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
     await db.insert(mtlsCertificateRoles).values({
-      issuedClientCertificateId: cert.id, mtlsRoleId: role.id, createdAt: now,
+      issuedClientCertificateId: cert.id,
+      mtlsRoleId: role.id,
+      createdAt: now,
     });
 
     await deleteCaCertificate(ca.id, userId);
@@ -120,17 +152,28 @@ describe('deleteCaCertificate cascade', () => {
     await expect(deleteCaCertificate(ca.id, userId)).rejects.toThrow(/in use by proxy host/i);
     // CA and its cert must survive the blocked delete.
     expect(await listCaCertificates()).toHaveLength(1);
-    const certs = await db.select().from(issuedClientCertificates).where(eq(issuedClientCertificates.id, cert.id));
+    const certs = await db
+      .select()
+      .from(issuedClientCertificates)
+      .where(eq(issuedClientCertificates.id, cert.id));
     expect(certs).toHaveLength(1);
   });
 
   it('blocks deletion when a host trusts a role containing one of the CA certs', async () => {
-    const ca = await createCaCertificate({ name: 'Role-Trusted CA', certificatePem: 'PEM' }, userId);
+    const ca = await createCaCertificate(
+      { name: 'Role-Trusted CA', certificatePem: 'PEM' },
+      userId,
+    );
     const cert = await seedIssuedCert(ca.id, 'erin', '005');
     const now = nowIso();
-    const [role] = await db.insert(mtlsRoles).values({ name: 'ops', createdAt: now, updatedAt: now }).returning();
+    const [role] = await db
+      .insert(mtlsRoles)
+      .values({ name: 'ops', createdAt: now, updatedAt: now })
+      .returning();
     await db.insert(mtlsCertificateRoles).values({
-      issuedClientCertificateId: cert.id, mtlsRoleId: role.id, createdAt: now,
+      issuedClientCertificateId: cert.id,
+      mtlsRoleId: role.id,
+      createdAt: now,
     });
     await seedMtlsHost('host-trusts-role', { trusted_role_ids: [role.id] });
 
@@ -145,7 +188,10 @@ describe('deleteCaCertificate cascade', () => {
   });
 
   it('allows deletion when the trusting host has mTLS disabled', async () => {
-    const ca = await createCaCertificate({ name: 'Disabled-mTLS CA', certificatePem: 'PEM' }, userId);
+    const ca = await createCaCertificate(
+      { name: 'Disabled-mTLS CA', certificatePem: 'PEM' },
+      userId,
+    );
     const cert = await seedIssuedCert(ca.id, 'frank', '006');
     // seedMtlsHost merges as { enabled: true, ...mtls }, so enabled:false wins.
     await seedMtlsHost('host-mtls-off', { enabled: false, trusted_client_cert_ids: [cert.id] });
@@ -162,7 +208,7 @@ describe('deleteCaCertificate cascade', () => {
 
     // Deleting the target CA (not referenced) must succeed.
     await deleteCaCertificate(target.id, userId);
-    expect((await listCaCertificates()).map(c => c.name)).toEqual(['Other CA']);
+    expect((await listCaCertificates()).map((c) => c.name)).toEqual(['Other CA']);
   });
 
   it('leaves other CAs and their certs untouched', async () => {
@@ -174,11 +220,11 @@ describe('deleteCaCertificate cascade', () => {
     await deleteCaCertificate(caA.id, userId);
 
     const cas = await listCaCertificates();
-    expect(cas.map(c => c.name)).toEqual(['CA B']);
+    expect(cas.map((c) => c.name)).toEqual(['CA B']);
     const survivors = await db
       .select()
       .from(issuedClientCertificates)
       .where(eq(issuedClientCertificates.caCertificateId, caB.id));
-    expect(survivors.map(c => c.id)).toEqual([keep.id]);
+    expect(survivors.map((c) => c.id)).toEqual([keep.id]);
   });
 });

@@ -47,7 +47,7 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
         router.push(`${pathname}?${params.toString()}`);
       }, 400);
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams],
   );
 
   useEffect(() => {

@@ -1,13 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { applyCaddyConfig } from "@/src/lib/caddy";
-import { applySyncPayload, getInstanceMode, getSlaveMasterToken, setSlaveLastSync, SyncPayload } from "@/src/lib/instance-sync";
+import {
+  applySyncPayload,
+  getInstanceMode,
+  getSlaveMasterToken,
+  setSlaveLastSync,
+  type SyncPayload,
+} from "@/src/lib/instance-sync";
 
 const DEFAULT_MAX_SYNC_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
 const _parsedMaxBytes = Number(process.env.INSTANCE_SYNC_MAX_BYTES);
-const MAX_SYNC_BODY_BYTES = Number.isFinite(_parsedMaxBytes) && _parsedMaxBytes > 0
-  ? _parsedMaxBytes
-  : DEFAULT_MAX_SYNC_BODY_BYTES;
+const MAX_SYNC_BODY_BYTES =
+  Number.isFinite(_parsedMaxBytes) && _parsedMaxBytes > 0
+    ? _parsedMaxBytes
+    : DEFAULT_MAX_SYNC_BODY_BYTES;
 const SYNC_RATE_MAX = Number(process.env.INSTANCE_SYNC_RATE_MAX ?? 60);
 const SYNC_RATE_WINDOW_MS = Number(process.env.INSTANCE_SYNC_RATE_WINDOW_MS ?? 60_000);
 const SYNC_RATE_LIMITS = new Map<string, { count: number; windowStart: number }>();
@@ -124,7 +131,9 @@ function isCaCertificate(value: unknown): value is SyncPayload["data"]["caCertif
   );
 }
 
-function isIssuedClientCertificate(value: unknown): value is SyncPayload["data"]["issuedClientCertificates"][number] {
+function isIssuedClientCertificate(
+  value: unknown,
+): value is SyncPayload["data"]["issuedClientCertificates"][number] {
   if (!isRecord(value)) return false;
   return (
     isNumber(value.id) &&
@@ -142,7 +151,9 @@ function isIssuedClientCertificate(value: unknown): value is SyncPayload["data"]
   );
 }
 
-function isAccessListEntry(value: unknown): value is SyncPayload["data"]["accessListEntries"][number] {
+function isAccessListEntry(
+  value: unknown,
+): value is SyncPayload["data"]["accessListEntries"][number] {
   if (!isRecord(value)) return false;
   return (
     isNumber(value.id) &&
@@ -177,7 +188,9 @@ function isProxyHost(value: unknown): value is SyncPayload["data"]["proxyHosts"]
   );
 }
 
-function isL4ProxyHost(value: unknown): value is NonNullable<SyncPayload["data"]["l4ProxyHosts"]>[number] {
+function isL4ProxyHost(
+  value: unknown,
+): value is NonNullable<SyncPayload["data"]["l4ProxyHosts"]>[number] {
   if (!isRecord(value)) return false;
   return (
     isNumber(value.id) &&
@@ -304,10 +317,12 @@ export async function POST(request: NextRequest) {
 
   const rateLimit = checkSyncRateLimit(getClientIp(request));
   if (rateLimit.blocked) {
-    const retryAfterSeconds = rateLimit.retryAfterMs ? Math.ceil(rateLimit.retryAfterMs / 1000) : 60;
+    const retryAfterSeconds = rateLimit.retryAfterMs
+      ? Math.ceil(rateLimit.retryAfterMs / 1000)
+      : 60;
     return NextResponse.json(
       { error: "Too many sync requests. Please retry later." },
-      { status: 429, headers: { "Retry-After": retryAfterSeconds.toString() } }
+      { status: 429, headers: { "Retry-After": retryAfterSeconds.toString() } },
     );
   }
 

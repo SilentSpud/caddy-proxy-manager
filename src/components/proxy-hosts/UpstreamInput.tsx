@@ -8,6 +8,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 
 type UpstreamEntry = {
   protocol: string;
@@ -36,41 +37,43 @@ export function UpstreamInput({
   defaultUpstreams?: string[];
   name?: string;
 }) {
-  const initialEntries: UpstreamEntry[] =
-    defaultUpstreams.length > 0
-      ? defaultUpstreams.map(parseUpstream)
-      : [{ protocol: "http://", address: "" }];
+  const [entries, setEntries] = useState<WithRowId<UpstreamEntry>[]>(() =>
+    withRowIds(
+      defaultUpstreams.length > 0
+        ? defaultUpstreams.map(parseUpstream)
+        : [{ protocol: "http://", address: "" }],
+    ),
+  );
 
-  const [entries, setEntries] = useState<UpstreamEntry[]>(initialEntries);
-
-  const handleProtocolChange = (index: number, newProtocol: string) => {
+  const handleProtocolChange = (rowId: string, newProtocol: string) => {
     setEntries((prev) =>
-      prev.map((entry, i) =>
-        i === index ? { ...entry, protocol: newProtocol || "http://" } : entry
-      )
+      prev.map((entry) =>
+        entry.rowId === rowId ? { ...entry, protocol: newProtocol || "http://" } : entry,
+      ),
     );
   };
 
-  const handleAddressChange = (index: number, newAddress: string) => {
+  const handleAddressChange = (rowId: string, newAddress: string) => {
     setEntries((prev) =>
-      prev.map((entry, i) => {
-        if (i !== index) return entry;
+      prev.map((entry) => {
+        if (entry.rowId !== rowId) return entry;
         // Strip protocol if the user pasted a full URL.
         if (newAddress.startsWith("https://")) {
-          return { protocol: "https://", address: newAddress.slice(8) };
+          return { ...entry, protocol: "https://", address: newAddress.slice(8) };
         }
         if (newAddress.startsWith("http://")) {
-          return { protocol: "http://", address: newAddress.slice(7) };
+          return { ...entry, protocol: "http://", address: newAddress.slice(7) };
         }
         return { ...entry, address: newAddress };
-      })
+      }),
     );
   };
 
-  const handleAdd = () => setEntries((prev) => [...prev, { protocol: "http://", address: "" }]);
+  const handleAdd = () =>
+    setEntries((prev) => [...prev, withRowId({ protocol: "http://", address: "" })]);
 
-  const handleRemove = (index: number) =>
-    setEntries((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+  const handleRemove = (rowId: string) =>
+    setEntries((prev) => (prev.length === 1 ? prev : prev.filter((e) => e.rowId !== rowId)));
 
   const serializedValue = entries
     .filter((e) => e.address.trim() !== "")
@@ -88,20 +91,20 @@ export function UpstreamInput({
 
       <VStack gap={3}>
         {entries.map((entry, index) => (
-          <HStack key={index} gap={2} vAlign="end">
+          <HStack key={entry.rowId} gap={2} vAlign="end">
             <Selector
               label="Protocol"
               isLabelHidden
               width={120}
               options={PROTOCOL_OPTIONS}
               value={entry.protocol}
-              onChange={(next) => handleProtocolChange(index, next as string)}
+              onChange={(next) => handleProtocolChange(entry.rowId, next as string)}
             />
             <TextInput
               label={`Upstream ${index + 1}`}
               isLabelHidden
               value={entry.address}
-              onChange={(next) => handleAddressChange(index, next)}
+              onChange={(next) => handleAddressChange(entry.rowId, next)}
               placeholder="10.0.0.5:8080"
               isRequired={index === 0}
             />
@@ -114,13 +117,19 @@ export function UpstreamInput({
               // Explains the disabled state on hover, replacing a title on a
               // wrapper span that screen readers never announced.
               tooltip={isOnlyEntry ? "At least one upstream is required" : "Remove upstream"}
-              onClick={() => handleRemove(index)}
+              onClick={() => handleRemove(entry.rowId)}
             />
           </HStack>
         ))}
 
         <HStack>
-          <Button variant="ghost" size="sm" label="Add Upstream" icon={<Plus />} onClick={handleAdd} />
+          <Button
+            variant="ghost"
+            size="sm"
+            label="Add Upstream"
+            icon={<Plus />}
+            onClick={handleAdd}
+          />
         </HStack>
       </VStack>
 

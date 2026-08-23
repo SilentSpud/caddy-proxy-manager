@@ -49,7 +49,7 @@ describe('the page title template', () => {
 
   it('follows a renamed app', async () => {
     expect(render(await loadAppName({ APP_NAME: 'Acme Proxies' }), 'Users')).toBe(
-      'Users · Acme Proxies'
+      'Users · Acme Proxies',
     );
   });
 });

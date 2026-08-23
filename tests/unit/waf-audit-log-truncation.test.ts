@@ -125,7 +125,9 @@ describe('waf-audit.log truncation', () => {
   it('keeps advancing the stored offset when truncation fails with EACCES', async () => {
     fsState.auditSize = TRUNCATE_THRESHOLD + 1;
     vi.mocked(fs.truncateSync).mockImplementation(() => {
-      const err = new Error("EACCES: permission denied, truncate '/logs/waf-audit.log'") as NodeJS.ErrnoException;
+      const err = new Error(
+        "EACCES: permission denied, truncate '/logs/waf-audit.log'",
+      ) as NodeJS.ErrnoException;
       err.code = 'EACCES';
       throw err;
     });

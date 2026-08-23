@@ -100,8 +100,8 @@ export default function OAuthProvidersSection({
   const [deleteConfirm, setDeleteConfirm] = useState<OAuthProvider | null>(null);
 
   const callbackUrl = useCallback(
-    (providerId: string) => `${baseUrl}/api/auth/oauth2/callback/${providerId}`,
-    [baseUrl]
+    (providerId: string) => `${baseUrl}/api/auth/callback/${providerId}`,
+    [baseUrl],
   );
 
   function openAddDialog() {
@@ -169,9 +169,7 @@ export default function OAuthProvidersSection({
           syncGroups: form.syncGroups,
         });
         if (updated) {
-          setProviders((prev) =>
-            prev.map((p) => (p.id === editingProvider.id ? updated : p))
-          );
+          setProviders((prev) => prev.map((p) => (p.id === editingProvider.id ? updated : p)));
         }
       } else {
         const created = await createOAuthProviderAction({
@@ -210,9 +208,7 @@ export default function OAuthProvidersSection({
         enabled: !provider.enabled,
       });
       if (updated) {
-        setProviders((prev) =>
-          prev.map((p) => (p.id === provider.id ? updated : p))
-        );
+        setProviders((prev) => prev.map((p) => (p.id === provider.id ? updated : p)));
       }
     } catch (err) {
       console.error("Failed to toggle provider:", err);
@@ -289,9 +285,7 @@ export default function OAuthProvidersSection({
                     icon={<Pencil />}
                     isDisabled={isFromEnv}
                     tooltip={
-                      isFromEnv
-                        ? "Environment-sourced providers cannot be edited"
-                        : "Edit provider"
+                      isFromEnv ? "Environment-sourced providers cannot be edited" : "Edit provider"
                     }
                     onClick={() => openEditDialog(provider)}
                   />
@@ -492,7 +486,9 @@ export default function OAuthProvidersSection({
                       size="sm"
                       value={form.adminGroup}
                       onChange={(v) => updateField("adminGroup", v)}
-                      placeholder={form.groupPrefix ? `${form.groupPrefix}Admin` : "platform-owners"}
+                      placeholder={
+                        form.groupPrefix ? `${form.groupPrefix}Admin` : "platform-owners"
+                      }
                     />
                     <TextInput
                       label="User groups"
@@ -511,9 +507,9 @@ export default function OAuthProvidersSection({
                   </Grid>
                   <Text type="body" size="xsm" color="secondary">
                     Name the groups exactly as your provider reports them. Separate several with
-                    commas &mdash; platform-owners, sre-oncall &mdash; and any one of them grants the
-                    role. A role left blank falls back to the prefix above, so the two styles can be
-                    mixed. The most privileged match wins.
+                    commas &mdash; platform-owners, sre-oncall &mdash; and any one of them grants
+                    the role. A role left blank falls back to the prefix above, so the two styles
+                    can be mixed. The most privileged match wins.
                   </Text>
 
                   <Selector

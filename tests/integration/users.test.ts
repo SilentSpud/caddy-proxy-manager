@@ -15,25 +15,30 @@ function nowIso() {
 
 async function insertUser(overrides: Partial<typeof users.$inferInsert> = {}) {
   const now = nowIso();
-  const [user] = await db.insert(users).values({
-    email: 'user@example.com',
-    name: 'Test User',
-    passwordHash: 'hash123',
-    role: 'user',
-    provider: 'credentials',
-    subject: 'user@example.com',
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: 'user@example.com',
+      name: 'Test User',
+      passwordHash: 'hash123',
+      role: 'user',
+      provider: 'credentials',
+      subject: 'user@example.com',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return user;
 }
 
 describe('users integration', () => {
   it('inserts a user and retrieves it by email', async () => {
     await insertUser({ email: 'alice@example.com', subject: 'alice@example.com' });
-    const row = await db.query.users.findFirst({ where: (t, { eq }) => eq(t.email, 'alice@example.com') });
+    const row = await db.query.users.findFirst({
+      where: (t, { eq }) => eq(t.email, 'alice@example.com'),
+    });
     expect(row).toBeDefined();
     expect(row!.email).toBe('alice@example.com');
   });
@@ -41,7 +46,7 @@ describe('users integration', () => {
   it('duplicate email throws unique constraint error', async () => {
     await insertUser({ email: 'dup@example.com', subject: 'dup@example.com' });
     await expect(
-      insertUser({ email: 'dup@example.com', subject: 'dup2@example.com' })
+      insertUser({ email: 'dup@example.com', subject: 'dup2@example.com' }),
     ).rejects.toThrow();
   });
 
@@ -51,7 +56,9 @@ describe('users integration', () => {
   });
 
   it('find by non-existent email returns undefined', async () => {
-    const row = await db.query.users.findFirst({ where: (t, { eq }) => eq(t.email, 'nobody@example.com') });
+    const row = await db.query.users.findFirst({
+      where: (t, { eq }) => eq(t.email, 'nobody@example.com'),
+    });
     expect(row).toBeUndefined();
   });
 

@@ -51,7 +51,7 @@ async function fetchWafEvents(page: Page): Promise<WafEvent[]> {
 async function waitForWafEvent(
   page: Page,
   predicate: (e: WafEvent) => boolean,
-  timeoutMs = INGEST_TIMEOUT_MS
+  timeoutMs = INGEST_TIMEOUT_MS,
 ): Promise<WafEvent> {
   const deadline = Date.now() + timeoutMs;
   let seen = 0;
@@ -67,58 +67,61 @@ async function waitForWafEvent(
   throw new Error(`No matching WAF event within ${timeoutMs}ms (${seen} events visible)`);
 }
 
-test.describe.serial('WAF event ingestion', () => {
-  test('setup: create proxy host with WAF enabled', async ({ page }) => {
-    test.setTimeout(120_000);
+test.describe
+  .serial('WAF event ingestion', () => {
+    test('setup: create proxy host with WAF enabled', async ({ page }) => {
+      test.setTimeout(120_000);
 
-    await createProxyHost(page, {
-      name: 'Functional WAF Ingestion',
-      domain: DOMAIN,
-      upstream: 'echo-server:8080',
-      enableWaf: true,
+      await createProxyHost(page, {
+        name: 'Functional WAF Ingestion',
+        domain: DOMAIN,
+        upstream: 'echo-server:8080',
+        enableWaf: true,
+      });
+      await waitForRoute(DOMAIN);
     });
-    await waitForRoute(DOMAIN);
+
+    test('a blocked attack is recorded as a WAF event with its rule', async ({ page }) => {
+      test.setTimeout(INGEST_TIMEOUT_MS + 60_000);
+
+      const res = await httpGet(DOMAIN, '/ingest-blocked?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E');
+      expect(res.status).toBe(403);
+
+      const event = await waitForWafEvent(page, (e) => e.uri.includes('/ingest-blocked'));
+
+      expect(event.blocked).toBe(true);
+      expect(event.host).toContain(DOMAIN);
+      expect(event.method).toBe('GET');
+      // Rule attribution must be populated. A null rule id means the event landed
+      // without knowing which rule fired — the failure mode behind #233, and the
+      // reason attribution now comes from the audit entry's own `messages` array.
+      expect(event.ruleId).not.toBeNull();
+      expect(event.ruleMessage).toBeTruthy();
+      expect(event.severity).toBeTruthy();
+    });
+
+    test('ingested events are visible on the WAF page', async ({ page }) => {
+      test.setTimeout(60_000);
+
+      await page.goto('/waf');
+      await expect(page.getByText('/ingest-blocked', { exact: false }).first()).toBeVisible({
+        timeout: 20_000,
+      });
+    });
+
+    test('ordinary traffic does not produce WAF events', async ({ page }) => {
+      test.setTimeout(INGEST_TIMEOUT_MS);
+
+      const res = await httpGet(DOMAIN, '/ingest-clean-path');
+      expect(res.status).toBe(200);
+
+      // Give the parser a couple of cycles, then confirm the clean request never
+      // showed up. Coraza audit-logs some non-matching transactions (part of
+      // SecAuditLogRelevantStatus covers 4xx/5xx), and those must stay out of the
+      // WAF table — the parser drops entries with no rule and no interruption.
+      await new Promise((r) => setTimeout(r, 70_000));
+
+      const events = await fetchWafEvents(page);
+      expect(events.some((e) => e.uri.includes('/ingest-clean-path'))).toBe(false);
+    });
   });
-
-  test('a blocked attack is recorded as a WAF event with its rule', async ({ page }) => {
-    test.setTimeout(INGEST_TIMEOUT_MS + 60_000);
-
-    const res = await httpGet(DOMAIN, '/ingest-blocked?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E');
-    expect(res.status).toBe(403);
-
-    const event = await waitForWafEvent(page, (e) => e.uri.includes('/ingest-blocked'));
-
-    expect(event.blocked).toBe(true);
-    expect(event.host).toContain(DOMAIN);
-    expect(event.method).toBe('GET');
-    // Rule attribution must be populated. A null rule id means the event landed
-    // without knowing which rule fired — the failure mode behind #233, and the
-    // reason attribution now comes from the audit entry's own `messages` array.
-    expect(event.ruleId).not.toBeNull();
-    expect(event.ruleMessage).toBeTruthy();
-    expect(event.severity).toBeTruthy();
-  });
-
-  test('ingested events are visible on the WAF page', async ({ page }) => {
-    test.setTimeout(60_000);
-
-    await page.goto('/waf');
-    await expect(page.getByText('/ingest-blocked', { exact: false }).first()).toBeVisible({ timeout: 20_000 });
-  });
-
-  test('ordinary traffic does not produce WAF events', async ({ page }) => {
-    test.setTimeout(INGEST_TIMEOUT_MS);
-
-    const res = await httpGet(DOMAIN, '/ingest-clean-path');
-    expect(res.status).toBe(200);
-
-    // Give the parser a couple of cycles, then confirm the clean request never
-    // showed up. Coraza audit-logs some non-matching transactions (part of
-    // SecAuditLogRelevantStatus covers 4xx/5xx), and those must stay out of the
-    // WAF table — the parser drops entries with no rule and no interruption.
-    await new Promise((r) => setTimeout(r, 70_000));
-
-    const events = await fetchWafEvents(page);
-    expect(events.some((e) => e.uri.includes('/ingest-clean-path'))).toBe(false);
-  });
-});

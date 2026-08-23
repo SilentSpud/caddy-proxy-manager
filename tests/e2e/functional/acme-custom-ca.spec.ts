@@ -59,12 +59,18 @@ function getLeafIssuer(servername: string): Promise<tls.PeerCertificate> {
       },
     );
     socket.on('error', reject);
-    socket.on('timeout', () => { socket.destroy(); reject(new Error('TLS timeout')); });
+    socket.on('timeout', () => {
+      socket.destroy();
+      reject(new Error('TLS timeout'));
+    });
   });
 }
 
 /** Poll until Caddy serves a leaf for `servername` issued by Step-CA. */
-async function waitForStepCaCert(servername: string, timeoutMs = 90_000): Promise<tls.PeerCertificate> {
+async function waitForStepCaCert(
+  servername: string,
+  timeoutMs = 90_000,
+): Promise<tls.PeerCertificate> {
   const deadline = Date.now() + timeoutMs;
   let lastIssuer = '';
   while (Date.now() < deadline) {
@@ -78,52 +84,62 @@ async function waitForStepCaCert(servername: string, timeoutMs = 90_000): Promis
     }
     await new Promise((r) => setTimeout(r, 2_000));
   }
-  throw new Error(`No Step-CA-issued cert for "${servername}" within ${timeoutMs}ms (last issuer: ${lastIssuer})`);
+  throw new Error(
+    `No Step-CA-issued cert for "${servername}" within ${timeoutMs}ms (last issuer: ${lastIssuer})`,
+  );
 }
 
-test.describe.serial('Custom ACME directory — real issuance via Step-CA', () => {
-  let hostId: number | undefined;
+test.describe
+  .serial('Custom ACME directory — real issuance via Step-CA', () => {
+    let hostId: number | undefined;
 
-  test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    test.beforeAll(async ({ browser }) => {
+      const page = await browser.newPage();
 
-    const root = readStepCaRoot();
-    const acmeRes = await page.request.put(`${API}/settings/acme`, {
-      data: { caUrl: STEP_CA_DIRECTORY, caRootPem: root },
-      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+      const root = readStepCaRoot();
+      const acmeRes = await page.request.put(`${API}/settings/acme`, {
+        data: { caUrl: STEP_CA_DIRECTORY, caRootPem: root },
+        headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+      });
+      expect(acmeRes.status()).toBe(200);
+
+      const hostRes = await page.request.post(`${API}/proxy-hosts`, {
+        data: {
+          name: 'ACME custom CA',
+          domains: [DOMAIN],
+          upstreams: ['whoami-server:80'],
+          sslForced: true,
+        },
+        headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+      });
+      expect(hostRes.status()).toBe(201);
+      hostId = (await hostRes.json()).id as number;
+
+      await page.close();
     });
-    expect(acmeRes.status()).toBe(200);
 
-    const hostRes = await page.request.post(`${API}/proxy-hosts`, {
-      data: { name: 'ACME custom CA', domains: [DOMAIN], upstreams: ['whoami-server:80'], sslForced: true },
-      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+    test.afterAll(async ({ browser }) => {
+      const page = await browser.newPage();
+      if (hostId !== undefined) {
+        await page.request.delete(`${API}/proxy-hosts/${hostId}`, {
+          headers: { Origin: BASE_URL },
+        });
+      }
+      // Revert the global ACME directory so other specs fall back to the default.
+      await page.request.put(`${API}/settings/acme`, {
+        data: { caUrl: '', caRootPem: '' },
+        headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+      });
+      await page.close();
     });
-    expect(hostRes.status()).toBe(201);
-    hostId = (await hostRes.json()).id as number;
 
-    await page.close();
-  });
-
-  test.afterAll(async ({ browser }) => {
-    const page = await browser.newPage();
-    if (hostId !== undefined) {
-      await page.request.delete(`${API}/proxy-hosts/${hostId}`, { headers: { Origin: BASE_URL } });
-    }
-    // Revert the global ACME directory so other specs fall back to the default.
-    await page.request.put(`${API}/settings/acme`, {
-      data: { caUrl: '', caRootPem: '' },
-      headers: { 'Content-Type': 'application/json', Origin: BASE_URL },
+    test("Caddy obtains the cert from Step-CA, not Let's Encrypt", async () => {
+      const cert = await waitForStepCaCert(DOMAIN);
+      const issuer = JSON.stringify(cert.issuer ?? {});
+      expect(issuer).toContain(STEP_CA_NAME);
+      // Sanity: it must NOT be Caddy's internal self-signed authority.
+      expect(issuer).not.toContain('Caddy Local Authority');
+      // The leaf must actually cover the requested domain.
+      expect(JSON.stringify(cert.subjectaltname ?? '')).toContain(DOMAIN);
     });
-    await page.close();
   });
-
-  test('Caddy obtains the cert from Step-CA, not Let\'s Encrypt', async () => {
-    const cert = await waitForStepCaCert(DOMAIN);
-    const issuer = JSON.stringify(cert.issuer ?? {});
-    expect(issuer).toContain(STEP_CA_NAME);
-    // Sanity: it must NOT be Caddy's internal self-signed authority.
-    expect(issuer).not.toContain('Caddy Local Authority');
-    // The leaf must actually cover the requested domain.
-    expect(JSON.stringify(cert.subjectaltname ?? '')).toContain(DOMAIN);
-  });
-});

@@ -139,10 +139,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
     if (statusFilter && c.expiryStatus !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.domains.some((d) => d.toLowerCase().includes(q))
-      );
+      return c.name.toLowerCase().includes(q) || c.domains.some((d) => d.toLowerCase().includes(q));
     }
     return true;
   });

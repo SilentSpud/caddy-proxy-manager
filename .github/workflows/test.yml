@@ -30,6 +30,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Biome covers both linting and formatting, so an unformatted file fails
+      # here rather than drifting until someone notices. `biome check` exits
+      # non-zero only on errors, so the remaining warnings stay advisory.
+      - name: Lint and format check
+        run: bun run lint
+
       # Coverage is collected here rather than in a separate job so the
       # thresholds in tests/vitest.config.ts actually gate a pull request: the
       # step fails if coverage drops below the ratchet.

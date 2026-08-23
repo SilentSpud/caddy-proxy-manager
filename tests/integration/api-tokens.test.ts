@@ -20,32 +20,41 @@ function hashToken(rawToken: string): string {
 
 async function insertUser(overrides: Partial<typeof users.$inferInsert> = {}) {
   const now = nowIso();
-  const [user] = await db.insert(users).values({
-    email: 'admin@localhost',
-    name: 'Admin',
-    passwordHash: 'hash123',
-    role: 'admin',
-    provider: 'credentials',
-    subject: 'admin@localhost',
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: 'admin@localhost',
+      name: 'Admin',
+      passwordHash: 'hash123',
+      role: 'admin',
+      provider: 'credentials',
+      subject: 'admin@localhost',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return user;
 }
 
-async function insertApiToken(createdBy: number, overrides: Partial<typeof apiTokens.$inferInsert> = {}) {
+async function insertApiToken(
+  createdBy: number,
+  overrides: Partial<typeof apiTokens.$inferInsert> = {},
+) {
   const now = nowIso();
   const rawToken = 'test-token-' + Math.random().toString(36).slice(2);
   const tokenHash = hashToken(rawToken);
-  const [token] = await db.insert(apiTokens).values({
-    name: 'Test Token',
-    tokenHash,
-    createdBy,
-    createdAt: now,
-    ...overrides,
-  }).returning();
+  const [token] = await db
+    .insert(apiTokens)
+    .values({
+      name: 'Test Token',
+      tokenHash,
+      createdBy,
+      createdAt: now,
+      ...overrides,
+    })
+    .returning();
   return { token, rawToken };
 }
 
@@ -173,7 +182,7 @@ describe('api-tokens integration', () => {
         tokenHash: token.tokenHash,
         createdBy: user.id,
         createdAt: nowIso(),
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -207,9 +216,21 @@ describe('api-tokens integration', () => {
   });
 
   it('admin can see all tokens regardless of creator', async () => {
-    const admin = await insertUser({ email: 'admin2@localhost', subject: 'admin2@localhost', role: 'admin' });
-    const user1 = await insertUser({ email: 'u3@localhost', subject: 'u3@localhost', role: 'user' });
-    const user2 = await insertUser({ email: 'u4@localhost', subject: 'u4@localhost', role: 'user' });
+    const admin = await insertUser({
+      email: 'admin2@localhost',
+      subject: 'admin2@localhost',
+      role: 'admin',
+    });
+    const user1 = await insertUser({
+      email: 'u3@localhost',
+      subject: 'u3@localhost',
+      role: 'user',
+    });
+    const user2 = await insertUser({
+      email: 'u4@localhost',
+      subject: 'u4@localhost',
+      role: 'user',
+    });
 
     await insertApiToken(user1.id, { name: 'User1 Token' });
     await insertApiToken(user2.id, { name: 'User2 Token' });
@@ -217,7 +238,7 @@ describe('api-tokens integration', () => {
 
     const allTokens = await db.query.apiTokens.findMany();
     expect(allTokens).toHaveLength(3);
-    const creators = allTokens.map(t => t.createdBy);
+    const creators = allTokens.map((t) => t.createdBy);
     expect(creators).toContain(user1.id);
     expect(creators).toContain(user2.id);
     expect(creators).toContain(admin.id);

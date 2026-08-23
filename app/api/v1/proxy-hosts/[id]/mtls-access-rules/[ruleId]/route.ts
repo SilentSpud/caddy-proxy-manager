@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { getMtlsAccessRule, updateMtlsAccessRule, deleteMtlsAccessRule } from "@/src/lib/models/mtls-access-rules";
+import {
+  getMtlsAccessRule,
+  updateMtlsAccessRule,
+  deleteMtlsAccessRule,
+} from "@/src/lib/models/mtls-access-rules";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; ruleId: string }> }
+  { params }: { params: Promise<{ id: string; ruleId: string }> },
 ) {
   try {
     await requireApiAdmin(request);
@@ -21,7 +25,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; ruleId: string }> }
+  { params }: { params: Promise<{ id: string; ruleId: string }> },
 ) {
   try {
     const { userId } = await requireApiAdmin(request);
@@ -36,7 +40,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; ruleId: string }> }
+  { params }: { params: Promise<{ id: string; ruleId: string }> },
 ) {
   try {
     const { userId } = await requireApiAdmin(request);

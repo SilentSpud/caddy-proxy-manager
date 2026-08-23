@@ -1,4 +1,5 @@
 import db, { nowIso, toIso } from "../db";
+import { CREDENTIAL_ISSUER } from "../account-issuer";
 import { users, accounts } from "../db/schema";
 import { and, count, eq } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
@@ -31,13 +32,13 @@ function parseDbUser(user: DbUser): User {
     avatarUrl: user.avatarUrl,
     status: user.status,
     createdAt: toIso(user.createdAt)!,
-    updatedAt: toIso(user.updatedAt)!
+    updatedAt: toIso(user.updatedAt)!,
   };
 }
 
 export async function getUserById(userId: number): Promise<User | null> {
   const user = await db.query.users.findFirst({
-    where: (table, { eq }) => eq(table.id, userId)
+    where: (table, { eq }) => eq(table.id, userId),
   });
   return user ? parseDbUser(user) : null;
 }
@@ -47,15 +48,20 @@ export async function getUserCount(): Promise<number> {
   return result[0]?.value ?? 0;
 }
 
-export async function findUserByProviderSubject(provider: string, subject: string): Promise<User | null> {
-  const account = await db.select().from(accounts).where(
-    and(eq(accounts.providerId, provider), eq(accounts.accountId, subject))
-  ).limit(1);
+export async function findUserByProviderSubject(
+  provider: string,
+  subject: string,
+): Promise<User | null> {
+  const account = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.providerId, provider), eq(accounts.accountId, subject)))
+    .limit(1);
 
   if (account.length === 0) return null;
 
   const user = await db.query.users.findFirst({
-    where: (table, { eq }) => eq(table.id, account[0].userId)
+    where: (table, { eq }) => eq(table.id, account[0].userId),
   });
   return user ? parseDbUser(user) : null;
 }
@@ -63,7 +69,7 @@ export async function findUserByProviderSubject(provider: string, subject: strin
 export async function findUserByEmail(email: string): Promise<User | null> {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await db.query.users.findFirst({
-    where: (table, { eq }) => eq(table.email, normalizedEmail)
+    where: (table, { eq }) => eq(table.email, normalizedEmail),
   });
   return user ? parseDbUser(user) : null;
 }
@@ -100,7 +106,7 @@ export async function createUser(data: {
       username,
       displayUsername,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning();
 
@@ -109,6 +115,7 @@ export async function createUser(data: {
       userId: user.id,
       accountId: user.id.toString(),
       providerId: "credential",
+      issuer: CREDENTIAL_ISSUER,
       password: data.passwordHash,
       createdAt: now,
       updatedAt: now,
@@ -118,7 +125,10 @@ export async function createUser(data: {
   return parseDbUser(user);
 }
 
-export async function updateUserProfile(userId: number, data: { email?: string; name?: string | null; avatarUrl?: string | null }): Promise<User | null> {
+export async function updateUserProfile(
+  userId: number,
+  data: { email?: string; name?: string | null; avatarUrl?: string | null },
+): Promise<User | null> {
   const current = await getUserById(userId);
   if (!current) {
     return null;
@@ -134,7 +144,7 @@ export async function updateUserProfile(userId: number, data: { email?: string; 
       // icon so the user falls back to their Gravatar or initial. Collapsing
       // both with `??` made "remove profile picture" a silent no-op.
       avatarUrl: data.avatarUrl === undefined ? current.avatarUrl : data.avatarUrl,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(users.id, userId))
     .returning();
@@ -148,7 +158,7 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
     .update(users)
     .set({
       passwordHash,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(users.id, userId));
 
@@ -164,7 +174,7 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
 
 export async function listUsers(): Promise<User[]> {
   const rows = await db.query.users.findMany({
-    orderBy: (table, { asc }) => asc(table.createdAt)
+    orderBy: (table, { asc }) => asc(table.createdAt),
   });
   return rows.map(parseDbUser);
 }
@@ -175,7 +185,7 @@ export async function promoteToAdmin(userId: number): Promise<void> {
     .update(users)
     .set({
       role: "admin",
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(users.id, userId));
 }

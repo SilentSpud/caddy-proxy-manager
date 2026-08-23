@@ -351,19 +351,27 @@ OAUTH_ISSUER=https://auth.example.com/application/o/app/
 The callback URL format is:
 
 ```text
-{BASE_URL}/api/auth/oauth2/callback/{provider-id}
+{BASE_URL}/api/auth/callback/{provider-id}
 ```
 
 For environment-configured providers, the provider ID is derived from `OAUTH_PROVIDER_NAME` (lowercased, non-alphanumeric replaced with `-`). The exact callback URL is shown in **Settings → OAuth Providers** after the provider is synced.
 
 Examples:
 
-- `https://caddy-manager.example.com/api/auth/oauth2/callback/authentik-QXV0aG` (production)
-- `http://localhost:3000/api/auth/oauth2/callback/authentik-QXV0aG` (development)
+- `https://caddy-manager.example.com/api/auth/callback/authentik-QXV0aG` (production)
+- `http://localhost:3000/api/auth/callback/authentik-QXV0aG` (development)
 
 The `BASE_URL` environment variable must match exactly where users access your dashboard.
 
 > **Upgrading from < 1.0-RC:** The old callback URL (`/api/auth/callback/oauth2`) no longer works. Update your OAuth provider's redirect URI to the new format shown in **Settings → OAuth Providers**.
+
+> **Upgrading to better-auth 1.7:** The callback URL changed again, from
+> `/api/auth/oauth2/callback/{provider-id}` to `/api/auth/callback/{provider-id}`.
+> Generic OAuth providers are now registered as first-class social providers and
+> are served by the core callback endpoint, so the old plugin-specific path no
+> longer exists. Update the redirect URI at your identity provider, or OAuth
+> sign-in will fail with a redirect-URI mismatch. The current value is always
+> shown in **Settings → OAuth Providers**.
 
 OAuth login appears on the login page alongside credentials. Users can link OAuth to existing accounts from the Profile page.
 

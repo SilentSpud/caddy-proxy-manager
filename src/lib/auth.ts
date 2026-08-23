@@ -23,14 +23,12 @@ export type Session = {
  * so that role changes (e.g. demotion) take effect immediately.
  */
 export async function auth(req?: NextRequest): Promise<Session | null> {
-  const hdrs = req
-    ? req.headers
-    : (await import("next/headers")).headers();
+  const hdrs = req ? req.headers : (await import("next/headers")).headers();
 
   // headers() in Next.js 15+ returns a Promise
   const resolvedHeaders = hdrs instanceof Promise ? await hdrs : hdrs;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: shape comes from better-auth's runtime-configured instance and is narrowed by the checks below
   let betterAuthSession: any;
   try {
     betterAuthSession = await getAuth().api.getSession({

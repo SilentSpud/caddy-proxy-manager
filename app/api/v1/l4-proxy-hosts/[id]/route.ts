@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import { getL4ProxyHost, updateL4ProxyHost, deleteL4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
+import {
+  getL4ProxyHost,
+  updateL4ProxyHost,
+  deleteL4ProxyHost,
+} from "@/src/lib/models/l4-proxy-hosts";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireApiAdmin(request);
     const { id } = await params;
@@ -19,10 +20,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await requireApiAdmin(request);
     const { id } = await params;
@@ -36,7 +34,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { userId } = await requireApiAdmin(request);

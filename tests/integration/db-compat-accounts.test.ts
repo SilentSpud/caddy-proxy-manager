@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -47,6 +48,17 @@ function createBrokenAccountsDatabase(dbPath: string) {
     DROP TABLE accounts_old;
     CREATE UNIQUE INDEX accounts_provider_account_idx ON accounts (providerId, accountId);
     CREATE INDEX accounts_user_idx ON accounts (userId);
+
+    -- Rows that predate better-auth 1.7, so they carry no issuer at all. The
+    -- repair has to invent the right one for each rather than dropping them.
+    INSERT INTO users (email, createdAt, updatedAt)
+      VALUES ('legacy@example.com', 'created', 'updated');
+    INSERT INTO accounts (id, userId, accountId, providerId, password, createdAt, updatedAt)
+      VALUES ('legacy-cred', (SELECT id FROM users WHERE email = 'legacy@example.com'),
+              'legacy-subject', 'credential', 'legacyhash', 'created', 'updated');
+    INSERT INTO accounts (id, userId, accountId, providerId, createdAt, updatedAt)
+      VALUES ('legacy-oauth', (SELECT id FROM users WHERE email = 'legacy@example.com'),
+              'oauth-subject', 'gone-provider', 'created', 'updated');
   `);
 
   sqlite.close();
@@ -96,23 +108,58 @@ describe('database compatibility for accounts schema', () => {
       expect(idColumn?.type.toUpperCase()).toBe('INTEGER');
       expect(idColumn?.pk).toBe(1);
 
-      const user = reader.prepare('SELECT id FROM users WHERE email = ?').get('compat-user@example.com') as { id: number } | undefined;
+      const user = reader
+        .prepare('SELECT id FROM users WHERE email = ?')
+        .get('compat-user@example.com') as { id: number } | undefined;
       expect(user?.id).toBeDefined();
 
-      const account = reader.prepare(
-        'SELECT id, providerId, accountId, password FROM accounts WHERE userId = ? AND providerId = ?'
-      ).get(user!.id, 'credential') as {
-        id: number;
-        providerId: string;
-        accountId: string;
-        password: string | null;
-      } | undefined;
+      const account = reader
+        .prepare(
+          'SELECT id, providerId, accountId, issuer, password FROM accounts WHERE userId = ? AND providerId = ?',
+        )
+        .get(user!.id, 'credential') as
+        | {
+            id: number;
+            providerId: string;
+            accountId: string;
+            issuer: string;
+            password: string | null;
+          }
+        | undefined;
 
       expect(account).toBeDefined();
       expect(account?.id).toBeGreaterThan(0);
       expect(account?.providerId).toBe('credential');
       expect(account?.accountId).toBe(String(user!.id));
       expect(account?.password).toBe('hash123');
+      expect(account?.issuer).toBe(createLocalAccountIssuer('credential'));
+
+      // The repair preserves the rows that were already there, and gives each
+      // the issuer better-auth would compute for that identity — a legacy row
+      // left with the wrong issuer would stop resolving at sign-in.
+      const legacy = reader
+        .prepare(
+          'SELECT accountId, providerId, issuer, password FROM accounts WHERE accountId IN (?, ?) ORDER BY accountId',
+        )
+        .all('legacy-subject', 'oauth-subject') as Array<{
+        accountId: string;
+        providerId: string;
+        issuer: string;
+        password: string | null;
+      }>;
+
+      expect(legacy).toHaveLength(2);
+      expect(legacy[0]).toMatchObject({
+        accountId: 'legacy-subject',
+        providerId: 'credential',
+        issuer: createLocalAccountIssuer('credential'),
+        password: 'legacyhash',
+      });
+      expect(legacy[1]).toMatchObject({
+        accountId: 'oauth-subject',
+        providerId: 'gone-provider',
+        issuer: createOAuthAccountIssuer('gone-provider'),
+      });
     } finally {
       reader?.close();
       appSqlite?.close();

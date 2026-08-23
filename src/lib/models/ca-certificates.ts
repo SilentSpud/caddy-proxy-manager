@@ -1,7 +1,12 @@
 import db, { nowIso, toIso } from "../db";
 import { logAuditEvent } from "../audit";
 import { applyCaddyConfig } from "../caddy";
-import { caCertificates, issuedClientCertificates, mtlsCertificateRoles, proxyHosts } from "../db/schema";
+import {
+  caCertificates,
+  issuedClientCertificates,
+  mtlsCertificateRoles,
+  proxyHosts,
+} from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
 
 function tryParseJson<T>(value: string | null | undefined, fallback: T): T {
@@ -37,7 +42,7 @@ function parseCaCertificate(row: CaCertificateRow): CaCertificate {
     certificatePem: row.certificatePem,
     hasPrivateKey: !!row.privateKeyPem,
     createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!
+    updatedAt: toIso(row.updatedAt)!,
   };
 }
 
@@ -48,19 +53,22 @@ export async function listCaCertificates(): Promise<CaCertificate[]> {
 
 export async function getCaCertificatePrivateKey(id: number): Promise<string | null> {
   const cert = await db.query.caCertificates.findFirst({
-    where: (table, { eq }) => eq(table.id, id)
+    where: (table, { eq }) => eq(table.id, id),
   });
   return cert?.privateKeyPem ?? null;
 }
 
 export async function getCaCertificate(id: number): Promise<CaCertificate | null> {
   const cert = await db.query.caCertificates.findFirst({
-    where: (table, { eq }) => eq(table.id, id)
+    where: (table, { eq }) => eq(table.id, id),
   });
   return cert ? parseCaCertificate(cert) : null;
 }
 
-export async function createCaCertificate(input: CaCertificateInput, actorUserId: number): Promise<CaCertificate> {
+export async function createCaCertificate(
+  input: CaCertificateInput,
+  actorUserId: number,
+): Promise<CaCertificate> {
   const now = nowIso();
   const [record] = await db
     .insert(caCertificates)
@@ -70,7 +78,7 @@ export async function createCaCertificate(input: CaCertificateInput, actorUserId
       privateKeyPem: input.privateKeyPem?.trim() ?? null,
       createdBy: actorUserId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning();
 
@@ -83,13 +91,17 @@ export async function createCaCertificate(input: CaCertificateInput, actorUserId
     action: "create",
     entityType: "ca_certificate",
     entityId: record.id,
-    summary: `Created CA certificate ${input.name}`
+    summary: `Created CA certificate ${input.name}`,
   });
   await applyCaddyConfig();
   return (await getCaCertificate(record.id))!;
 }
 
-export async function updateCaCertificate(id: number, input: Partial<CaCertificateInput>, actorUserId: number): Promise<CaCertificate> {
+export async function updateCaCertificate(
+  id: number,
+  input: Partial<CaCertificateInput>,
+  actorUserId: number,
+): Promise<CaCertificate> {
   const existing = await getCaCertificate(id);
   if (!existing) {
     throw new Error("CA certificate not found");
@@ -101,8 +113,10 @@ export async function updateCaCertificate(id: number, input: Partial<CaCertifica
     .set({
       name: input.name?.trim() ?? existing.name,
       certificatePem: input.certificatePem?.trim() ?? existing.certificatePem,
-      ...(input.privateKeyPem !== undefined ? { privateKeyPem: input.privateKeyPem?.trim() ?? null } : {}),
-      updatedAt: now
+      ...(input.privateKeyPem !== undefined
+        ? { privateKeyPem: input.privateKeyPem?.trim() ?? null }
+        : {}),
+      updatedAt: now,
     })
     .where(eq(caCertificates.id, id));
 
@@ -111,7 +125,7 @@ export async function updateCaCertificate(id: number, input: Partial<CaCertifica
     action: "update",
     entityType: "ca_certificate",
     entityId: id,
-    summary: `Updated CA certificate ${input.name ?? existing.name}`
+    summary: `Updated CA certificate ${input.name ?? existing.name}`,
   });
   await applyCaddyConfig();
   return (await getCaCertificate(id))!;
@@ -149,7 +163,9 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
   // (ca_certificate_ids). The old guard only checked the deprecated field, so
   // CAs trusted via the current per-cert/role model could be deleted out from
   // under a live host.
-  const allHosts = await db.select({ meta: proxyHosts.meta, name: proxyHosts.name }).from(proxyHosts);
+  const allHosts = await db
+    .select({ meta: proxyHosts.meta, name: proxyHosts.name })
+    .from(proxyHosts);
   const referencing = allHosts.filter((host) => {
     const meta = tryParseJson<{
       mtls?: {
@@ -160,7 +176,8 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
       };
     }>(host.meta, {});
     if (!meta.mtls?.enabled) return false;
-    const trustsCert = meta.mtls.trusted_client_cert_ids?.some((cid) => issuedCertIdSet.has(cid)) ?? false;
+    const trustsCert =
+      meta.mtls.trusted_client_cert_ids?.some((cid) => issuedCertIdSet.has(cid)) ?? false;
     const trustsRole = meta.mtls.trusted_role_ids?.some((rid) => affectedRoleIds.has(rid)) ?? false;
     const trustsCa = meta.mtls.ca_certificate_ids?.includes(id) ?? false;
     return trustsCert || trustsRole || trustsCa;
@@ -191,7 +208,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     action: "delete",
     entityType: "ca_certificate",
     entityId: id,
-    summary: `Deleted CA certificate ${existing.name}`
+    summary: `Deleted CA certificate ${existing.name}`,
   });
   await applyCaddyConfig();
 }

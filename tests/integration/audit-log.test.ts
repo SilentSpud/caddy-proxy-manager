@@ -14,22 +14,29 @@ function nowIso(offsetMs = 0) {
 }
 
 async function insertEvent(overrides: Partial<typeof auditEvents.$inferInsert> = {}) {
-  const [event] = await db.insert(auditEvents).values({
-    action: 'create',
-    entityType: 'proxy_host',
-    entityId: 1,
-    summary: 'Created proxy host example.com',
-    data: null,
-    userId: null,
-    createdAt: nowIso(),
-    ...overrides,
-  }).returning();
+  const [event] = await db
+    .insert(auditEvents)
+    .values({
+      action: 'create',
+      entityType: 'proxy_host',
+      entityId: 1,
+      summary: 'Created proxy host example.com',
+      data: null,
+      userId: null,
+      createdAt: nowIso(),
+      ...overrides,
+    })
+    .returning();
   return event;
 }
 
 describe('audit-log integration', () => {
   it('inserts audit event and retrieves it', async () => {
-    const event = await insertEvent({ action: 'update', entityType: 'certificate', summary: 'Updated cert' });
+    const event = await insertEvent({
+      action: 'update',
+      entityType: 'certificate',
+      summary: 'Updated cert',
+    });
     const row = await db.query.auditEvents.findFirst({ where: (t, { eq }) => eq(t.id, event.id) });
     expect(row).toBeDefined();
     expect(row!.action).toBe('update');
@@ -70,7 +77,10 @@ describe('audit-log integration', () => {
     await insertEvent({ entityType: 'certificate' });
     await insertEvent({ entityType: 'proxy_host' });
 
-    const rows = await db.select().from(auditEvents).where(eq(auditEvents.entityType, 'certificate'));
+    const rows = await db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.entityType, 'certificate'));
     expect(rows.length).toBe(1);
     expect(rows[0].entityType).toBe('certificate');
   });
@@ -87,17 +97,20 @@ describe('audit-log integration', () => {
   it('event with userId stores reference correctly', async () => {
     // Insert a user first (needed for FK)
     const now = nowIso();
-    const [user] = await db.insert(users).values({
-      email: 'admin@test.com',
-      name: 'Admin',
-      passwordHash: 'hash',
-      role: 'admin',
-      provider: 'credentials',
-      subject: 'admin@test.com',
-      status: 'active',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: 'admin@test.com',
+        name: 'Admin',
+        passwordHash: 'hash',
+        role: 'admin',
+        provider: 'credentials',
+        subject: 'admin@test.com',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     const event = await insertEvent({ userId: user.id });
     const row = await db.query.auditEvents.findFirst({ where: (t, { eq }) => eq(t.id, event.id) });

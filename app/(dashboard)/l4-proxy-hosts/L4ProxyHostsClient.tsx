@@ -16,7 +16,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { CreateL4HostDialog, EditL4HostDialog, DeleteL4HostDialog } from "@/components/l4-proxy-hosts/L4HostDialogs";
+import {
+  CreateL4HostDialog,
+  EditL4HostDialog,
+  DeleteL4HostDialog,
+} from "@/components/l4-proxy-hosts/L4HostDialogs";
 import { L4PortsApplyBanner } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
 
 type Props = {
@@ -28,17 +32,19 @@ type Props = {
 
 function formatMatcher(host: L4ProxyHost): string {
   switch (host.matcherType) {
-    case "tls_sni":    return `SNI: ${host.matcherValue.join(", ")}`;
-    case "http_host":  return `Host: ${host.matcherValue.join(", ")}`;
-    case "proxy_protocol": return "Proxy Protocol";
-    default:           return "None";
+    case "tls_sni":
+      return `SNI: ${host.matcherValue.join(", ")}`;
+    case "http_host":
+      return `Host: ${host.matcherValue.join(", ")}`;
+    case "proxy_protocol":
+      return "Proxy Protocol";
+    default:
+      return "None";
   }
 }
 
 function ProtocolBadge({ protocol }: { protocol: string }) {
-  return (
-    <Badge variant={protocol === "tcp" ? "info" : "warning"} label={protocol.toUpperCase()} />
-  );
+  return <Badge variant={protocol === "tcp" ? "info" : "warning"} label={protocol.toUpperCase()} />;
 }
 
 /** "10.0.0.1:443 +2" — the primary upstream plus a count of the rest. */
@@ -87,7 +93,12 @@ function HostActions({
   );
 }
 
-export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, initialSort }: Props) {
+export default function L4ProxyHostsClient({
+  hosts,
+  pagination,
+  initialSearch,
+  initialSort,
+}: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<L4ProxyHost | null>(null);
@@ -100,16 +111,22 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
   const searchParams = useSearchParams();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const signalBannerRefresh = () => setBannerRefresh(n => n + 1);
+  const signalBannerRefresh = () => setBannerRefresh((n) => n + 1);
 
-  useEffect(() => { setSearchTerm(initialSearch); }, [initialSearch]);
+  useEffect(() => {
+    setSearchTerm(initialSearch);
+  }, [initialSearch]);
 
   function handleSearchChange(value: string) {
     setSearchTerm(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString());
-      if (value.trim()) { params.set("search", value.trim()); } else { params.delete("search"); }
+      if (value.trim()) {
+        params.set("search", value.trim());
+      } else {
+        params.delete("search");
+      }
       params.set("page", "1");
       router.push(`${pathname}?${params.toString()}`);
     }, 400);
@@ -250,7 +267,11 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
 
       <CreateL4HostDialog
         open={createOpen}
-        onClose={() => { setCreateOpen(false); setTimeout(() => setDuplicateHost(null), 200); signalBannerRefresh(); }}
+        onClose={() => {
+          setCreateOpen(false);
+          setTimeout(() => setDuplicateHost(null), 200);
+          signalBannerRefresh();
+        }}
         initialData={duplicateHost}
       />
 
@@ -258,7 +279,10 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
         <EditL4HostDialog
           open={!!editHost}
           host={editHost}
-          onClose={() => { setEditHost(null); signalBannerRefresh(); }}
+          onClose={() => {
+            setEditHost(null);
+            signalBannerRefresh();
+          }}
         />
       )}
 
@@ -266,7 +290,10 @@ export default function L4ProxyHostsClient({ hosts, pagination, initialSearch, i
         <DeleteL4HostDialog
           open={!!deleteHost}
           host={deleteHost}
-          onClose={() => { setDeleteHost(null); signalBannerRefresh(); }}
+          onClose={() => {
+            setDeleteHost(null);
+            signalBannerRefresh();
+          }}
         />
       )}
     </VStack>

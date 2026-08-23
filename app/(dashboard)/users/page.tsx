@@ -16,7 +16,6 @@ export default async function UsersPage() {
   const gravatarEnabled = await isGravatarEnabled();
   // Strip password hashes before sending to client, and resolve each row's icon
   // here — Gravatar hashing needs node:crypto.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const safeUsers = allUsers.map(({ passwordHash, ...rest }) => ({
     ...rest,
     avatar: resolveAvatar(rest, 72, { gravatar: gravatarEnabled }),

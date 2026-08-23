@@ -103,17 +103,16 @@ describe('v1 OpenAPI schemas: no top-level snake_case', () => {
   ]);
   // Properties on otherwise-camelCase schemas that we intentionally keep
   // snake_case because the route handler reads them that way.
-  const LEGACY_SNAKE_KEYS = new Set([
-    'TokenInput.expires_at',
-  ]);
+  const LEGACY_SNAKE_KEYS = new Set(['TokenInput.expires_at']);
 
   const schemas = (spec as any).components.schemas as Record<string, any>;
 
   for (const [schemaName, schemaDef] of Object.entries(schemas)) {
     if (META_SHAPED_SCHEMAS.has(schemaName)) continue;
     if (typeof schemaDef !== 'object' || !schemaDef?.properties) continue;
-    const offenders = Object.keys(schemaDef.properties)
-      .filter((k) => k.includes('_') && !LEGACY_SNAKE_KEYS.has(`${schemaName}.${k}`));
+    const offenders = Object.keys(schemaDef.properties).filter(
+      (k) => k.includes('_') && !LEGACY_SNAKE_KEYS.has(`${schemaName}.${k}`),
+    );
     it(`${schemaName} uses camelCase top-level keys`, () => {
       expect(offenders).toEqual([]);
     });

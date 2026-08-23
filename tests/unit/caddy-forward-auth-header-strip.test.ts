@@ -98,7 +98,7 @@ describe('CPM forward-auth inbound X-CPM-* header stripping', () => {
         upstreams: [UPSTREAM],
         cpmForwardAuth: { enabled: true },
       },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();
@@ -122,7 +122,7 @@ describe('CPM forward-auth inbound X-CPM-* header stripping', () => {
         upstreams: [UPSTREAM],
         cpmForwardAuth: { enabled: true, excluded_paths: ['/public/*'] },
       },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();
@@ -136,8 +136,8 @@ describe('CPM forward-auth inbound X-CPM-* header stripping', () => {
         !arr.some(
           (h) =>
             (h as Record<string, unknown>)?.handler === 'reverse_proxy' &&
-            JSON.stringify(h).includes('/api/forward-auth/verify')
-        )
+            JSON.stringify(h).includes('/api/forward-auth/verify'),
+        ),
     );
 
     expect(excludedRoute).toBeDefined();
@@ -147,7 +147,7 @@ describe('CPM forward-auth inbound X-CPM-* header stripping', () => {
   it('does not leak X-CPM-* stripping into a plain (non-forward-auth) host', async () => {
     await createProxyHost(
       { name: 'plain', domains: ['plain.example.com'], upstreams: [UPSTREAM] },
-      1
+      1,
     );
 
     const doc = await buildCaddyDocument();

@@ -16,7 +16,11 @@ export interface HttpResponse {
 }
 
 /** Make an HTTP request to Caddy (localhost:80) with a custom Host header. */
-export function httpGet(domain: string, path = '/', extraHeaders: Record<string, string> = {}): Promise<HttpResponse> {
+export function httpGet(
+  domain: string,
+  path = '/',
+  extraHeaders: Record<string, string> = {},
+): Promise<HttpResponse> {
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
@@ -28,11 +32,17 @@ export function httpGet(domain: string, path = '/', extraHeaders: Record<string,
       },
       (res) => {
         let body = '';
-        res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        res.on('data', (chunk: Buffer) => {
+          body += chunk.toString();
+        });
         res.on('end', () =>
-          resolve({ status: res.statusCode!, headers: res.headers as HttpResponse['headers'], body })
+          resolve({
+            status: res.statusCode!,
+            headers: res.headers as HttpResponse['headers'],
+            body,
+          }),
         );
-      }
+      },
     );
     req.on('error', reject);
     req.end();
@@ -55,16 +65,22 @@ export async function waitForRoute(domain: string, timeoutMs = 15_000): Promise<
     } catch {
       // Connection refused — Caddy not ready yet
     }
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error(`Route for "${domain}" not ready after ${timeoutMs}ms (last status: ${lastStatus})`);
+  throw new Error(
+    `Route for "${domain}" not ready after ${timeoutMs}ms (last status: ${lastStatus})`,
+  );
 }
 
 /**
  * Poll until the route returns a specific expected status code.
  * Useful for forward auth routes where you expect 302 (redirect to portal).
  */
-export async function waitForStatus(domain: string, expectedStatus: number, timeoutMs = 20_000): Promise<void> {
+export async function waitForStatus(
+  domain: string,
+  expectedStatus: number,
+  timeoutMs = 20_000,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastStatus = 0;
   while (Date.now() < deadline) {
@@ -75,9 +91,11 @@ export async function waitForStatus(domain: string, expectedStatus: number, time
     } catch {
       // Connection refused — not ready yet
     }
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error(`Route for "${domain}" did not return ${expectedStatus} after ${timeoutMs}ms (last status: ${lastStatus})`);
+  throw new Error(
+    `Route for "${domain}" did not return ${expectedStatus} after ${timeoutMs}ms (last status: ${lastStatus})`,
+  );
 }
 
 /**
@@ -88,7 +106,12 @@ export async function waitForStatus(domain: string, expectedStatus: number, time
  * so waiting on status alone can't tell the config has applied — wait on the
  * body instead.
  */
-export async function waitForBody(domain: string, substring: string, path = '/', timeoutMs = 25_000): Promise<void> {
+export async function waitForBody(
+  domain: string,
+  substring: string,
+  path = '/',
+  timeoutMs = 25_000,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastStatus = 0;
   let lastBody = '';
@@ -101,11 +124,11 @@ export async function waitForBody(domain: string, substring: string, path = '/',
     } catch {
       // Connection refused — Caddy not ready yet
     }
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(
     `Body for "${domain}${path}" never contained "${substring}" within ${timeoutMs}ms ` +
-    `(last status: ${lastStatus}, body: ${JSON.stringify(lastBody.slice(0, 200))})`
+      `(last status: ${lastStatus}, body: ${JSON.stringify(lastBody.slice(0, 200))})`,
   );
 }
 
@@ -134,7 +157,7 @@ export interface WsHandshakeResult {
 export function wsHandshake(
   domain: string,
   path = '/echo',
-  extraHeaders: Record<string, string> = {}
+  extraHeaders: Record<string, string> = {},
 ): Promise<WsHandshakeResult> {
   return new Promise((resolve, reject) => {
     const key = crypto.randomBytes(16).toString('base64');
@@ -158,7 +181,11 @@ export function wsHandshake(
 
     const timer = setTimeout(() => {
       socket.destroy();
-      reject(new Error(`WebSocket handshake to "${domain}${path}" timed out (raw: ${JSON.stringify(buf.toString('latin1').slice(0, 200))})`));
+      reject(
+        new Error(
+          `WebSocket handshake to "${domain}${path}" timed out (raw: ${JSON.stringify(buf.toString('latin1').slice(0, 200))})`,
+        ),
+      );
     }, 10_000);
 
     socket.on('connect', () => {
@@ -173,7 +200,7 @@ export function wsHandshake(
           ...Object.entries(extraHeaders).map(([k, v]) => `${k}: ${v}`),
           '',
           '',
-        ].join('\r\n')
+        ].join('\r\n'),
       );
     });
 

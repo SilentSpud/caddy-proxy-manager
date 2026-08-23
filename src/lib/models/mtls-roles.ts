@@ -1,11 +1,7 @@
 import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
-import {
-  mtlsRoles,
-  mtlsCertificateRoles,
-  issuedClientCertificates,
-} from "../db/schema";
+import { mtlsRoles, mtlsCertificateRoles, issuedClientCertificates } from "../db/schema";
 import { asc, eq, inArray, count, and, isNull } from "drizzle-orm";
 import { normalizeFingerprint } from "../caddy-mtls";
 
@@ -91,10 +87,7 @@ export async function getMtlsRole(id: number): Promise<MtlsRoleWithCertificates 
   };
 }
 
-export async function createMtlsRole(
-  input: MtlsRoleInput,
-  actorUserId: number
-): Promise<MtlsRole> {
+export async function createMtlsRole(input: MtlsRoleInput, actorUserId: number): Promise<MtlsRole> {
   const now = nowIso();
   const [record] = await db
     .insert(mtlsRoles)
@@ -123,7 +116,7 @@ export async function createMtlsRole(
 export async function updateMtlsRole(
   id: number,
   input: Partial<MtlsRoleInput>,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<MtlsRole> {
   const existing = await db.query.mtlsRoles.findFirst({
     where: (table, { eq: cmpEq }) => cmpEq(table.id, id),
@@ -135,7 +128,8 @@ export async function updateMtlsRole(
     .update(mtlsRoles)
     .set({
       name: input.name?.trim() ?? existing.name,
-      description: input.description !== undefined ? (input.description ?? null) : existing.description,
+      description:
+        input.description !== undefined ? (input.description ?? null) : existing.description,
       updatedAt: now,
     })
     .where(eq(mtlsRoles.id, id));
@@ -180,7 +174,7 @@ export async function deleteMtlsRole(id: number, actorUserId: number): Promise<v
 export async function assignRoleToCertificate(
   roleId: number,
   certId: number,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<void> {
   const role = await db.query.mtlsRoles.findFirst({
     where: (t, { eq: cmpEq }) => cmpEq(t.id, roleId),
@@ -193,13 +187,11 @@ export async function assignRoleToCertificate(
   if (!cert) throw new Error("Issued client certificate not found");
 
   const now = nowIso();
-  await db
-    .insert(mtlsCertificateRoles)
-    .values({
-      issuedClientCertificateId: certId,
-      mtlsRoleId: roleId,
-      createdAt: now,
-    });
+  await db.insert(mtlsCertificateRoles).values({
+    issuedClientCertificateId: certId,
+    mtlsRoleId: roleId,
+    createdAt: now,
+  });
 
   logAuditEvent({
     userId: actorUserId,
@@ -216,7 +208,7 @@ export async function assignRoleToCertificate(
 export async function removeRoleFromCertificate(
   roleId: number,
   certId: number,
-  actorUserId: number
+  actorUserId: number,
 ): Promise<void> {
   const role = await db.query.mtlsRoles.findFirst({
     where: (t, { eq: cmpEq }) => cmpEq(t.id, roleId),
@@ -228,8 +220,8 @@ export async function removeRoleFromCertificate(
     .where(
       and(
         eq(mtlsCertificateRoles.mtlsRoleId, roleId),
-        eq(mtlsCertificateRoles.issuedClientCertificateId, certId)
-      )
+        eq(mtlsCertificateRoles.issuedClientCertificateId, certId),
+      ),
     );
 
   logAuditEvent({
@@ -275,7 +267,7 @@ export async function buildRoleFingerprintMap(): Promise<Map<number, Set<string>
     .from(mtlsCertificateRoles)
     .innerJoin(
       issuedClientCertificates,
-      eq(mtlsCertificateRoles.issuedClientCertificateId, issuedClientCertificates.id)
+      eq(mtlsCertificateRoles.issuedClientCertificateId, issuedClientCertificates.id),
     )
     .where(isNull(issuedClientCertificates.revokedAt));
 
@@ -324,7 +316,7 @@ export async function buildRoleCertIdMap(): Promise<Map<number, Set<number>>> {
     .from(mtlsCertificateRoles)
     .innerJoin(
       issuedClientCertificates,
-      eq(mtlsCertificateRoles.issuedClientCertificateId, issuedClientCertificates.id)
+      eq(mtlsCertificateRoles.issuedClientCertificateId, issuedClientCertificates.id),
     )
     .where(isNull(issuedClientCertificates.revokedAt));
 

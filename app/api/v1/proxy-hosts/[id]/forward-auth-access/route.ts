@@ -1,9 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
-import {
-  getForwardAuthAccessForHost,
-  setForwardAuthAccess
-} from "@/src/lib/models/forward-auth";
+import { getForwardAuthAccessForHost, setForwardAuthAccess } from "@/src/lib/models/forward-auth";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,7 +23,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const access = await setForwardAuthAccess(
       Number(id),
       { userIds: body.userIds, groupIds: body.groupIds },
-      userId
+      userId,
     );
     return NextResponse.json(access);
   } catch (error) {

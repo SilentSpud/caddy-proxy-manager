@@ -11,11 +11,7 @@ import {
  * Call this once at server startup.
  */
 export async function syncEnvOAuthProviders(): Promise<void> {
-  if (
-    !config.oauth.enabled ||
-    !config.oauth.clientId ||
-    !config.oauth.clientSecret
-  ) {
+  if (!config.oauth.enabled || !config.oauth.clientId || !config.oauth.clientSecret) {
     return;
   }
 

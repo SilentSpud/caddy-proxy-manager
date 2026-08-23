@@ -34,8 +34,22 @@ export const EMPTY_LOAD_BALANCER: LoadBalancerConfig = {
   passiveHealthCheck: null,
 };
 
-const EMPTY_ACTIVE = { enabled: true, uri: null, port: null, interval: null, timeout: null, status: null, body: null };
-const EMPTY_PASSIVE = { enabled: true, failDuration: null, maxFails: null, unhealthyStatus: null, unhealthyLatency: null };
+const EMPTY_ACTIVE = {
+  enabled: true,
+  uri: null,
+  port: null,
+  interval: null,
+  timeout: null,
+  status: null,
+  body: null,
+};
+const EMPTY_PASSIVE = {
+  enabled: true,
+  failDuration: null,
+  maxFails: null,
+  unhealthyStatus: null,
+  unhealthyLatency: null,
+};
 
 function str(v: string): string | null {
   const t = v.trim();
@@ -187,7 +201,9 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       placeholder="30s"
                       value={lb.activeHealthCheck.interval ?? ""}
                       onChange={(next) =>
-                        patch({ activeHealthCheck: { ...lb.activeHealthCheck!, interval: str(next) } })
+                        patch({
+                          activeHealthCheck: { ...lb.activeHealthCheck!, interval: str(next) },
+                        })
                       }
                     />
                     <TextInput
@@ -196,7 +212,9 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       placeholder="5s"
                       value={lb.activeHealthCheck.timeout ?? ""}
                       onChange={(next) =>
-                        patch({ activeHealthCheck: { ...lb.activeHealthCheck!, timeout: str(next) } })
+                        patch({
+                          activeHealthCheck: { ...lb.activeHealthCheck!, timeout: str(next) },
+                        })
                       }
                     />
                     <NumberInput
@@ -246,7 +264,10 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       value={lb.passiveHealthCheck.failDuration ?? ""}
                       onChange={(next) =>
                         patch({
-                          passiveHealthCheck: { ...lb.passiveHealthCheck!, failDuration: str(next) },
+                          passiveHealthCheck: {
+                            ...lb.passiveHealthCheck!,
+                            failDuration: str(next),
+                          },
                         })
                       }
                     />

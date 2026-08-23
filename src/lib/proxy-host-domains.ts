@@ -31,10 +31,8 @@ export function isValidProxyHostDomain(value: string) {
 export function normalizeProxyHostDomains(domains: string[]) {
   const normalizedDomains = Array.from(
     new Set(
-      domains
-        .map((domain) => domain.trim().toLowerCase().replace(/\.$/, ""))
-        .filter(Boolean)
-    )
+      domains.map((domain) => domain.trim().toLowerCase().replace(/\.$/, "")).filter(Boolean),
+    ),
   );
 
   if (normalizedDomains.length === 0) {
@@ -44,7 +42,7 @@ export function normalizeProxyHostDomains(domains: string[]) {
   const invalidDomain = normalizedDomains.find((domain) => !isValidProxyHostDomain(domain));
   if (invalidDomain) {
     throw new Error(
-      `Invalid domain "${invalidDomain}". Wildcards are supported only as the left-most label, for example "*.example.com".`
+      `Invalid domain "${invalidDomain}". Wildcards are supported only as the left-most label, for example "*.example.com".`,
     );
   }
 

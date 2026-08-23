@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 
 export const spec = {
@@ -74,8 +74,7 @@ export const spec = {
                     token: { $ref: "#/components/schemas/Token" },
                     raw_token: {
                       type: "string",
-                      description:
-                        "Plain-text token value. Only returned at creation time.",
+                      description: "Plain-text token value. Only returned at creation time.",
                     },
                   },
                   required: ["token", "raw_token"],
@@ -124,7 +123,10 @@ export const spec = {
                       expiresAt: { type: "string" },
                       ipAddress: { type: "string", nullable: true },
                       userAgent: { type: "string", nullable: true },
-                      current: { type: "boolean", description: "True for the session making this request" },
+                      current: {
+                        type: "boolean",
+                        description: "True for the session making this request",
+                      },
                     },
                   },
                 },
@@ -872,7 +874,8 @@ export const spec = {
         ],
         responses: {
           "200": {
-            description: "Settings object (shape varies by group). For instance-mode: `{mode}`. For sync-token: `{has_token}`.",
+            description:
+              "Settings object (shape varies by group). For instance-mode: `{mode}`. For sync-token: `{has_token}`.",
             content: {
               "application/json": {
                 schema: {
@@ -1173,7 +1176,14 @@ export const spec = {
         summary: "List groups",
         operationId: "listGroups",
         responses: {
-          "200": { description: "List of groups", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Group" } } } } },
+          "200": {
+            description: "List of groups",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/Group" } },
+              },
+            },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -1181,9 +1191,23 @@ export const spec = {
         tags: ["Groups"],
         summary: "Create a group",
         operationId: "createGroup",
-        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["name"], properties: { name: { type: "string" }, description: { type: "string" } } } } } },
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: { name: { type: "string" }, description: { type: "string" } },
+              },
+            },
+          },
+        },
         responses: {
-          "201": { description: "Group created", content: { "application/json": { schema: { $ref: "#/components/schemas/Group" } } } },
+          "201": {
+            description: "Group created",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Group" } } },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -1195,7 +1219,10 @@ export const spec = {
         operationId: "getGroup",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         responses: {
-          "200": { description: "Group details", content: { "application/json": { schema: { $ref: "#/components/schemas/Group" } } } },
+          "200": {
+            description: "Group details",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Group" } } },
+          },
           "404": { $ref: "#/components/responses/NotFound" },
         },
       },
@@ -1204,9 +1231,22 @@ export const spec = {
         summary: "Update a group",
         operationId: "updateGroup",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
-        requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { name: { type: "string" }, description: { type: "string" } } } } } },
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { name: { type: "string" }, description: { type: "string" } },
+              },
+            },
+          },
+        },
         responses: {
-          "200": { description: "Group updated", content: { "application/json": { schema: { $ref: "#/components/schemas/Group" } } } },
+          "200": {
+            description: "Group updated",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Group" } } },
+          },
           "404": { $ref: "#/components/responses/NotFound" },
         },
       },
@@ -1227,7 +1267,18 @@ export const spec = {
         summary: "Add a member to a group",
         operationId: "addGroupMember",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
-        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["userId"], properties: { userId: { type: "integer" } } } } } },
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId"],
+                properties: { userId: { type: "integer" } },
+              },
+            },
+          },
+        },
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "404": { $ref: "#/components/responses/NotFound" },
@@ -1241,7 +1292,13 @@ export const spec = {
         operationId: "removeGroupMember",
         parameters: [
           { $ref: "#/components/parameters/IdPath" },
-          { name: "userId", in: "path", required: true, schema: { type: "integer" }, description: "User ID to remove" },
+          {
+            name: "userId",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            description: "User ID to remove",
+          },
         ],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
@@ -1257,7 +1314,14 @@ export const spec = {
         summary: "List mTLS roles",
         operationId: "listMtlsRoles",
         responses: {
-          "200": { description: "List of roles", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/MtlsRole" } } } } },
+          "200": {
+            description: "List of roles",
+            content: {
+              "application/json": {
+                schema: { type: "array", items: { $ref: "#/components/schemas/MtlsRole" } },
+              },
+            },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -1265,9 +1329,23 @@ export const spec = {
         tags: ["mTLS Roles"],
         summary: "Create an mTLS role",
         operationId: "createMtlsRole",
-        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["name"], properties: { name: { type: "string" }, description: { type: "string" } } } } } },
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: { name: { type: "string" }, description: { type: "string" } },
+              },
+            },
+          },
+        },
         responses: {
-          "201": { description: "Role created", content: { "application/json": { schema: { $ref: "#/components/schemas/MtlsRole" } } } },
+          "201": {
+            description: "Role created",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/MtlsRole" } } },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -1279,7 +1357,10 @@ export const spec = {
         operationId: "getMtlsRole",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         responses: {
-          "200": { description: "Role details", content: { "application/json": { schema: { $ref: "#/components/schemas/MtlsRole" } } } },
+          "200": {
+            description: "Role details",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/MtlsRole" } } },
+          },
           "404": { $ref: "#/components/responses/NotFound" },
         },
       },
@@ -1288,9 +1369,22 @@ export const spec = {
         summary: "Update an mTLS role",
         operationId: "updateMtlsRole",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
-        requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { name: { type: "string" }, description: { type: "string" } } } } } },
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { name: { type: "string" }, description: { type: "string" } },
+              },
+            },
+          },
+        },
         responses: {
-          "200": { description: "Role updated", content: { "application/json": { schema: { $ref: "#/components/schemas/MtlsRole" } } } },
+          "200": {
+            description: "Role updated",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/MtlsRole" } } },
+          },
           "404": { $ref: "#/components/responses/NotFound" },
         },
       },
@@ -1311,7 +1405,18 @@ export const spec = {
         summary: "Assign a certificate to an mTLS role",
         operationId: "assignMtlsRoleCertificate",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
-        requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["certificateId"], properties: { certificateId: { type: "integer" } } } } } },
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["certificateId"],
+                properties: { certificateId: { type: "integer" } },
+              },
+            },
+          },
+        },
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "404": { $ref: "#/components/responses/NotFound" },
@@ -1325,7 +1430,13 @@ export const spec = {
         operationId: "removeMtlsRoleCertificate",
         parameters: [
           { $ref: "#/components/parameters/IdPath" },
-          { name: "certId", in: "path", required: true, schema: { type: "integer" }, description: "Client certificate ID" },
+          {
+            name: "certId",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            description: "Client certificate ID",
+          },
         ],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
@@ -1342,7 +1453,20 @@ export const spec = {
         operationId: "getForwardAuthAccess",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
         responses: {
-          "200": { description: "Access list with user IDs and group IDs", content: { "application/json": { schema: { type: "object", properties: { userIds: { type: "array", items: { type: "integer" } }, groupIds: { type: "array", items: { type: "integer" } } } } } } },
+          "200": {
+            description: "Access list with user IDs and group IDs",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    userIds: { type: "array", items: { type: "integer" } },
+                    groupIds: { type: "array", items: { type: "integer" } },
+                  },
+                },
+              },
+            },
+          },
           "404": { $ref: "#/components/responses/NotFound" },
         },
       },
@@ -1351,7 +1475,20 @@ export const spec = {
         summary: "Set forward auth access list for a proxy host",
         operationId: "setForwardAuthAccess",
         parameters: [{ $ref: "#/components/parameters/IdPath" }],
-        requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { userIds: { type: "array", items: { type: "integer" } }, groupIds: { type: "array", items: { type: "integer" } } } } } } },
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  userIds: { type: "array", items: { type: "integer" } },
+                  groupIds: { type: "array", items: { type: "integer" } },
+                },
+              },
+            },
+          },
+        },
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "404": { $ref: "#/components/responses/NotFound" },
@@ -1363,9 +1500,21 @@ export const spec = {
         tags: ["Forward Auth"],
         summary: "List forward auth sessions",
         operationId: "listForwardAuthSessions",
-        parameters: [{ name: "userId", in: "query", schema: { type: "integer" }, description: "Filter by user ID" }],
+        parameters: [
+          {
+            name: "userId",
+            in: "query",
+            schema: { type: "integer" },
+            description: "Filter by user ID",
+          },
+        ],
         responses: {
-          "200": { description: "List of sessions", content: { "application/json": { schema: { type: "array", items: { type: "object" } } } } },
+          "200": {
+            description: "List of sessions",
+            content: {
+              "application/json": { schema: { type: "array", items: { type: "object" } } },
+            },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -1373,7 +1522,14 @@ export const spec = {
         tags: ["Forward Auth"],
         summary: "Delete forward auth sessions",
         operationId: "deleteForwardAuthSessions",
-        parameters: [{ name: "userId", in: "query", schema: { type: "integer" }, description: "Delete sessions for a specific user" }],
+        parameters: [
+          {
+            name: "userId",
+            in: "query",
+            schema: { type: "integer" },
+            description: "Delete sessions for a specific user",
+          },
+        ],
         responses: {
           "200": { $ref: "#/components/responses/Ok" },
           "401": { $ref: "#/components/responses/Unauthorized" },
@@ -1504,10 +1660,16 @@ export const spec = {
       },
       TokenInput: {
         type: "object",
-        description: "Note: this endpoint accepts expires_at (snake_case) for input; the rest of the API uses camelCase.",
+        description:
+          "Note: this endpoint accepts expires_at (snake_case) for input; the rest of the API uses camelCase.",
         properties: {
           name: { type: "string", example: "CI/CD Pipeline" },
-          expires_at: { type: "string", format: "date-time", description: "Optional expiration date (ISO 8601). Field name is snake_case for this endpoint." },
+          expires_at: {
+            type: "string",
+            format: "date-time",
+            description:
+              "Optional expiration date (ISO 8601). Field name is snake_case for this endpoint.",
+          },
         },
         required: ["name"],
       },
@@ -1521,11 +1683,23 @@ export const spec = {
           outpostDomain: { type: ["string", "null"], example: "auth.example.com" },
           outpostUpstream: { type: ["string", "null"], example: "http://authentik:9000" },
           authEndpoint: { type: ["string", "null"] },
-          copyHeaders: { type: "array", items: { type: "string" }, description: "Headers to copy from Authentik response" },
+          copyHeaders: {
+            type: "array",
+            items: { type: "string" },
+            description: "Headers to copy from Authentik response",
+          },
           trustedProxies: { type: "array", items: { type: "string" }, example: ["private_ranges"] },
           setOutpostHostHeader: { type: "boolean" },
-          protectedPaths: { type: ["array", "null"], items: { type: "string" }, description: "Paths to protect (null = all)" },
-          excludedPaths: { type: ["array", "null"], items: { type: "string" }, description: "Paths to exclude from auth (bypassed while rest is protected)" },
+          protectedPaths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths to protect (null = all)",
+          },
+          excludedPaths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths to exclude from auth (bypassed while rest is protected)",
+          },
         },
       },
       LoadBalancerConfig: {
@@ -1533,9 +1707,27 @@ export const spec = {
         description: "Load balancing configuration for multiple upstreams",
         properties: {
           enabled: { type: "boolean" },
-          policy: { type: "string", enum: ["random", "round_robin", "least_conn", "ip_hash", "first", "header", "cookie", "uri_hash"] },
-          policyHeaderField: { type: ["string", "null"], description: "Header name for 'header' policy" },
-          policyCookieName: { type: ["string", "null"], description: "Cookie name for 'cookie' policy" },
+          policy: {
+            type: "string",
+            enum: [
+              "random",
+              "round_robin",
+              "least_conn",
+              "ip_hash",
+              "first",
+              "header",
+              "cookie",
+              "uri_hash",
+            ],
+          },
+          policyHeaderField: {
+            type: ["string", "null"],
+            description: "Header name for 'header' policy",
+          },
+          policyCookieName: {
+            type: ["string", "null"],
+            description: "Cookie name for 'cookie' policy",
+          },
           policyCookieSecret: { type: ["string", "null"] },
           tryDuration: { type: ["string", "null"], example: "5s" },
           tryInterval: { type: ["string", "null"], example: "250ms" },
@@ -1569,7 +1761,10 @@ export const spec = {
         description: "L4 load balancing configuration",
         properties: {
           enabled: { type: "boolean" },
-          policy: { type: "string", enum: ["random", "round_robin", "least_conn", "ip_hash", "first"] },
+          policy: {
+            type: "string",
+            enum: ["random", "round_robin", "least_conn", "ip_hash", "first"],
+          },
           tryDuration: { type: ["string", "null"] },
           tryInterval: { type: ["string", "null"] },
           retries: { type: ["integer", "null"] },
@@ -1616,8 +1811,18 @@ export const spec = {
         description: "Geographic/network-based access control",
         properties: {
           enabled: { type: "boolean" },
-          block_countries: { type: "array", items: { type: "string" }, example: ["CN", "RU"], description: "ISO 3166-1 alpha-2 codes" },
-          block_continents: { type: "array", items: { type: "string" }, example: ["AS"], description: "AF, AN, AS, EU, NA, OC, SA" },
+          block_countries: {
+            type: "array",
+            items: { type: "string" },
+            example: ["CN", "RU"],
+            description: "ISO 3166-1 alpha-2 codes",
+          },
+          block_continents: {
+            type: "array",
+            items: { type: "string" },
+            example: ["AS"],
+            description: "AF, AN, AS, EU, NA, OC, SA",
+          },
           block_asns: { type: "array", items: { type: "integer" } },
           block_cidrs: { type: "array", items: { type: "string" }, example: ["10.0.0.0/8"] },
           block_ips: { type: "array", items: { type: "string" } },
@@ -1626,12 +1831,27 @@ export const spec = {
           allow_asns: { type: "array", items: { type: "integer" } },
           allow_cidrs: { type: "array", items: { type: "string" } },
           allow_ips: { type: "array", items: { type: "string" } },
-          trusted_proxies: { type: "array", items: { type: "string" }, description: "Trusted proxy CIDRs for X-Forwarded-For" },
-          fail_closed: { type: "boolean", description: "Block when client IP cannot be determined" },
+          trusted_proxies: {
+            type: "array",
+            items: { type: "string" },
+            description: "Trusted proxy CIDRs for X-Forwarded-For",
+          },
+          fail_closed: {
+            type: "boolean",
+            description: "Block when client IP cannot be determined",
+          },
           response_status: { type: "integer", example: 403 },
           response_body: { type: "string", example: "Forbidden" },
-          response_headers: { type: "object", additionalProperties: { type: "string" }, example: { "Content-Type": "text/plain", "X-Custom": "blocked" }, description: "Custom response headers (header name → value)" },
-          redirect_url: { type: "string", description: "If set, 302 redirect instead of status/body" },
+          response_headers: {
+            type: "object",
+            additionalProperties: { type: "string" },
+            example: { "Content-Type": "text/plain", "X-Custom": "blocked" },
+            description: "Custom response headers (header name → value)",
+          },
+          redirect_url: {
+            type: "string",
+            description: "If set, 302 redirect instead of status/body",
+          },
         },
       },
       WafConfig: {
@@ -1642,8 +1862,16 @@ export const spec = {
           mode: { type: "string", enum: ["Off", "On"] },
           load_owasp_crs: { type: "boolean", description: "Load OWASP Core Rule Set" },
           custom_directives: { type: "string", description: "Custom WAF directives" },
-          excluded_rule_ids: { type: "array", items: { type: "integer" }, description: "Rule IDs to exclude" },
-          waf_mode: { type: "string", enum: ["merge", "override"], description: "How per-host WAF merges with global" },
+          excluded_rule_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description: "Rule IDs to exclude",
+          },
+          waf_mode: {
+            type: "string",
+            enum: ["merge", "override"],
+            description: "How per-host WAF merges with global",
+          },
         },
       },
       MtlsConfig: {
@@ -1651,7 +1879,11 @@ export const spec = {
         description: "Mutual TLS (client certificate) configuration",
         properties: {
           enabled: { type: "boolean" },
-          ca_certificate_ids: { type: "array", items: { type: "integer" }, description: "CA certificate IDs to trust" },
+          ca_certificate_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description: "CA certificate IDs to trust",
+          },
         },
       },
       CpmForwardAuthConfig: {
@@ -1659,15 +1891,27 @@ export const spec = {
         description: "Built-in CPM forward-auth (replaces Authentik when enabled)",
         properties: {
           enabled: { type: "boolean" },
-          protected_paths: { type: ["array", "null"], items: { type: "string" }, description: "Paths to protect (null = all)" },
-          excluded_paths: { type: ["array", "null"], items: { type: "string" }, description: "Paths to exclude from auth" },
+          protected_paths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths to protect (null = all)",
+          },
+          excluded_paths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths to exclude from auth",
+          },
         },
       },
       RedirectRule: {
         type: "object",
         description: "HTTP redirect rule",
         properties: {
-          from: { type: "string", example: "/.well-known/carddav", description: "Path pattern to match" },
+          from: {
+            type: "string",
+            example: "/.well-known/carddav",
+            description: "Path pattern to match",
+          },
           to: { type: "string", example: "/remote.php/dav/", description: "Redirect destination" },
           status: { type: "integer", enum: [301, 302, 307, 308], example: 301 },
         },
@@ -1677,25 +1921,44 @@ export const spec = {
         type: "object",
         description: "Path rewrite (strip prefix)",
         properties: {
-          path_prefix: { type: "string", example: "/app", description: "Prefix to strip from request path" },
+          path_prefix: {
+            type: "string",
+            example: "/app",
+            description: "Prefix to strip from request path",
+          },
         },
         required: ["path_prefix"],
       },
       LocationRule: {
         type: "object",
-        description: "Route a path pattern to specific upstream servers (like nginx location blocks)",
+        description:
+          "Route a path pattern to specific upstream servers (like nginx location blocks)",
         properties: {
           path: { type: "string", example: "/ws/*", description: "Caddy path pattern to match" },
-          upstreams: { type: "array", items: { type: "string" }, example: ["ws-backend:8080", "ws-backend2:8080"], description: "Upstream servers for this path" },
-          loadBalancer: { oneOf: [{ $ref: "#/components/schemas/LoadBalancerConfig" }, { type: "null" }], description: "Optional per-rule load balancing and health checks for this path's upstreams" },
+          upstreams: {
+            type: "array",
+            items: { type: "string" },
+            example: ["ws-backend:8080", "ws-backend2:8080"],
+            description: "Upstream servers for this path",
+          },
+          loadBalancer: {
+            oneOf: [{ $ref: "#/components/schemas/LoadBalancerConfig" }, { type: "null" }],
+            description:
+              "Optional per-rule load balancing and health checks for this path's upstreams",
+          },
         },
         required: ["path", "upstreams"],
       },
       PathAllowRule: {
         type: "object",
-        description: "Allow a request path to bypass any matching Path Block and reach the upstream. Evaluated before blocks.",
+        description:
+          "Allow a request path to bypass any matching Path Block and reach the upstream. Evaluated before blocks.",
         properties: {
-          path: { type: "string", example: "/secret", description: "Caddy path pattern to allow through" },
+          path: {
+            type: "string",
+            example: "/secret",
+            description: "Caddy path pattern to allow through",
+          },
         },
         required: ["path"],
       },
@@ -1703,8 +1966,16 @@ export const spec = {
         type: "object",
         description: "Block a request path with a static response (no proxying)",
         properties: {
-          path: { type: "string", example: "/dns-query", description: "Caddy path pattern to match" },
-          status: { type: "integer", enum: [400, 401, 403, 404, 410, 418, 451, 500, 502, 503], example: 403 },
+          path: {
+            type: "string",
+            example: "/dns-query",
+            description: "Caddy path pattern to match",
+          },
+          status: {
+            type: "integer",
+            enum: [400, 401, 403, 404, 410, 418, 451, 500, 502, 503],
+            example: 403,
+          },
           body: { type: "string", example: "Forbidden", description: "Optional response body" },
         },
         required: ["path", "status"],
@@ -1713,7 +1984,11 @@ export const spec = {
         type: "object",
         description: "Internally rewrite the request URI before proxying (client URL is unchanged)",
         properties: {
-          from: { type: "string", example: "/secretpath", description: "Caddy path pattern to match" },
+          from: {
+            type: "string",
+            example: "/secretpath",
+            description: "Caddy path pattern to match",
+          },
           to: { type: "string", example: "/dns-query", description: "Internal target URI" },
         },
         required: ["from", "to"],
@@ -1725,7 +2000,11 @@ export const spec = {
         properties: {
           id: { type: "integer" },
           name: { type: "string" },
-          domains: { type: "array", items: { type: "string" }, example: ["example.com", "www.example.com"] },
+          domains: {
+            type: "array",
+            items: { type: "string" },
+            example: ["example.com", "www.example.com"],
+          },
           upstreams: { type: "array", items: { type: "string" }, example: ["localhost:8080"] },
           certificateId: { type: ["integer", "null"] },
           accessListId: { type: ["integer", "null"] },
@@ -1738,23 +2017,60 @@ export const spec = {
           enabled: { type: "boolean" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
-          customReverseProxyJson: { type: ["string", "null"], description: "Raw Caddy JSON for reverse_proxy handler" },
-          customPreHandlersJson: { type: ["string", "null"], description: "Raw Caddy JSON for handlers before reverse_proxy" },
-          authentik: { oneOf: [{ $ref: "#/components/schemas/AuthentikConfig" }, { type: "null" }] },
-          loadBalancer: { oneOf: [{ $ref: "#/components/schemas/LoadBalancerConfig" }, { type: "null" }] },
-          dnsResolver: { oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }] },
-          upstreamDnsResolution: { oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }] },
+          customReverseProxyJson: {
+            type: ["string", "null"],
+            description: "Raw Caddy JSON for reverse_proxy handler",
+          },
+          customPreHandlersJson: {
+            type: ["string", "null"],
+            description: "Raw Caddy JSON for handlers before reverse_proxy",
+          },
+          authentik: {
+            oneOf: [{ $ref: "#/components/schemas/AuthentikConfig" }, { type: "null" }],
+          },
+          loadBalancer: {
+            oneOf: [{ $ref: "#/components/schemas/LoadBalancerConfig" }, { type: "null" }],
+          },
+          dnsResolver: {
+            oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }],
+          },
+          upstreamDnsResolution: {
+            oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }],
+          },
           geoblock: { oneOf: [{ $ref: "#/components/schemas/GeoBlockConfig" }, { type: "null" }] },
-          geoblockMode: { type: "string", enum: ["merge", "override"], description: "How per-host geoblock merges with global" },
+          geoblockMode: {
+            type: "string",
+            enum: ["merge", "override"],
+            description: "How per-host geoblock merges with global",
+          },
           waf: { oneOf: [{ $ref: "#/components/schemas/WafConfig" }, { type: "null" }] },
           mtls: { oneOf: [{ $ref: "#/components/schemas/MtlsConfig" }, { type: "null" }] },
-          cpmForwardAuth: { oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }] },
+          cpmForwardAuth: {
+            oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }],
+          },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
-          locationRules: { type: "array", items: { $ref: "#/components/schemas/LocationRule" }, description: "Path-based routing rules (routes specific paths to different upstreams)" },
-          pathAllows: { type: "array", items: { $ref: "#/components/schemas/PathAllowRule" }, description: "Paths that bypass any matching Path Block and reach the upstream (evaluated first)" },
-          pathBlocks: { type: "array", items: { $ref: "#/components/schemas/PathBlockRule" }, description: "Paths blocked with a static response" },
-          pathRewrites: { type: "array", items: { $ref: "#/components/schemas/PathRewriteRule" }, description: "Internal URI rewrites applied before proxying" },
+          locationRules: {
+            type: "array",
+            items: { $ref: "#/components/schemas/LocationRule" },
+            description: "Path-based routing rules (routes specific paths to different upstreams)",
+          },
+          pathAllows: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PathAllowRule" },
+            description:
+              "Paths that bypass any matching Path Block and reach the upstream (evaluated first)",
+          },
+          pathBlocks: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PathBlockRule" },
+            description: "Paths blocked with a static response",
+          },
+          pathRewrites: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PathRewriteRule" },
+            description: "Internal URI rewrites applied before proxying",
+          },
         },
         required: ["id", "name", "domains", "upstreams", "enabled", "createdAt", "updatedAt"],
       },
@@ -1775,21 +2091,48 @@ export const spec = {
           enabled: { type: "boolean" },
           customReverseProxyJson: { type: ["string", "null"] },
           customPreHandlersJson: { type: ["string", "null"] },
-          authentik: { oneOf: [{ $ref: "#/components/schemas/AuthentikConfig" }, { type: "null" }] },
-          loadBalancer: { oneOf: [{ $ref: "#/components/schemas/LoadBalancerConfig" }, { type: "null" }] },
-          dnsResolver: { oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }] },
-          upstreamDnsResolution: { oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }] },
+          authentik: {
+            oneOf: [{ $ref: "#/components/schemas/AuthentikConfig" }, { type: "null" }],
+          },
+          loadBalancer: {
+            oneOf: [{ $ref: "#/components/schemas/LoadBalancerConfig" }, { type: "null" }],
+          },
+          dnsResolver: {
+            oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }],
+          },
+          upstreamDnsResolution: {
+            oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }],
+          },
           geoblock: { oneOf: [{ $ref: "#/components/schemas/GeoBlockConfig" }, { type: "null" }] },
           geoblockMode: { type: "string", enum: ["merge", "override"] },
           waf: { oneOf: [{ $ref: "#/components/schemas/WafConfig" }, { type: "null" }] },
           mtls: { oneOf: [{ $ref: "#/components/schemas/MtlsConfig" }, { type: "null" }] },
-          cpmForwardAuth: { oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }] },
+          cpmForwardAuth: {
+            oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }],
+          },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
-          locationRules: { type: "array", items: { $ref: "#/components/schemas/LocationRule" }, description: "Path-based routing rules (routes specific paths to different upstreams)" },
-          pathAllows: { type: "array", items: { $ref: "#/components/schemas/PathAllowRule" }, description: "Paths that bypass any matching Path Block and reach the upstream (evaluated first)" },
-          pathBlocks: { type: "array", items: { $ref: "#/components/schemas/PathBlockRule" }, description: "Paths blocked with a static response" },
-          pathRewrites: { type: "array", items: { $ref: "#/components/schemas/PathRewriteRule" }, description: "Internal URI rewrites applied before proxying" },
+          locationRules: {
+            type: "array",
+            items: { $ref: "#/components/schemas/LocationRule" },
+            description: "Path-based routing rules (routes specific paths to different upstreams)",
+          },
+          pathAllows: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PathAllowRule" },
+            description:
+              "Paths that bypass any matching Path Block and reach the upstream (evaluated first)",
+          },
+          pathBlocks: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PathBlockRule" },
+            description: "Paths blocked with a static response",
+          },
+          pathRewrites: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PathRewriteRule" },
+            description: "Internal URI rewrites applied before proxying",
+          },
         },
         required: ["name", "domains", "upstreams"],
       },
@@ -1799,30 +2142,60 @@ export const spec = {
           id: { type: "integer" },
           name: { type: "string" },
           protocol: { type: "string", enum: ["tcp", "udp"] },
-          listenAddress: { type: "string", example: ":5432", description: "Single host:port or :port to listen on" },
+          listenAddress: {
+            type: "string",
+            example: ":5432",
+            description: "Single host:port or :port to listen on",
+          },
           upstreams: { type: "array", items: { type: "string" }, example: ["db-server:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
-          matcherValue: { type: "array", items: { type: "string" }, description: "Match values for tls_sni / http_host (empty otherwise)" },
+          matcherValue: {
+            type: "array",
+            items: { type: "string" },
+            description: "Match values for tls_sni / http_host (empty otherwise)",
+          },
           tlsTermination: { type: "boolean" },
           proxyProtocolVersion: { type: ["string", "null"], enum: ["v1", "v2", null] },
-          proxyProtocolReceive: { type: "boolean", description: "Trust inbound PROXY protocol header from upstream LBs" },
+          proxyProtocolReceive: {
+            type: "boolean",
+            description: "Trust inbound PROXY protocol header from upstream LBs",
+          },
           enabled: { type: "boolean" },
-          loadBalancer: { oneOf: [{ $ref: "#/components/schemas/L4LoadBalancerConfig" }, { type: "null" }] },
-          dnsResolver: { oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }] },
-          upstreamDnsResolution: { oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }] },
+          loadBalancer: {
+            oneOf: [{ $ref: "#/components/schemas/L4LoadBalancerConfig" }, { type: "null" }],
+          },
+          dnsResolver: {
+            oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }],
+          },
+          upstreamDnsResolution: {
+            oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }],
+          },
           geoblock: { oneOf: [{ $ref: "#/components/schemas/GeoBlockConfig" }, { type: "null" }] },
           geoblockMode: { type: "string", enum: ["merge", "override"] },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
-        required: ["id", "name", "listenAddress", "upstreams", "protocol", "enabled", "createdAt", "updatedAt"],
+        required: [
+          "id",
+          "name",
+          "listenAddress",
+          "upstreams",
+          "protocol",
+          "enabled",
+          "createdAt",
+          "updatedAt",
+        ],
       },
       L4ProxyHostInput: {
         type: "object",
         properties: {
           name: { type: "string", example: "PostgreSQL Proxy" },
           protocol: { type: "string", enum: ["tcp", "udp"] },
-          listenAddress: { type: "string", example: ":5432", description: "Single host:port or :port" },
+          listenAddress: {
+            type: "string",
+            example: ":5432",
+            description: "Single host:port or :port",
+          },
           upstreams: { type: "array", items: { type: "string" }, example: ["db:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
           matcherValue: { type: "array", items: { type: "string" } },
@@ -1830,9 +2203,15 @@ export const spec = {
           proxyProtocolVersion: { type: ["string", "null"], enum: ["v1", "v2", null] },
           proxyProtocolReceive: { type: "boolean" },
           enabled: { type: "boolean" },
-          loadBalancer: { oneOf: [{ $ref: "#/components/schemas/L4LoadBalancerConfig" }, { type: "null" }] },
-          dnsResolver: { oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }] },
-          upstreamDnsResolution: { oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }] },
+          loadBalancer: {
+            oneOf: [{ $ref: "#/components/schemas/L4LoadBalancerConfig" }, { type: "null" }],
+          },
+          dnsResolver: {
+            oneOf: [{ $ref: "#/components/schemas/DnsResolverConfig" }, { type: "null" }],
+          },
+          upstreamDnsResolution: {
+            oneOf: [{ $ref: "#/components/schemas/UpstreamDnsResolutionConfig" }, { type: "null" }],
+          },
           geoblock: { oneOf: [{ $ref: "#/components/schemas/GeoBlockConfig" }, { type: "null" }] },
           geoblockMode: { type: "string", enum: ["merge", "override"] },
         },
@@ -1844,15 +2223,26 @@ export const spec = {
           id: { type: "integer" },
           name: { type: "string" },
           type: { type: "string", enum: ["managed", "imported"] },
-          domainNames: { type: "array", items: { type: "string" }, example: ["example.com", "*.example.com"] },
+          domainNames: {
+            type: "array",
+            items: { type: "string" },
+            example: ["example.com", "*.example.com"],
+          },
           autoRenew: { type: "boolean" },
           providerOptions: {
             type: ["object", "null"],
-            description: "Provider-specific options (e.g. Cloudflare API token). Free-form key/value object passed through to the DNS provider.",
+            description:
+              "Provider-specific options (e.g. Cloudflare API token). Free-form key/value object passed through to the DNS provider.",
             additionalProperties: true,
           },
-          certificatePem: { type: ["string", "null"], description: "PEM-encoded certificate (imported type only)" },
-          privateKeyPem: { type: ["string", "null"], description: "PEM-encoded private key (imported type only)" },
+          certificatePem: {
+            type: ["string", "null"],
+            description: "PEM-encoded certificate (imported type only)",
+          },
+          privateKeyPem: {
+            type: ["string", "null"],
+            description: "PEM-encoded private key (imported type only)",
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -1877,7 +2267,10 @@ export const spec = {
           id: { type: "integer" },
           name: { type: "string" },
           certificatePem: { type: "string", description: "PEM-encoded CA certificate" },
-          hasPrivateKey: { type: "boolean", description: "Whether a private key is stored (for issuing client certs)" },
+          hasPrivateKey: {
+            type: "boolean",
+            description: "Whether a private key is stored (for issuing client certs)",
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -1888,7 +2281,10 @@ export const spec = {
         properties: {
           name: { type: "string", example: "Internal CA" },
           certificatePem: { type: "string", description: "PEM-encoded CA certificate" },
-          privateKeyPem: { type: "string", description: "PEM-encoded private key (optional, needed for issuing client certs)" },
+          privateKeyPem: {
+            type: "string",
+            description: "PEM-encoded private key (optional, needed for issuing client certs)",
+          },
         },
         required: ["name", "certificatePem"],
       },
@@ -1907,13 +2303,28 @@ export const spec = {
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
-        required: ["id", "caCertificateId", "commonName", "serialNumber", "fingerprintSha256", "certificatePem", "validFrom", "validTo", "createdAt", "updatedAt"],
+        required: [
+          "id",
+          "caCertificateId",
+          "commonName",
+          "serialNumber",
+          "fingerprintSha256",
+          "certificatePem",
+          "validFrom",
+          "validTo",
+          "createdAt",
+          "updatedAt",
+        ],
       },
       ClientCertificateInput: {
         type: "object",
-        description: "Store a pre-issued client certificate. All PEM/serial/fingerprint/validity fields must be provided.",
+        description:
+          "Store a pre-issued client certificate. All PEM/serial/fingerprint/validity fields must be provided.",
         properties: {
-          caCertificateId: { type: "integer", description: "ID of the CA certificate this cert was issued from" },
+          caCertificateId: {
+            type: "integer",
+            description: "ID of the CA certificate this cert was issued from",
+          },
           commonName: { type: "string", example: "client-device-01" },
           serialNumber: { type: "string" },
           fingerprintSha256: { type: "string" },
@@ -1921,7 +2332,15 @@ export const spec = {
           validFrom: { type: "string", format: "date-time" },
           validTo: { type: "string", format: "date-time" },
         },
-        required: ["caCertificateId", "commonName", "serialNumber", "fingerprintSha256", "certificatePem", "validFrom", "validTo"],
+        required: [
+          "caCertificateId",
+          "commonName",
+          "serialNumber",
+          "fingerprintSha256",
+          "certificatePem",
+          "validFrom",
+          "validTo",
+        ],
       },
       AccessList: {
         type: "object",
@@ -1994,7 +2413,8 @@ export const spec = {
       },
       DnsProviderSettings: {
         type: "object",
-        description: "DNS provider configuration for ACME DNS-01 challenges. Supports multiple configured providers with a default.",
+        description:
+          "DNS provider configuration for ACME DNS-01 challenges. Supports multiple configured providers with a default.",
         properties: {
           providers: {
             type: "object",
@@ -2003,12 +2423,14 @@ export const spec = {
               additionalProperties: { type: "string" },
               description: "Credential key-value pairs for this provider",
             },
-            description: "Configured providers keyed by name (e.g. { cloudflare: { api_token: '...' }, route53: { ... } })",
+            description:
+              "Configured providers keyed by name (e.g. { cloudflare: { api_token: '...' }, route53: { ... } })",
           },
           default: {
             type: "string",
             nullable: true,
-            description: "Name of the default provider used for DNS-01 challenges (null = HTTP-01 only)",
+            description:
+              "Name of the default provider used for DNS-01 challenges (null = HTTP-01 only)",
           },
         },
         required: ["providers", "default"],
@@ -2155,7 +2577,16 @@ export const spec = {
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
-        required: ["id", "email", "role", "provider", "subject", "status", "createdAt", "updatedAt"],
+        required: [
+          "id",
+          "email",
+          "role",
+          "provider",
+          "subject",
+          "status",
+          "createdAt",
+          "updatedAt",
+        ],
       },
       AuditLogEvent: {
         type: "object",

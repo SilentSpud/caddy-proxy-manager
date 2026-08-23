@@ -8,8 +8,8 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { AuthentikSettings } from "@/lib/settings";
-import { ProxyHost } from "@/lib/models/proxy-hosts";
+import type { AuthentikSettings } from "@/lib/settings";
+import type { ProxyHost } from "@/lib/models/proxy-hosts";
 
 const AUTHENTIK_DEFAULT_HEADERS = [
   "X-Authentik-Username",
@@ -30,7 +30,7 @@ const AUTHENTIK_DEFAULT_TRUSTED_PROXIES = ["private_ranges"];
 
 function getAuthentikFormDefaults(
   authentik: ProxyHost["authentik"] | null,
-  defaults: AuthentikSettings | null | undefined
+  defaults: AuthentikSettings | null | undefined,
 ) {
   return {
     enabled: authentik?.enabled ?? false,

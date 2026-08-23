@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('WAF', () => {
-  test('WAF events period filters support presets, custom range, and reset to all time', async ({ page }) => {
+  test('WAF events period filters support presets, custom range, and reset to all time', async ({
+    page,
+  }) => {
     const customFrom = '2026-05-01T09:00';
     const customTo = '2026-05-02T09:30';
     const expectedFrom = Math.floor(new Date(customFrom).getTime() / 1000);
@@ -28,7 +30,9 @@ test.describe('WAF', () => {
     await dateInputs.nth(1).fill(customTo);
     await page.getByRole('button', { name: /apply range/i }).click();
 
-    await expect(page).toHaveURL(new RegExp(`range=custom.*from=${expectedFrom}.*to=${expectedTo}`));
+    await expect(page).toHaveURL(
+      new RegExp(`range=custom.*from=${expectedFrom}.*to=${expectedTo}`),
+    );
     await expect(dateInputs.nth(0)).toHaveValue(customFrom);
     await expect(dateInputs.nth(1)).toHaveValue(customTo);
 
@@ -48,7 +52,7 @@ test.describe('WAF', () => {
 
   test('WAF page has global settings visible', async ({ page }) => {
     await page.goto('/waf');
-    const hasWafContent = await page.locator('text=/waf|mode|enabled|owasp/i').count() > 0;
+    const hasWafContent = (await page.locator('text=/waf|mode|enabled|owasp/i').count()) > 0;
     expect(hasWafContent).toBe(true);
   });
 
@@ -89,7 +93,9 @@ test.describe('WAF', () => {
     }
 
     await page.getByRole('button', { name: /save waf settings/i }).click();
-    await expect(page.getByRole('button', { name: /save waf settings/i })).toBeEnabled({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /save waf settings/i })).toBeEnabled({
+      timeout: 10000,
+    });
 
     // Navigate away and back to verify persistence
     await page.goto('/hosts');

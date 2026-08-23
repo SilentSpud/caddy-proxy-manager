@@ -20,7 +20,7 @@ function randomSerialNumber(): string {
 export function createSelfSignedServerCertificate(
   commonName: string,
   altNames: string[],
-  validityDays = 30
+  validityDays = 30,
 ): GeneratedCertificate {
   const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
   const cert = forge.pki.createCertificate();
@@ -61,24 +61,29 @@ export function parsePkcs12Identity(bundle: Buffer, password: string): Pkcs12Ide
   const p12Asn1 = forge.asn1.fromDer(der);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
 
-  const keyBags = p12.getBags({
-    bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
-  })[forge.pki.oids.pkcs8ShroudedKeyBag] ?? [];
+  const keyBags =
+    p12.getBags({
+      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
+    })[forge.pki.oids.pkcs8ShroudedKeyBag] ?? [];
   const key = keyBags[0]?.key;
   if (!key) {
     throw new Error('PKCS#12 bundle did not contain a private key');
   }
 
-  const certBags = p12.getBags({
-    bagType: forge.pki.oids.certBag,
-  })[forge.pki.oids.certBag] ?? [];
-  const certBag = certBags.find((bag) => {
-    const extKeyUsage = bag.cert?.getExtension('extKeyUsage');
-    const basicConstraints = bag.cert?.getExtension('basicConstraints');
-    const isClientCert = Boolean(extKeyUsage && 'clientAuth' in extKeyUsage && extKeyUsage.clientAuth);
-    const isCa = Boolean(basicConstraints && 'cA' in basicConstraints && basicConstraints.cA);
-    return isClientCert || !isCa;
-  }) ?? certBags[0];
+  const certBags =
+    p12.getBags({
+      bagType: forge.pki.oids.certBag,
+    })[forge.pki.oids.certBag] ?? [];
+  const certBag =
+    certBags.find((bag) => {
+      const extKeyUsage = bag.cert?.getExtension('extKeyUsage');
+      const basicConstraints = bag.cert?.getExtension('basicConstraints');
+      const isClientCert = Boolean(
+        extKeyUsage && 'clientAuth' in extKeyUsage && extKeyUsage.clientAuth,
+      );
+      const isCa = Boolean(basicConstraints && 'cA' in basicConstraints && basicConstraints.cA);
+      return isClientCert || !isCa;
+    }) ?? certBags[0];
 
   if (!certBag?.cert) {
     throw new Error('PKCS#12 bundle did not contain a certificate');

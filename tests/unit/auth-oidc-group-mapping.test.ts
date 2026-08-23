@@ -69,6 +69,18 @@ function provider(overrides: Partial<OAuthProvider> = {}): OAuthProvider {
   };
 }
 
+/**
+ * better-auth's GenericOAuthUserInfo carries the full set of standard OIDC
+ * fields. These tests only care about the subject and the group claim, so the
+ * remaining required fields are filled in here rather than repeated at every
+ * call site.
+ */
+function profile(claims: Record<string, unknown>) {
+  return { emailVerified: false, ...claims } as Parameters<
+    NonNullable<ReturnType<typeof mapOAuthProvider>['mapProfileToUser']>
+  >[0];
+}
+
 beforeEach(() => {
   clearPendingOidcSyncs();
 });
@@ -94,11 +106,13 @@ describe('mapOAuthProvider — group mapping hooks', () => {
   it('records the mapped role for the subject in the profile', async () => {
     const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true }));
 
-    await cfg.mapProfileToUser!({
-      sub: 'user-1',
-      email: 'dev@example.com',
-      groups: ['CPM_Admin', 'CPM_Devs'],
-    });
+    await cfg.mapProfileToUser!(
+      profile({
+        sub: 'user-1',
+        email: 'dev@example.com',
+        groups: ['CPM_Admin', 'CPM_Devs'],
+      }),
+    );
 
     const pending = consumePendingOidcSync('authentik', 'user-1');
     expect(pending).not.toBeNull();
@@ -109,11 +123,13 @@ describe('mapOAuthProvider — group mapping hooks', () => {
   it('records the mirrored group names when group sync is on', async () => {
     const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true, syncGroups: true }));
 
-    await cfg.mapProfileToUser!({
-      sub: 'user-1',
-      email: 'dev@example.com',
-      groups: ['CPM_Admin', 'CPM_Devs', 'Unrelated'],
-    });
+    await cfg.mapProfileToUser!(
+      profile({
+        sub: 'user-1',
+        email: 'dev@example.com',
+        groups: ['CPM_Admin', 'CPM_Devs', 'Unrelated'],
+      }),
+    );
 
     const pending = consumePendingOidcSync('authentik', 'user-1');
     expect(pending!.localGroups).toEqual(['Devs']);
@@ -123,13 +139,15 @@ describe('mapOAuthProvider — group mapping hooks', () => {
   it('never returns privileged fields to better-auth from the IdP profile', async () => {
     const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true }));
 
-    const mapped = await cfg.mapProfileToUser!({
-      sub: 'user-1',
-      email: 'evil@example.com',
-      role: 'admin',
-      status: 'active',
-      groups: [],
-    });
+    const mapped = await cfg.mapProfileToUser!(
+      profile({
+        sub: 'user-1',
+        email: 'evil@example.com',
+        role: 'admin',
+        status: 'active',
+        groups: [],
+      }),
+    );
 
     expect(mapped).toEqual({});
   });
@@ -142,14 +160,16 @@ describe('mapOAuthProvider — group mapping hooks', () => {
         adminGroup: 'platform-owners, sre-oncall',
         userGroup: 'staff',
         viewerGroup: 'auditors',
-      })
+      }),
     );
 
-    await cfg.mapProfileToUser!({
-      sub: 'user-3',
-      email: 'sre@example.com',
-      groups: ['sre-oncall'],
-    });
+    await cfg.mapProfileToUser!(
+      profile({
+        sub: 'user-3',
+        email: 'sre@example.com',
+        groups: ['sre-oncall'],
+      }),
+    );
 
     expect(consumePendingOidcSync('authentik', 'user-3')!.role).toBe('admin');
   });
@@ -157,7 +177,9 @@ describe('mapOAuthProvider — group mapping hooks', () => {
   it('records the default role for a user in none of the role groups', async () => {
     const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true, defaultRole: 'viewer' }));
 
-    await cfg.mapProfileToUser!({ sub: 'user-2', email: 'x@example.com', groups: ['Marketing'] });
+    await cfg.mapProfileToUser!(
+      profile({ sub: 'user-2', email: 'x@example.com', groups: ['Marketing'] }),
+    );
 
     expect(consumePendingOidcSync('authentik', 'user-2')!.role).toBe('viewer');
   });
@@ -165,7 +187,7 @@ describe('mapOAuthProvider — group mapping hooks', () => {
   it('parks nothing when the profile has no subject to key on', async () => {
     const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true }));
 
-    await cfg.mapProfileToUser!({ email: 'x@example.com', groups: ['CPM_Admin'] });
+    await cfg.mapProfileToUser!(profile({ email: 'x@example.com', groups: ['CPM_Admin'] }));
 
     expect(consumePendingOidcSync('authentik', 'undefined')).toBeNull();
   });

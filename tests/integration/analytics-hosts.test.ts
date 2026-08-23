@@ -19,7 +19,7 @@ vi.mock('@/src/lib/clickhouse/client', () => ({
 import { getAnalyticsHosts } from '@/src/lib/analytics-db';
 
 function proxyRows(...domainLists: string[][]) {
-  return domainLists.map(domains => ({ domains: JSON.stringify(domains) }));
+  return domainLists.map((domains) => ({ domains: JSON.stringify(domains) }));
 }
 
 describe('getAnalyticsHosts', () => {

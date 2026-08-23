@@ -6,11 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-const COMPOSE_ARGS = [
-  'compose',
-  '-f', 'docker-compose.yml',
-  '-f', 'tests/docker-compose.test.yml',
-];
+const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 const HEALTH_URL = 'http://localhost:3000/api/health';
 export const AUTH_DIR = resolve(moduleDir, '.auth');
 export const AUTH_FILE = resolve(AUTH_DIR, 'admin.json');
@@ -30,18 +26,28 @@ async function waitForHealth(): Promise<void> {
         console.log(`[global-setup-no-ch] App is healthy (attempt ${attempt})`);
         return;
       }
-      console.log(`[global-setup-no-ch] Health check attempt ${attempt}: HTTP ${res.status}, retrying...`);
+      console.log(
+        `[global-setup-no-ch] Health check attempt ${attempt}: HTTP ${res.status}, retrying...`,
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.log(`[global-setup-no-ch] Health check attempt ${attempt}: ${msg}, retrying in ${POLL_INTERVAL_MS / 1000}s...`);
+      console.log(
+        `[global-setup-no-ch] Health check attempt ${attempt}: ${msg}, retrying in ${POLL_INTERVAL_MS / 1000}s...`,
+      );
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
 
   console.error('[global-setup-no-ch] Health check timed out. Container logs:');
   try {
-    execFileSync('docker', [...COMPOSE_ARGS, 'logs', '--tail=50'], { stdio: 'inherit', cwd: process.cwd(), env: ENV });
-  } catch { /* ignore */ }
+    execFileSync('docker', [...COMPOSE_ARGS, 'logs', '--tail=50'], {
+      stdio: 'inherit',
+      cwd: process.cwd(),
+      env: ENV,
+    });
+  } catch {
+    /* ignore */
+  }
 
   throw new Error(`App did not become healthy within ${MAX_WAIT_MS}ms`);
 }
@@ -51,10 +57,14 @@ async function waitForCaddyHealthy(): Promise<void> {
   const maxWait = 90_000;
   console.log('[global-setup-no-ch] Verifying Caddy is healthy...');
   while (Date.now() - start < maxWait) {
-    const result = spawnSync('docker', ['inspect', '--format={{.State.Health.Status}}', 'caddy-proxy-manager-caddy'], {
-      encoding: 'utf-8',
-      cwd: process.cwd(),
-    });
+    const result = spawnSync(
+      'docker',
+      ['inspect', '--format={{.State.Health.Status}}', 'caddy-proxy-manager-caddy'],
+      {
+        encoding: 'utf-8',
+        cwd: process.cwd(),
+      },
+    );
     if (result.status === 0 && result.stdout.trim() === 'healthy') {
       console.log('[global-setup-no-ch] Caddy is healthy.');
       return;
@@ -89,15 +99,15 @@ async function seedAuthState(): Promise<void> {
 
 export default async function globalSetup() {
   console.log('[global-setup-no-ch] Starting Docker Compose test stack (no ClickHouse)...');
-  execFileSync('docker', [
-    ...COMPOSE_ARGS,
-    'up', '-d', '--build',
-    '--wait', '--wait-timeout', '120',
-  ], {
-    stdio: 'inherit',
-    cwd: process.cwd(),
-    env: ENV,
-  });
+  execFileSync(
+    'docker',
+    [...COMPOSE_ARGS, 'up', '-d', '--build', '--wait', '--wait-timeout', '120'],
+    {
+      stdio: 'inherit',
+      cwd: process.cwd(),
+      env: ENV,
+    },
+  );
 
   console.log('[global-setup-no-ch] Containers up. Waiting for /api/health...');
   await waitForHealth();

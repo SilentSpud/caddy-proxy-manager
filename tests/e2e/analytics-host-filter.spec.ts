@@ -43,7 +43,11 @@ test.describe('Analytics host filter (#171)', () => {
       // A configured proxy host (SQLite) — always present in the dropdown.
       const createRes = await page.request.post(API_PROXY_HOSTS, {
         headers: { Origin: ORIGIN },
-        data: { name: `Host Filter ${stamp}`, domains: [configuredHost], upstreams: ['localhost:9999'] },
+        data: {
+          name: `Host Filter ${stamp}`,
+          domains: [configuredHost],
+          upstreams: ['localhost:9999'],
+        },
       });
       expect(createRes.ok(), `create proxy host failed: ${createRes.status()}`).toBeTruthy();
       proxyHostId = (await createRes.json()).id;
@@ -52,20 +56,34 @@ test.describe('Analytics host filter (#171)', () => {
       await ch.insert({
         table: 'traffic_events',
         format: 'JSONEachRow',
-        values: [{
-          ts: chDateTime(Math.floor(Date.now() / 1000)),
-          client_ip: '203.0.113.7', host: unconfiguredHost, method: 'GET',
-          uri: '/', status: 200, proto: 'HTTP/1.1', bytes_sent: 1,
-          user_agent: 'host-filter-test', is_blocked: 0,
-        }],
+        values: [
+          {
+            ts: chDateTime(Math.floor(Date.now() / 1000)),
+            client_ip: '203.0.113.7',
+            host: unconfiguredHost,
+            method: 'GET',
+            uri: '/',
+            status: 200,
+            proto: 'HTTP/1.1',
+            bytes_sent: 1,
+            user_agent: 'host-filter-test',
+            is_blocked: 0,
+          },
+        ],
       });
 
       // Start with the toggle off regardless of any persisted preference.
       await page.addInitScript(() => {
-        try { localStorage.removeItem('analytics:includeUnconfiguredHosts'); } catch { /* ignore */ }
+        try {
+          localStorage.removeItem('analytics:includeUnconfiguredHosts');
+        } catch {
+          /* ignore */
+        }
       });
       await page.goto('/analytics');
-      await expect(page.getByText('Total Requests', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Total Requests', { exact: true })).toBeVisible({
+        timeout: 15_000,
+      });
 
       // Open the hosts combobox and narrow the list to our two markers.
       // (The trigger is the only combobox on the page until the popover opens
@@ -87,12 +105,20 @@ test.describe('Analytics host filter (#171)', () => {
       await expect(unconfiguredOption).toBeVisible();
     } finally {
       if (proxyHostId != null) {
-        await page.request.delete(`${API_PROXY_HOSTS}/${proxyHostId}`, { headers: { Origin: ORIGIN } }).catch(() => { /* best-effort cleanup */ });
+        await page.request
+          .delete(`${API_PROXY_HOSTS}/${proxyHostId}`, { headers: { Origin: ORIGIN } })
+          .catch(() => {
+            /* best-effort cleanup */
+          });
       }
-      await ch.command({
-        query: `ALTER TABLE traffic_events DELETE WHERE host = {h:String} SETTINGS mutations_sync = 2`,
-        query_params: { h: unconfiguredHost },
-      }).catch(() => { /* best-effort cleanup */ });
+      await ch
+        .command({
+          query: `ALTER TABLE traffic_events DELETE WHERE host = {h:String} SETTINGS mutations_sync = 2`,
+          query_params: { h: unconfiguredHost },
+        })
+        .catch(() => {
+          /* best-effort cleanup */
+        });
       await ch.close();
     }
   });

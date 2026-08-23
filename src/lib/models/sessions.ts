@@ -59,7 +59,7 @@ export async function revokeUserSession(userId: number, sessionId: number): Prom
  */
 export async function revokeOtherUserSessions(
   userId: number,
-  exceptSessionId: number | null
+  exceptSessionId: number | null,
 ): Promise<number> {
   const rows = await db
     .select({ id: sessions.id })

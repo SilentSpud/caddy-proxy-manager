@@ -12,10 +12,17 @@ describe('clickhouse client analytics enablement', () => {
 
     const query = vi
       .fn()
-      .mockResolvedValueOnce({ json: async () => [{ total: '12', unique_ips: '4', blocked: '2', bytes: '1024' }] })
+      .mockResolvedValueOnce({
+        json: async () => [{ total: '12', unique_ips: '4', blocked: '2', bytes: '1024' }],
+      })
       .mockResolvedValueOnce({ json: async () => [{ waf_blocked: '3' }] });
 
-    const createClient = vi.fn(() => ({ query, command: vi.fn(), insert: vi.fn(), close: vi.fn() }));
+    const createClient = vi.fn(() => ({
+      query,
+      command: vi.fn(),
+      insert: vi.fn(),
+      close: vi.fn(),
+    }));
 
     vi.doMock('@clickhouse/client', () => ({
       createClient,
@@ -34,13 +41,15 @@ describe('clickhouse client analytics enablement', () => {
     });
 
     expect(query).toHaveBeenCalledTimes(2);
-    expect(createClient).toHaveBeenCalledWith(expect.objectContaining({
-      log: { level: 127 },
-      clickhouse_settings: {
-        async_insert: 1,
-        wait_for_async_insert: 0,
-      },
-    }));
+    expect(createClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        log: { level: 127 },
+        clickhouse_settings: {
+          async_insert: 1,
+          wait_for_async_insert: 0,
+        },
+      }),
+    );
   });
 
   it('treats analytics as disabled when CLICKHOUSE_PASSWORD is missing', async () => {
@@ -69,9 +78,13 @@ describe('clickhouse client analytics enablement', () => {
     vi.stubEnv('CLICKHOUSE_RETENTION_DAYS', '');
 
     const commands: string[] = [];
-    const command = vi.fn(async ({ query }: { query: string }) => { commands.push(query); });
+    const command = vi.fn(async ({ query }: { query: string }) => {
+      commands.push(query);
+    });
     // ensureRetentionTtl reads the live TTL; report it already matches 30 days.
-    const query = vi.fn(async () => ({ json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(30)' }] }));
+    const query = vi.fn(async () => ({
+      json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(30)' }],
+    }));
 
     vi.doMock('@clickhouse/client', () => ({
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
@@ -82,12 +95,14 @@ describe('clickhouse client analytics enablement', () => {
 
     await initClickHouse();
 
-    const trafficDdl = commands.find(q => q.includes('CREATE TABLE IF NOT EXISTS traffic_events'));
-    const wafDdl = commands.find(q => q.includes('CREATE TABLE IF NOT EXISTS waf_events'));
+    const trafficDdl = commands.find((q) =>
+      q.includes('CREATE TABLE IF NOT EXISTS traffic_events'),
+    );
+    const wafDdl = commands.find((q) => q.includes('CREATE TABLE IF NOT EXISTS waf_events'));
     expect(trafficDdl).toContain('TTL ts + INTERVAL 30 DAY DELETE');
     expect(wafDdl).toContain('TTL ts + INTERVAL 30 DAY DELETE');
     // TTL already matches → no MODIFY TTL migration issued.
-    expect(commands.some(q => q.includes('MODIFY TTL'))).toBe(false);
+    expect(commands.some((q) => q.includes('MODIFY TTL'))).toBe(false);
   });
 
   it('honors a custom retention value and migrates an existing table whose TTL differs', async () => {
@@ -95,9 +110,13 @@ describe('clickhouse client analytics enablement', () => {
     vi.stubEnv('CLICKHOUSE_RETENTION_DAYS', '7');
 
     const commands: string[] = [];
-    const command = vi.fn(async ({ query }: { query: string }) => { commands.push(query); });
+    const command = vi.fn(async ({ query }: { query: string }) => {
+      commands.push(query);
+    });
     // Existing tables were created under the old 90-day TTL.
-    const query = vi.fn(async () => ({ json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(90)' }] }));
+    const query = vi.fn(async () => ({
+      json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(90)' }],
+    }));
 
     vi.doMock('@clickhouse/client', () => ({
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
@@ -108,9 +127,12 @@ describe('clickhouse client analytics enablement', () => {
 
     await initClickHouse();
 
-    expect(commands.find(q => q.includes('CREATE TABLE IF NOT EXISTS traffic_events')))
-      .toContain('TTL ts + INTERVAL 7 DAY DELETE');
-    const modifies = commands.filter(q => /ALTER TABLE \w+ MODIFY TTL ts \+ INTERVAL 7 DAY DELETE/.test(q));
+    expect(commands.find((q) => q.includes('CREATE TABLE IF NOT EXISTS traffic_events'))).toContain(
+      'TTL ts + INTERVAL 7 DAY DELETE',
+    );
+    const modifies = commands.filter((q) =>
+      /ALTER TABLE \w+ MODIFY TTL ts \+ INTERVAL 7 DAY DELETE/.test(q),
+    );
     expect(modifies).toHaveLength(2);
   });
 
@@ -119,14 +141,19 @@ describe('clickhouse client analytics enablement', () => {
     vi.stubEnv('CLICKHOUSE_RETENTION_DAYS', 'not-a-number');
     vi.doMock('@clickhouse/client', () => ({ createClient: vi.fn() }));
 
-    await expect(import('@/src/lib/clickhouse/client')).rejects.toThrow(/CLICKHOUSE_RETENTION_DAYS/);
+    await expect(import('@/src/lib/clickhouse/client')).rejects.toThrow(
+      /CLICKHOUSE_RETENTION_DAYS/,
+    );
   });
 
   // The drop step first enumerates matching tables from system.tables, then drops
   // each. This mock answers the enumeration query with `liveTables` and every
   // other query (the retention create_table_query read) with a matching 30-day TTL.
   function mockClient(liveTables: string[], commandImpl?: (q: string) => void) {
-    const calls: { command: string[]; queries: { query: string; params?: Record<string, unknown> }[] } = {
+    const calls: {
+      command: string[];
+      queries: { query: string; params?: Record<string, unknown> }[];
+    } = {
       command: [],
       queries: [],
     };
@@ -134,13 +161,21 @@ describe('clickhouse client analytics enablement', () => {
       calls.command.push(query);
       commandImpl?.(query);
     });
-    const query = vi.fn(async ({ query, query_params }: { query: string; query_params?: Record<string, unknown> }) => {
-      calls.queries.push({ query, params: query_params });
-      if (query.includes('FROM system.tables') && query.includes('match(name')) {
-        return { json: async () => liveTables.map((name) => ({ name })) };
-      }
-      return { json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(30)' }] };
-    });
+    const query = vi.fn(
+      async ({
+        query,
+        query_params,
+      }: {
+        query: string;
+        query_params?: Record<string, unknown>;
+      }) => {
+        calls.queries.push({ query, params: query_params });
+        if (query.includes('FROM system.tables') && query.includes('match(name')) {
+          return { json: async () => liveTables.map((name) => ({ name })) };
+        }
+        return { json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(30)' }] };
+      },
+    );
     vi.doMock('@clickhouse/client', () => ({
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
     }));
@@ -152,7 +187,14 @@ describe('clickhouse client analytics enablement', () => {
 
     // What system.tables would return: live tables, numbered _N copies from past
     // upgrades, and the newly-disabled histogram_metric_log.
-    const liveTables = ['trace_log', 'trace_log_3', 'trace_log_5', 'metric_log', 'metric_log_0', 'histogram_metric_log'];
+    const liveTables = [
+      'trace_log',
+      'trace_log_3',
+      'trace_log_5',
+      'metric_log',
+      'metric_log_0',
+      'histogram_metric_log',
+    ];
     const calls = mockClient(liveTables);
 
     const { initClickHouse } = await import('@/src/lib/clickhouse/client');
@@ -163,8 +205,8 @@ describe('clickhouse client analytics enablement', () => {
     const enumeration = calls.queries.find((q) => q.query.includes('match(name'));
     expect(enumeration?.params?.pattern).toBe(
       '^(metric_log|asynchronous_metric_log|trace_log|query_log|query_thread_log|query_views_log|' +
-      'part_log|processors_profile_log|text_log|session_log|opentelemetry_span_log|blob_storage_log|' +
-      'backup_log|histogram_metric_log)(_[0-9]+)?$',
+        'part_log|processors_profile_log|text_log|session_log|opentelemetry_span_log|blob_storage_log|' +
+        'backup_log|histogram_metric_log)(_[0-9]+)?$',
     );
 
     // Exactly the tables that exist are dropped — the _N leftovers included.
@@ -182,7 +224,9 @@ describe('clickhouse client analytics enablement', () => {
     const calls = mockClient(['trace_log', 'metric_log', 'part_log'], (q) => {
       if (q.startsWith('DROP TABLE IF EXISTS system.')) {
         dropAttempts.push(q);
-        throw new Error('Not enough privileges. To execute this query, it is necessary to have the grant DROP TABLE');
+        throw new Error(
+          'Not enough privileges. To execute this query, it is necessary to have the grant DROP TABLE',
+        );
       }
     });
 
@@ -205,7 +249,15 @@ describe('clickhouse client analytics enablement', () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
 
     const query = vi.fn().mockResolvedValueOnce({
-      json: async () => [{ total: '5400', blocked: '5400', critical: '5400', unique_hosts: '1', rule_ids_triggered: '3' }],
+      json: async () => [
+        {
+          total: '5400',
+          blocked: '5400',
+          critical: '5400',
+          unique_hosts: '1',
+          rule_ids_triggered: '3',
+        },
+      ],
     });
 
     vi.doMock('@clickhouse/client', () => ({

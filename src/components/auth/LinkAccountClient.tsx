@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -19,11 +19,7 @@ interface LinkAccountClientProps {
   linkingId: string;
 }
 
-export default function LinkAccountClient({
-  provider,
-  email,
-  linkingId,
-}: LinkAccountClientProps) {
+export default function LinkAccountClient({ provider, email, linkingId }: LinkAccountClientProps) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -67,9 +63,7 @@ export default function LinkAccountClient({
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">
-            <Heading level={1}>
-              Link Your Account
-            </Heading>
+            <Heading level={1}>Link Your Account</Heading>
             <Text type="body" size="sm" color="secondary">
               An account with <strong>{email}</strong> already exists
             </Text>

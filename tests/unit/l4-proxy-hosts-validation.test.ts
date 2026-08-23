@@ -29,10 +29,7 @@ vi.mock('../../src/lib/audit', () => ({
   logAuditEvent: vi.fn(),
 }));
 
-import {
-  createL4ProxyHost,
-  type L4ProxyHostInput,
-} from '../../src/lib/models/l4-proxy-hosts';
+import { createL4ProxyHost, type L4ProxyHostInput } from '../../src/lib/models/l4-proxy-hosts';
 import * as schema from '../../src/lib/db/schema';
 
 // ---------------------------------------------------------------------------
@@ -97,7 +94,9 @@ describe('L4 proxy host create validation', () => {
       listenAddress: '10.0.0.1',
       upstreams: ['10.0.0.1:5432'],
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow("Listen address must be in format ':PORT' or 'HOST:PORT'");
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(
+      "Listen address must be in format ':PORT' or 'HOST:PORT'",
+    );
   });
 
   it('rejects listen address with port 0', async () => {
@@ -127,7 +126,9 @@ describe('L4 proxy host create validation', () => {
       listenAddress: ':5432',
       upstreams: [],
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow('At least one upstream must be specified');
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(
+      'At least one upstream must be specified',
+    );
   });
 
   it('rejects upstream without port', async () => {
@@ -148,7 +149,9 @@ describe('L4 proxy host create validation', () => {
       upstreams: ['8.8.8.8:53'],
       tlsTermination: true,
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow('TLS termination is only supported with TCP');
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(
+      'TLS termination is only supported with TCP',
+    );
   });
 
   it('rejects TLS SNI matcher without values', async () => {
@@ -183,7 +186,9 @@ describe('L4 proxy host create validation', () => {
       upstreams: ['10.0.0.1:5432'],
       proxyProtocolVersion: 'v3' as any,
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow("Proxy protocol version must be 'v1' or 'v2'");
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(
+      "Proxy protocol version must be 'v1' or 'v2'",
+    );
   });
 
   it('rejects invalid matcher type', async () => {

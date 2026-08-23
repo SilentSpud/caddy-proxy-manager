@@ -106,8 +106,18 @@ export type L4ProxyHostMeta = {
   geoblock_mode?: L4GeoBlockMode;
 };
 
-const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = ["random", "round_robin", "least_conn", "ip_hash", "first"];
-const VALID_L4_UPSTREAM_DNS_FAMILIES: L4UpstreamDnsResolutionConfig["family"][] = ["ipv6", "ipv4", "both"];
+const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
+  "random",
+  "round_robin",
+  "least_conn",
+  "ip_hash",
+  "first",
+];
+const VALID_L4_UPSTREAM_DNS_FAMILIES: L4UpstreamDnsResolutionConfig["family"][] = [
+  "ipv6",
+  "ipv4",
+  "both",
+];
 
 export type L4ProxyHost = {
   id: number;
@@ -226,7 +236,9 @@ function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBala
   };
 }
 
-function dehydrateL4LoadBalancer(config: Partial<L4LoadBalancerConfig> | null): L4LoadBalancerMeta | undefined {
+function dehydrateL4LoadBalancer(
+  config: Partial<L4LoadBalancerConfig> | null,
+): L4LoadBalancerMeta | undefined {
   if (!config) return undefined;
 
   const meta: L4LoadBalancerMeta = {
@@ -269,7 +281,10 @@ function dehydrateL4LoadBalancer(config: Partial<L4LoadBalancerConfig> | null): 
     if (config.passiveHealthCheck.failDuration) {
       phc.fail_duration = config.passiveHealthCheck.failDuration;
     }
-    if (config.passiveHealthCheck.maxFails !== null && config.passiveHealthCheck.maxFails !== undefined) {
+    if (
+      config.passiveHealthCheck.maxFails !== null &&
+      config.passiveHealthCheck.maxFails !== undefined
+    ) {
       phc.max_fails = config.passiveHealthCheck.maxFails;
     }
     if (config.passiveHealthCheck.unhealthyLatency) {
@@ -304,7 +319,9 @@ function hydrateL4DnsResolver(meta: L4DnsResolverMeta | undefined): L4DnsResolve
   };
 }
 
-function dehydrateL4DnsResolver(config: Partial<L4DnsResolverConfig> | null): L4DnsResolverMeta | undefined {
+function dehydrateL4DnsResolver(
+  config: Partial<L4DnsResolverConfig> | null,
+): L4DnsResolverMeta | undefined {
   if (!config) return undefined;
 
   const meta: L4DnsResolverMeta = {
@@ -324,12 +341,15 @@ function dehydrateL4DnsResolver(config: Partial<L4DnsResolverConfig> | null): L4
   return meta;
 }
 
-function hydrateL4UpstreamDnsResolution(meta: L4UpstreamDnsResolutionMeta | undefined): L4UpstreamDnsResolutionConfig | null {
+function hydrateL4UpstreamDnsResolution(
+  meta: L4UpstreamDnsResolutionMeta | undefined,
+): L4UpstreamDnsResolutionConfig | null {
   if (!meta) return null;
 
   const enabled = meta.enabled === undefined ? null : Boolean(meta.enabled);
   const family =
-    meta.family && VALID_L4_UPSTREAM_DNS_FAMILIES.includes(meta.family as L4UpstreamDnsResolutionConfig["family"])
+    meta.family &&
+    VALID_L4_UPSTREAM_DNS_FAMILIES.includes(meta.family as L4UpstreamDnsResolutionConfig["family"])
       ? (meta.family as L4UpstreamDnsResolutionConfig["family"])
       : null;
 
@@ -340,7 +360,7 @@ function hydrateL4UpstreamDnsResolution(meta: L4UpstreamDnsResolutionMeta | unde
 }
 
 function dehydrateL4UpstreamDnsResolution(
-  config: Partial<L4UpstreamDnsResolutionConfig> | null
+  config: Partial<L4UpstreamDnsResolutionConfig> | null,
 ): L4UpstreamDnsResolutionMeta | undefined {
   if (!config) return undefined;
 
@@ -454,14 +474,14 @@ export async function countL4ProxyHosts(search?: string): Promise<number> {
     ? or(
         like(l4ProxyHosts.name, `%${search}%`),
         like(l4ProxyHosts.listenAddress, `%${search}%`),
-        like(l4ProxyHosts.upstreams, `%${search}%`)
+        like(l4ProxyHosts.upstreams, `%${search}%`),
       )
     : undefined;
   const [row] = await db.select({ value: count() }).from(l4ProxyHosts).where(where);
   return row?.value ?? 0;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
 const L4_SORT_COLUMNS: Record<string, any> = {
   name: l4ProxyHosts.name,
   protocol: l4ProxyHosts.protocol,
@@ -476,13 +496,13 @@ export async function listL4ProxyHostsPaginated(
   offset: number,
   search?: string,
   sortBy?: string,
-  sortDir?: "asc" | "desc"
+  sortDir?: "asc" | "desc",
 ): Promise<L4ProxyHost[]> {
   const where = search
     ? or(
         like(l4ProxyHosts.name, `%${search}%`),
         like(l4ProxyHosts.listenAddress, `%${search}%`),
-        like(l4ProxyHosts.upstreams, `%${search}%`)
+        like(l4ProxyHosts.upstreams, `%${search}%`),
       )
     : undefined;
   const col = (sortBy && L4_SORT_COLUMNS[sortBy]) || l4ProxyHosts.createdAt;
@@ -509,7 +529,9 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
       listenAddress: input.listenAddress.trim(),
       upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))),
       matcherType: input.matcherType ?? "none",
-      matcherValue: input.matcherValue ? JSON.stringify(input.matcherValue.map((v) => v.trim()).filter(Boolean)) : null,
+      matcherValue: input.matcherValue
+        ? JSON.stringify(input.matcherValue.map((v) => v.trim()).filter(Boolean))
+        : null,
       tlsTermination: input.tlsTermination ?? false,
       proxyProtocolVersion: input.proxyProtocolVersion ?? null,
       proxyProtocolReceive: input.proxyProtocolReceive ?? false,
@@ -518,9 +540,13 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
         const meta: L4ProxyHostMeta = { ...(input.meta ?? {}) };
         if (input.loadBalancer) meta.load_balancer = dehydrateL4LoadBalancer(input.loadBalancer);
         if (input.dnsResolver) meta.dns_resolver = dehydrateL4DnsResolver(input.dnsResolver);
-        if (input.upstreamDnsResolution) meta.upstream_dns_resolution = dehydrateL4UpstreamDnsResolution(input.upstreamDnsResolution);
+        if (input.upstreamDnsResolution)
+          meta.upstream_dns_resolution = dehydrateL4UpstreamDnsResolution(
+            input.upstreamDnsResolution,
+          );
         if (input.geoblock) meta.geoblock = input.geoblock;
-        if (input.geoblockMode && input.geoblockMode !== "merge") meta.geoblock_mode = input.geoblockMode;
+        if (input.geoblockMode && input.geoblockMode !== "merge")
+          meta.geoblock_mode = input.geoblockMode;
         return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null;
       })(),
       enabled: input.enabled ?? true,
@@ -553,7 +579,11 @@ export async function getL4ProxyHost(id: number): Promise<L4ProxyHost | null> {
   return host ? parseL4ProxyHost(host) : null;
 }
 
-export async function updateL4ProxyHost(id: number, input: Partial<L4ProxyHostInput>, actorUserId: number) {
+export async function updateL4ProxyHost(
+  id: number,
+  input: Partial<L4ProxyHostInput>,
+  actorUserId: number,
+) {
   const existing = await getL4ProxyHost(id);
   if (!existing) {
     throw new Error("L4 proxy host not found");
@@ -569,7 +599,10 @@ export async function updateL4ProxyHost(id: number, input: Partial<L4ProxyHostIn
   if (merged.tlsTermination && merged.protocol === "udp") {
     throw new Error("TLS termination is only supported with TCP protocol");
   }
-  if ((merged.matcherType === "tls_sni" || merged.matcherType === "http_host") && merged.matcherValue.length === 0) {
+  if (
+    (merged.matcherType === "tls_sni" || merged.matcherType === "http_host") &&
+    merged.matcherValue.length === 0
+  ) {
     throw new Error("Matcher value is required for TLS SNI and HTTP Host matchers");
   }
 
@@ -590,8 +623,12 @@ export async function updateL4ProxyHost(id: number, input: Partial<L4ProxyHostIn
         ? { matcherValue: JSON.stringify(input.matcherValue.map((v) => v.trim()).filter(Boolean)) }
         : {}),
       ...(input.tlsTermination !== undefined ? { tlsTermination: input.tlsTermination } : {}),
-      ...(input.proxyProtocolVersion !== undefined ? { proxyProtocolVersion: input.proxyProtocolVersion } : {}),
-      ...(input.proxyProtocolReceive !== undefined ? { proxyProtocolReceive: input.proxyProtocolReceive } : {}),
+      ...(input.proxyProtocolVersion !== undefined
+        ? { proxyProtocolVersion: input.proxyProtocolVersion }
+        : {}),
+      ...(input.proxyProtocolReceive !== undefined
+        ? { proxyProtocolReceive: input.proxyProtocolReceive }
+        : {}),
       ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
       ...(() => {
         const hasMetaChanges =
@@ -605,15 +642,26 @@ export async function updateL4ProxyHost(id: number, input: Partial<L4ProxyHostIn
 
         // Start from existing meta
         const existingMeta: L4ProxyHostMeta = {
-          ...(existing.loadBalancer ? { load_balancer: dehydrateL4LoadBalancer(existing.loadBalancer) } : {}),
-          ...(existing.dnsResolver ? { dns_resolver: dehydrateL4DnsResolver(existing.dnsResolver) } : {}),
-          ...(existing.upstreamDnsResolution ? { upstream_dns_resolution: dehydrateL4UpstreamDnsResolution(existing.upstreamDnsResolution) } : {}),
+          ...(existing.loadBalancer
+            ? { load_balancer: dehydrateL4LoadBalancer(existing.loadBalancer) }
+            : {}),
+          ...(existing.dnsResolver
+            ? { dns_resolver: dehydrateL4DnsResolver(existing.dnsResolver) }
+            : {}),
+          ...(existing.upstreamDnsResolution
+            ? {
+                upstream_dns_resolution: dehydrateL4UpstreamDnsResolution(
+                  existing.upstreamDnsResolution,
+                ),
+              }
+            : {}),
           ...(existing.geoblock ? { geoblock: existing.geoblock } : {}),
           ...(existing.geoblockMode !== "merge" ? { geoblock_mode: existing.geoblockMode } : {}),
         };
 
         // Apply direct meta override if provided
-        const meta: L4ProxyHostMeta = input.meta !== undefined ? { ...(input.meta ?? {}) } : { ...existingMeta };
+        const meta: L4ProxyHostMeta =
+          input.meta !== undefined ? { ...(input.meta ?? {}) } : { ...existingMeta };
 
         // Apply structured field overrides
         if (input.loadBalancer !== undefined) {

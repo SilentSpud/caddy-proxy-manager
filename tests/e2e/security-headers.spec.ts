@@ -10,7 +10,9 @@ import { test, expect } from '@playwright/test';
 const BASE_URL = 'http://localhost:3000';
 
 for (const path of ['/login', '/portal']) {
-  test(`public page ${path} cannot be framed (X-Frame-Options + CSP frame-ancestors)`, async ({ request }) => {
+  test(`public page ${path} cannot be framed (X-Frame-Options + CSP frame-ancestors)`, async ({
+    request,
+  }) => {
     const resp = await request.get(`${BASE_URL}${path}`, { maxRedirects: 0 });
     const headers = resp.headers();
 

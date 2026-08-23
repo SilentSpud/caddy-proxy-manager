@@ -44,10 +44,17 @@ test.describe('Settings — page load & layout', () => {
     await page.goto('/settings');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     const expectedItems = [
-      'Instance Sync', 'General', 'ACME Server',
-      'DNS Providers', 'DNS Resolvers', 'Upstream DNS Pinning',
-      'Global Geoblocking', 'Authentik Defaults', 'OAuth Providers',
-      'Metrics & Monitoring', 'Access Logging',
+      'Instance Sync',
+      'General',
+      'ACME Server',
+      'DNS Providers',
+      'DNS Resolvers',
+      'Upstream DNS Pinning',
+      'Global Geoblocking',
+      'Authentik Defaults',
+      'OAuth Providers',
+      'Metrics & Monitoring',
+      'Access Logging',
     ];
     for (const name of expectedItems) {
       await expect(sidebar.getByRole('button', { name, exact: true })).toBeVisible();
@@ -71,7 +78,10 @@ test.describe('Settings — sidebar navigation', () => {
     await expect(page.getByRole('heading', { name: 'Instance Sync' })).toBeVisible();
 
     // Navigate to General
-    await page.locator(SETTINGS_SIDEBAR).getByRole('button', { name: 'General', exact: true }).click();
+    await page
+      .locator(SETTINGS_SIDEBAR)
+      .getByRole('button', { name: 'General', exact: true })
+      .click();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
     // Instance Sync heading should no longer be visible
     await expect(page.getByRole('heading', { name: 'Instance Sync' })).not.toBeVisible();
@@ -85,7 +95,10 @@ test.describe('Settings — sidebar navigation', () => {
     await expect(breadcrumb.getByText('System')).toBeVisible();
 
     // Navigate to DNS Providers under Networking
-    await page.locator(SETTINGS_SIDEBAR).getByRole('button', { name: 'DNS Providers', exact: true }).click();
+    await page
+      .locator(SETTINGS_SIDEBAR)
+      .getByRole('button', { name: 'DNS Providers', exact: true })
+      .click();
     await expect(breadcrumb.getByText('Networking')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'DNS Providers' })).toBeVisible();
   });
@@ -95,10 +108,16 @@ test.describe('Settings — sidebar navigation', () => {
     const sidebar = page.locator(SETTINGS_SIDEBAR);
 
     const sections = [
-      'Instance Sync', 'General',
-      'DNS Providers', 'DNS Resolvers', 'Upstream DNS Pinning',
-      'Global Geoblocking', 'Authentik Defaults', 'OAuth Providers',
-      'Metrics & Monitoring', 'Access Logging',
+      'Instance Sync',
+      'General',
+      'DNS Providers',
+      'DNS Resolvers',
+      'Upstream DNS Pinning',
+      'Global Geoblocking',
+      'Authentik Defaults',
+      'OAuth Providers',
+      'Metrics & Monitoring',
+      'Access Logging',
     ];
 
     for (const name of sections) {
@@ -115,7 +134,10 @@ test.describe('Settings — sidebar navigation', () => {
     await expect(page.getByRole('button', { name: /save instance mode/i })).toBeVisible();
 
     // Switch to General
-    await page.locator(SETTINGS_SIDEBAR).getByRole('button', { name: 'General', exact: true }).click();
+    await page
+      .locator(SETTINGS_SIDEBAR)
+      .getByRole('button', { name: 'General', exact: true })
+      .click();
     await expect(page.getByRole('button', { name: /save general settings/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /save instance mode/i })).not.toBeVisible();
   });
@@ -227,7 +249,9 @@ test.describe('Settings — General', () => {
     const domainInput = page.locator('input[name="primaryDomain"]');
     await domainInput.fill('test.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByRole('button', { name: /save general settings/i })).toBeEnabled({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /save general settings/i })).toBeEnabled({
+      timeout: 10_000,
+    });
   });
 
   test('primary domain persists after save and page reload', async ({ page }) => {
@@ -320,11 +344,16 @@ test.describe('Settings — DNS Providers', () => {
     const providerSelect = selects.last();
     await providerSelect.click();
     // Select the first non-"Select" option
-    const firstProvider = page.getByRole('option').filter({ hasNot: page.locator('text=/select/i') }).first();
+    const firstProvider = page
+      .getByRole('option')
+      .filter({ hasNot: page.locator('text=/select/i') })
+      .first();
     await firstProvider.click();
     // Credential input fields should now appear
     // Most providers have at least one field (API token, etc.)
-    const formInputs = page.locator('form#dnsp-add-form input[type="text"], form#dnsp-add-form input[type="password"]');
+    const formInputs = page.locator(
+      'form#dnsp-add-form input[type="text"], form#dnsp-add-form input[type="password"]',
+    );
     await expect(formInputs.first()).toBeVisible({ timeout: 3000 });
   });
 });
@@ -380,8 +409,14 @@ test.describe('Settings — Authentik Defaults', () => {
 
   test('fields have appropriate placeholders', async ({ page }) => {
     await goToSection(page, 'Authentik Defaults');
-    await expect(page.locator('input[name="outpostDomain"]')).toHaveAttribute('placeholder', 'outpost.goauthentik.io');
-    await expect(page.locator('input[name="outpostUpstream"]')).toHaveAttribute('placeholder', 'http://authentik-server:9000');
+    await expect(page.locator('input[name="outpostDomain"]')).toHaveAttribute(
+      'placeholder',
+      'outpost.goauthentik.io',
+    );
+    await expect(page.locator('input[name="outpostUpstream"]')).toHaveAttribute(
+      'placeholder',
+      'http://authentik-server:9000',
+    );
   });
 });
 
@@ -513,7 +548,10 @@ test.describe('Settings — cross-section navigation', () => {
     await expect(page.getByRole('heading', { name: 'Access Logging' })).toBeVisible();
 
     // Then use sidebar to go to General
-    await page.locator(SETTINGS_SIDEBAR).getByRole('button', { name: 'General', exact: true }).click();
+    await page
+      .locator(SETTINGS_SIDEBAR)
+      .getByRole('button', { name: 'General', exact: true })
+      .click();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
   });
 });
@@ -647,7 +685,10 @@ test.describe('Settings — detail header', () => {
     await goToSection(page, 'General');
     await expect(page.getByText('Primary domain and ACME contact email')).toBeVisible();
 
-    await page.locator(SETTINGS_SIDEBAR).getByRole('button', { name: 'DNS Providers', exact: true }).click();
+    await page
+      .locator(SETTINGS_SIDEBAR)
+      .getByRole('button', { name: 'DNS Providers', exact: true })
+      .click();
     await expect(page.getByText('Provider credentials for ACME DNS-01')).toBeVisible();
   });
 

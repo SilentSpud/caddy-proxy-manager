@@ -16,7 +16,9 @@ function nowIso() {
 async function setSetting(key: string, value: unknown) {
   const payload = JSON.stringify(value);
   const now = nowIso();
-  await db.insert(settings).values({ key, value: payload, updatedAt: now })
+  await db
+    .insert(settings)
+    .values({ key, value: payload, updatedAt: now })
     .onConflictDoUpdate({ target: settings.key, set: { value: payload, updatedAt: now } });
 }
 

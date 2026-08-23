@@ -43,7 +43,12 @@ function decodeBase64(base64: string): ArrayBuffer {
 }
 
 function sanitizeFilenameSegment(value: string): string {
-  return value.trim().replace(/[^a-z0-9._-]+/gi, "_").replace(/^_+|_+$/g, "") || "client";
+  return (
+    value
+      .trim()
+      .replace(/[^a-z0-9._-]+/gi, "_")
+      .replace(/^_+|_+$/g, "") || "client"
+  );
 }
 
 function formatDateTime(value: string): string {
@@ -155,7 +160,7 @@ export function IssueClientCertDialog({
             onClick={() =>
               downloadFile(
                 `${issued.name}.p12`,
-                new Blob([decodeBase64(issued.pkcs12Base64)], { type: "application/x-pkcs12" })
+                new Blob([decodeBase64(issued.pkcs12Base64)], { type: "application/x-pkcs12" }),
               )
             }
           />
@@ -248,8 +253,10 @@ export function ManageIssuedClientCertsDialog({
         const result = await revokeIssuedClientCertificateAction(id);
         setItems((current) =>
           current.map((item) =>
-            item.id === id ? { ...item, revokedAt: result.revokedAt, updatedAt: result.revokedAt } : item
-          )
+            item.id === id
+              ? { ...item, revokedAt: result.revokedAt, updatedAt: result.revokedAt }
+              : item,
+          ),
         );
         router.refresh();
       } catch (e) {
@@ -267,7 +274,9 @@ export function ManageIssuedClientCertsDialog({
       onClose={onClose}
       title="Issued Client Certificates"
       maxWidth="md"
-      actions={<Button variant="secondary" label="Close" onClick={onClose} isDisabled={isPending} />}
+      actions={
+        <Button variant="secondary" label="Close" onClick={onClose} isDisabled={isPending} />
+      }
     >
       <VStack gap={4}>
         <Banner
@@ -275,7 +284,9 @@ export function ManageIssuedClientCertsDialog({
           title="Revoking removes trust"
           description={`Revoking a client certificate removes it from the trusted mTLS client certificate pool for hosts using ${cert.name}.`}
         />
-        {error && <Banner status="error" title="Could not revoke certificate" description={error} />}
+        {error && (
+          <Banner status="error" title="Could not revoke certificate" description={error} />
+        )}
         {revokedCount > 0 && (
           <Switch
             label={`Show revoked (${revokedCount})`}
@@ -398,7 +409,9 @@ export function DeleteCaCertDialog({
           Delete CA certificate <strong>{cert.name}</strong>? This cannot be undone. Proxy hosts
           using this CA for mTLS will stop requiring client certificates.
         </Text>
-        {error && <Banner status="error" title="Could not delete certificate" description={error} />}
+        {error && (
+          <Banner status="error" title="Could not delete certificate" description={error} />
+        )}
       </VStack>
     </AppDialog>
   );

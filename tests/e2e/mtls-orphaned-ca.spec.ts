@@ -30,7 +30,7 @@ test.describe('mTLS — deleted CA must not remain selectable', () => {
       data: { name: caName, certificatePem: FAKE_PEM, privateKeyPem: FAKE_KEY },
     });
     expect(caResp.ok()).toBeTruthy();
-    const ca = await caResp.json() as { id: number };
+    const ca = (await caResp.json()) as { id: number };
 
     // 2. Issue a client certificate from that CA.
     const certResp = await page.request.post(API_CLIENT_CERTS, {
@@ -39,14 +39,15 @@ test.describe('mTLS — deleted CA must not remain selectable', () => {
         caCertificateId: ca.id,
         commonName: certCommonName,
         serialNumber: 'ORPHAN01',
-        fingerprintSha256: 'AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99',
+        fingerprintSha256:
+          'AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99',
         certificatePem: FAKE_PEM,
         validFrom: '2026-01-01T00:00:00Z',
         validTo: '2030-01-01T00:00:00Z',
       },
     });
     expect(certResp.ok()).toBeTruthy();
-    const cert = await certResp.json() as { id: number };
+    const cert = (await certResp.json()) as { id: number };
 
     let caDeleted = false;
     try {
@@ -56,11 +57,16 @@ test.describe('mTLS — deleted CA must not remain selectable', () => {
       const dialog = page.getByRole('dialog');
       await expect(dialog.getByText(caName)).toBeVisible({ timeout: 10000 });
       await expect(dialog.getByText(certCommonName)).toBeVisible();
-      await dialog.getByRole('button', { name: /cancel|close/i }).first().click();
+      await dialog
+        .getByRole('button', { name: /cancel|close/i })
+        .first()
+        .click();
       await expect(dialog).not.toBeVisible({ timeout: 10000 });
 
       // 4. Delete the CA. This must cascade to its issued certificates.
-      const delResp = await page.request.delete(`${API_CA}/${ca.id}`, { headers: { Origin: origin } });
+      const delResp = await page.request.delete(`${API_CA}/${ca.id}`, {
+        headers: { Origin: origin },
+      });
       expect(delResp.ok()).toBeTruthy();
       caDeleted = true;
 

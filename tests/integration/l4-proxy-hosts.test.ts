@@ -15,21 +15,24 @@ function nowIso() {
 
 async function insertL4Host(overrides: Partial<typeof l4ProxyHosts.$inferInsert> = {}) {
   const now = nowIso();
-  const [host] = await db.insert(l4ProxyHosts).values({
-    name: 'Test L4 Host',
-    protocol: 'tcp',
-    listenAddress: ':5432',
-    upstreams: JSON.stringify(['10.0.0.1:5432']),
-    matcherType: 'none',
-    matcherValue: null,
-    tlsTermination: false,
-    proxyProtocolVersion: null,
-    proxyProtocolReceive: false,
-    enabled: true,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [host] = await db
+    .insert(l4ProxyHosts)
+    .values({
+      name: 'Test L4 Host',
+      protocol: 'tcp',
+      listenAddress: ':5432',
+      upstreams: JSON.stringify(['10.0.0.1:5432']),
+      matcherType: 'none',
+      matcherValue: null,
+      tlsTermination: false,
+      proxyProtocolVersion: null,
+      proxyProtocolReceive: false,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return host;
 }
 
@@ -297,7 +300,19 @@ describe('l4-proxy-hosts meta', () => {
       load_balancer: { enabled: true, policy: 'round_robin' },
       dns_resolver: { enabled: true, resolvers: ['1.1.1.1'] },
       upstream_dns_resolution: { enabled: true, family: 'ipv4' },
-      geoblock: { enabled: true, block_countries: ['CN'], block_continents: [], block_asns: [], block_cidrs: [], block_ips: [], allow_countries: [], allow_continents: [], allow_asns: [], allow_cidrs: [], allow_ips: [] },
+      geoblock: {
+        enabled: true,
+        block_countries: ['CN'],
+        block_continents: [],
+        block_asns: [],
+        block_cidrs: [],
+        block_ips: [],
+        allow_countries: [],
+        allow_continents: [],
+        allow_asns: [],
+        allow_cidrs: [],
+        allow_ips: [],
+      },
     };
     const host = await insertL4Host({ meta: JSON.stringify(meta) });
     const row = await db.query.l4ProxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
@@ -314,7 +329,10 @@ describe('l4-proxy-hosts meta', () => {
 describe('l4-proxy-hosts update', () => {
   it('updates listen address', async () => {
     const host = await insertL4Host({ listenAddress: ':5432' });
-    await db.update(l4ProxyHosts).set({ listenAddress: ':3306' }).where(eq(l4ProxyHosts.id, host.id));
+    await db
+      .update(l4ProxyHosts)
+      .set({ listenAddress: ':3306' })
+      .where(eq(l4ProxyHosts.id, host.id));
     const row = await db.query.l4ProxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
     expect(row!.listenAddress).toBe(':3306');
   });

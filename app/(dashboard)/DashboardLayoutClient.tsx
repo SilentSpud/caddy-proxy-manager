@@ -1,13 +1,25 @@
 "use client";
 
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
-  LayoutDashboard, ArrowLeftRight, Cable, KeyRound, ShieldCheck,
-  ShieldOff, BarChart2, History, Settings, LogOut, Sun, Moon,
-  FileJson2, Users, UserCog,
+  LayoutDashboard,
+  ArrowLeftRight,
+  Cable,
+  KeyRound,
+  ShieldCheck,
+  ShieldOff,
+  BarChart2,
+  History,
+  Settings,
+  LogOut,
+  Sun,
+  Moon,
+  FileJson2,
+  Users,
+  UserCog,
 } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
@@ -28,18 +40,18 @@ type User = {
 };
 
 const NAV_ITEMS = [
-  { href: "/",               label: "Overview",       icon: LayoutDashboard, adminOnly: false },
-  { href: "/proxy-hosts",    label: "Proxy Hosts",    icon: ArrowLeftRight,  adminOnly: true  },
-  { href: "/l4-proxy-hosts", label: "L4 Proxy Hosts", icon: Cable,           adminOnly: true  },
-  { href: "/access-lists",   label: "Access Lists",   icon: KeyRound,        adminOnly: true  },
-  { href: "/groups",         label: "Groups",         icon: Users,           adminOnly: true  },
-  { href: "/users",          label: "Users",          icon: UserCog,         adminOnly: true  },
-  { href: "/certificates",   label: "Certificates",   icon: ShieldCheck,     adminOnly: true  },
-  { href: "/waf",            label: "WAF",            icon: ShieldOff,       adminOnly: true  },
-  { href: "/analytics",      label: "Analytics",      icon: BarChart2,       adminOnly: true  },
-  { href: "/audit-log",      label: "Audit Log",      icon: History,         adminOnly: true  },
-  { href: "/api-docs",       label: "API Docs",       icon: FileJson2,       adminOnly: true  },
-  { href: "/settings",       label: "Settings",       icon: Settings,        adminOnly: true  },
+  { href: "/", label: "Overview", icon: LayoutDashboard, adminOnly: false },
+  { href: "/proxy-hosts", label: "Proxy Hosts", icon: ArrowLeftRight, adminOnly: true },
+  { href: "/l4-proxy-hosts", label: "L4 Proxy Hosts", icon: Cable, adminOnly: true },
+  { href: "/access-lists", label: "Access Lists", icon: KeyRound, adminOnly: true },
+  { href: "/groups", label: "Groups", icon: Users, adminOnly: true },
+  { href: "/users", label: "Users", icon: UserCog, adminOnly: true },
+  { href: "/certificates", label: "Certificates", icon: ShieldCheck, adminOnly: true },
+  { href: "/waf", label: "WAF", icon: ShieldOff, adminOnly: true },
+  { href: "/analytics", label: "Analytics", icon: BarChart2, adminOnly: true },
+  { href: "/audit-log", label: "Audit Log", icon: History, adminOnly: true },
+  { href: "/api-docs", label: "API Docs", icon: FileJson2, adminOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ] as const;
 
 function ThemeToggle() {
@@ -126,7 +138,15 @@ export default function DashboardLayoutClient({
             <SideNavHeading
               heading={appName}
               headingHref="/"
-              icon={<NavIcon icon={<Text type="body" size="xsm" weight="bold">C</Text>} />}
+              icon={
+                <NavIcon
+                  icon={
+                    <Text type="body" size="xsm" weight="bold">
+                      C
+                    </Text>
+                  }
+                />
+              }
             />
           }
           footer={<UserFooter user={user} avatar={avatar} />}

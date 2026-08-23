@@ -36,8 +36,10 @@ const ROLL_FIELDS = {
 };
 
 function loggingLogs(doc: unknown): Record<string, { writer?: Record<string, unknown> }> {
-  return (doc as { logging?: { logs?: Record<string, { writer?: Record<string, unknown> }> } })
-    ?.logging?.logs ?? {};
+  return (
+    (doc as { logging?: { logs?: Record<string, { writer?: Record<string, unknown> }> } })?.logging
+      ?.logs ?? {}
+  );
 }
 
 describe('Caddy log writer rotation settings', () => {

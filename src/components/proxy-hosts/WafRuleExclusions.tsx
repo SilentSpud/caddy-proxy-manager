@@ -62,7 +62,13 @@ export function WafRuleExclusions({ value }: Props) {
           width={160}
           onEnter={addId}
         />
-        <IconButton variant="ghost" size="sm" label="Add excluded rule ID" icon={<Plus />} onClick={addId} />
+        <IconButton
+          variant="ghost"
+          size="sm"
+          label="Add excluded rule ID"
+          icon={<Plus />}
+          onClick={addId}
+        />
       </HStack>
     </VStack>
   );

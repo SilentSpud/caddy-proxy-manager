@@ -47,20 +47,16 @@ export async function createRedirectIntent(redirectUri: string): Promise<string>
     redirectUri,
     expiresAt,
     consumed: false,
-    createdAt: now
+    createdAt: now,
   });
 
   // Opportunistic cleanup of expired intents
-  await db
-    .delete(forwardAuthRedirectIntents)
-    .where(lt(forwardAuthRedirectIntents.expiresAt, now));
+  await db.delete(forwardAuthRedirectIntents).where(lt(forwardAuthRedirectIntents.expiresAt, now));
 
   return rid;
 }
 
-export async function consumeRedirectIntent(
-  rid: string
-): Promise<string | null> {
+export async function consumeRedirectIntent(rid: string): Promise<string | null> {
   const ridHash = hashToken(rid);
   const now = nowIso();
 
@@ -72,8 +68,8 @@ export async function consumeRedirectIntent(
       and(
         eq(forwardAuthRedirectIntents.ridHash, ridHash),
         eq(forwardAuthRedirectIntents.consumed, false),
-        gt(forwardAuthRedirectIntents.expiresAt, now)
-      )
+        gt(forwardAuthRedirectIntents.expiresAt, now),
+      ),
     )
     .returning();
 
@@ -100,7 +96,7 @@ export type ForwardAuthSession = {
 
 export async function createForwardAuthSession(
   userId: number,
-  ttlSeconds?: number
+  ttlSeconds?: number,
 ): Promise<{ rawToken: string; session: ForwardAuthSession }> {
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = hashToken(rawToken);
@@ -121,17 +117,17 @@ export async function createForwardAuthSession(
       id: row.id,
       userId: row.userId,
       expiresAt: toIso(row.expiresAt)!,
-      createdAt: toIso(row.createdAt)!
-    }
+      createdAt: toIso(row.createdAt)!,
+    },
   };
 }
 
 export async function validateForwardAuthSession(
-  rawToken: string
+  rawToken: string,
 ): Promise<{ sessionId: number; userId: number } | null> {
   const tokenHash = hashToken(rawToken);
   const session = await db.query.forwardAuthSessions.findFirst({
-    where: (table, operators) => operators.eq(table.tokenHash, tokenHash)
+    where: (table, operators) => operators.eq(table.tokenHash, tokenHash),
   });
 
   if (!session) return null;
@@ -142,13 +138,13 @@ export async function validateForwardAuthSession(
 
 export async function listForwardAuthSessions(): Promise<ForwardAuthSession[]> {
   const rows = await db.query.forwardAuthSessions.findMany({
-    where: (table, operators) => operators.gt(table.expiresAt, nowIso())
+    where: (table, operators) => operators.gt(table.expiresAt, nowIso()),
   });
   return rows.map((r) => ({
     id: r.id,
     userId: r.userId,
     expiresAt: toIso(r.expiresAt)!,
-    createdAt: toIso(r.createdAt)!
+    createdAt: toIso(r.createdAt)!,
   }));
 }
 
@@ -157,16 +153,14 @@ export async function deleteForwardAuthSession(id: number): Promise<void> {
 }
 
 export async function deleteUserForwardAuthSessions(userId: number): Promise<void> {
-  await db
-    .delete(forwardAuthSessions)
-    .where(eq(forwardAuthSessions.userId, userId));
+  await db.delete(forwardAuthSessions).where(eq(forwardAuthSessions.userId, userId));
 }
 
 // ── Exchange Codes ───────────────────────────────────────────────────
 
 export async function createExchangeCode(
   sessionId: number,
-  redirectUri: string
+  redirectUri: string,
 ): Promise<{ rawCode: string }> {
   const rawCode = randomBytes(32).toString("hex");
   const codeHash = hashToken(rawCode);
@@ -180,14 +174,14 @@ export async function createExchangeCode(
     redirectUri,
     expiresAt,
     used: false,
-    createdAt: now
+    createdAt: now,
   });
 
   return { rawCode };
 }
 
 export async function redeemExchangeCode(
-  rawCode: string
+  rawCode: string,
 ): Promise<{ sessionId: number; redirectUri: string; rawSessionToken: string } | null> {
   const codeHash = hashToken(rawCode);
   const now = nowIso();
@@ -200,8 +194,8 @@ export async function redeemExchangeCode(
       and(
         eq(forwardAuthExchanges.codeHash, codeHash),
         eq(forwardAuthExchanges.used, false),
-        gt(forwardAuthExchanges.expiresAt, now)
-      )
+        gt(forwardAuthExchanges.expiresAt, now),
+      ),
     )
     .returning();
 
@@ -218,14 +212,12 @@ export async function redeemExchangeCode(
     .where(eq(forwardAuthSessions.id, exchange.sessionId));
 
   // Delete the redeemed exchange immediately
-  await db
-    .delete(forwardAuthExchanges)
-    .where(eq(forwardAuthExchanges.id, exchange.id));
+  await db.delete(forwardAuthExchanges).where(eq(forwardAuthExchanges.id, exchange.id));
 
   return {
     sessionId: exchange.sessionId,
     redirectUri: exchange.redirectUri,
-    rawSessionToken: rawToken
+    rawSessionToken: rawToken,
   };
 }
 
@@ -239,12 +231,9 @@ export type ForwardAuthAccessEntry = {
   createdAt: string;
 };
 
-export async function checkHostAccess(
-  userId: number,
-  proxyHostId: number
-): Promise<boolean> {
+export async function checkHostAccess(userId: number, proxyHostId: number): Promise<boolean> {
   const user = await db.query.users.findFirst({
-    where: (table, operators) => operators.eq(table.id, userId)
+    where: (table, operators) => operators.eq(table.id, userId),
   });
   if (!user) return false;
 
@@ -253,8 +242,8 @@ export async function checkHostAccess(
     where: (table, operators) =>
       operators.and(
         operators.eq(table.proxyHostId, proxyHostId),
-        operators.eq(table.userId, userId)
-      )
+        operators.eq(table.userId, userId),
+      ),
   });
   if (directAccess) return true;
 
@@ -269,10 +258,7 @@ export async function checkHostAccess(
   const groupIds = userGroupIds.map((r) => r.groupId);
   const groupAccess = await db.query.forwardAuthAccess.findFirst({
     where: (table, operators) =>
-      operators.and(
-        operators.eq(table.proxyHostId, proxyHostId),
-        inArray(table.groupId, groupIds)
-      )
+      operators.and(operators.eq(table.proxyHostId, proxyHostId), inArray(table.groupId, groupIds)),
   });
 
   return !!groupAccess;
@@ -280,11 +266,11 @@ export async function checkHostAccess(
 
 export async function checkHostAccessByDomain(
   userId: number,
-  host: string
+  host: string,
 ): Promise<{ hasAccess: boolean; proxyHostId: number | null }> {
   // Find proxy host(s) that contain this domain
   const allHosts = await db.query.proxyHosts.findMany({
-    where: (table, operators) => operators.eq(table.enabled, true)
+    where: (table, operators) => operators.eq(table.enabled, true),
   });
 
   // Exact-match hosts take precedence over wildcard-covered ones, mirroring
@@ -316,7 +302,7 @@ export async function checkHostAccessByDomain(
 }
 
 export async function getForwardAuthAccessForHost(
-  proxyHostId: number
+  proxyHostId: number,
 ): Promise<ForwardAuthAccessEntry[]> {
   const rows = await db
     .select()
@@ -328,19 +314,17 @@ export async function getForwardAuthAccessForHost(
     proxyHostId: r.proxyHostId,
     userId: r.userId,
     groupId: r.groupId,
-    createdAt: toIso(r.createdAt)!
+    createdAt: toIso(r.createdAt)!,
   }));
 }
 
 export async function setForwardAuthAccess(
   proxyHostId: number,
   access: { userIds?: number[]; groupIds?: number[] },
-  actorUserId: number
+  actorUserId: number,
 ): Promise<ForwardAuthAccessEntry[]> {
   // Delete existing access for this host
-  await db
-    .delete(forwardAuthAccess)
-    .where(eq(forwardAuthAccess.proxyHostId, proxyHostId));
+  await db.delete(forwardAuthAccess).where(eq(forwardAuthAccess.proxyHostId, proxyHostId));
 
   const now = nowIso();
   const values: Array<{
@@ -366,7 +350,7 @@ export async function setForwardAuthAccess(
     action: "update",
     entityType: "forward_auth_access",
     entityId: proxyHostId,
-    summary: `Updated forward auth access for proxy host ${proxyHostId}`
+    summary: `Updated forward auth access for proxy host ${proxyHostId}`,
   });
 
   return getForwardAuthAccessForHost(proxyHostId);
@@ -387,7 +371,7 @@ function hasForwardAuthEnabled(ph: { meta: string | null }): boolean {
 
 export async function isForwardAuthDomain(host: string): Promise<boolean> {
   const allHosts = await db.query.proxyHosts.findMany({
-    where: (table, operators) => operators.eq(table.enabled, true)
+    where: (table, operators) => operators.eq(table.enabled, true),
   });
 
   // Exact-match hosts take precedence over wildcard-covered ones: if an
@@ -427,9 +411,7 @@ export async function cleanupExpiredSessions(): Promise<number> {
   const now = nowIso();
 
   // Delete expired exchanges first (FK constraint)
-  await db
-    .delete(forwardAuthExchanges)
-    .where(lt(forwardAuthExchanges.expiresAt, now));
+  await db.delete(forwardAuthExchanges).where(lt(forwardAuthExchanges.expiresAt, now));
 
   // Delete expired sessions
   const result = await db

@@ -103,74 +103,94 @@ describe('getRequiredL4Ports', () => {
   });
 
   it('returns TCP port for enabled host', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5432',
-      protocol: 'tcp',
-      enabled: true,
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5432',
+        protocol: 'tcp',
+        enabled: true,
+      }),
+    );
     const ports = await getRequiredL4Ports();
     expect(ports).toEqual(['5432:5432']);
   });
 
   it('returns UDP port with /udp suffix', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5353',
-      protocol: 'udp',
-      enabled: true,
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5353',
+        protocol: 'udp',
+        enabled: true,
+      }),
+    );
     const ports = await getRequiredL4Ports();
     expect(ports).toEqual(['5353:5353/udp']);
   });
 
   it('excludes disabled hosts', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'Enabled',
-      listenAddress: ':5432',
-      enabled: true,
-    }));
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'Disabled',
-      listenAddress: ':3306',
-      enabled: false,
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'Enabled',
+        listenAddress: ':5432',
+        enabled: true,
+      }),
+    );
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'Disabled',
+        listenAddress: ':3306',
+        enabled: false,
+      }),
+    );
     const ports = await getRequiredL4Ports();
     expect(ports).toEqual(['5432:5432']);
   });
 
   it('deduplicates ports from multiple hosts on same address', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'Host 1',
-      listenAddress: ':5432',
-    }));
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'Host 2',
-      listenAddress: ':5432',
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'Host 1',
+        listenAddress: ':5432',
+      }),
+    );
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'Host 2',
+        listenAddress: ':5432',
+      }),
+    );
     const ports = await getRequiredL4Ports();
     expect(ports).toEqual(['5432:5432']);
   });
 
   it('handles HOST:PORT format', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: '0.0.0.0:5432',
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: '0.0.0.0:5432',
+      }),
+    );
     const ports = await getRequiredL4Ports();
     expect(ports).toEqual(['5432:5432']);
   });
 
   it('returns multiple ports sorted', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'Redis',
-      listenAddress: ':6379',
-    }));
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'PG',
-      listenAddress: ':5432',
-    }));
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'MySQL',
-      listenAddress: ':3306',
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'Redis',
+        listenAddress: ':6379',
+      }),
+    );
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'PG',
+        listenAddress: ':5432',
+      }),
+    );
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'MySQL',
+        listenAddress: ':3306',
+      }),
+    );
     const ports = await getRequiredL4Ports();
     expect(ports).toEqual(['3306:3306', '5432:5432', '6379:6379']);
   });
@@ -187,19 +207,25 @@ describe('getAppliedL4Ports', () => {
   });
 
   it('parses ports from override file', () => {
-    writeFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), `services:
+    writeFileSync(
+      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
+      `services:
   caddy:
     ports:
       - "5432:5432"
       - "3306:3306"
-`);
+`,
+    );
     const ports = getAppliedL4Ports();
     expect(ports).toEqual(['3306:3306', '5432:5432']);
   });
 
   it('handles empty override file', () => {
-    writeFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), `services: {}
-`);
+    writeFileSync(
+      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
+      `services: {}
+`,
+    );
     const ports = getAppliedL4Ports();
     expect(ports).toEqual([]);
   });
@@ -218,9 +244,11 @@ describe('getL4PortsDiff', () => {
   });
 
   it('needsApply is true when host exists but no override', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5432',
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5432',
+      }),
+    );
     const diff = await getL4PortsDiff();
     expect(diff.needsApply).toBe(true);
     expect(diff.requiredPorts).toEqual(['5432:5432']);
@@ -228,27 +256,37 @@ describe('getL4PortsDiff', () => {
   });
 
   it('needsApply is false when override matches', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5432',
-    }));
-    writeFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), `services:
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5432',
+      }),
+    );
+    writeFileSync(
+      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
+      `services:
   caddy:
     ports:
       - "5432:5432"
-`);
+`,
+    );
     const diff = await getL4PortsDiff();
     expect(diff.needsApply).toBe(false);
   });
 
   it('needsApply is true when override has different ports', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5432',
-    }));
-    writeFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), `services:
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5432',
+      }),
+    );
+    writeFileSync(
+      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
+      `services:
   caddy:
     ports:
       - "3306:3306"
-`);
+`,
+    );
     const diff = await getL4PortsDiff();
     expect(diff.needsApply).toBe(true);
   });
@@ -260,14 +298,18 @@ describe('getL4PortsDiff', () => {
 
 describe('applyL4Ports', () => {
   it('writes override file with required ports', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5432',
-    }));
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      name: 'DNS',
-      listenAddress: ':5353',
-      protocol: 'udp',
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5432',
+      }),
+    );
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        name: 'DNS',
+        listenAddress: ':5353',
+        protocol: 'udp',
+      }),
+    );
 
     const status = await applyL4Ports();
     expect(status.state).toBe('pending');
@@ -278,9 +320,11 @@ describe('applyL4Ports', () => {
   });
 
   it('writes trigger file', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5432',
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5432',
+      }),
+    );
 
     await applyL4Ports();
     const triggerPath = join(ctx.tmpDir, 'l4-ports.trigger');
@@ -300,9 +344,11 @@ describe('applyL4Ports', () => {
   });
 
   it('override file is idempotent — same ports produce same content', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({
-      listenAddress: ':5432',
-    }));
+    await ctx.db.insert(schema.l4ProxyHosts).values(
+      makeL4Host({
+        listenAddress: ':5432',
+      }),
+    );
 
     await applyL4Ports();
     const content1 = readFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), 'utf-8');
@@ -328,30 +374,39 @@ describe('getL4PortsStatus', () => {
     // Trigger files are deleted by the sidecar after processing.
     // A leftover trigger file must NEVER cause "Waiting for port manager sidecar..."
     // because that message gets permanently stuck if the sidecar is slow or restarting.
-    writeFileSync(join(ctx.tmpDir, 'l4-ports.trigger'), JSON.stringify({
-      triggeredAt: new Date().toISOString(),
-    }));
+    writeFileSync(
+      join(ctx.tmpDir, 'l4-ports.trigger'),
+      JSON.stringify({
+        triggeredAt: new Date().toISOString(),
+      }),
+    );
     const status = getL4PortsStatus();
     expect(status.state).toBe('idle');
   });
 
   it('returns applied when status file says applied', () => {
-    writeFileSync(join(ctx.tmpDir, 'l4-ports.status'), JSON.stringify({
-      state: 'applied',
-      message: 'Success',
-      appliedAt: new Date().toISOString(),
-    }));
+    writeFileSync(
+      join(ctx.tmpDir, 'l4-ports.status'),
+      JSON.stringify({
+        state: 'applied',
+        message: 'Success',
+        appliedAt: new Date().toISOString(),
+      }),
+    );
     const status = getL4PortsStatus();
     expect(status.state).toBe('applied');
   });
 
   it('returns failed when status file says failed', () => {
-    writeFileSync(join(ctx.tmpDir, 'l4-ports.status'), JSON.stringify({
-      state: 'failed',
-      message: 'Failed',
-      error: 'Container failed',
-      appliedAt: new Date().toISOString(),
-    }));
+    writeFileSync(
+      join(ctx.tmpDir, 'l4-ports.status'),
+      JSON.stringify({
+        state: 'failed',
+        message: 'Failed',
+        error: 'Container failed',
+        appliedAt: new Date().toISOString(),
+      }),
+    );
     const status = getL4PortsStatus();
     expect(status.state).toBe('failed');
     expect(status.error).toBe('Container failed');
@@ -360,14 +415,20 @@ describe('getL4PortsStatus', () => {
   it('returns status from file regardless of trigger file presence', () => {
     // The sidecar deletes triggers after processing, so the status file is
     // the single source of truth — trigger file presence is irrelevant here.
-    writeFileSync(join(ctx.tmpDir, 'l4-ports.trigger'), JSON.stringify({
-      triggeredAt: '2026-03-21T12:00:00Z',
-    }));
-    writeFileSync(join(ctx.tmpDir, 'l4-ports.status'), JSON.stringify({
-      state: 'applied',
-      message: 'Done',
-      appliedAt: '2026-01-01T00:00:00Z',
-    }));
+    writeFileSync(
+      join(ctx.tmpDir, 'l4-ports.trigger'),
+      JSON.stringify({
+        triggeredAt: '2026-03-21T12:00:00Z',
+      }),
+    );
+    writeFileSync(
+      join(ctx.tmpDir, 'l4-ports.status'),
+      JSON.stringify({
+        state: 'applied',
+        message: 'Done',
+        appliedAt: '2026-01-01T00:00:00Z',
+      }),
+    );
     const status = getL4PortsStatus();
     expect(status.state).toBe('applied');
   });

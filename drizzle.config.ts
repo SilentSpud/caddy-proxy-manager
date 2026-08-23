@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./src/lib/db/schema.ts",
   dialect: "sqlite",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "file:./data/caddy-proxy-manager.db"
-  }
+    url: process.env.DATABASE_URL ?? "file:./data/caddy-proxy-manager.db",
+  },
 });

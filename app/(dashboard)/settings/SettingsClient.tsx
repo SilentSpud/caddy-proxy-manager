@@ -2,9 +2,21 @@
 
 import { useState, useActionState, useEffect, type ReactNode } from "react";
 import {
-  Cloud, Globe, Network, Pin, Activity,
-  ScrollText, Settings2, UserCheck, MapPin, KeyRound,
-  Search, FileWarning, ShieldCheck, Waypoints, UserCircle,
+  Cloud,
+  Globe,
+  Network,
+  Pin,
+  Activity,
+  ScrollText,
+  Settings2,
+  UserCheck,
+  MapPin,
+  KeyRound,
+  Search,
+  FileWarning,
+  ShieldCheck,
+  Waypoints,
+  UserCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -93,29 +105,84 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "system",
     label: "System",
     items: [
-      { id: "sync", name: "Instance Sync", desc: "Standalone, master, or slave coordination", icon: Network },
-      { id: "general", name: "General", desc: "Primary domain and ACME contact email", icon: Settings2 },
-      { id: "acme", name: "ACME Server", desc: "Custom ACME directory URL for internal CAs", icon: ShieldCheck },
-      { id: "avatars", name: "User Avatars", desc: "Gravatar fallback for users without an icon", icon: UserCircle },
+      {
+        id: "sync",
+        name: "Instance Sync",
+        desc: "Standalone, master, or slave coordination",
+        icon: Network,
+      },
+      {
+        id: "general",
+        name: "General",
+        desc: "Primary domain and ACME contact email",
+        icon: Settings2,
+      },
+      {
+        id: "acme",
+        name: "ACME Server",
+        desc: "Custom ACME directory URL for internal CAs",
+        icon: ShieldCheck,
+      },
+      {
+        id: "avatars",
+        name: "User Avatars",
+        desc: "Gravatar fallback for users without an icon",
+        icon: UserCircle,
+      },
     ],
   },
   {
     id: "networking",
     label: "Networking",
     items: [
-      { id: "dns-providers", name: "DNS Providers", desc: "Provider credentials for ACME DNS-01", icon: Cloud },
-      { id: "dns-resolvers", name: "DNS Resolvers", desc: "Custom resolvers for challenge verification", icon: Globe },
-      { id: "upstream-dns", name: "Upstream DNS Pinning", desc: "Pin upstream IPs at config-apply time", icon: Pin },
-      { id: "trusted-proxies", name: "Trusted Proxies", desc: "Resolve real client IP behind an upstream proxy", icon: Waypoints },
+      {
+        id: "dns-providers",
+        name: "DNS Providers",
+        desc: "Provider credentials for ACME DNS-01",
+        icon: Cloud,
+      },
+      {
+        id: "dns-resolvers",
+        name: "DNS Resolvers",
+        desc: "Custom resolvers for challenge verification",
+        icon: Globe,
+      },
+      {
+        id: "upstream-dns",
+        name: "Upstream DNS Pinning",
+        desc: "Pin upstream IPs at config-apply time",
+        icon: Pin,
+      },
+      {
+        id: "trusted-proxies",
+        name: "Trusted Proxies",
+        desc: "Resolve real client IP behind an upstream proxy",
+        icon: Waypoints,
+      },
     ],
   },
   {
     id: "security",
     label: "Security",
     items: [
-      { id: "geoblock", name: "Global Geoblocking", desc: "Default geoblock rules across all hosts", icon: MapPin },
-      { id: "error-pages", name: "Error Pages", desc: "Global custom error responses (fallback for all hosts)", icon: FileWarning },
-      { id: "authentik", name: "Authentik Defaults", desc: "Forward-auth defaults for new proxy hosts", icon: UserCheck },
+      {
+        id: "geoblock",
+        name: "Global Geoblocking",
+        desc: "Default geoblock rules across all hosts",
+        icon: MapPin,
+      },
+      {
+        id: "error-pages",
+        name: "Error Pages",
+        desc: "Global custom error responses (fallback for all hosts)",
+        icon: FileWarning,
+      },
+      {
+        id: "authentik",
+        name: "Authentik Defaults",
+        desc: "Forward-auth defaults for new proxy hosts",
+        icon: UserCheck,
+      },
       { id: "oauth", name: "OAuth Providers", desc: "OAuth/OIDC SSO providers", icon: KeyRound },
     ],
   },
@@ -123,14 +190,24 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "observability",
     label: "Observability",
     items: [
-      { id: "metrics", name: "Metrics & Monitoring", desc: "Prometheus metrics endpoint", icon: Activity },
-      { id: "logging", name: "Access Logging", desc: "HTTP access log for proxied requests", icon: ScrollText },
+      {
+        id: "metrics",
+        name: "Metrics & Monitoring",
+        desc: "Prometheus metrics endpoint",
+        icon: Activity,
+      },
+      {
+        id: "logging",
+        name: "Access Logging",
+        desc: "HTTP access log for proxied requests",
+        icon: ScrollText,
+      },
     ],
   },
 ];
 
 const ALL_ITEMS = SETTINGS_GROUPS.flatMap((g) =>
-  g.items.map((i) => ({ ...i, groupId: g.id, groupLabel: g.label }))
+  g.items.map((i) => ({ ...i, groupId: g.id, groupLabel: g.label })),
 );
 
 function findItem(id: string) {
@@ -475,7 +552,10 @@ export default function SettingsClient({
   // Form action states
   const [generalState, generalFormAction] = useActionState(updateGeneralSettingsAction, null);
   const [acmeState, acmeFormAction] = useActionState(updateAcmeSettingsAction, null);
-  const [dnsProviderState, dnsProviderFormAction] = useActionState(updateDnsProviderSettingsAction, null);
+  const [dnsProviderState, dnsProviderFormAction] = useActionState(
+    updateDnsProviderSettingsAction,
+    null,
+  );
   const [selectedProvider, setSelectedProvider] = useState("none");
   const configuredProviders = dnsProvider?.providers ? Object.keys(dnsProvider.providers) : [];
   const [authentikState, authentikFormAction] = useActionState(updateAuthentikSettingsAction, null);
@@ -484,30 +564,50 @@ export default function SettingsClient({
   const [loggingState, loggingFormAction] = useActionState(updateLoggingSettingsAction, null);
   const [dnsState, dnsFormAction] = useActionState(updateDnsSettingsAction, null);
   const [upstreamDnsResolutionState, upstreamDnsResolutionFormAction] = useActionState(
-    updateUpstreamDnsResolutionSettingsAction, null
+    updateUpstreamDnsResolutionSettingsAction,
+    null,
   );
-  const [instanceModeState, instanceModeFormAction] = useActionState(updateInstanceModeAction, null);
-  const [slaveTokenState, slaveTokenFormAction] = useActionState(updateSlaveMasterTokenAction, null);
-  const [slaveInstanceState, slaveInstanceFormAction] = useActionState(createSlaveInstanceAction, null);
+  const [instanceModeState, instanceModeFormAction] = useActionState(
+    updateInstanceModeAction,
+    null,
+  );
+  const [slaveTokenState, slaveTokenFormAction] = useActionState(
+    updateSlaveMasterTokenAction,
+    null,
+  );
+  const [slaveInstanceState, slaveInstanceFormAction] = useActionState(
+    createSlaveInstanceAction,
+    null,
+  );
   const [syncState, syncFormAction] = useActionState(syncSlaveInstancesAction, null);
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
-  const [errorPagesState, errorPagesFormAction] = useActionState(updateErrorPagesSettingsAction, null);
-  const [trustedProxiesState, trustedProxiesFormAction] = useActionState(updateTrustedProxiesSettingsAction, null);
+  const [errorPagesState, errorPagesFormAction] = useActionState(
+    updateErrorPagesSettingsAction,
+    null,
+  );
+  const [trustedProxiesState, trustedProxiesFormAction] = useActionState(
+    updateTrustedProxiesSettingsAction,
+    null,
+  );
 
   const isSlave = instanceSync.mode === "slave";
   const isMaster = instanceSync.mode === "master";
   const [generalOverride, setGeneralOverride] = useState(instanceSync.overrides.general);
   const [acmeOverride, setAcmeOverride] = useState(instanceSync.overrides.acme);
-  const [dnsProviderOverride, setDnsProviderOverride] = useState(instanceSync.overrides.dnsProvider);
+  const [dnsProviderOverride, setDnsProviderOverride] = useState(
+    instanceSync.overrides.dnsProvider,
+  );
   const [authentikOverride, setAuthentikOverride] = useState(instanceSync.overrides.authentik);
   const [metricsOverride, setMetricsOverride] = useState(instanceSync.overrides.metrics);
   const [avatarsOverride, setAvatarsOverride] = useState(instanceSync.overrides.avatars);
   const [loggingOverride, setLoggingOverride] = useState(instanceSync.overrides.logging);
   const [dnsOverride, setDnsOverride] = useState(instanceSync.overrides.dns);
   const [upstreamDnsResolutionOverride, setUpstreamDnsResolutionOverride] = useState(
-    instanceSync.overrides.upstreamDnsResolution
+    instanceSync.overrides.upstreamDnsResolution,
   );
-  const [trustedProxiesOverride, setTrustedProxiesOverride] = useState(instanceSync.overrides.trustedProxies);
+  const [trustedProxiesOverride, setTrustedProxiesOverride] = useState(
+    instanceSync.overrides.trustedProxies,
+  );
 
   return (
     <>
@@ -736,7 +836,10 @@ function SyncSection({
               </InfoAlert>
             )}
             {instanceModeState?.message && (
-              <StatusAlert message={instanceModeState.message} success={instanceModeState.success} />
+              <StatusAlert
+                message={instanceModeState.message}
+                success={instanceModeState.success}
+              />
             )}
             <Selector
               label="Instance mode"
@@ -763,7 +866,10 @@ function SyncSection({
                   </InfoAlert>
                 )}
                 {slaveTokenState?.message && (
-                  <StatusAlert message={slaveTokenState.message} success={slaveTokenState.success} />
+                  <StatusAlert
+                    message={slaveTokenState.message}
+                    success={slaveTokenState.success}
+                  />
                 )}
                 {instanceSync.slave?.hasToken && !instanceSync.tokenFromEnv && (
                   <InfoAlert title="A master sync token is configured">
@@ -815,12 +921,17 @@ function SyncSection({
       )}
 
       {isMaster && (
-        <FormCard title={`Slave Instances (${(instanceSync.master?.instances.length ?? 0) + (instanceSync.master?.envInstances.length ?? 0)})`}>
+        <FormCard
+          title={`Slave Instances (${(instanceSync.master?.instances.length ?? 0) + (instanceSync.master?.envInstances.length ?? 0)})`}
+        >
           <VStack gap={3}>
             <form action={slaveInstanceFormAction}>
               <VStack gap={3}>
                 {slaveInstanceState?.message && (
-                  <StatusAlert message={slaveInstanceState.message} success={slaveInstanceState.success} />
+                  <StatusAlert
+                    message={slaveInstanceState.message}
+                    success={slaveInstanceState.success}
+                  />
                 )}
                 <Grid columns={{ minWidth: 220, max: 2 }} gap={3}>
                   <TextInput
@@ -865,17 +976,18 @@ function SyncSection({
               </VStack>
             </form>
 
-            {instanceSync.master?.instances.length === 0 && instanceSync.master?.envInstances.length === 0 && (
-              <InfoAlert title="No slave instances configured yet." />
-            )}
+            {instanceSync.master?.instances.length === 0 &&
+              instanceSync.master?.envInstances.length === 0 && (
+                <InfoAlert title="No slave instances configured yet." />
+              )}
 
             {instanceSync.master?.envInstances && instanceSync.master.envInstances.length > 0 && (
               <VStack gap={2}>
                 <Text type="label" size="xsm" weight="semibold" color="secondary">
                   Environment-configured (INSTANCE_SLAVES)
                 </Text>
-                {instanceSync.master.envInstances.map((instance, index) => (
-                  <Card key={`env-${index}`} variant="muted" padding={3}>
+                {instanceSync.master.envInstances.map((instance) => (
+                  <Card key={instance.url} variant="muted" padding={3}>
                     <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
                       <VStack gap={0}>
                         <Text type="body" size="sm" weight="semibold">
@@ -908,7 +1020,9 @@ function SyncSection({
                           {instance.baseUrl}
                         </Text>
                         <Text type="body" size="xsm" color="secondary">
-                          {instance.lastSyncAt ? `Last sync: ${instance.lastSyncAt}` : "No sync yet"}
+                          {instance.lastSyncAt
+                            ? `Last sync: ${instance.lastSyncAt}`
+                            : "No sync yet"}
                         </Text>
                         {instance.lastSyncError && (
                           <Text type="body" size="xsm" color="secondary">
@@ -919,7 +1033,11 @@ function SyncSection({
                       <HStack gap={2}>
                         <form action={toggleSlaveInstanceAction}>
                           <input type="hidden" name="instanceId" value={instance.id} />
-                          <input type="hidden" name="enabled" value={instance.enabled ? "" : "on"} />
+                          <input
+                            type="hidden"
+                            name="enabled"
+                            value={instance.enabled ? "" : "on"}
+                          />
                           <Button
                             type="submit"
                             variant="secondary"
@@ -962,7 +1080,7 @@ function GeneralSection({
   setGeneralOverride: (v: boolean) => void;
 }) {
   const [primaryDomain, setPrimaryDomain] = useState(
-    general?.primaryDomain ?? "caddyproxymanager.com"
+    general?.primaryDomain ?? "caddyproxymanager.com",
   );
   const [acmeEmail, setAcmeEmail] = useState(general?.acmeEmail ?? "");
   const disabled = isSlave && !generalOverride;
@@ -974,9 +1092,7 @@ function GeneralSection({
           {generalState?.message && (
             <StatusAlert message={generalState.message} success={generalState.success} />
           )}
-          {isSlave && (
-            <OverrideToggle value={generalOverride} onChange={setGeneralOverride} />
-          )}
+          {isSlave && <OverrideToggle value={generalOverride} onChange={setGeneralOverride} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label="Primary domain"
@@ -1171,14 +1287,26 @@ function DnsProvidersSection({
                         <form action={dnsProviderFormAction}>
                           <input type="hidden" name="action" value="set-default" />
                           <input type="hidden" name="provider" value={name} />
-                          {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
+                          {isSlave && (
+                            <input
+                              type="hidden"
+                              name="overrideEnabled"
+                              value={dnsProviderOverride ? "on" : ""}
+                            />
+                          )}
                           <Button type="submit" variant="secondary" size="sm" label="Set default" />
                         </form>
                       )}
                       <form action={dnsProviderFormAction}>
                         <input type="hidden" name="action" value="remove" />
                         <input type="hidden" name="provider" value={name} />
-                        {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
+                        {isSlave && (
+                          <input
+                            type="hidden"
+                            name="overrideEnabled"
+                            value={dnsProviderOverride ? "on" : ""}
+                          />
+                        )}
                         <Button type="submit" variant="destructive" size="sm" label="Remove" />
                       </form>
                     </HStack>
@@ -1190,7 +1318,13 @@ function DnsProvidersSection({
               <form action={dnsProviderFormAction}>
                 <input type="hidden" name="action" value="set-default" />
                 <input type="hidden" name="provider" value="none" />
-                {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
+                {isSlave && (
+                  <input
+                    type="hidden"
+                    name="overrideEnabled"
+                    value={dnsProviderOverride ? "on" : ""}
+                  />
+                )}
                 <Button
                   type="submit"
                   variant="ghost"
@@ -1207,7 +1341,14 @@ function DnsProvidersSection({
         title={configuredProviders.length > 0 ? "Add or update provider" : "Add a provider"}
         footer={
           <>
-            {isSlave && <input type="hidden" name="overrideEnabled" form="dnsp-add-form" value={dnsProviderOverride ? "on" : ""} />}
+            {isSlave && (
+              <input
+                type="hidden"
+                name="overrideEnabled"
+                form="dnsp-add-form"
+                value={dnsProviderOverride ? "on" : ""}
+              />
+            )}
             <Button
               type="submit"
               form="dnsp-add-form"
@@ -1252,7 +1393,9 @@ function DnsProvidersSection({
                 )}
               </>
             )}
-            {isSlave && <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />}
+            {isSlave && (
+              <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />
+            )}
           </VStack>
         </form>
       </FormCard>
@@ -1375,7 +1518,10 @@ function UpstreamDnsSection({
         <form action={upstreamDnsResolutionFormAction}>
           <VStack gap={3}>
             {upstreamDnsResolutionState?.message && (
-              <StatusAlert message={upstreamDnsResolutionState.message} success={upstreamDnsResolutionState.success} />
+              <StatusAlert
+                message={upstreamDnsResolutionState.message}
+                success={upstreamDnsResolutionState.success}
+              />
             )}
             {isSlave && (
               <OverrideToggle
@@ -1433,7 +1579,7 @@ function TrustedProxiesSection({
 }) {
   const [ranges, setRanges] = useState((trustedProxies?.ranges ?? []).join("\n"));
   const [clientIpHeaders, setClientIpHeaders] = useState(
-    (trustedProxies?.client_ip_headers ?? []).join("\n")
+    (trustedProxies?.client_ip_headers ?? []).join("\n"),
   );
   const [strict, setStrict] = useState(trustedProxies?.strict ?? false);
   const [defaultGeoblock, setDefaultGeoblock] = useState(trustedProxies?.default_geoblock ?? false);
@@ -1445,13 +1591,13 @@ function TrustedProxiesSection({
         <form action={trustedProxiesFormAction}>
           <VStack gap={3}>
             {trustedProxiesState?.message && (
-              <StatusAlert message={trustedProxiesState.message} success={trustedProxiesState.success} />
+              <StatusAlert
+                message={trustedProxiesState.message}
+                success={trustedProxiesState.success}
+              />
             )}
             {isSlave && (
-              <OverrideToggle
-                value={trustedProxiesOverride}
-                onChange={setTrustedProxiesOverride}
-              />
+              <OverrideToggle value={trustedProxiesOverride} onChange={setTrustedProxiesOverride} />
             )}
             <TextArea
               label="Trusted proxy ranges"
@@ -1591,9 +1737,7 @@ function AuthentikSection({
           {authentikState?.message && (
             <StatusAlert message={authentikState.message} success={authentikState.success} />
           )}
-          {isSlave && (
-            <OverrideToggle value={authentikOverride} onChange={setAuthentikOverride} />
-          )}
+          {isSlave && <OverrideToggle value={authentikOverride} onChange={setAuthentikOverride} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label="Outpost domain"

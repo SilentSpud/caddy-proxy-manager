@@ -26,22 +26,34 @@ test.describe('Dashboard home page', () => {
   });
 
   test('stat card links navigate to correct pages', async ({ page }) => {
-    await page.getByRole('link', { name: /proxy hosts/i }).first().click();
+    await page
+      .getByRole('link', { name: /proxy hosts/i })
+      .first()
+      .click();
     await expect(page).toHaveURL(/\/proxy-hosts/);
   });
 
   test('Certificates stat card navigates to /certificates', async ({ page }) => {
-    await page.getByRole('link', { name: /certificates/i }).first().click();
+    await page
+      .getByRole('link', { name: /certificates/i })
+      .first()
+      .click();
     await expect(page).toHaveURL(/\/certificates/);
   });
 
   test('Access Lists stat card navigates to /access-lists', async ({ page }) => {
-    await page.getByRole('link', { name: /access lists/i }).first().click();
+    await page
+      .getByRole('link', { name: /access lists/i })
+      .first()
+      .click();
     await expect(page).toHaveURL(/\/access-lists/);
   });
 
   test('Traffic card navigates to /analytics', async ({ page }) => {
-    await page.getByRole('link', { name: /traffic/i }).first().click();
+    await page
+      .getByRole('link', { name: /traffic/i })
+      .first()
+      .click();
     await expect(page).toHaveURL(/\/analytics/);
   });
 

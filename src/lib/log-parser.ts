@@ -1,13 +1,13 @@
-import { existsSync, statSync } from 'node:fs';
-import maxmind, { CountryResponse } from 'maxmind';
-import db from './db';
-import { logParseState } from './db/schema';
-import { eq } from 'drizzle-orm';
-import { insertTrafficEvents, type TrafficEventRow } from './clickhouse/client';
-import { readLines as readLinesFrom } from './log-read';
+import { existsSync, statSync } from "node:fs";
+import maxmind, { type CountryResponse } from "maxmind";
+import db from "./db";
+import { logParseState } from "./db/schema";
+import { eq } from "drizzle-orm";
+import { insertTrafficEvents, type TrafficEventRow } from "./clickhouse/client";
+import { readLines as readLinesFrom } from "./log-read";
 
-const LOG_FILE = '/logs/access.log';
-const GEOIP_DB = '/usr/share/GeoIP/GeoLite2-Country.mmdb';
+const LOG_FILE = "/logs/access.log";
+const GEOIP_DB = "/usr/share/GeoIP/GeoLite2-Country.mmdb";
 const BATCH_SIZE = 500;
 
 // GeoIP reader — null if mmdb not available
@@ -19,26 +19,33 @@ let stopped = false;
 // ── state helpers ────────────────────────────────────────────────────────────
 
 function getState(key: string): string | null {
-  const row = db.select({ value: logParseState.value }).from(logParseState).where(eq(logParseState.key, key)).get();
+  const row = db
+    .select({ value: logParseState.value })
+    .from(logParseState)
+    .where(eq(logParseState.key, key))
+    .get();
   return row?.value ?? null;
 }
 
 function setState(key: string, value: string): void {
-  db.insert(logParseState).values({ key, value }).onConflictDoUpdate({ target: logParseState.key, set: { value } }).run();
+  db.insert(logParseState)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: logParseState.key, set: { value } })
+    .run();
 }
 
 // ── GeoIP ────────────────────────────────────────────────────────────────────
 
 async function initGeoIP(): Promise<void> {
   if (!existsSync(GEOIP_DB)) {
-    console.log('[log-parser] GeoIP database not found, country codes will be null');
+    console.log("[log-parser] GeoIP database not found, country codes will be null");
     return;
   }
   try {
     geoReader = await maxmind.open<CountryResponse>(GEOIP_DB);
-    console.log('[log-parser] GeoIP database loaded');
+    console.log("[log-parser] GeoIP database loaded");
   } catch (err) {
-    console.warn('[log-parser] Failed to load GeoIP database:', err);
+    console.warn("[log-parser] Failed to load GeoIP database:", err);
   }
 }
 
@@ -108,14 +115,21 @@ let pendingBlocked: Map<string, number> = new Map();
 // can mark the corresponding "handled request" rows correctly instead of using
 // status === 403 (which would also catch legitimate upstream 403s). Pass an
 // existing map via `into` to merge new signatures onto carried-over ones.
-export function collectBlockedSignatures(lines: string[], into?: Map<string, number>): Map<string, number> {
+export function collectBlockedSignatures(
+  lines: string[],
+  into?: Map<string, number>,
+): Map<string, number> {
   const blocked = into ?? new Map<string, number>();
   for (const line of lines) {
     let entry: CaddyLogEntry;
-    try { entry = JSON.parse(line.trim()); } catch { continue; }
-    if (entry.msg !== 'request blocked' || entry.plugin !== 'caddy-blocker') continue;
+    try {
+      entry = JSON.parse(line.trim());
+    } catch {
+      continue;
+    }
+    if (entry.msg !== "request blocked" || entry.plugin !== "caddy-blocker") continue;
     const ts = Math.floor(entry.ts ?? 0);
-    const key = `${ts}|${entry.client_ip ?? ''}|${entry.method ?? ''}|${entry.uri ?? ''}`;
+    const key = `${ts}|${entry.client_ip ?? ""}|${entry.method ?? ""}|${entry.uri ?? ""}`;
     blocked.set(key, (blocked.get(key) ?? 0) + 1);
   }
   return blocked;
@@ -124,11 +138,17 @@ export function collectBlockedSignatures(lines: string[], into?: Map<string, num
 // Drop carried-over signatures older than the carry-over window so the pending
 // map can't grow unbounded when a "request blocked" line never gets a paired
 // "handled request" row. The timestamp is the first field of the key.
-export function pruneBlockedSignatures(blocked: Map<string, number>, refTs: number): Map<string, number> {
+export function pruneBlockedSignatures(
+  blocked: Map<string, number>,
+  refTs: number,
+): Map<string, number> {
   const cutoff = refTs - BLOCKED_CARRYOVER_WINDOW_SEC;
   for (const [key, count] of blocked) {
-    if (count <= 0) { blocked.delete(key); continue; }
-    const ts = Number(key.slice(0, key.indexOf('|')));
+    if (count <= 0) {
+      blocked.delete(key);
+      continue;
+    }
+    const ts = Number(key.slice(0, key.indexOf("|")));
     if (Number.isFinite(ts) && ts < cutoff) blocked.delete(key);
   }
   return blocked;
@@ -143,13 +163,13 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
   }
 
   // Only process "handled request" log entries
-  if (entry.msg !== 'handled request') return null;
+  if (entry.msg !== "handled request") return null;
 
   const req = entry.request ?? {};
-  const clientIp = req.client_ip || req.remote_ip || '';
+  const clientIp = req.client_ip || req.remote_ip || "";
   const ts = Math.floor(entry.ts ?? Date.now() / 1000);
-  const method = req.method ?? '';
-  const uri = req.uri ?? '';
+  const method = req.method ?? "";
+  const uri = req.uri ?? "";
   const status = entry.status ?? 0;
 
   const key = `${ts}|${clientIp}|${method}|${uri}`;
@@ -158,13 +178,13 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
     ts,
     client_ip: clientIp,
     country_code: clientIp ? lookupCountry(clientIp) : null,
-    host: req.host ?? '',
+    host: req.host ?? "",
     method,
     uri,
     status,
-    proto: req.proto ?? '',
+    proto: req.proto ?? "",
     bytes_sent: entry.size ?? 0,
-    user_agent: req.headers?.['User-Agent']?.[0] ?? '',
+    user_agent: req.headers?.["User-Agent"]?.[0] ?? "",
     is_blocked: consumeBlockedSignature(blocked, key),
   };
 }
@@ -172,7 +192,10 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
 // Re-exported so existing callers/tests keep importing `readLines` from here.
 // The implementation lives in ./log-read because waf-log-parser needs the same
 // newline-safe offset accounting.
-export async function readLines(startOffset: number, file: string = LOG_FILE): Promise<{ lines: string[]; newOffset: number }> {
+export async function readLines(
+  startOffset: number,
+  file: string = LOG_FILE,
+): Promise<{ lines: string[]; newOffset: number }> {
   return readLinesFrom(startOffset, file);
 }
 
@@ -186,7 +209,7 @@ async function insertBatch(rows: TrafficEventRow[]): Promise<void> {
 
 export async function initLogParser(): Promise<void> {
   await initGeoIP();
-  console.log('[log-parser] initialized');
+  console.log("[log-parser] initialized");
 }
 
 export async function parseNewLogEntries(): Promise<void> {
@@ -194,8 +217,8 @@ export async function parseNewLogEntries(): Promise<void> {
   if (!existsSync(LOG_FILE)) return;
 
   try {
-    const storedOffset = parseInt(getState('access_log_offset') ?? '0', 10);
-    const storedSize = parseInt(getState('access_log_size') ?? '0', 10);
+    const storedOffset = parseInt(getState("access_log_offset") ?? "0", 10);
+    const storedSize = parseInt(getState("access_log_size") ?? "0", 10);
 
     let currentSize: number;
     try {
@@ -213,20 +236,22 @@ export async function parseNewLogEntries(): Promise<void> {
       // Merge any signatures carried over from the previous pass (a "request
       // blocked" line whose "handled request" row hadn't been written yet).
       const blocked = collectBlockedSignatures(lines, pendingBlocked);
-      const rows = lines.map(l => parseLine(l, blocked)).filter(r => r !== null);
+      const rows = lines.map((l) => parseLine(l, blocked)).filter((r) => r !== null);
       await insertBatch(rows);
       // Whatever signatures weren't consumed are unmatched blocks; carry the
       // recent ones forward and drop stale ones so the map can't grow forever.
-      const latestTs = rows.length ? Math.max(...rows.map(r => r.ts)) : Math.floor(Date.now() / 1000);
+      const latestTs = rows.length
+        ? Math.max(...rows.map((r) => r.ts))
+        : Math.floor(Date.now() / 1000);
       pendingBlocked = pruneBlockedSignatures(blocked, latestTs);
       const blockedRows = rows.reduce((n, r) => n + (r.is_blocked ? 1 : 0), 0);
       console.log(`[log-parser] inserted ${rows.length} traffic events (${blockedRows} blocked)`);
     }
 
-    setState('access_log_offset', String(newOffset));
-    setState('access_log_size', String(currentSize));
+    setState("access_log_offset", String(newOffset));
+    setState("access_log_size", String(currentSize));
   } catch (err) {
-    console.error('[log-parser] error during parse:', err);
+    console.error("[log-parser] error during parse:", err);
   }
 }
 

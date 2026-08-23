@@ -55,14 +55,19 @@ async function caddyAdminUrl(path: string): Promise<string> {
  * Deliberately not `fetch` — native fetch sends browser-security headers
  * (Sec-Fetch-*) that trigger Caddy's CORS origin enforcement.
  */
-export const httpCaddyAdminTransport: CaddyAdminTransport = async ({ path, method, body, timeoutMs }) => {
+export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
+  path,
+  method,
+  body,
+  timeoutMs,
+}) => {
   // Backstop for the guard installed by tests/setup.vitest.ts: if a test swaps
   // the real transport back in, fail loudly instead of quietly opening a socket
   // to whatever happens to be listening on the admin port.
   if (process.env.VITEST) {
     throw new Error(
       "The real Caddy admin transport was used inside a test. Tests must install an " +
-      "in-memory adapter via setCaddyAdminTransport() — see tests/helpers/caddy-admin.ts."
+        "in-memory adapter via setCaddyAdminTransport() — see tests/helpers/caddy-admin.ts.",
     );
   }
 
@@ -77,14 +82,18 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({ path, metho
         path: parsed.pathname + parsed.search,
         method,
         headers: {
-          ...(body ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } : {})
-        }
+          ...(body
+            ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+            : {}),
+        },
       },
       (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, text: data, headers: res.headers }));
-      }
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, text: data, headers: res.headers }),
+        );
+      },
     );
     if (timeoutMs !== undefined) {
       req.setTimeout(timeoutMs, () => {

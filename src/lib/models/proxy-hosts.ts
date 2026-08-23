@@ -24,11 +24,13 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
     return;
   }
   const dnsSettings = await getDnsProviderSettings();
-  const hasDnsProvider = Boolean(dnsSettings?.default && dnsSettings.providers[dnsSettings.default]);
+  const hasDnsProvider = Boolean(
+    dnsSettings?.default && dnsSettings.providers[dnsSettings.default],
+  );
   if (!hasDnsProvider) {
     throw new Error(
       `Wildcard domain "${wildcardDomains[0]}" requires a DNS provider for the ACME DNS-01 challenge. ` +
-        `Configure a default DNS provider in settings, or assign a certificate to this host.`
+        `Configure a default DNS provider in settings, or assign a certificate to this host.`,
     );
   }
 }
@@ -44,7 +46,9 @@ function validateUpstreamProtocol(upstream: string): void {
   if (schemeMatch) {
     const scheme = schemeMatch[1].toLowerCase();
     if (scheme !== "http" && scheme !== "https") {
-      throw new Error(`Invalid upstream protocol "${scheme}://". Only http:// and https:// are allowed`);
+      throw new Error(
+        `Invalid upstream protocol "${scheme}://". Only http:// and https:// are allowed`,
+      );
     }
   }
 }
@@ -61,7 +65,7 @@ const DEFAULT_AUTHENTIK_HEADERS = [
   "X-Authentik-Meta-Outpost",
   "X-Authentik-Meta-Provider",
   "X-Authentik-Meta-App",
-  "X-Authentik-Meta-Version"
+  "X-Authentik-Meta-Version",
 ];
 
 const DEFAULT_AUTHENTIK_TRUSTED_PROXIES = ["private_ranges"];
@@ -72,8 +76,8 @@ export type GeoBlockMode = "merge" | "override";
 export type WafMode = "merge" | "override";
 
 export type RedirectRule = {
-  from: string;   // path pattern e.g. "/.well-known/carddav"
-  to: string;     // destination e.g. "/remote.php/dav/"
+  from: string; // path pattern e.g. "/.well-known/carddav"
+  to: string; // destination e.g. "/remote.php/dav/"
   status: 301 | 302 | 307 | 308;
 };
 
@@ -82,7 +86,7 @@ export type RewriteConfig = {
 };
 
 export type LocationRule = {
-  path: string;      // Caddy path pattern, e.g. "/ws/*", "/api/*"
+  path: string; // Caddy path pattern, e.g. "/ws/*", "/api/*"
   upstreams: string[]; // e.g. ["backend:8080", "backend2:8080"]
   loadBalancer: LoadBalancerConfig | null; // optional per-rule load balancing / health checks
 };
@@ -105,14 +109,14 @@ export const PATH_BLOCK_STATUS_CODES = [400, 401, 403, 404, 410, 418, 451, 500, 
 export type PathBlockStatusCode = (typeof PATH_BLOCK_STATUS_CODES)[number];
 
 export type PathBlockRule = {
-  path: string;                    // Caddy path pattern, e.g. "/dns-query"
-  status: PathBlockStatusCode;     // status code to return, e.g. 403
-  body?: string;                   // optional response body, e.g. "Forbidden"
+  path: string; // Caddy path pattern, e.g. "/dns-query"
+  status: PathBlockStatusCode; // status code to return, e.g. 403
+  body?: string; // optional response body, e.g. "Forbidden"
 };
 
 export type PathRewriteRule = {
-  from: string;   // path pattern, e.g. "/secretpath"
-  to: string;     // internal target URI, e.g. "/dns-query"
+  from: string; // path pattern, e.g. "/secretpath"
+  to: string; // internal target URI, e.g. "/dns-query"
 };
 
 // Suggested status codes for the error-page UI. Any 4xx/5xx code is accepted by
@@ -120,20 +124,20 @@ export type PathRewriteRule = {
 export const ERROR_PAGE_STATUS_CODES = [400, 401, 403, 404, 408, 429, 500, 502, 503, 504] as const;
 
 export type ErrorPageRule = {
-  statuses: number[];     // error codes this rule handles, e.g. [502, 503, 504]; empty = all errors
-  body: string;           // response body (HTML/text); the original status code is preserved
-  contentType?: string;   // optional Content-Type, defaults to "text/html; charset=utf-8"
+  statuses: number[]; // error codes this rule handles, e.g. [502, 503, 504]; empty = all errors
+  body: string; // response body (HTML/text); the original status code is preserved
+  contentType?: string; // optional Content-Type, defaults to "text/html; charset=utf-8"
 };
 
 export type PathAllowRule = {
-  path: string;   // Caddy path pattern, e.g. "/secret" — matches short-circuit the
-                  // subroute (no block applies) and the request falls through to the
-                  // upstream proxy.
+  path: string; // Caddy path pattern, e.g. "/secret" — matches short-circuit the
+  // subroute (no block applies) and the request falls through to the
+  // upstream proxy.
 };
 
 export type WafHostConfig = {
   enabled?: boolean;
-  mode?: 'Off' | 'On';
+  mode?: "Off" | "On";
   load_owasp_crs?: boolean;
   custom_directives?: string;
   excluded_rule_ids?: number[];
@@ -141,7 +145,15 @@ export type WafHostConfig = {
 };
 
 // Load Balancer Types
-export type LoadBalancingPolicy = "random" | "round_robin" | "least_conn" | "ip_hash" | "first" | "header" | "cookie" | "uri_hash";
+export type LoadBalancingPolicy =
+  | "random"
+  | "round_robin"
+  | "least_conn"
+  | "ip_hash"
+  | "first"
+  | "header"
+  | "cookie"
+  | "uri_hash";
 
 export type LoadBalancerActiveHealthCheck = {
   enabled: boolean;
@@ -327,35 +339,45 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
   const normalized: MtlsConfig = { enabled: true };
 
   if (Array.isArray(meta.trusted_client_cert_ids)) {
-    const certIds = meta.trusted_client_cert_ids.filter((id): id is number => Number.isFinite(id) && id > 0);
+    const certIds = meta.trusted_client_cert_ids.filter(
+      (id): id is number => Number.isFinite(id) && id > 0,
+    );
     if (certIds.length > 0) {
       normalized.trusted_client_cert_ids = certIds;
     }
   }
 
   if (Array.isArray(meta.trusted_role_ids)) {
-    const roleIds = meta.trusted_role_ids.filter((id): id is number => Number.isFinite(id) && id > 0);
+    const roleIds = meta.trusted_role_ids.filter(
+      (id): id is number => Number.isFinite(id) && id > 0,
+    );
     if (roleIds.length > 0) {
       normalized.trusted_role_ids = roleIds;
     }
   }
 
   if (Array.isArray(meta.protected_paths)) {
-    const paths = meta.protected_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.protected_paths
+      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
+      .filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
 
   if (Array.isArray(meta.excluded_paths)) {
-    const paths = meta.excluded_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.excluded_paths
+      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
+      .filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
   }
 
   if (Array.isArray(meta.ca_certificate_ids)) {
-    const caIds = meta.ca_certificate_ids.filter((id): id is number => Number.isFinite(id) && id > 0);
+    const caIds = meta.ca_certificate_ids.filter(
+      (id): id is number => Number.isFinite(id) && id > 0,
+    );
     if (caIds.length > 0) {
       normalized.ca_certificate_ids = caIds;
     }
@@ -366,9 +388,13 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
   // host). Note this cannot catch a role that is later emptied via revocation —
   // the config still references a valid role — which is why Caddy config
   // generation also fails closed for the zero-resolved-trust case.
-  if (!normalized.trusted_client_cert_ids && !normalized.trusted_role_ids && !normalized.ca_certificate_ids) {
+  if (
+    !normalized.trusted_client_cert_ids &&
+    !normalized.trusted_role_ids &&
+    !normalized.ca_certificate_ids
+  ) {
     throw new Error(
-      "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS."
+      "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
     );
   }
 
@@ -493,7 +519,9 @@ function normalizeMetaValue(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function sanitizeAuthentikMeta(meta: ProxyHostAuthentikMeta | undefined): ProxyHostAuthentikMeta | undefined {
+function sanitizeAuthentikMeta(
+  meta: ProxyHostAuthentikMeta | undefined,
+): ProxyHostAuthentikMeta | undefined {
   if (!meta) {
     return undefined;
   }
@@ -520,14 +548,18 @@ function sanitizeAuthentikMeta(meta: ProxyHostAuthentikMeta | undefined): ProxyH
   }
 
   if (Array.isArray(meta.copy_headers)) {
-    const headers = meta.copy_headers.map((header) => header?.trim()).filter((header): header is string => Boolean(header));
+    const headers = meta.copy_headers
+      .map((header) => header?.trim())
+      .filter((header): header is string => Boolean(header));
     if (headers.length > 0) {
       normalized.copy_headers = headers;
     }
   }
 
   if (Array.isArray(meta.trusted_proxies)) {
-    const proxies = meta.trusted_proxies.map((proxy) => proxy?.trim()).filter((proxy): proxy is string => Boolean(proxy));
+    const proxies = meta.trusted_proxies
+      .map((proxy) => proxy?.trim())
+      .filter((proxy): proxy is string => Boolean(proxy));
     if (proxies.length > 0) {
       normalized.trusted_proxies = proxies;
     }
@@ -538,14 +570,18 @@ function sanitizeAuthentikMeta(meta: ProxyHostAuthentikMeta | undefined): ProxyH
   }
 
   if (Array.isArray(meta.protected_paths)) {
-    const paths = meta.protected_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path));
+    const paths = meta.protected_paths
+      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
+      .filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
 
   if (Array.isArray(meta.excluded_paths)) {
-    const paths = meta.excluded_paths.map((path) => path?.trim().replace(/\{[^}]*\}/g, "")).filter((path): path is string => Boolean(path));
+    const paths = meta.excluded_paths
+      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
+      .filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -554,9 +590,20 @@ function sanitizeAuthentikMeta(meta: ProxyHostAuthentikMeta | undefined): ProxyH
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
-const VALID_LB_POLICIES: LoadBalancingPolicy[] = ["random", "round_robin", "least_conn", "ip_hash", "first", "header", "cookie", "uri_hash"];
+const VALID_LB_POLICIES: LoadBalancingPolicy[] = [
+  "random",
+  "round_robin",
+  "least_conn",
+  "ip_hash",
+  "first",
+  "header",
+  "cookie",
+  "uri_hash",
+];
 
-function sanitizeLoadBalancerMeta(meta: LoadBalancerMeta | undefined): LoadBalancerMeta | undefined {
+function sanitizeLoadBalancerMeta(
+  meta: LoadBalancerMeta | undefined,
+): LoadBalancerMeta | undefined {
   if (!meta) {
     return undefined;
   }
@@ -609,7 +656,11 @@ function sanitizeLoadBalancerMeta(meta: LoadBalancerMeta | undefined): LoadBalan
     if (uri) {
       ahc.uri = uri;
     }
-    if (typeof meta.active_health_check.port === "number" && Number.isFinite(meta.active_health_check.port) && meta.active_health_check.port > 0) {
+    if (
+      typeof meta.active_health_check.port === "number" &&
+      Number.isFinite(meta.active_health_check.port) &&
+      meta.active_health_check.port > 0
+    ) {
       ahc.port = meta.active_health_check.port;
     }
     const interval = normalizeMetaValue(meta.active_health_check.interval ?? null);
@@ -620,7 +671,11 @@ function sanitizeLoadBalancerMeta(meta: LoadBalancerMeta | undefined): LoadBalan
     if (timeout) {
       ahc.timeout = timeout;
     }
-    if (typeof meta.active_health_check.status === "number" && Number.isFinite(meta.active_health_check.status) && meta.active_health_check.status >= 100) {
+    if (
+      typeof meta.active_health_check.status === "number" &&
+      Number.isFinite(meta.active_health_check.status) &&
+      meta.active_health_check.status >= 100
+    ) {
       ahc.status = meta.active_health_check.status;
     }
     const body = normalizeMetaValue(meta.active_health_check.body ?? null);
@@ -641,16 +696,24 @@ function sanitizeLoadBalancerMeta(meta: LoadBalancerMeta | undefined): LoadBalan
     if (failDuration) {
       phc.fail_duration = failDuration;
     }
-    if (typeof meta.passive_health_check.max_fails === "number" && Number.isFinite(meta.passive_health_check.max_fails) && meta.passive_health_check.max_fails >= 0) {
+    if (
+      typeof meta.passive_health_check.max_fails === "number" &&
+      Number.isFinite(meta.passive_health_check.max_fails) &&
+      meta.passive_health_check.max_fails >= 0
+    ) {
       phc.max_fails = meta.passive_health_check.max_fails;
     }
     if (Array.isArray(meta.passive_health_check.unhealthy_status)) {
-      const statuses = meta.passive_health_check.unhealthy_status.filter((s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100);
+      const statuses = meta.passive_health_check.unhealthy_status.filter(
+        (s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100,
+      );
       if (statuses.length > 0) {
         phc.unhealthy_status = statuses;
       }
     }
-    const unhealthyLatency = normalizeMetaValue(meta.passive_health_check.unhealthy_latency ?? null);
+    const unhealthyLatency = normalizeMetaValue(
+      meta.passive_health_check.unhealthy_latency ?? null,
+    );
     if (unhealthyLatency) {
       phc.unhealthy_latency = unhealthyLatency;
     }
@@ -700,7 +763,7 @@ function sanitizeDnsResolverMeta(meta: DnsResolverMeta | undefined): DnsResolver
 }
 
 function sanitizeUpstreamDnsResolutionMeta(
-  meta: UpstreamDnsResolutionMeta | undefined
+  meta: UpstreamDnsResolutionMeta | undefined,
 ): UpstreamDnsResolutionMeta | undefined {
   if (!meta) {
     return undefined;
@@ -718,20 +781,26 @@ function sanitizeUpstreamDnsResolutionMeta(
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
-function sanitizeCpmForwardAuthMeta(meta: CpmForwardAuthMeta | undefined): CpmForwardAuthMeta | undefined {
+function sanitizeCpmForwardAuthMeta(
+  meta: CpmForwardAuthMeta | undefined,
+): CpmForwardAuthMeta | undefined {
   if (!meta) return undefined;
   const normalized: CpmForwardAuthMeta = {};
   if (meta.enabled !== undefined) {
     normalized.enabled = Boolean(meta.enabled);
   }
   if (Array.isArray(meta.protected_paths)) {
-    const paths = meta.protected_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.protected_paths
+      .map((p) => p?.trim().replace(/\{[^}]*\}/g, ""))
+      .filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
   if (Array.isArray(meta.excluded_paths)) {
-    const paths = meta.excluded_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    const paths = meta.excluded_paths
+      .map((p) => p?.trim().replace(/\{[^}]*\}/g, ""))
+      .filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -840,12 +909,18 @@ function sanitizeRedirectRules(value: unknown): RedirectRule[] {
     if (
       item &&
       typeof item === "object" &&
-      typeof item.from === "string" && item.from.trim() &&
-      typeof item.to === "string" && item.to.trim() &&
+      typeof item.from === "string" &&
+      item.from.trim() &&
+      typeof item.to === "string" &&
+      item.to.trim() &&
       [301, 302, 307, 308].includes(item.status)
     ) {
       // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      valid.push({ from: item.from.trim().replace(/\{[^}]*\}/g, ""), to: item.to.trim().replace(/\{[^}]*\}/g, ""), status: item.status });
+      valid.push({
+        from: item.from.trim().replace(/\{[^}]*\}/g, ""),
+        to: item.to.trim().replace(/\{[^}]*\}/g, ""),
+        status: item.status,
+      });
     }
   }
   return valid;
@@ -881,7 +956,8 @@ function sanitizePathBlocks(value: unknown): PathBlockRule[] {
     if (
       item &&
       typeof item === "object" &&
-      typeof item.path === "string" && item.path.trim() &&
+      typeof item.path === "string" &&
+      item.path.trim() &&
       typeof item.status === "number" &&
       (PATH_BLOCK_STATUS_CODES as readonly number[]).includes(item.status)
     ) {
@@ -908,8 +984,10 @@ function sanitizePathRewrites(value: unknown): PathRewriteRule[] {
     if (
       item &&
       typeof item === "object" &&
-      typeof item.from === "string" && item.from.trim() &&
-      typeof item.to === "string" && item.to.trim()
+      typeof item.from === "string" &&
+      item.from.trim() &&
+      typeof item.to === "string" &&
+      item.to.trim()
     ) {
       // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
       const from = item.from.trim().replace(/\{[^}]*\}/g, "");
@@ -934,14 +1012,20 @@ export function sanitizeErrorPageRules(value: unknown): ErrorPageRule[] {
     const body = typeof item.body === "string" ? item.body : "";
     if (!body) continue; // a rule with no body would do nothing
     const rawStatuses: unknown[] = Array.isArray(item.statuses) ? item.statuses : [];
-    const statuses = [...new Set(
-      rawStatuses.filter((s): s is number =>
-        typeof s === "number" && Number.isInteger(s) && s >= 400 && s <= 599)
-    )];
+    const statuses = [
+      ...new Set(
+        rawStatuses.filter(
+          (s): s is number => typeof s === "number" && Number.isInteger(s) && s >= 400 && s <= 599,
+        ),
+      ),
+    ];
     const rule: ErrorPageRule = { statuses, body: body.slice(0, ERROR_PAGE_BODY_MAX) };
     if (typeof item.contentType === "string") {
       // Strip CR/LF to prevent response header injection.
-      const ct = item.contentType.replace(/[\r\n]/g, "").trim().slice(0, ERROR_PAGE_CONTENT_TYPE_MAX);
+      const ct = item.contentType
+        .replace(/[\r\n]/g, "")
+        .trim()
+        .slice(0, ERROR_PAGE_CONTENT_TYPE_MAX);
       if (ct) rule.contentType = ct;
     }
     valid.push(rule);
@@ -959,7 +1043,7 @@ function parseLocationRuleBase(item: unknown): { path: string; upstreams: string
     (item as { path: string }).path.trim() &&
     Array.isArray((item as { upstreams?: unknown }).upstreams)
   ) {
-    const upstreams = ((item as { upstreams: unknown[] }).upstreams)
+    const upstreams = (item as { upstreams: unknown[] }).upstreams
       .filter((u): u is string => typeof u === "string" && Boolean(u.trim()))
       .map((u) => u.trim());
     if (upstreams.length > 0) {
@@ -977,7 +1061,9 @@ function sanitizeLocationRuleMetas(value: unknown): LocationRuleMeta[] {
     const base = parseLocationRuleBase(item);
     if (!base) continue;
     const rule: LocationRuleMeta = base;
-    const lb = sanitizeLoadBalancerMeta((item as { load_balancer?: LoadBalancerMeta }).load_balancer);
+    const lb = sanitizeLoadBalancerMeta(
+      (item as { load_balancer?: LoadBalancerMeta }).load_balancer,
+    );
     if (lb) rule.load_balancer = lb;
     valid.push(rule);
   }
@@ -1028,8 +1114,10 @@ function parseMeta(value: string | null): ProxyHostMeta {
   try {
     const parsed = JSON.parse(value) as ProxyHostMeta;
     return {
-      custom_reverse_proxy_json: normalizeMetaValue(parsed.custom_reverse_proxy_json ?? null) ?? undefined,
-      custom_pre_handlers_json: normalizeMetaValue(parsed.custom_pre_handlers_json ?? null) ?? undefined,
+      custom_reverse_proxy_json:
+        normalizeMetaValue(parsed.custom_reverse_proxy_json ?? null) ?? undefined,
+      custom_pre_handlers_json:
+        normalizeMetaValue(parsed.custom_pre_handlers_json ?? null) ?? undefined,
       authentik: sanitizeAuthentikMeta(parsed.authentik),
       load_balancer: sanitizeLoadBalancerMeta(parsed.load_balancer),
       dns_resolver: sanitizeDnsResolverMeta(parsed.dns_resolver),
@@ -1055,7 +1143,7 @@ function parseMeta(value: string | null): ProxyHostMeta {
 
 function normalizeAuthentikInput(
   input: ProxyHostAuthentikInput | null | undefined,
-  existing: ProxyHostAuthentikMeta | undefined
+  existing: ProxyHostAuthentikMeta | undefined,
 ): ProxyHostAuthentikMeta | undefined {
   if (input === undefined) {
     return existing;
@@ -1154,7 +1242,7 @@ function normalizeAuthentikInput(
 
 function normalizeLoadBalancerInput(
   input: LoadBalancerInput | null | undefined,
-  existing: LoadBalancerMeta | undefined
+  existing: LoadBalancerMeta | undefined,
 ): LoadBalancerMeta | undefined {
   if (input === undefined) {
     return existing;
@@ -1248,7 +1336,11 @@ function normalizeLoadBalancerInput(
         }
       }
       if (input.activeHealthCheck.port !== undefined) {
-        if (typeof input.activeHealthCheck.port === "number" && Number.isFinite(input.activeHealthCheck.port) && input.activeHealthCheck.port > 0) {
+        if (
+          typeof input.activeHealthCheck.port === "number" &&
+          Number.isFinite(input.activeHealthCheck.port) &&
+          input.activeHealthCheck.port > 0
+        ) {
           ahc.port = input.activeHealthCheck.port;
         } else {
           delete ahc.port;
@@ -1271,7 +1363,11 @@ function normalizeLoadBalancerInput(
         }
       }
       if (input.activeHealthCheck.status !== undefined) {
-        if (typeof input.activeHealthCheck.status === "number" && Number.isFinite(input.activeHealthCheck.status) && input.activeHealthCheck.status >= 100) {
+        if (
+          typeof input.activeHealthCheck.status === "number" &&
+          Number.isFinite(input.activeHealthCheck.status) &&
+          input.activeHealthCheck.status >= 100
+        ) {
           ahc.status = input.activeHealthCheck.status;
         } else {
           delete ahc.status;
@@ -1312,7 +1408,11 @@ function normalizeLoadBalancerInput(
         }
       }
       if (input.passiveHealthCheck.maxFails !== undefined) {
-        if (typeof input.passiveHealthCheck.maxFails === "number" && Number.isFinite(input.passiveHealthCheck.maxFails) && input.passiveHealthCheck.maxFails >= 0) {
+        if (
+          typeof input.passiveHealthCheck.maxFails === "number" &&
+          Number.isFinite(input.passiveHealthCheck.maxFails) &&
+          input.passiveHealthCheck.maxFails >= 0
+        ) {
           phc.max_fails = input.passiveHealthCheck.maxFails;
         } else {
           delete phc.max_fails;
@@ -1320,7 +1420,9 @@ function normalizeLoadBalancerInput(
       }
       if (input.passiveHealthCheck.unhealthyStatus !== undefined) {
         if (Array.isArray(input.passiveHealthCheck.unhealthyStatus)) {
-          const statuses = input.passiveHealthCheck.unhealthyStatus.filter((s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100);
+          const statuses = input.passiveHealthCheck.unhealthyStatus.filter(
+            (s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100,
+          );
           if (statuses.length > 0) {
             phc.unhealthy_status = statuses;
           } else {
@@ -1352,7 +1454,7 @@ function normalizeLoadBalancerInput(
 
 function normalizeDnsResolverInput(
   input: DnsResolverInput | null | undefined,
-  existing: DnsResolverMeta | undefined
+  existing: DnsResolverMeta | undefined,
 ): DnsResolverMeta | undefined {
   if (input === undefined) {
     return existing;
@@ -1411,7 +1513,7 @@ function normalizeDnsResolverInput(
 
 function normalizeUpstreamDnsResolutionInput(
   input: UpstreamDnsResolutionInput | null | undefined,
-  existing: UpstreamDnsResolutionMeta | undefined
+  existing: UpstreamDnsResolutionMeta | undefined,
 ): UpstreamDnsResolutionMeta | undefined {
   if (input === undefined) {
     return existing;
@@ -1492,7 +1594,7 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
   if (input.upstreamDnsResolution !== undefined) {
     const upstreamDnsResolution = normalizeUpstreamDnsResolutionInput(
       input.upstreamDnsResolution,
-      existing.upstream_dns_resolution
+      existing.upstream_dns_resolution,
     );
     if (upstreamDnsResolution) {
       next.upstream_dns_resolution = upstreamDnsResolution;
@@ -1615,7 +1717,9 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
   return serializeMeta(next);
 }
 
-function hydrateAuthentik(meta: ProxyHostAuthentikMeta | undefined): ProxyHostAuthentikConfig | null {
+function hydrateAuthentik(
+  meta: ProxyHostAuthentikMeta | undefined,
+): ProxyHostAuthentikConfig | null {
   if (!meta) {
     return null;
   }
@@ -1624,9 +1728,12 @@ function hydrateAuthentik(meta: ProxyHostAuthentikMeta | undefined): ProxyHostAu
   const outpostDomain = normalizeMetaValue(meta.outpost_domain ?? null);
   const outpostUpstream = normalizeMetaValue(meta.outpost_upstream ?? null);
   const authEndpoint =
-    normalizeMetaValue(meta.auth_endpoint ?? null) ?? (outpostDomain ? `/${outpostDomain}/auth/caddy` : null);
+    normalizeMetaValue(meta.auth_endpoint ?? null) ??
+    (outpostDomain ? `/${outpostDomain}/auth/caddy` : null);
   const copyHeaders =
-    Array.isArray(meta.copy_headers) && meta.copy_headers.length > 0 ? meta.copy_headers : DEFAULT_AUTHENTIK_HEADERS;
+    Array.isArray(meta.copy_headers) && meta.copy_headers.length > 0
+      ? meta.copy_headers
+      : DEFAULT_AUTHENTIK_HEADERS;
   const trustedProxies =
     Array.isArray(meta.trusted_proxies) && meta.trusted_proxies.length > 0
       ? meta.trusted_proxies
@@ -1634,9 +1741,13 @@ function hydrateAuthentik(meta: ProxyHostAuthentikMeta | undefined): ProxyHostAu
   const setOutpostHostHeader =
     meta.set_outpost_host_header !== undefined ? Boolean(meta.set_outpost_host_header) : true;
   const protectedPaths =
-    Array.isArray(meta.protected_paths) && meta.protected_paths.length > 0 ? meta.protected_paths : null;
+    Array.isArray(meta.protected_paths) && meta.protected_paths.length > 0
+      ? meta.protected_paths
+      : null;
   const excludedPaths =
-    Array.isArray(meta.excluded_paths) && meta.excluded_paths.length > 0 ? meta.excluded_paths : null;
+    Array.isArray(meta.excluded_paths) && meta.excluded_paths.length > 0
+      ? meta.excluded_paths
+      : null;
 
   return {
     enabled,
@@ -1647,17 +1758,19 @@ function hydrateAuthentik(meta: ProxyHostAuthentikMeta | undefined): ProxyHostAu
     trustedProxies,
     setOutpostHostHeader,
     protectedPaths,
-    excludedPaths
+    excludedPaths,
   };
 }
 
-function dehydrateAuthentik(config: ProxyHostAuthentikConfig | null): ProxyHostAuthentikMeta | undefined {
+function dehydrateAuthentik(
+  config: ProxyHostAuthentikConfig | null,
+): ProxyHostAuthentikMeta | undefined {
   if (!config) {
     return undefined;
   }
 
   const meta: ProxyHostAuthentikMeta = {
-    enabled: config.enabled
+    enabled: config.enabled,
   };
 
   if (config.outpostDomain) {
@@ -1692,48 +1805,63 @@ function hydrateLoadBalancer(meta: LoadBalancerMeta | undefined): LoadBalancerCo
   }
 
   const enabled = Boolean(meta.enabled);
-  const policy: LoadBalancingPolicy = (meta.policy && VALID_LB_POLICIES.includes(meta.policy as LoadBalancingPolicy))
-    ? (meta.policy as LoadBalancingPolicy)
-    : "random";
+  const policy: LoadBalancingPolicy =
+    meta.policy && VALID_LB_POLICIES.includes(meta.policy as LoadBalancingPolicy)
+      ? (meta.policy as LoadBalancingPolicy)
+      : "random";
 
   const policyHeaderField = normalizeMetaValue(meta.policy_header_field ?? null);
   const policyCookieName = normalizeMetaValue(meta.policy_cookie_name ?? null);
   const policyCookieSecret = normalizeMetaValue(meta.policy_cookie_secret ?? null);
   const tryDuration = normalizeMetaValue(meta.try_duration ?? null);
   const tryInterval = normalizeMetaValue(meta.try_interval ?? null);
-  const retries = typeof meta.retries === "number" && Number.isFinite(meta.retries) && meta.retries >= 0 ? meta.retries : null;
+  const retries =
+    typeof meta.retries === "number" && Number.isFinite(meta.retries) && meta.retries >= 0
+      ? meta.retries
+      : null;
 
   let activeHealthCheck: LoadBalancerActiveHealthCheck | null = null;
   if (meta.active_health_check) {
     activeHealthCheck = {
       enabled: Boolean(meta.active_health_check.enabled),
       uri: normalizeMetaValue(meta.active_health_check.uri ?? null),
-      port: typeof meta.active_health_check.port === "number" && Number.isFinite(meta.active_health_check.port) && meta.active_health_check.port > 0
-        ? meta.active_health_check.port
-        : null,
+      port:
+        typeof meta.active_health_check.port === "number" &&
+        Number.isFinite(meta.active_health_check.port) &&
+        meta.active_health_check.port > 0
+          ? meta.active_health_check.port
+          : null,
       interval: normalizeMetaValue(meta.active_health_check.interval ?? null),
       timeout: normalizeMetaValue(meta.active_health_check.timeout ?? null),
-      status: typeof meta.active_health_check.status === "number" && Number.isFinite(meta.active_health_check.status) && meta.active_health_check.status >= 100
-        ? meta.active_health_check.status
-        : null,
-      body: normalizeMetaValue(meta.active_health_check.body ?? null)
+      status:
+        typeof meta.active_health_check.status === "number" &&
+        Number.isFinite(meta.active_health_check.status) &&
+        meta.active_health_check.status >= 100
+          ? meta.active_health_check.status
+          : null,
+      body: normalizeMetaValue(meta.active_health_check.body ?? null),
     };
   }
 
   let passiveHealthCheck: LoadBalancerPassiveHealthCheck | null = null;
   if (meta.passive_health_check) {
     const unhealthyStatus = Array.isArray(meta.passive_health_check.unhealthy_status)
-      ? meta.passive_health_check.unhealthy_status.filter((s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100)
+      ? meta.passive_health_check.unhealthy_status.filter(
+          (s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100,
+        )
       : null;
 
     passiveHealthCheck = {
       enabled: Boolean(meta.passive_health_check.enabled),
       failDuration: normalizeMetaValue(meta.passive_health_check.fail_duration ?? null),
-      maxFails: typeof meta.passive_health_check.max_fails === "number" && Number.isFinite(meta.passive_health_check.max_fails) && meta.passive_health_check.max_fails >= 0
-        ? meta.passive_health_check.max_fails
-        : null,
+      maxFails:
+        typeof meta.passive_health_check.max_fails === "number" &&
+        Number.isFinite(meta.passive_health_check.max_fails) &&
+        meta.passive_health_check.max_fails >= 0
+          ? meta.passive_health_check.max_fails
+          : null,
       unhealthyStatus: unhealthyStatus && unhealthyStatus.length > 0 ? unhealthyStatus : null,
-      unhealthyLatency: normalizeMetaValue(meta.passive_health_check.unhealthy_latency ?? null)
+      unhealthyLatency: normalizeMetaValue(meta.passive_health_check.unhealthy_latency ?? null),
     };
   }
 
@@ -1747,7 +1875,7 @@ function hydrateLoadBalancer(meta: LoadBalancerMeta | undefined): LoadBalancerCo
     tryInterval,
     retries,
     activeHealthCheck,
-    passiveHealthCheck
+    passiveHealthCheck,
   };
 }
 
@@ -1757,7 +1885,7 @@ function dehydrateLoadBalancer(config: LoadBalancerConfig | null): LoadBalancerM
   }
 
   const meta: LoadBalancerMeta = {
-    enabled: config.enabled
+    enabled: config.enabled,
   };
 
   if (config.policy) {
@@ -1784,7 +1912,7 @@ function dehydrateLoadBalancer(config: LoadBalancerConfig | null): LoadBalancerM
 
   if (config.activeHealthCheck) {
     const ahc: LoadBalancerActiveHealthCheckMeta = {
-      enabled: config.activeHealthCheck.enabled
+      enabled: config.activeHealthCheck.enabled,
     };
     if (config.activeHealthCheck.uri) {
       ahc.uri = config.activeHealthCheck.uri;
@@ -1809,7 +1937,7 @@ function dehydrateLoadBalancer(config: LoadBalancerConfig | null): LoadBalancerM
 
   if (config.passiveHealthCheck) {
     const phc: LoadBalancerPassiveHealthCheckMeta = {
-      enabled: config.passiveHealthCheck.enabled
+      enabled: config.passiveHealthCheck.enabled,
     };
     if (config.passiveHealthCheck.failDuration) {
       phc.fail_duration = config.passiveHealthCheck.failDuration;
@@ -1817,7 +1945,10 @@ function dehydrateLoadBalancer(config: LoadBalancerConfig | null): LoadBalancerM
     if (config.passiveHealthCheck.maxFails !== null) {
       phc.max_fails = config.passiveHealthCheck.maxFails;
     }
-    if (config.passiveHealthCheck.unhealthyStatus && config.passiveHealthCheck.unhealthyStatus.length > 0) {
+    if (
+      config.passiveHealthCheck.unhealthyStatus &&
+      config.passiveHealthCheck.unhealthyStatus.length > 0
+    ) {
       phc.unhealthy_status = [...config.passiveHealthCheck.unhealthyStatus];
     }
     if (config.passiveHealthCheck.unhealthyLatency) {
@@ -1850,7 +1981,7 @@ function hydrateDnsResolver(meta: DnsResolverMeta | undefined): DnsResolverConfi
     enabled,
     resolvers,
     fallbacks: fallbacks && fallbacks.length > 0 ? fallbacks : null,
-    timeout
+    timeout,
   };
 }
 
@@ -1860,7 +1991,7 @@ function dehydrateDnsResolver(config: DnsResolverConfig | null): DnsResolverMeta
   }
 
   const meta: DnsResolverMeta = {
-    enabled: config.enabled
+    enabled: config.enabled,
   };
 
   if (config.resolvers && config.resolvers.length > 0) {
@@ -1876,22 +2007,25 @@ function dehydrateDnsResolver(config: DnsResolverConfig | null): DnsResolverMeta
   return meta;
 }
 
-function hydrateUpstreamDnsResolution(meta: UpstreamDnsResolutionMeta | undefined): UpstreamDnsResolutionConfig | null {
+function hydrateUpstreamDnsResolution(
+  meta: UpstreamDnsResolutionMeta | undefined,
+): UpstreamDnsResolutionConfig | null {
   if (!meta) {
     return null;
   }
 
   const enabled = meta.enabled === undefined ? null : Boolean(meta.enabled);
-  const family = meta.family && VALID_UPSTREAM_DNS_FAMILIES.includes(meta.family) ? meta.family : null;
+  const family =
+    meta.family && VALID_UPSTREAM_DNS_FAMILIES.includes(meta.family) ? meta.family : null;
 
   return {
     enabled,
-    family
+    family,
   };
 }
 
 function dehydrateUpstreamDnsResolution(
-  config: UpstreamDnsResolutionConfig | null
+  config: UpstreamDnsResolutionConfig | null,
 ): UpstreamDnsResolutionMeta | undefined {
   if (!config) {
     return undefined;
@@ -1946,7 +2080,11 @@ function parseProxyHost(row: ProxyHostRow): ProxyHost {
     waf: meta.waf ?? null,
     mtls: meta.mtls ?? null,
     cpmForwardAuth: meta.cpm_forward_auth?.enabled
-      ? { enabled: true, protected_paths: meta.cpm_forward_auth.protected_paths ?? null, excluded_paths: meta.cpm_forward_auth.excluded_paths ?? null }
+      ? {
+          enabled: true,
+          protected_paths: meta.cpm_forward_auth.protected_paths ?? null,
+          excluded_paths: meta.cpm_forward_auth.excluded_paths ?? null,
+        }
       : null,
     redirects: meta.redirects ?? [],
     rewrite: meta.rewrite ?? null,
@@ -1968,14 +2106,14 @@ export async function countProxyHosts(search?: string): Promise<number> {
     ? or(
         like(proxyHosts.name, `%${search}%`),
         like(proxyHosts.domains, `%${search}%`),
-        like(proxyHosts.upstreams, `%${search}%`)
+        like(proxyHosts.upstreams, `%${search}%`),
       )
     : undefined;
   const [row] = await db.select({ value: count() }).from(proxyHosts).where(where);
   return row?.value ?? 0;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
 const PROXY_HOST_SORT_COLUMNS: Record<string, any> = {
   name: proxyHosts.name,
   domains: proxyHosts.domains,
@@ -1989,13 +2127,13 @@ export async function listProxyHostsPaginated(
   offset: number,
   search?: string,
   sortBy?: string,
-  sortDir?: "asc" | "desc"
+  sortDir?: "asc" | "desc",
 ): Promise<ProxyHost[]> {
   const where = search
     ? or(
         like(proxyHosts.name, `%${search}%`),
         like(proxyHosts.domains, `%${search}%`),
-        like(proxyHosts.upstreams, `%${search}%`)
+        like(proxyHosts.upstreams, `%${search}%`),
       )
     : undefined;
   const col = (sortBy && PROXY_HOST_SORT_COLUMNS[sortBy]) || proxyHosts.createdAt;
@@ -2039,7 +2177,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
       skipHttpsHostnameValidation: input.skipHttpsHostnameValidation ?? false,
       enabled: input.enabled ?? true,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning();
 
@@ -2053,7 +2191,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     entityType: "proxy_host",
     entityId: record.id,
     summary: `Created proxy host ${input.name}`,
-    data: input
+    data: input,
   });
 
   await applyCaddyConfig();
@@ -2062,12 +2200,16 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
 
 export async function getProxyHost(id: number): Promise<ProxyHost | null> {
   const host = await db.query.proxyHosts.findFirst({
-    where: (table, { eq }) => eq(table.id, id)
+    where: (table, { eq }) => eq(table.id, id),
   });
   return host ? parseProxyHost(host) : null;
 }
 
-export async function updateProxyHost(id: number, input: Partial<ProxyHostInput>, actorUserId: number) {
+export async function updateProxyHost(
+  id: number,
+  input: Partial<ProxyHostInput>,
+  actorUserId: number,
+) {
   const existing = await getProxyHost(id);
   if (!existing) {
     throw new Error("Proxy host not found");
@@ -2081,7 +2223,9 @@ export async function updateProxyHost(id: number, input: Partial<ProxyHostInput>
   const effectiveCertificateId =
     input.certificateId !== undefined ? input.certificateId : existing.certificateId;
   await assertWildcardIssuable(domainList, effectiveCertificateId);
-  const upstreams = input.upstreams ? JSON.stringify(Array.from(new Set(input.upstreams))) : JSON.stringify(existing.upstreams);
+  const upstreams = input.upstreams
+    ? JSON.stringify(Array.from(new Set(input.upstreams)))
+    : JSON.stringify(existing.upstreams);
   const existingMeta: ProxyHostMeta = {
     custom_reverse_proxy_json: existing.customReverseProxyJson ?? undefined,
     custom_pre_handlers_json: existing.customPreHandlersJson ?? undefined,
@@ -2093,20 +2237,38 @@ export async function updateProxyHost(id: number, input: Partial<ProxyHostInput>
     ...(existing.geoblockMode !== "merge" ? { geoblock_mode: existing.geoblockMode } : {}),
     ...(existing.waf ? { waf: existing.waf } : {}),
     ...(existing.mtls ? { mtls: existing.mtls } : {}),
-    ...(existing.cpmForwardAuth?.enabled ? {
-      cpm_forward_auth: {
-        enabled: true,
-        ...(existing.cpmForwardAuth.protected_paths ? { protected_paths: existing.cpmForwardAuth.protected_paths } : {}),
-        ...(existing.cpmForwardAuth.excluded_paths ? { excluded_paths: existing.cpmForwardAuth.excluded_paths } : {})
-      }
-    } : {}),
-    ...(existing.redirects && existing.redirects.length > 0 ? { redirects: existing.redirects } : {}),
+    ...(existing.cpmForwardAuth?.enabled
+      ? {
+          cpm_forward_auth: {
+            enabled: true,
+            ...(existing.cpmForwardAuth.protected_paths
+              ? { protected_paths: existing.cpmForwardAuth.protected_paths }
+              : {}),
+            ...(existing.cpmForwardAuth.excluded_paths
+              ? { excluded_paths: existing.cpmForwardAuth.excluded_paths }
+              : {}),
+          },
+        }
+      : {}),
+    ...(existing.redirects && existing.redirects.length > 0
+      ? { redirects: existing.redirects }
+      : {}),
     ...(existing.rewrite ? { rewrite: existing.rewrite } : {}),
-    ...(existing.locationRules && existing.locationRules.length > 0 ? { location_rules: dehydrateLocationRules(existing.locationRules) } : {}),
-    ...(existing.pathAllows && existing.pathAllows.length > 0 ? { path_allows: existing.pathAllows } : {}),
-    ...(existing.pathBlocks && existing.pathBlocks.length > 0 ? { path_blocks: existing.pathBlocks } : {}),
-    ...(existing.pathRewrites && existing.pathRewrites.length > 0 ? { path_rewrites: existing.pathRewrites } : {}),
-    ...(existing.errorPages && existing.errorPages.length > 0 ? { error_pages: existing.errorPages } : {}),
+    ...(existing.locationRules && existing.locationRules.length > 0
+      ? { location_rules: dehydrateLocationRules(existing.locationRules) }
+      : {}),
+    ...(existing.pathAllows && existing.pathAllows.length > 0
+      ? { path_allows: existing.pathAllows }
+      : {}),
+    ...(existing.pathBlocks && existing.pathBlocks.length > 0
+      ? { path_blocks: existing.pathBlocks }
+      : {}),
+    ...(existing.pathRewrites && existing.pathRewrites.length > 0
+      ? { path_rewrites: existing.pathRewrites }
+      : {}),
+    ...(existing.errorPages && existing.errorPages.length > 0
+      ? { error_pages: existing.errorPages }
+      : {}),
   };
   const meta = buildMeta(existingMeta, input);
 
@@ -2125,9 +2287,10 @@ export async function updateProxyHost(id: number, input: Partial<ProxyHostInput>
       allowWebsocket: input.allowWebsocket ?? existing.allowWebsocket,
       preserveHostHeader: input.preserveHostHeader ?? existing.preserveHostHeader,
       meta,
-      skipHttpsHostnameValidation: input.skipHttpsHostnameValidation ?? existing.skipHttpsHostnameValidation,
+      skipHttpsHostnameValidation:
+        input.skipHttpsHostnameValidation ?? existing.skipHttpsHostnameValidation,
       enabled: input.enabled ?? existing.enabled,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(proxyHosts.id, id));
 
@@ -2137,7 +2300,7 @@ export async function updateProxyHost(id: number, input: Partial<ProxyHostInput>
     entityType: "proxy_host",
     entityId: id,
     summary: `Updated proxy host ${input.name ?? existing.name}`,
-    data: input
+    data: input,
   });
 
   await applyCaddyConfig();
@@ -2156,7 +2319,7 @@ export async function deleteProxyHost(id: number, actorUserId: number) {
     action: "delete",
     entityType: "proxy_host",
     entityId: id,
-    summary: `Deleted proxy host ${existing.name}`
+    summary: `Deleted proxy host ${existing.name}`,
   });
   await applyCaddyConfig();
 }

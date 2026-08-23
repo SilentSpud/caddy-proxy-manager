@@ -17,21 +17,24 @@ function nowIso() {
 
 async function insertProvider(overrides: Partial<typeof oauthProviders.$inferInsert> = {}) {
   const now = nowIso();
-  const [provider] = await db.insert(oauthProviders).values({
-    id: randomUUID(),
-    name: 'Test OIDC',
-    type: 'oidc',
-    clientId: encryptSecret('test-client-id'),
-    clientSecret: encryptSecret('test-client-secret'),
-    issuer: 'https://issuer.example.com',
-    scopes: 'openid email profile',
-    autoLink: false,
-    enabled: true,
-    source: 'ui',
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [provider] = await db
+    .insert(oauthProviders)
+    .values({
+      id: randomUUID(),
+      name: 'Test OIDC',
+      type: 'oidc',
+      clientId: encryptSecret('test-client-id'),
+      clientSecret: encryptSecret('test-client-secret'),
+      issuer: 'https://issuer.example.com',
+      scopes: 'openid email profile',
+      autoLink: false,
+      enabled: true,
+      source: 'ui',
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return provider;
 }
 
@@ -146,9 +149,7 @@ describe('oauth-providers integration', () => {
   it('unique name constraint prevents duplicate names', async () => {
     await insertProvider({ name: 'UniqueProvider', id: randomUUID() });
 
-    await expect(
-      insertProvider({ name: 'UniqueProvider', id: randomUUID() })
-    ).rejects.toThrow();
+    await expect(insertProvider({ name: 'UniqueProvider', id: randomUUID() })).rejects.toThrow();
   });
 
   it('re-encrypts secret on update', async () => {
@@ -187,15 +188,18 @@ describe('oauth-providers integration', () => {
 
   it('default type is oidc and default source is ui', async () => {
     const now = nowIso();
-    const [provider] = await db.insert(oauthProviders).values({
-      id: randomUUID(),
-      name: 'Defaults Test',
-      clientId: encryptSecret('cid'),
-      clientSecret: encryptSecret('csecret'),
-      scopes: 'openid',
-      createdAt: now,
-      updatedAt: now,
-    }).returning();
+    const [provider] = await db
+      .insert(oauthProviders)
+      .values({
+        id: randomUUID(),
+        name: 'Defaults Test',
+        clientId: encryptSecret('cid'),
+        clientSecret: encryptSecret('csecret'),
+        scopes: 'openid',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
 
     expect(provider.type).toBe('oidc');
     expect(provider.source).toBe('ui');

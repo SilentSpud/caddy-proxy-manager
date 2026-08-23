@@ -10,15 +10,18 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ErrorPageRule } from "@/lib/models/proxy-hosts";
+import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 
 type RuleState = { statuses: string; body: string; contentType: string };
 
-function toState(rules: ErrorPageRule[]): RuleState[] {
-  return rules.map((r) => ({
-    statuses: r.statuses.join(", "),
-    body: r.body,
-    contentType: r.contentType ?? "",
-  }));
+function toState(rules: ErrorPageRule[]): WithRowId<RuleState>[] {
+  return withRowIds(
+    rules.map((r) => ({
+      statuses: r.statuses.join(", "),
+      body: r.body,
+      contentType: r.contentType ?? "",
+    })),
+  );
 }
 
 function parseStatuses(value: string): number[] {
@@ -27,7 +30,7 @@ function parseStatuses(value: string): number[] {
       value
         .split(",")
         .map((part) => parseInt(part.trim(), 10))
-        .filter((n) => Number.isInteger(n) && n >= 400 && n <= 599)
+        .filter((n) => Number.isInteger(n) && n >= 400 && n <= 599),
     ),
   ];
 }
@@ -40,7 +43,7 @@ function toJson(rules: RuleState[]): string {
         const out: ErrorPageRule = { statuses: parseStatuses(r.statuses), body: r.body };
         if (r.contentType.trim()) out.contentType = r.contentType.trim();
         return out;
-      })
+      }),
   );
 }
 
@@ -52,21 +55,21 @@ type Props = {
 };
 
 export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: Props) {
-  const [rules, setRules] = useState<RuleState[]>(toState(initialData));
+  const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
   const addRule = () =>
     setRules((r) => [
       ...r,
-      {
+      withRowId({
         statuses: "502, 503, 504",
         body: "<h1>Service temporarily unavailable</h1>",
         contentType: "",
-      },
+      }),
     ]);
 
-  const removeRule = (i: number) => setRules((r) => r.filter((_, idx) => idx !== i));
-  const updateRule = (i: number, key: keyof RuleState, value: string) =>
-    setRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, [key]: value } : rule)));
+  const removeRule = (rowId: string) => setRules((r) => r.filter((rule) => rule.rowId !== rowId));
+  const updateRule = (rowId: string, key: keyof RuleState, value: string) =>
+    setRules((r) => r.map((rule) => (rule.rowId === rowId ? { ...rule, [key]: value } : rule)));
 
   return (
     <VStack gap={2}>
@@ -78,7 +81,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
       {rules.length > 0 && (
         <VStack gap={3}>
           {rules.map((rule, i) => (
-            <Card key={i}>
+            <Card key={rule.rowId}>
               <VStack gap={2}>
                 <HStack gap={2} vAlign="end">
                   <TextInput
@@ -86,7 +89,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                     size="sm"
                     placeholder="502, 503, 504 (blank = all errors)"
                     value={rule.statuses}
-                    onChange={(next) => updateRule(i, "statuses", next)}
+                    onChange={(next) => updateRule(rule.rowId, "statuses", next)}
                   />
                   <TextInput
                     label="Content type"
@@ -94,14 +97,14 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                     size="sm"
                     placeholder="text/html; charset=utf-8"
                     value={rule.contentType}
-                    onChange={(next) => updateRule(i, "contentType", next)}
+                    onChange={(next) => updateRule(rule.rowId, "contentType", next)}
                   />
                   <IconButton
                     variant="ghost"
                     size="sm"
                     label={`Remove error page ${i + 1}`}
                     icon={<Trash2 />}
-                    onClick={() => removeRule(i)}
+                    onClick={() => removeRule(rule.rowId)}
                   />
                 </HStack>
                 <TextArea
@@ -109,7 +112,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                   isLabelHidden
                   placeholder="<h1>Service temporarily unavailable</h1>"
                   value={rule.body}
-                  onChange={(next) => updateRule(i, "body", next)}
+                  onChange={(next) => updateRule(rule.rowId, "body", next)}
                   rows={3}
                 />
               </VStack>
@@ -119,7 +122,13 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
       )}
 
       <HStack>
-        <Button variant="ghost" size="sm" label="Add Error Page" icon={<Plus />} onClick={addRule} />
+        <Button
+          variant="ghost"
+          size="sm"
+          label="Add Error Page"
+          icon={<Plus />}
+          onClick={addRule}
+        />
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">

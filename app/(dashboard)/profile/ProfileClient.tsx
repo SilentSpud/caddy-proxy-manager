@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -47,17 +47,26 @@ interface ActiveSession {
 /** Best-effort friendly device label from a User-Agent string. */
 function describeDevice(ua: string | null): string {
   if (!ua) return "Unknown device";
-  const browser = /Edg\//.test(ua) ? "Edge"
-    : /Chrome\//.test(ua) ? "Chrome"
-    : /Firefox\//.test(ua) ? "Firefox"
-    : /Safari\//.test(ua) ? "Safari"
-    : "Browser";
-  const os = /Windows/.test(ua) ? "Windows"
-    : /Mac OS X|Macintosh/.test(ua) ? "macOS"
-    : /Android/.test(ua) ? "Android"
-    : /iPhone|iPad|iOS/.test(ua) ? "iOS"
-    : /Linux/.test(ua) ? "Linux"
-    : "";
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /Chrome\//.test(ua)
+      ? "Chrome"
+      : /Firefox\//.test(ua)
+        ? "Firefox"
+        : /Safari\//.test(ua)
+          ? "Safari"
+          : "Browser";
+  const os = /Windows/.test(ua)
+    ? "Windows"
+    : /Mac OS X|Macintosh/.test(ua)
+      ? "macOS"
+      : /Android/.test(ua)
+        ? "Android"
+        : /iPhone|iPad|iOS/.test(ua)
+          ? "iOS"
+          : /Linux/.test(ua)
+            ? "Linux"
+            : "";
   return os ? `${browser} on ${os}` : browser;
 }
 
@@ -120,7 +129,14 @@ function ProfileSection({
   );
 }
 
-export default function ProfileClient({ user, enabledProviders, apiTokens, sessions, localPasswordsEnabled = true, avatar }: ProfileClientProps) {
+export default function ProfileClient({
+  user,
+  enabledProviders,
+  apiTokens,
+  sessions,
+  localPasswordsEnabled = true,
+  avatar,
+}: ProfileClientProps) {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -159,8 +175,8 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currentPassword,
-          newPassword
-        })
+          newPassword,
+        }),
       });
 
       const data = await response.json();
@@ -196,7 +212,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
     try {
       const response = await fetch("/api/user/unlink-oauth", {
         method: "POST",
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
 
       const data = await response.json();
@@ -229,7 +245,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
       const response = await fetch("/api/user/link-oauth-start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: providerId })
+        body: JSON.stringify({ provider: providerId }),
       });
 
       if (!response.ok) {
@@ -275,7 +291,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
         const response = await fetch("/api/user/update-avatar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ avatarUrl: base64 })
+          body: JSON.stringify({ avatarUrl: base64 }),
         });
 
         const data = await response.json();
@@ -308,7 +324,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
       const response = await fetch("/api/user/update-avatar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarUrl: null })
+        body: JSON.stringify({ avatarUrl: null }),
       });
 
       const data = await response.json();
@@ -347,8 +363,11 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
   const formatDate = (iso: string | null): string => {
     if (!iso) return "Never";
     return new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric", month: "short", day: "numeric",
-      hour: "2-digit", minute: "2-digit",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -379,12 +398,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
       )}
 
       {success && (
-        <Banner
-          status="success"
-          title={success}
-          isDismissable
-          onDismiss={() => setSuccess(null)}
-        />
+        <Banner status="success" title={success} isDismissable onDismiss={() => setSuccess(null)} />
       )}
 
       <VStack gap={4}>
@@ -602,8 +616,8 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
         <ProfileSection icon={Key} title="API Tokens">
           <VStack gap={4}>
             <Text type="body" size="sm" color="secondary">
-              Create tokens for programmatic access to the API using the header
-              Authorization: Bearer &lt;token&gt;
+              Create tokens for programmatic access to the API using the header Authorization:
+              Bearer &lt;token&gt;
             </Text>
 
             {newToken && (

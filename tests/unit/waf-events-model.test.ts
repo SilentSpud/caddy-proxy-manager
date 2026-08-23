@@ -39,7 +39,9 @@ describe('waf-events ClickHouse fallback', () => {
 
   it('returns empty results for connection failures', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const connectionError = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8123'), { code: 'ECONNREFUSED' });
+    const connectionError = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8123'), {
+      code: 'ECONNREFUSED',
+    });
 
     mockQueryWafCountWithSearch.mockRejectedValueOnce(connectionError);
     mockQueryWafEventStatsWithSearch.mockRejectedValueOnce(connectionError);
@@ -60,7 +62,9 @@ describe('waf-events ClickHouse fallback', () => {
     await expect(listWafEvents(50, 0, 'example.com', 100, 200)).resolves.toEqual([]);
 
     expect(warn).toHaveBeenCalledTimes(5);
-    expect(warn).toHaveBeenCalledWith('[waf-events] ClickHouse unavailable during countWafEvents; returning empty WAF analytics.');
+    expect(warn).toHaveBeenCalledWith(
+      '[waf-events] ClickHouse unavailable during countWafEvents; returning empty WAF analytics.',
+    );
   });
 
   it('detects nested FailedToOpenSocket causes', async () => {
@@ -71,7 +75,9 @@ describe('waf-events ClickHouse fallback', () => {
     });
 
     await expect(listWafEvents()).resolves.toEqual([]);
-    expect(warn).toHaveBeenCalledWith('[waf-events] ClickHouse unavailable during listWafEvents; returning empty WAF analytics.');
+    expect(warn).toHaveBeenCalledWith(
+      '[waf-events] ClickHouse unavailable during listWafEvents; returning empty WAF analytics.',
+    );
   });
 
   it('rethrows non-connection query failures', async () => {

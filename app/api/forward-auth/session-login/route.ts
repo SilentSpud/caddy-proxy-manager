@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
 import {
   createForwardAuthSession,
   createExchangeCode,
   checkHostAccessByDomain,
-  consumeRedirectIntent
+  consumeRedirectIntent,
 } from "@/src/lib/models/forward-auth";
 import { logAuditEvent } from "@/src/lib/audit";
 
@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
     // Consume the redirect intent — returns the server-stored redirect URI
     const redirectUri = await consumeRedirectIntent(rid);
     if (!redirectUri) {
-      return NextResponse.json({ error: "Invalid or expired redirect intent. Please try again." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid or expired redirect intent. Please try again." },
+        { status: 400 },
+      );
     }
 
     const targetUrl = new URL(redirectUri);
@@ -51,11 +54,11 @@ export async function POST(request: NextRequest) {
         userId,
         action: "forward_auth_access_denied",
         entityType: "proxy_host",
-        summary: `Forward auth access denied for user ${session.user.email} to host ${targetUrl.hostname}`
+        summary: `Forward auth access denied for user ${session.user.email} to host ${targetUrl.hostname}`,
       });
       return NextResponse.json(
         { error: "You do not have access to this application." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
       action: "forward_auth_login",
       entityType: "user",
       entityId: userId,
-      summary: `Forward auth login (session) for user ${session.user.email} to ${targetUrl.hostname}`
+      summary: `Forward auth login (session) for user ${session.user.email} to ${targetUrl.hostname}`,
     });
 
     const callbackUrl = new URL("/.cpm-auth/callback", targetUrl.origin);

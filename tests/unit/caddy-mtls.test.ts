@@ -72,7 +72,7 @@ describe('buildClientAuthentication', () => {
       new Map(),
       new Map(),
       new Map(),
-      new Set()
+      new Set(),
     );
     expect(result).toBeNull();
   });
@@ -84,7 +84,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       new Map(), // CA 99 not in map
       new Map(),
-      new Set()
+      new Set(),
     );
     expect(result).toBeNull();
   });
@@ -98,7 +98,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       caCertMap,
       new Map(),
-      new Set() // CA 1 is not managed
+      new Set(), // CA 1 is not managed
     );
 
     expect(result).not.toBeNull();
@@ -118,7 +118,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       caCertMap,
       issuedClientCertMap,
-      cAsWithAnyIssuedCerts
+      cAsWithAnyIssuedCerts,
     );
 
     // Returns a valid client_authentication that no client can satisfy:
@@ -141,7 +141,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       caCertMap,
       issuedClientCertMap,
-      cAsWithAnyIssuedCerts
+      cAsWithAnyIssuedCerts,
     );
 
     expect(result).not.toBeNull();
@@ -161,7 +161,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       caCertMap,
       issuedClientCertMap,
-      cAsWithAnyIssuedCerts
+      cAsWithAnyIssuedCerts,
     );
 
     expect(result!.trusted_leaf_certs).toEqual(['LEAF_1', 'LEAF_2', 'LEAF_3']);
@@ -180,7 +180,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       caCertMap,
       issuedClientCertMap,
-      cAsWithAnyIssuedCerts
+      cAsWithAnyIssuedCerts,
     );
 
     expect(result!.trusted_ca_certs).toContain('CA_A');
@@ -199,7 +199,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       caCertMap,
       issuedClientCertMap,
-      cAsWithAnyIssuedCerts
+      cAsWithAnyIssuedCerts,
     );
     // Must NOT return null — returns a valid but unsatisfiable client_authentication
     expect(result).not.toBeNull();
@@ -217,7 +217,7 @@ describe('buildClientAuthentication', () => {
       mTlsDomainMap,
       caCertMap,
       new Map(),
-      new Set()
+      new Set(),
     );
 
     expect(result).not.toBeNull();
@@ -235,7 +235,7 @@ describe('buildClientAuthentication', () => {
       new Map(),
       new Set(),
       undefined,
-      'request'
+      'request',
     );
 
     expect(result).not.toBeNull();
@@ -271,10 +271,7 @@ describe('groupMtlsDomainsByCaSet', () => {
       ['app.example.com', [1]],
       ['app2.example.com', [1]],
     ]);
-    const groups = groupMtlsDomainsByCaSet(
-      ['app.example.com', 'app2.example.com'],
-      mTlsDomainMap
-    );
+    const groups = groupMtlsDomainsByCaSet(['app.example.com', 'app2.example.com'], mTlsDomainMap);
     expect(groups.size).toBe(1);
     const [group] = groups.values();
     expect(group).toHaveLength(2);
@@ -289,15 +286,12 @@ describe('groupMtlsDomainsByCaSet', () => {
       ['app.example.com', [1]], // trusts CA_A only
       ['api.example.com', [2]], // trusts CA_B only
     ]);
-    const groups = groupMtlsDomainsByCaSet(
-      ['app.example.com', 'api.example.com'],
-      mTlsDomainMap
-    );
+    const groups = groupMtlsDomainsByCaSet(['app.example.com', 'api.example.com'], mTlsDomainMap);
     expect(groups.size).toBe(2);
 
     const groupValues = Array.from(groups.values());
-    const appGroup = groupValues.find(g => g.includes('app.example.com'));
-    const apiGroup = groupValues.find(g => g.includes('api.example.com'));
+    const appGroup = groupValues.find((g) => g.includes('app.example.com'));
+    const apiGroup = groupValues.find((g) => g.includes('api.example.com'));
 
     expect(appGroup).toEqual(['app.example.com']);
     expect(apiGroup).toEqual(['api.example.com']);
@@ -308,10 +302,7 @@ describe('groupMtlsDomainsByCaSet', () => {
       ['app.example.com', [1, 2]],
       ['app2.example.com', [2, 1]], // same CAs, different order
     ]);
-    const groups = groupMtlsDomainsByCaSet(
-      ['app.example.com', 'app2.example.com'],
-      mTlsDomainMap
-    );
+    const groups = groupMtlsDomainsByCaSet(['app.example.com', 'app2.example.com'], mTlsDomainMap);
     expect(groups.size).toBe(1);
     const [group] = groups.values();
     expect(group).toHaveLength(2);
@@ -319,13 +310,10 @@ describe('groupMtlsDomainsByCaSet', () => {
 
   it('separates domains with subset vs superset CAs', () => {
     const mTlsDomainMap = new Map([
-      ['app.example.com', [1]],       // trusts CA_A only
-      ['api.example.com', [1, 2]],    // trusts CA_A + CA_B
+      ['app.example.com', [1]], // trusts CA_A only
+      ['api.example.com', [1, 2]], // trusts CA_A + CA_B
     ]);
-    const groups = groupMtlsDomainsByCaSet(
-      ['app.example.com', 'api.example.com'],
-      mTlsDomainMap
-    );
+    const groups = groupMtlsDomainsByCaSet(['app.example.com', 'api.example.com'], mTlsDomainMap);
     expect(groups.size).toBe(2);
   });
 
@@ -337,7 +325,7 @@ describe('groupMtlsDomainsByCaSet', () => {
     ]);
     const groups = groupMtlsDomainsByCaSet(
       ['a.example.com', 'b.example.com', 'c.example.com'],
-      mTlsDomainMap
+      mTlsDomainMap,
     );
     expect(groups.size).toBe(3);
   });
@@ -350,13 +338,13 @@ describe('groupMtlsDomainsByCaSet', () => {
     ]);
     const groups = groupMtlsDomainsByCaSet(
       ['shared1.example.com', 'shared2.example.com', 'unique.example.com'],
-      mTlsDomainMap
+      mTlsDomainMap,
     );
     expect(groups.size).toBe(2);
 
     const groupValues = Array.from(groups.values());
-    const sharedGroup = groupValues.find(g => g.length === 2);
-    const uniqueGroup = groupValues.find(g => g.length === 1);
+    const sharedGroup = groupValues.find((g) => g.length === 2);
+    const uniqueGroup = groupValues.find((g) => g.length === 1);
 
     expect(sharedGroup).toContain('shared1.example.com');
     expect(sharedGroup).toContain('shared2.example.com');
@@ -369,10 +357,7 @@ describe('groupMtlsDomainsByCaSet', () => {
       ['app.example.com', [1]],
       ['noca.example.com', []],
     ]);
-    const groups = groupMtlsDomainsByCaSet(
-      ['app.example.com', 'noca.example.com'],
-      mTlsDomainMap
-    );
+    const groups = groupMtlsDomainsByCaSet(['app.example.com', 'noca.example.com'], mTlsDomainMap);
     // Two distinct groups: key="1" and key=""
     expect(groups.size).toBe(2);
   });
@@ -396,7 +381,7 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
       mTlsDomainMap,
       caCertMap,
       new Map(),
-      new Set()
+      new Set(),
     );
     // Both CAs end up trusted — this is the unsafe behavior
     expect(result!.trusted_ca_certs).toContain('CA_A');
@@ -418,7 +403,7 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
         mTlsDomainMap,
         caCertMap,
         new Map(),
-        new Set()
+        new Set(),
       );
       if (auth) {
         policies.push({
@@ -430,8 +415,8 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
 
     expect(policies).toHaveLength(2);
 
-    const appPolicy = policies.find(p => p.sni.includes('app.example.com'))!;
-    const apiPolicy = policies.find(p => p.sni.includes('api.example.com'))!;
+    const appPolicy = policies.find((p) => p.sni.includes('app.example.com'))!;
+    const apiPolicy = policies.find((p) => p.sni.includes('api.example.com'))!;
 
     // app.example.com policy must ONLY trust CA_A
     expect(appPolicy.trusted_ca_certs).toContain('CA_A');
@@ -461,7 +446,7 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
         mTlsDomainMap,
         caCertMapExtended,
         new Map(),
-        new Set()
+        new Set(),
       );
       if (auth) {
         policies.push({ sni: domainGroup, trusted_ca_certs: auth.trusted_ca_certs as unknown[] });
@@ -470,7 +455,7 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
 
     expect(policies).toHaveLength(3);
 
-    const aPolicy = policies.find(p => p.sni.includes('a.example.com'))!;
+    const aPolicy = policies.find((p) => p.sni.includes('a.example.com'))!;
     expect(aPolicy.trusted_ca_certs).toEqual(['CA_A']);
     expect(aPolicy.trusted_ca_certs).not.toContain('CA_B');
     expect(aPolicy.trusted_ca_certs).not.toContain('CA_C');
@@ -492,7 +477,7 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
       mTlsDomainMap,
       caCertMap,
       new Map(),
-      new Set()
+      new Set(),
     );
 
     expect(auth).not.toBeNull();

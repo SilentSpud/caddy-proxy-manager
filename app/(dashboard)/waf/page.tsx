@@ -1,7 +1,12 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 import WafEventsClient from "./WafEventsClient";
-import { listWafEvents, countWafEvents, getWafEventStats, getWafRuleMessages } from "@/src/lib/models/waf-events";
+import {
+  listWafEvents,
+  countWafEvents,
+  getWafEventStats,
+  getWafRuleMessages,
+} from "@/src/lib/models/waf-events";
 import { getWafSettings } from "@/src/lib/settings";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { requireAdmin } from "@/src/lib/auth";
@@ -9,34 +14,44 @@ import type { Metadata } from "next";
 
 const PER_PAGE = 50;
 const RANGE_SECONDS = {
-  '24h': 24 * 60 * 60,
-  '7d': 7 * 24 * 60 * 60,
-  '30d': 30 * 24 * 60 * 60,
+  "24h": 24 * 60 * 60,
+  "7d": 7 * 24 * 60 * 60,
+  "30d": 30 * 24 * 60 * 60,
 } as const;
 
-type RangeKey = keyof typeof RANGE_SECONDS | 'all' | 'custom';
+type RangeKey = keyof typeof RANGE_SECONDS | "all" | "custom";
 
-function parseRange(searchParams: { range?: string; from?: string; to?: string }): { range: RangeKey; from?: number; to?: number } {
+function parseRange(searchParams: { range?: string; from?: string; to?: string }): {
+  range: RangeKey;
+  from?: number;
+  to?: number;
+} {
   const rangeParam = searchParams.range;
-  if (rangeParam === '24h' || rangeParam === '7d' || rangeParam === '30d') {
+  if (rangeParam === "24h" || rangeParam === "7d" || rangeParam === "30d") {
     const to = Math.floor(Date.now() / 1000);
     const from = to - RANGE_SECONDS[rangeParam];
     return { range: rangeParam, from, to };
   }
 
-  if (rangeParam === 'custom') {
-    const from = parseInt(searchParams.from ?? '', 10);
-    const to = parseInt(searchParams.to ?? '', 10);
+  if (rangeParam === "custom") {
+    const from = parseInt(searchParams.from ?? "", 10);
+    const to = parseInt(searchParams.to ?? "", 10);
     if (Number.isFinite(from) && Number.isFinite(to) && from < to) {
-      return { range: 'custom', from, to };
+      return { range: "custom", from, to };
     }
   }
 
-  return { range: 'all' };
+  return { range: "all" };
 }
 
 interface PageProps {
-  searchParams: Promise<{ page?: string; search?: string; range?: string; from?: string; to?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+  }>;
 }
 
 export const metadata: Metadata = {

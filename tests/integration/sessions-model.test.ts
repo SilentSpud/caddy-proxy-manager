@@ -11,12 +11,20 @@ let db: TestDb;
 
 vi.mock('../../src/lib/db', async () => {
   return {
-    get default() { return db; },
-    get sqlite() { return undefined; },
+    get default() {
+      return db;
+    },
+    get sqlite() {
+      return undefined;
+    },
   };
 });
 
-import { listUserSessions, revokeUserSession, revokeOtherUserSessions } from '../../src/lib/models/sessions';
+import {
+  listUserSessions,
+  revokeUserSession,
+  revokeOtherUserSessions,
+} from '../../src/lib/models/sessions';
 
 const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
 const HOUR = 3_600_000;
@@ -24,12 +32,26 @@ const DAY = 86_400_000;
 
 async function seedUser(id: number, email: string) {
   await db.insert(users).values({
-    id, email, name: email, role: 'user', provider: 'credentials', subject: email,
-    status: 'active', createdAt: iso(0), updatedAt: iso(0),
+    id,
+    email,
+    name: email,
+    role: 'user',
+    provider: 'credentials',
+    subject: email,
+    status: 'active',
+    createdAt: iso(0),
+    updatedAt: iso(0),
   });
 }
 
-async function seedSession(opts: { id: number; userId: number; createdMsAgo: number; expiresInMs: number; ip?: string; ua?: string }) {
+async function seedSession(opts: {
+  id: number;
+  userId: number;
+  createdMsAgo: number;
+  expiresInMs: number;
+  ip?: string;
+  ua?: string;
+}) {
   await db.insert(sessions).values({
     id: opts.id,
     userId: opts.userId,
@@ -49,10 +71,16 @@ beforeEach(async () => {
 });
 
 describe('sessions model', () => {
-  it('lists only the user\'s active sessions, newest first, excluding expired', async () => {
-    await seedSession({ id: 10, userId: 1, createdMsAgo: 2 * HOUR, expiresInMs: 7 * DAY, ua: 'Mozilla/5.0 (Macintosh) Chrome/120' });
+  it("lists only the user's active sessions, newest first, excluding expired", async () => {
+    await seedSession({
+      id: 10,
+      userId: 1,
+      createdMsAgo: 2 * HOUR,
+      expiresInMs: 7 * DAY,
+      ua: 'Mozilla/5.0 (Macintosh) Chrome/120',
+    });
     await seedSession({ id: 11, userId: 1, createdMsAgo: 1 * HOUR, expiresInMs: 7 * DAY }); // newer
-    await seedSession({ id: 12, userId: 1, createdMsAgo: 3 * HOUR, expiresInMs: -HOUR });   // expired
+    await seedSession({ id: 12, userId: 1, createdMsAgo: 3 * HOUR, expiresInMs: -HOUR }); // expired
     await seedSession({ id: 20, userId: 2, createdMsAgo: 1 * HOUR, expiresInMs: 7 * DAY }); // other user
 
     const list = await listUserSessions(1);

@@ -56,7 +56,7 @@ export function registerFailedAttempt(key: string): RateLimitOutcome {
   if (!existing) {
     ATTEMPTS.set(key, {
       attempts: 1,
-      firstAttemptTimestamp: now
+      firstAttemptTimestamp: now,
     });
     return { blocked: false };
   }
@@ -80,4 +80,3 @@ export function registerFailedAttempt(key: string): RateLimitOutcome {
 export function resetAttempts(key: string): void {
   ATTEMPTS.delete(key);
 }
-

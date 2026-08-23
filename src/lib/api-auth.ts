@@ -24,9 +24,7 @@ export type ApiAuthResult = {
   authMethod: "bearer" | "session";
 };
 
-export async function authenticateApiRequest(
-  request: NextRequest
-): Promise<ApiAuthResult> {
+export async function authenticateApiRequest(request: NextRequest): Promise<ApiAuthResult> {
   // Try Bearer token first
   const authHeader = request.headers.get("authorization") ?? "";
   if (authHeader.startsWith("Bearer ")) {
@@ -109,8 +107,5 @@ export function apiErrorResponse(error: unknown): NextResponse {
   // reaches the browser as `{"error":""}` with nothing recorded anywhere.
   console.error("Unhandled API error:", error);
   const message = error instanceof Error ? error.message.trim() : "";
-  return NextResponse.json(
-    { error: message || "Internal server error" },
-    { status: 500 }
-  );
+  return NextResponse.json({ error: message || "Internal server error" }, { status: 500 });
 }

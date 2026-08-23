@@ -53,8 +53,20 @@ const LB_INPUT = {
   policy: 'round_robin' as const,
   tryDuration: '5s',
   retries: 3,
-  activeHealthCheck: { enabled: true, uri: '/health', port: 8081, interval: '30s', timeout: '5s', status: 200 },
-  passiveHealthCheck: { enabled: true, failDuration: '30s', maxFails: 5, unhealthyStatus: [500, 502, 503] },
+  activeHealthCheck: {
+    enabled: true,
+    uri: '/health',
+    port: 8081,
+    interval: '30s',
+    timeout: '5s',
+    status: 200,
+  },
+  passiveHealthCheck: {
+    enabled: true,
+    failDuration: '30s',
+    maxFails: 5,
+    unhealthyStatus: [500, 502, 503],
+  },
 };
 
 async function createHostWithRuleLb() {
@@ -65,7 +77,7 @@ async function createHostWithRuleLb() {
       upstreams: ['origin:80'],
       locationRules: [{ path: '/api/*', upstreams: ['a:80', 'b:80'], loadBalancer: LB_INPUT }],
     },
-    1
+    1,
   );
 }
 
@@ -79,8 +91,17 @@ describe('location rule load balancer — model round-trip', () => {
     expect(rule.loadBalancer).not.toBeNull();
     expect(rule.loadBalancer!.policy).toBe('round_robin');
     expect(rule.loadBalancer!.retries).toBe(3);
-    expect(rule.loadBalancer!.activeHealthCheck).toMatchObject({ enabled: true, uri: '/health', port: 8081, status: 200 });
-    expect(rule.loadBalancer!.passiveHealthCheck).toMatchObject({ enabled: true, maxFails: 5, unhealthyStatus: [500, 502, 503] });
+    expect(rule.loadBalancer!.activeHealthCheck).toMatchObject({
+      enabled: true,
+      uri: '/health',
+      port: 8081,
+      status: 200,
+    });
+    expect(rule.loadBalancer!.passiveHealthCheck).toMatchObject({
+      enabled: true,
+      maxFails: 5,
+      unhealthyStatus: [500, 502, 503],
+    });
   });
 
   it('preserves the rule load balancer across an unrelated update', async () => {

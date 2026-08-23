@@ -21,24 +21,27 @@ function nowIso() {
 
 async function insertHost(overrides: Partial<typeof proxyHosts.$inferInsert> = {}) {
   const now = nowIso();
-  const [host] = await db.insert(proxyHosts).values({
-    name: 'Test Host',
-    domains: JSON.stringify(['test.example.com']),
-    upstreams: JSON.stringify(['backend:8080']),
-    certificateId: null,
-    accessListId: null,
-    sslForced: false,
-    hstsEnabled: false,
-    hstsSubdomains: false,
-    allowWebsocket: false,
-    preserveHostHeader: false,
-    skipHttpsHostnameValidation: false,
-    meta: null,
-    enabled: true,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  }).returning();
+  const [host] = await db
+    .insert(proxyHosts)
+    .values({
+      name: 'Test Host',
+      domains: JSON.stringify(['test.example.com']),
+      upstreams: JSON.stringify(['backend:8080']),
+      certificateId: null,
+      accessListId: null,
+      sslForced: false,
+      hstsEnabled: false,
+      hstsSubdomains: false,
+      allowWebsocket: false,
+      preserveHostHeader: false,
+      skipHttpsHostnameValidation: false,
+      meta: null,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    })
+    .returning();
   return host;
 }
 
@@ -334,7 +337,10 @@ describe('proxy-hosts null meta', () => {
 
   it('multiple hosts can coexist with different meta states', async () => {
     const h1 = await insertHost({ name: 'Simple', meta: null });
-    const h2 = await insertHost({ name: 'With WAF', meta: JSON.stringify({ waf: { enabled: true, waf_mode: 'override' } }) });
+    const h2 = await insertHost({
+      name: 'With WAF',
+      meta: JSON.stringify({ waf: { enabled: true, waf_mode: 'override' } }),
+    });
 
     const r1 = await db.query.proxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, h1.id) });
     const r2 = await db.query.proxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, h2.id) });

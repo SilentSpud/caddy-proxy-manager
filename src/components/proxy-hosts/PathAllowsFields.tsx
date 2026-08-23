@@ -8,16 +8,17 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { PathAllowRule } from "@/lib/models/proxy-hosts";
+import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 
 type Props = { initialData?: PathAllowRule[] };
 
 export function PathAllowsFields({ initialData = [] }: Props) {
-  const [rules, setRules] = useState<PathAllowRule[]>(initialData);
+  const [rules, setRules] = useState<WithRowId<PathAllowRule>[]>(() => withRowIds(initialData));
 
-  const addRule = () => setRules((r) => [...r, { path: "" }]);
-  const removeRule = (i: number) => setRules((r) => r.filter((_, idx) => idx !== i));
-  const updateRule = (i: number, value: string) =>
-    setRules((r) => r.map((rule, idx) => (idx === i ? { path: value } : rule)));
+  const addRule = () => setRules((r) => [...r, withRowId({ path: "" })]);
+  const removeRule = (rowId: string) => setRules((r) => r.filter((rule) => rule.rowId !== rowId));
+  const updateRule = (rowId: string, value: string) =>
+    setRules((r) => r.map((rule) => (rule.rowId === rowId ? { ...rule, path: value } : rule)));
 
   return (
     <VStack gap={2}>
@@ -27,27 +28,29 @@ export function PathAllowsFields({ initialData = [] }: Props) {
       <input
         type="hidden"
         name="pathAllowsJson"
-        value={JSON.stringify(rules.filter((r) => r.path.trim()))}
+        value={JSON.stringify(
+          rules.filter((r) => r.path.trim()).map(({ path }): PathAllowRule => ({ path })),
+        )}
       />
 
       {rules.length > 0 && (
         <VStack gap={2}>
           {rules.map((rule, i) => (
-            <HStack key={i} gap={2} vAlign="end">
+            <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
                 label={`Path ${i + 1}`}
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/secret"
                 value={rule.path}
-                onChange={(next) => updateRule(i, next)}
+                onChange={(next) => updateRule(rule.rowId, next)}
               />
               <IconButton
                 variant="ghost"
                 size="sm"
                 label={`Remove path allow ${i + 1}`}
                 icon={<Trash2 />}
-                onClick={() => removeRule(i)}
+                onClick={() => removeRule(rule.rowId)}
               />
             </HStack>
           ))}
@@ -55,7 +58,13 @@ export function PathAllowsFields({ initialData = [] }: Props) {
       )}
 
       <HStack>
-        <Button variant="ghost" size="sm" label="Add Path Allow" icon={<Plus />} onClick={addRule} />
+        <Button
+          variant="ghost"
+          size="sm"
+          label="Add Path Allow"
+          icon={<Plus />}
+          onClick={addRule}
+        />
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">

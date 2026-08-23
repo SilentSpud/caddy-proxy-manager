@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
@@ -27,11 +27,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
         )}
       </VStack>
       {action && (
-        <Button
-          label={action.label}
-          icon={action.icon ?? <Plus />}
-          onClick={action.onClick}
-        />
+        <Button label={action.label} icon={action.icon ?? <Plus />} onClick={action.onClick} />
       )}
     </HStack>
   );

@@ -23,13 +23,19 @@ test.describe('Mobile layout', () => {
     // Open drawer first to get a reference to the dialog
     const drawerDialog = page.locator('[role="dialog"]');
     // The dialog is hidden (not visible) before opening
-    await expect(drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true })).not.toBeVisible();
+    await expect(
+      drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true }),
+    ).not.toBeVisible();
     // Open drawer
     await page.getByRole('button', { name: /open navigation/i }).click();
-    await expect(drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true })).toBeVisible();
+    await expect(
+      drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true }),
+    ).toBeVisible();
     // Close by pressing Escape
     await page.keyboard.press('Escape');
-    await expect(drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true })).not.toBeVisible();
+    await expect(
+      drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true }),
+    ).not.toBeVisible();
   });
 
   test('navigating from drawer closes it', async ({ page }) => {

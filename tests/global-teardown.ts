@@ -5,11 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-const COMPOSE_ARGS = [
-  'compose',
-  '-f', 'docker-compose.yml',
-  '-f', 'tests/docker-compose.test.yml',
-];
+const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 export default async function globalTeardown() {
   console.log('[global-teardown] Stopping Docker Compose test stack...');
@@ -17,7 +13,11 @@ export default async function globalTeardown() {
     execFileSync('docker', [...COMPOSE_ARGS, 'down', '-v', '--remove-orphans'], {
       stdio: 'inherit',
       cwd: process.cwd(),
-      env: { ...process.env, CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026', COMPOSE_PROFILES: 'clickhouse' },
+      env: {
+        ...process.env,
+        CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026',
+        COMPOSE_PROFILES: 'clickhouse',
+      },
     });
   } catch (err) {
     console.warn('[global-teardown] docker compose down failed:', err);

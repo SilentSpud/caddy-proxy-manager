@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { redeemExchangeCode } from "@/src/lib/models/forward-auth";
 
 const COOKIE_NAME = "_cpm_fa";
@@ -16,10 +16,9 @@ export async function GET(request: NextRequest) {
 
   const result = await redeemExchangeCode(code);
   if (!result) {
-    return new NextResponse(
-      "Invalid or expired authorization code. Please try logging in again.",
-      { status: 401 }
-    );
+    return new NextResponse("Invalid or expired authorization code. Please try logging in again.", {
+      status: 401,
+    });
   }
 
   // Redirect back to original URL with the session cookie set
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
-    maxAge: COOKIE_MAX_AGE
+    maxAge: COOKIE_MAX_AGE,
   });
 
   return response;

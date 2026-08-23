@@ -13,7 +13,11 @@ vi.mock('@/src/lib/models/access-lists', () => ({
 vi.mock('@/src/lib/api-auth', () => {
   const ApiAuthError = class extends Error {
     status: number;
-    constructor(msg: string, status: number) { super(msg); this.status = status; this.name = 'ApiAuthError'; }
+    constructor(msg: string, status: number) {
+      super(msg);
+      this.status = status;
+      this.name = 'ApiAuthError';
+    }
   };
   return {
     requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
@@ -23,7 +27,10 @@ vi.mock('@/src/lib/api-auth', () => {
       if (error instanceof ApiAuthError) {
         return NR.json({ error: error.message }, { status: error.status });
       }
-      return NR.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
+      return NR.json(
+        { error: error instanceof Error ? error.message : 'Internal server error' },
+        { status: 500 },
+      );
     }),
     ApiAuthError,
   };
@@ -33,7 +40,15 @@ import { GET as listGET, POST as listPOST } from '@/app/api/v1/access-lists/rout
 import { GET as getGET, PUT, DELETE } from '@/app/api/v1/access-lists/[id]/route';
 import { POST as entriesPOST } from '@/app/api/v1/access-lists/[id]/entries/route';
 import { DELETE as entryDELETE } from '@/app/api/v1/access-lists/[id]/entries/[entryId]/route';
-import { listAccessLists, createAccessList, getAccessList, updateAccessList, deleteAccessList, addAccessListEntry, removeAccessListEntry } from '@/src/lib/models/access-lists';
+import {
+  listAccessLists,
+  createAccessList,
+  getAccessList,
+  updateAccessList,
+  deleteAccessList,
+  addAccessListEntry,
+  removeAccessListEntry,
+} from '@/src/lib/models/access-lists';
 import { requireApiAdmin } from '@/src/lib/api-auth';
 
 const mockList = vi.mocked(listAccessLists);
@@ -128,7 +143,9 @@ describe('PUT /api/v1/access-lists/[id]', () => {
     const body = { name: 'Updated List' };
     mockUpdate.mockResolvedValue({ ...sampleList, name: 'Updated List' } as any);
 
-    const response = await PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ id: '1' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -139,7 +156,9 @@ describe('PUT /api/v1/access-lists/[id]', () => {
   it('returns 500 when access list not found', async () => {
     mockUpdate.mockRejectedValue(new Error('not found'));
 
-    const response = await PUT(createMockRequest({ method: 'PUT', body: { name: 'X' } }), { params: Promise.resolve({ id: '999' }) });
+    const response = await PUT(createMockRequest({ method: 'PUT', body: { name: 'X' } }), {
+      params: Promise.resolve({ id: '999' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -151,7 +170,9 @@ describe('DELETE /api/v1/access-lists/[id]', () => {
   it('deletes an access list', async () => {
     mockDelete.mockResolvedValue(undefined as any);
 
-    const response = await DELETE(createMockRequest({ method: 'DELETE' }), { params: Promise.resolve({ id: '1' }) });
+    const response = await DELETE(createMockRequest({ method: 'DELETE' }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -162,7 +183,9 @@ describe('DELETE /api/v1/access-lists/[id]', () => {
   it('returns 500 when access list not found', async () => {
     mockDelete.mockRejectedValue(new Error('not found'));
 
-    const response = await DELETE(createMockRequest({ method: 'DELETE' }), { params: Promise.resolve({ id: '999' }) });
+    const response = await DELETE(createMockRequest({ method: 'DELETE' }), {
+      params: Promise.resolve({ id: '999' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(500);
@@ -176,7 +199,9 @@ describe('POST /api/v1/access-lists/[id]/entries', () => {
     const updatedList = { ...sampleList, entries: [...sampleList.entries, { id: 2, ...body }] };
     mockAddEntry.mockResolvedValue(updatedList as any);
 
-    const response = await entriesPOST(createMockRequest({ method: 'POST', body }), { params: Promise.resolve({ id: '1' }) });
+    const response = await entriesPOST(createMockRequest({ method: 'POST', body }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(201);
@@ -190,10 +215,9 @@ describe('DELETE /api/v1/access-lists/[id]/entries/[entryId]', () => {
     const updatedList = { ...sampleList, entries: [] };
     mockRemoveEntry.mockResolvedValue(updatedList as any);
 
-    const response = await entryDELETE(
-      createMockRequest({ method: 'DELETE' }),
-      { params: Promise.resolve({ id: '1', entryId: '1' }) }
-    );
+    const response = await entryDELETE(createMockRequest({ method: 'DELETE' }), {
+      params: Promise.resolve({ id: '1', entryId: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -242,10 +266,9 @@ describe('POST /api/v1/access-lists/[id]/entries - with username and password', 
     };
     mockAddEntry.mockResolvedValue(updatedList as any);
 
-    const response = await entriesPOST(
-      createMockRequest({ method: 'POST', body: entry }),
-      { params: Promise.resolve({ id: '1' }) }
-    );
+    const response = await entriesPOST(createMockRequest({ method: 'POST', body: entry }), {
+      params: Promise.resolve({ id: '1' }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(201);

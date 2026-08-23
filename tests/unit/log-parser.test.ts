@@ -3,13 +3,21 @@ import { describe, it, expect, vi } from 'vitest';
 // Mock heavy dependencies before importing the module under test
 vi.mock('@/src/lib/db', () => ({
   default: {
-    select: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }) }) }),
-    insert: vi.fn().mockReturnValue({ values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) }) }),
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }),
+      }),
+    }),
+    insert: vi.fn().mockReturnValue({
+      values: vi
+        .fn()
+        .mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) }),
+    }),
     delete: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ run: vi.fn() }) }),
     run: vi.fn(),
   },
   nowIso: () => new Date().toISOString(),
-  toIso: (v: string | Date | null | undefined) => v ? new Date(v as string).toISOString() : null,
+  toIso: (v: string | Date | null | undefined) => (v ? new Date(v as string).toISOString() : null),
 }));
 
 vi.mock('maxmind', () => ({
@@ -86,8 +94,22 @@ describe('log-parser', () => {
 
     it('collects multiple blocked signatures', () => {
       const lines = [
-        JSON.stringify({ ts: 1700000001, msg: 'request blocked', plugin: 'caddy-blocker', client_ip: '1.2.3.4', method: 'POST', uri: '/a' }),
-        JSON.stringify({ ts: 1700000002, msg: 'request blocked', plugin: 'caddy-blocker', client_ip: '5.6.7.8', method: 'GET', uri: '/b' }),
+        JSON.stringify({
+          ts: 1700000001,
+          msg: 'request blocked',
+          plugin: 'caddy-blocker',
+          client_ip: '1.2.3.4',
+          method: 'POST',
+          uri: '/a',
+        }),
+        JSON.stringify({
+          ts: 1700000002,
+          msg: 'request blocked',
+          plugin: 'caddy-blocker',
+          client_ip: '5.6.7.8',
+          method: 'GET',
+          uri: '/b',
+        }),
       ];
       const result = collectBlockedSignatures(lines);
       expect(result.size).toBe(2);
@@ -128,7 +150,14 @@ describe('log-parser', () => {
     });
 
     it('returns null for entries with wrong msg field', () => {
-      const entry = JSON.stringify({ ts: 1700000100, msg: 'request blocked', plugin: 'caddy-blocker', client_ip: '1.2.3.4', method: 'GET', uri: '/' });
+      const entry = JSON.stringify({
+        ts: 1700000100,
+        msg: 'request blocked',
+        plugin: 'caddy-blocker',
+        client_ip: '1.2.3.4',
+        method: 'GET',
+        uri: '/',
+      });
       expect(parseLine(entry, emptyBlocked)).toBeNull();
     });
 
@@ -163,7 +192,14 @@ describe('log-parser', () => {
     it('consumes collected blocked signatures once to avoid over-marking duplicates', () => {
       const ts = 1700000200;
       const blocked = collectBlockedSignatures([
-        JSON.stringify({ ts, msg: 'request blocked', plugin: 'caddy-blocker', client_ip: '1.2.3.4', method: 'GET', uri: '/repeat' }),
+        JSON.stringify({
+          ts,
+          msg: 'request blocked',
+          plugin: 'caddy-blocker',
+          client_ip: '1.2.3.4',
+          method: 'GET',
+          uri: '/repeat',
+        }),
       ]);
       const entry = JSON.stringify({
         ts,
@@ -203,12 +239,29 @@ describe('log-parser', () => {
     it('merges new signatures onto an existing (carried-over) map', () => {
       const ts = 1700000500;
       const pending = collectBlockedSignatures([
-        JSON.stringify({ ts, msg: 'request blocked', plugin: 'caddy-blocker', client_ip: '1.1.1.1', method: 'GET', uri: '/a' }),
+        JSON.stringify({
+          ts,
+          msg: 'request blocked',
+          plugin: 'caddy-blocker',
+          client_ip: '1.1.1.1',
+          method: 'GET',
+          uri: '/a',
+        }),
       ]);
       // Second pass merges a new signature into the carried-over map.
-      const merged = collectBlockedSignatures([
-        JSON.stringify({ ts, msg: 'request blocked', plugin: 'caddy-blocker', client_ip: '2.2.2.2', method: 'GET', uri: '/b' }),
-      ], pending);
+      const merged = collectBlockedSignatures(
+        [
+          JSON.stringify({
+            ts,
+            msg: 'request blocked',
+            plugin: 'caddy-blocker',
+            client_ip: '2.2.2.2',
+            method: 'GET',
+            uri: '/b',
+          }),
+        ],
+        pending,
+      );
       expect(merged).toBe(pending);
       expect(merged.size).toBe(2);
       expect(merged.get(`${ts}|1.1.1.1|GET|/a`)).toBe(1);
@@ -220,10 +273,19 @@ describe('log-parser', () => {
       // Pass 1: only the "request blocked" line is present (the tick boundary
       // fell before the "handled request" row was written).
       const carried = collectBlockedSignatures([
-        JSON.stringify({ ts, msg: 'request blocked', plugin: 'caddy-blocker', client_ip: '3.3.3.3', method: 'GET', uri: '/x' }),
+        JSON.stringify({
+          ts,
+          msg: 'request blocked',
+          plugin: 'caddy-blocker',
+          client_ip: '3.3.3.3',
+          method: 'GET',
+          uri: '/x',
+        }),
       ]);
       const handled = JSON.stringify({
-        ts, msg: 'handled request', status: 403,
+        ts,
+        msg: 'handled request',
+        status: 403,
         request: { client_ip: '3.3.3.3', method: 'GET', uri: '/x', host: 'x.com' },
       });
       // Pass 2: the handled request consumes the carried-over signature.
@@ -236,8 +298,8 @@ describe('log-parser', () => {
     it('drops signatures older than the carry-over window, keeps recent ones', () => {
       const now = 1700001000;
       const blocked = new Map<string, number>([
-        [`${now - 10}|1.1.1.1|GET|/recent`, 1],   // within 120s window
-        [`${now - 500}|2.2.2.2|GET|/stale`, 1],    // older than window
+        [`${now - 10}|1.1.1.1|GET|/recent`, 1], // within 120s window
+        [`${now - 500}|2.2.2.2|GET|/stale`, 1], // older than window
       ]);
       pruneBlockedSignatures(blocked, now);
       expect(blocked.has(`${now - 10}|1.1.1.1|GET|/recent`)).toBe(true);

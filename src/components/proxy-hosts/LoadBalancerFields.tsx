@@ -9,7 +9,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
 import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { ProxyHost, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
+import type { ProxyHost, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 
 const LOAD_BALANCING_POLICIES = [
   { value: "random", label: "Random", description: "Random selection (default)" },
@@ -58,10 +58,10 @@ export function LoadBalancerFields({
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [policy, setPolicy] = useState<LoadBalancingPolicy>(initial?.policy ?? "random");
   const [activeHealthEnabled, setActiveHealthEnabled] = useState(
-    initial?.activeHealthCheck?.enabled ?? false
+    initial?.activeHealthCheck?.enabled ?? false,
   );
   const [passiveHealthEnabled, setPassiveHealthEnabled] = useState(
-    initial?.passiveHealthCheck?.enabled ?? false
+    initial?.passiveHealthCheck?.enabled ?? false,
   );
 
   const [text, setText] = useState<TextFields>({
@@ -75,8 +75,7 @@ export function LoadBalancerFields({
     activeHealthTimeout: initial?.activeHealthCheck?.timeout ?? "",
     activeHealthBody: initial?.activeHealthCheck?.body ?? "",
     passiveHealthFailDuration: initial?.passiveHealthCheck?.failDuration ?? "",
-    passiveHealthUnhealthyStatus:
-      initial?.passiveHealthCheck?.unhealthyStatus?.join(", ") ?? "",
+    passiveHealthUnhealthyStatus: initial?.passiveHealthCheck?.unhealthyStatus?.join(", ") ?? "",
     passiveHealthUnhealthyLatency: initial?.passiveHealthCheck?.unhealthyLatency ?? "",
   });
 

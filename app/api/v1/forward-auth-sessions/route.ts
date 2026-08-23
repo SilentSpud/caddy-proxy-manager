@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import {
   listForwardAuthSessions,
-  deleteUserForwardAuthSessions
+  deleteUserForwardAuthSessions,
 } from "@/src/lib/models/forward-auth";
 
 export async function GET(request: NextRequest) {

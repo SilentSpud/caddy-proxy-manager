@@ -54,9 +54,7 @@ test.describe('Analytics world map', () => {
     await gotoAnalyticsMap(page);
     await page.waitForTimeout(3_000); // let the worker spin up and the source parse
 
-    const mapErrors = errors.filter((e) =>
-      /worker|content security policy|maplibre/i.test(e),
-    );
+    const mapErrors = errors.filter((e) => /worker|content security policy|maplibre/i.test(e));
     expect(mapErrors, `map errors in console: ${JSON.stringify(mapErrors)}`).toEqual([]);
   });
 
@@ -75,8 +73,8 @@ test.describe('Analytics world map', () => {
     const targets: [number, number][] = [
       [0.55, 0.62], // Africa
       [0.72, 0.35], // Asia
-      [0.20, 0.30], // North America
-      [0.50, 0.30], // Europe / North Africa
+      [0.2, 0.3], // North America
+      [0.5, 0.3], // Europe / North Africa
     ];
 
     let popupText: string | null = null;

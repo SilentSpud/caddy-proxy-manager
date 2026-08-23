@@ -2,8 +2,8 @@
  * WAF handler builder and effective-config resolver for Caddy.
  * Extracted from caddy.ts so these functions can be unit tested.
  */
-import { type WafSettings } from "./settings";
-import { type WafHostConfig } from "./models/proxy-hosts";
+import type { WafSettings } from "./settings";
+import type { WafHostConfig } from "./models/proxy-hosts";
 
 /**
  * Resolves the effective WAF settings for a proxy host by merging or overriding
@@ -17,7 +17,7 @@ import { type WafHostConfig } from "./models/proxy-hosts";
  */
 export function resolveEffectiveWaf(
   global: WafSettings | null,
-  host: WafHostConfig | null | undefined
+  host: WafHostConfig | null | undefined,
 ): WafSettings | null {
   const hostEnabled = host?.enabled;
   const globalEnabled = global?.enabled;
@@ -29,9 +29,9 @@ export function resolveEffectiveWaf(
     if (!hostEnabled) return null;
     return {
       enabled: true,
-      mode: host.mode ?? 'On',
+      mode: host.mode ?? "On",
       load_owasp_crs: host.load_owasp_crs ?? false,
-      custom_directives: host.custom_directives ?? '',
+      custom_directives: host.custom_directives ?? "",
       excluded_rule_ids: host.excluded_rule_ids,
     };
   }
@@ -44,20 +44,19 @@ export function resolveEffectiveWaf(
       enabled: true,
       mode: host.mode ?? global.mode,
       load_owasp_crs: host.load_owasp_crs ?? global.load_owasp_crs,
-      custom_directives: [global.custom_directives, host.custom_directives].filter(Boolean).join('\n'),
-      excluded_rule_ids: [
-        ...(global.excluded_rule_ids ?? []),
-        ...(host.excluded_rule_ids ?? []),
-      ],
+      custom_directives: [global.custom_directives, host.custom_directives]
+        .filter(Boolean)
+        .join("\n"),
+      excluded_rule_ids: [...(global.excluded_rule_ids ?? []), ...(host.excluded_rule_ids ?? [])],
     };
   }
 
   if (host?.enabled) {
     return {
       enabled: true,
-      mode: host.mode ?? 'On',
+      mode: host.mode ?? "On",
       load_owasp_crs: host.load_owasp_crs ?? false,
-      custom_directives: host.custom_directives ?? '',
+      custom_directives: host.custom_directives ?? "",
       excluded_rule_ids: host.excluded_rule_ids,
     };
   }
@@ -73,8 +72,8 @@ export function resolveEffectiveWaf(
  */
 export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
   header: {
-    Connection: ['*Upgrade*'],
-    Upgrade: ['websocket'],
+    Connection: ["*Upgrade*"],
+    Upgrade: ["websocket"],
   },
 };
 
@@ -96,25 +95,26 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
   // (e.g. "On\nSecRuleRemoveById 1-999999") would smuggle in SecLang that the
   // custom_directives allowlist below exists to reject. Clamp to Coraza's three
   // real values and fall back to the safe one.
-  const engineMode = waf.mode === 'Off' || waf.mode === 'DetectionOnly' ? waf.mode : 'On';
+  const engineMode = waf.mode === "Off" || waf.mode === "DetectionOnly" ? waf.mode : "On";
 
   if (waf.load_owasp_crs) {
     // @-prefixed paths resolve from the embedded coraza-coreruleset filesystem,
     // which is only mounted when load_owasp_crs is true.
     parts.push(
-      'Include @coraza.conf-recommended',
-      'Include @crs-setup.conf.example',
-      'Include @owasp_crs/*.conf',
+      "Include @coraza.conf-recommended",
+      "Include @crs-setup.conf.example",
+      "Include @owasp_crs/*.conf",
     );
   }
 
   // Runtime-validate excluded_rule_ids are positive integers
   if (waf.excluded_rule_ids?.length) {
     const validIds = waf.excluded_rule_ids.filter(
-      (id): id is number => typeof id === "number" && Number.isFinite(id) && id > 0 && Number.isInteger(id)
+      (id): id is number =>
+        typeof id === "number" && Number.isFinite(id) && id > 0 && Number.isInteger(id),
     );
     if (validIds.length > 0) {
-      parts.push(`SecRuleRemoveById ${validIds.join(' ')}`);
+      parts.push(`SecRuleRemoveById ${validIds.join(" ")}`);
     }
   }
 
@@ -123,9 +123,9 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     // RelevantOnly logs transactions where a rule fired with the auditlog action (which all OWASP
     // CRS rules include via SecDefaultAction), covering both blocked and DetectionOnly hits.
     // Clean requests with no rule matches are silently skipped, avoiding massive log growth.
-    'SecAuditEngine RelevantOnly',
-    'SecAuditLog /logs/waf-audit.log',
-    'SecAuditLogFormat JSON',
+    "SecAuditEngine RelevantOnly",
+    "SecAuditLog /logs/waf-audit.log",
+    "SecAuditLogFormat JSON",
     // Note: the audit log ends up owned by caddy with mode 0644, so the web
     // container (a different UID) can read it but not truncate it once it passes
     // the parser's size cap. SecAuditLogFileMode cannot fix that — the container's
@@ -136,19 +136,14 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     // Part H carries the matched rules, which waf-log-parser reads to attribute
     // each event to a rule id/message/severity. Bodies (I, J, E) and intermediate
     // response headers (D) are omitted to avoid logging multi-MB payloads.
-    'SecAuditLogParts ABFHZ',
-    'SecResponseBodyAccess Off',
+    "SecAuditLogParts ABFHZ",
+    "SecResponseBodyAccess Off",
   );
 
   // Allowlist approach: only permit known-safe directive prefixes in custom directives
   if (waf.custom_directives?.trim()) {
     const directives = waf.custom_directives.trim();
-    const allowedPrefixes = [
-      /^SecRule\s/,
-      /^SecAction\s/,
-      /^SecMarker\s/,
-      /^SecDefaultAction\s/,
-    ];
+    const allowedPrefixes = [/^SecRule\s/, /^SecAction\s/, /^SecMarker\s/, /^SecDefaultAction\s/];
     const allowedBodyLimitDirectives = [
       /^SecRequestBodyLimit\s+\d+\s*$/i,
       /^SecRequestBodyNoFilesLimit\s+\d+\s*$/i,
@@ -164,30 +159,30 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
       /^SecRuleUpdateActionById\s/i,
       /^SecRuleUpdateTargetById\s/i,
     ];
-    const lines = directives.split('\n');
-    const safeLines = lines.filter(line => {
+    const lines = directives.split("\n");
+    const safeLines = lines.filter((line) => {
       const trimmed = line.trim();
       // Allow empty lines and comments
-      if (!trimmed || trimmed.startsWith('#')) return true;
+      if (!trimmed || trimmed.startsWith("#")) return true;
       // Reject Include directives (prevents file inclusion from container filesystem)
       if (/^Include\s/i.test(trimmed)) return false;
       // Check against allowlist
       const matchesAllowed =
-        allowedPrefixes.some(pattern => pattern.test(trimmed)) ||
-        allowedBodyLimitDirectives.some(pattern => pattern.test(trimmed));
+        allowedPrefixes.some((pattern) => pattern.test(trimmed)) ||
+        allowedBodyLimitDirectives.some((pattern) => pattern.test(trimmed));
       if (!matchesAllowed) return false;
       // Reject blocked SecRule* variants (e.g. SecRuleEngine)
-      if (blockedSecRulePrefixes.some(pattern => pattern.test(trimmed))) return false;
+      if (blockedSecRulePrefixes.some((pattern) => pattern.test(trimmed))) return false;
       // Reject ctl:ruleEngine inside allowed lines (can conditionally disable WAF)
       if (/ctl:ruleEngine/i.test(trimmed)) return false;
       return true;
     });
     if (safeLines.length > 0) {
-      parts.push(safeLines.join('\n'));
+      parts.push(safeLines.join("\n"));
     }
   }
 
-  const handler: Record<string, unknown> = { handler: 'waf', directives: parts.join('\n') };
+  const handler: Record<string, unknown> = { handler: "waf", directives: parts.join("\n") };
   if (waf.load_owasp_crs) handler.load_owasp_crs = true;
   return handler;
 }
@@ -219,12 +214,12 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
  */
 export function buildWafHandlerEntry(
   waf: WafSettings,
-  allowWebsocket = false
+  allowWebsocket = false,
 ): Record<string, unknown> {
   const wafHandler = buildWafHandler(waf);
   if (!allowWebsocket) return wafHandler;
   return {
-    handler: 'subroute',
+    handler: "subroute",
     routes: [
       {
         match: [{ not: [WEBSOCKET_UPGRADE_MATCHER] }],

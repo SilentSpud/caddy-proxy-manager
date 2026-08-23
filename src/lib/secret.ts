@@ -6,7 +6,7 @@ const IV_LENGTH = 12;
 
 function deriveKey(): Buffer {
   return Buffer.from(
-    hkdfSync("sha256", config.sessionSecret, Buffer.alloc(0), "caddy-proxy-manager:secret:v1", 32)
+    hkdfSync("sha256", config.sessionSecret, Buffer.alloc(0), "caddy-proxy-manager:secret:v1", 32),
   );
 }
 
@@ -37,9 +37,10 @@ export function encryptSecret(value: string): string {
  * Set LEGACY_KEY_CUTOFF_DATE env var to extend/disable (ISO 8601 date or "never").
  */
 const LEGACY_KEY_CUTOFF_ENV = process.env.LEGACY_KEY_CUTOFF_DATE;
-const LEGACY_KEY_CUTOFF = LEGACY_KEY_CUTOFF_ENV === "never"
-  ? null
-  : new Date(LEGACY_KEY_CUTOFF_ENV || "2026-06-01T00:00:00Z");
+const LEGACY_KEY_CUTOFF =
+  LEGACY_KEY_CUTOFF_ENV === "never"
+    ? null
+    : new Date(LEGACY_KEY_CUTOFF_ENV || "2026-06-01T00:00:00Z");
 
 export function decryptSecret(value: string): string {
   if (!value) return "";
@@ -53,12 +54,14 @@ export function decryptSecret(value: string): string {
     if (LEGACY_KEY_CUTOFF && new Date() > LEGACY_KEY_CUTOFF) {
       throw new Error(
         "[secret] HKDF decryption failed and legacy key grace period has expired. " +
-        "Re-encrypt this secret with the current key. " +
-        "Set LEGACY_KEY_CUTOFF_DATE=never to temporarily restore legacy key support.",
-        { cause: hkdfError }
+          "Re-encrypt this secret with the current key. " +
+          "Set LEGACY_KEY_CUTOFF_DATE=never to temporarily restore legacy key support.",
+        { cause: hkdfError },
       );
     }
-    console.warn("[secret] HKDF decryption failed; retrying with legacy SHA-256 key. Re-encrypt this secret to remove the legacy key dependency.");
+    console.warn(
+      "[secret] HKDF decryption failed; retrying with legacy SHA-256 key. Re-encrypt this secret to remove the legacy key dependency.",
+    );
     return _decryptWithKey(value, deriveKeyLegacy());
   }
 }

@@ -80,7 +80,7 @@ export async function resolveUserinfoUrl(cfg: ClaimSourceConfig): Promise<string
 
 async function fetchUserinfoClaims(
   cfg: ClaimSourceConfig,
-  accessToken: string
+  accessToken: string,
 ): Promise<Record<string, unknown> | null> {
   const url = await resolveUserinfoUrl(cfg);
   if (!url) return null;
@@ -109,7 +109,7 @@ async function fetchUserinfoClaims(
 export async function fetchOidcClaims(
   cfg: ClaimSourceConfig,
   tokens: OidcTokens,
-  groupsClaim: string
+  groupsClaim: string,
 ): Promise<Record<string, unknown> | null> {
   const idTokenClaims = decodeJwtPayload(tokens.idToken) ?? {};
   let claims: Record<string, unknown> = { ...idTokenClaims };

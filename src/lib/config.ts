@@ -3,9 +3,10 @@ const DEFAULT_ADMIN_USERNAME = "admin";
 const DEFAULT_ADMIN_PASSWORD = "admin";
 const DISALLOWED_SESSION_SECRETS = new Set([
   "change-me-in-production",
-  "dev-secret-change-in-production-12345678901234567890123456789012"
+  "dev-secret-change-in-production-12345678901234567890123456789012",
 ]);
-const DEFAULT_CADDY_URL = process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019";
+const DEFAULT_CADDY_URL =
+  process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019";
 const MIN_SESSION_SECRET_LENGTH = 32;
 const MIN_ADMIN_PASSWORD_LENGTH = 12;
 const DEFAULT_APP_NAME = "Caddy Proxy Manager";
@@ -42,7 +43,8 @@ const isProduction = process.env.NODE_ENV === "production";
 const isNodeRuntime = process.env.NEXT_RUNTIME === "nodejs";
 const isDevelopment = process.env.NODE_ENV === "development";
 // Only enforce strict validation in actual production runtime, not during build
-const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build" || !process.env.NEXT_RUNTIME;
+const isBuildPhase =
+  process.env.NEXT_PHASE === "phase-production-build" || !process.env.NEXT_RUNTIME;
 const isRuntimeProduction = isProduction && isNodeRuntime && !isBuildPhase;
 
 function resolveSessionSecret(): string {
@@ -63,8 +65,8 @@ function resolveSessionSecret(): string {
   if (!isDevelopment && !isProduction && !secret) {
     throw new Error(
       `SESSION_SECRET is required when NODE_ENV="${process.env.NODE_ENV ?? ""}" ` +
-      `(not "development" or "production"). ` +
-      "Generate a secure secret with: openssl rand -base64 32"
+        `(not "development" or "production"). ` +
+        "Generate a secure secret with: openssl rand -base64 32",
     );
   }
 
@@ -76,19 +78,19 @@ function resolveSessionSecret(): string {
     if (!secret) {
       throw new Error(
         "SESSION_SECRET environment variable is required in production. " +
-        "Generate a secure secret with: openssl rand -base64 32"
+          "Generate a secure secret with: openssl rand -base64 32",
       );
     }
     if (DISALLOWED_SESSION_SECRETS.has(secret)) {
       throw new Error(
         "SESSION_SECRET is using a known insecure placeholder value. " +
-        "Generate a secure secret with: openssl rand -base64 32"
+          "Generate a secure secret with: openssl rand -base64 32",
       );
     }
     if (secret.length < MIN_SESSION_SECRET_LENGTH) {
       throw new Error(
         `SESSION_SECRET must be at least ${MIN_SESSION_SECRET_LENGTH} characters long in production. ` +
-        "Generate a secure secret with: openssl rand -base64 32"
+          "Generate a secure secret with: openssl rand -base64 32",
       );
     }
   }
@@ -128,44 +130,32 @@ function resolveAdminCredentials(): { username: string | null; password: string 
 
     // Username validation - just ensure it's set
     if (!rawUsername || !username) {
-      errors.push(
-        "ADMIN_USERNAME must be set"
-      );
+      errors.push("ADMIN_USERNAME must be set");
     }
 
     // Password validation - strict requirements
     if (!rawPassword || password === DEFAULT_ADMIN_PASSWORD) {
-      errors.push(
-        "ADMIN_PASSWORD must be set to a custom value in production (not 'admin')"
-      );
+      errors.push("ADMIN_PASSWORD must be set to a custom value in production (not 'admin')");
     } else {
       if (password.length < MIN_ADMIN_PASSWORD_LENGTH) {
-        errors.push(
-          `ADMIN_PASSWORD must be at least ${MIN_ADMIN_PASSWORD_LENGTH} characters long`
-        );
+        errors.push(`ADMIN_PASSWORD must be at least ${MIN_ADMIN_PASSWORD_LENGTH} characters long`);
       }
       if (!/[A-Z]/.test(password) || !/[a-z]/.test(password)) {
-        errors.push(
-          "ADMIN_PASSWORD must include both uppercase and lowercase letters"
-        );
+        errors.push("ADMIN_PASSWORD must include both uppercase and lowercase letters");
       }
       if (!/[0-9]/.test(password)) {
-        errors.push(
-          "ADMIN_PASSWORD must include at least one number"
-        );
+        errors.push("ADMIN_PASSWORD must include at least one number");
       }
       if (!/[^A-Za-z0-9]/.test(password)) {
-        errors.push(
-          "ADMIN_PASSWORD must include at least one special character"
-        );
+        errors.push("ADMIN_PASSWORD must include at least one special character");
       }
     }
 
     if (errors.length > 0) {
       throw new Error(
         "Admin credentials validation failed:\n" +
-        errors.map(e => `  - ${e}`).join("\n") +
-        "\n\nSet secure credentials using ADMIN_USERNAME and ADMIN_PASSWORD environment variables."
+          errors.map((e) => `  - ${e}`).join("\n") +
+          "\n\nSet secure credentials using ADMIN_USERNAME and ADMIN_PASSWORD environment variables.",
       );
     }
   }
@@ -273,8 +263,8 @@ export function validateProductionConfig() {
  * Returns list of enabled OAuth providers based on configuration.
  * Only includes providers that have complete credentials configured.
  */
-export function getEnabledOAuthProviders(): Array<{id: string; name: string}> {
-  const providers: Array<{id: string; name: string}> = [];
+export function getEnabledOAuthProviders(): Array<{ id: string; name: string }> {
+  const providers: Array<{ id: string; name: string }> = [];
 
   if (
     config.oauth.enabled &&
@@ -284,7 +274,7 @@ export function getEnabledOAuthProviders(): Array<{id: string; name: string}> {
   ) {
     providers.push({
       id: "oauth2",
-      name: config.oauth.providerName
+      name: config.oauth.providerName,
     });
   }
 

@@ -22,8 +22,9 @@ import { Token } from "@astryxdesign/core/Token";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { GeoBlockSettings } from "@/lib/settings";
-import { GeoBlockMode } from "@/lib/models/proxy-hosts";
+import type { GeoBlockSettings } from "@/lib/settings";
+import type { GeoBlockMode } from "@/lib/models/proxy-hosts";
+import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { COUNTRIES, flagEmoji } from "./countries";
 
 // ─── GeoIpStatus ─────────────────────────────────────────────────────────────
@@ -60,10 +61,7 @@ function GeoIpStatus() {
 
   return (
     <Tooltip content={tooltip}>
-      <Badge
-        label={label}
-        variant={allLoaded ? "success" : noneLoaded ? "error" : "warning"}
-      />
+      <Badge label={label} variant={allLoaded ? "success" : noneLoaded ? "error" : "warning"} />
     </Tooltip>
   );
 }
@@ -111,7 +109,7 @@ function CodeMultiSelect({
   searchPlaceholder?: string;
 }) {
   const [selected, setSelected] = useState<string[]>(() =>
-    initialValues.map((c) => c.toUpperCase()).filter(Boolean)
+    initialValues.map((c) => c.toUpperCase()).filter(Boolean),
   );
 
   return (
@@ -211,8 +209,8 @@ function TagInput({
 type HeaderRow = { key: string; value: string };
 
 function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<string, string> }) {
-  const [rows, setRows] = useState<HeaderRow[]>(() =>
-    Object.entries(initialHeaders).map(([key, value]) => ({ key, value }))
+  const [rows, setRows] = useState<WithRowId<HeaderRow>[]>(() =>
+    withRowIds(Object.entries(initialHeaders).map(([key, value]) => ({ key, value }))),
   );
 
   return (
@@ -226,7 +224,7 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
           size="sm"
           label="Add response header"
           icon={<Plus />}
-          onClick={() => setRows((prev) => [...prev, { key: "", value: "" }])}
+          onClick={() => setRows((prev) => [...prev, withRowId({ key: "", value: "" })])}
         />
       </HStack>
 
@@ -237,7 +235,7 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
       ) : (
         <VStack gap={2}>
           {rows.map((row, i) => (
-            <HStack key={i} gap={2} vAlign="end">
+            <HStack key={row.rowId} gap={2} vAlign="end">
               <input type="hidden" name="geoblockResponseHeadersKeys[]" value={row.key} />
               <input type="hidden" name="geoblockResponseHeadersValues[]" value={row.value} />
               <TextInput
@@ -247,7 +245,9 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
                 placeholder="Header"
                 value={row.key}
                 onChange={(next) =>
-                  setRows((prev) => prev.map((r, j) => (j === i ? { ...r, key: next } : r)))
+                  setRows((prev) =>
+                    prev.map((r) => (r.rowId === row.rowId ? { ...r, key: next } : r)),
+                  )
                 }
               />
               <TextInput
@@ -257,7 +257,9 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
                 placeholder="Value"
                 value={row.value}
                 onChange={(next) =>
-                  setRows((prev) => prev.map((r, j) => (j === i ? { ...r, value: next } : r)))
+                  setRows((prev) =>
+                    prev.map((r) => (r.rowId === row.rowId ? { ...r, value: next } : r)),
+                  )
                 }
               />
               <IconButton
@@ -265,7 +267,7 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
                 size="sm"
                 label={`Remove header ${i + 1}`}
                 icon={<X />}
-                onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
+                onClick={() => setRows((prev) => prev.filter((r) => r.rowId !== row.rowId))}
               />
             </HStack>
           ))}
@@ -285,12 +287,13 @@ type RulesPanelProps = {
 
 function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
   const cap = prefix === "block" ? "Block" : "Allow";
-  const countries = prefix === "block" ? initial?.block_countries ?? [] : initial?.allow_countries ?? [];
+  const countries =
+    prefix === "block" ? (initial?.block_countries ?? []) : (initial?.allow_countries ?? []);
   const continents =
-    prefix === "block" ? initial?.block_continents ?? [] : initial?.allow_continents ?? [];
-  const asns = prefix === "block" ? initial?.block_asns ?? [] : initial?.allow_asns ?? [];
-  const cidrs = prefix === "block" ? initial?.block_cidrs ?? [] : initial?.allow_cidrs ?? [];
-  const ips = prefix === "block" ? initial?.block_ips ?? [] : initial?.allow_ips ?? [];
+    prefix === "block" ? (initial?.block_continents ?? []) : (initial?.allow_continents ?? []);
+  const asns = prefix === "block" ? (initial?.block_asns ?? []) : (initial?.allow_asns ?? []);
+  const cidrs = prefix === "block" ? (initial?.block_cidrs ?? []) : (initial?.allow_cidrs ?? []);
+  const ips = prefix === "block" ? (initial?.block_ips ?? []) : (initial?.allow_ips ?? []);
 
   return (
     <VStack gap={6}>
@@ -369,7 +372,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
   const [activeTab, setActiveTab] = useState("block");
 
   const [responseStatus, setResponseStatus] = useState<number | null>(
-    rawInitial?.response_status ?? 403
+    rawInitial?.response_status ?? 403,
   );
   const [responseBody, setResponseBody] = useState(rawInitial?.response_body ?? "Forbidden");
   const [redirectUrl, setRedirectUrl] = useState(rawInitial?.redirect_url ?? "");

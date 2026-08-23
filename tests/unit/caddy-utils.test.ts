@@ -85,7 +85,7 @@ describe('mergeDeep', () => {
     const target: Record<string, unknown> = {};
     mergeDeep(target, JSON.parse('{"__proto__":{"polluted":true}}'));
     // The OWN property list must not contain __proto__
-    expect(Object.prototype.hasOwnProperty.call(target, '__proto__')).toBe(false);
+    expect(Object.hasOwn(target, '__proto__')).toBe(false);
     // Object.prototype must not have been polluted
     expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined();
   });
@@ -94,13 +94,13 @@ describe('mergeDeep', () => {
     const target: Record<string, unknown> = {};
     mergeDeep(target, { constructor: { name: 'hacked' } });
     // No own property named 'constructor' should have been set
-    expect(Object.prototype.hasOwnProperty.call(target, 'constructor')).toBe(false);
+    expect(Object.hasOwn(target, 'constructor')).toBe(false);
   });
 
   it('blocks prototype key', () => {
     const target: Record<string, unknown> = {};
     mergeDeep(target, { prototype: { evil: true } });
-    expect(Object.prototype.hasOwnProperty.call(target, 'prototype')).toBe(false);
+    expect(Object.hasOwn(target, 'prototype')).toBe(false);
   });
 
   it('handles deeply nested merge without pollution', () => {
@@ -176,9 +176,7 @@ describe('parseCustomHandlers', () => {
   });
 
   it('filters out non-object entries', () => {
-    expect(parseCustomHandlers('[{"ok":true}, 42, "string", null]')).toEqual([
-      { ok: true },
-    ]);
+    expect(parseCustomHandlers('[{"ok":true}, 42, "string", null]')).toEqual([{ ok: true }]);
   });
 
   it('returns empty array for null', () => {

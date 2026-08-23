@@ -10,7 +10,11 @@
  *   "failed to readfile: open @coraza.conf-recommended: no such file or directory"
  */
 import { describe, it, expect } from 'vitest';
-import { buildWafHandler, buildWafHandlerEntry, resolveEffectiveWaf } from '../../src/lib/caddy-waf';
+import {
+  buildWafHandler,
+  buildWafHandlerEntry,
+  resolveEffectiveWaf,
+} from '../../src/lib/caddy-waf';
 
 const baseWaf = {
   enabled: true,
@@ -28,7 +32,11 @@ const baseWaf = {
 
 describe('buildWafHandler — SecRuleEngine mode sanitising', () => {
   function directives(mode: string): string {
-    const handler = buildWafHandler({ ...baseWaf, mode: mode as typeof baseWaf.mode, load_owasp_crs: false });
+    const handler = buildWafHandler({
+      ...baseWaf,
+      mode: mode as typeof baseWaf.mode,
+      load_owasp_crs: false,
+    });
     return handler.directives as string;
   }
 
@@ -90,13 +98,22 @@ describe('buildWafHandler — without OWASP CRS', () => {
   });
 
   it('includes custom directives when provided', () => {
-    const directive = 'SecRule REQUEST_HEADERS:User-Agent "@contains leakix.net" "id:9002,phase:1,deny,status:403,log"';
-    const handler = buildWafHandler({ ...baseWaf, load_owasp_crs: false, custom_directives: directive });
+    const directive =
+      'SecRule REQUEST_HEADERS:User-Agent "@contains leakix.net" "id:9002,phase:1,deny,status:403,log"';
+    const handler = buildWafHandler({
+      ...baseWaf,
+      load_owasp_crs: false,
+      custom_directives: directive,
+    });
     expect(handler.directives).toContain(directive);
   });
 
   it('does not append empty/whitespace-only custom_directives', () => {
-    const handler = buildWafHandler({ ...baseWaf, load_owasp_crs: false, custom_directives: '   ' });
+    const handler = buildWafHandler({
+      ...baseWaf,
+      load_owasp_crs: false,
+      custom_directives: '   ',
+    });
     // The directives string should end with the last standard directive
     expect((handler.directives as string).trimEnd()).not.toMatch(/\s+$/);
   });
@@ -221,7 +238,8 @@ const globalWaf = {
   enabled: true,
   mode: 'On' as const,
   load_owasp_crs: false,
-  custom_directives: 'SecRule REQUEST_HEADERS:User-Agent "@contains leakix.net" "id:9002,phase:1,deny,status:403,log"',
+  custom_directives:
+    'SecRule REQUEST_HEADERS:User-Agent "@contains leakix.net" "id:9002,phase:1,deny,status:403,log"',
 };
 
 describe('resolveEffectiveWaf — no per-host config', () => {
@@ -335,7 +353,10 @@ describe('resolveEffectiveWaf — override mode', () => {
 function subrouteOf(entry: Record<string, unknown>) {
   return entry as {
     handler: string;
-    routes: Array<{ match: Array<Record<string, unknown>>; handle: Array<Record<string, unknown>> }>;
+    routes: Array<{
+      match: Array<Record<string, unknown>>;
+      handle: Array<Record<string, unknown>>;
+    }>;
   };
 }
 
@@ -389,10 +410,15 @@ describe('buildWafHandlerEntry — WebSocket bypass', () => {
   });
 
   it('keeps custom directives inside the bypass subroute', () => {
-    const entry = subrouteOf(buildWafHandlerEntry({
-      ...baseWaf,
-      custom_directives: 'SecRule ARGS "@contains evil" "id:9001,deny"',
-    }, true));
+    const entry = subrouteOf(
+      buildWafHandlerEntry(
+        {
+          ...baseWaf,
+          custom_directives: 'SecRule ARGS "@contains evil" "id:9001,deny"',
+        },
+        true,
+      ),
+    );
     const directives = entry.routes[0].handle[0].directives as string;
     expect(directives).toContain('SecRule ARGS "@contains evil"');
   });

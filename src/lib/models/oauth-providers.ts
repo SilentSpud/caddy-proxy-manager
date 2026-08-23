@@ -66,20 +66,22 @@ function parseDbProvider(row: DbProvider): OAuthProvider {
   };
 }
 
-export async function createOAuthProvider(data: {
-  name: string;
-  type?: string;
-  clientId: string;
-  clientSecret: string;
-  issuer?: string | null;
-  authorizationUrl?: string | null;
-  tokenUrl?: string | null;
-  userinfoUrl?: string | null;
-  scopes?: string;
-  autoLink?: boolean;
-  enabled?: boolean;
-  source?: string;
-} & Partial<OAuthGroupMapping>): Promise<OAuthProvider> {
+export async function createOAuthProvider(
+  data: {
+    name: string;
+    type?: string;
+    clientId: string;
+    clientSecret: string;
+    issuer?: string | null;
+    authorizationUrl?: string | null;
+    tokenUrl?: string | null;
+    userinfoUrl?: string | null;
+    scopes?: string;
+    autoLink?: boolean;
+    enabled?: boolean;
+    source?: string;
+  } & Partial<OAuthGroupMapping>,
+): Promise<OAuthProvider> {
   const now = nowIso();
   const id = randomUUID();
 
@@ -158,7 +160,8 @@ export async function updateOAuthProvider(
     scopes: string;
     autoLink: boolean;
     enabled: boolean;
-  }> & Partial<OAuthGroupMapping>
+  }> &
+    Partial<OAuthGroupMapping>,
 ): Promise<OAuthProvider | null> {
   const now = nowIso();
 
@@ -181,7 +184,8 @@ export async function updateOAuthProvider(
   if (data.adminGroup !== undefined) updates.adminGroup = data.adminGroup?.trim() || null;
   if (data.userGroup !== undefined) updates.userGroup = data.userGroup?.trim() || null;
   if (data.viewerGroup !== undefined) updates.viewerGroup = data.viewerGroup?.trim() || null;
-  if (data.defaultRole !== undefined) updates.defaultRole = isAppRole(data.defaultRole) ? data.defaultRole : "user";
+  if (data.defaultRole !== undefined)
+    updates.defaultRole = isAppRole(data.defaultRole) ? data.defaultRole : "user";
   if (data.syncGroups !== undefined) updates.syncGroups = data.syncGroups;
 
   const [row] = await db

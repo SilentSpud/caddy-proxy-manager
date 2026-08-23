@@ -1,237 +1,237 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 import {
   DNS_PROVIDERS,
   buildDnsChallengeConfig,
   decryptProviderCredentials,
   encryptProviderCredentials,
   getProviderDefinition,
-} from "@/src/lib/dns-providers";
-import { isEncryptedSecret } from "@/src/lib/secret";
+} from '@/src/lib/dns-providers';
+import { isEncryptedSecret } from '@/src/lib/secret';
 
-describe("DNS provider registry", () => {
-  it("registers Njalla with the Caddy module path and API token field", () => {
-    const provider = getProviderDefinition("njalla");
+describe('DNS provider registry', () => {
+  it('registers Njalla with the Caddy module path and API token field', () => {
+    const provider = getProviderDefinition('njalla');
 
     expect(provider).toMatchObject({
-      name: "njalla",
-      displayName: "Njalla",
-      docsUrl: "https://github.com/caddy-dns/njalla",
-      modulePath: "github.com/caddy-dns/njalla",
+      name: 'njalla',
+      displayName: 'Njalla',
+      docsUrl: 'https://github.com/caddy-dns/njalla',
+      modulePath: 'github.com/caddy-dns/njalla',
     });
     expect(provider?.fields).toEqual([
       {
-        key: "api_token",
-        label: "API Token",
-        type: "password",
+        key: 'api_token',
+        label: 'API Token',
+        type: 'password',
         required: true,
       },
     ]);
-    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("njalla");
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('njalla');
   });
 
-  it("encrypts, decrypts, and emits Njalla credentials for Caddy DNS challenges", () => {
-    const encrypted = encryptProviderCredentials("njalla", {
-      api_token: "njalla-token",
+  it('encrypts, decrypts, and emits Njalla credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('njalla', {
+      api_token: 'njalla-token',
     });
 
     expect(isEncryptedSecret(encrypted.api_token)).toBe(true);
-    expect(decryptProviderCredentials("njalla", encrypted)).toEqual({
-      api_token: "njalla-token",
+    expect(decryptProviderCredentials('njalla', encrypted)).toEqual({
+      api_token: 'njalla-token',
     });
-    expect(buildDnsChallengeConfig("njalla", encrypted, ["1.1.1.1"])).toEqual({
+    expect(buildDnsChallengeConfig('njalla', encrypted, ['1.1.1.1'])).toEqual({
       provider: {
-        name: "njalla",
-        api_token: "njalla-token",
+        name: 'njalla',
+        api_token: 'njalla-token',
       },
-      resolvers: ["1.1.1.1"],
+      resolvers: ['1.1.1.1'],
     });
   });
 
-  it("registers Spaceship with the Caddy module path and API key/secret fields", () => {
-    const provider = getProviderDefinition("spaceship");
+  it('registers Spaceship with the Caddy module path and API key/secret fields', () => {
+    const provider = getProviderDefinition('spaceship');
 
     expect(provider).toMatchObject({
-      name: "spaceship",
-      displayName: "Spaceship",
-      docsUrl: "https://github.com/caddy-dns/spaceship",
-      modulePath: "github.com/caddy-dns/spaceship",
+      name: 'spaceship',
+      displayName: 'Spaceship',
+      docsUrl: 'https://github.com/caddy-dns/spaceship',
+      modulePath: 'github.com/caddy-dns/spaceship',
     });
     expect(provider?.fields).toEqual([
-      { key: "api_key", label: "API Key", type: "password", required: true },
-      { key: "api_secret", label: "API Secret", type: "password", required: true },
+      { key: 'api_key', label: 'API Key', type: 'password', required: true },
+      { key: 'api_secret', label: 'API Secret', type: 'password', required: true },
     ]);
-    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("spaceship");
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('spaceship');
   });
 
-  it("encrypts, decrypts, and emits Spaceship credentials for Caddy DNS challenges", () => {
-    const encrypted = encryptProviderCredentials("spaceship", {
-      api_key: "spaceship-key",
-      api_secret: "spaceship-secret",
+  it('encrypts, decrypts, and emits Spaceship credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('spaceship', {
+      api_key: 'spaceship-key',
+      api_secret: 'spaceship-secret',
     });
 
     expect(isEncryptedSecret(encrypted.api_key)).toBe(true);
     expect(isEncryptedSecret(encrypted.api_secret)).toBe(true);
-    expect(decryptProviderCredentials("spaceship", encrypted)).toEqual({
-      api_key: "spaceship-key",
-      api_secret: "spaceship-secret",
+    expect(decryptProviderCredentials('spaceship', encrypted)).toEqual({
+      api_key: 'spaceship-key',
+      api_secret: 'spaceship-secret',
     });
-    expect(buildDnsChallengeConfig("spaceship", encrypted, ["1.1.1.1"])).toEqual({
+    expect(buildDnsChallengeConfig('spaceship', encrypted, ['1.1.1.1'])).toEqual({
       provider: {
-        name: "spaceship",
-        api_key: "spaceship-key",
-        api_secret: "spaceship-secret",
+        name: 'spaceship',
+        api_key: 'spaceship-key',
+        api_secret: 'spaceship-secret',
       },
-      resolvers: ["1.1.1.1"],
+      resolvers: ['1.1.1.1'],
     });
   });
 
-  it("registers deSEC with the Caddy module path and API token field", () => {
-    const provider = getProviderDefinition("desec");
+  it('registers deSEC with the Caddy module path and API token field', () => {
+    const provider = getProviderDefinition('desec');
 
     expect(provider).toMatchObject({
-      name: "desec",
-      displayName: "deSEC",
-      docsUrl: "https://github.com/caddy-dns/desec",
-      modulePath: "github.com/caddy-dns/desec",
+      name: 'desec',
+      displayName: 'deSEC',
+      docsUrl: 'https://github.com/caddy-dns/desec',
+      modulePath: 'github.com/caddy-dns/desec',
     });
     expect(provider?.fields).toEqual([
-      { key: "token", label: "API Token", type: "password", required: true },
+      { key: 'token', label: 'API Token', type: 'password', required: true },
     ]);
-    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("desec");
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('desec');
   });
 
-  it("encrypts, decrypts, and emits deSEC credentials for Caddy DNS challenges", () => {
-    const encrypted = encryptProviderCredentials("desec", {
-      token: "desec-token",
+  it('encrypts, decrypts, and emits deSEC credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('desec', {
+      token: 'desec-token',
     });
 
     expect(isEncryptedSecret(encrypted.token)).toBe(true);
-    expect(decryptProviderCredentials("desec", encrypted)).toEqual({
-      token: "desec-token",
+    expect(decryptProviderCredentials('desec', encrypted)).toEqual({
+      token: 'desec-token',
     });
-    expect(buildDnsChallengeConfig("desec", encrypted, ["1.1.1.1"])).toEqual({
+    expect(buildDnsChallengeConfig('desec', encrypted, ['1.1.1.1'])).toEqual({
       provider: {
-        name: "desec",
-        token: "desec-token",
+        name: 'desec',
+        token: 'desec-token',
       },
-      resolvers: ["1.1.1.1"],
+      resolvers: ['1.1.1.1'],
     });
   });
 
-  it("registers Dynu with the Caddy module path and API token field", () => {
-    const provider = getProviderDefinition("dynu");
+  it('registers Dynu with the Caddy module path and API token field', () => {
+    const provider = getProviderDefinition('dynu');
 
     expect(provider).toMatchObject({
-      name: "dynu",
-      displayName: "Dynu",
-      docsUrl: "https://github.com/caddy-dns/dynu",
-      modulePath: "github.com/caddy-dns/dynu",
+      name: 'dynu',
+      displayName: 'Dynu',
+      docsUrl: 'https://github.com/caddy-dns/dynu',
+      modulePath: 'github.com/caddy-dns/dynu',
     });
     expect(provider?.fields).toEqual([
-      { key: "api_token", label: "API Token", type: "password", required: true },
+      { key: 'api_token', label: 'API Token', type: 'password', required: true },
     ]);
-    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("dynu");
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('dynu');
   });
 
-  it("encrypts, decrypts, and emits Dynu credentials for Caddy DNS challenges", () => {
-    const encrypted = encryptProviderCredentials("dynu", {
-      api_token: "dynu-token",
+  it('encrypts, decrypts, and emits Dynu credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('dynu', {
+      api_token: 'dynu-token',
     });
 
     expect(isEncryptedSecret(encrypted.api_token)).toBe(true);
-    expect(decryptProviderCredentials("dynu", encrypted)).toEqual({
-      api_token: "dynu-token",
+    expect(decryptProviderCredentials('dynu', encrypted)).toEqual({
+      api_token: 'dynu-token',
     });
-    expect(buildDnsChallengeConfig("dynu", encrypted, ["1.1.1.1"])).toEqual({
+    expect(buildDnsChallengeConfig('dynu', encrypted, ['1.1.1.1'])).toEqual({
       provider: {
-        name: "dynu",
-        api_token: "dynu-token",
+        name: 'dynu',
+        api_token: 'dynu-token',
       },
-      resolvers: ["1.1.1.1"],
+      resolvers: ['1.1.1.1'],
     });
   });
 
-  it("registers acme-dns with the Caddy module path and account fields", () => {
-    const provider = getProviderDefinition("acmedns");
+  it('registers acme-dns with the Caddy module path and account fields', () => {
+    const provider = getProviderDefinition('acmedns');
 
     expect(provider).toMatchObject({
-      name: "acmedns",
-      displayName: "acme-dns",
-      docsUrl: "https://github.com/caddy-dns/acmedns",
-      modulePath: "github.com/caddy-dns/acmedns",
+      name: 'acmedns',
+      displayName: 'acme-dns',
+      docsUrl: 'https://github.com/caddy-dns/acmedns',
+      modulePath: 'github.com/caddy-dns/acmedns',
     });
     expect(provider?.fields).toEqual([
-      { key: "username", label: "Username", type: "string", required: true },
-      { key: "password", label: "Password", type: "password", required: true },
-      { key: "subdomain", label: "Subdomain", type: "string", required: true },
+      { key: 'username', label: 'Username', type: 'string', required: true },
+      { key: 'password', label: 'Password', type: 'password', required: true },
+      { key: 'subdomain', label: 'Subdomain', type: 'string', required: true },
       {
-        key: "server_url",
-        label: "Server URL",
-        type: "string",
+        key: 'server_url',
+        label: 'Server URL',
+        type: 'string',
         required: true,
-        placeholder: "https://auth.acme-dns.io",
+        placeholder: 'https://auth.acme-dns.io',
       },
     ]);
-    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("acmedns");
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('acmedns');
   });
 
-  it("encrypts, decrypts, and emits acme-dns credentials for Caddy DNS challenges", () => {
-    const encrypted = encryptProviderCredentials("acmedns", {
-      username: "acmedns-user",
-      password: "acmedns-pass",
-      subdomain: "acmedns-subdomain",
-      server_url: "https://auth.acme-dns.io",
+  it('encrypts, decrypts, and emits acme-dns credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('acmedns', {
+      username: 'acmedns-user',
+      password: 'acmedns-pass',
+      subdomain: 'acmedns-subdomain',
+      server_url: 'https://auth.acme-dns.io',
     });
 
     expect(isEncryptedSecret(encrypted.password)).toBe(true);
-    expect(decryptProviderCredentials("acmedns", encrypted)).toEqual({
-      username: "acmedns-user",
-      password: "acmedns-pass",
-      subdomain: "acmedns-subdomain",
-      server_url: "https://auth.acme-dns.io",
+    expect(decryptProviderCredentials('acmedns', encrypted)).toEqual({
+      username: 'acmedns-user',
+      password: 'acmedns-pass',
+      subdomain: 'acmedns-subdomain',
+      server_url: 'https://auth.acme-dns.io',
     });
-    expect(buildDnsChallengeConfig("acmedns", encrypted, ["1.1.1.1"])).toEqual({
+    expect(buildDnsChallengeConfig('acmedns', encrypted, ['1.1.1.1'])).toEqual({
       provider: {
-        name: "acmedns",
-        username: "acmedns-user",
-        password: "acmedns-pass",
-        subdomain: "acmedns-subdomain",
-        server_url: "https://auth.acme-dns.io",
+        name: 'acmedns',
+        username: 'acmedns-user',
+        password: 'acmedns-pass',
+        subdomain: 'acmedns-subdomain',
+        server_url: 'https://auth.acme-dns.io',
       },
-      resolvers: ["1.1.1.1"],
+      resolvers: ['1.1.1.1'],
     });
   });
 
-  it("registers Infomaniak with the Caddy module path and API token field", () => {
-    const provider = getProviderDefinition("infomaniak");
+  it('registers Infomaniak with the Caddy module path and API token field', () => {
+    const provider = getProviderDefinition('infomaniak');
 
     expect(provider).toMatchObject({
-      name: "infomaniak",
-      displayName: "Infomaniak",
-      docsUrl: "https://github.com/caddy-dns/infomaniak",
-      modulePath: "github.com/caddy-dns/infomaniak",
+      name: 'infomaniak',
+      displayName: 'Infomaniak',
+      docsUrl: 'https://github.com/caddy-dns/infomaniak',
+      modulePath: 'github.com/caddy-dns/infomaniak',
     });
     expect(provider?.fields).toEqual([
-      { key: "api_token", label: "API Token", type: "password", required: true },
+      { key: 'api_token', label: 'API Token', type: 'password', required: true },
     ]);
-    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("infomaniak");
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('infomaniak');
   });
 
-  it("encrypts, decrypts, and emits Infomaniak credentials for Caddy DNS challenges", () => {
-    const encrypted = encryptProviderCredentials("infomaniak", {
-      api_token: "infomaniak-token",
+  it('encrypts, decrypts, and emits Infomaniak credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('infomaniak', {
+      api_token: 'infomaniak-token',
     });
 
     expect(isEncryptedSecret(encrypted.api_token)).toBe(true);
-    expect(decryptProviderCredentials("infomaniak", encrypted)).toEqual({
-      api_token: "infomaniak-token",
+    expect(decryptProviderCredentials('infomaniak', encrypted)).toEqual({
+      api_token: 'infomaniak-token',
     });
-    expect(buildDnsChallengeConfig("infomaniak", encrypted, ["1.1.1.1"])).toEqual({
+    expect(buildDnsChallengeConfig('infomaniak', encrypted, ['1.1.1.1'])).toEqual({
       provider: {
-        name: "infomaniak",
-        api_token: "infomaniak-token",
+        name: 'infomaniak',
+        api_token: 'infomaniak-token',
       },
-      resolvers: ["1.1.1.1"],
+      resolvers: ['1.1.1.1'],
     });
   });
 });

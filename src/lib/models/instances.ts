@@ -34,21 +34,23 @@ function toInstance(row: InstanceRow): Instance {
     lastSyncAt: row.lastSyncAt ? toIso(row.lastSyncAt) : null,
     lastSyncError: row.lastSyncError ?? null,
     createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!
+    updatedAt: toIso(row.updatedAt)!,
   };
 }
 
 export async function listInstances(): Promise<Instance[]> {
   const rows = await db.query.instances.findMany({
-    orderBy: (table) => asc(table.name)
+    orderBy: (table) => asc(table.name),
   });
   return rows.map(toInstance);
 }
 
 export async function getInstance(id: number): Promise<InstanceRow | null> {
-  return await db.query.instances.findFirst({
-    where: (table, operators) => operators.eq(table.id, id)
-  }) ?? null;
+  return (
+    (await db.query.instances.findFirst({
+      where: (table, operators) => operators.eq(table.id, id),
+    })) ?? null
+  );
 }
 
 export async function createInstance(input: InstanceInput): Promise<Instance> {
@@ -61,7 +63,7 @@ export async function createInstance(input: InstanceInput): Promise<Instance> {
       apiToken: encryptSecret(input.apiToken.trim()),
       enabled: input.enabled ?? true,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     })
     .returning();
 
@@ -74,7 +76,7 @@ export async function createInstance(input: InstanceInput): Promise<Instance> {
 
 export async function updateInstance(
   id: number,
-  input: { name?: string; baseUrl?: string; apiToken?: string; enabled?: boolean }
+  input: { name?: string; baseUrl?: string; apiToken?: string; enabled?: boolean },
 ): Promise<Instance> {
   const existing = await getInstance(id);
   if (!existing) {
@@ -87,9 +89,10 @@ export async function updateInstance(
     .set({
       name: input.name?.trim() ?? existing.name,
       baseUrl: input.baseUrl?.trim() ?? existing.baseUrl,
-      apiToken: input.apiToken !== undefined ? encryptSecret(input.apiToken.trim()) : existing.apiToken,
+      apiToken:
+        input.apiToken !== undefined ? encryptSecret(input.apiToken.trim()) : existing.apiToken,
       enabled: input.enabled ?? existing.enabled,
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(instances.id, id))
     .returning();
@@ -105,14 +108,17 @@ export async function deleteInstance(id: number): Promise<void> {
   await db.delete(instances).where(eq(instances.id, id));
 }
 
-export async function recordInstanceSyncResult(id: number, result: { ok: boolean; error?: string | null }) {
+export async function recordInstanceSyncResult(
+  id: number,
+  result: { ok: boolean; error?: string | null },
+) {
   const now = nowIso();
   await db
     .update(instances)
     .set({
       lastSyncAt: now,
-      lastSyncError: result.ok ? null : result.error ?? "Unknown sync error",
-      updatedAt: now
+      lastSyncError: result.ok ? null : (result.error ?? "Unknown sync error"),
+      updatedAt: now,
     })
     .where(eq(instances.id, id));
 }

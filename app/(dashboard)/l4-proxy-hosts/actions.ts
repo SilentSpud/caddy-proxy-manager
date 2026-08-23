@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
-import { actionError, actionSuccess, INITIAL_ACTION_STATE, type ActionState } from "@/src/lib/actions";
+import {
+  actionError,
+  actionSuccess,
+  INITIAL_ACTION_STATE,
+  type ActionState,
+} from "@/src/lib/actions";
 import {
   createL4ProxyHost,
   deleteL4ProxyHost,
@@ -18,12 +23,24 @@ import {
   type L4GeoBlockConfig,
   type L4GeoBlockMode,
 } from "@/src/lib/models/l4-proxy-hosts";
-import { parseCheckbox, parseCsv, parseUpstreams, parseOptionalText, parseOptionalNumber } from "@/src/lib/form-parse";
+import {
+  parseCheckbox,
+  parseCsv,
+  parseUpstreams,
+  parseOptionalText,
+  parseOptionalNumber,
+} from "@/src/lib/form-parse";
 
 const VALID_PROTOCOLS: L4Protocol[] = ["tcp", "udp"];
 const VALID_MATCHER_TYPES: L4MatcherType[] = ["none", "tls_sni", "http_host", "proxy_protocol"];
 const VALID_PP_VERSIONS: L4ProxyProtocolVersion[] = ["v1", "v2"];
-const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = ["random", "round_robin", "least_conn", "ip_hash", "first"];
+const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
+  "random",
+  "round_robin",
+  "least_conn",
+  "ip_hash",
+  "first",
+];
 const VALID_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
 function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerConfig> | undefined {
@@ -32,8 +49,10 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
     ? parseCheckbox(formData.get("lbEnabled"))
     : undefined;
   const policyRaw = parseOptionalText(formData.get("lbPolicy"));
-  const policy = policyRaw && VALID_L4_LB_POLICIES.includes(policyRaw as L4LoadBalancingPolicy)
-    ? (policyRaw as L4LoadBalancingPolicy) : undefined;
+  const policy =
+    policyRaw && VALID_L4_LB_POLICIES.includes(policyRaw as L4LoadBalancingPolicy)
+      ? (policyRaw as L4LoadBalancingPolicy)
+      : undefined;
 
   const result: Partial<L4LoadBalancerConfig> = {};
   if (enabled !== undefined) result.enabled = enabled;
@@ -75,11 +94,17 @@ function parseL4DnsResolverConfig(formData: FormData): Partial<L4DnsResolverConf
     : undefined;
   const resolversRaw = parseOptionalText(formData.get("dnsResolvers"));
   const resolvers = resolversRaw
-    ? resolversRaw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
+    ? resolversRaw
+        .split(/[\n,]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
     : undefined;
   const fallbacksRaw = parseOptionalText(formData.get("dnsFallbacks"));
   const fallbacks = fallbacksRaw
-    ? fallbacksRaw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
+    ? fallbacksRaw
+        .split(/[\n,]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
     : undefined;
   const timeout = parseOptionalText(formData.get("dnsTimeout"));
 
@@ -92,7 +117,9 @@ function parseL4DnsResolverConfig(formData: FormData): Partial<L4DnsResolverConf
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-function parseL4UpstreamDnsResolutionConfig(formData: FormData): Partial<L4UpstreamDnsResolutionConfig> | undefined {
+function parseL4UpstreamDnsResolutionConfig(
+  formData: FormData,
+): Partial<L4UpstreamDnsResolutionConfig> | undefined {
   if (!formData.has("upstreamDnsResolutionPresent")) return undefined;
   const modeRaw = parseOptionalText(formData.get("upstreamDnsResolutionMode")) ?? "inherit";
   const familyRaw = parseOptionalText(formData.get("upstreamDnsResolutionFamily")) ?? "inherit";
@@ -103,14 +130,17 @@ function parseL4UpstreamDnsResolutionConfig(formData: FormData): Partial<L4Upstr
   else if (modeRaw === "inherit") result.enabled = null;
 
   if (familyRaw === "inherit") result.family = null;
-  else if (VALID_DNS_FAMILIES.includes(familyRaw as typeof VALID_DNS_FAMILIES[number])) {
+  else if (VALID_DNS_FAMILIES.includes(familyRaw as (typeof VALID_DNS_FAMILIES)[number])) {
     result.family = familyRaw as "ipv6" | "ipv4" | "both";
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-function parseL4GeoBlockConfig(formData: FormData): { geoblock: L4GeoBlockConfig | null; geoblockMode: L4GeoBlockMode } {
+function parseL4GeoBlockConfig(formData: FormData): {
+  geoblock: L4GeoBlockConfig | null;
+  geoblockMode: L4GeoBlockMode;
+} {
   if (!formData.has("geoblockPresent")) {
     return { geoblock: null, geoblockMode: "merge" };
   }
@@ -121,10 +151,15 @@ function parseL4GeoBlockConfig(formData: FormData): { geoblock: L4GeoBlockConfig
   const parseStringList = (key: string): string[] => {
     const val = formData.get(key);
     if (!val || typeof val !== "string") return [];
-    return val.split(",").map(s => s.trim()).filter(Boolean);
+    return val
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   };
   const parseNumberList = (key: string): number[] => {
-    return parseStringList(key).map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+    return parseStringList(key)
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !isNaN(n));
   };
 
   const config: L4GeoBlockConfig = {
@@ -144,7 +179,9 @@ function parseL4GeoBlockConfig(formData: FormData): { geoblock: L4GeoBlockConfig
 }
 
 function parseProtocol(formData: FormData): L4Protocol {
-  const raw = String(formData.get("protocol") ?? "tcp").trim().toLowerCase();
+  const raw = String(formData.get("protocol") ?? "tcp")
+    .trim()
+    .toLowerCase();
   if (VALID_PROTOCOLS.includes(raw as L4Protocol)) return raw as L4Protocol;
   return "tcp";
 }
@@ -157,13 +194,14 @@ function parseMatcherType(formData: FormData): L4MatcherType {
 
 function parseProxyProtocolVersion(formData: FormData): L4ProxyProtocolVersion | null {
   const raw = parseOptionalText(formData.get("proxyProtocolVersion"));
-  if (raw && VALID_PP_VERSIONS.includes(raw as L4ProxyProtocolVersion)) return raw as L4ProxyProtocolVersion;
+  if (raw && VALID_PP_VERSIONS.includes(raw as L4ProxyProtocolVersion))
+    return raw as L4ProxyProtocolVersion;
   return null;
 }
 
 export async function createL4ProxyHostAction(
   _prevState: ActionState = INITIAL_ACTION_STATE,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionState> {
   void _prevState;
   try {
@@ -171,9 +209,10 @@ export async function createL4ProxyHostAction(
     const userId = Number(session.user.id);
 
     const matcherType = parseMatcherType(formData);
-    const matcherValue = (matcherType === "tls_sni" || matcherType === "http_host")
-      ? parseCsv(formData.get("matcherValue"))
-      : [];
+    const matcherValue =
+      matcherType === "tls_sni" || matcherType === "http_host"
+        ? parseCsv(formData.get("matcherValue"))
+        : [];
 
     const input: L4ProxyHostInput = {
       name: String(formData.get("name") ?? "Untitled"),
@@ -204,7 +243,7 @@ export async function createL4ProxyHostAction(
 export async function updateL4ProxyHostAction(
   id: number,
   _prevState: ActionState = INITIAL_ACTION_STATE,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionState> {
   void _prevState;
   try {
@@ -212,14 +251,17 @@ export async function updateL4ProxyHostAction(
     const userId = Number(session.user.id);
 
     const matcherType = parseMatcherType(formData);
-    const matcherValue = (matcherType === "tls_sni" || matcherType === "http_host")
-      ? parseCsv(formData.get("matcherValue"))
-      : [];
+    const matcherValue =
+      matcherType === "tls_sni" || matcherType === "http_host"
+        ? parseCsv(formData.get("matcherValue"))
+        : [];
 
     const input: Partial<L4ProxyHostInput> = {
       name: formData.get("name") ? String(formData.get("name")) : undefined,
       protocol: parseProtocol(formData),
-      listenAddress: formData.get("listenAddress") ? String(formData.get("listenAddress")).trim() : undefined,
+      listenAddress: formData.get("listenAddress")
+        ? String(formData.get("listenAddress")).trim()
+        : undefined,
       upstreams: formData.get("upstreams") ? parseUpstreams(formData.get("upstreams")) : undefined,
       matcherType: matcherType,
       matcherValue: matcherValue,
@@ -244,7 +286,7 @@ export async function updateL4ProxyHostAction(
 
 export async function deleteL4ProxyHostAction(
   id: number,
-  _prevState: ActionState = INITIAL_ACTION_STATE
+  _prevState: ActionState = INITIAL_ACTION_STATE,
 ): Promise<ActionState> {
   void _prevState;
   try {
@@ -259,10 +301,7 @@ export async function deleteL4ProxyHostAction(
   }
 }
 
-export async function toggleL4ProxyHostAction(
-  id: number,
-  enabled: boolean
-): Promise<ActionState> {
+export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
     const session = await requireAdmin();
     const userId = Number(session.user.id);

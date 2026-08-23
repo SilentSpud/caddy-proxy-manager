@@ -31,15 +31,33 @@ vi.mock('../../src/lib/db', async () => {
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';
-import { saveTrustedProxiesSettings, saveGeoBlockSettings, type GeoBlockSettings } from '../../src/lib/settings';
-import { buildServerTrustedProxies, buildBlockerHandler, resolveEffectiveGeoBlock, buildCaddyDocument } from '../../src/lib/caddy';
+import {
+  saveTrustedProxiesSettings,
+  saveGeoBlockSettings,
+  type GeoBlockSettings,
+} from '../../src/lib/settings';
+import {
+  buildServerTrustedProxies,
+  buildBlockerHandler,
+  resolveEffectiveGeoBlock,
+  buildCaddyDocument,
+} from '../../src/lib/caddy';
 import * as schema from '../../src/lib/db/schema';
 
-const PRIVATE_RANGES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', 'fd00::/8', '::1/128'];
+const PRIVATE_RANGES = [
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '127.0.0.0/8',
+  'fd00::/8',
+  '::1/128',
+];
 
 function cpmServer(doc: unknown): Record<string, unknown> {
-  return (doc as { apps?: { http?: { servers?: { cpm?: Record<string, unknown> } } } })
-    ?.apps?.http?.servers?.cpm ?? {};
+  return (
+    (doc as { apps?: { http?: { servers?: { cpm?: Record<string, unknown> } } } })?.apps?.http
+      ?.servers?.cpm ?? {}
+  );
 }
 
 const baseGeoBlock: GeoBlockSettings = {
@@ -86,19 +104,27 @@ describe('buildServerTrustedProxies', () => {
 
   it('trims and drops blank ranges', () => {
     const result = buildServerTrustedProxies({ ranges: ['  172.21.0.1/32 ', '', ' 10.1.2.3/32'] });
-    expect((result.trusted_proxies as { ranges: string[] }).ranges).toEqual(['172.21.0.1/32', '10.1.2.3/32']);
+    expect((result.trusted_proxies as { ranges: string[] }).ranges).toEqual([
+      '172.21.0.1/32',
+      '10.1.2.3/32',
+    ]);
   });
 
   it('emits client_ip_headers only when custom headers are set', () => {
     expect(buildServerTrustedProxies({ ranges: ['10.0.0.0/8'] }).client_ip_headers).toBeUndefined();
     expect(
-      buildServerTrustedProxies({ ranges: ['10.0.0.0/8'], client_ip_headers: ['Cf-Connecting-Ip'] }).client_ip_headers
+      buildServerTrustedProxies({ ranges: ['10.0.0.0/8'], client_ip_headers: ['Cf-Connecting-Ip'] })
+        .client_ip_headers,
     ).toEqual(['Cf-Connecting-Ip']);
   });
 
   it('emits trusted_proxies_strict as 1 when strict is enabled', () => {
-    expect(buildServerTrustedProxies({ ranges: ['10.0.0.0/8'] }).trusted_proxies_strict).toBeUndefined();
-    expect(buildServerTrustedProxies({ ranges: ['10.0.0.0/8'], strict: true }).trusted_proxies_strict).toBe(1);
+    expect(
+      buildServerTrustedProxies({ ranges: ['10.0.0.0/8'] }).trusted_proxies_strict,
+    ).toBeUndefined();
+    expect(
+      buildServerTrustedProxies({ ranges: ['10.0.0.0/8'], strict: true }).trusted_proxies_strict,
+    ).toBe(1);
   });
 });
 
@@ -120,7 +146,7 @@ describe('buildCaddyDocument server-level trusted proxies', () => {
     });
     await createProxyHost(
       { name: 'plain', domains: ['app.example.com'], upstreams: ['10.0.0.5:8080'] },
-      1
+      1,
     );
   });
 
@@ -198,10 +224,13 @@ function findBlocker(node: unknown): Record<string, unknown> | undefined {
 // Sanity: buildBlockerHandler / resolveEffectiveGeoBlock still imported & usable
 describe('geoblock helpers remain reachable', () => {
   it('buildBlockerHandler emits trusted_proxies from a resolved config', () => {
-    const resolved = resolveEffectiveGeoBlock({ ...baseGeoBlock, trusted_proxies: ['private_ranges'] }, {
-      geoblock_mode: 'merge',
-      geoblock: null,
-    });
+    const resolved = resolveEffectiveGeoBlock(
+      { ...baseGeoBlock, trusted_proxies: ['private_ranges'] },
+      {
+        geoblock_mode: 'merge',
+        geoblock: null,
+      },
+    );
     const handler = buildBlockerHandler(resolved!);
     expect(handler.trusted_proxies).toEqual(PRIVATE_RANGES);
   });

@@ -51,7 +51,10 @@ export function recordPendingOidcSync(entry: PendingOidcSync): void {
   });
 }
 
-export function consumePendingOidcSync(providerId: string, subject: string): PendingOidcSync | null {
+export function consumePendingOidcSync(
+  providerId: string,
+  subject: string,
+): PendingOidcSync | null {
   const key = pendingKey(providerId, subject);
   const found = pending.get(key);
   pending.delete(key);
@@ -83,7 +86,7 @@ async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> 
   // Never let a claim change lock the instance out of its last administrator.
   if (current.role === "admin" && (await countOtherActiveAdmins(userId)) === 0) {
     console.warn(
-      `[oidc-group-sync] Skipping demotion of user ${userId} to "${entry.role}": they are the last active admin.`
+      `[oidc-group-sync] Skipping demotion of user ${userId} to "${entry.role}": they are the last active admin.`,
     );
     logAuditEvent({
       userId,

@@ -60,7 +60,7 @@ describe('applyCaddyConfig against a spoofed Caddy', () => {
   it('POSTs the built document to /load', async () => {
     await createProxyHost(
       { name: 'apply', domains: ['apply.example.com'], upstreams: ['10.0.0.5:8080'] },
-      1
+      1,
     );
     caddy.reset();
 
@@ -137,7 +137,7 @@ describe('the network guard', () => {
     const { httpCaddyAdminTransport } = await import('../../src/lib/caddy-admin');
 
     await expect(
-      httpCaddyAdminTransport({ path: '/load', method: 'POST', body: '{}' })
+      httpCaddyAdminTransport({ path: '/load', method: 'POST', body: '{}' }),
     ).rejects.toThrow(/real Caddy admin transport was used inside a test/);
   });
 });

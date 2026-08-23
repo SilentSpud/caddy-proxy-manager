@@ -1,11 +1,11 @@
-import { createClient, type ClickHouseClient } from '@clickhouse/client';
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
-const CH_URL = process.env.CLICKHOUSE_URL ?? 'http://clickhouse:8123';
-const CH_USER = process.env.CLICKHOUSE_USER ?? 'cpm';
-const CH_PASS = process.env.CLICKHOUSE_PASSWORD ?? '';
-const CH_DB = process.env.CLICKHOUSE_DB ?? 'analytics';
+const CH_URL = process.env.CLICKHOUSE_URL ?? "http://clickhouse:8123";
+const CH_USER = process.env.CLICKHOUSE_USER ?? "cpm";
+const CH_PASS = process.env.CLICKHOUSE_PASSWORD ?? "";
+const CH_DB = process.env.CLICKHOUSE_DB ?? "analytics";
 
 // Validate CH_DB is a safe identifier (alphanumeric + underscore only)
 if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(CH_DB)) {
@@ -16,7 +16,7 @@ const DEFAULT_RETENTION_DAYS = 30;
 
 /** Parse CLICKHOUSE_RETENTION_DAYS into a positive integer number of days. */
 function parseRetentionDays(raw: string | undefined): number {
-  if (raw == null || raw.trim() === '') return DEFAULT_RETENTION_DAYS;
+  if (raw == null || raw.trim() === "") return DEFAULT_RETENTION_DAYS;
   const n = Number(raw.trim());
   if (!Number.isInteger(n) || n <= 0) {
     throw new Error(`CLICKHOUSE_RETENTION_DAYS must be a positive integer (got: ${raw})`);
@@ -132,7 +132,7 @@ const WAF_EVENTS_MIGRATIONS = [
   `ALTER TABLE waf_events MODIFY COLUMN raw_data Nullable(String) CODEC(ZSTD(3))`,
 ];
 
-const RETENTION_TABLES = ['traffic_events', 'waf_events'] as const;
+const RETENTION_TABLES = ["traffic_events", "waf_events"] as const;
 
 /** Extract the retention (in days) from a table's TTL clause, if present. */
 function ttlDaysFromCreateQuery(createQuery: string): number | null {
@@ -153,14 +153,17 @@ function ttlDaysFromCreateQuery(createQuery: string): number | null {
  * since MODIFY TTL materializes a mutation that rewrites parts to drop expired
  * rows — cheap to skip, wasteful to repeat on every restart.
  */
-async function ensureRetentionTtl(ch: ClickHouseClient, table: (typeof RETENTION_TABLES)[number]): Promise<void> {
+async function ensureRetentionTtl(
+  ch: ClickHouseClient,
+  table: (typeof RETENTION_TABLES)[number],
+): Promise<void> {
   const result = await ch.query({
     query: `SELECT create_table_query FROM system.tables WHERE database = {db:String} AND name = {tbl:String}`,
     query_params: { db: CH_DB, tbl: table },
-    format: 'JSONEachRow',
+    format: "JSONEachRow",
   });
   const rows = await result.json<{ create_table_query: string }>();
-  const current = ttlDaysFromCreateQuery(rows[0]?.create_table_query ?? '');
+  const current = ttlDaysFromCreateQuery(rows[0]?.create_table_query ?? "");
   if (current === CH_RETENTION_DAYS) return;
   await ch.command({
     query: `ALTER TABLE ${table} MODIFY TTL ts + INTERVAL ${CH_RETENTION_DAYS} DAY DELETE`,
@@ -173,20 +176,20 @@ async function ensureRetentionTtl(ch: ClickHouseClient, table: (typeof RETENTION
 // can now reclaim. Disabling only stops new writes; the old data lingers until
 // the tables are dropped, which is what this list drives.
 const DISABLED_SYSTEM_LOGS = [
-  'metric_log',
-  'asynchronous_metric_log',
-  'trace_log',
-  'query_log',
-  'query_thread_log',
-  'query_views_log',
-  'part_log',
-  'processors_profile_log',
-  'text_log',
-  'session_log',
-  'opentelemetry_span_log',
-  'blob_storage_log',
-  'backup_log',
-  'histogram_metric_log',
+  "metric_log",
+  "asynchronous_metric_log",
+  "trace_log",
+  "query_log",
+  "query_thread_log",
+  "query_views_log",
+  "part_log",
+  "processors_profile_log",
+  "text_log",
+  "session_log",
+  "opentelemetry_span_log",
+  "blob_storage_log",
+  "backup_log",
+  "histogram_metric_log",
 ] as const;
 
 // Matches a disabled log table and its numbered upgrade leftovers. When a
@@ -196,7 +199,7 @@ const DISABLED_SYSTEM_LOGS = [
 // dwarf the live table. An exact-name drop misses them, so we match the
 // `_<N>` suffix too. Anchored to full names built from the trusted constant
 // list above — no user input reaches this regex.
-const DISABLED_SYSTEM_LOG_PATTERN = `^(${DISABLED_SYSTEM_LOGS.join('|')})(_[0-9]+)?$`;
+const DISABLED_SYSTEM_LOG_PATTERN = `^(${DISABLED_SYSTEM_LOGS.join("|")})(_[0-9]+)?$`;
 
 /**
  * Drop the diagnostic system-log tables we disable via config — including the
@@ -211,13 +214,15 @@ async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
     const result = await ch.query({
       query: `SELECT name FROM system.tables WHERE database = 'system' AND match(name, {pattern:String})`,
       query_params: { pattern: DISABLED_SYSTEM_LOG_PATTERN },
-      format: 'JSONEachRow',
+      format: "JSONEachRow",
     });
     names = (await result.json<{ name: string }>())
       .map((row) => row.name)
-      .filter((name): name is string => typeof name === 'string' && name.length > 0);
+      .filter((name): name is string => typeof name === "string" && name.length > 0);
   } catch (err) {
-    console.warn(`[clickhouse] could not list disabled system log tables to drop: ${(err as Error).message}`);
+    console.warn(
+      `[clickhouse] could not list disabled system log tables to drop: ${(err as Error).message}`,
+    );
     return;
   }
 
@@ -227,8 +232,8 @@ async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
     } catch (err) {
       console.warn(
         `[clickhouse] could not drop disabled system log tables (insufficient privileges?); ` +
-        `they will stop growing once the config override is applied, but existing data must be ` +
-        `cleared manually. Reason: ${(err as Error).message}`,
+          `they will stop growing once the config override is applied, but existing data must be ` +
+          `cleared manually. Reason: ${(err as Error).message}`,
       );
       return;
     }
@@ -237,7 +242,7 @@ async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
 
 export async function initClickHouse(): Promise<void> {
   if (!analyticsConfigured) {
-    console.log('ClickHouse analytics disabled (CLICKHOUSE_PASSWORD not set)');
+    console.log("ClickHouse analytics disabled (CLICKHOUSE_PASSWORD not set)");
     return;
   }
   const ch = getClient();
@@ -294,23 +299,23 @@ export async function insertTrafficEvents(rows: TrafficEventRow[]): Promise<void
   if (!analyticsConfigured || rows.length === 0) return;
   const ch = getClient();
   // Convert unix timestamp to ClickHouse DateTime string
-  const values = rows.map(r => ({
+  const values = rows.map((r) => ({
     ...r,
-    ts: new Date(r.ts * 1000).toISOString().replace('T', ' ').slice(0, 19),
+    ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     is_blocked: r.is_blocked ? 1 : 0,
   }));
-  await ch.insert({ table: 'traffic_events', values, format: 'JSONEachRow' });
+  await ch.insert({ table: "traffic_events", values, format: "JSONEachRow" });
 }
 
 export async function insertWafEvents(rows: WafEventRow[]): Promise<void> {
   if (!analyticsConfigured || rows.length === 0) return;
   const ch = getClient();
-  const values = rows.map(r => ({
+  const values = rows.map((r) => ({
     ...r,
-    ts: new Date(r.ts * 1000).toISOString().replace('T', ' ').slice(0, 19),
+    ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     blocked: r.blocked ? 1 : 0,
   }));
-  await ch.insert({ table: 'waf_events', values, format: 'JSONEachRow' });
+  await ch.insert({ table: "waf_events", values, format: "JSONEachRow" });
 }
 
 // ── Parameterized query helpers ─────────────────────────────────────────────
@@ -322,7 +327,7 @@ type QueryParams = Record<string, unknown>;
  * Returns the SQL fragment and the params to merge into query_params.
  */
 function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
-  if (hosts.length === 0) return { sql: '', params: {} };
+  if (hosts.length === 0) return { sql: "", params: {} };
   const params: QueryParams = {};
   const placeholders: string[] = [];
   hosts.forEach((h, i) => {
@@ -330,7 +335,7 @@ function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
     params[key] = h;
     placeholders.push(`{${key}:String}`);
   });
-  return { sql: ` AND host IN (${placeholders.join(',')})`, params };
+  return { sql: ` AND host IN (${placeholders.join(",")})`, params };
 }
 
 function timeFilter(): string {
@@ -341,7 +346,11 @@ function timeParams(from: number, to: number): QueryParams {
   return { p_from: safeUint(from), p_to: safeUint(to) };
 }
 
-function buildWafFilter(search?: string, from?: number, to?: number): { where: string; params: QueryParams } {
+function buildWafFilter(
+  search?: string,
+  from?: number,
+  to?: number,
+): { where: string; params: QueryParams } {
   const clauses: string[] = [];
   let params: QueryParams = {};
 
@@ -361,7 +370,7 @@ function buildWafFilter(search?: string, from?: number, to?: number): { where: s
   }
 
   return {
-    where: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '',
+    where: clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "",
     params,
   };
 }
@@ -375,7 +384,7 @@ function safeUint(n: number): number {
 async function queryRows<T>(query: string, query_params?: QueryParams): Promise<T[]> {
   if (!analyticsConfigured) return [];
   const ch = getClient();
-  const result = await ch.query({ query, query_params, format: 'JSONEachRow' });
+  const result = await ch.query({ query, query_params, format: "JSONEachRow" });
   return result.json<T>();
 }
 
@@ -394,11 +403,21 @@ export interface AnalyticsSummary {
   bytesServed: number;
 }
 
-export async function querySummary(from: number, to: number, hosts: string[]): Promise<AnalyticsSummary> {
+export async function querySummary(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<AnalyticsSummary> {
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const traffic = await queryRow<{ total: string; unique_ips: string; blocked: string; bytes: string }>(`
+  const traffic = await queryRow<{
+    total: string;
+    unique_ips: string;
+    blocked: string;
+    bytes: string;
+  }>(
+    `
     SELECT
       count() AS total,
       uniq(client_ip) AS unique_ips,
@@ -406,13 +425,18 @@ export async function querySummary(from: number, to: number, hosts: string[]): P
       sum(bytes_sent) AS bytes
     FROM traffic_events
     WHERE ${timeFilter()}${hf.sql}
-  `, { ...tp, ...hf.params });
+  `,
+    { ...tp, ...hf.params },
+  );
 
-  const wafRow = await queryRow<{ waf_blocked: string }>(`
+  const wafRow = await queryRow<{ waf_blocked: string }>(
+    `
     SELECT count() AS waf_blocked
     FROM waf_events
     WHERE ${timeFilter()} AND blocked = true${hf.sql}
-  `, { ...tp, ...hf.params });
+  `,
+    { ...tp, ...hf.params },
+  );
 
   const total = Number(traffic?.total ?? 0);
   const geoBlocked = Number(traffic?.blocked ?? 0);
@@ -442,12 +466,17 @@ export function bucketSizeForDuration(seconds: number): number {
   return 86400;
 }
 
-export async function queryTimeline(from: number, to: number, hosts: string[]): Promise<TimelineBucket[]> {
+export async function queryTimeline(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<TimelineBucket[]> {
   const bucketSize = bucketSizeForDuration(to - from);
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const rows = await queryRows<{ bucket: string; total: string; blocked: string }>(`
+  const rows = await queryRows<{ bucket: string; total: string; blocked: string }>(
+    `
     SELECT
       intDiv(toUInt32(ts), {p_bucket:UInt32}) AS bucket,
       count() AS total,
@@ -456,9 +485,11 @@ export async function queryTimeline(from: number, to: number, hosts: string[]): 
     WHERE ${timeFilter()}${hf.sql}
     GROUP BY bucket
     ORDER BY bucket
-  `, { ...tp, ...hf.params, p_bucket: safeUint(bucketSize) });
+  `,
+    { ...tp, ...hf.params, p_bucket: safeUint(bucketSize) },
+  );
 
-  return rows.map(r => ({
+  return rows.map((r) => ({
     ts: Number(r.bucket) * bucketSize,
     total: Number(r.total),
     blocked: Number(r.blocked),
@@ -471,11 +502,16 @@ export interface CountryStats {
   blocked: number;
 }
 
-export async function queryCountries(from: number, to: number, hosts: string[]): Promise<CountryStats[]> {
+export async function queryCountries(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<CountryStats[]> {
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const rows = await queryRows<{ country_code: string | null; total: string; blocked: string }>(`
+  const rows = await queryRows<{ country_code: string | null; total: string; blocked: string }>(
+    `
     SELECT
       country_code,
       count() AS total,
@@ -484,10 +520,12 @@ export async function queryCountries(from: number, to: number, hosts: string[]):
     WHERE ${timeFilter()}${hf.sql}
     GROUP BY country_code
     ORDER BY total DESC
-  `, { ...tp, ...hf.params });
+  `,
+    { ...tp, ...hf.params },
+  );
 
-  return rows.map(r => ({
-    countryCode: r.country_code ?? 'XX',
+  return rows.map((r) => ({
+    countryCode: r.country_code ?? "XX",
     total: Number(r.total),
     blocked: Number(r.blocked),
   }));
@@ -499,11 +537,16 @@ export interface ProtoStats {
   percent: number;
 }
 
-export async function queryProtocols(from: number, to: number, hosts: string[]): Promise<ProtoStats[]> {
+export async function queryProtocols(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<ProtoStats[]> {
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const rows = await queryRows<{ proto: string; count: string }>(`
+  const rows = await queryRows<{ proto: string; count: string }>(
+    `
     SELECT
       proto,
       count() AS count
@@ -511,12 +554,14 @@ export async function queryProtocols(from: number, to: number, hosts: string[]):
     WHERE ${timeFilter()}${hf.sql}
     GROUP BY proto
     ORDER BY count DESC
-  `, { ...tp, ...hf.params });
+  `,
+    { ...tp, ...hf.params },
+  );
 
   const total = rows.reduce((s, r) => s + Number(r.count), 0);
 
-  return rows.map(r => ({
-    proto: r.proto || 'Unknown',
+  return rows.map((r) => ({
+    proto: r.proto || "Unknown",
     count: Number(r.count),
     percent: total > 0 ? Math.round((Number(r.count) / total) * 1000) / 10 : 0,
   }));
@@ -528,11 +573,16 @@ export interface UAStats {
   percent: number;
 }
 
-export async function queryUserAgents(from: number, to: number, hosts: string[]): Promise<UAStats[]> {
+export async function queryUserAgents(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<UAStats[]> {
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const rows = await queryRows<{ user_agent: string; count: string }>(`
+  const rows = await queryRows<{ user_agent: string; count: string }>(
+    `
     SELECT
       user_agent,
       count() AS count
@@ -541,12 +591,14 @@ export async function queryUserAgents(from: number, to: number, hosts: string[])
     GROUP BY user_agent
     ORDER BY count DESC
     LIMIT 10
-  `, { ...tp, ...hf.params });
+  `,
+    { ...tp, ...hf.params },
+  );
 
   const total = rows.reduce((s, r) => s + Number(r.count), 0);
 
-  return rows.map(r => ({
-    userAgent: r.user_agent || 'Unknown',
+  return rows.map((r) => ({
+    userAgent: r.user_agent || "Unknown",
     count: Number(r.count),
     percent: total > 0 ? Math.round((Number(r.count) / total) * 1000) / 10 : 0,
   }));
@@ -570,7 +622,12 @@ export interface BlockedPage {
   pages: number;
 }
 
-export async function queryBlocked(from: number, to: number, hosts: string[], page: number): Promise<BlockedPage> {
+export async function queryBlocked(
+  from: number,
+  to: number,
+  hosts: string[],
+  page: number,
+): Promise<BlockedPage> {
   if (!analyticsConfigured) return { events: [], total: 0, page: 1, pages: 1 };
   const pageSize = 10;
   const hf = hostFilter(hosts);
@@ -578,21 +635,32 @@ export async function queryBlocked(from: number, to: number, hosts: string[], pa
   const whereSQL = `${timeFilter()} AND is_blocked = true${hf.sql}`;
   const params = { ...tp, ...hf.params };
 
-  const totalRow = await queryRow<{ total: string }>(`SELECT count() AS total FROM traffic_events WHERE ${whereSQL}`, params);
+  const totalRow = await queryRow<{ total: string }>(
+    `SELECT count() AS total FROM traffic_events WHERE ${whereSQL}`,
+    params,
+  );
   const total = Number(totalRow?.total ?? 0);
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, Number.isFinite(page) ? page : 1), pages);
 
   const rows = await queryRows<{
-    ts: string; client_ip: string; country_code: string | null;
-    method: string; uri: string; status: string; host: string;
-  }>(`
+    ts: string;
+    client_ip: string;
+    country_code: string | null;
+    method: string;
+    uri: string;
+    status: string;
+    host: string;
+  }>(
+    `
     SELECT toUInt32(ts) AS ts, client_ip, country_code, method, uri, status, host
     FROM traffic_events
     WHERE ${whereSQL}
     ORDER BY ts DESC
     LIMIT {p_limit:UInt32} OFFSET {p_offset:UInt32}
-  `, { ...params, p_limit: pageSize, p_offset: (safePage - 1) * pageSize });
+  `,
+    { ...params, p_limit: pageSize, p_offset: (safePage - 1) * pageSize },
+  );
 
   return {
     events: rows.map((r, i) => ({
@@ -612,26 +680,38 @@ export async function queryBlocked(from: number, to: number, hosts: string[], pa
 }
 
 export async function queryDistinctHosts(): Promise<string[]> {
-  const rows = await queryRows<{ host: string }>(`SELECT DISTINCT host FROM traffic_events WHERE host != ''`);
-  return rows.map(r => r.host);
+  const rows = await queryRows<{ host: string }>(
+    `SELECT DISTINCT host FROM traffic_events WHERE host != ''`,
+  );
+  return rows.map((r) => r.host);
 }
 
 // ── WAF analytics queries ───────────────────────────────────────────────────
 
 export async function queryWafCount(from: number, to: number): Promise<number> {
   const tp = timeParams(from, to);
-  const row = await queryRow<{ value: string }>(`
+  const row = await queryRow<{ value: string }>(
+    `
     SELECT count() AS value FROM waf_events WHERE ${timeFilter()}
-  `, tp);
+  `,
+    tp,
+  );
   return Number(row?.value ?? 0);
 }
 
-export async function queryWafCountWithSearch(search?: string, from?: number, to?: number): Promise<number> {
+export async function queryWafCountWithSearch(
+  search?: string,
+  from?: number,
+  to?: number,
+): Promise<number> {
   const filter = buildWafFilter(search, from, to);
-  const row = await queryRow<{ value: string }>(`
+  const row = await queryRow<{ value: string }>(
+    `
     SELECT count() AS value FROM waf_events
     ${filter.where}
-  `, filter.params);
+  `,
+    filter.params,
+  );
   return Number(row?.value ?? 0);
 }
 
@@ -643,7 +723,11 @@ export interface WafEventStats {
   ruleIdsTriggered: number;
 }
 
-export async function queryWafEventStatsWithSearch(search?: string, from?: number, to?: number): Promise<WafEventStats> {
+export async function queryWafEventStatsWithSearch(
+  search?: string,
+  from?: number,
+  to?: number,
+): Promise<WafEventStats> {
   const filter = buildWafFilter(search, from, to);
   const row = await queryRow<{
     total: string;
@@ -651,7 +735,8 @@ export async function queryWafEventStatsWithSearch(search?: string, from?: numbe
     critical: string;
     unique_hosts: string;
     rule_ids_triggered: string;
-  }>(`
+  }>(
+    `
     SELECT
       count() AS total,
       countIf(blocked) AS blocked,
@@ -660,7 +745,9 @@ export async function queryWafEventStatsWithSearch(search?: string, from?: numbe
       uniqExactIf(rule_id, rule_id IS NOT NULL) AS rule_ids_triggered
     FROM waf_events
     ${filter.where}
-  `, filter.params);
+  `,
+    filter.params,
+  );
 
   return {
     total: Number(row?.total ?? 0),
@@ -677,9 +764,14 @@ export interface TopWafRule {
   message: string | null;
 }
 
-export async function queryTopWafRules(from: number, to: number, limit = 10): Promise<TopWafRule[]> {
+export async function queryTopWafRules(
+  from: number,
+  to: number,
+  limit = 10,
+): Promise<TopWafRule[]> {
   const tp = timeParams(from, to);
-  const rows = await queryRows<{ rule_id: string; count: string; message: string | null }>(`
+  const rows = await queryRows<{ rule_id: string; count: string; message: string | null }>(
+    `
     SELECT
       rule_id,
       count() AS count,
@@ -689,11 +781,17 @@ export async function queryTopWafRules(from: number, to: number, limit = 10): Pr
     GROUP BY rule_id
     ORDER BY count DESC
     LIMIT {p_limit:UInt32}
-  `, { ...tp, p_limit: safeUint(limit) });
+  `,
+    { ...tp, p_limit: safeUint(limit) },
+  );
 
   return rows
-    .filter(r => r.rule_id != null)
-    .map(r => ({ ruleId: Number(r.rule_id), count: Number(r.count), message: r.message ?? null }));
+    .filter((r) => r.rule_id != null)
+    .map((r) => ({
+      ruleId: Number(r.rule_id),
+      count: Number(r.count),
+      message: r.message ?? null,
+    }));
 }
 
 export interface TopWafRuleWithHosts {
@@ -703,12 +801,16 @@ export interface TopWafRuleWithHosts {
   hosts: { host: string; count: number }[];
 }
 
-export async function queryTopWafRulesWithHosts(from: number, to: number, limit = 10): Promise<TopWafRuleWithHosts[]> {
+export async function queryTopWafRulesWithHosts(
+  from: number,
+  to: number,
+  limit = 10,
+): Promise<TopWafRuleWithHosts[]> {
   const topRules = await queryTopWafRules(from, to, limit);
   if (topRules.length === 0) return [];
 
   // Rule IDs come from ClickHouse query results — they are integers, safe for IN clause
-  const ruleIds = topRules.map(r => r.ruleId);
+  const ruleIds = topRules.map((r) => r.ruleId);
   const tp = timeParams(from, to);
   const ruleParams: QueryParams = {};
   const rulePlaceholders: string[] = [];
@@ -718,35 +820,46 @@ export async function queryTopWafRulesWithHosts(from: number, to: number, limit 
     rulePlaceholders.push(`{${key}:Int32}`);
   });
 
-  const hostRows = await queryRows<{ rule_id: string; host: string; count: string }>(`
+  const hostRows = await queryRows<{ rule_id: string; host: string; count: string }>(
+    `
     SELECT rule_id, host, count() AS count
     FROM waf_events
-    WHERE ${timeFilter()} AND rule_id IN (${rulePlaceholders.join(',')})
+    WHERE ${timeFilter()} AND rule_id IN (${rulePlaceholders.join(",")})
     GROUP BY rule_id, host
     ORDER BY count DESC
-  `, { ...tp, ...ruleParams });
+  `,
+    { ...tp, ...ruleParams },
+  );
 
-  return topRules.map(rule => ({
+  return topRules.map((rule) => ({
     ...rule,
     hosts: hostRows
-      .filter(r => Number(r.rule_id) === rule.ruleId)
-      .map(r => ({ host: r.host, count: Number(r.count) })),
+      .filter((r) => Number(r.rule_id) === rule.ruleId)
+      .map((r) => ({ host: r.host, count: Number(r.count) })),
   }));
 }
 
-export async function queryWafCountries(from: number, to: number): Promise<{ countryCode: string; count: number }[]> {
+export async function queryWafCountries(
+  from: number,
+  to: number,
+): Promise<{ countryCode: string; count: number }[]> {
   const tp = timeParams(from, to);
-  const rows = await queryRows<{ country_code: string | null; count: string }>(`
+  const rows = await queryRows<{ country_code: string | null; count: string }>(
+    `
     SELECT country_code, count() AS count
     FROM waf_events
     WHERE ${timeFilter()}
     GROUP BY country_code
     ORDER BY count DESC
-  `, tp);
-  return rows.map(r => ({ countryCode: r.country_code ?? 'XX', count: Number(r.count) }));
+  `,
+    tp,
+  );
+  return rows.map((r) => ({ countryCode: r.country_code ?? "XX", count: Number(r.count) }));
 }
 
-export async function queryWafRuleMessages(ruleIds: number[]): Promise<Record<number, string | null>> {
+export async function queryWafRuleMessages(
+  ruleIds: number[],
+): Promise<Record<number, string | null>> {
   if (ruleIds.length === 0) return {};
   const params: QueryParams = {};
   const placeholders: string[] = [];
@@ -755,14 +868,17 @@ export async function queryWafRuleMessages(ruleIds: number[]): Promise<Record<nu
     params[key] = id;
     placeholders.push(`{${key}:Int32}`);
   });
-  const rows = await queryRows<{ rule_id: string; message: string | null }>(`
+  const rows = await queryRows<{ rule_id: string; message: string | null }>(
+    `
     SELECT rule_id, any(rule_message) AS message
     FROM waf_events
-    WHERE rule_id IN (${placeholders.join(',')})
+    WHERE rule_id IN (${placeholders.join(",")})
     GROUP BY rule_id
-  `, params);
+  `,
+    params,
+  );
   return Object.fromEntries(
-    rows.filter(r => r.rule_id != null).map(r => [Number(r.rule_id), r.message ?? null])
+    rows.filter((r) => r.rule_id != null).map((r) => [Number(r.rule_id), r.message ?? null]),
   );
 }
 
@@ -781,7 +897,13 @@ export interface WafEvent {
   blocked: boolean;
 }
 
-export async function queryWafEvents(limit = 50, offset = 0, search?: string, from?: number, to?: number): Promise<WafEvent[]> {
+export async function queryWafEvents(
+  limit = 50,
+  offset = 0,
+  search?: string,
+  from?: number,
+  to?: number,
+): Promise<WafEvent[]> {
   const safeLimit = safeUint(limit);
   const safeOffset = safeUint(offset);
   const filter = buildWafFilter(search, from, to);
@@ -796,9 +918,17 @@ export async function queryWafEvents(limit = 50, offset = 0, search?: string, fr
   const params = { ...filter.params, p_limit: safeLimit, p_offset: safeOffset };
 
   const rows = await queryRows<{
-    ts: string; host: string; client_ip: string; country_code: string | null;
-    method: string; uri: string; rule_id: string | null; rule_message: string | null;
-    severity: string | null; raw_data: string | null; blocked: string;
+    ts: string;
+    host: string;
+    client_ip: string;
+    country_code: string | null;
+    method: string;
+    uri: string;
+    rule_id: string | null;
+    rule_message: string | null;
+    severity: string | null;
+    raw_data: string | null;
+    blocked: string;
   }>(query, params);
 
   return rows.map((r, i) => ({

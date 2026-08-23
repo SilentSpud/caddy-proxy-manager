@@ -8,11 +8,7 @@ import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 
 const BASE = 'http://localhost:3000';
-const COMPOSE_ARGS = [
-  'compose',
-  '-f', 'docker-compose.yml',
-  '-f', 'tests/docker-compose.test.yml',
-];
+const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 type CreatedUserRecord = {
   email: string;
@@ -169,7 +165,10 @@ test.describe('Users page', () => {
     await expect(page.getByTestId('create-email')).not.toBeVisible();
   });
 
-  test('creating a user via the form provisions a working credential account', async ({ page, browser }) => {
+  test('creating a user via the form provisions a working credential account', async ({
+    page,
+    browser,
+  }) => {
     const email = `newuser-ui-${Date.now()}@test.local`;
     const password = 'SecurePass2026!';
     const expectedUsername = email;
@@ -195,12 +194,19 @@ test.describe('Users page', () => {
     expect(created.accountId).not.toBeNull();
     expect(created.accountHasPassword).toBe(true);
 
-    const { context, page: loginPage } = await loginWithCredentials(browser, expectedUsername, password);
+    const { context, page: loginPage } = await loginWithCredentials(
+      browser,
+      expectedUsername,
+      password,
+    );
     await expect(loginPage).not.toHaveURL(/\/login/, { timeout: 10000 });
     await context.close();
   });
 
-  test('creating a user with a specific role shows correct badge and email login works', async ({ page, browser }) => {
+  test('creating a user with a specific role shows correct badge and email login works', async ({
+    page,
+    browser,
+  }) => {
     const email = `viewer-ui-${Date.now()}@test.local`;
     const password = 'ViewerPass2026!';
     const expectedUsername = email;
