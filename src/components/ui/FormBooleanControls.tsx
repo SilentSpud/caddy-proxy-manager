@@ -34,7 +34,10 @@ function booleanFormValue(value: boolean | "indeterminate"): string {
 }
 
 export function Switch({ htmlName, ...props }: SwitchProps) {
-  if (!htmlName) return <BaseSwitch {...props} />;
+  // A disabled control must not submit — the base components enforce this with
+  // `name={isDisabled ? undefined : htmlName}`, so the hidden input has to
+  // honour it too, or a disabled toggle starts contributing its state.
+  if (!htmlName || props.isDisabled) return <BaseSwitch {...props} />;
   return (
     <>
       <BaseSwitch {...props} />
@@ -44,7 +47,8 @@ export function Switch({ htmlName, ...props }: SwitchProps) {
 }
 
 export function CheckboxInput({ htmlName, ...props }: CheckboxInputProps) {
-  if (!htmlName) return <BaseCheckboxInput {...props} />;
+  // See above: disabled controls are excluded from submission.
+  if (!htmlName || props.isDisabled) return <BaseCheckboxInput {...props} />;
   return (
     <>
       <BaseCheckboxInput {...props} />

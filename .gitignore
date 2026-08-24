@@ -1,34 +1,56 @@
-node_modules
-package-lock.json
-.next
-out
-dist
-data
-*.log
-.env*
-!.env.example
-/.idea
-tsconfig.tsbuildinfo
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/.vinext/
+/dist/
+/out/
+/.vite/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# ai stuff
+/.claude/
+
+# configs for running instances
 /caddy-data
 /caddy-config
-.DS_Store
-CLAUDE.local.md
-/caddy-proxy-manager.wiki
-docs/plans
-/.playwright-mcp
-/.worktrees
-docker-compose.override.yml
+/data
 
 # Playwright auth state
 tests/.auth/
 test-results/
 playwright-report/
-/.superpowers
-/docs/superpowers
-.mcp.json
 
 # Staged from node_modules by scripts/copy-maplibre-worker.mjs at build time
 /public/maplibre/
 /geoip-data
-.vinext/
-/coverage

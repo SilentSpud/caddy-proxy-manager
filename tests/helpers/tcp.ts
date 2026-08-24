@@ -76,30 +76,12 @@ export function tcpConnect(host: string, port: number, timeoutMs = 5_000): Promi
 }
 
 /**
- * Poll until a TCP port accepts connections.
- * Similar to waitForRoute() but for TCP.
- */
-export async function waitForTcpRoute(
-  host: string,
-  port: number,
-  timeoutMs = 15_000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const ok = await tcpConnect(host, port, 2000);
-    if (ok) return;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`TCP port ${host}:${port} not ready after ${timeoutMs}ms`);
-}
-
-/**
  * Poll until a TCP port actually *proxies* data, not merely accepts a socket.
  *
  * Docker's port publisher accepts connections on a published port whether or
- * not Caddy has an L4 listener bound behind it, so `waitForTcpRoute` returns
- * as soon as the container is up — well before a newly created, re-enabled or
- * re-applied route is live. Anything that then asserts on echoed data races
+ * not Caddy has an L4 listener bound behind it, so merely opening a socket
+ * succeeds as soon as the container is up — well before a newly created,
+ * re-enabled or re-applied route is live. Anything that then asserts on echoed data races
  * against Caddy's reload. This helper closes that gap by requiring a probe to
  * come back, which only happens once the route reaches the upstream.
  *
@@ -113,18 +95,20 @@ export async function waitForTcpEcho(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const res = await tcpSend(
-      host,
-      port,
-      `${probe}
-`,
-      2_000,
-    );
-    if (res.data.includes(probe)) return;
+    try {
+      // tcpSend rejects (rather than resolving) when the socket errors before
+      // it ever connects — ECONNREFUSED while the caddy container is being
+      // recreated, for one. That is precisely the window this helper exists to
+      // wait through, so treat it as "not ready yet" and keep polling.
+      const res = await tcpSend(host, port, `${probe}\n`, 2_000);
+      if (res.data.includes(probe)) return;
+    } catch {
+      /* not accepting connections yet */
+    }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(
-    `TCP port ${host}:${port} accepted connections but never echoed within ${timeoutMs}ms`,
+    `TCP port ${host}:${port} never echoed a probe within ${timeoutMs}ms (it may not be accepting connections, or Caddy may not be proxying yet)`,
   );
 }
 
