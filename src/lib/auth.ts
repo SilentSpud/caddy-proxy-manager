@@ -57,7 +57,7 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
 
   // Always fetch current role/status from database to reflect changes immediately
   const currentUser = await getUserById(userId);
-  if (!currentUser || currentUser.status !== "active") {
+  if (currentUser?.status !== "active") {
     return null;
   }
 

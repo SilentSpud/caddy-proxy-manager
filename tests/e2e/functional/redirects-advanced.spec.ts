@@ -23,7 +23,7 @@ const DOMAIN = 'func-redirects-adv.test';
 
 /** Extract the Location header value from a response, normalised to a string. */
 function location(res: Awaited<ReturnType<typeof httpGet>>): string {
-  const h = res.headers['location'];
+  const h = res.headers.location;
   return Array.isArray(h) ? h[0] : (h ?? '');
 }
 

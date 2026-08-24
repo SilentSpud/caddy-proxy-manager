@@ -73,7 +73,7 @@ test.describe
     test('non-excluded root path requires auth (redirects to portal)', async () => {
       const res = await httpGet(DOMAIN, '/');
       expect(res.status).toBe(302);
-      const location = String(res.headers['location']);
+      const location = String(res.headers.location);
       expect(location).toContain('/portal?rd=');
       expect(location).toContain(DOMAIN);
     });
@@ -81,7 +81,7 @@ test.describe
     test('non-excluded arbitrary path requires auth', async () => {
       const res = await httpGet(DOMAIN, '/admin/dashboard');
       expect(res.status).toBe(302);
-      expect(String(res.headers['location'])).toContain('/portal');
+      expect(String(res.headers.location)).toContain('/portal');
     });
 
     test('credential login works for non-excluded paths', async ({ page }) => {

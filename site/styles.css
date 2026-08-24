@@ -400,6 +400,7 @@ footer {
   opacity: 0.7;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: `.hero > p` is a disjoint selector — .hero is a top-level section, never an ancestor of footer, so neither rule can shadow the other. */
 footer p {
   font-size: 0.8rem;
   color: var(--fg-subtle);

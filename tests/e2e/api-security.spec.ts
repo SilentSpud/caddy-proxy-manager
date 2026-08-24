@@ -273,7 +273,7 @@ async function apiRequest(
     'Content-Type': 'application/json',
     Origin: ORIGIN,
   };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   let res: Awaited<ReturnType<typeof request.get>>;
   switch (endpoint.method) {

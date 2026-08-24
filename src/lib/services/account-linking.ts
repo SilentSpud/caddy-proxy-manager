@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { config } from "../config";
 import { findUserByEmail, getUserById } from "../models/user";
@@ -205,7 +205,7 @@ export async function verifyAndLinkOAuth(
   providerAccountId: string,
 ): Promise<boolean> {
   const user = await getUserById(userId);
-  if (!user || !user.passwordHash) {
+  if (!user?.passwordHash) {
     return false;
   }
 

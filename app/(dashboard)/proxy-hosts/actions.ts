@@ -316,7 +316,7 @@ function parseGeoBlockConfig(formData: FormData): {
   const parseNumberList = (key: string): number[] => {
     return parseStringList(key)
       .map((s) => parseInt(s, 10))
-      .filter((n) => !isNaN(n));
+      .filter((n) => !Number.isNaN(n));
   };
 
   const config: GeoBlockSettings = {

@@ -272,7 +272,7 @@ test.describe
     test('unauthenticated request redirects to portal with ?rd=', async () => {
       const res = await httpGet(DOMAIN, '/protected/page');
       expect(res.status).toBe(302);
-      const location = String(res.headers['location']);
+      const location = String(res.headers.location);
       expect(location).toContain('/portal?rd=');
       expect(location).toContain(DOMAIN);
       expect(location).toContain('/protected/page');
@@ -281,7 +281,7 @@ test.describe
     test('forged session cookie gets redirected', async () => {
       const res = await httpGet(DOMAIN, '/', { Cookie: '_cpm_fa=forged-token' });
       expect(res.status).toBe(302);
-      expect(String(res.headers['location'])).toContain('/portal');
+      expect(String(res.headers.location)).toContain('/portal');
     });
 
     // ── User-based access control ─────────────────────────────────────

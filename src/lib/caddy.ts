@@ -372,7 +372,7 @@ function getLookupServers(
   dnsConfig: DnsResolverRouteConfig | null,
   globalDnsSettings: DnsSettings | null,
 ): string[] {
-  if (dnsConfig && dnsConfig.enabled && dnsConfig.resolvers.length > 0) {
+  if (dnsConfig?.enabled && dnsConfig.resolvers.length > 0) {
     const servers = [...dnsConfig.resolvers];
     if (dnsConfig.fallbacks && dnsConfig.fallbacks.length > 0) {
       servers.push(...dnsConfig.fallbacks);
@@ -1473,7 +1473,7 @@ async function buildProxyRoutes(
     }
 
     // Add transport-level DNS resolver config if enabled
-    if (dnsConfig && dnsConfig.enabled && dnsConfig.resolvers.length > 0) {
+    if (dnsConfig?.enabled && dnsConfig.resolvers.length > 0) {
       const resolverConfig = buildResolverConfig(dnsConfig);
       if (resolverConfig) {
         // Merge resolver into existing transport (preserving TLS settings for HTTPS upstreams)
@@ -3013,7 +3013,7 @@ function getCpmDialAddress(): string | null {
 function parseAuthentikConfig(
   meta: ProxyHostAuthentikMeta | undefined | null,
 ): AuthentikRouteConfig | null {
-  if (!meta || !meta.enabled) {
+  if (!meta?.enabled) {
     return null;
   }
 
@@ -3085,7 +3085,7 @@ const VALID_LB_POLICIES = [
 function parseLoadBalancerConfig(
   meta: LoadBalancerMeta | undefined | null,
 ): LoadBalancerRouteConfig | null {
-  if (!meta || !meta.enabled) {
+  if (!meta?.enabled) {
     return null;
   }
 
@@ -3106,7 +3106,7 @@ function parseLoadBalancerConfig(
       : null;
 
   let activeHealthCheck: LoadBalancerRouteConfig["activeHealthCheck"] = null;
-  if (meta.active_health_check && meta.active_health_check.enabled) {
+  if (meta.active_health_check?.enabled) {
     activeHealthCheck = {
       enabled: true,
       uri:
@@ -3141,7 +3141,7 @@ function parseLoadBalancerConfig(
   }
 
   let passiveHealthCheck: LoadBalancerRouteConfig["passiveHealthCheck"] = null;
-  if (meta.passive_health_check && meta.passive_health_check.enabled) {
+  if (meta.passive_health_check?.enabled) {
     const unhealthyStatus = Array.isArray(meta.passive_health_check.unhealthy_status)
       ? meta.passive_health_check.unhealthy_status.filter(
           (s): s is number => typeof s === "number" && Number.isFinite(s) && s >= 100,
@@ -3226,7 +3226,7 @@ function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string
   const healthChecks: Record<string, unknown> = {};
 
   // Active health checks
-  if (config.activeHealthCheck && config.activeHealthCheck.enabled) {
+  if (config.activeHealthCheck?.enabled) {
     const active: Record<string, unknown> = {};
 
     if (config.activeHealthCheck.uri) {
@@ -3254,7 +3254,7 @@ function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string
   }
 
   // Passive health checks
-  if (config.passiveHealthCheck && config.passiveHealthCheck.enabled) {
+  if (config.passiveHealthCheck?.enabled) {
     const passive: Record<string, unknown> = {};
 
     if (config.passiveHealthCheck.failDuration) {
@@ -3284,7 +3284,7 @@ function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string
 function parseDnsResolverConfig(
   meta: DnsResolverMeta | undefined | null,
 ): DnsResolverRouteConfig | null {
-  if (!meta || !meta.enabled) {
+  if (!meta?.enabled) {
     return null;
   }
 
@@ -3311,7 +3311,7 @@ function parseDnsResolverConfig(
 }
 
 function buildResolverConfig(dnsConfig: DnsResolverRouteConfig): Record<string, unknown> | null {
-  if (!dnsConfig || !dnsConfig.enabled || dnsConfig.resolvers.length === 0) {
+  if (!dnsConfig?.enabled || dnsConfig.resolvers.length === 0) {
     return null;
   }
 

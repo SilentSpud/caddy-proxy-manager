@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "node:crypto";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import {
   applySyncPayload,

@@ -159,7 +159,7 @@ function parseL4GeoBlockConfig(formData: FormData): {
   const parseNumberList = (key: string): number[] => {
     return parseStringList(key)
       .map((s) => parseInt(s, 10))
-      .filter((n) => !isNaN(n));
+      .filter((n) => !Number.isNaN(n));
   };
 
   const config: L4GeoBlockConfig = {

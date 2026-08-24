@@ -47,7 +47,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     cfg.accountIssuer = p.issuer;
     // Only use discovery when explicit URLs are not provided
     if (!p.authorizationUrl && !p.tokenUrl) {
-      cfg.discoveryUrl = p.issuer.replace(/\/$/, "") + "/.well-known/openid-configuration";
+      cfg.discoveryUrl = `${p.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
     }
   }
 

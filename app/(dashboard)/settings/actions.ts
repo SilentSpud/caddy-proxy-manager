@@ -492,7 +492,7 @@ export async function updateMetricsSettingsAction(
     }
     const enabled = formData.get("enabled") === "on";
     const portStr = formData.get("port") ? String(formData.get("port")).trim() : "";
-    const port = portStr && !isNaN(Number(portStr)) ? Number(portStr) : 9090;
+    const port = portStr && !Number.isNaN(Number(portStr)) ? Number(portStr) : 9090;
 
     await saveMetricsSettings({
       enabled,
@@ -956,7 +956,7 @@ function parseGeoBlockStringList(key: string, formData: FormData): string[] {
 function parseGeoBlockNumberList(key: string, formData: FormData): number[] {
   return parseGeoBlockStringList(key, formData)
     .map((s) => parseInt(s, 10))
-    .filter((n) => !isNaN(n));
+    .filter((n) => !Number.isNaN(n));
 }
 
 function parseGeoBlockResponseHeaders(formData: FormData): Record<string, string> {
@@ -1201,7 +1201,7 @@ function redactProviderSecrets<T extends { clientId: string; clientSecret: strin
   const clientId = provider.clientId;
   return {
     ...provider,
-    clientId: clientId.length > 4 ? "••••" + clientId.slice(-4) : "••••",
+    clientId: clientId.length > 4 ? `••••${clientId.slice(-4)}` : "••••",
     clientSecret: "••••••••",
   };
 }

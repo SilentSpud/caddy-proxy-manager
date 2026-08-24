@@ -57,7 +57,7 @@ test.describe
 
     test('301 redirect Location header points to the configured destination', async () => {
       const res = await httpGet(DOMAIN, '/.well-known/carddav');
-      const location = res.headers['location'];
+      const location = res.headers.location;
       const locationStr = Array.isArray(location) ? location[0] : (location ?? '');
       expect(locationStr).toBe('/remote.php/dav/');
     });
@@ -69,7 +69,7 @@ test.describe
 
     test('302 redirect Location header points to the configured destination', async () => {
       const res = await httpGet(DOMAIN, '/.well-known/caldav');
-      const location = res.headers['location'];
+      const location = res.headers.location;
       const locationStr = Array.isArray(location) ? location[0] : (location ?? '');
       expect(locationStr).toBe('/remote.php/dav/');
     });

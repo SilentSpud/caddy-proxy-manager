@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   const user = await getUserById(session.userId);
-  if (!user || user.status !== "active") {
+  if (user?.status !== "active") {
     return new NextResponse(null, { status: 401 });
   }
 

@@ -9,7 +9,7 @@ function redactSecrets(provider: OAuthProvider) {
   const clientId = provider.clientId;
   return {
     ...provider,
-    clientId: clientId.length > 4 ? "••••" + clientId.slice(-4) : "••••",
+    clientId: clientId.length > 4 ? `••••${clientId.slice(-4)}` : "••••",
     clientSecret: "••••••••",
   };
 }

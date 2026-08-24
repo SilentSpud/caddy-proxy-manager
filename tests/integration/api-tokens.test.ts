@@ -43,7 +43,7 @@ async function insertApiToken(
   overrides: Partial<typeof apiTokens.$inferInsert> = {},
 ) {
   const now = nowIso();
-  const rawToken = 'test-token-' + Math.random().toString(36).slice(2);
+  const rawToken = `test-token-${Math.random().toString(36).slice(2)}`;
   const tokenHash = hashToken(rawToken);
   const [token] = await db
     .insert(apiTokens)

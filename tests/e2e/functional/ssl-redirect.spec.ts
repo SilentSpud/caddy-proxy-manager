@@ -52,7 +52,7 @@ test.describe
     test('redirect Location header points to HTTPS', async () => {
       const res = await httpGet(DOMAIN, '/');
       expect(res.status).toBe(308);
-      const location = res.headers['location'];
+      const location = res.headers.location;
       const locationStr = Array.isArray(location) ? location[0] : (location ?? '');
       expect(locationStr).toMatch(/^https:\/\//);
       expect(locationStr).toContain(DOMAIN);
@@ -61,7 +61,7 @@ test.describe
     test('redirect preserves the request path', async () => {
       const res = await httpGet(DOMAIN, '/some/path');
       expect(res.status).toBe(308);
-      const location = res.headers['location'];
+      const location = res.headers.location;
       const locationStr = Array.isArray(location) ? location[0] : (location ?? '');
       expect(locationStr).toContain('/some/path');
     });

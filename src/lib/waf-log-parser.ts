@@ -199,7 +199,7 @@ export function parseLine(line: string, ruleMap: Map<string, RuleInfo>): WafEven
   }
 
   // Host header is an array under lowercase key
-  const hostArr = req.headers?.["host"] ?? req.headers?.["Host"];
+  const hostArr = req.headers?.host ?? req.headers?.Host;
   const host = Array.isArray(hostArr) ? (hostArr[0] ?? "") : (hostArr ?? "");
 
   // Prefer the rule carried by the audit entry itself; fall back to the

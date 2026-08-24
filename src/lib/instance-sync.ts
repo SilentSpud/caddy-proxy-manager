@@ -113,7 +113,7 @@ export function getSyncIntervalMs(): number {
   if (!envValue) return 0;
 
   const seconds = parseInt(envValue, 10);
-  if (isNaN(seconds) || seconds <= 0) return 0;
+  if (Number.isNaN(seconds) || seconds <= 0) return 0;
 
   // Minimum 30 seconds to prevent abuse
   return Math.max(seconds, 30) * 1000;

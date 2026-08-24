@@ -153,7 +153,7 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
   const removed: string[] = [];
   for (const membership of memberships) {
     const group = existingGroups.find((g) => g.id === membership.groupId);
-    if (!group || group.source !== "oidc") continue;
+    if (group?.source !== "oidc") continue;
     if (desired.has(group.name.toLowerCase())) continue;
     await db.delete(groupMembers).where(eq(groupMembers.id, membership.memberId));
     removed.push(group.name);

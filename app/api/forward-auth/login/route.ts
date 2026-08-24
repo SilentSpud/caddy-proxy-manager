@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       where: (table, operators) => operators.eq(table.email, email),
     });
 
-    if (!user || user.status !== "active" || !user.passwordHash) {
+    if (user?.status !== "active" || !user.passwordHash) {
       registerFailedAttempt(ip);
       logAuditEvent({
         userId: null,

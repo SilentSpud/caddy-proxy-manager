@@ -56,7 +56,7 @@ export async function createApiToken(
   let validatedExpiresAt: string | null = null;
   if (expiresAt) {
     const parsed = new Date(expiresAt);
-    if (isNaN(parsed.getTime())) {
+    if (Number.isNaN(parsed.getTime())) {
       throw new Error("expires_at must be a valid ISO 8601 date");
     }
     if (parsed <= new Date()) {
@@ -117,7 +117,7 @@ export async function deleteApiToken(id: number, userId: number): Promise<void> 
     const user = await db.query.users.findFirst({
       where: (table, { eq }) => eq(table.id, userId),
     });
-    if (!user || user.role !== "admin") {
+    if (user?.role !== "admin") {
       throw new Error("Forbidden");
     }
   }
@@ -143,7 +143,7 @@ export async function validateToken(
   // Check expiry — reject tokens with invalid or past expiry dates
   if (row.expiresAt) {
     const expiresAt = new Date(row.expiresAt);
-    if (isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+    if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
       return null;
     }
   }
@@ -153,7 +153,7 @@ export async function validateToken(
     where: (table, { eq }) => eq(table.id, row.createdBy),
   });
 
-  if (!user || user.status !== "active") {
+  if (user?.status !== "active") {
     return null;
   }
 

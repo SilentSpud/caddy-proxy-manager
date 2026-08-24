@@ -55,7 +55,7 @@ test.describe
     test('unauthenticated request redirects to portal with ?rd= param', async () => {
       const res = await httpGet(DOMAIN, '/some/page');
       expect(res.status).toBe(302);
-      const location = res.headers['location'];
+      const location = res.headers.location;
       expect(String(location)).toContain('/portal?rd=');
       expect(String(location)).toContain(DOMAIN);
     });
@@ -63,7 +63,7 @@ test.describe
     test('redirect preserves the original request path in ?rd=', async () => {
       const res = await httpGet(DOMAIN, '/deep/path?q=hello');
       expect(res.status).toBe(302);
-      const location = String(res.headers['location']);
+      const location = String(res.headers.location);
       expect(location).toContain('/deep/path');
       expect(location).toContain('q=hello');
     });
@@ -192,7 +192,7 @@ test.describe
         Cookie: '_cpm_fa=invalid-token-value',
       });
       expect(res.status).toBe(302);
-      expect(String(res.headers['location'])).toContain('/portal');
+      expect(String(res.headers.location)).toContain('/portal');
     });
 
     test('request with forged _cpm_fa cookie gets redirected', async () => {
@@ -201,6 +201,6 @@ test.describe
         Cookie: `_cpm_fa=${forgedToken}`,
       });
       expect(res.status).toBe(302);
-      expect(String(res.headers['location'])).toContain('/portal');
+      expect(String(res.headers.location)).toContain('/portal');
     });
   });

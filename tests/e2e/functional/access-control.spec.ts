@@ -17,7 +17,7 @@ const TEST_USER = { username: 'testuser', password: 'S3cur3P@ss!' };
 const ECHO_BODY = 'echo-ok';
 
 function basicAuth(username: string, password: string): string {
-  return 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+  return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
 }
 
 test.describe

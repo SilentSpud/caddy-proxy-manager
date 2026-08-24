@@ -1626,7 +1626,7 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
   }
 
   if (input.mtls !== undefined) {
-    if (input.mtls && input.mtls.enabled) {
+    if (input.mtls?.enabled) {
       const mtls = sanitizeMtlsMeta(input.mtls);
       if (mtls) {
         next.mtls = mtls;
@@ -1637,7 +1637,7 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
   }
 
   if (input.cpmForwardAuth !== undefined) {
-    if (input.cpmForwardAuth && input.cpmForwardAuth.enabled) {
+    if (input.cpmForwardAuth?.enabled) {
       const cfa: CpmForwardAuthMeta = { enabled: true };
       if (input.cpmForwardAuth.protected_paths && input.cpmForwardAuth.protected_paths.length > 0) {
         cfa.protected_paths = input.cpmForwardAuth.protected_paths;

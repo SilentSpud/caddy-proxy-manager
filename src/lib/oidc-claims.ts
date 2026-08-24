@@ -52,7 +52,7 @@ export function decodeJwtPayload(token: string | null | undefined): Record<strin
  * default `getUserInfo` places in it.
  */
 async function discoverUserinfoUrl(issuer: string): Promise<string | null> {
-  const discoveryUrl = issuer.replace(/\/$/, "") + "/.well-known/openid-configuration";
+  const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
   const cached = discoveryCache.get(discoveryUrl);
   if (cached && cached.expiresAt > Date.now()) return cached.userinfoUrl;
 

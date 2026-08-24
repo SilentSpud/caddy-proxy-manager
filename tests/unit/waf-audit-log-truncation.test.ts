@@ -69,7 +69,7 @@ vi.mock('node:fs', () => ({
     const start = opts?.start ?? 0;
     const size = p.includes('waf-audit') ? fsState.auditSize : 0;
     const remaining = Math.max(0, size - start);
-    const content = remaining > 0 ? 'x'.repeat(remaining - 1) + '\n' : '';
+    const content = remaining > 0 ? `${'x'.repeat(remaining - 1)}\n` : '';
     return Readable.from([Buffer.from(content, 'utf8')]);
   }),
   truncateSync: vi.fn(),

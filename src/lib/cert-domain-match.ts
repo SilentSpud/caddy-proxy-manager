@@ -6,7 +6,7 @@ export function isDomainCoveredByWildcard(domain: string, wildcardDomains: strin
     // Exact base is not covered by wildcard alone (needs explicit entry)
     if (domain === base) continue;
     // Wildcard covers one level: sub.example.com but not sub.sub.example.com
-    if (domain.endsWith("." + base) && !domain.slice(0, -(base.length + 1)).includes(".")) {
+    if (domain.endsWith(`.${base}`) && !domain.slice(0, -(base.length + 1)).includes(".")) {
       return true;
     }
   }

@@ -38,8 +38,8 @@ test.describe
       // connection with raw body. A correct handshake yields 101.
       expect(res.statusCode, `handshake response: ${JSON.stringify(res.raw)}`).toBe(101);
       expect(res.statusLine).toMatch(/HTTP\/1\.1 101/);
-      expect(res.headers['upgrade']?.toLowerCase()).toBe('websocket');
-      expect(res.headers['connection']?.toLowerCase()).toContain('upgrade');
+      expect(res.headers.upgrade?.toLowerCase()).toBe('websocket');
+      expect(res.headers.connection?.toLowerCase()).toContain('upgrade');
       expect(res.headers['sec-websocket-accept']).toBeTruthy();
     });
 
