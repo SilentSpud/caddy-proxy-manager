@@ -12,6 +12,8 @@ type PageHeaderProps = {
     label: string;
     onClick: () => void;
     icon?: ReactNode;
+    /** Greys out the primary action, e.g. when a required Caddy module is off. */
+    isDisabled?: boolean;
   };
 };
 
@@ -27,7 +29,12 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
         )}
       </VStack>
       {action && (
-        <Button label={action.label} icon={action.icon ?? <Plus />} onClick={action.onClick} />
+        <Button
+          label={action.label}
+          icon={action.icon ?? <Plus />}
+          onClick={action.onClick}
+          isDisabled={action.isDisabled}
+        />
       )}
     </HStack>
   );

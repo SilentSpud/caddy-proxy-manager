@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Waypoints,
   UserCircle,
+  Package,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -59,6 +60,10 @@ import type {
   TrustedProxiesSettings,
 } from "@/lib/settings";
 import type { DnsProviderDefinition } from "@/src/lib/dns-providers";
+import type { CaddyBuildSettings } from "@/lib/settings";
+import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
+import { dnsModuleId } from "@/src/lib/caddy-modules";
+import { useModuleGate } from "@/components/caddy-modules/ModuleGate";
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
 import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -84,6 +89,7 @@ import {
   updateGeoBlockSettingsAction,
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
+  updateCaddyBuildSettingsAction,
 } from "./actions";
 
 // ─── Settings navigation catalog ─────────────────────────────────────────────
@@ -129,6 +135,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "User Avatars",
         desc: "Gravatar fallback for users without an icon",
         icon: UserCircle,
+      },
+      {
+        id: "caddy-build",
+        name: "Caddy Build",
+        desc: "Which plugins the Caddy image is compiled with",
+        icon: Package,
       },
     ],
   },
@@ -475,6 +487,7 @@ type Props = {
   oauthProviders: OAuthProvider[];
   localUsersDisabled: boolean;
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
+  caddyBuild: CaddyBuildSettings | null;
   baseUrl: string;
   instanceSync: {
     mode: "standalone" | "master" | "slave";
@@ -532,6 +545,7 @@ export default function SettingsClient({
   oauthProviders,
   localUsersDisabled,
   avatars,
+  caddyBuild,
   baseUrl,
   instanceSync,
 }: Props) {
@@ -553,6 +567,10 @@ export default function SettingsClient({
   // Form action states
   const [generalState, generalFormAction] = useActionState(updateGeneralSettingsAction, null);
   const [acmeState, acmeFormAction] = useActionState(updateAcmeSettingsAction, null);
+  const [caddyBuildState, caddyBuildFormAction] = useActionState(
+    updateCaddyBuildSettingsAction,
+    null,
+  );
   const [dnsProviderState, dnsProviderFormAction] = useActionState(
     updateDnsProviderSettingsAction,
     null,
@@ -762,6 +780,13 @@ export default function SettingsClient({
                     isSlave={isSlave}
                     avatarsOverride={avatarsOverride}
                     setAvatarsOverride={setAvatarsOverride}
+                  />
+                )}
+                {active === "caddy-build" && (
+                  <CaddyBuildSection
+                    caddyBuild={caddyBuild}
+                    caddyBuildState={caddyBuildState}
+                    caddyBuildFormAction={caddyBuildFormAction}
                   />
                 )}
                 {active === "metrics" && (
@@ -1249,16 +1274,35 @@ function DnsProvidersSection({
   dnsProviderOverride: boolean;
   setDnsProviderOverride: (v: boolean) => void;
 }) {
+  const { enabledModuleIds } = useModuleGate();
+  // Each provider is a separate caddy-dns plugin, so availability is per
+  // provider — not one blanket "DNS-01 works" flag. A provider whose module is
+  // switched off would produce a config Caddy rejects outright, so it is taken
+  // out of the picker rather than left to fail at certificate-issuance time.
+  const isProviderAvailable = (name: string) =>
+    enabledModuleIds.length === 0 || enabledModuleIds.includes(dnsModuleId(name));
+
   const providerDef = dnsProviderDefinitions.find((p) => p.name === selectedProvider);
   const isUpdate = configuredProviders.includes(selectedProvider);
   const hasProvider = Boolean(selectedProvider) && selectedProvider !== "none";
+  const selectedUnavailable = hasProvider && !isProviderAvailable(selectedProvider);
   const disabled = isSlave && !dnsProviderOverride;
+
+  const unavailableCount = dnsProviderDefinitions.filter(
+    (p) => !isProviderAvailable(p.name),
+  ).length;
 
   const providerOptions = [
     { value: "none", label: "Select..." },
     ...dnsProviderDefinitions.map((p) => ({
       value: p.name,
       label: `${p.displayName}${configuredProviders.includes(p.name) ? " (update)" : ""}`,
+      // Kept in the list rather than filtered out, so an admin looking for a
+      // provider finds it and learns why it is unavailable.
+      disabled: !isProviderAvailable(p.name),
+      description: isProviderAvailable(p.name)
+        ? undefined
+        : "Its caddy-dns module is disabled in Settings → Caddy Build",
     })),
   ];
 
@@ -1374,7 +1418,11 @@ function DnsProvidersSection({
             <input type="hidden" name="action" value="save" />
             <Selector
               label="Provider"
-              description={`${dnsProviderDefinitions.length} providers supported`}
+              description={
+                unavailableCount > 0
+                  ? `${dnsProviderDefinitions.length} providers supported — ${unavailableCount} unavailable because their Caddy module is disabled`
+                  : `${dnsProviderDefinitions.length} providers supported`
+              }
               htmlName="provider"
               options={providerOptions}
               value={selectedProvider}
@@ -1383,6 +1431,13 @@ function DnsProvidersSection({
               hasSearch
               isDisabled={disabled}
             />
+
+            {selectedUnavailable && (
+              <WarnAlert title="This provider's Caddy module is disabled">
+                Enable it under Settings → Caddy Build and rebuild Caddy before using it for DNS-01
+                challenges. Credentials saved now will not be used until then.
+              </WarnAlert>
+            )}
 
             {hasProvider && providerDef && (
               <>
@@ -1852,6 +1907,41 @@ function AvatarsSection({
         </VStack>
       </form>
     </FormCard>
+  );
+}
+
+// ─── Section: Caddy Build ────────────────────────────────────────────────────
+
+/**
+ * Not offered as a slave override: the module list describes a binary built on
+ * this host, so inheriting a master's choice would tell a slave its Caddy has
+ * plugins it never compiled.
+ */
+function CaddyBuildSection({
+  caddyBuild,
+  caddyBuildState,
+  caddyBuildFormAction,
+}: {
+  caddyBuild: CaddyBuildSettings | null;
+  caddyBuildState: { success: boolean; message?: string } | null;
+  caddyBuildFormAction: (formData: FormData) => void;
+}) {
+  return (
+    <form action={caddyBuildFormAction}>
+      <VStack gap={4}>
+        {caddyBuildState?.message && (
+          <StatusAlert
+            message={caddyBuildState.message}
+            success={Boolean(caddyBuildState.success)}
+          />
+        )}
+        <CaddyBuildFields
+          initialModules={caddyBuild?.modules ?? {}}
+          initialCustomModules={caddyBuild?.customModules ?? []}
+        />
+        <SaveButton label="Save Module Selection" />
+      </VStack>
+    </form>
   );
 }
 

@@ -56,6 +56,7 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 - **Instance Sync** - Master/slave configuration sync for multi-instance deployments. The master pushes proxy hosts, certificates, access lists, and settings to slaves on every change
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, Spaceship, deSEC, Dynu, and acme-dns. Credentials encrypted at rest. Per-certificate provider override supported
+- **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
 - **Search & Pagination** - Server-side search and pagination on all data tables
@@ -280,6 +281,66 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 ```text
 SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
 ```
+
+---
+
+## Caddy Build
+
+Caddy is a single static binary: a plugin either was compiled in with
+[xcaddy](https://github.com/caddyserver/xcaddy) or it does not exist at runtime.
+**Settings → Caddy Build** makes that list editable.
+
+The default image ships with every supported module, so an existing install
+behaves exactly as it did before this page existed.
+
+### Choosing modules
+
+Each supported plugin has a toggle. Turning one off has two effects:
+
+- The app stops generating config that uses it, immediately. This is safe — the
+  handler simply stops being emitted — and it is what lets you remove a plugin
+  without Caddy rejecting the stored config on the way out.
+- Every setting that depends on it is disabled in the UI, with a tooltip naming
+  the module. Global geoblocking and per-host geoblock rules follow the Request
+  Blocker module; the WAF page and per-host WAF settings follow Coraza; the L4
+  Proxy Hosts page follows caddy-l4; and each DNS provider follows its own
+  `caddy-dns` module, so disabling Cloudflare leaves Route 53 alone.
+
+A module still in use cannot be switched off — the save is refused and names
+what is using it (for example "3 enabled L4 proxy hosts need the Layer 4 Proxy
+module"). Turn the feature off first.
+
+### Custom modules
+
+Any Caddy plugin published as a Go module can be added by path, with an optional
+tag, branch, or commit. It is compiled from source at build time, so a module
+that does not build fails the rebuild — the running container is left untouched
+when that happens.
+
+### Rebuilding
+
+Saving records the selection; it does not change the running container. **Rebuild
+Caddy** writes a Compose override onto the shared data volume and signals the
+sidecar, which runs `docker compose build caddy` and then recreates the
+container. Compiling Caddy takes several minutes; the proxy keeps serving on the
+current binary until the new one is ready, then restarts.
+
+Because *enabling* a module only takes effect once it is actually in the binary,
+config generation uses the intersection of what you selected and what the running
+image was built with. The panel shows a "Rebuild required" banner in between.
+
+Rebuilding needs `BUILD: 1` on the `docker-socket-proxy` service (the default in
+`docker-compose.yml`). Set it to `0` to opt out: everything else keeps working,
+and you can run `docker compose build caddy` yourself — the generated module list
+is written to the data volume as `docker-compose.caddy-build.yml` either way.
+
+### Per-host Caddyfile
+
+Each proxy host also has a **Custom Caddyfile** field for raw Caddyfile
+directives. They are adapted to JSON by the running Caddy — the same binary, with
+the same plugin set, that will execute them — and inserted before that host's
+reverse proxy. A snippet Caddy cannot parse is rejected when you save, with
+Caddy's own error naming the line.
 
 ---
 

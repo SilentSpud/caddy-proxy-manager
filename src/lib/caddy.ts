@@ -84,6 +84,13 @@ import {
 } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
+import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
+import {
+  type CaddyModuleAvailability,
+  getCaddyModuleAvailability,
+  isDnsProviderUsable,
+  isFeatureUsable,
+} from "./caddy-build";
 
 const CERTS_DIR = process.env.CERTS_DIRECTORY || join(process.cwd(), "data", "certs");
 mkdirSync(CERTS_DIR, { recursive: true, mode: 0o700 });
@@ -187,6 +194,7 @@ type MtlsMeta = {
 type ProxyHostMeta = {
   custom_reverse_proxy_json?: string;
   custom_pre_handlers_json?: string;
+  custom_caddyfile?: string;
   authentik?: ProxyHostAuthentikMeta;
   cpm_forward_auth?: CpmForwardAuthMeta;
   load_balancer?: LoadBalancerMeta;
@@ -822,6 +830,15 @@ type CaddyBuildContext = {
   globalUpstreamDnsResolutionSettings: UpstreamDnsResolutionSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalWaf?: WafSettings | null;
+  /**
+   * Which plugin-backed features the running Caddy binary can actually serve.
+   *
+   * Caddy validates a posted config as a whole: one handler naming a module
+   * that was not compiled in is rejected along with everything else in the
+   * document, so a single stale WAF toggle would take every host offline. Every
+   * plugin-backed handler below is therefore gated on this.
+   */
+  moduleAvailability: CaddyModuleAvailability;
   mtlsRbac?: {
     roleFingerprintMap: Map<number, Set<string>>;
     certFingerprintMap: Map<number, string>;
@@ -1187,6 +1204,11 @@ async function buildProxyRoutes(
   const errorRoutes: CaddyHttpRoute[] = [];
   const validClientCertExpression = buildValidClientCertCelExpression();
 
+  // Hoisted out of the per-host loop: the answer is the same for every host,
+  // and the cost of getting it wrong is the whole config being rejected.
+  const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
+  const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
+
   for (const row of rows) {
     if (!row.enabled) {
       continue;
@@ -1223,12 +1245,12 @@ async function buildProxyRoutes(
       geoblock: meta.geoblock ?? null,
       geoblock_mode: meta.geoblock_mode ?? "merge",
     });
-    if (effectiveGeoBlock?.enabled) {
+    if (effectiveGeoBlock?.enabled && geoblockUsable) {
       handlers.unshift(buildBlockerHandler(effectiveGeoBlock));
     }
 
     const effectiveWaf = resolveEffectiveWaf(context.globalWaf ?? null, meta.waf);
-    if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off") {
+    if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
       handlers.unshift(buildWafHandlerEntry(effectiveWaf, Boolean(row.allowWebsocket)));
     }
 
@@ -1527,6 +1549,37 @@ async function buildProxyRoutes(
     const customHandlers = parseCustomHandlers(meta.custom_pre_handlers_json);
     if (customHandlers.length > 0) {
       handlers.push(...customHandlers);
+    }
+
+    // Per-host Caddyfile directives, adapted by the running Caddy binary.
+    //
+    // A snippet that no longer adapts — most likely because it used a plugin
+    // that has since been switched off in Settings → Caddy Build — is skipped
+    // with a warning rather than aborting the build. Failing here would take
+    // every other host down over one host's stale escape hatch, and would also
+    // block the very edit needed to fix it. Snippets are validated when saved,
+    // so reaching this path at all means something changed underneath them.
+    if (meta.custom_caddyfile?.trim()) {
+      try {
+        const adapted = await adaptCaddyfileSnippet(meta.custom_caddyfile);
+        for (const warning of adapted.warnings) {
+          console.warn(`Caddyfile warning for host "${row.name}": ${warning}`);
+        }
+        if (adapted.ignoredApps.length > 0) {
+          console.warn(
+            `Ignoring non-HTTP directives in the Caddyfile for host "${row.name}": ${adapted.ignoredApps.join(", ")}`,
+          );
+        }
+        const subroute = buildCaddyfileSubrouteHandler(adapted.routes);
+        if (subroute) {
+          handlers.push(subroute);
+        }
+      } catch (error) {
+        console.warn(
+          `Skipping the custom Caddyfile for host "${row.name}" — Caddy could not adapt it:`,
+          error instanceof Error ? error.message : error,
+        );
+      }
     }
 
     if (authentik) {
@@ -2117,6 +2170,12 @@ type TlsAutomationContext = {
     dnsSettings?: DnsSettings | null;
     dnsProviderSettings?: DnsProviderSettings | null;
     acmeSettings?: AcmeSettings | null;
+    /**
+     * Omitted means "do not gate" — callers that only exercise ACME policy
+     * shapes have no module selection to consult. buildCaddyDocument always
+     * passes it, so the real config path is always gated.
+     */
+    moduleAvailability?: CaddyModuleAvailability;
   };
 };
 
@@ -2129,12 +2188,14 @@ export async function buildTlsAutomation(
         dnsSettings?: DnsSettings | null;
         dnsProviderSettings?: DnsProviderSettings | null;
         acmeSettings?: AcmeSettings | null;
+        moduleAvailability?: CaddyModuleAvailability;
       },
   maybeOptions?: {
     acmeEmail?: string;
     dnsSettings?: DnsSettings | null;
     dnsProviderSettings?: DnsProviderSettings | null;
     acmeSettings?: AcmeSettings | null;
+    moduleAvailability?: CaddyModuleAvailability;
   },
 ): Promise<{
   tlsApp?: { automation: { policies: Record<string, unknown>[] } };
@@ -2194,6 +2255,24 @@ export async function buildTlsAutomation(
     }
   }
 
+  /**
+   * A DNS-01 challenge names its provider module in the config, so a provider
+   * whose caddy-dns plugin is not compiled in cannot be used. Dropping just the
+   * `challenges.dns` block degrades that subject to HTTP-01 (wildcards will
+   * fail to issue) instead of having Caddy reject the config outright and take
+   * every host down with it.
+   */
+  const dnsProviderAllowed = (providerName: string): boolean => {
+    const availability = options.moduleAvailability;
+    if (!availability) return true;
+    if (isDnsProviderUsable(availability, providerName)) return true;
+    console.warn(
+      `Skipping the ACME DNS-01 challenge for "${providerName}": its Caddy DNS module is not ` +
+        "enabled in Settings → Caddy Build, or the caddy image has not been rebuilt with it yet.",
+    );
+    return false;
+  };
+
   const policies: Record<string, unknown>[] = [];
   const managedCertificateIds = new Set<number>();
 
@@ -2223,7 +2302,7 @@ export async function buildTlsAutomation(
         issuer.email = options.acmeEmail;
       }
 
-      if (globalDnsProvider) {
+      if (globalDnsProvider && dnsProviderAllowed(globalDnsProvider.provider)) {
         const dnsChallenge = buildDnsChallengeConfig(
           globalDnsProvider.provider,
           globalDnsProvider.credentials,
@@ -2267,7 +2346,7 @@ export async function buildTlsAutomation(
         issuer.email = options.acmeEmail;
       }
 
-      if (effectiveProvider) {
+      if (effectiveProvider && dnsProviderAllowed(effectiveProvider.provider)) {
         const dnsChallenge = buildDnsChallengeConfig(
           effectiveProvider.provider,
           effectiveProvider.credentials,
@@ -2304,13 +2383,23 @@ export async function buildTlsAutomation(
 
 type L4BuildContext = Pick<
   CaddyBuildContext,
-  "globalDnsSettings" | "globalUpstreamDnsResolutionSettings" | "globalGeoBlock"
+  | "globalDnsSettings"
+  | "globalUpstreamDnsResolutionSettings"
+  | "globalGeoBlock"
+  | "moduleAvailability"
 >;
 
 async function buildL4Servers(context: L4BuildContext): Promise<Record<string, unknown> | null> {
+  // The entire layer4 app comes from caddy-l4. Without it there is no `layer4`
+  // key for Caddy to unmarshal, so emitting one would fail the whole config —
+  // including the HTTP hosts, which have nothing to do with L4.
+  if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
+
   const l4Hosts = await db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true));
 
   if (l4Hosts.length === 0) return null;
+
+  const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
 
   // Group hosts by listen address — multiple hosts on the same port share routes in one server
   const serverMap = new Map<string, typeof l4Hosts>();
@@ -2476,7 +2565,7 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
         geoblock: meta.geoblock ?? null,
         geoblock_mode: meta.geoblock_mode ?? "merge",
       });
-      if (effectiveGeoBlock) {
+      if (effectiveGeoBlock && geoblockUsable) {
         const blockerMatcher = buildGeoBlockMatcher(effectiveGeoBlock);
 
         // Build the same route matcher as the proxy route (if any)
@@ -2742,6 +2831,7 @@ export async function buildCaddyDocument() {
     globalGeoBlock,
     globalWaf,
     trustedProxiesSettings,
+    moduleAvailability,
   ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
@@ -2751,6 +2841,7 @@ export async function buildCaddyDocument() {
     getGeoBlockSettings(),
     getWafSettings(),
     getTrustedProxiesSettings(),
+    getCaddyModuleAvailability(),
   ]);
 
   // Optionally seed the global geoblock trusted-proxy list from the server-level
@@ -2771,6 +2862,7 @@ export async function buildCaddyDocument() {
       dnsSettings,
       dnsProviderSettings,
       acmeSettings,
+      moduleAvailability,
     },
   });
   const {
@@ -2797,6 +2889,7 @@ export async function buildCaddyDocument() {
     globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
     globalGeoBlock: effectiveGlobalGeoBlock,
     globalWaf,
+    moduleAvailability,
     mtlsRbac: {
       roleFingerprintMap,
       certFingerprintMap,
@@ -2915,6 +3008,7 @@ export async function buildCaddyDocument() {
     globalDnsSettings: dnsSettings,
     globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
     globalGeoBlock: effectiveGlobalGeoBlock,
+    moduleAvailability,
   });
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 

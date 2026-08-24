@@ -58,6 +58,9 @@ vi.mock('@/src/lib/models/waf-events', () => ({
 vi.mock('@/src/lib/dns-providers', () => ({
   getProviderDefinition: vi.fn(),
   encryptProviderCredentials: vi.fn(),
+  // The Caddy module registry derives its DNS entries from this list at module
+  // scope, so it has to exist even though this test never reaches DNS code.
+  DNS_PROVIDERS: [],
 }));
 
 import { suppressWafRuleForHostAction } from '@/app/(dashboard)/settings/actions';

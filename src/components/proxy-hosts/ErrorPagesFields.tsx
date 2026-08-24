@@ -6,10 +6,10 @@ import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Card } from "@astryxdesign/core/Card";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { TextArea } from "@astryxdesign/core/TextArea";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ErrorPageRule } from "@/lib/models/proxy-hosts";
+import { CodeEditor } from "@/components/ui/CodeEditor";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 
 type RuleState = { statuses: string; body: string; contentType: string };
@@ -107,13 +107,15 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                     onClick={() => removeRule(rule.rowId)}
                   />
                 </HStack>
-                <TextArea
+                {/* Error bodies are usually a chunk of styled HTML, which is
+                    unreadable in a three-row textarea. */}
+                <CodeEditor
                   label="Response body"
-                  isLabelHidden
+                  language="html"
+                  height="sm"
                   placeholder="<h1>Service temporarily unavailable</h1>"
                   value={rule.body}
                   onChange={(next) => updateRule(rule.rowId, "body", next)}
-                  rows={3}
                 />
               </VStack>
             </Card>

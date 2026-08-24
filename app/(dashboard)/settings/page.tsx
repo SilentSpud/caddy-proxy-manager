@@ -13,6 +13,7 @@ import {
   getErrorPagesSettings,
   getTrustedProxiesSettings,
   getAvatarSettings,
+  getCaddyBuildSettings,
 } from "@/src/lib/settings";
 import {
   getInstanceMode,
@@ -55,6 +56,7 @@ export default async function SettingsPage() {
     trustedProxies,
     oauthProviders,
     avatarSettings,
+    caddyBuild,
   ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
@@ -70,6 +72,7 @@ export default async function SettingsPage() {
     getTrustedProxiesSettings(),
     listOAuthProviders(),
     getAvatarSettings(),
+    getCaddyBuildSettings(),
   ]);
 
   const [
@@ -128,6 +131,7 @@ export default async function SettingsPage() {
         gravatarEnabled: config.avatars.gravatarFromEnv ?? avatarSettings?.gravatarEnabled ?? true,
         fromEnv: config.avatars.gravatarFromEnv !== null,
       }}
+      caddyBuild={caddyBuild}
       baseUrl={config.baseUrl}
       instanceSync={{
         mode: instanceMode,
