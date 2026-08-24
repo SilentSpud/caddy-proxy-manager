@@ -27,7 +27,7 @@ async function pageShellRendered(page: Page) {
   // The header renders above the data section; if the component tree crashed,
   // React unmounts it along with everything else.
   await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('button', { name: '24h' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: '24h' })).toBeVisible();
 }
 
 test.describe('Analytics API failures', () => {

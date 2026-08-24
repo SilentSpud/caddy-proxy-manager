@@ -4,12 +4,12 @@ import { useState } from "react";
 import { Card } from "@astryxdesign/core/Card";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
-import { Switch } from "@astryxdesign/core/Switch";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
 import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 
 const LOAD_BALANCING_POLICIES = [
   { value: "random", label: "Random", description: "Random selection (default)" },

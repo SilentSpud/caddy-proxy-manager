@@ -104,7 +104,10 @@ test.describe('Users page', () => {
   });
 
   test('clicking edit button shows edit form', async ({ page }) => {
-    await page.getByTitle('Edit user').first().click();
+    await page
+      .getByRole('button', { name: /^Edit user / })
+      .first()
+      .click();
     await expect(page.getByText(/editing/i)).toBeVisible();
     await expect(page.getByPlaceholder('Display name')).toBeVisible();
     await expect(page.getByPlaceholder('Email address')).toBeVisible();
@@ -113,7 +116,10 @@ test.describe('Users page', () => {
   });
 
   test('clicking cancel closes the edit form', async ({ page }) => {
-    await page.getByTitle('Edit user').first().click();
+    await page
+      .getByRole('button', { name: /^Edit user / })
+      .first()
+      .click();
     await expect(page.getByText(/editing/i)).toBeVisible();
 
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -121,7 +127,10 @@ test.describe('Users page', () => {
   });
 
   test('edit form has role select with Admin, User, Viewer options', async ({ page }) => {
-    await page.getByTitle('Edit user').first().click();
+    await page
+      .getByRole('button', { name: /^Edit user / })
+      .first()
+      .click();
 
     // The role select trigger should be visible
     const roleTrigger = page.getByRole('combobox').first();
@@ -135,9 +144,9 @@ test.describe('Users page', () => {
   });
 
   test('user row shows action buttons (edit, disable, delete)', async ({ page }) => {
-    await expect(page.getByTitle('Edit user').first()).toBeVisible();
-    await expect(page.getByTitle('Disable user').first()).toBeVisible();
-    await expect(page.getByTitle('Delete user').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Edit user / }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Disable user / }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Delete user / }).first()).toBeVisible();
   });
 
   // ── Create user (UI) ──────────────────────────────────────────────────
@@ -183,7 +192,11 @@ test.describe('Users page', () => {
 
     await expect(page.getByTestId('create-email')).not.toBeVisible();
     await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('New Test User')).toBeVisible({ timeout: 5000 });
+    // The row name renders through Text maxLines, which also mounts a hidden
+    // truncation tooltip carrying the same string — filter to the visible one.
+    await expect(
+      page.getByText('New Test User', { exact: true }).filter({ visible: true }),
+    ).toBeVisible({ timeout: 5000 });
 
     const created = getCreatedUserRecord(email);
     expect(created.provider).toBe('credentials');

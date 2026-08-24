@@ -5,7 +5,6 @@ import { Globe, Home, Plus, X } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -14,7 +13,6 @@ import { MultiSelector } from "@astryxdesign/core/MultiSelector";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Spinner } from "@astryxdesign/core/Spinner";
-import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
@@ -26,6 +24,7 @@ import type { GeoBlockSettings } from "@/lib/settings";
 import type { GeoBlockMode } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { COUNTRIES, flagEmoji } from "./countries";
+import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
 
 // ─── GeoIpStatus ─────────────────────────────────────────────────────────────
 
@@ -190,6 +189,13 @@ function TagInput({
           placeholder={placeholder}
           description={helperText}
           onEnter={() => commit(draft)}
+          // Enter here means "add this tag", not "submit the form". The design
+          // system fires onEnter without preventing the default, so without this
+          // the same keypress also triggers implicit form submission — saving
+          // the whole config, and re-applying Caddy, on every tag added.
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
           onBlur={() => commit(draft)}
         />
         <IconButton

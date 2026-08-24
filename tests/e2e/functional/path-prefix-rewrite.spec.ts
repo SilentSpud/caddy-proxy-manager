@@ -21,7 +21,7 @@ test.describe
       await expect(page.getByRole('dialog')).toBeVisible();
 
       await page.getByLabel('Name').fill('Functional Path Prefix Rewrite Test');
-      await page.getByLabel(/domains/i).fill(DOMAIN);
+      await page.getByLabel(/^domains/i).fill(DOMAIN);
       // whoami-server listens on port 80 by default
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
@@ -32,7 +32,7 @@ test.describe
       await page.getByRole('button', { name: /^create$/i }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
       await expect(
-        page.getByRole('table').getByText('Functional Path Prefix Rewrite Test'),
+        page.getByRole('table').getByText('Functional Path Prefix Rewrite Test', { exact: true }),
       ).toBeVisible({ timeout: 10_000 });
 
       await waitForRoute(DOMAIN);

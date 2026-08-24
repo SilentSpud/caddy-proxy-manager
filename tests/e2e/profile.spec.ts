@@ -36,7 +36,9 @@ test.describe('Profile', () => {
       .click();
 
     // Should show an error alert
-    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[role="alert"]').filter({ hasText: /\S/ }).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('change password: new password too short shows validation error', async ({ page }) => {

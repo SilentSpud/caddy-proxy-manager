@@ -21,19 +21,21 @@ test.describe
       page,
     }) => {
       await page.goto('/waf');
-      await page.getByRole('tab', { name: /settings/i }).click();
+      await page.getByRole('button', { name: /settings/i }).click();
       await expect(page.getByRole('button', { name: /save waf settings/i })).toBeVisible();
 
-      const wafSwitch = page.locator('#waf_enabled');
-      const owaspCheckbox = page.locator('#waf_load_owasp_crs');
+      // Hand-written ids the astryx controls never emit; both expose a role and
+      // an accessible name instead.
+      const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
+      const owaspCheckbox = page.getByRole('checkbox', { name: /load owasp core rule set/i });
 
-      if ((await wafSwitch.getAttribute('data-state')) !== 'checked') {
+      if (!(await wafSwitch.isChecked())) {
         await wafSwitch.click();
-        await expect(wafSwitch).toHaveAttribute('data-state', 'checked');
+        await expect(wafSwitch).toBeChecked();
       }
-      if ((await owaspCheckbox.getAttribute('data-state')) !== 'checked') {
+      if (!(await owaspCheckbox.isChecked())) {
         await owaspCheckbox.click();
-        await expect(owaspCheckbox).toHaveAttribute('data-state', 'checked');
+        await expect(owaspCheckbox).toBeChecked();
       }
 
       await page.getByRole('button', { name: /save waf settings/i }).click();

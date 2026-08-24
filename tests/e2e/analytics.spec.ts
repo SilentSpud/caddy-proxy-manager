@@ -33,8 +33,8 @@ test.describe('Analytics', () => {
 
   test('analytics page has time range toggle buttons', async ({ page }) => {
     await page.goto('/analytics');
-    await expect(page.getByRole('button', { name: '24h' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '7d' })).toBeVisible();
+    await expect(page.getByRole('radio', { name: '24h' })).toBeVisible();
+    await expect(page.getByRole('radio', { name: '7d' })).toBeVisible();
   });
 
   test('analytics page does not show error content', async ({ page }) => {

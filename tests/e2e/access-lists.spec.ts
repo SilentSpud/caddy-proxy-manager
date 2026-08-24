@@ -69,8 +69,10 @@ test.describe('Access Lists — page load', () => {
 
   test('shows sort buttons (Recent, Name, Members, Usage)', async ({ page }) => {
     await page.goto('/access-lists');
+    // The sort rail is a SegmentedControl, which exposes its choices as a radio
+    // group rather than as buttons.
     for (const label of ['Recent', 'Name', 'Members', 'Usage']) {
-      await expect(page.getByRole('button', { name: label })).toBeVisible();
+      await expect(page.getByRole('radio', { name: label })).toBeVisible();
     }
   });
 });
@@ -193,7 +195,7 @@ test.describe('Access Lists — create dialog', () => {
     const dialog = page.getByRole('dialog');
 
     await expect(dialog.getByPlaceholder('username')).toHaveCount(1);
-    await dialog.getByText('+ Add another member').click();
+    await dialog.getByRole('button', { name: 'Add another member' }).click();
     await expect(dialog.getByPlaceholder('username')).toHaveCount(2);
   });
 
@@ -205,7 +207,7 @@ test.describe('Access Lists — create dialog', () => {
     const pwInput = dialog.getByPlaceholder('password').first();
     await expect(pwInput).toHaveValue('');
 
-    await dialog.getByTitle('Generate password').click();
+    await dialog.getByRole('button', { name: /^Generate a password for seed member / }).click();
     const val = await pwInput.inputValue();
     expect(val.length).toBeGreaterThanOrEqual(16);
   });
@@ -286,6 +288,11 @@ test.describe('Access Lists — rail interaction', () => {
   test('no-match search shows "No lists match" message', async ({ page }) => {
     await page.goto('/access-lists');
     const search = page.getByPlaceholder(/search lists or members/i);
+    // Wait for the rail to be populated before typing. The search input exists
+    // in the server-rendered markup, so filling it can land before hydration
+    // wires up onChange — the value sticks but no filtering happens, and an
+    // assertion on an absence-driven message can never retry into existence.
+    await expect(page.locator('ul').getByText(listA.name)).toBeVisible();
     await search.fill('zzz-nonexistent-zzz');
 
     await expect(page.getByText(/no lists match/i)).toBeVisible();
@@ -295,6 +302,8 @@ test.describe('Access Lists — rail interaction', () => {
     await page.goto('/access-lists');
     const search = page.getByPlaceholder(/search lists or members/i);
     const rail = page.locator('ul');
+    // See above: the rail must be hydrated before the search box is driven.
+    await expect(rail.getByText(listA.name)).toBeVisible();
     await search.fill('zzz-nonexistent-zzz');
     await expect(page.getByText(/no lists match/i)).toBeVisible();
 
@@ -306,7 +315,7 @@ test.describe('Access Lists — rail interaction', () => {
 
   test('sort by Name reorders lists alphabetically', async ({ page }) => {
     await page.goto('/access-lists');
-    await page.getByRole('button', { name: 'Name' }).click();
+    await page.getByRole('radio', { name: 'Name' }).click();
 
     const items = page.locator('ul > li');
     const count = await items.count();
@@ -321,7 +330,7 @@ test.describe('Access Lists — rail interaction', () => {
 
   test('sort by Members reorders by member count (descending)', async ({ page }) => {
     await page.goto('/access-lists');
-    await page.getByRole('button', { name: 'Members', exact: true }).click();
+    await page.getByRole('radio', { name: 'Members', exact: true }).click();
 
     // listB has 2 members, listA has 1 — listB should appear before listA
     const items = page.locator('ul > li');
@@ -364,9 +373,9 @@ test.describe('Access Lists — detail pane tabs', () => {
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
-    await expect(page.getByRole('tab', { name: /members/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /used by/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Members/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Used by/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
   });
 
   test('detail header shows badges (members count, hosts count, updated)', async ({ page }) => {
@@ -418,8 +427,8 @@ test.describe('Access Lists — members tab', () => {
   });
 
   test('members table shows usernames', async ({ page }) => {
-    await expect(page.getByText('memuser1')).toBeVisible();
-    await expect(page.getByText('memuser2')).toBeVisible();
+    await expect(page.getByText('memuser1', { exact: true })).toBeVisible();
+    await expect(page.getByText('memuser2', { exact: true })).toBeVisible();
   });
 
   test('members table shows member count', async ({ page }) => {
@@ -459,7 +468,7 @@ test.describe('Access Lists — members tab', () => {
     const pwInput = page.getByPlaceholder(/auto-generate or paste/i);
     await expect(pwInput).toHaveValue('');
 
-    await page.getByTitle('Generate strong password').click();
+    await page.getByRole('button', { name: 'Generate a strong password' }).click();
 
     const val = await pwInput.inputValue();
     expect(val.length).toBeGreaterThanOrEqual(16);
@@ -471,10 +480,12 @@ test.describe('Access Lists — members tab', () => {
 
     // 'abcdefgh' = 8 chars, all lowercase → score 1 = "Weak"
     await pwInput.fill('abcdefgh');
-    await expect(page.getByText('Weak')).toBeVisible();
+    await expect(page.getByText('Weak', { exact: true })).toBeVisible();
 
     await pwInput.fill('MyStr0ng!Pass#2026xyz');
-    await expect(page.getByText(/excellent|strong/i).first()).toBeVisible();
+    // Anchored: an unanchored /strong/i also matches the hidden "Generate strong
+    // password" tooltip, which .first() was picking up.
+    await expect(page.getByText(/^(strong|excellent)$/i)).toBeVisible();
   });
 
   test('add member — Cancel closes the add form', async ({ page }) => {
@@ -501,15 +512,15 @@ test.describe('Access Lists — members tab', () => {
 
   test('remove a member via trash icon', async ({ page }) => {
     const firstRow = page.locator('tbody tr').first();
-    await firstRow.getByTitle('Remove').click();
+    await firstRow.getByRole('button', { name: /^Remove / }).click();
 
-    await expect(page.getByText('memuser1')).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('memuser1', { exact: true })).not.toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('1 member').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('regenerate password via refresh icon shows success toast', async ({ page }) => {
     const firstRow = page.locator('tbody tr').first();
-    await firstRow.getByTitle(/regenerate password/i).click();
+    await firstRow.getByRole('button', { name: /^Regenerate password for / }).click();
 
     await expect(page.getByText(/new password generated/i)).toBeVisible({ timeout: 10_000 });
   });
@@ -596,6 +607,21 @@ test.describe('Access Lists — members empty state', () => {
 // Settings tab
 // ---------------------------------------------------------------------------
 
+/**
+ * The settings tab's Name / Description inputs.
+ *
+ * The "New access list" dialog is a native <dialog>, which stays in the DOM when
+ * closed, so its own Name and Description fields match the same label and make a
+ * bare getByLabel ambiguous. Only one pair is ever visible.
+ */
+function settingsNameField(page: Page) {
+  return page.getByLabel(/^Name/).filter({ visible: true });
+}
+
+function settingsDescField(page: Page) {
+  return page.getByLabel(/^Description/).filter({ visible: true });
+}
+
 test.describe('Access Lists — settings tab', () => {
   let list: { id: number; name: string };
 
@@ -606,7 +632,7 @@ test.describe('Access Lists — settings tab', () => {
     await page.goto('/access-lists');
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
-    await page.getByRole('tab', { name: /settings/i }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
   });
 
   test.afterEach(async ({ page }) => {
@@ -614,8 +640,8 @@ test.describe('Access Lists — settings tab', () => {
   });
 
   test('settings tab shows name and description fields', async ({ page }) => {
-    await expect(page.locator('#s-name')).toBeVisible();
-    await expect(page.locator('#s-desc')).toBeVisible();
+    await expect(settingsNameField(page)).toBeVisible();
+    await expect(settingsDescField(page)).toBeVisible();
   });
 
   test('settings tab shows metadata section (Created, Last updated, List ID)', async ({ page }) => {
@@ -634,25 +660,25 @@ test.describe('Access Lists — settings tab', () => {
   });
 
   test('editing name enables Save changes button', async ({ page }) => {
-    await page.locator('#s-name').fill('Modified Name');
+    await settingsNameField(page).fill('Modified Name');
     await expect(page.getByRole('button', { name: /save changes/i })).toBeEnabled();
   });
 
   test('Discard button appears when edits are made', async ({ page }) => {
-    await page.locator('#s-name').fill('Modified Name');
+    await settingsNameField(page).fill('Modified Name');
     await expect(page.getByRole('button', { name: /discard/i })).toBeVisible();
   });
 
   test('clicking Discard resets fields', async ({ page }) => {
-    const originalName = await page.locator('#s-name').inputValue();
-    await page.locator('#s-name').fill('Modified Name');
+    const originalName = await settingsNameField(page).inputValue();
+    await settingsNameField(page).fill('Modified Name');
     await page.getByRole('button', { name: /discard/i }).click();
-    await expect(page.locator('#s-name')).toHaveValue(originalName);
+    await expect(settingsNameField(page)).toHaveValue(originalName);
   });
 
   test('save changes updates the list name', async ({ page }) => {
     const newName = `E2E Renamed ${Date.now()}`;
-    await page.locator('#s-name').fill(newName);
+    await settingsNameField(page).fill(newName);
     await page.getByRole('button', { name: /save changes/i }).click();
 
     await expect(page.getByText('Saved')).toBeVisible({ timeout: 5_000 });
@@ -701,7 +727,7 @@ test.describe('Access Lists — used-by tab', () => {
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
-    await page.getByRole('tab', { name: /used by/i }).click();
+    await page.getByRole('button', { name: /^Used by/ }).click();
     await expect(page.getByText('Not used by any proxy host')).toBeVisible();
     await expect(page.getByText(/dormant/i)).toBeVisible();
   });
@@ -726,7 +752,7 @@ test.describe('Access Lists — used-by tab', () => {
       await page.getByText(list.name).first().click();
       await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
-      await page.getByRole('tab', { name: /used by/i }).click();
+      await page.getByRole('button', { name: /^Used by/ }).click();
       await expect(page.getByText('usage-test.local')).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText('active')).toBeVisible();
     } finally {
@@ -791,21 +817,21 @@ test.describe('Access Lists — cross-tab consistency', () => {
   test('switching from Members to Settings and back preserves member data', async ({ page }) => {
     await page.goto('/access-lists');
     await page.getByText(list.name).first().click();
-    await expect(page.getByText('crossuser')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('crossuser', { exact: true })).toBeVisible({ timeout: 5_000 });
 
-    await page.getByRole('tab', { name: /settings/i }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(page.getByText('Danger zone')).toBeVisible();
 
-    await page.getByRole('tab', { name: /members/i }).click();
-    await expect(page.getByText('crossuser')).toBeVisible();
+    await page.getByRole('button', { name: /^Members/ }).click();
+    await expect(page.getByText('crossuser', { exact: true })).toBeVisible();
   });
 
   test('switching from Members to Used by shows correct tab content', async ({ page }) => {
     await page.goto('/access-lists');
     await page.getByText(list.name).first().click();
-    await expect(page.getByText('crossuser')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('crossuser', { exact: true })).toBeVisible({ timeout: 5_000 });
 
-    await page.getByRole('tab', { name: /used by/i }).click();
+    await page.getByRole('button', { name: /^Used by/ }).click();
     await expect(page.getByText('Not used by any proxy host')).toBeVisible();
   });
 });

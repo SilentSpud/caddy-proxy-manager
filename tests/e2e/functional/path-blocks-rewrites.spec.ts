@@ -33,7 +33,7 @@ test.describe
       await expect(page.getByRole('dialog')).toBeVisible();
 
       await page.getByLabel('Name').fill('Functional Path Blocks/Rewrites Test');
-      await page.getByLabel(/domains/i).fill(DOMAIN);
+      await page.getByLabel(/^domains/i).fill(DOMAIN);
       // whoami-server echoes the full request line, letting us assert the
       // rewritten URI is what the upstream received.
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
@@ -53,7 +53,7 @@ test.describe
       await page.getByRole('button', { name: /^create$/i }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
       await expect(
-        page.getByRole('table').getByText('Functional Path Blocks/Rewrites Test'),
+        page.getByRole('table').getByText('Functional Path Blocks/Rewrites Test', { exact: true }),
       ).toBeVisible({ timeout: 10_000 });
 
       await waitForRoute(DOMAIN);
@@ -116,7 +116,7 @@ test.describe
       await expect(page.getByRole('dialog')).toBeVisible();
 
       await page.getByLabel('Name').fill('Functional Path Allows Test');
-      await page.getByLabel(/domains/i).fill(ALLOW_DOMAIN);
+      await page.getByLabel(/^domains/i).fill(ALLOW_DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('whoami-server:80');
 
       await injectFormFields(page, {
@@ -127,7 +127,9 @@ test.describe
 
       await page.getByRole('button', { name: /^create$/i }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
-      await expect(page.getByRole('table').getByText('Functional Path Allows Test')).toBeVisible({
+      await expect(
+        page.getByRole('table').getByText('Functional Path Allows Test', { exact: true }),
+      ).toBeVisible({
         timeout: 10_000,
       });
 

@@ -12,7 +12,7 @@ test.describe('Groups page', () => {
   });
 
   test('page loads with Groups heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Groups' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
     await expect(
       page.getByText('Organize users into groups for forward auth access control.'),
     ).toBeVisible();
@@ -55,42 +55,56 @@ test.describe('Groups page', () => {
 
   test('add member to group', async ({ page }) => {
     // Ensure the group exists
-    await expect(page.getByText('E2E Test Group')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('E2E Test Group', { exact: true })).toBeVisible({ timeout: 5_000 });
 
     // Click add member button
-    await page.getByTitle('Add member').first().click();
+    await page.getByRole('button', { name: 'Add member' }).first().click();
     await expect(page.getByText('Add a user to this group')).toBeVisible();
 
-    // Click the first available user in the add-member list to add them.
-    // The add-member list items are full-width buttons inside a bordered container.
-    const memberList = page.locator('.border.rounded-md');
-    const firstUser = memberList.locator('button').first();
-    if (await firstUser.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await firstUser.click();
+    // The available-users list renders as ListItems inside the add-member
+    // panel — the old '.border.rounded-md' container class is not emitted any
+    // more, so scope to the panel that owns the prompt text instead.
+    const addPanel = page
+      .locator('div.astryx-stack')
+      .filter({ hasText: 'Add a user to this group' })
+      .last();
+    const noneLeft = addPanel.getByText('All users are already in this group.');
+    const firstUser = addPanel.getByRole('listitem').first();
 
-      // Member should now appear in the group
-      await expect(page.getByText('1 member')).toBeVisible({ timeout: 10_000 });
+    // Assert one of the two branches actually rendered, so an empty panel is a
+    // failure rather than a silently skipped test.
+    await expect(firstUser.or(noneLeft).first()).toBeVisible({ timeout: 5_000 });
+
+    if (await firstUser.isVisible()) {
+      await firstUser.click();
+      await expect(page.getByText('1 member').first()).toBeVisible({ timeout: 10_000 });
     }
   });
 
   test('remove member from group', async ({ page }) => {
     // If the group has a member, remove it
-    const removeMemberBtn = page.getByTitle('Remove member').first();
+    const removeMemberBtn = page.getByRole('button', { name: /^Remove .+ from / }).first();
     if (await removeMemberBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await removeMemberBtn.click();
-      await expect(page.getByText('0 members')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText('0 members').first()).toBeVisible({ timeout: 10_000 });
     }
   });
 
   test('delete group via confirm dialog', async ({ page }) => {
     await expect(page.getByText('E2E Test Group')).toBeVisible({ timeout: 5_000 });
 
-    // Accept the confirm dialog
-    page.on('dialog', (dialog) => dialog.accept());
-    await page.getByTitle('Delete group').first().click();
+    // Deletion is confirmed through an in-app AlertDialog (it replaced
+    // window.confirm), so there is no native dialog event to accept. The row
+    // button is labelled per group; the dialog's action is the bare verb.
+    await page.getByRole('button', { name: 'Delete group E2E Test Group' }).click();
+    const confirm = page.getByRole('alertdialog');
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button', { name: 'Delete group', exact: true }).click();
 
     // Group should be removed
-    await expect(page.getByText('E2E Test Group')).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('E2E Test Group', { exact: true })).not.toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('shows empty state when no groups exist', async ({ page }) => {

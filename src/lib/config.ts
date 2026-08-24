@@ -258,25 +258,3 @@ export function validateProductionConfig() {
     void config.adminPassword;
   }
 }
-
-/**
- * Returns list of enabled OAuth providers based on configuration.
- * Only includes providers that have complete credentials configured.
- */
-export function getEnabledOAuthProviders(): Array<{ id: string; name: string }> {
-  const providers: Array<{ id: string; name: string }> = [];
-
-  if (
-    config.oauth.enabled &&
-    config.oauth.clientId &&
-    config.oauth.clientSecret &&
-    config.oauth.issuer
-  ) {
-    providers.push({
-      id: "oauth2",
-      name: config.oauth.providerName,
-    });
-  }
-
-  return providers;
-}

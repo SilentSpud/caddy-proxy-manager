@@ -130,11 +130,12 @@ function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInput | un
     return undefined;
   }
 
+  // The boolean is carried by a hidden input that is always present (see
+  // FormBooleanControls), so presence no longer distinguishes on from off —
+  // only the value does.
   const enabledIndicator = formData.has("cpmForwardAuthEnabledPresent");
   const enabledValue = enabledIndicator
-    ? formData.has("cpmForwardAuthEnabled")
-      ? parseCheckbox(formData.get("cpmForwardAuthEnabled"))
-      : false
+    ? parseCheckbox(formData.get("cpmForwardAuthEnabled"))
     : undefined;
   const protectedPaths = parseCsv(formData.get("cpmForwardAuthProtectedPaths"));
   const excludedPaths = parseCsv(formData.get("cpmForwardAuthExcludedPaths"));

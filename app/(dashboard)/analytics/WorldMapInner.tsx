@@ -661,7 +661,14 @@ export default function WorldMapInner({
         .wm-popup .maplibregl-popup-tip { display: none !important; }
       `}</style>
 
-      <div className="rounded-lg overflow-hidden border border-white/[0.08] flex-1 min-h-[280px] min-w-[400px] w-full">
+      {/* `relative` makes this the map's containing block. MapGL is then sized by
+          `inset: 0` rather than `height: 100%`: this wrapper is a flex item, and a
+          percentage height resolved against a flex-determined height collapses to
+          zero here. MapLibre's own container carries `overflow: hidden`, so a
+          collapsed height clips the canvas away completely — the map still runs
+          and answers queryRenderedFeatures, but paints nothing and hit-tests
+          nothing. */}
+      <div className="relative rounded-lg overflow-hidden border border-white/[0.08] flex-1 min-h-[280px] min-w-[400px] w-full">
         <MapGL
           mapStyle={MAP_STYLE}
           initialViewState={{
@@ -675,7 +682,7 @@ export default function WorldMapInner({
           interactiveLayerIds={["countries-fill"]}
           onMouseMove={onHover}
           onMouseLeave={() => setHoverInfo(null)}
-          style={{ width: "100%", height: "100%" }}
+          style={{ position: "absolute", inset: 0 }}
           attributionControl={false}
           dragRotate={false}
           pitchWithRotate={false}

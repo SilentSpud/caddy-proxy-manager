@@ -15,7 +15,7 @@ test.describe('Proxy Hosts', () => {
   test('clicking Create Host opens a dialog with form fields', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByLabel(/domains/i)).toBeVisible();
+    await expect(page.getByLabel(/^domains/i)).toBeVisible();
   });
 
   test('create a proxy host — appears in the table', async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe('Proxy Hosts', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('E2E Test Host');
-    await page.getByLabel(/domains/i).fill('e2etest.local');
+    await page.getByLabel(/^domains/i).fill('e2etest.local');
     // Upstream field uses placeholder text, not a label
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9999');
 
@@ -31,7 +31,7 @@ test.describe('Proxy Hosts', () => {
 
     // Dialog should close and host appear in table
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('E2E Test Host')).toBeVisible({
+    await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible({
       timeout: 10000,
     });
   });
@@ -70,12 +70,14 @@ test.describe('Proxy Hosts', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Advanced Options Test');
-    await page.getByLabel(/domains/i).fill('advanced-opts-test.local');
+    await page.getByLabel(/^domains/i).fill('advanced-opts-test.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9990');
     await page.getByRole('button', { name: /^create$/i }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Advanced Options Test')).toBeVisible({
+    await expect(
+      page.getByRole('table').getByText('Advanced Options Test', { exact: true }),
+    ).toBeVisible({
       timeout: 10000,
     });
 
@@ -110,15 +112,15 @@ test.describe('Proxy Hosts', () => {
         .getByRole('switch');
 
       // Verify initial state matches what was saved
-      await expect(hstsSwitch).toHaveAttribute('data-state', 'checked');
-      await expect(skipSwitch).toHaveAttribute('data-state', 'unchecked');
+      await expect(hstsSwitch).toBeChecked();
+      await expect(skipSwitch).not.toBeChecked();
 
       // Toggle HSTS Subdomains OFF and Skip HTTPS Validation ON
       await hstsSwitch.click();
       await skipSwitch.click();
 
-      await expect(hstsSwitch).toHaveAttribute('data-state', 'unchecked');
-      await expect(skipSwitch).toHaveAttribute('data-state', 'checked');
+      await expect(hstsSwitch).not.toBeChecked();
+      await expect(skipSwitch).toBeChecked();
 
       // Save the changes
       await dialog.getByRole('button', { name: /save changes/i }).click();
@@ -146,8 +148,8 @@ test.describe('Proxy Hosts', () => {
         .locator('div:has(> input[name="skipHttpsHostnameValidationPresent"])')
         .getByRole('switch');
 
-      await expect(hstsSwitch2).toHaveAttribute('data-state', 'unchecked');
-      await expect(skipSwitch2).toHaveAttribute('data-state', 'checked');
+      await expect(hstsSwitch2).not.toBeChecked();
+      await expect(skipSwitch2).toBeChecked();
 
       await dialog2
         .getByRole('button', { name: /cancel|close/i })
@@ -159,7 +161,11 @@ test.describe('Proxy Hosts', () => {
       const hosts2 = (await listResp2.json()) as Array<{ id: number; name: string }>;
       const toDelete = hosts2.find((h) => h.name === 'Advanced Options Test');
       if (toDelete) {
-        await page.request.delete(`${API_PROXY_HOSTS}/${toDelete.id}`);
+        // Mutating requests are same-origin checked; without this header the
+        // cleanup 403s and leaves the host behind for every later run.
+        await page.request.delete(`${API_PROXY_HOSTS}/${toDelete.id}`, {
+          headers: { Origin: 'http://localhost:3000' },
+        });
       }
     }
   });
@@ -197,16 +203,18 @@ test.describe('Proxy Hosts', () => {
 
     try {
       await page.reload();
-      await expect(page.getByRole('table').getByText('Toggle Persistence Test')).toBeVisible({
+      await expect(
+        page.getByRole('table').getByText('Toggle Persistence Test', { exact: true }),
+      ).toBeVisible({
         timeout: 10000,
       });
 
       // Click the Switch in the row to disable the host
       const row = page.locator('tr', { hasText: 'Toggle Persistence Test' });
       const rowSwitch = row.getByRole('switch').first();
-      await expect(rowSwitch).toHaveAttribute('data-state', 'checked');
+      await expect(rowSwitch).toBeChecked();
       await rowSwitch.click();
-      await expect(rowSwitch).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+      await expect(rowSwitch).not.toBeChecked({ timeout: 10000 });
 
       // Verify redirects and rewrite survive the disable toggle
       const afterDisable = (await (
@@ -222,7 +230,7 @@ test.describe('Proxy Hosts', () => {
 
       // Re-enable
       await rowSwitch.click();
-      await expect(rowSwitch).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+      await expect(rowSwitch).toBeChecked({ timeout: 10000 });
 
       // Verify redirects and rewrite survive the re-enable toggle
       const afterEnable = (await (
@@ -258,7 +266,7 @@ test.describe('Proxy Hosts', () => {
 
     try {
       await page.goto('/settings');
-      const sidebar = page.locator('aside[aria-label="Settings navigation"]');
+      const sidebar = page.locator('[role="navigation"][aria-label="Settings navigation"]');
       const navBtn = sidebar.getByRole('button', { name: 'Authentik Defaults', exact: true });
       await expect(navBtn).toBeVisible({ timeout: 10_000 });
       await navBtn.click();
@@ -278,10 +286,10 @@ test.describe('Proxy Hosts', () => {
       const dialog = page.getByRole('dialog');
       const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
       const authentikSwitch = authentikSection.getByRole('switch');
-      await expect(authentikSwitch).toHaveAttribute('data-state', 'unchecked');
+      await expect(authentikSwitch).not.toBeChecked();
 
       await authentikSwitch.click();
-      await expect(authentikSwitch).toHaveAttribute('data-state', 'checked');
+      await expect(authentikSwitch).toBeChecked();
 
       await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(
         defaultSettings.outpostDomain,
@@ -348,7 +356,7 @@ test.describe('Proxy Hosts', () => {
       await page.goto('/proxy-hosts');
       const row = page.locator('tr', { hasText: 'Authentik Edit Defaults Host' });
       await expect(row).toBeVisible({ timeout: 10_000 });
-      await row.getByRole('button', { name: /open menu/i }).click();
+      await row.getByRole('button', { name: /^Actions for / }).click();
       await page.getByRole('menuitem', { name: 'Edit' }).click();
 
       const dialog = page.getByRole('dialog');
@@ -356,9 +364,9 @@ test.describe('Proxy Hosts', () => {
 
       const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
       const authentikSwitch = authentikSection.getByRole('switch');
-      await expect(authentikSwitch).toHaveAttribute('data-state', 'unchecked');
+      await expect(authentikSwitch).not.toBeChecked();
       await authentikSwitch.click();
-      await expect(authentikSwitch).toHaveAttribute('data-state', 'checked');
+      await expect(authentikSwitch).toBeChecked();
 
       await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(
         defaultSettings.outpostDomain,
@@ -442,7 +450,7 @@ test.describe('Proxy Hosts', () => {
       await page.goto('/proxy-hosts');
       const row = page.locator('tr', { hasText: 'Authentik Own Values Host' });
       await expect(row).toBeVisible({ timeout: 10_000 });
-      await row.getByRole('button', { name: /open menu/i }).click();
+      await row.getByRole('button', { name: /^Actions for / }).click();
       await page.getByRole('menuitem', { name: 'Edit' }).click();
 
       const dialog = page.getByRole('dialog');
@@ -485,7 +493,7 @@ test.describe('Proxy Hosts', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Geoblock Override Host');
-    await page.getByLabel(/domains/i).fill('geoblock-override.local');
+    await page.getByLabel(/^domains/i).fill('geoblock-override.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9991');
 
     // Enable per-host geoblock (the rose-colored card with a Switch).
@@ -494,14 +502,16 @@ test.describe('Proxy Hosts', () => {
     await geoCard.scrollIntoViewIfNeeded();
     const geoSwitch = geoCard.getByRole('switch').first();
     await geoSwitch.click();
-    await expect(geoSwitch).toHaveAttribute('data-state', 'checked');
+    await expect(geoSwitch).toBeChecked();
 
-    // Pick "Override global" from the two-tile mode selector.
-    await geoCard.getByText('Override global').click();
+    // Mode is a SegmentedControl — a radiogroup, not a pair of tiles.
+    await geoCard.getByRole('radio', { name: 'Override global' }).click();
 
     await dialog.getByRole('button', { name: /^create$/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Geoblock Override Host')).toBeVisible({
+    await expect(
+      page.getByRole('table').getByText('Geoblock Override Host', { exact: true }),
+    ).toBeVisible({
       timeout: 10000,
     });
 
@@ -525,13 +535,12 @@ test.describe('Proxy Hosts', () => {
     const editGeoCard = page
       .getByRole('dialog')
       .locator('div:has(> input[name="geoblockPresent"])');
-    // Selected mode tile carries the highlighted "border-yellow-500" class.
-    await expect(
-      editGeoCard.locator('div.border-yellow-500', { hasText: 'Override global' }),
-    ).toBeVisible();
+    // Assert the selection through the radiogroup's own state rather than a
+    // highlight class, which the design system no longer emits.
+    await expect(editGeoCard.getByRole('radio', { name: 'Override global' })).toBeChecked();
 
     // Switch back to merge and verify that round-trips too.
-    await editGeoCard.getByText('Merge with global').click();
+    await editGeoCard.getByRole('radio', { name: 'Merge with global' }).click();
     await page
       .getByRole('dialog')
       .getByRole('button', { name: /save changes/i })
@@ -550,12 +559,12 @@ test.describe('Proxy Hosts', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Host To Delete');
-    await page.getByLabel(/domains/i).fill('delete-me.local');
+    await page.getByLabel(/^domains/i).fill('delete-me.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:7777');
     await page.getByRole('button', { name: /^create$/i }).click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Host To Delete')).toBeVisible({
+    await expect(page.getByRole('table').getByText('Host To Delete', { exact: true })).toBeVisible({
       timeout: 10000,
     });
 

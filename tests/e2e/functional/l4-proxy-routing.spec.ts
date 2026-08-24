@@ -15,7 +15,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { createL4ProxyHost } from '../../helpers/l4-proxy-api';
-import { tcpSend, waitForTcpRoute, tcpConnect, udpSend, waitForUdpRoute } from '../../helpers/tcp';
+import { tcpSend, waitForTcpEcho, tcpConnect, udpSend, waitForUdpRoute } from '../../helpers/tcp';
 
 const TCP_PORT = 15432;
 const TCP_PORT_2 = 15433;
@@ -34,7 +34,7 @@ test.describe
         listenAddress: `:${TCP_PORT}`,
         upstream: 'tcp-echo:9000',
       });
-      await waitForTcpRoute('127.0.0.1', TCP_PORT);
+      await waitForTcpEcho('127.0.0.1', TCP_PORT);
     });
 
     test('routes TCP traffic to the upstream echo server', async () => {
@@ -65,9 +65,10 @@ test.describe
       const res = await tcpSend('127.0.0.1', TCP_PORT, 'should-not-echo\n', 2000);
       expect(res.data).not.toContain('should-not-echo');
 
-      // Re-enable and wait for route to come back
+      // Re-enable and wait for the route to actually carry data again — the
+      // port keeps accepting connections throughout, so only an echo proves it.
       await row.getByRole('switch').click();
-      await waitForTcpRoute('127.0.0.1', TCP_PORT);
+      await waitForTcpEcho('127.0.0.1', TCP_PORT);
     });
   });
 
@@ -80,13 +81,13 @@ test.describe
         listenAddress: `:${TCP_PORT_2}`,
         upstream: 'tcp-echo:9000',
       });
-      await waitForTcpRoute('127.0.0.1', TCP_PORT_2);
+      await waitForTcpEcho('127.0.0.1', TCP_PORT_2);
     });
 
     test('both TCP ports route traffic independently', async () => {
-      // Ensure both ports are ready (port 1 may have been toggled in earlier test)
-      await waitForTcpRoute('127.0.0.1', TCP_PORT);
-      await waitForTcpRoute('127.0.0.1', TCP_PORT_2);
+      // Ensure both ports actually proxy (port 1 was toggled off/on earlier).
+      await waitForTcpEcho('127.0.0.1', TCP_PORT);
+      await waitForTcpEcho('127.0.0.1', TCP_PORT_2);
       const res1 = await tcpSend('127.0.0.1', TCP_PORT, 'port1\n');
       const res2 = await tcpSend('127.0.0.1', TCP_PORT_2, 'port2\n');
       expect(res1.connected).toBe(true);

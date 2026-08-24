@@ -3,14 +3,40 @@
  *
  * Verifies the L4 Proxy Hosts UI — navigation, list, create/edit/delete dialogs.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';
+const ORIGIN = 'http://localhost:3000';
+
+/**
+ * The sortable column headers only exist once the table has rows — an empty
+ * list renders an EmptyState instead. These tests used to rely on hosts left
+ * behind by the functional L4 specs, which made them silently order-dependent
+ * (and made them fail outright once cleanup started working). Own the fixture
+ * instead.
+ */
+async function createFixtureHost(page: Page, name: string, listenAddress: string) {
+  const res = await page.request.post(API_L4_HOSTS, {
+    headers: { Origin: ORIGIN },
+    data: {
+      name,
+      protocol: 'tcp',
+      listenAddress,
+      upstreams: ['tcp-echo:9000'],
+      matcherType: 'none',
+    },
+  });
+  expect(res.ok(), `L4 fixture host create failed: ${res.status()} ${await res.text()}`).toBe(true);
+  return ((await res.json()) as { id: number }).id;
+}
 
 test.describe('L4 Proxy Hosts page', () => {
   test('is accessible from sidebar navigation', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('link', { name: /l4 proxy hosts/i }).click();
     await expect(page).toHaveURL(/\/l4-proxy-hosts/);
-    await expect(page.getByRole('heading', { name: 'L4 Proxy Hosts' })).toBeVisible();
+    // Non-exact would also match the empty state's "No L4 proxy hosts found".
+    await expect(page.getByRole('heading', { name: 'L4 Proxy Hosts', exact: true })).toBeVisible();
   });
 
   test('shows empty state when search has no results', async ({ page }) => {
@@ -32,36 +58,53 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByRole('combobox', { name: 'Matcher' }).first()).toBeVisible();
   });
 
-  test('clicking Name / Matcher header sorts the table', async ({ page }) => {
-    await page.goto('/l4-proxy-hosts');
-    const sortBtn = page.getByRole('button', { name: 'Name / Matcher' });
-    await expect(sortBtn).toBeVisible();
+  test.describe('column sorting', () => {
+    let fixtureId: number | null = null;
 
-    await sortBtn.click();
-    await expect(page).toHaveURL(/sortBy=name/);
-    await expect(page).toHaveURL(/sortDir=asc/);
+    test.beforeAll(async ({ browser }) => {
+      const page = await browser.newPage();
+      fixtureId = await createFixtureHost(page, 'L4 Sort Fixture', ':15999');
+      await page.close();
+    });
 
-    // Click again to toggle direction
-    await sortBtn.click();
-    await expect(page).toHaveURL(/sortDir=desc/);
-  });
+    test.afterAll(async ({ browser }) => {
+      if (fixtureId == null) return;
+      const page = await browser.newPage();
+      await page.request.delete(`${API_L4_HOSTS}/${fixtureId}`, { headers: { Origin: ORIGIN } });
+      await page.close();
+    });
 
-  test('clicking Protocol header sorts by protocol', async ({ page }) => {
-    await page.goto('/l4-proxy-hosts');
-    const sortBtn = page.getByRole('button', { name: 'Protocol' });
-    await expect(sortBtn).toBeVisible();
+    test('clicking Name / Matcher header sorts the table', async ({ page }) => {
+      await page.goto('/l4-proxy-hosts');
+      const sortBtn = page.getByRole('button', { name: 'Name / Matcher' });
+      await expect(sortBtn).toBeVisible();
 
-    await sortBtn.click();
-    await expect(page).toHaveURL(/sortBy=protocol/);
-  });
+      await sortBtn.click();
+      await expect(page).toHaveURL(/sortBy=name/);
+      await expect(page).toHaveURL(/sortDir=asc/);
 
-  test('clicking Listen header sorts by listen address', async ({ page }) => {
-    await page.goto('/l4-proxy-hosts');
-    const sortBtn = page.getByRole('button', { name: 'Listen' });
-    await expect(sortBtn).toBeVisible();
+      // Click again to toggle direction
+      await sortBtn.click();
+      await expect(page).toHaveURL(/sortDir=desc/);
+    });
 
-    await sortBtn.click();
-    await expect(page).toHaveURL(/sortBy=listenAddress/);
+    test('clicking Protocol header sorts by protocol', async ({ page }) => {
+      await page.goto('/l4-proxy-hosts');
+      const sortBtn = page.getByRole('button', { name: 'Protocol' });
+      await expect(sortBtn).toBeVisible();
+
+      await sortBtn.click();
+      await expect(page).toHaveURL(/sortBy=protocol/);
+    });
+
+    test('clicking Listen header sorts by listen address', async ({ page }) => {
+      await page.goto('/l4-proxy-hosts');
+      const sortBtn = page.getByRole('button', { name: 'Listen' });
+      await expect(sortBtn).toBeVisible();
+
+      await sortBtn.click();
+      await expect(page).toHaveURL(/sortBy=listenAddress/);
+    });
   });
 
   test('creates a new L4 proxy host', async ({ page }) => {
@@ -73,17 +116,17 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByLabel('Listen Address').fill(':19999');
     await page.getByLabel('Upstreams').fill('10.0.0.1:5432');
 
-    await page.getByRole('button', { name: /create/i }).click();
+    await page.getByRole('button', { name: /^create$/i }).click();
 
     // Dialog should close and host should appear in table
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('table').getByText('E2E Test Host')).toBeVisible();
+    await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible();
     await expect(page.getByRole('table').getByText(':19999', { exact: true })).toBeVisible();
   });
 
   test('deletes the created L4 proxy host', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
-    await expect(page.getByRole('table').getByText('E2E Test Host')).toBeVisible();
+    await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible();
 
     // Open the dropdown menu for that row and click Delete
     const row = page.locator('tr', { hasText: 'E2E Test Host' });

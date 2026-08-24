@@ -2,9 +2,28 @@ import { test, expect, type Page } from '@playwright/test';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** The settings page has its own sidebar (`aria-label="Settings navigation"`),
- *  separate from the global dashboard sidebar. Use this selector everywhere. */
-const SETTINGS_SIDEBAR = 'aside[aria-label="Settings navigation"]';
+/** The settings page has its own sidebar, separate from the global dashboard
+ *  sidebar. It is an astryx LayoutPanel, which renders a <div> carrying the
+ *  landmark role and label rather than an <aside>. Use this selector everywhere. */
+const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings navigation"]';
+
+/** Mutating v1 API calls are same-origin checked and 403 without this header. */
+const SETTINGS_ORIGIN = 'http://localhost:3000';
+
+/**
+ * Opens the settings command palette with its keyboard shortcut.
+ *
+ * The shortcut is bound to `window` inside a useEffect, so pressing it straight
+ * after goto() does nothing at all — the listener is not attached until the page
+ * has hydrated. Waiting for the sidebar's search control first is what makes the
+ * press land; a plain click auto-waits for actionability and never had the
+ * problem, which is why only the keyboard tests were failing.
+ */
+async function openPaletteWithKeyboard(page: Page) {
+  await expect(page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+k');
+  await expect(page.getByRole('dialog')).toBeVisible();
+}
 
 /** Navigate to a specific settings section via the sidebar. */
 async function goToSection(page: Page, sectionName: string) {
@@ -65,7 +84,7 @@ test.describe('Settings — page load & layout', () => {
     await page.goto('/settings');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     await expect(sidebar.getByText('Jump to setting...')).toBeVisible();
-    await expect(sidebar.locator('kbd')).toBeVisible();
+    await expect(sidebar.locator('kbd').first()).toBeVisible();
   });
 });
 
@@ -148,10 +167,10 @@ test.describe('Settings — sidebar navigation', () => {
 test.describe('Settings — Cmd-K palette', () => {
   test('Cmd+K opens the command palette', async ({ page }) => {
     await page.goto('/settings');
-    await page.keyboard.press('Meta+k');
+    await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByPlaceholder(/jump to a setting/i)).toBeVisible();
+    await expect(dialog.getByPlaceholder(/search/i)).toBeVisible();
   });
 
   test('clicking the search button opens the command palette', async ({ page }) => {
@@ -162,7 +181,7 @@ test.describe('Settings — Cmd-K palette', () => {
 
   test('palette shows all settings items', async ({ page }) => {
     await page.goto('/settings');
-    await page.keyboard.press('Meta+k');
+    await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Instance Sync')).toBeVisible();
     await expect(dialog.getByText('General')).toBeVisible();
@@ -172,9 +191,9 @@ test.describe('Settings — Cmd-K palette', () => {
 
   test('typing in the palette filters results', async ({ page }) => {
     await page.goto('/settings');
-    await page.keyboard.press('Meta+k');
+    await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    const input = dialog.getByPlaceholder(/jump to a setting/i);
+    const input = dialog.getByPlaceholder(/search/i);
     // Use "geob" — specific enough that cmdk fuzzy matching won't hit unrelated items
     // ("dns" fuzzy-matches "Instance Sync" via d-n-s in "Standalone, coordination, System")
     await input.fill('geob');
@@ -185,9 +204,9 @@ test.describe('Settings — Cmd-K palette', () => {
 
   test('selecting a palette result navigates to that section', async ({ page }) => {
     await page.goto('/settings');
-    await page.keyboard.press('Meta+k');
+    await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    const input = dialog.getByPlaceholder(/jump to a setting/i);
+    const input = dialog.getByPlaceholder(/search/i);
     await input.fill('logging');
     await dialog.getByText('Access Logging').click();
     // Palette should close
@@ -198,7 +217,7 @@ test.describe('Settings — Cmd-K palette', () => {
 
   test('Escape closes the palette', async ({ page }) => {
     await page.goto('/settings');
-    await page.keyboard.press('Meta+k');
+    await openPaletteWithKeyboard(page);
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).not.toBeVisible();
@@ -206,9 +225,9 @@ test.describe('Settings — Cmd-K palette', () => {
 
   test('palette shows "no match" for gibberish query', async ({ page }) => {
     await page.goto('/settings');
-    await page.keyboard.press('Meta+k');
+    await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    await dialog.getByPlaceholder(/jump to a setting/i).fill('zzzzxyzzy');
+    await dialog.getByPlaceholder(/search/i).fill('zzzzxyzzy');
     await expect(dialog.getByText(/no settings match/i)).toBeVisible();
   });
 });
@@ -220,13 +239,13 @@ test.describe('Settings — Instance Sync', () => {
     await page.goto('/settings');
     await expect(page.getByRole('heading', { name: 'Instance Sync' })).toBeVisible();
     // The mode select trigger should be present
-    await expect(page.getByRole('combobox')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Instance mode' })).toBeVisible();
     await expect(page.getByRole('button', { name: /save instance mode/i })).toBeVisible();
   });
 
   test('mode selector displays the three options', async ({ page }) => {
     await page.goto('/settings');
-    await page.getByRole('combobox').click();
+    await page.getByRole('combobox', { name: 'Instance mode' }).click();
     await expect(page.getByRole('option', { name: 'Standalone' })).toBeVisible();
     await expect(page.getByRole('option', { name: 'Master' })).toBeVisible();
     await expect(page.getByRole('option', { name: 'Slave' })).toBeVisible();
@@ -287,7 +306,13 @@ test.describe('Settings — ACME Server', () => {
 
   test.afterEach(async ({ page }) => {
     // Reset to the Let's Encrypt default so other tests/runs start clean.
-    await page.request.put(API_SETTINGS_ACME, { data: { caUrl: '', caRootPem: '' } });
+    // The Origin header is required: mutating v1 API calls are same-origin
+    // checked and reject with 403 without it, which made this reset a no-op.
+    const res = await page.request.put(API_SETTINGS_ACME, {
+      headers: { Origin: SETTINGS_ORIGIN },
+      data: { caUrl: '', caRootPem: '' },
+    });
+    expect(res.ok(), `ACME reset failed: ${res.status()}`).toBe(true);
   });
 
   test('shows the custom directory URL and CA root fields', async ({ page }) => {
@@ -339,9 +364,11 @@ test.describe('Settings — DNS Providers', () => {
   test('selecting a provider reveals its credential fields', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
     // Click the provider select and pick one (Cloudflare or first available)
-    const selects = page.getByRole('combobox');
-    // Find the provider select (the one with "Select..." text)
-    const providerSelect = selects.last();
+    // Selector runs with hasSearch, so the trigger is deliberately NOT a
+    // combobox — the popup's search input owns that role. The trigger is the
+    // form's only listbox-opening button.
+    const providerSelect = page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]');
+
     await providerSelect.click();
     // Select the first non-"Select" option
     const firstProvider = page
@@ -352,7 +379,10 @@ test.describe('Settings — DNS Providers', () => {
     // Credential input fields should now appear
     // Most providers have at least one field (API token, etc.)
     const formInputs = page.locator(
-      'form#dnsp-add-form input[type="text"], form#dnsp-add-form input[type="password"]',
+      // The Selector's own popover search box is a text input inside the form,
+      // so exclude comboboxes — otherwise `.first()` picks the hidden search
+      // field instead of a credential field.
+      'form#dnsp-add-form input[type="text"]:not([role="combobox"]), form#dnsp-add-form input[type="password"]',
     );
     await expect(formInputs.first()).toBeVisible({ timeout: 3000 });
   });
@@ -388,7 +418,7 @@ test.describe('Settings — Upstream DNS Pinning', () => {
 
   test('address family selector shows three options', async ({ page }) => {
     await goToSection(page, 'Upstream DNS Pinning');
-    await page.getByRole('combobox').click();
+    await page.getByRole('combobox', { name: 'Address family' }).click();
     await expect(page.getByRole('option', { name: /both/i })).toBeVisible();
     await expect(page.getByRole('option', { name: /ipv6 only/i })).toBeVisible();
     await expect(page.getByRole('option', { name: /ipv4 only/i })).toBeVisible();
@@ -453,11 +483,17 @@ test.describe('Settings — OAuth Providers', () => {
     // Provider should appear in the list
     await expect(page.getByText('E2E Test Provider')).toBeVisible({ timeout: 10_000 });
 
-    // Scope delete to the provider card containing the test provider
-    const providerCard = page.locator('div.rounded-md').filter({ hasText: 'E2E Test Provider' });
-    await providerCard.getByRole('button', { name: 'Delete provider' }).click();
-    await providerCard.getByRole('button', { name: /^confirm$/i }).click();
-    await expect(page.getByText('E2E Test Provider')).not.toBeVisible({ timeout: 10_000 });
+    // The delete control is labelled "Delete <provider>", which is unique on the
+    // page; "Delete provider" is only its tooltip.
+    await page.getByRole('button', { name: 'Delete E2E Test Provider' }).click();
+    // Confirmation is an AlertDialog (role="alertdialog", not "dialog") whose
+    // action is labelled "Delete provider".
+    const confirm = page.getByRole('alertdialog', { name: /delete oauth provider/i });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button', { name: 'Delete provider', exact: true }).click();
+    await expect(page.getByText('E2E Test Provider', { exact: true })).not.toBeVisible({
+      timeout: 10_000,
+    });
   });
 });
 
@@ -505,7 +541,7 @@ test.describe('Settings — Access Logging', () => {
 
   test('format selector has JSON and Console options', async ({ page }) => {
     await goToSection(page, 'Access Logging');
-    await page.getByRole('combobox').click();
+    await page.getByRole('combobox', { name: 'Format' }).click();
     await expect(page.getByRole('option', { name: 'JSON' })).toBeVisible();
     await expect(page.getByRole('option', { name: /console/i })).toBeVisible();
   });
@@ -541,9 +577,9 @@ test.describe('Settings — cross-section navigation', () => {
     await page.goto('/settings');
 
     // Use Cmd-K to go to Access Logging
-    await page.keyboard.press('Meta+k');
+    await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    await dialog.getByPlaceholder(/jump to a setting/i).fill('access');
+    await dialog.getByPlaceholder(/search/i).fill('access');
     await dialog.getByText('Access Logging').click();
     await expect(page.getByRole('heading', { name: 'Access Logging' })).toBeVisible();
 
@@ -563,14 +599,18 @@ test.describe('Settings — mobile layout', () => {
 
   test('sidebar is hidden on mobile', async ({ page }) => {
     await page.goto('/settings');
-    // The <aside> sidebar should not be visible on mobile
+    // At mobile width the sidebar panel gives way to the compact section nav.
     await expect(page.locator(SETTINGS_SIDEBAR)).not.toBeVisible();
   });
 
-  test('mobile pill navigation is visible', async ({ page }) => {
+  test('mobile section navigation is visible', async ({ page }) => {
     await page.goto('/settings');
+    // The compact nav is a section dropdown, not a row of pills; it shows the
+    // active section as its value.
     const mobileNav = page.getByTestId('mobile-settings-nav');
-    await expect(mobileNav.getByRole('button', { name: 'Instance Sync' })).toBeVisible();
+    const sectionSelect = mobileNav.getByRole('combobox', { name: 'Settings section' });
+    await expect(sectionSelect).toBeVisible();
+    await expect(sectionSelect).toContainText('Instance Sync');
   });
 
   test('mobile search button is visible', async ({ page }) => {
@@ -579,12 +619,11 @@ test.describe('Settings — mobile layout', () => {
     await expect(mobileNav.getByText('Jump to setting...')).toBeVisible();
   });
 
-  test('clicking a mobile pill switches the section', async ({ page }) => {
+  test('choosing a section in the mobile nav switches the detail pane', async ({ page }) => {
     await page.goto('/settings');
     const mobileNav = page.getByTestId('mobile-settings-nav');
-    const generalPill = mobileNav.getByRole('button', { name: 'General', exact: true });
-    await expect(generalPill).toBeVisible();
-    await generalPill.click();
+    await mobileNav.getByRole('combobox', { name: 'Settings section' }).click();
+    await page.getByRole('option', { name: 'General', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
   });
 
@@ -600,7 +639,7 @@ test.describe('Settings — mobile layout', () => {
     const mobileNav = page.getByTestId('mobile-settings-nav');
     await mobileNav.getByText('Jump to setting...').click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByPlaceholder(/jump to a setting/i).fill('metrics');
+    await dialog.getByPlaceholder(/search/i).fill('metrics');
     await dialog.getByText('Metrics & Monitoring').click();
     await expect(page.getByRole('heading', { name: 'Metrics & Monitoring' })).toBeVisible();
   });
@@ -633,6 +672,7 @@ test.describe('Settings — form data round-trip via API', () => {
 
     // Reset
     await page.request.put(API_SETTINGS_GENERAL, {
+      headers: { Origin: SETTINGS_ORIGIN },
       data: { primaryDomain: 'caddyproxymanager.com', acmeEmail: '' },
     });
   });
@@ -653,7 +693,10 @@ test.describe('Settings — form data round-trip via API', () => {
     expect(data.port).toBe(9191);
 
     // Reset
-    await page.request.put(API_SETTINGS_METRICS, { data: { enabled: false, port: 9090 } });
+    await page.request.put(API_SETTINGS_METRICS, {
+      headers: { Origin: SETTINGS_ORIGIN },
+      data: { enabled: false, port: 9090 },
+    });
   });
 
   test('logging settings: change format via UI, verify via API', async ({ page }) => {
@@ -664,7 +707,7 @@ test.describe('Settings — form data round-trip via API', () => {
       await enableCheckbox.click();
     }
     // Change format to console
-    await page.getByRole('combobox').click();
+    await page.getByRole('combobox', { name: 'Format' }).click();
     await page.getByRole('option', { name: /console/i }).click();
     await page.getByRole('button', { name: /save logging/i }).click();
     await expect(page.getByText(/saved|success|applied/i).first()).toBeVisible({ timeout: 10_000 });
@@ -674,7 +717,10 @@ test.describe('Settings — form data round-trip via API', () => {
     expect(data.format).toBe('console');
 
     // Reset
-    await page.request.put(API_SETTINGS_LOGGING, { data: { enabled: false, format: 'json' } });
+    await page.request.put(API_SETTINGS_LOGGING, {
+      headers: { Origin: SETTINGS_ORIGIN },
+      data: { enabled: false, format: 'json' },
+    });
   });
 });
 

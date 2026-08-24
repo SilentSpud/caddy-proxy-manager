@@ -2,7 +2,6 @@ import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { Resolver } from "node:dns/promises";
 import { join, dirname } from "node:path";
 import { isIP } from "node:net";
-import crypto from "node:crypto";
 import {
   expandPrivateRanges,
   isPlainObject,
@@ -22,7 +21,7 @@ import {
   sortRoutesByHostPriority,
   sortTlsPoliciesBySniPriority,
 } from "./host-pattern-priority";
-import db, { nowIso } from "./db";
+import db from "./db";
 import { eq, isNull } from "drizzle-orm";
 import { config } from "./config";
 import {
@@ -37,7 +36,6 @@ import {
   getWafSettings,
   getErrorPagesSettings,
   getTrustedProxiesSettings,
-  setSetting,
   type AcmeSettings,
   type DnsProviderSettings,
   type DnsSettings,
@@ -2946,8 +2944,6 @@ export async function buildCaddyDocument() {
 export async function applyCaddyConfig() {
   const document = await buildCaddyDocument();
   const payload = JSON.stringify(document);
-  const hash = crypto.createHash("sha256").update(payload).digest("hex");
-  setSetting("caddy_config_hash", { hash, updatedAt: nowIso() });
 
   try {
     const response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });

@@ -24,7 +24,6 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Grid } from "@astryxdesign/core/Grid";
@@ -62,8 +61,10 @@ import type {
 import type { DnsProviderDefinition } from "@/src/lib/dns-providers";
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
 import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import OAuthProvidersSection from "./OAuthProvidersSection";
 import type { OAuthProvider } from "@/src/lib/models/oauth-providers";
+import { CheckboxInput } from "@/src/components/ui/FormBooleanControls";
 import {
   updateDnsProviderSettingsAction,
   updateGeneralSettingsAction,
@@ -609,29 +610,38 @@ export default function SettingsClient({
     instanceSync.overrides.trustedProxies,
   );
 
+  // The page has two navigations — the sidebar panel and the compact picker in
+  // the content column — and neither carried a media gate, so both rendered at
+  // every width. Same breakpoint DataTable uses for its card layout.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
+
   return (
     <>
       <Layout
         height="fill"
         start={
-          <LayoutPanel width={260} hasDivider label="Settings navigation">
-            <SettingsSidebar
-              active={active}
-              onSelect={setActive}
-              onSearchClick={() => setCmdkOpen(true)}
-            />
-          </LayoutPanel>
+          isNarrow ? undefined : (
+            <LayoutPanel width={260} hasDivider role="navigation" label="Settings navigation">
+              <SettingsSidebar
+                active={active}
+                onSelect={setActive}
+                onSearchClick={() => setCmdkOpen(true)}
+              />
+            </LayoutPanel>
+          )
         }
         content={
           <LayoutContent padding={5}>
             <VStack gap={5} maxWidth={768}>
               <DetailHeader activeId={active} />
 
-              <MobileSettingsNav
-                active={active}
-                onSelect={setActive}
-                onSearchClick={() => setCmdkOpen(true)}
-              />
+              {isNarrow && (
+                <MobileSettingsNav
+                  active={active}
+                  onSelect={setActive}
+                  onSearchClick={() => setCmdkOpen(true)}
+                />
+              )}
 
               <VStack gap={4}>
                 {active === "sync" && (

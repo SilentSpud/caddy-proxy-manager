@@ -7,8 +7,9 @@ test.use({ viewport: { width: 393, height: 852 } });
 test.describe('Mobile layout', () => {
   test('app bar is visible with hamburger and title', async ({ page }) => {
     await page.goto('/');
-    // The MUI AppBar should be present on mobile
-    const appBar = page.locator('header');
+    // AppShell renders the mobile top bar as a role="banner" region rather
+    // than a <header> element.
+    const appBar = page.getByRole('banner');
     await expect(appBar).toBeVisible();
     // Hamburger button
     await expect(page.getByRole('button', { name: /open navigation/i })).toBeVisible();
@@ -18,10 +19,10 @@ test.describe('Mobile layout', () => {
 
   test('drawer opens and closes via hamburger', async ({ page }) => {
     await page.goto('/');
-    // Drawer is closed initially — it renders as a dialog with keepMounted
-    // but the dialog should not be visible (no active attr on closed drawer)
-    // Open drawer first to get a reference to the dialog
-    const drawerDialog = page.locator('[role="dialog"]');
+    // Drawer is closed initially. It is a native <dialog>, so its dialog role
+    // is implicit — getByRole resolves it, a [role="dialog"] CSS selector
+    // would not.
+    const drawerDialog = page.getByRole('dialog');
     // The dialog is hidden (not visible) before opening
     await expect(
       drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true }),
@@ -41,7 +42,7 @@ test.describe('Mobile layout', () => {
   test('navigating from drawer closes it', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /open navigation/i }).click();
-    const drawerDialog = page.locator('[role="dialog"]');
+    const drawerDialog = page.getByRole('dialog');
     const drawerNavLink = drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true });
     await expect(drawerNavLink).toBeVisible();
     // Click a nav link inside the drawer
@@ -60,7 +61,9 @@ test.describe('Mobile layout', () => {
 
   test('page header action button appears below title on mobile', async ({ page }) => {
     await page.goto('/proxy-hosts');
-    const title = page.getByRole('heading', { name: /proxy hosts/i });
+    // level 1 pins this to the page title; the empty state renders its own
+    // "No proxy hosts found" heading.
+    const title = page.getByRole('heading', { name: /proxy hosts/i, level: 1 });
     const button = page.getByRole('button', { name: /create host/i });
     await expect(title).toBeVisible();
     await expect(button).toBeVisible();
@@ -83,7 +86,7 @@ test.describe('Mobile layout', () => {
     expect(dialogBox).not.toBeNull();
     expect(dialogBox!.width).toBeLessThanOrEqual(viewportWidth + 1); // +1 for rounding
     // Key form fields should be visible
-    await expect(page.getByLabel(/domains/i)).toBeVisible();
+    await expect(page.getByLabel(/^domains/i)).toBeVisible();
   });
 
   test('card edit and delete actions reachable without scrolling', async ({ page }) => {
@@ -92,13 +95,13 @@ test.describe('Mobile layout', () => {
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByLabel('Name').fill('Mobile Test Host');
-    await page.getByLabel(/domains/i).fill('mobile-test.local');
+    await page.getByLabel(/^domains/i).fill('mobile-test.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9999');
     await page.getByRole('button', { name: /^create$/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-    // The mobileCard renderer uses a DropdownMenu (three-dot button) for actions.
-    // Open the dropdown and verify Edit and Delete menu items are present.
-    const moreButton = page.getByRole('button', { name: /open menu/i }).first();
+    // The card's action menu is an astryx MoreMenu, whose icon-only trigger is
+    // labelled "Actions for <host name>".
+    const moreButton = page.getByRole('button', { name: /^Actions for / }).first();
     await expect(moreButton).toBeVisible();
     await moreButton.click();
     await expect(page.getByRole('menuitem', { name: /edit/i })).toBeVisible();

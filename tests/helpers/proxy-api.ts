@@ -48,14 +48,19 @@ export interface IssuedClientCertificateConfig {
 
 async function openCertificatesTab(page: Page, tabName: RegExp): Promise<void> {
   await page.goto('/certificates');
-  await page.getByRole('tab', { name: tabName }).click();
+  await page.getByRole('button', { name: tabName }).click();
 }
 
 async function expandCaRow(page: Page, caName: string): Promise<void> {
   const row = page.locator('tr').filter({ hasText: caName }).first();
   await expect(row).toBeVisible({ timeout: 10_000 });
   await row.locator('button').first().click();
-  await expect(page.getByText(/issued client certificates/i)).toBeVisible({ timeout: 10_000 });
+  // The phrase also appears as the title and empty-state copy of the "Manage"
+  // dialog, which is a native <dialog> and so stays in the DOM while closed.
+  // Exact + visible narrows this to the expanded row's own panel label.
+  await expect(
+    page.getByText('Issued Client Certificates', { exact: true }).filter({ visible: true }),
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 /**
@@ -68,7 +73,7 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
   await expect(page.getByRole('dialog')).toBeVisible();
 
   await page.getByLabel('Name').fill(config.name);
-  await page.getByLabel(/domains/i).fill(config.domain);
+  await page.getByLabel(/^domains/i).fill(config.domain);
 
   // Support multiple upstreams separated by newlines.
   const upstreamList = config.upstream
@@ -153,7 +158,9 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
 
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('table').getByText(config.name)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('table').getByText(config.name, { exact: true })).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 export async function importCertificate(
@@ -164,19 +171,21 @@ export async function importCertificate(
   await page.getByRole('button', { name: /import certificate/i }).click();
   await expect(page.getByRole('heading', { name: /^import certificate$/i })).toBeVisible();
 
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(config.name);
+  await page.getByRole('textbox', { name: /^Name/ }).fill(config.name);
   await page.getByLabel(/domains \(one per line\)/i).fill(config.domains.join('\n'));
   await page.locator('[name="certificate_pem"]').fill(config.certificatePem);
   await page.getByRole('button', { name: /show private key/i }).click();
   await page.locator('[name="private_key_pem"]').fill(config.privateKeyPem);
-  await page.getByRole('button', { name: /^import certificate$/i }).click();
+  // Scope the submit to the sheet's form: the page-level trigger that opened
+  // the sheet carries the same label and stays in the DOM behind it.
+  await page.locator('button[form="import-cert-form"]').click();
 
   // Wait for the import sheet to close, then verify the cert appears in the table
   await expect(page.getByRole('heading', { name: /^import certificate$/i })).not.toBeVisible({
     timeout: 10_000,
   });
   await page.waitForTimeout(500); // allow page to revalidate
-  await expect(page.locator('table').getByText(config.name).first()).toBeVisible({
+  await expect(page.locator('table').getByText(config.name, { exact: true }).first()).toBeVisible({
     timeout: 10_000,
   });
 }
@@ -186,7 +195,7 @@ export async function generateCaCertificate(page: Page, config: GeneratedCaConfi
   await page.getByRole('button', { name: /add ca certificate/i }).click();
   await expect(page.getByRole('heading', { name: /^add ca certificate$/i })).toBeVisible();
 
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(config.name);
+  await page.getByRole('textbox', { name: /^Name/ }).fill(config.name);
   if (config.commonName) {
     await page
       .getByRole('textbox', { name: 'Common Name (CN)', exact: true })
@@ -202,7 +211,7 @@ export async function generateCaCertificate(page: Page, config: GeneratedCaConfi
   await expect(page.getByRole('heading', { name: /^add ca certificate$/i })).not.toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.locator('table').getByText(config.name).first()).toBeVisible({
+  await expect(page.locator('table').getByText(config.name, { exact: true }).first()).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -214,38 +223,37 @@ export async function issueClientCertificate(
   await openCertificatesTab(page, /^CA \/ mTLS/i);
   await expandCaRow(page, config.caName);
   await page.getByRole('button', { name: /^issue cert$/i }).click();
-  await expect(page.getByRole('dialog', { name: /issue client certificate/i })).toBeVisible();
+  // Every CA row mounts its own issue dialog, and a closed native <dialog>
+  // stays in the DOM — so scope all field lookups to the open one. (getByRole
+  // skips hidden elements, but getByLabel and CSS locators do not.)
+  const dialog = page.getByRole('dialog', { name: /issue client certificate/i });
+  await expect(dialog).toBeVisible();
 
-  await page
-    .getByRole('textbox', { name: 'Common Name (CN)', exact: true })
-    .fill(config.commonName);
+  // Required fields render their accessible name with a "Required" suffix, so
+  // an exact match can never hit them — anchor on the prefix instead.
+  await dialog.getByRole('textbox', { name: /^Common Name \(CN\)/ }).fill(config.commonName);
   if (config.validityDays !== undefined) {
-    await page
-      .getByRole('spinbutton', { name: 'Validity', exact: true })
-      .fill(String(config.validityDays));
+    await dialog.getByRole('spinbutton', { name: /^Validity/ }).fill(String(config.validityDays));
   }
-  await page.getByLabel(/export password/i).fill(config.exportPassword);
+  await dialog.getByRole('textbox', { name: /^Export Password/ }).fill(config.exportPassword);
 
   const shouldBeChecked = config.compatibilityMode ?? true;
   if (!shouldBeChecked) {
-    const compatibilityToggle = page.locator('input[name="compatibility_mode"]').first();
-    await compatibilityToggle.click({ force: true });
+    await dialog.locator('input[name="compatibility_mode"]').click({ force: true });
   }
 
-  await page.getByRole('button', { name: /issue certificate/i }).click();
-  await expect(page.getByRole('button', { name: /download client certificate/i })).toBeVisible({
+  await dialog.getByRole('button', { name: /issue certificate/i }).click();
+  await expect(dialog.getByRole('button', { name: /download client certificate/i })).toBeVisible({
     timeout: 15_000,
   });
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: /download client certificate/i }).click();
+  await dialog.getByRole('button', { name: /download client certificate/i }).click();
   const download = await downloadPromise;
   const downloadPath = await saveDownload(download);
 
-  await page.getByRole('button', { name: /^done$/i }).click();
-  await expect(page.getByRole('dialog', { name: /issue client certificate/i })).not.toBeVisible({
-    timeout: 10_000,
-  });
+  await dialog.getByRole('button', { name: /^done$/i }).click();
+  await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
   return readFile(downloadPath);
 }
@@ -261,15 +269,15 @@ export async function revokeIssuedClientCertificate(
   const dialog = page.getByRole('dialog', { name: /issued client certificates/i });
   await expect(dialog).toBeVisible();
 
-  // Find the cert card containing the common name and click its Revoke button
-  const certCard = dialog.locator('.rounded-lg.border', { hasText: commonName });
+  // Each issued cert renders as a design-system Card; the old
+  // '.rounded-lg.border' Tailwind classes are no longer emitted.
+  const certCard = dialog.locator('.astryx-card').filter({ hasText: commonName });
   await expect(certCard).toBeVisible({ timeout: 10_000 });
   await certCard.getByRole('button', { name: /^revoke$/i }).click();
-  // After revoking, the cert should no longer be visible (hidden by default, only shown with "Show revoked")
-  await expect(certCard.getByRole('button', { name: /^revoke$/i })).not.toBeVisible({
-    timeout: 15_000,
-  });
-  await page
+  // Revoked certs are filtered out of the list unless "Show revoked" is on, so
+  // the whole card goes away rather than just its button.
+  await expect(certCard).toHaveCount(0, { timeout: 15_000 });
+  await dialog
     .getByRole('button', { name: /^close$/i })
     .first()
     .click();
@@ -315,7 +323,7 @@ export async function createAccessList(
 
     // Add additional seed member rows
     for (let i = 1; i < users.length; i++) {
-      await dialog.getByText('+ Add another member').click();
+      await dialog.getByRole('button', { name: 'Add another member' }).click();
       await dialog.getByPlaceholder('username').nth(i).fill(users[i].username);
       await dialog.getByPlaceholder('password').nth(i).fill(users[i].password);
     }

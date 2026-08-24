@@ -16,7 +16,6 @@ import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { Selector } from "@astryxdesign/core/Selector";
-import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -24,6 +23,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 
 const PROTOCOL_OPTIONS = [
   { value: "tcp", label: "TCP" },

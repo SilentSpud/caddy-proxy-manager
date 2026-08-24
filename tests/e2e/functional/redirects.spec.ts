@@ -24,7 +24,7 @@ test.describe
       await expect(page.getByRole('dialog')).toBeVisible();
 
       await page.getByLabel('Name').fill('Functional Redirects Test');
-      await page.getByLabel(/domains/i).fill(DOMAIN);
+      await page.getByLabel(/^domains/i).fill(DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').first().fill('echo-server:8080');
 
       // Inject redirect rules and form flags directly.
@@ -41,7 +41,9 @@ test.describe
 
       await page.getByRole('button', { name: /^create$/i }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
-      await expect(page.getByRole('table').getByText('Functional Redirects Test')).toBeVisible({
+      await expect(
+        page.getByRole('table').getByText('Functional Redirects Test', { exact: true }),
+      ).toBeVisible({
         timeout: 10_000,
       });
 

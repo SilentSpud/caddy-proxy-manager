@@ -1,14 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Download } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
-import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -16,6 +15,7 @@ import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 import {
   deleteCaCertificateAction,
   issueClientCertificateAction,
@@ -59,8 +59,6 @@ function formatFingerprint(value: string): string {
   return value.match(/.{1,2}/g)?.join(":") ?? value;
 }
 
-const ISSUE_FORM = "issue-cert-form";
-
 export function IssueClientCertDialog({
   open,
   cert,
@@ -71,6 +69,14 @@ export function IssueClientCertDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  // One of these dialogs is mounted per CA row, and a closed native <dialog>
+  // stays in the DOM — so a shared form id would appear many times over. The
+  // submit button associates by `form={id}`, which resolves through
+  // getElementById and would therefore target the *first* form in the
+  // document: a different, empty dialog whose required fields then block
+  // submission. With more than one CA, "Issue Certificate" silently did
+  // nothing. useId gives every instance its own form.
+  const issueFormId = useId();
   const [isPending, startTransition] = useTransition();
   const [issued, setIssued] = useState<{
     pkcs12Base64: string;
@@ -126,7 +132,7 @@ export function IssueClientCertDialog({
       <Button variant="secondary" label="Cancel" onClick={handleClose} isDisabled={isPending} />
       <Button
         type="submit"
-        form={ISSUE_FORM}
+        form={issueFormId}
         label="Issue Certificate"
         isLoading={isPending}
         isDisabled={isPending}
@@ -171,7 +177,7 @@ export function IssueClientCertDialog({
           )}
         </VStack>
       ) : (
-        <form id={ISSUE_FORM} ref={formRef} onSubmit={handleSubmit}>
+        <form id={issueFormId} ref={formRef} onSubmit={handleSubmit}>
           <VStack gap={4}>
             <TextInput
               {...NATIVE_REQUIRED}

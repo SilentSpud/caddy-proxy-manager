@@ -16,7 +16,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { waitForTcpRoute, tcpSend } from '../../helpers/tcp';
+import { waitForTcpEcho, tcpSend } from '../../helpers/tcp';
 
 // Container name as defined in docker-compose.yml
 const L4_CONTAINER = 'caddy-proxy-manager-l4-ports';
@@ -95,7 +95,7 @@ test.describe
     });
 
     test('TCP traffic works after explicit apply', async () => {
-      await waitForTcpRoute('127.0.0.1', TCP_PORT, 30_000);
+      await waitForTcpEcho('127.0.0.1', TCP_PORT, 'ready-probe', 30_000);
       const res = await tcpSend('127.0.0.1', TCP_PORT, 'sidecar-apply-check\n');
       expect(res.connected).toBe(true);
       expect(res.data).toContain('sidecar-apply-check');
@@ -136,9 +136,9 @@ test.describe
     });
 
     test('TCP traffic still works after sidecar restart and auto-apply', async () => {
-      // Caddy was briefly recreated during the restart apply; waitForTcpRoute
-      // retries until it comes back up.
-      await waitForTcpRoute('127.0.0.1', TCP_PORT, 30_000);
+      // Caddy was briefly recreated during the restart apply; waitForTcpEcho
+      // retries until the route actually carries data again.
+      await waitForTcpEcho('127.0.0.1', TCP_PORT, 'ready-probe', 30_000);
       const res = await tcpSend('127.0.0.1', TCP_PORT, 'after-restart-check\n');
       expect(res.connected).toBe(true);
       expect(res.data).toContain('after-restart-check');

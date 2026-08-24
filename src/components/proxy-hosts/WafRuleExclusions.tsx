@@ -61,6 +61,12 @@ export function WafRuleExclusions({ value }: Props) {
           min={1}
           width={160}
           onEnter={addId}
+          // Enter adds the ID; it must not also submit the surrounding host
+          // form. The design system fires onEnter without preventing the
+          // default, which would otherwise save the host mid-edit.
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
         />
         <IconButton
           variant="ghost"

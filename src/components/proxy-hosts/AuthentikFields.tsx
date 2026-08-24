@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "@astryxdesign/core/Card";
-import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { Switch } from "@astryxdesign/core/Switch";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AuthentikSettings } from "@/lib/settings";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
+import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
 
 const AUTHENTIK_DEFAULT_HEADERS = [
   "X-Authentik-Username",

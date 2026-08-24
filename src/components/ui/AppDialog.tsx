@@ -16,6 +16,8 @@ type AppDialogProps = {
   submitLabel?: string;
   onSubmit?: () => void;
   isSubmitting?: boolean;
+  /** Gates the submit button on form validity, independent of isSubmitting. */
+  isSubmitDisabled?: boolean;
 };
 
 /** Token-backed widths, replacing the max-w-* utility classes. */
@@ -37,6 +39,7 @@ export function AppDialog({
   submitLabel = "Save",
   onSubmit,
   isSubmitting = false,
+  isSubmitDisabled = false,
 }: AppDialogProps) {
   return (
     <Dialog
@@ -60,7 +63,7 @@ export function AppDialog({
                       label={submitLabel}
                       onClick={onSubmit}
                       isLoading={isSubmitting}
-                      isDisabled={isSubmitting}
+                      isDisabled={isSubmitting || isSubmitDisabled}
                     />
                   )}
                 </>

@@ -85,23 +85,31 @@ test.describe('Analytics host filter (#171)', () => {
         timeout: 15_000,
       });
 
-      // Open the hosts combobox and narrow the list to our two markers.
-      // (The trigger is the only combobox on the page until the popover opens
-      // and adds the search input.)
-      await page.getByRole('combobox').click();
-      await page.getByPlaceholder('Search hosts...').fill(tag);
-
       const configuredOption = page.getByRole('option', { name: configuredHost });
       const unconfiguredOption = page.getByRole('option', { name: unconfiguredHost });
 
+      // Open the hosts selector and narrow the list to our two markers.
+      // In `hasSearch` mode the MultiSelector trigger is deliberately NOT a
+      // combobox — the popup's search input owns that role and the
+      // aria-activedescendant cursor, so the trigger is a plain button that
+      // opens the listbox. It is the only such trigger on the analytics page.
+      const openHostList = async () => {
+        await page.locator('button[aria-haspopup="listbox"]').click();
+        await page.getByPlaceholder('Search hosts...').fill(tag);
+      };
+
       // By default only configured proxy hosts are listed.
+      await openHostList();
       await expect(configuredOption).toBeVisible({ timeout: 10_000 });
       await expect(unconfiguredOption).not.toBeVisible();
 
-      // Enable "Include unconfigured hosts": the traffic-only host appears.
-      await page.getByRole('button', { name: /include unconfigured hosts/i }).click();
+      // The toggle lives outside the popover, so activating it light-dismisses
+      // the listbox — reopen and re-search before checking the widened list.
+      await page.keyboard.press('Escape');
+      await page.getByRole('checkbox', { name: /include unconfigured hosts/i }).click();
 
-      await expect(configuredOption).toBeVisible();
+      await openHostList();
+      await expect(configuredOption).toBeVisible({ timeout: 10_000 });
       await expect(unconfiguredOption).toBeVisible();
     } finally {
       if (proxyHostId != null) {

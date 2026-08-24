@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Card } from "@astryxdesign/core/Card";
 import { Divider } from "@astryxdesign/core/Divider";
-import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/Stack";
+import { Switch } from "@/src/components/ui/FormBooleanControls";
 
 type ToggleSetting = {
   stateKey: "hstsSubdomains" | "skipHttpsHostnameValidation";

@@ -30,6 +30,13 @@ const PRE_0024_SCHEMA = `
     name TEXT NOT NULL,
     issuer TEXT
   );
+  -- Only here because 0024 carries an unrelated settings cleanup (the orphaned
+  -- caddy_config_hash row); the backfill itself never touches this table.
+  CREATE TABLE settings (
+    key TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
   CREATE TABLE accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

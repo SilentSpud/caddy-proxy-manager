@@ -55,8 +55,11 @@ test.describe('mTLS — deleted CA must not remain selectable', () => {
       await page.reload();
       await openMtlsPicker(page);
       const dialog = page.getByRole('dialog');
-      await expect(dialog.getByText(caName)).toBeVisible({ timeout: 10000 });
-      await expect(dialog.getByText(certCommonName)).toBeVisible();
+      // Both names appear more than once as text (field label plus selected
+      // value), so assert on the controls themselves: the CA is a checkbox and
+      // each issued cert is a CheckboxListItem named after its common name.
+      await expect(dialog.getByRole('checkbox', { name: caName })).toBeVisible({ timeout: 10000 });
+      await expect(dialog.getByRole('checkbox', { name: certCommonName })).toBeVisible();
       await dialog
         .getByRole('button', { name: /cancel|close/i })
         .first()
@@ -101,5 +104,5 @@ async function openMtlsPicker(page: import('@playwright/test').Page) {
   await mtlsCard.scrollIntoViewIfNeeded();
   const mtlsSwitch = mtlsCard.getByRole('switch').first();
   await mtlsSwitch.click();
-  await expect(mtlsSwitch).toHaveAttribute('data-state', 'checked');
+  await expect(mtlsSwitch).toBeChecked();
 }

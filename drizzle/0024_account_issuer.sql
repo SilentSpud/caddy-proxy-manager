@@ -69,3 +69,10 @@ CREATE UNIQUE INDEX accounts_provider_account_idx ON accounts (providerId, accou
 CREATE UNIQUE INDEX accounts_issuer_account_idx ON accounts (issuer, accountId);
 --> statement-breakpoint
 CREATE INDEX accounts_user_idx ON accounts (userId);
+--> statement-breakpoint
+-- Unrelated cleanup, folded into the last pre-release migration rather than
+-- given its own: `caddy_config_hash` was written on every applyCaddyConfig()
+-- but never read by anything, and the write has been removed. Databases that
+-- ran the old code still carry the orphan row; fresh ones never create it, so
+-- this is a no-op there.
+DELETE FROM settings WHERE key = 'caddy_config_hash';

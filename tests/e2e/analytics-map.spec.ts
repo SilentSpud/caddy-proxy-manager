@@ -61,38 +61,63 @@ test.describe('Analytics world map', () => {
   test('map renders country geometry that responds to hover', async ({ page }) => {
     await gotoAnalyticsMap(page);
 
+    // MapLibre's own container carries `overflow: hidden`, so if it collapses to
+    // zero height the canvas is clipped away entirely: nothing paints and nothing
+    // hit-tests, while the map instance still reports rendered features. Assert
+    // the container has real height first, so that regression reports itself
+    // instead of masquerading as "the map has no geometry".
+    const mapContainer = page.locator('.maplibregl-map');
+    await expect
+      .poll(async () => Math.round((await mapContainer.boundingBox())?.height ?? 0), {
+        timeout: 10_000,
+        message: 'the MapLibre container collapsed to zero height — the canvas is clipped away',
+      })
+      .toBeGreaterThan(100);
+
     const canvas = page.locator(MAP_CANVAS);
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
     if (!box) return;
 
-    // The map fits the whole world into the canvas, so these fractional offsets
-    // land on large landmasses. Hovering a country only produces a popup when
-    // the worker has parsed the GeoJSON source and the fill layer is rendered —
-    // with a broken worker the map is all ocean and every hover is a miss.
-    const targets: [number, number][] = [
-      [0.55, 0.62], // Africa
-      [0.72, 0.35], // Asia
-      [0.2, 0.3], // North America
-      [0.5, 0.3], // Europe / North Africa
-    ];
+    // Give the worker time to parse the source and the fill layer to paint —
+    // the canvas is visible well before any geometry exists.
+    await page.waitForTimeout(3_000);
 
+    // Hovering a country only produces a popup when the fill layer is actually
+    // rendered; with a broken worker the map is all ocean and every hover is a
+    // miss. Sweep a grid rather than a handful of hand-picked offsets: the
+    // exact projection depends on how maplibre fits the configured bounds to
+    // the current canvas size, so fixed fractions are not a safe bet for
+    // "this point is over land". A map with no geometry still misses all of
+    // them, which is the condition this test exists to catch.
+    const targets: [number, number][] = [];
+    for (const fy of [0.3, 0.4, 0.5, 0.62, 0.72]) {
+      for (const fx of [0.2, 0.3, 0.5, 0.55, 0.72, 0.85]) {
+        targets.push([fx, fy]);
+      }
+    }
+
+    const popup = page.locator('.wm-popup');
     let popupText: string | null = null;
     for (const [fx, fy] of targets) {
-      await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
-      const popup = page.locator('.wm-popup');
+      const x = box.x + box.width * fx;
+      const y = box.y + box.height * fy;
+      // Two moves: maplibre only re-evaluates the hover on a mousemove event,
+      // so a repeat of the current position would produce no event at all.
+      await page.mouse.move(x - 2, y - 2);
+      await page.mouse.move(x, y);
       try {
-        await expect(popup).toBeVisible({ timeout: 5_000 });
+        await expect(popup).toBeVisible({ timeout: 1_000 });
         popupText = await popup.innerText();
         break;
       } catch {
-        // Miss (ocean, or map still settling) — try the next landmass.
+        // Miss (ocean) — try the next point.
       }
     }
 
     expect(
       popupText,
-      'no country popup appeared on hover — the map rendered no country geometry',
+      `no country popup appeared over any of ${targets.length} points — the map rendered no country geometry`,
     ).not.toBeNull();
     expect(popupText).toContain('Requests');
   });

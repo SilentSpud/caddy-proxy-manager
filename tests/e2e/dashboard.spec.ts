@@ -3,7 +3,7 @@
  *
  * Verifies stat cards, navigation links, welcome header, and recent activity.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Dashboard home page', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,45 +15,46 @@ test.describe('Dashboard home page', () => {
   });
 
   test('shows stat cards for Proxy Hosts, Certificates, and Access Lists', async ({ page }) => {
-    // Stat card labels are <p> inside link cards — match via the parent link
-    await expect(page.getByRole('link', { name: /^\d+\s+Proxy Hosts/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /\d+\s*Certificates/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /\d+\s*Access Lists/ })).toBeVisible();
+    // Each stat card is a ClickableCard whose accessible name is built as
+    // `${label}: ${count}` — label first, then the number.
+    await expect(page.getByRole('link', { name: /^Proxy Hosts:\s*\d+/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Certificates:\s*\d+/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Access Lists:\s*\d+/ })).toBeVisible();
   });
 
   test('shows Traffic (24h) card', async ({ page }) => {
     await expect(page.getByText('Traffic (24h)')).toBeVisible();
   });
 
-  test('stat card links navigate to correct pages', async ({ page }) => {
-    await page
-      .getByRole('link', { name: /proxy hosts/i })
-      .first()
-      .click();
+  /**
+   * ClickableCard renders a visually-hidden 1px <a> that exists only to give
+   * the card an accessible name — the real click target is the card surface,
+   * which carries the navigation handler. Clicking the anchor itself is
+   * impossible for a mouse user (card content sits over it), so click the
+   * parent surface instead. Matching on the card's exact accessible name also
+   * keeps these tests off the sidebar links, which `.first()` used to select.
+   */
+  async function clickCard(page: Page, name: string | RegExp) {
+    await page.getByRole('link', { name }).locator('xpath=..').click();
+  }
+
+  test('Proxy Hosts stat card navigates to /proxy-hosts', async ({ page }) => {
+    await clickCard(page, /^Proxy Hosts:\s*\d+/);
     await expect(page).toHaveURL(/\/proxy-hosts/);
   });
 
   test('Certificates stat card navigates to /certificates', async ({ page }) => {
-    await page
-      .getByRole('link', { name: /certificates/i })
-      .first()
-      .click();
+    await clickCard(page, /^Certificates:\s*\d+/);
     await expect(page).toHaveURL(/\/certificates/);
   });
 
   test('Access Lists stat card navigates to /access-lists', async ({ page }) => {
-    await page
-      .getByRole('link', { name: /access lists/i })
-      .first()
-      .click();
+    await clickCard(page, /^Access Lists:\s*\d+/);
     await expect(page).toHaveURL(/\/access-lists/);
   });
 
   test('Traffic card navigates to /analytics', async ({ page }) => {
-    await page
-      .getByRole('link', { name: /traffic/i })
-      .first()
-      .click();
+    await clickCard(page, 'Traffic in the last 24 hours');
     await expect(page).toHaveURL(/\/analytics/);
   });
 

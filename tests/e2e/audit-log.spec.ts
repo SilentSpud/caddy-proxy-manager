@@ -23,14 +23,16 @@ test.describe('Audit Log', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Name').fill('Audit Test Host');
-    await page.getByLabel(/domains/i).fill('audit-test.local');
+    await page.getByLabel(/^domains/i).fill('audit-test.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:8888');
 
     await page.getByRole('button', { name: /^create$/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('table').getByText('Audit Test Host')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByRole('table').getByText('Audit Test Host', { exact: true })).toBeVisible(
+      {
+        timeout: 10000,
+      },
+    );
 
     // Check audit log
     await page.goto('/audit-log');

@@ -721,6 +721,7 @@ function NewListDialog({
       submitLabel="Create list"
       onSubmit={submit}
       isSubmitting={submitting}
+      isSubmitDisabled={!name.trim()}
     >
       <VStack gap={4}>
         <Text type="body" size="sm" color="secondary">
@@ -1012,7 +1013,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
       <Layout
         height="fill"
         start={
-          <LayoutPanel width={320} hasDivider label="Access lists">
+          <LayoutPanel width={320} hasDivider role="navigation" label="Access lists">
             <div ref={searchRef}>
               <ListsRail
                 lists={lists}

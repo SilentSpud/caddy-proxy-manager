@@ -30,7 +30,6 @@ vi.mock('../../src/lib/db', async () => {
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
-import { eq } from 'drizzle-orm';
 import { installFakeCaddy, type FakeCaddy } from '../helpers/caddy-admin';
 import { caddyAdminRequest } from '../../src/lib/caddy-admin';
 import { applyCaddyConfig } from '../../src/lib/caddy';
@@ -78,19 +77,6 @@ describe('applyCaddyConfig against a spoofed Caddy', () => {
       .flatMap((r) => r.match ?? [])
       .flatMap((m) => m.host ?? []);
     expect(hosts).toContain('apply.example.com');
-  });
-
-  it('records the config hash so drift can be detected', async () => {
-    await applyCaddyConfig();
-
-    const [row] = await ctx.db
-      .select()
-      .from(schema.settings)
-      .where(eq(schema.settings.key, 'caddy_config_hash'));
-
-    expect(row).toBeDefined();
-    const stored = JSON.parse(row.value as string) as { hash: string };
-    expect(stored.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('throws when Caddy rejects the config', async () => {

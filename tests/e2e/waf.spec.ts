@@ -11,37 +11,58 @@ test.describe('WAF', () => {
 
     await page.goto('/waf');
 
-    await page.getByRole('button', { name: '24h' }).click();
+    await page.getByRole('radio', { name: '24h' }).click();
     await expect(page).toHaveURL(/range=24h/);
-    await expect(page.getByRole('button', { name: '24h' })).toBeVisible();
+    await expect(page.getByRole('radio', { name: '24h' })).toBeVisible();
 
-    await page.getByRole('button', { name: '7d' }).click();
+    await page.getByRole('radio', { name: '7d' }).click();
     await expect(page).toHaveURL(/range=7d/);
-    await expect(page.getByRole('button', { name: '7d' })).toBeVisible();
+    await expect(page.getByRole('radio', { name: '7d' })).toBeVisible();
 
-    await page.getByRole('button', { name: '30d' }).click();
+    await page.getByRole('radio', { name: '30d' }).click();
     await expect(page).toHaveURL(/range=30d/);
-    await expect(page.getByRole('button', { name: '30d' })).toBeVisible();
+    await expect(page.getByRole('radio', { name: '30d' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Custom' }).click();
-    const dateInputs = page.locator('input[type="datetime-local"]');
-    await expect(dateInputs).toHaveCount(2);
-    await dateInputs.nth(0).fill(customFrom);
-    await dateInputs.nth(1).fill(customTo);
+    await page.getByRole('radio', { name: 'Custom' }).click();
+
+    // DateTimeInput is no longer a native datetime-local control: it renders a
+    // date combobox (accepting unambiguous ISO input) plus a separate time
+    // field, each committing its pending text on blur.
+    const fromDate = page.getByRole('combobox', { name: 'From', exact: true });
+    const fromTime = page.getByLabel('From time', { exact: true });
+    const toDate = page.getByRole('combobox', { name: 'To', exact: true });
+    const toTime = page.getByLabel('To time', { exact: true });
+    await expect(fromDate).toBeVisible();
+
+    const [fromDay, fromClock] = customFrom.split('T');
+    const [toDay, toClock] = customTo.split('T');
+    for (const [field, text] of [
+      [fromDate, fromDay],
+      [fromTime, fromClock],
+      [toDate, toDay],
+      [toTime, toClock],
+    ] as const) {
+      await field.fill(text);
+      await field.blur();
+    }
+
     await page.getByRole('button', { name: /apply range/i }).click();
 
     await expect(page).toHaveURL(
       new RegExp(`range=custom.*from=${expectedFrom}.*to=${expectedTo}`),
     );
-    await expect(dateInputs.nth(0)).toHaveValue(customFrom);
-    await expect(dateInputs.nth(1)).toHaveValue(customTo);
+    // The committed values are re-rendered in the field's own locale format, so
+    // assert the round-trip through the URL (above) and that the fields kept a
+    // value rather than pinning the display string.
+    await expect(fromDate).not.toHaveValue('');
+    await expect(toDate).not.toHaveValue('');
 
-    await page.getByRole('button', { name: 'All time' }).click();
+    await page.getByRole('radio', { name: 'All time' }).click();
     await expect(page).not.toHaveURL(/range=/);
     await expect(page).not.toHaveURL(/from=/);
     await expect(page).not.toHaveURL(/to=/);
-    await expect(page.getByRole('button', { name: 'All time' })).toBeVisible();
-    await expect(page.locator('input[type="datetime-local"]')).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: 'All time' })).toBeVisible();
+    await expect(fromDate).toHaveCount(0);
   });
 
   test('WAF page loads without redirecting to login', async ({ page }) => {
@@ -59,37 +80,38 @@ test.describe('WAF', () => {
   test('WAF page has Save WAF settings button', async ({ page }) => {
     await page.goto('/waf');
     // Save button is on the Settings tab
-    await page.getByRole('tab', { name: /settings/i }).click();
+    await page.getByRole('button', { name: /settings/i }).click();
     await expect(page.getByRole('button', { name: /save waf settings/i })).toBeVisible();
   });
 
   test('WAF page has tabs', async ({ page }) => {
     await page.goto('/waf');
-    await expect(page.getByRole('tab', { name: /events/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /suppressed rules/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /events/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /suppressed rules/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /settings/i })).toBeVisible();
   });
 
   test('WAF settings toggle persists after save and navigation', async ({ page }) => {
     await page.goto('/waf');
-    await page.getByRole('tab', { name: /settings/i }).click();
+    await page.getByRole('button', { name: /settings/i }).click();
     await expect(page.getByRole('button', { name: /save waf settings/i })).toBeVisible();
 
-    const wafSwitch = page.locator('#waf_enabled');
-    const owaspCheckbox = page.locator('#waf_load_owasp_crs');
+    // These were addressed by hand-written DOM ids that the astryx controls do
+    // not emit; both expose a proper role and label, and their checked state is
+    // real ARIA state rather than a data- attribute.
+    const wafSwitch = page.getByRole('switch', { name: /enable waf globally/i });
+    const owaspCheckbox = page.getByRole('checkbox', { name: /load owasp core rule set/i });
 
     // Turn WAF on if not already
-    const isWafOn = await wafSwitch.getAttribute('data-state');
-    if (isWafOn !== 'checked') {
+    if (!(await wafSwitch.isChecked())) {
       await wafSwitch.click();
-      await expect(wafSwitch).toHaveAttribute('data-state', 'checked');
+      await expect(wafSwitch).toBeChecked();
     }
 
     // Turn OWASP CRS on if not already
-    const isOwaspOn = await owaspCheckbox.getAttribute('data-state');
-    if (isOwaspOn !== 'checked') {
+    if (!(await owaspCheckbox.isChecked())) {
       await owaspCheckbox.click();
-      await expect(owaspCheckbox).toHaveAttribute('data-state', 'checked');
+      await expect(owaspCheckbox).toBeChecked();
     }
 
     await page.getByRole('button', { name: /save waf settings/i }).click();
@@ -101,9 +123,9 @@ test.describe('WAF', () => {
     await page.goto('/hosts');
     await expect(page).not.toHaveURL(/login/);
     await page.goto('/waf');
-    await page.getByRole('tab', { name: /settings/i }).click();
+    await page.getByRole('button', { name: /settings/i }).click();
 
-    await expect(wafSwitch).toHaveAttribute('data-state', 'checked');
-    await expect(owaspCheckbox).toHaveAttribute('data-state', 'checked');
+    await expect(wafSwitch).toBeChecked();
+    await expect(owaspCheckbox).toBeChecked();
   });
 });

@@ -93,6 +93,41 @@ export async function waitForTcpRoute(
   throw new Error(`TCP port ${host}:${port} not ready after ${timeoutMs}ms`);
 }
 
+/**
+ * Poll until a TCP port actually *proxies* data, not merely accepts a socket.
+ *
+ * Docker's port publisher accepts connections on a published port whether or
+ * not Caddy has an L4 listener bound behind it, so `waitForTcpRoute` returns
+ * as soon as the container is up — well before a newly created, re-enabled or
+ * re-applied route is live. Anything that then asserts on echoed data races
+ * against Caddy's reload. This helper closes that gap by requiring a probe to
+ * come back, which only happens once the route reaches the upstream.
+ *
+ * Only safe against echo upstreams, which is what the L4 suite proxies to.
+ */
+export async function waitForTcpEcho(
+  host: string,
+  port: number,
+  probe = 'ready-probe',
+  timeoutMs = 30_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const res = await tcpSend(
+      host,
+      port,
+      `${probe}
+`,
+      2_000,
+    );
+    if (res.data.includes(probe)) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(
+    `TCP port ${host}:${port} accepted connections but never echoed within ${timeoutMs}ms`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // UDP helpers
 // ---------------------------------------------------------------------------

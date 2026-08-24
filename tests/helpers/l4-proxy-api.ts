@@ -73,11 +73,13 @@ export async function createL4ProxyHost(page: Page, config: L4ProxyHostConfig): 
   }
 
   // Submit
-  await page.getByRole('button', { name: /create/i }).click();
+  await page.getByRole('button', { name: /^create$/i }).click();
 
   // Wait for success state (dialog closes or success alert)
   await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
 
   // Verify host appears in the table
-  await expect(page.getByRole('table').getByText(config.name)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('table').getByText(config.name, { exact: true })).toBeVisible({
+    timeout: 10_000,
+  });
 }

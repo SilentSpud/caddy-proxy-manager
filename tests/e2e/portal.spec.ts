@@ -44,8 +44,8 @@ test.describe('Portal login page', () => {
     const username = page.getByLabel('Username');
     const password = page.getByLabel('Password');
 
-    await expect(username).toHaveAttribute('required', '');
-    await expect(password).toHaveAttribute('required', '');
+    await expect(username).toHaveAttribute('aria-required', 'true');
+    await expect(password).toHaveAttribute('aria-required', 'true');
   });
 
   test('rejects javascript: URI — no rid is created', async ({ page }) => {
