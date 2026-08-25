@@ -44,7 +44,10 @@ import {
   getCaddyBuildDiff,
   sanitizeCaddyBuildSettings,
 } from "@/src/lib/caddy-build";
-import { describeModuleConflicts } from "@/src/lib/caddy-build-conflicts";
+import {
+  describeCaddyfileSnippetWarning,
+  describeModuleConflicts,
+} from "@/src/lib/caddy-build-conflicts";
 import type {
   CloudflareSettings,
   DnsProviderSettings,
@@ -1459,11 +1462,17 @@ export async function updateCaddyBuildSettingsAction(
     const rebuildNote = diff.needsRebuild
       ? " Rebuild Caddy to apply the change to the running container."
       : "";
+    // Advisory, not a refusal — see describeCaddyfileSnippetWarning.
+    const snippetWarning = await describeCaddyfileSnippetWarning(settings);
+    const snippetNote = snippetWarning ? ` ${snippetWarning}` : "";
 
     try {
       await applyCaddyConfig();
       revalidatePath("/settings");
-      return { success: true, message: `Caddy module selection saved.${rebuildNote}` };
+      return {
+        success: true,
+        message: `Caddy module selection saved.${rebuildNote}${snippetNote}`,
+      };
     } catch (error) {
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");

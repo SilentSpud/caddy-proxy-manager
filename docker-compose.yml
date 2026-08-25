@@ -185,6 +185,11 @@ services:
       # if you would rather run `docker compose build caddy` yourself — the
       # generated module list is written to the shared data volume either way,
       # as docker-compose.caddy-build.yml.
+      #
+      # Note that a hand-run build does not produce caddy-build.applied.json
+      # (the sidecar writes that only after a build it performed came back
+      # healthy), so the app keeps assuming the shipped module set and will not
+      # emit config for anything you added that way.
       BUILD: 1
       # Deny everything else by default
       EXEC: 0

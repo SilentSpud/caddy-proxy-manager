@@ -1209,6 +1209,38 @@ async function buildProxyRoutes(
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
   const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
 
+  // Adapt every host's Caddyfile snippet up front, concurrently.
+  //
+  // Each adapt is a round trip to Caddy's admin API, and this runs on every
+  // config apply — a host edit, a cert renewal, a settings save. Doing them
+  // inside the loop made the cost the *sum* of those round trips; doing them
+  // here makes it the slowest one.
+  //
+  // Deliberately not cached across applies. The result depends on which plugins
+  // the running binary has, and a cache that outlived a rebuild would hand back
+  // routes for a module that is no longer there — producing exactly the
+  // whole-document rejection this file works to avoid. Latency is the cheaper
+  // thing to spend.
+  const adaptedCaddyfiles = new Map<number, Awaited<ReturnType<typeof adaptCaddyfileSnippet>>>();
+  await Promise.all(
+    rows
+      .filter(
+        (row) => row.enabled && parseJson<ProxyHostMeta>(row.meta, {}).custom_caddyfile?.trim(),
+      )
+      .map(async (row) => {
+        const snippet = parseJson<ProxyHostMeta>(row.meta, {}).custom_caddyfile as string;
+        try {
+          adaptedCaddyfiles.set(row.id, await adaptCaddyfileSnippet(snippet));
+        } catch (error) {
+          // Left absent in the map; the loop below reports it per host.
+          console.warn(
+            `Skipping the custom Caddyfile for host "${row.name}" — Caddy could not adapt it:`,
+            error instanceof Error ? error.message : error,
+          );
+        }
+      }),
+  );
+
   for (const row of rows) {
     if (!row.enabled) {
       continue;
@@ -1559,26 +1591,19 @@ async function buildProxyRoutes(
     // every other host down over one host's stale escape hatch, and would also
     // block the very edit needed to fix it. Snippets are validated when saved,
     // so reaching this path at all means something changed underneath them.
-    if (meta.custom_caddyfile?.trim()) {
-      try {
-        const adapted = await adaptCaddyfileSnippet(meta.custom_caddyfile);
-        for (const warning of adapted.warnings) {
-          console.warn(`Caddyfile warning for host "${row.name}": ${warning}`);
-        }
-        if (adapted.ignoredApps.length > 0) {
-          console.warn(
-            `Ignoring non-HTTP directives in the Caddyfile for host "${row.name}": ${adapted.ignoredApps.join(", ")}`,
-          );
-        }
-        const subroute = buildCaddyfileSubrouteHandler(adapted.routes);
-        if (subroute) {
-          handlers.push(subroute);
-        }
-      } catch (error) {
+    const adapted = adaptedCaddyfiles.get(row.id);
+    if (adapted) {
+      for (const warning of adapted.warnings) {
+        console.warn(`Caddyfile warning for host "${row.name}": ${warning}`);
+      }
+      if (adapted.ignoredApps.length > 0) {
         console.warn(
-          `Skipping the custom Caddyfile for host "${row.name}" — Caddy could not adapt it:`,
-          error instanceof Error ? error.message : error,
+          `Ignoring non-HTTP directives in the Caddyfile for host "${row.name}": ${adapted.ignoredApps.join(", ")}`,
         );
+      }
+      const subroute = buildCaddyfileSubrouteHandler(adapted.routes);
+      if (subroute) {
+        handlers.push(subroute);
       }
     }
 

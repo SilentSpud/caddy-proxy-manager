@@ -1,15 +1,33 @@
 /**
- * Unit tests for the L4 port manager sidecar entrypoint script.
+ * Invariants of the compose-manager sidecar's entrypoint script.
  *
- * Tests critical invariants of the shell script:
- * - Always applies the override on startup (not just on trigger change)
- * - Only recreates the caddy service (never other services)
- * - Uses --no-deps to prevent dependency cascades
- * - Auto-detects compose project name from caddy container labels
- * - Pre-loads LAST_TRIGGER to avoid double-applying on startup
- * - Writes status files in valid JSON
- * - Never includes test override files in production
- * - Supports both named-volume and bind-mount deployments (COMPOSE_HOST_DIR)
+ * The script runs in its own container, driven by files on a shared volume, so
+ * nothing else in the test suite can reach it — these assertions read the
+ * shipped source directly. That is a weaker check than executing it, and it is
+ * chosen deliberately: the alternative is a Docker-in-Docker harness for a
+ * 400-line shell script. What it does buy is a guard on the properties whose
+ * violation is expensive and silent.
+ *
+ * Port management:
+ * - Applies the override on startup, not only on trigger change
+ * - Only ever touches the caddy service, with --no-deps and --force-recreate
+ * - Auto-detects the compose project from the caddy container's labels
+ * - Pre-loads LAST_TRIGGER so startup does not double-apply
+ * - Supports named-volume and bind-mount deployments (COMPOSE_HOST_DIR)
+ * - Never pulls images, and never drags the test override into production
+ *
+ * Image rebuilds (module selection):
+ * - Build and port overrides are always passed together, so neither undoes the other
+ * - The build is bounded by a timeout and cannot wedge the sidecar
+ * - A failed build leaves the running container alone
+ * - The applied-module record is written only after the build is healthy —
+ *   writing it earlier would let the app emit config for plugins the running
+ *   binary does not have, which Caddy rejects wholesale
+ * - A stale "building" status from a killed sidecar is cleared on startup
+ *
+ * Status reporting:
+ * - Status files are valid JSON, with control characters stripped
+ * - Exit codes are captured without `set -e` killing the failure branch
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -215,6 +233,29 @@ describe('L4 port manager entrypoint.sh', () => {
     for (const line of captures) {
       expect(line).toMatch(/&& [A-Z_]+=0 \|\| [A-Z_]+=\$\?/);
     }
+  });
+
+  it('records the applied module set only after the build is healthy', () => {
+    // The web app treats this file as the authority on what the binary
+    // contains. Writing it any earlier — when the override is generated, say —
+    // would claim a module is available while the old binary is still serving.
+    const writeIdx = lines.findIndex((l) => l.trim() === 'write_applied_modules');
+    const healthyIdx = lines.findIndex(
+      (l) => l.includes('HEALTH" = "healthy"') && l.includes('if'),
+    );
+    expect(writeIdx).toBeGreaterThan(-1);
+    expect(healthyIdx).toBeGreaterThan(-1);
+    expect(writeIdx).toBeGreaterThan(healthyIdx);
+    // And nothing writes it on any failure path.
+    expect(script.split('write_applied_modules').length - 1).toBe(2); // definition + one call
+  });
+
+  it('clears a stale in-progress build status on startup', () => {
+    // A sidecar killed mid-build leaves state=building on disk, and the trigger
+    // is pre-loaded as already-handled — so nothing would ever move it on, and
+    // the UI would sit on a disabled Rebuild button forever.
+    expect(script).toMatch(/grep -q .*building.*pending.*BUILD_STATUS_FILE/);
+    expect(script).toContain('Startup: cleared a stale in-progress build status.');
   });
 
   it('writes build status separately from port status', () => {

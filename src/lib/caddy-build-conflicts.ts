@@ -9,7 +9,7 @@
  */
 
 import { resolveEnabledModuleIds } from "./caddy-build";
-import { dnsModuleId } from "./caddy-modules";
+import { CADDY_MODULES, dnsModuleId } from "./caddy-modules";
 import { countEnabledL4ProxyHosts } from "./models/l4-proxy-hosts";
 import { listProxyHosts } from "./models/proxy-hosts";
 import {
@@ -39,7 +39,7 @@ export async function describeModuleConflicts(
     const l4Count = await countEnabledL4ProxyHosts();
     if (l4Count > 0) {
       problems.push(
-        `${l4Count} enabled L4 proxy host${l4Count === 1 ? "" : "s"} need the Layer 4 Proxy module`,
+        `${l4Count} enabled L4 proxy host${l4Count === 1 ? " needs" : "s need"} the Layer 4 Proxy module`,
       );
     }
   }
@@ -70,7 +70,7 @@ export async function describeModuleConflicts(
       const count = hosts.filter((h) => h.enabled && h.waf?.enabled).length;
       if (count > 0) {
         problems.push(
-          `${count} proxy host${count === 1 ? " has" : "s have"} per-host WAF enabled and need the Coraza WAF module`,
+          `${count} proxy host${count === 1 ? " has" : "s have"} per-host WAF enabled and ${count === 1 ? "needs" : "need"} the Coraza WAF module`,
         );
       }
     }
@@ -78,7 +78,7 @@ export async function describeModuleConflicts(
       const count = hosts.filter((h) => h.enabled && h.geoblock?.enabled).length;
       if (count > 0) {
         problems.push(
-          `${count} proxy host${count === 1 ? " has" : "s have"} per-host geoblocking enabled and need the Request Blocker module`,
+          `${count} proxy host${count === 1 ? " has" : "s have"} per-host geoblocking enabled and ${count === 1 ? "needs" : "need"} the Request Blocker module`,
         );
       }
     }
@@ -100,4 +100,38 @@ export async function describeModuleConflicts(
 
   if (problems.length === 0) return null;
   return `Cannot disable those modules yet: ${problems.join("; ")}. Turn the feature off first.`;
+}
+
+/**
+ * A non-blocking heads-up about per-host Caddyfile snippets, or null.
+ *
+ * Snippets are free-form Caddyfile text and can name a directive from any
+ * compiled-in plugin — `waf { … }`, `geoblock { … }`, something from a custom
+ * module. Nothing in the stored shape says which, and the only thing that could
+ * tell us is Caddy's own adapter, which can only answer for the binary that is
+ * running now, not the one a rebuild would produce. So this cannot be a refusal
+ * the way the checks above are.
+ *
+ * It is still worth saying. Without it, a snippet referencing a removed plugin
+ * simply stops adapting after the rebuild and is skipped with a console warning
+ * nobody reads — the same silent-disappearance problem the refusals exist to
+ * prevent, just one layer down.
+ */
+export async function describeCaddyfileSnippetWarning(
+  settings: CaddyBuildSettings,
+): Promise<string | null> {
+  const enabled = new Set(resolveEnabledModuleIds(settings));
+  const anyDisabled = CADDY_MODULES.some((m) => !enabled.has(m.id));
+  if (!anyDisabled) return null;
+
+  const hosts = await listProxyHosts();
+  const withSnippets = hosts.filter((h) => h.enabled && h.customCaddyfile?.trim());
+  if (withSnippets.length === 0) return null;
+
+  const names = withSnippets
+    .slice(0, 3)
+    .map((h) => h.name)
+    .join(", ");
+  const more = withSnippets.length > 3 ? `, and ${withSnippets.length - 3} more` : "";
+  return `${withSnippets.length} proxy host${withSnippets.length === 1 ? "" : "s"} (${names}${more}) use custom Caddyfile directives, which may reference a module you just switched off. Review them before rebuilding — a snippet Caddy can no longer adapt is skipped silently.`;
 }

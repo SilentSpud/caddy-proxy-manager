@@ -15,6 +15,8 @@ ARG TARGETARCH
 # (docker-compose.caddy-build.yml) when an operator turns modules off or adds
 # their own. Keep this list in sync with CADDY_MODULES in src/lib/caddy-modules.ts —
 # that registry is what tells the UI which settings a given module powers.
+# tests/unit/caddy-modules.test.ts asserts the two match, so a module added to
+# one and not the other fails the suite rather than shipping a dead toggle.
 #
 # Declared inside this stage, the only stage that consumes it. ARG scope is per
 # stage, so the runtime stage below cannot see it — rather than duplicating the
@@ -89,10 +91,12 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
     chown -R caddy:caddy /data /config /logs /home/caddy && \
     chmod 0777 /acme-ca
 
-# Record what this image was built with. The app reads its own generated compose
-# override to know the module set, but this makes an image inspectable on its
-# own — `docker run --rm <image> cat /etc/caddy/caddy-modules.txt` answers "which
-# plugins does this binary actually have" without guessing.
+# Record what this image was built with. The app learns the module set from the
+# record its sidecar writes after a successful rebuild (caddy-build.applied.json
+# on the shared data volume); this file is the same answer carried by the image
+# itself, so an image is inspectable on its own —
+# `docker run --rm <image> cat /etc/caddy/caddy-modules.txt` says which plugins
+# this binary actually has, with no volume and no running stack needed.
 #
 # Copied from the builder rather than re-read from a build arg: ARG is scoped per
 # stage, so recording it here would need either a second copy of the default list

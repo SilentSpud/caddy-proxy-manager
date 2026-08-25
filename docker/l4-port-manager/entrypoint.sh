@@ -14,12 +14,31 @@
 #
 # On startup: always applies the current L4 ports override so the caddy
 # container has the correct ports bound (the main compose stack starts caddy
-# without the L4 ports override file).
+# without the L4 ports override file). Also clears any "building" build status
+# left behind by a sidecar that was killed mid-build, which would otherwise
+# leave the UI's Rebuild button disabled forever.
 #
 # During runtime: watches both trigger files and acts when the web app signals
 # that port configuration or the module selection has changed.
 #
 # Only ever touches the caddy container — never any other service.
+#
+# Files on the shared data volume ($DATA_DIR), all of them the interface to the
+# web container — there is no other channel between the two:
+#
+#   docker-compose.l4-ports.yml     read   port override, written by web
+#   l4-ports.trigger                r/w    web signals; deleted once handled
+#   l4-ports.status                 write  progress of the port apply
+#   docker-compose.caddy-build.yml  read   DESIRED module list, written by web
+#   caddy-build.trigger             r/w    web signals; deleted once handled
+#   caddy-build.status              write  progress of the rebuild
+#   caddy-build.applied.json        write  APPLIED module list — written ONLY
+#                                          after a build succeeds and caddy is
+#                                          healthy. The web app treats this as
+#                                          the authority on what the binary
+#                                          contains, so writing it any earlier
+#                                          would let it emit config for plugins
+#                                          that are not in the running binary.
 #
 # Environment variables:
 #   DATA_DIR              - Path to shared data volume (default: /data)
@@ -46,6 +65,10 @@ OVERRIDE_FILE="$DATA_DIR/docker-compose.l4-ports.yml"
 BUILD_TRIGGER_FILE="$DATA_DIR/caddy-build.trigger"
 BUILD_STATUS_FILE="$DATA_DIR/caddy-build.status"
 BUILD_OVERRIDE_FILE="$DATA_DIR/docker-compose.caddy-build.yml"
+# The record of what the running binary was actually built with. Distinct from
+# BUILD_OVERRIDE_FILE, which carries the *desired* list into the build and is
+# written before it starts.
+BUILD_APPLIED_FILE="$DATA_DIR/caddy-build.applied.json"
 
 log() {
   echo "[caddy-compose-manager] $(date -u '+%Y-%m-%dT%H:%M:%SZ') $*"
@@ -103,6 +126,23 @@ write_status() {
 
 write_build_status() {
   write_status_file "$BUILD_STATUS_FILE" "$1" "$2" "${3:-}"
+}
+
+# Record the module list the running binary was just built with.
+#
+# Read back out of the override that fed the build, so the record can only ever
+# describe a build that actually happened. The web app treats this file as the
+# authority on which plugin-backed handlers it may emit; a handler for a module
+# the binary lacks makes Caddy reject the whole config document.
+write_applied_modules() {
+  modules="$(sed -n 's/^[[:space:]]*CADDY_MODULES:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$BUILD_OVERRIDE_FILE" 2>/dev/null || echo "")"
+  cat > "$BUILD_APPLIED_FILE" <<APPLIEDEOF
+{
+  "modules": "$(json_escape "$modules")",
+  "appliedAt": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+}
+APPLIEDEOF
+  log "Recorded applied modules: ${modules:-none}"
 }
 
 # Auto-detect the Docker Compose project name from the running caddy container's labels.
@@ -280,6 +320,13 @@ do_build() {
 
   HEALTH="$(wait_for_caddy_health 60)"
   if [ "$HEALTH" = "healthy" ]; then
+    # Record what the binary now actually contains. This is the web app's source
+    # of truth for which plugin-backed handlers it may emit, so it is written
+    # here and nowhere else: only at this point — build succeeded, container
+    # recreated, healthy — is the new module set genuinely in the running binary.
+    # Writing it any earlier (e.g. when the override is generated) would tell the
+    # app a module is available while the old binary is still serving.
+    write_applied_modules
     write_build_status "applied" "Caddy rebuilt with the selected modules and is healthy."
     log "Caddy is healthy."
   else
@@ -323,7 +370,16 @@ else
   log "Started. No L4 port override file yet."
 fi
 
-if [ ! -f "$BUILD_STATUS_FILE" ]; then
+# A build that was in flight when this container died cannot be in flight now.
+# The status file would otherwise still say "building", and because the trigger
+# is pre-loaded as already-handled just below, nothing would ever move it on —
+# leaving the UI spinning on a build that is not running, with its Rebuild
+# button disabled and no way back except deleting the file by hand.
+if [ -f "$BUILD_STATUS_FILE" ] && grep -q '"state": *"\(building\|pending\)"' "$BUILD_STATUS_FILE" 2>/dev/null; then
+  STALE_MSG="The sidecar restarted while a rebuild was in progress. The Caddy image was left unchanged; click Rebuild to try again."
+  write_build_status "failed" "$STALE_MSG" "$STALE_MSG"
+  log "Startup: cleared a stale in-progress build status."
+elif [ ! -f "$BUILD_STATUS_FILE" ]; then
   write_build_status "idle" "Build manager is running and ready."
 fi
 

@@ -13,17 +13,25 @@
  *   2. "Rebuild Caddy" writes docker-compose.caddy-build.yml (a CADDY_MODULES
  *      build arg) and caddy-build.trigger.
  *   3. Sidecar detects the trigger, runs `docker compose build caddy` then
- *      recreates the container, and writes caddy-build.status.
+ *      recreates the container, and writes caddy-build.status. On success — and
+ *      only on success — it also writes caddy-build.applied.json.
  *   4. Web reads the status to report progress and the applied module list.
  *
  * Two module sets therefore exist at any moment, and the difference between
  * them is load-bearing rather than incidental:
  *
  *   - *desired* — what the admin selected. Drives which settings the UI offers.
- *   - *applied* — what the running binary was actually built with, read back
- *     from the override file. Config generation must never emit a handler that
- *     is not in this set, because Caddy rejects a config containing an unknown
- *     module in full, taking down every unrelated host with it.
+ *     Lives in the compose override, which is the build's *input*.
+ *   - *applied* — what the running binary was actually built with, read from the
+ *     record the sidecar writes after a successful build. Config generation must
+ *     never emit a handler that is not in this set, because Caddy rejects a
+ *     config containing an unknown module in full, taking every unrelated host
+ *     with it.
+ *
+ * Those are two separate files for a reason: the override is written before the
+ * build, so treating it as the applied set would make applied equal desired
+ * while the old binary is still running — and keep it wrong forever if the build
+ * failed. See getAppliedModuleSpecs.
  *
  * So config generation uses the intersection: turning a module *off* takes
  * effect immediately (harmless — the handler simply stops being emitted), while
@@ -51,6 +59,9 @@ const DATA_DIR = process.env.L4_PORTS_DIR || "/app/data";
 const OVERRIDE_FILE = "docker-compose.caddy-build.yml";
 const TRIGGER_FILE = "caddy-build.trigger";
 const STATUS_FILE = "caddy-build.status";
+// Written by the sidecar after a build succeeds and caddy is healthy again.
+// Kept separate from OVERRIDE_FILE on purpose — see getAppliedModuleSpecs.
+const APPLIED_FILE = "caddy-build.applied.json";
 
 export type CaddyBuildState = "idle" | "pending" | "building" | "applied" | "failed";
 
@@ -116,22 +127,37 @@ export function defaultModuleSpecs(): string[] {
 // ─── Applied state ───────────────────────────────────────────────────────────
 
 /**
- * The module specs baked into the running image, read from the override file.
+ * The module specs actually compiled into the running binary.
  *
- * No file means no rebuild has happened, so the container is still the image
- * from the registry (or the repo's Dockerfile default) — that is the full
- * catalog, not an empty list. Returning empty here would make config generation
- * drop every plugin-backed handler on a perfectly healthy default install.
+ * Read from a record the sidecar writes only *after* a build succeeds and the
+ * container comes back healthy — deliberately not from the compose override,
+ * even though that file also holds a module list.
+ *
+ * The override carries the *desired* list into the build, and it is written
+ * before the build starts. Reading it here would make applied equal desired the
+ * instant the rebuild is requested, which collapses the whole desired-vs-applied
+ * distinction this module exists to maintain. Two concrete failures follow from
+ * that, and both were reachable:
+ *
+ *   - During the minutes a build takes, any other config apply (a host edit, a
+ *     cert renewal, an instance-sync push) would emit handlers for a module the
+ *     running binary does not have yet, and Caddy would reject the document.
+ *   - If the build then failed, the override would stay on disk, so the wrong
+ *     answer would persist — every later apply rejected — until someone deleted
+ *     the file by hand.
+ *
+ * No record means no successful rebuild has happened, so the container is still
+ * the shipped image, which is built with the full catalog. Returning an empty
+ * list here would drop every plugin-backed handler on a healthy default install.
  */
 export function getAppliedModuleSpecs(): string[] {
-  const filePath = join(DATA_DIR, OVERRIDE_FILE);
+  const filePath = join(DATA_DIR, APPLIED_FILE);
   if (!existsSync(filePath)) return defaultModuleSpecs();
 
   try {
-    const content = readFileSync(filePath, "utf-8");
-    const match = content.match(/^\s*CADDY_MODULES:\s*"([^"]*)"\s*$/m);
-    if (!match) return defaultModuleSpecs();
-    return parseModuleSpecList(match[1]);
+    const parsed = JSON.parse(readFileSync(filePath, "utf-8")) as { modules?: string };
+    if (typeof parsed.modules !== "string") return defaultModuleSpecs();
+    return parseModuleSpecList(parsed.modules);
   } catch {
     return defaultModuleSpecs();
   }
@@ -392,7 +418,7 @@ const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "dns01"];
 export async function getModuleGateState(): Promise<{
   features: Record<CaddyFeatureId, boolean>;
   moduleNames: Record<CaddyFeatureId, string>;
-  enabledModuleIds: string[];
+  enabledModuleIds: string[] | null;
   pendingRebuild: boolean;
 }> {
   const [availability, diff] = await Promise.all([

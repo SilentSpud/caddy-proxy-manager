@@ -117,6 +117,12 @@ export function CodeEditor({
         wordWrap: "on",
         readOnly,
         theme: monacoThemeRef.current,
+        // Monaco renders its own hidden textarea, which a screen reader
+        // otherwise announces as the generic "Editor content". The visible
+        // label above is a styled Text node, not a <label>, so it cannot carry
+        // the association — this is the only thing naming the field once the
+        // TextArea fallback is gone.
+        ariaLabel: label,
         // Without this the editor keeps its own scroll position glued to the
         // page scroll on long settings pages, which feels broken.
         scrollbar: { alwaysConsumeMouseWheel: false },
@@ -142,7 +148,7 @@ export function CodeEditor({
       editorRef.current = null;
       setReady(false);
     };
-  }, [language, readOnly]);
+  }, [language, readOnly, label]);
 
   // External value changes (a form reset, loading a different record) have to
   // reach the model, but only when they genuinely differ — setValue moves the
@@ -207,14 +213,26 @@ export function CodeEditor({
           plain host node with an explicit box — the same arrangement the
           analytics map uses for MapLibre. Kept mounted but zero-height until
           ready so the fallback and the editor never both take up space. */}
-      <div
-        ref={hostRef}
-        className={
-          ready
-            ? `${HEIGHT_CLASS[height]} w-full overflow-hidden rounded-md border border-border`
-            : "h-0 w-full overflow-hidden"
-        }
-      />
+      <div className={ready ? "relative w-full" : "contents"}>
+        <div
+          ref={hostRef}
+          className={
+            ready
+              ? `${HEIGHT_CLASS[height]} w-full overflow-hidden rounded-md border border-border`
+              : "h-0 w-full overflow-hidden"
+          }
+        />
+        {/* Monaco has no placeholder of its own, and the fallback TextArea that
+            did show one is unmounted the moment Monaco is ready — taking the
+            example away exactly when the field becomes usable. Overlaid rather
+            than inserted as text so it never becomes part of the value.
+            Offset clears Monaco's line-number gutter. */}
+        {ready && placeholder && value === "" && (
+          <div className="pointer-events-none absolute left-16 top-1 select-none whitespace-pre font-mono text-xs opacity-50">
+            {placeholder}
+          </div>
+        )}
+      </div>
     </VStack>
   );
 }

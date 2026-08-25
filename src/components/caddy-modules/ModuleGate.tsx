@@ -26,8 +26,16 @@ export type ModuleGateState = {
   features: Record<CaddyFeatureId, boolean>;
   /** Feature -> human-readable module name(s) to name in the tooltip. */
   moduleNames: Record<CaddyFeatureId, string>;
-  /** Individual module ids the admin has selected, for per-module checks. */
-  enabledModuleIds: string[];
+  /**
+   * Individual module ids the admin has selected, for per-module checks.
+   *
+   * `null` means "not known here" (no provider above us); an empty array is a
+   * real answer meaning the admin disabled everything. Using `[]` for both — as
+   * this once did — makes "nothing is enabled" indistinguishable from "we have
+   * no idea", and the DNS provider picker then reports every provider as
+   * available on an instance where none of them are.
+   */
+  enabledModuleIds: string[] | null;
   /** True when the selection has not been built into the image yet. */
   pendingRebuild: boolean;
 };
@@ -38,9 +46,7 @@ export type ModuleGateState = {
 const FALLBACK: ModuleGateState = {
   features: { l4: true, geoblock: true, waf: true, dns01: true },
   moduleNames: { l4: "", geoblock: "", waf: "", dns01: "" },
-  // Empty means "unknown", so useModuleEnabled reports every module as
-  // available rather than greying out the whole DNS provider list.
-  enabledModuleIds: [],
+  enabledModuleIds: null,
   pendingRebuild: false,
 };
 
@@ -63,11 +69,11 @@ export function useModuleGate(): ModuleGateState {
 /**
  * Whether one specific module is selected.
  *
- * Outside a provider (empty list) everything reads as enabled — see FALLBACK.
+ * Outside a provider (null) everything reads as enabled — see FALLBACK.
  */
 export function useModuleEnabled(moduleId: string): boolean {
   const { enabledModuleIds } = useModuleGate();
-  if (enabledModuleIds.length === 0) return true;
+  if (enabledModuleIds === null) return true;
   return enabledModuleIds.includes(moduleId);
 }
 

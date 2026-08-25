@@ -99,6 +99,8 @@ export function CaddyBuildFields({
   );
   const [build, setBuild] = useState<BuildResponse | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
+  // Errors from the trigger request itself, which never reach the status file.
+  const [rebuildError, setRebuildError] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -154,11 +156,22 @@ export function CaddyBuildFields({
 
   const handleRebuild = async () => {
     setRebuilding(true);
+    setRebuildError(null);
     try {
       const res = await fetch("/api/caddy-build", { method: "POST" });
-      if (res.ok) await fetchStatus();
-    } catch {
-      // The status file is the source of truth; the next poll will show it.
+      if (!res.ok) {
+        // Deliberately not left to the status poll. The failures that land here
+        // — an invalid custom module, Caddy unreachable, an expired session —
+        // all abort before the sidecar writes any status at all, and the poll
+        // only runs while the status says pending/building. Without this the
+        // spinner just stops and the button looks broken.
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setRebuildError(body?.error ?? `Rebuild could not be started (HTTP ${res.status}).`);
+        return;
+      }
+      await fetchStatus();
+    } catch (error) {
+      setRebuildError(error instanceof Error ? error.message : "Rebuild could not be started.");
     } finally {
       setRebuilding(false);
     }
@@ -178,6 +191,10 @@ export function CaddyBuildFields({
 
   return (
     <VStack gap={5}>
+      {rebuildError && (
+        <Banner status="error" title="Rebuild failed to start" description={rebuildError} />
+      )}
+
       <RebuildBanner
         build={build}
         rebuilding={rebuilding}

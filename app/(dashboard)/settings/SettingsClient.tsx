@@ -1280,7 +1280,7 @@ function DnsProvidersSection({
   // switched off would produce a config Caddy rejects outright, so it is taken
   // out of the picker rather than left to fail at certificate-issuance time.
   const isProviderAvailable = (name: string) =>
-    enabledModuleIds.length === 0 || enabledModuleIds.includes(dnsModuleId(name));
+    enabledModuleIds === null || enabledModuleIds.includes(dnsModuleId(name));
 
   const providerDef = dnsProviderDefinitions.find((p) => p.name === selectedProvider);
   const isUpdate = configuredProviders.includes(selectedProvider);

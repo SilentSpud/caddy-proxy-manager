@@ -47,7 +47,6 @@ vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { setCaddyAdminTransport, type CaddyAdminRequest } from '../../src/lib/caddy-admin';
 import { buildCaddyDocument } from '../../src/lib/caddy';
-import { generateCaddyBuildOverride } from '../../src/lib/caddy-build';
 import { CADDY_MODULES } from '../../src/lib/caddy-modules';
 import {
   saveCaddyBuildSettings,
@@ -59,7 +58,7 @@ import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { createL4ProxyHost } from '../../src/lib/models/l4-proxy-hosts';
 import * as schema from '../../src/lib/db/schema';
 
-const OVERRIDE_PATH = join(ctx.tmpDir, 'docker-compose.caddy-build.yml');
+const APPLIED_PATH = join(ctx.tmpDir, 'caddy-build.applied.json');
 const ALL_MODULE_PATHS = CADDY_MODULES.map((m) => m.modulePath);
 
 const GEOBLOCK: GeoBlockSettings = {
@@ -82,9 +81,12 @@ const GEOBLOCK: GeoBlockSettings = {
   redirect_url: '',
 };
 
-/** Pretend the running image was compiled with exactly these module paths. */
+/**
+ * Pretend a rebuild already completed with exactly these module paths — i.e.
+ * write the sidecar's post-build record, not the pre-build compose override.
+ */
 function setAppliedModules(specs: string[]) {
-  writeFileSync(OVERRIDE_PATH, generateCaddyBuildOverride(specs), 'utf-8');
+  writeFileSync(APPLIED_PATH, JSON.stringify({ modules: specs.join(' ') }), 'utf-8');
 }
 
 /** Select every catalog module except the named ids. */
@@ -156,7 +158,7 @@ function handlerNames(document: unknown): string[] {
 }
 
 beforeEach(async () => {
-  rmSync(OVERRIDE_PATH, { force: true });
+  rmSync(APPLIED_PATH, { force: true });
   installAdapter();
   await ctx.db.delete(schema.proxyHosts);
   await ctx.db.delete(schema.l4ProxyHosts);

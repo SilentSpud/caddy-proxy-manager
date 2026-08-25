@@ -9,7 +9,7 @@
  * built would take every unrelated host offline.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
 
@@ -64,19 +64,27 @@ import * as schema from '../../src/lib/db/schema';
 const OVERRIDE_PATH = join(ctx.tmpDir, 'docker-compose.caddy-build.yml');
 const TRIGGER_PATH = join(ctx.tmpDir, 'caddy-build.trigger');
 const STATUS_PATH = join(ctx.tmpDir, 'caddy-build.status');
+const APPLIED_PATH = join(ctx.tmpDir, 'caddy-build.applied.json');
 
 const L4 = 'github.com/mholt/caddy-l4';
 const CORAZA = 'github.com/corazawaf/coraza-caddy/v2';
 const BLOCKER = 'github.com/fuomag9/caddy-blocker-plugin';
 const CLOUDFLARE = 'github.com/caddy-dns/cloudflare';
 
-/** Pretend the running image was built with exactly these modules. */
+/**
+ * Pretend a rebuild already completed with exactly these modules.
+ *
+ * Writes the *applied record* — the file the sidecar produces only after a
+ * successful build — not the compose override. The override carries the desired
+ * list into a build that has not happened yet, so writing that here would be
+ * asserting the very confusion this separation exists to prevent.
+ */
 function setAppliedModules(specs: string[]) {
-  writeFileSync(OVERRIDE_PATH, generateCaddyBuildOverride(specs), 'utf-8');
+  writeFileSync(APPLIED_PATH, JSON.stringify({ modules: specs.join(' ') }), 'utf-8');
 }
 
 beforeEach(async () => {
-  for (const path of [OVERRIDE_PATH, TRIGGER_PATH, STATUS_PATH]) {
+  for (const path of [OVERRIDE_PATH, TRIGGER_PATH, STATUS_PATH, APPLIED_PATH]) {
     rmSync(path, { force: true });
   }
   mkdirSync(ctx.tmpDir, { recursive: true });
@@ -134,24 +142,59 @@ describe('selection resolution', () => {
 
 describe('applied module specs', () => {
   it('reports the full catalog when no rebuild has happened', () => {
-    // No override file means the container is still the shipped image, which is
-    // built with everything. Returning an empty list here would make config
+    // No applied record means the container is still the shipped image, which
+    // is built with everything. Returning an empty list here would make config
     // generation drop every plugin handler on a healthy default install.
     expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 
-  it('reads back exactly what the override file records', () => {
+  it('reads back exactly what the applied record holds', () => {
     setAppliedModules([L4, CORAZA]);
     expect(getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
   });
 
-  it('falls back to the catalog when the override file is unreadable', () => {
-    writeFileSync(OVERRIDE_PATH, 'not: a build override\n', 'utf-8');
+  it('ignores the compose override entirely', () => {
+    // The override is the build's *input*, written before anything is compiled.
+    // Reading it as the applied set is precisely the bug this split fixes, so a
+    // stray override must not be able to move the answer.
+    writeFileSync(OVERRIDE_PATH, generateCaddyBuildOverride([L4]), 'utf-8');
     expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 
   it('parses a whitespace-separated build arg', () => {
     expect(parseModuleSpecList(`  ${L4}   ${CORAZA}\n`)).toEqual([CORAZA, L4].sort());
+  });
+});
+
+describe("the sidecar's applied record", () => {
+  it('parses the exact JSON shape entrypoint.sh writes', () => {
+    // Verified by running the real script: this is byte-for-byte what
+    // write_applied_modules produces, including the two-space indent from its
+    // heredoc and the trailing newline. The app and the sidecar are separate
+    // programs in separate containers, so nothing else checks this seam.
+    const fromSidecar = [
+      '{',
+      '  "modules": "github.com/mholt/caddy-l4 github.com/o/x@v1.2.3",',
+      '  "appliedAt": "2026-08-25T00:33:17Z"',
+      '}',
+      '',
+    ].join('\n');
+    writeFileSync(APPLIED_PATH, fromSidecar, 'utf-8');
+
+    expect(getAppliedModuleSpecs()).toEqual(['github.com/mholt/caddy-l4', 'github.com/o/x@v1.2.3']);
+  });
+
+  it('falls back to the full catalog when the record is absent or unreadable', () => {
+    // Absent means no rebuild has happened, so the container is still the
+    // shipped image. Claiming an empty module set would drop every
+    // plugin-backed handler on a perfectly healthy install.
+    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
+
+    writeFileSync(APPLIED_PATH, '{"modules": ', 'utf-8');
+    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
+
+    writeFileSync(APPLIED_PATH, '{"modules": ["not", "a", "string"]}', 'utf-8');
+    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 });
 
@@ -314,13 +357,55 @@ describe('applyCaddyBuild', () => {
     expect(status.state).toBe('pending');
     expect(existsSync(OVERRIDE_PATH)).toBe(true);
     expect(existsSync(TRIGGER_PATH)).toBe(true);
+    // The override carries the desired list into the build.
+    expect(readFileSync(OVERRIDE_PATH, 'utf-8')).toContain('CADDY_MODULES:');
+  });
 
-    // The override must round-trip: what was written is what a later read of
-    // the applied set reports, otherwise the diff never settles.
-    expect(getAppliedModuleSpecs()).toEqual(
-      resolveModuleSpecs({ modules: { 'caddy-l4': false }, customModules: [] }),
-    );
+  it('does not claim the new modules are applied until the build succeeds', async () => {
+    // Requesting a rebuild changes nothing about the binary that is running.
+    // Treating the request as if it had already landed is how the applied set
+    // gets poisoned: config generation would emit handlers for a module the
+    // live binary does not have, and Caddy rejects such a document wholesale.
+    setAppliedModules([L4, CORAZA]);
+    await saveCaddyBuildSettings({
+      modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, true])),
+      customModules: [],
+    });
+
+    await applyCaddyBuild();
+
+    // Still the old binary's module set, and the diff still says a rebuild is
+    // outstanding — it only settles once the sidecar records success.
+    expect(getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
+    expect((await getCaddyBuildDiff()).needsRebuild).toBe(true);
+  });
+
+  it('leaves the applied set untouched when a build never completes', async () => {
+    // A failed xcaddy compile is routine. The override stays on disk either
+    // way, so if that file were the applied record the wrong answer would
+    // persist across restarts and every later config apply would be rejected.
+    setAppliedModules([L4]);
+    await saveCaddyBuildSettings({
+      modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, true])),
+      customModules: [],
+    });
+
+    await applyCaddyBuild(); // sidecar never reports success
+
+    expect(getAppliedModuleSpecs()).toEqual([L4]);
+    expect(isFeatureUsable(await getCaddyModuleAvailability(), 'waf')).toBe(false);
+  });
+
+  it('reports the new set once the sidecar records a successful build', async () => {
+    setAppliedModules([L4]);
+    await saveCaddyBuildSettings({ modules: {}, customModules: [] });
+    await applyCaddyBuild();
+
+    // What the sidecar does after build + up + healthy.
+    setAppliedModules(defaultModuleSpecs());
+
     expect((await getCaddyBuildDiff()).needsRebuild).toBe(false);
+    expect(isFeatureUsable(await getCaddyModuleAvailability(), 'waf')).toBe(true);
   });
 
   it('refuses to trigger a build with an invalid custom module', async () => {
