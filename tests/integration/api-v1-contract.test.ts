@@ -73,6 +73,7 @@ beforeEach(async () => {
     schema.l4ProxyHosts,
     schema.certificates,
     schema.caCertificates,
+    schema.settings,
     schema.users,
   ]) {
     await ctx.db.delete(table).catch(() => {});
@@ -183,6 +184,33 @@ describe('v1 API contract: camelCase round-trip', () => {
     expect(data.customReverseProxyJson).toBe('{"flush_interval": -1}');
     expect(data.geoblockMode).toBe('override');
     expect(data.geoblock.block_countries).toEqual(['CN']);
+  });
+
+  it('POST /api/v1/proxy-hosts returns a safe 400 for mTLS without trust material', async () => {
+    const response = await createProxyHost(mockRequest({
+      name: 'No Trust Host',
+      domains: ['no-trust.example.com'],
+      upstreams: ['10.0.0.1:8080'],
+      mtls: { enabled: true },
+    }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: expect.stringMatching(/no trusted client certificates, roles, or CA/i),
+    });
+  });
+
+  it('POST /api/v1/proxy-hosts returns a safe 400 for a wildcard without DNS credentials', async () => {
+    const response = await createProxyHost(mockRequest({
+      name: 'Wildcard Without DNS',
+      domains: ['*.example.com'],
+      upstreams: ['10.0.0.1:8080'],
+    }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: expect.stringMatching(/requires a DNS provider/i),
+    });
   });
 
   it('POST /api/v1/l4-proxy-hosts uses listenAddress (string) and matcherValue (array)', async () => {

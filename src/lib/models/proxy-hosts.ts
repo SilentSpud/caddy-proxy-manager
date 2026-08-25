@@ -5,6 +5,7 @@ import { proxyHosts } from "../db/schema";
 import { asc, desc, eq, count, like, or } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
+import { ApiValidationError } from "../api-errors";
 
 /**
  * Wildcard certificates (e.g. "*.example.com") can only be issued via the ACME
@@ -26,7 +27,7 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
   const dnsSettings = await getDnsProviderSettings();
   const hasDnsProvider = Boolean(dnsSettings?.default && dnsSettings.providers[dnsSettings.default]);
   if (!hasDnsProvider) {
-    throw new Error(
+    throw new ApiValidationError(
       `Wildcard domain "${wildcardDomains[0]}" requires a DNS provider for the ACME DNS-01 challenge. ` +
         `Configure a default DNS provider in settings, or assign a certificate to this host.`
     );
@@ -367,7 +368,7 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
   // the config still references a valid role — which is why Caddy config
   // generation also fails closed for the zero-resolved-trust case.
   if (!normalized.trusted_client_cert_ids && !normalized.trusted_role_ids && !normalized.ca_certificate_ids) {
-    throw new Error(
+    throw new ApiValidationError(
       "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS."
     );
   }

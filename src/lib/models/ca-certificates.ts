@@ -3,6 +3,7 @@ import { logAuditEvent } from "../audit";
 import { applyCaddyConfig } from "../caddy";
 import { caCertificates, issuedClientCertificates, mtlsCertificateRoles, proxyHosts } from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
+import { ApiConflictError } from "../api-errors";
 
 function tryParseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -168,7 +169,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
 
   if (referencing.length > 0) {
     const names = referencing.map((h) => h.name).join(", ");
-    throw new Error(`CA certificate is in use by proxy host(s): ${names}`);
+    throw new ApiConflictError(`CA certificate is in use by proxy host(s): ${names}`);
   }
 
   // Cascade-delete the CA's issued client certificates and their role

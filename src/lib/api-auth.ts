@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth, checkSameOrigin } from "./auth";
 import { validateToken } from "./models/api-tokens";
 import { randomUUID } from "node:crypto";
+import { ApiClientError } from "./api-errors";
 
 export class ApiAuthError extends Error {
   status: number;
@@ -97,6 +98,9 @@ export async function requireApiAdmin(request: NextRequest): Promise<ApiAuthResu
  */
 export function apiErrorResponse(error: unknown): NextResponse {
   if (error instanceof ApiAuthError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  if (error instanceof ApiClientError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   if (error instanceof NotFoundError) {

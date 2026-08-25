@@ -12,6 +12,7 @@ vi.mock('@/src/lib/auth', () => ({
 }));
 
 import { authenticateApiRequest, requireApiUser, requireApiAdmin, ApiAuthError, NotFoundError, apiErrorResponse } from '@/src/lib/api-auth';
+import { ApiClientError, ApiConflictError, ApiValidationError } from '@/src/lib/api-errors';
 import { validateToken } from '@/src/lib/models/api-tokens';
 import { auth, checkSameOrigin } from '@/src/lib/auth';
 import { NextResponse } from 'next/server';
@@ -194,6 +195,21 @@ describe('apiErrorResponse', () => {
     const response = apiErrorResponse(new NotFoundError('Token not found'));
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'Token not found' });
+  });
+
+  it.each([
+    [new ApiValidationError('Safe validation detail'), 400],
+    [new ApiConflictError('Safe conflict detail'), 409],
+  ])('returns explicitly client-safe errors without an error ID', async (error, status) => {
+    const response = apiErrorResponse(error);
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error: error.message });
+  });
+
+  it('prevents client-safe errors from being used to expose 5xx failures', () => {
+    expect(() => new ApiClientError('must stay private', 500)).toThrow(
+      /status must be a 4xx status code/
+    );
   });
 
   it('handles generic Error', async () => {

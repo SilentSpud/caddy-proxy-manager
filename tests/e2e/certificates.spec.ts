@@ -186,6 +186,9 @@ test.describe('Certificates', () => {
     const domain = `import-ui-${Date.now()}.example`;
     const certName = `UI Import ${domain}`;
     const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate(domain, [domain]);
+    // HTML textareas normalize CRLF input to LF. Compare against the browser's
+    // canonical value while still checking that every PEM line survives.
+    const normalizedPrivateKeyPem = privateKeyPem.replace(/\r\n?/g, '\n');
 
     // Sanity-check the fixture: PEM blocks must be multi-line for this test
     // to meaningfully exercise newline preservation.
@@ -216,7 +219,7 @@ test.describe('Certificates', () => {
       await keyField.click();
       await keyField.fill(privateKeyPem);
       expect(await keyField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
-      expect(await keyField.inputValue()).toBe(privateKeyPem);
+      expect(await keyField.inputValue()).toBe(normalizedPrivateKeyPem);
 
       await drawer.getByRole('button', { name: /import certificate|save changes/i }).click();
       await expect(drawer).not.toBeVisible({ timeout: 10_000 });
@@ -231,8 +234,8 @@ test.describe('Certificates', () => {
       expect(created).toBeTruthy();
       createdId = created!.id;
       expect(created!.hasPrivateKey).toBe(true);
-      expect(listBody).not.toContain(privateKeyPem);
-      expect(listBody).not.toContain('privateKeyPem');
+      expect(created).not.toHaveProperty('privateKeyPem');
+      expect(listBody).not.toContain(normalizedPrivateKeyPem.split('\n')[1]);
     } finally {
       if (createdId !== null) {
         await page.request.delete(`${API}/certificates/${createdId}`, { headers }).catch(() => undefined);

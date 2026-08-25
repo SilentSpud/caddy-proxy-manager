@@ -5,9 +5,8 @@
  * on a master instance (web-master:3002) is pushed over HTTP to a slave
  * (web-slave:3003) and surfaces as the slave's effective ACME setting.
  *
- * Both instances point at an unreachable Caddy, so they never touch the shared
- * Caddy stack — the slave persists synced settings before its own (failing)
- * Caddy apply, which is exactly what we assert.
+ * Both instances have isolated Caddy sidecars, so they exercise the same atomic
+ * settings-apply path as production without touching the shared E2E Caddy.
  *
  * Guards against the regression where a new setting group is added but not wired
  * into instance-sync's SyncSettings allowlist (so it silently never syncs).
@@ -67,9 +66,9 @@ test.describe.serial('Instance sync — ACME settings (master → slave)', () =>
     const sync = await master.request.post(`${MASTER}/api/v1/instances/sync`, { headers: { Origin: MASTER } });
     expect(sync.status()).toBe(200);
 
+    expect(await sync.json()).toMatchObject({ total: 1, success: 1, failed: 0 });
+
     // 3. The slave's effective ACME setting now reflects the master's value.
-    //    (The push itself reports the slave's Caddy-apply failure — the slave
-    //    points at an unreachable Caddy — but synced settings persist regardless.)
     await expect.poll(async () => {
       const res = await slave.request.get(`${SLAVE}/api/v1/settings/acme`);
       if (res.status() !== 200) return null;

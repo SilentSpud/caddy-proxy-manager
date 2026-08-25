@@ -119,7 +119,7 @@ test.describe('mTLS — CA delete guard (in-use protection)', () => {
     try {
       // 3. Deleting the CA must be blocked, naming the offending host.
       const blocked = await page.request.delete(`${API_CA}/${caRow.id}`, { headers: { Origin: origin } });
-      expect(blocked.ok()).toBeFalsy();
+      expect(blocked.status()).toBe(409);
       const blockedBody = await blocked.json() as { error?: string };
       expect(blockedBody.error ?? '').toMatch(/in use by proxy host/i);
       expect(blockedBody.error ?? '').toContain('E2E Guard Host');

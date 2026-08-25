@@ -188,7 +188,7 @@ test.describe('mTLS — role-based trust fails closed on revocation', () => {
       },
     });
 
-    expect(resp.ok(), 'enabling mTLS with no trust material must be rejected').toBeFalsy();
+    expect(resp.status(), 'enabling mTLS with no trust material must be rejected as invalid input').toBe(400);
     const body = await resp.json().catch(() => ({}));
     expect(JSON.stringify(body)).toMatch(/no trusted client certificates, roles, or CA/i);
   });

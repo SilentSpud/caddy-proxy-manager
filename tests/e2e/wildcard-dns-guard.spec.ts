@@ -30,7 +30,7 @@ test.describe('Wildcard host DNS-provider guard', () => {
         headers,
         data: { name: 'Wildcard Guard', domains: ['*.e2e-wildcard.test'], upstreams: ['localhost:9999'] },
       });
-      expect(rejected.ok()).toBeFalsy();
+      expect(rejected.status()).toBe(400);
       expect((await rejected.json()).error).toMatch(/DNS provider/i);
 
       // Control: an exact-domain host is unaffected by the guard.
