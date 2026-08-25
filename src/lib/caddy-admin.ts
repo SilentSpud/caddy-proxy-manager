@@ -24,6 +24,12 @@ export type CaddyAdminRequest = {
   body?: string;
   /** Abort the request after this many ms. Omitted means no client-side timeout. */
   timeoutMs?: number;
+  /**
+   * Content-Type for the body. Defaults to application/json, which is right for
+   * every config endpoint; /adapt is the exception — it needs text/caddyfile to
+   * know which adapter to run.
+   */
+  contentType?: string;
 };
 
 export type CaddyAdminResponse = {
@@ -60,6 +66,7 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   method,
   body,
   timeoutMs,
+  contentType,
 }) => {
   // Backstop for the guard installed by tests/setup.vitest.ts: if a test swaps
   // the real transport back in, fail loudly instead of quietly opening a socket
@@ -83,7 +90,10 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
         method,
         headers: {
           ...(body
-            ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+            ? {
+                "Content-Type": contentType ?? "application/json",
+                "Content-Length": Buffer.byteLength(body),
+              }
             : {}),
         },
       },

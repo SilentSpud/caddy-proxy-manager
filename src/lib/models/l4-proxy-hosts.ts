@@ -481,6 +481,19 @@ export async function countL4ProxyHosts(search?: string): Promise<number> {
   return row?.value ?? 0;
 }
 
+/**
+ * Enabled hosts only — used to refuse switching the caddy-l4 module off while
+ * something is still listening. Disabled hosts emit no config, so they do not
+ * block the change.
+ */
+export async function countEnabledL4ProxyHosts(): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(l4ProxyHosts)
+    .where(eq(l4ProxyHosts.enabled, true));
+  return row?.value ?? 0;
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
 const L4_SORT_COLUMNS: Record<string, any> = {
   name: l4ProxyHosts.name,

@@ -2,6 +2,7 @@ import db, { nowIso } from "./db";
 import { settings } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { sanitizeErrorPageRules, type ErrorPageRule } from "./models/proxy-hosts";
+import type { CaddyCustomModule } from "./caddy-modules";
 
 export type SettingValue<T> = T | null;
 
@@ -345,4 +346,29 @@ export async function getErrorPagesSettings(): Promise<ErrorPagesSettings | null
 
 export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<void> {
   await setSetting("error_pages", { rules: sanitizeErrorPageRules(s?.rules) });
+}
+
+// ─── Caddy build ─────────────────────────────────────────────────────────────
+
+/**
+ * Which Caddy plugins this instance's caddy image is built with.
+ *
+ * Deliberately read with getSetting rather than getEffectiveSetting: the module
+ * list describes a binary that lives on *this* host and is rebuilt by this
+ * host's sidecar. Inheriting a master's list would tell a slave its image
+ * contains plugins it never compiled, and the config it generates would then be
+ * rejected wholesale by its own Caddy.
+ */
+export type CaddyBuildSettings = {
+  /** Built-in module id -> enabled. Absent ids fall back to enabled. */
+  modules: Record<string, boolean>;
+  customModules: CaddyCustomModule[];
+};
+
+export async function getCaddyBuildSettings(): Promise<CaddyBuildSettings | null> {
+  return await getSetting<CaddyBuildSettings>("caddy_build");
+}
+
+export async function saveCaddyBuildSettings(s: CaddyBuildSettings): Promise<void> {
+  await setSetting("caddy_build", s);
 }

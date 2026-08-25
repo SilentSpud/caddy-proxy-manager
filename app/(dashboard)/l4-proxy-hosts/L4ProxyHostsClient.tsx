@@ -22,6 +22,8 @@ import {
   DeleteL4HostDialog,
 } from "@/components/l4-proxy-hosts/L4HostDialogs";
 import { L4PortsApplyBanner } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
+import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
+import { Banner } from "@astryxdesign/core/Banner";
 
 type Props = {
   hosts: L4ProxyHost[];
@@ -105,6 +107,9 @@ export default function L4ProxyHostsClient({
   const [deleteHost, setDeleteHost] = useState<L4ProxyHost | null>(null);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [bannerRefresh, setBannerRefresh] = useState(0);
+  // The whole layer4 app comes from caddy-l4; with it off, nothing on this page
+  // reaches the running proxy.
+  const l4DisabledReason = useDisabledReason("l4");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -238,12 +243,27 @@ export default function L4ProxyHostsClient({
 
   return (
     <VStack gap={6}>
-      <L4PortsApplyBanner refreshSignal={bannerRefresh} />
+      {/* Existing hosts stay listed and editable while the module is off — they
+          are simply not emitted into the config. Hiding them would make hosts
+          that still exist look deleted. */}
+      {l4DisabledReason && (
+        <Banner
+          status="warning"
+          title="Layer 4 proxying is switched off"
+          description={`${l4DisabledReason} Hosts below are saved but are not being served.`}
+        />
+      )}
+
+      {!l4DisabledReason && <L4PortsApplyBanner refreshSignal={bannerRefresh} />}
 
       <PageHeader
         title="L4 Proxy Hosts"
         description="Define TCP/UDP stream proxies powered by caddy-l4. Port mappings are applied automatically."
-        action={{ label: "Create L4 Host", onClick: () => setCreateOpen(true) }}
+        action={{
+          label: "Create L4 Host",
+          onClick: () => setCreateOpen(true),
+          isDisabled: Boolean(l4DisabledReason),
+        }}
       />
 
       <HStack gap={2} vAlign="center">

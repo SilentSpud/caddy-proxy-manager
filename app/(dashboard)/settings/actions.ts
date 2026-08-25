@@ -30,6 +30,7 @@ import {
   saveErrorPagesSettings,
   saveTrustedProxiesSettings,
   saveAvatarSettings,
+  saveCaddyBuildSettings,
 } from "@/src/lib/settings";
 import {
   listProxyHosts,
@@ -37,6 +38,16 @@ import {
   sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
+import { CADDY_MODULES, type CaddyCustomModule } from "@/src/lib/caddy-modules";
+import {
+  applyCaddyBuild,
+  getCaddyBuildDiff,
+  sanitizeCaddyBuildSettings,
+} from "@/src/lib/caddy-build";
+import {
+  describeCaddyfileSnippetWarning,
+  describeModuleConflicts,
+} from "@/src/lib/caddy-build-conflicts";
 import type {
   CloudflareSettings,
   DnsProviderSettings,
@@ -1407,4 +1418,107 @@ export async function updateWafSettingsAction(
       message: error instanceof Error ? error.message : "Failed to save WAF settings",
     };
   }
+}
+
+// ─── Caddy Build ─────────────────────────────────────────────────────────────
+
+/**
+ * Save the module selection.
+ *
+ * Saving alone does not change the running Caddy — the plugins are compiled in,
+ * so the image has to be rebuilt. It does immediately change what the config
+ * builder is willing to emit, though: applyCaddyConfig runs here so that
+ * switching a module off stops producing handlers for it right away, rather
+ * than leaving a config that references a plugin about to disappear.
+ */
+export async function updateCaddyBuildSettingsAction(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const modules: Record<string, boolean> = {};
+    for (const module of CADDY_MODULES) {
+      // A checkbox that is off submits nothing, so every known module is read
+      // explicitly rather than inferred from which keys are present.
+      modules[module.id] = formData.get(`module:${module.id}`) === "on";
+    }
+
+    const customModules = parseCustomModules(formData.get("customModulesJson"));
+    const settings = sanitizeCaddyBuildSettings({ modules, customModules });
+
+    // Refuse a selection that would strip a module something is actively using.
+    // The rebuild would otherwise succeed and the feature would just stop, with
+    // the settings still showing it as enabled.
+    const conflict = await describeModuleConflicts(settings);
+    if (conflict) {
+      return { success: false, message: conflict };
+    }
+
+    await saveCaddyBuildSettings(settings);
+
+    const diff = await getCaddyBuildDiff();
+    const rebuildNote = diff.needsRebuild
+      ? " Rebuild Caddy to apply the change to the running container."
+      : "";
+    // Advisory, not a refusal — see describeCaddyfileSnippetWarning.
+    const snippetWarning = await describeCaddyfileSnippetWarning(settings);
+    const snippetNote = snippetWarning ? ` ${snippetWarning}` : "";
+
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return {
+        success: true,
+        message: `Caddy module selection saved.${rebuildNote}${snippetNote}`,
+      };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      return {
+        success: true,
+        message: `Selection saved, but could not apply to Caddy: ${errorMsg}`,
+      };
+    }
+  } catch (error) {
+    console.error("Failed to save Caddy build settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save Caddy module selection",
+    };
+  }
+}
+
+/** Write the compose override and signal the sidecar to rebuild. */
+export async function rebuildCaddyAction(
+  _prevState: ActionResult | null,
+  _formData: FormData,
+): Promise<ActionResult> {
+  void _formData;
+  try {
+    await requireAdmin();
+    const status = await applyCaddyBuild();
+    revalidatePath("/settings");
+    return { success: true, message: status.message ?? "Rebuild triggered." };
+  } catch (error) {
+    console.error("Failed to trigger a Caddy rebuild:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to trigger a Caddy rebuild",
+    };
+  }
+}
+
+function parseCustomModules(raw: FormDataEntryValue | null): CaddyCustomModule[] {
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Custom modules could not be read. Try re-entering them.");
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed as CaddyCustomModule[];
 }

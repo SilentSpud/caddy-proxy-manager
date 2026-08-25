@@ -42,6 +42,28 @@ Our CI/CD pipeline implements multiple security layers:
 - Minimal attack surface
 - Non-root user execution where possible
 
+### Caddy Module Builds
+
+**Settings → Caddy Build** lets an admin choose which plugins Caddy is compiled
+with, and add their own. Two consequences are worth stating plainly:
+
+- **Custom modules are arbitrary code in the proxy.** A module added there is
+  fetched from its Go module path, compiled into the Caddy binary, and runs with
+  the proxy's privileges on every request. Treat adding one exactly as you would
+  treat merging code into this repository. Module paths are validated against a
+  strict allowlist before they reach the build (see `validateCustomModule`), so
+  a path cannot inject shell into the Dockerfile — but a *valid* path to a
+  malicious repository is still malicious.
+
+- **Rebuilding widens the Docker API surface.** The `docker-socket-proxy`
+  service ships with `BUILD: 1` so the sidecar can run `docker compose build
+  caddy`. The socket proxy still denies `EXEC`, `SWARM`, `AUTH`, and `SECRETS`,
+  and only the sidecar is attached to that isolated network — but image builds
+  are a meaningful capability. Set `BUILD: 0` to opt out; the rest of the
+  application is unaffected and images can be built by hand instead.
+
+Only admins can reach either surface.
+
 ### Dependency Management
 
 - Automated dependency updates via Dependabot

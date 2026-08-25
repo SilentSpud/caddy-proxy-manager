@@ -25,6 +25,7 @@ import type { GeoBlockMode } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { COUNTRIES, flagEmoji } from "./countries";
 import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
+import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 
 // ─── GeoIpStatus ─────────────────────────────────────────────────────────────
 
@@ -371,6 +372,10 @@ const BLOCK_ALL_CIDR = "0.0.0.0/0";
 
 export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBlockFieldsProps) {
   const rawInitial = initialValues?.geoblock ?? null;
+  // Geoblocking is entirely the caddy-blocker plugin. With it switched off the
+  // rules would be recorded and then never emitted, so the switch is locked
+  // rather than left to look functional.
+  const moduleDisabledReason = useDisabledReason("geoblock");
   const [enabled, setEnabled] = useState(rawInitial?.enabled ?? false);
   const [mode, setMode] = useState<GeoBlockMode>(initialValues?.geoblock_mode ?? "merge");
   const [resetKey, setResetKey] = useState(0);
@@ -431,15 +436,31 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               </Text>
             </VStack>
           </HStack>
-          <Switch
-            label="Enable geo blocking"
-            isLabelHidden
-            htmlName="geoblockEnabled"
-            value={enabled}
-            onChange={setEnabled}
-          />
+          {/* A disabled control emits no pointer events of its own, so
+              ModuleGated wraps it in the tooltip that explains why. */}
+          <ModuleGated feature="geoblock">
+            <Switch
+              label="Enable geo blocking"
+              isLabelHidden
+              htmlName="geoblockEnabled"
+              value={enabled}
+              onChange={setEnabled}
+              isDisabled={Boolean(moduleDisabledReason)}
+            />
+          </ModuleGated>
         </HStack>
 
+        {moduleDisabledReason && (
+          <Text type="body" size="xsm" color="secondary">
+            {moduleDisabledReason}
+          </Text>
+        )}
+
+        {/* Deliberately NOT gated on moduleDisabledReason. The hidden
+            `geoblockPresent` marker above always submits, and the parser treats
+            a missing rule input as an empty list — so unmounting these while the
+            module is off would silently erase every stored rule on the next
+            save of an unrelated field. The Switch above is what stays locked. */}
         {enabled && (
           <VStack gap={4}>
             {showModeSelector && (

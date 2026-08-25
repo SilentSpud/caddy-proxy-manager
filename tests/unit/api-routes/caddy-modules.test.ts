@@ -1,0 +1,117 @@
+/**
+ * PUT /api/v1/caddy/modules must be held to the same rules as the Settings UI.
+ *
+ * The REST API is a second write path into the module selection, and a guard
+ * that only exists in a server action is not a guard — it is a suggestion. Two
+ * things in particular have to hold here, because getting either wrong takes
+ * the proxy down rather than merely misconfiguring it:
+ *
+ *   - a selection that disables a module something still uses is refused, and
+ *   - a selection that is accepted regenerates the Caddy config, so the stored
+ *     config stops naming a module that is on its way out of the binary.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('@/src/lib/settings', () => ({
+  getCaddyBuildSettings: vi.fn().mockResolvedValue(null),
+  saveCaddyBuildSettings: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/src/lib/caddy-build', () => ({
+  sanitizeCaddyBuildSettings: vi.fn((input: unknown) => input),
+  getCaddyBuildDiff: vi.fn().mockResolvedValue({
+    appliedSpecs: [],
+    desiredSpecs: [],
+    added: [],
+    removed: [],
+    needsRebuild: false,
+  }),
+}));
+
+vi.mock('@/src/lib/caddy-build-conflicts', () => ({
+  describeModuleConflicts: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/src/lib/caddy', () => ({
+  applyCaddyConfig: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/src/lib/api-auth', () => {
+  const ApiAuthError = class extends Error {
+    status: number;
+    constructor(msg: string, status: number) {
+      super(msg);
+      this.status = status;
+      this.name = 'ApiAuthError';
+    }
+  };
+  return {
+    requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
+    apiErrorResponse: vi.fn((error: unknown) => {
+      const { NextResponse: NR } = require('next/server');
+      if (error instanceof ApiAuthError) {
+        return NR.json({ error: error.message }, { status: error.status });
+      }
+      return NR.json({ error: (error as Error)?.message ?? 'error' }, { status: 500 });
+    }),
+    ApiAuthError,
+  };
+});
+
+import { PUT } from '@/app/api/v1/caddy/modules/route';
+import { describeModuleConflicts } from '@/src/lib/caddy-build-conflicts';
+import { saveCaddyBuildSettings } from '@/src/lib/settings';
+import { applyCaddyConfig } from '@/src/lib/caddy';
+
+const mockConflicts = vi.mocked(describeModuleConflicts);
+const mockSave = vi.mocked(saveCaddyBuildSettings);
+const mockApply = vi.mocked(applyCaddyConfig);
+
+function createMockRequest(body: unknown): any {
+  return {
+    headers: { get: () => null },
+    method: 'PUT',
+    nextUrl: { pathname: '/api/v1/caddy/modules', searchParams: new URLSearchParams() },
+    json: async () => body,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockConflicts.mockResolvedValue(null);
+});
+
+describe('PUT /api/v1/caddy/modules', () => {
+  it('saves the selection when nothing conflicts', async () => {
+    const response = await PUT(createMockRequest({ modules: { 'caddy-l4': true } }));
+
+    expect(response.status).toBe(200);
+    expect(mockSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a selection that disables a module still in use', async () => {
+    mockConflicts.mockResolvedValue(
+      'Cannot disable those modules yet: 3 enabled L4 proxy hosts need the Layer 4 Proxy module.',
+    );
+
+    const response = await PUT(createMockRequest({ modules: { 'caddy-l4': false } }));
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toMatch(/Layer 4 Proxy module/);
+    // Nothing is written — the refusal has to be total, not cosmetic.
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(mockApply).not.toHaveBeenCalled();
+  });
+
+  it('regenerates the Caddy config after an accepted change', async () => {
+    // Otherwise the stored config keeps naming a module the next rebuild will
+    // remove, and the recreated container resumes into a config it cannot load.
+    await PUT(createMockRequest({ modules: { 'coraza-waf': false } }));
+
+    expect(mockApply).toHaveBeenCalledTimes(1);
+    expect(mockSave.mock.invocationCallOrder[0]).toBeLessThan(
+      mockApply.mock.invocationCallOrder[0],
+    );
+  });
+});

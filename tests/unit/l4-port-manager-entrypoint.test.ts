@@ -1,15 +1,33 @@
 /**
- * Unit tests for the L4 port manager sidecar entrypoint script.
+ * Invariants of the compose-manager sidecar's entrypoint script.
  *
- * Tests critical invariants of the shell script:
- * - Always applies the override on startup (not just on trigger change)
- * - Only recreates the caddy service (never other services)
- * - Uses --no-deps to prevent dependency cascades
- * - Auto-detects compose project name from caddy container labels
- * - Pre-loads LAST_TRIGGER to avoid double-applying on startup
- * - Writes status files in valid JSON
- * - Never includes test override files in production
- * - Supports both named-volume and bind-mount deployments (COMPOSE_HOST_DIR)
+ * The script runs in its own container, driven by files on a shared volume, so
+ * nothing else in the test suite can reach it — these assertions read the
+ * shipped source directly. That is a weaker check than executing it, and it is
+ * chosen deliberately: the alternative is a Docker-in-Docker harness for a
+ * 400-line shell script. What it does buy is a guard on the properties whose
+ * violation is expensive and silent.
+ *
+ * Port management:
+ * - Applies the override on startup, not only on trigger change
+ * - Only ever touches the caddy service, with --no-deps and --force-recreate
+ * - Auto-detects the compose project from the caddy container's labels
+ * - Pre-loads LAST_TRIGGER so startup does not double-apply
+ * - Supports named-volume and bind-mount deployments (COMPOSE_HOST_DIR)
+ * - Never pulls images, and never drags the test override into production
+ *
+ * Image rebuilds (module selection):
+ * - Build and port overrides are always passed together, so neither undoes the other
+ * - The build is bounded by a timeout and cannot wedge the sidecar
+ * - A failed build leaves the running container alone
+ * - The applied-module record is written only after the build is healthy —
+ *   writing it earlier would let the app emit config for plugins the running
+ *   binary does not have, which Caddy rejects wholesale
+ * - A stale "building" status from a killed sidecar is cleared on startup
+ *
+ * Status reporting:
+ * - Status files are valid JSON, with control characters stripped
+ * - Exit codes are captured without `set -e` killing the failure branch
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -81,7 +99,14 @@ describe('L4 port manager entrypoint.sh', () => {
     // Without -p, compose would infer the project from the mount directory name
     // ("/compose") rather than the actual running stack name, causing it to
     // create new containers instead of recreating the existing ones.
-    expect(script).toMatch(/COMPOSE_ARGS=.*-p \$COMPOSE_PROJECT/);
+    expect(script).toMatch(/args="-p \$COMPOSE_PROJECT"/);
+    // Every compose invocation must take its flags from the shared builder,
+    // so the build path cannot drift away from the port-apply path.
+    for (const line of lines.filter(
+      (l) => l.includes('docker compose') && !l.trim().startsWith('#'),
+    )) {
+      expect(line).toContain('$COMPOSE_ARGS');
+    }
   });
 
   it('auto-detects project name from caddy container labels', () => {
@@ -93,15 +118,19 @@ describe('L4 port manager entrypoint.sh', () => {
   it('compares trigger content to avoid redundant restarts', () => {
     expect(script).toContain('LAST_TRIGGER');
     expect(script).toContain('CURRENT_TRIGGER');
-    expect(script).toContain('"$CURRENT_TRIGGER" = "$LAST_TRIGGER"');
+    expect(script).toContain('"$CURRENT_TRIGGER" != "$LAST_TRIGGER"');
+    expect(script).toContain('"$CURRENT_BUILD_TRIGGER" != "$LAST_BUILD_TRIGGER"');
   });
 
-  it('uses --pull never to avoid registry pulls (only recreates)', () => {
+  it('uses --pull never on every compose up (recreate, never pull)', () => {
     const composeUpLines = lines.filter(
-      (line) => line.includes('docker compose') && line.includes('up'),
+      (line) => line.includes('docker compose') && line.includes(' up '),
     );
+    expect(composeUpLines.length).toBeGreaterThan(0);
     for (const line of composeUpLines) {
       expect(line).toContain('--pull never');
+      // Building is a separate, explicitly triggered step — `up --build` would
+      // turn every port change into a multi-minute Caddy recompile.
       expect(line).not.toContain('--build');
     }
   });
@@ -134,6 +163,113 @@ describe('L4 port manager entrypoint.sh', () => {
     for (const pattern of dangerousPatterns) {
       expect(script).not.toMatch(pattern);
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Caddy image rebuild (module selection)
+  // ---------------------------------------------------------------------------
+
+  it('watches a separate build trigger and only builds the caddy service', () => {
+    expect(script).toContain('caddy-build.trigger');
+    const buildLines = lines.filter((l) => l.includes('docker compose') && l.includes(' build '));
+    expect(buildLines.length).toBe(1);
+    expect(buildLines[0]).toContain('caddy');
+    expect(buildLines[0]).not.toMatch(/\bweb\b/);
+  });
+
+  it('includes the build override in compose args so ports and modules coexist', () => {
+    // A rebuild that dropped the L4 port override would unbind every L4
+    // listener; a port apply that dropped the build override would rebuild
+    // with the default module set. Both files must always be passed together.
+    expect(script).toContain('-f $BUILD_OVERRIDE_FILE');
+    expect(script).toContain('-f $OVERRIDE_FILE');
+  });
+
+  it('bounds the build with a timeout so a hung compile cannot wedge the sidecar', () => {
+    expect(script).toContain('CADDY_BUILD_TIMEOUT');
+    expect(script).toMatch(/timeout "\$CADDY_BUILD_TIMEOUT" docker compose/);
+  });
+
+  it('leaves the running container alone when the build fails', () => {
+    // xcaddy compiles from source against upstream module repos, so a build
+    // failure is routine (a bad custom module path, an upstream tag pulled).
+    // The recreate must be gated on the build having succeeded.
+    const buildIdx = lines.findIndex((l) => l.includes('docker compose') && l.includes(' build '));
+    const returnIdx = lines.findIndex((l, i) => i > buildIdx && l.trim() === 'return');
+    const upIdx = lines.findIndex(
+      (l, i) => i > buildIdx && l.includes('docker compose') && l.includes(' up '),
+    );
+    expect(buildIdx).toBeGreaterThan(-1);
+    expect(returnIdx).toBeGreaterThan(buildIdx);
+    expect(upIdx).toBeGreaterThan(returnIdx);
+  });
+
+  it('resolves the compose project in the caller, not inside the subshell', () => {
+    // build_compose_args is invoked as $(...), so an assignment inside it is
+    // discarded on subshell exit and the "Using compose project" log line would
+    // print an empty name.
+    expect(script).not.toMatch(/build_compose_args\(\) \{[\s\S]{0,200}COMPOSE_PROJECT=/);
+    const callers = lines.filter((l) => l.includes('COMPOSE_ARGS="$(build_compose_args)"'));
+    expect(callers.length).toBeGreaterThanOrEqual(2);
+    for (const [i, line] of lines.entries()) {
+      if (!line.includes('COMPOSE_ARGS="$(build_compose_args)"')) continue;
+      expect(lines[i - 1]).toContain('COMPOSE_PROJECT="$(detect_project_name)"');
+    }
+  });
+
+  it('strips control characters before embedding output in status JSON', () => {
+    // RFC 8259 forbids raw U+0000..U+001F inside a JSON string, and compose
+    // output carries CR/ESC routinely. One of them makes the status file
+    // unparseable, which the UI shows as no progress at all.
+    expect(script).toContain("tr -d '\\000-\\037'");
+  });
+
+  it('captures compose exit codes without tripping set -e', () => {
+    // The script runs under `set -e`, where a plain `VAR=$(failing-cmd)` exits
+    // immediately — so every failure branch that writes a "failed" status would
+    // be unreachable. Each capture must be an AND-OR list instead.
+    const captures = lines.filter((l) => l.includes('docker compose') && l.includes('=$('));
+    expect(captures.length).toBeGreaterThanOrEqual(3);
+    for (const line of captures) {
+      expect(line).toMatch(/&& [A-Z_]+=0 \|\| [A-Z_]+=\$\?/);
+    }
+  });
+
+  it('records the applied module set only after the build is healthy', () => {
+    // The web app treats this file as the authority on what the binary
+    // contains. Writing it any earlier — when the override is generated, say —
+    // would claim a module is available while the old binary is still serving.
+    const writeIdx = lines.findIndex((l) => l.trim() === 'write_applied_modules');
+    const healthyIdx = lines.findIndex(
+      (l) => l.includes('HEALTH" = "healthy"') && l.includes('if'),
+    );
+    expect(writeIdx).toBeGreaterThan(-1);
+    expect(healthyIdx).toBeGreaterThan(-1);
+    expect(writeIdx).toBeGreaterThan(healthyIdx);
+    // And nothing writes it on any failure path.
+    expect(script.split('write_applied_modules').length - 1).toBe(2); // definition + one call
+  });
+
+  it('clears a stale in-progress build status on startup', () => {
+    // A sidecar killed mid-build leaves state=building on disk, and the trigger
+    // is pre-loaded as already-handled — so nothing would ever move it on, and
+    // the UI would sit on a disabled Rebuild button forever.
+    expect(script).toMatch(/grep -q .*building.*pending.*BUILD_STATUS_FILE/);
+    expect(script).toContain('Startup: cleared a stale in-progress build status.');
+  });
+
+  it('writes build status separately from port status', () => {
+    expect(script).toContain('caddy-build.status');
+    const buildStatusWrites = lines.filter((l) => l.trim().startsWith('write_build_status'));
+    // building, timeout/failure, up failure, healthy, unhealthy, startup idle
+    expect(buildStatusWrites.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('escapes compose output before embedding it in status JSON', () => {
+    // Compose output routinely contains quotes; writing it raw produced status
+    // files the web app could not parse, which the operator saw as silence.
+    expect(script).toContain('json_escape');
+    expect(script).toMatch(/message="\$\(json_escape "\$3"\)"/);
   });
 
   // ---------------------------------------------------------------------------

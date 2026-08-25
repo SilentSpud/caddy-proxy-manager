@@ -638,6 +638,7 @@ export async function createProxyHostAction(
         enabled: parseCheckbox(formData.get("enabled")),
         customPreHandlersJson: parseOptionalText(formData.get("customPreHandlersJson")),
         customReverseProxyJson: parseOptionalText(formData.get("customReverseProxyJson")),
+        customCaddyfile: parseOptionalText(formData.get("customCaddyfile")),
         authentik: parseAuthentikConfig(formData),
         cpmForwardAuth: parseCpmForwardAuthConfig(formData),
         loadBalancer: parseLoadBalancerConfig(formData),
@@ -741,6 +742,9 @@ export async function updateProxyHostAction(
           : undefined,
         customReverseProxyJson: formData.has("customReverseProxyJson")
           ? parseOptionalText(formData.get("customReverseProxyJson"))
+          : undefined,
+        customCaddyfile: formData.has("customCaddyfile")
+          ? parseOptionalText(formData.get("customCaddyfile"))
           : undefined,
         authentik: parseAuthentikConfig(formData),
         cpmForwardAuth: parseCpmForwardAuthConfig(formData),

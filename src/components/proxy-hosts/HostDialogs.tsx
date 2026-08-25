@@ -35,6 +35,7 @@ import { PathAllowsFields } from "./PathAllowsFields";
 import { PathBlocksFields } from "./PathBlocksFields";
 import { PathRewritesFields } from "./PathRewritesFields";
 import { ErrorPagesFields } from "./ErrorPagesFields";
+import { AdvancedConfigFields } from "./AdvancedConfigFields";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
@@ -96,8 +97,6 @@ export function CreateHostDialog({
     String(initialData?.certificateId ?? NONE_VALUE),
   );
   const [accessListId, setAccessListId] = useState(String(initialData?.accessListId ?? NONE_VALUE));
-  const [preHandlers, setPreHandlers] = useState(initialData?.customPreHandlersJson ?? "");
-  const [reverseProxy, setReverseProxy] = useState(initialData?.customReverseProxyJson ?? "");
 
   useEffect(() => {
     if (state.status === "success") {
@@ -164,24 +163,7 @@ export function CreateHostDialog({
           <PathBlocksFields initialData={initialData?.pathBlocks} />
           <PathRewritesFields initialData={initialData?.pathRewrites} />
           <ErrorPagesFields initialData={initialData?.errorPages} />
-          <TextArea
-            label="Custom Pre-Handlers (JSON)"
-            htmlName="customPreHandlersJson"
-            placeholder='[{"handler": "headers", ...}]'
-            value={preHandlers}
-            onChange={setPreHandlers}
-            rows={3}
-            description="Optional JSON array of Caddy handlers"
-          />
-          <TextArea
-            label="Custom Reverse Proxy (JSON)"
-            htmlName="customReverseProxyJson"
-            placeholder='{"headers": {"request": {...}}}'
-            value={reverseProxy}
-            onChange={setReverseProxy}
-            rows={3}
-            description="Deep-merge into reverse_proxy handler (only applies in proxy mode)"
-          />
+          <AdvancedConfigFields host={initialData} />
           <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
           <CpmForwardAuthFields
             cpmForwardAuth={initialData?.cpmForwardAuth}
@@ -242,8 +224,6 @@ export function EditHostDialog({
   const [domains, setDomains] = useState(host.domains.join("\n"));
   const [certificateId, setCertificateId] = useState(String(host.certificateId ?? NONE_VALUE));
   const [accessListId, setAccessListId] = useState(String(host.accessListId ?? NONE_VALUE));
-  const [preHandlers, setPreHandlers] = useState(host.customPreHandlersJson ?? "");
-  const [reverseProxy, setReverseProxy] = useState(host.customReverseProxyJson ?? "");
 
   useEffect(() => {
     if (state.status === "success") {
@@ -301,22 +281,7 @@ export function EditHostDialog({
           <PathBlocksFields initialData={host.pathBlocks} />
           <PathRewritesFields initialData={host.pathRewrites} />
           <ErrorPagesFields initialData={host.errorPages} />
-          <TextArea
-            label="Custom Pre-Handlers (JSON)"
-            htmlName="customPreHandlersJson"
-            value={preHandlers}
-            onChange={setPreHandlers}
-            rows={3}
-            description="Optional JSON array of Caddy handlers"
-          />
-          <TextArea
-            label="Custom Reverse Proxy (JSON)"
-            htmlName="customReverseProxyJson"
-            value={reverseProxy}
-            onChange={setReverseProxy}
-            rows={3}
-            description="Deep-merge into reverse_proxy handler (only applies in proxy mode)"
-          />
+          <AdvancedConfigFields host={host} />
           <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
           <CpmForwardAuthFields
             cpmForwardAuth={host.cpmForwardAuth}

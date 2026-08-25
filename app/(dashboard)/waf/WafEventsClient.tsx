@@ -32,7 +32,8 @@ import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/Segme
 import { Switch } from "@astryxdesign/core/Switch";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
-import { TextArea } from "@astryxdesign/core/TextArea";
+import { CodeEditor } from "@/components/ui/CodeEditor";
+import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -921,6 +922,10 @@ export default function WafEventsClient({
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
   );
+  // Coraza is a compiled-in plugin. With it off the settings below would be
+  // stored and then never reach Caddy, so the form says so up front rather than
+  // accepting a rule set that silently does nothing.
+  const wafModuleDisabledReason = useDisabledReason("waf");
 
   useEffect(() => {
     setSearchTerm(initialSearch);
@@ -1257,24 +1262,40 @@ export default function WafEventsClient({
               {wafState?.message && (
                 <Banner status={wafState.success ? "success" : "error"} title={wafState.message} />
               )}
-              <Switch
-                label="Enable WAF globally (blocking)"
-                value={wafEnabled}
-                onChange={setWafEnabled}
-              />
+              {wafModuleDisabledReason && (
+                <Banner
+                  status="warning"
+                  title="The Coraza WAF module is disabled"
+                  description={wafModuleDisabledReason}
+                />
+              )}
+              {/* Disabled controls emit no pointer events, so the reason is
+                  attached by wrapping. */}
+              <ModuleGated feature="waf">
+                <Switch
+                  label="Enable WAF globally (blocking)"
+                  value={wafEnabled}
+                  onChange={setWafEnabled}
+                  isDisabled={Boolean(wafModuleDisabledReason)}
+                />
+              </ModuleGated>
               <CheckboxInput
                 label="Load OWASP Core Rule Set"
                 description="Covers SQLi, XSS, LFI, RCE — recommended."
                 value={wafLoadOwaspCrs}
                 onChange={setWafLoadOwaspCrs}
               />
-              <TextArea
+              <CodeEditor
                 label="Custom SecLang Directives"
-                isOptional
+                language="ini"
                 htmlName="wafCustomDirectives"
-                rows={3}
+                height="sm"
                 value={wafCustomDirectives}
                 onChange={setWafCustomDirectives}
+                // isReadOnly, not isDisabled: a disabled field submits nothing,
+                // and updateWafSettingsAction reads a missing value as an empty
+                // string — which would erase the stored directives.
+                isReadOnly={Boolean(wafModuleDisabledReason)}
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
                 description="ModSecurity SecLang syntax. Applied after OWASP CRS if enabled."
               />

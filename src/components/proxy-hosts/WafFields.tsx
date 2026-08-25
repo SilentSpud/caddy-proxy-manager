@@ -10,11 +10,12 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Icon } from "@astryxdesign/core/Icon";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Switch } from "@astryxdesign/core/Switch";
-import { TextArea } from "@astryxdesign/core/TextArea";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { WafHostConfig } from "@/lib/models/proxy-hosts";
 import { WafRuleExclusions } from "./WafRuleExclusions";
+import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
+import { CodeEditor } from "@/components/ui/CodeEditor";
 
 type WafMode = "merge" | "override";
 type EngineMode = "Off" | "On" | "inherit";
@@ -41,6 +42,10 @@ type Props = {
 };
 
 export function WafFields({ value, showModeSelector = true }: Props) {
+  // The WAF is the Coraza plugin and nothing else. Without it compiled in, a
+  // saved rule set is inert, so the switch reports why instead of accepting
+  // configuration that will never run.
+  const moduleDisabledReason = useDisabledReason("waf");
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [wafMode, setWafMode] = useState<WafMode>(value?.waf_mode ?? "merge");
   const [engineMode, setEngineMode] = useState<EngineMode>(
@@ -71,16 +76,31 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               </Text>
             </VStack>
           </HStack>
-          <Switch
-            label="Enable web application firewall"
-            isLabelHidden
-            value={enabled}
-            onChange={setEnabled}
-          />
+          {/* Disabled controls emit no pointer events, so the explanation is
+              attached by wrapping rather than as a prop on the Switch. */}
+          <ModuleGated feature="waf">
+            <Switch
+              label="Enable web application firewall"
+              isLabelHidden
+              value={enabled}
+              onChange={setEnabled}
+              isDisabled={Boolean(moduleDisabledReason)}
+            />
+          </ModuleGated>
         </HStack>
+
+        {moduleDisabledReason && (
+          <Text type="body" size="xsm" color="secondary">
+            {moduleDisabledReason}
+          </Text>
+        )}
 
         {/* Unmounted when off, so the fields below are neither focusable nor
             submitted — the old max-h-0 wrapper left them in the tab order. */}
+        {/* Not gated on moduleDisabledReason: WafRuleExclusions carries the
+            hidden wafExcludedRuleIds input, and parseWafConfig reads a missing
+            one as "no exclusions". Unmounting it here would wipe the operator's
+            suppression list on the next save. */}
         {enabled && (
           <VStack gap={4}>
             {showModeSelector && (
@@ -120,12 +140,13 @@ export function WafFields({ value, showModeSelector = true }: Props) {
 
             <WafRuleExclusions value={value?.excluded_rule_ids} />
 
-            <TextArea
+            <CodeEditor
               label="Custom SecLang Directives"
+              language="ini"
               placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
               value={customDirectives}
               onChange={setCustomDirectives}
-              rows={3}
+              height="sm"
               description="ModSecurity SecLang syntax. Appended after OWASP CRS if enabled."
             />
 

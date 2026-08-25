@@ -1562,6 +1562,76 @@ export const spec = {
         },
       },
     },
+    "/api/v1/caddy/modules": {
+      get: {
+        tags: ["Caddy"],
+        summary: "List Caddy modules and the current selection",
+        description:
+          "Returns the module catalog, the stored selection, and how it differs from the modules compiled into the running Caddy image.",
+        operationId: "listCaddyModules",
+        responses: {
+          "200": {
+            description: "Module catalog and selection",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/CaddyModulesResponse" } },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "500": { $ref: "#/components/responses/InternalError" },
+        },
+      },
+      put: {
+        tags: ["Caddy"],
+        summary: "Replace the Caddy module selection",
+        description:
+          "Saves which plugins the Caddy image should be built with. Does not rebuild — plugins are compiled in, so the running container keeps its current set until a rebuild is triggered.",
+        operationId: "updateCaddyModules",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  modules: {
+                    type: "object",
+                    additionalProperties: { type: "boolean" },
+                    description: "Module id to enabled. Omitted ids default to enabled.",
+                  },
+                  customModules: {
+                    type: "array",
+                    items: { $ref: "#/components/schemas/CaddyCustomModule" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Updated selection",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/CaddyModulesResponse" } },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "409": {
+            description:
+              "A module in the selection is still in use — by an enabled L4 proxy host, a host with per-host WAF or geoblocking, or a configured DNS provider. Turn that feature off first.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { error: { type: "string" } },
+                },
+              },
+            },
+          },
+          "500": { $ref: "#/components/responses/InternalError" },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -1995,6 +2065,63 @@ export const spec = {
       },
 
       // ── Main resource schemas ───────────────────────────────────
+      CaddyCustomModule: {
+        type: "object",
+        required: ["modulePath"],
+        properties: {
+          modulePath: {
+            type: "string",
+            description: "Go module path, e.g. github.com/greenpau/caddy-security",
+            example: "github.com/greenpau/caddy-security",
+          },
+          version: {
+            type: "string",
+            description: "Optional tag, branch, or commit passed as path@version",
+          },
+          enabled: { type: "boolean", default: true },
+        },
+      },
+      CaddyModulesResponse: {
+        type: "object",
+        properties: {
+          available: {
+            type: "array",
+            description: "Every module this app knows how to configure.",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                modulePath: { type: "string" },
+                description: { type: "string" },
+                category: { type: "string", enum: ["proxy", "security", "dns"] },
+                features: { type: "array", items: { type: "string" } },
+              },
+            },
+          },
+          selection: {
+            type: "object",
+            properties: {
+              modules: { type: "object", additionalProperties: { type: "boolean" } },
+              customModules: {
+                type: "array",
+                items: { $ref: "#/components/schemas/CaddyCustomModule" },
+              },
+            },
+          },
+          diff: {
+            type: "object",
+            description: "How the selection differs from the running image.",
+            properties: {
+              appliedSpecs: { type: "array", items: { type: "string" } },
+              desiredSpecs: { type: "array", items: { type: "string" } },
+              added: { type: "array", items: { type: "string" } },
+              removed: { type: "array", items: { type: "string" } },
+              needsRebuild: { type: "boolean" },
+            },
+          },
+        },
+      },
       ProxyHost: {
         type: "object",
         properties: {
@@ -2024,6 +2151,11 @@ export const spec = {
           customPreHandlersJson: {
             type: ["string", "null"],
             description: "Raw Caddy JSON for handlers before reverse_proxy",
+          },
+          customCaddyfile: {
+            type: ["string", "null"],
+            description:
+              "Caddyfile directives for this host, adapted to JSON handlers and inserted before the reverse proxy. Rejected if the running Caddy cannot adapt them.",
           },
           authentik: {
             oneOf: [{ $ref: "#/components/schemas/AuthentikConfig" }, { type: "null" }],
@@ -2091,6 +2223,7 @@ export const spec = {
           enabled: { type: "boolean" },
           customReverseProxyJson: { type: ["string", "null"] },
           customPreHandlersJson: { type: ["string", "null"] },
+          customCaddyfile: { type: ["string", "null"] },
           authentik: {
             oneOf: [{ $ref: "#/components/schemas/AuthentikConfig" }, { type: "null" }],
           },

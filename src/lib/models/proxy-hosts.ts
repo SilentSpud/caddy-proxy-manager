@@ -1,5 +1,6 @@
 import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
+import { validateCaddyfileSnippet } from "../caddy-caddyfile";
 import { logAuditEvent } from "../audit";
 import { proxyHosts } from "../db/schema";
 import { asc, desc, eq, count, like, or } from "drizzle-orm";
@@ -422,6 +423,13 @@ type CpmForwardAuthMeta = {
 type ProxyHostMeta = {
   custom_reverse_proxy_json?: string;
   custom_pre_handlers_json?: string;
+  /**
+   * Raw Caddyfile directives for this host, adapted to JSON handlers at
+   * config-build time. Stored as written so the operator gets their own text
+   * back when they reopen the dialog — the adapted JSON is a build artefact,
+   * not the source of truth.
+   */
+  custom_caddyfile?: string;
   authentik?: ProxyHostAuthentikMeta;
   load_balancer?: LoadBalancerMeta;
   dns_resolver?: DnsResolverMeta;
@@ -458,6 +466,7 @@ export type ProxyHost = {
   updatedAt: string;
   customReverseProxyJson: string | null;
   customPreHandlersJson: string | null;
+  customCaddyfile: string | null;
   authentik: ProxyHostAuthentikConfig | null;
   loadBalancer: LoadBalancerConfig | null;
   dnsResolver: DnsResolverConfig | null;
@@ -491,6 +500,7 @@ export type ProxyHostInput = {
   enabled?: boolean;
   customReverseProxyJson?: string | null;
   customPreHandlersJson?: string | null;
+  customCaddyfile?: string | null;
   authentik?: ProxyHostAuthentikInput | null;
   loadBalancer?: LoadBalancerInput | null;
   dnsResolver?: DnsResolverInput | null;
@@ -815,12 +825,16 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
   const normalized: ProxyHostMeta = {};
   const reverse = normalizeMetaValue(meta.custom_reverse_proxy_json ?? null);
   const preHandlers = normalizeMetaValue(meta.custom_pre_handlers_json ?? null);
+  const caddyfile = normalizeMetaValue(meta.custom_caddyfile ?? null);
 
   if (reverse) {
     normalized.custom_reverse_proxy_json = reverse;
   }
   if (preHandlers) {
     normalized.custom_pre_handlers_json = preHandlers;
+  }
+  if (caddyfile) {
+    normalized.custom_caddyfile = caddyfile;
   }
 
   const authentik = sanitizeAuthentikMeta(meta.authentik);
@@ -1118,6 +1132,7 @@ function parseMeta(value: string | null): ProxyHostMeta {
         normalizeMetaValue(parsed.custom_reverse_proxy_json ?? null) ?? undefined,
       custom_pre_handlers_json:
         normalizeMetaValue(parsed.custom_pre_handlers_json ?? null) ?? undefined,
+      custom_caddyfile: normalizeMetaValue(parsed.custom_caddyfile ?? null) ?? undefined,
       authentik: sanitizeAuthentikMeta(parsed.authentik),
       load_balancer: sanitizeLoadBalancerMeta(parsed.load_balancer),
       dns_resolver: sanitizeDnsResolverMeta(parsed.dns_resolver),
@@ -1561,6 +1576,15 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
       next.custom_pre_handlers_json = pre;
     } else {
       delete next.custom_pre_handlers_json;
+    }
+  }
+
+  if (input.customCaddyfile !== undefined) {
+    const caddyfile = normalizeMetaValue(input.customCaddyfile ?? null);
+    if (caddyfile) {
+      next.custom_caddyfile = caddyfile;
+    } else {
+      delete next.custom_caddyfile;
     }
   }
 
@@ -2071,6 +2095,7 @@ function parseProxyHost(row: ProxyHostRow): ProxyHost {
     updatedAt: toIso(row.updatedAt)!,
     customReverseProxyJson: meta.custom_reverse_proxy_json ?? null,
     customPreHandlersJson: meta.custom_pre_handlers_json ?? null,
+    customCaddyfile: meta.custom_caddyfile ?? null,
     authentik: hydrateAuthentik(meta.authentik),
     loadBalancer: hydrateLoadBalancer(meta.load_balancer),
     dnsResolver: hydrateDnsResolver(meta.dns_resolver),
@@ -2148,6 +2173,23 @@ export async function listProxyHostsPaginated(
   return hosts.map(parseProxyHost);
 }
 
+/**
+ * Reject a Caddyfile snippet the running Caddy cannot adapt.
+ *
+ * Enforced in the model rather than in the server action so the REST API is
+ * held to the same rule. Storing a snippet that fails to adapt would not break
+ * the host on its own — the config builder skips it with a warning — but it
+ * would quietly stop doing whatever the operator wrote it to do, which is the
+ * worst way for a proxy rule to fail.
+ */
+async function assertCaddyfileAdapts(snippet: string | null | undefined): Promise<void> {
+  if (!snippet?.trim()) return;
+  const error = await validateCaddyfileSnippet(snippet);
+  if (error) {
+    throw new Error(`Custom Caddyfile: ${error}`);
+  }
+}
+
 export async function createProxyHost(input: ProxyHostInput, actorUserId: number) {
   const domains = normalizeProxyHostDomains(input.domains ?? []);
 
@@ -2156,6 +2198,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   }
   input.upstreams.forEach(validateUpstreamProtocol);
   await assertWildcardIssuable(domains, input.certificateId ?? null);
+  await assertCaddyfileAdapts(input.customCaddyfile);
 
   const now = nowIso();
   const meta = buildMeta({}, input);
@@ -2223,12 +2266,16 @@ export async function updateProxyHost(
   const effectiveCertificateId =
     input.certificateId !== undefined ? input.certificateId : existing.certificateId;
   await assertWildcardIssuable(domainList, effectiveCertificateId);
+  if (input.customCaddyfile !== undefined) {
+    await assertCaddyfileAdapts(input.customCaddyfile);
+  }
   const upstreams = input.upstreams
     ? JSON.stringify(Array.from(new Set(input.upstreams)))
     : JSON.stringify(existing.upstreams);
   const existingMeta: ProxyHostMeta = {
     custom_reverse_proxy_json: existing.customReverseProxyJson ?? undefined,
     custom_pre_handlers_json: existing.customPreHandlersJson ?? undefined,
+    custom_caddyfile: existing.customCaddyfile ?? undefined,
     authentik: dehydrateAuthentik(existing.authentik),
     load_balancer: dehydrateLoadBalancer(existing.loadBalancer),
     dns_resolver: dehydrateDnsResolver(existing.dnsResolver),
