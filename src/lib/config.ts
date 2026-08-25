@@ -1,3 +1,5 @@
+import { assertValidInstanceSyncToken } from "./instance-sync-token";
+
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
 const DEFAULT_ADMIN_USERNAME = "admin";
 const DEFAULT_ADMIN_PASSWORD = "admin";
@@ -203,6 +205,15 @@ export function validateProductionConfig() {
     void config.sessionSecret;
     void config.adminUsername;
     void config.adminPassword;
+
+    // An environment-configured slave cannot safely fall back to a short or
+    // missing bearer credential. Validate this synchronously during startup.
+    if (process.env.INSTANCE_MODE === "slave") {
+      assertValidInstanceSyncToken(
+        process.env.INSTANCE_SYNC_TOKEN,
+        "INSTANCE_SYNC_TOKEN for slave mode"
+      );
+    }
   }
 }
 

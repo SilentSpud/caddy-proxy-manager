@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
 
 # Always run the builder on the host arch (BUILDPLATFORM) and let xcaddy
 # cross-compile Caddy for the target arch via GOOS/GOARCH. This avoids QEMU
@@ -9,35 +9,18 @@ FROM --platform=$BUILDPLATFORM golang:1.27 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
-# Install xcaddy
-RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+WORKDIR /build
+COPY docker/caddy/go.mod docker/caddy/go.sum docker/caddy/build.sh docker/caddy/update-compatibility-pins.sh ./
 
-# Build Caddy with plugins.
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH xcaddy build master \
-    --with github.com/caddy-dns/cloudflare \
-    --with github.com/caddy-dns/route53 \
-    --with github.com/caddy-dns/digitalocean \
-    --with github.com/caddy-dns/duckdns \
-    --with github.com/caddy-dns/hetzner \
-    --with github.com/caddy-dns/vultr \
-    --with github.com/caddy-dns/porkbun \
-    --with github.com/caddy-dns/godaddy \
-    --with github.com/caddy-dns/namecheap \
-    --with github.com/caddy-dns/ovh \
-    --with github.com/caddy-dns/ionos \
-    --with github.com/caddy-dns/linode \
-    --with github.com/caddy-dns/njalla \
-    --with github.com/caddy-dns/spaceship \
-    --with github.com/caddy-dns/desec \
-    --with github.com/caddy-dns/dynu \
-    --with github.com/caddy-dns/acmedns \
-    --with github.com/caddy-dns/infomaniak \
-    --with github.com/mholt/caddy-l4 \
-    --with github.com/fuomag9/caddy-blocker-plugin \
-    --with github.com/corazawaf/coraza-caddy/v2 \
-    --output /usr/bin/caddy
+# Every module version comes from go.mod. Dependabot updates that file weekly;
+# the compatibility updater derives cel-go from the pinned Caddy release, and
+# go.sum authenticates the module metadata used to resolve the build.
+RUN sh ./update-compatibility-pins.sh
+RUN XCADDY_VERSION="$(go list -m -f '{{.Version}}' github.com/caddyserver/xcaddy)" && \
+    go install github.com/caddyserver/xcaddy/cmd/xcaddy@"${XCADDY_VERSION}"
+RUN sh ./build.sh
 
-FROM ubuntu:26.04
+FROM ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b
 
 # Accept build args for user/group IDs to support rootless operation
 # Using 10000 as default to avoid conflicts with system users

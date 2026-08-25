@@ -5,10 +5,54 @@ import {
   decryptProviderCredentials,
   encryptProviderCredentials,
   getProviderDefinition,
+  redactDnsProviderSettingsForApi,
+  redactLegacyCloudflareSettingsForApi,
 } from "@/src/lib/dns-providers";
 import { isEncryptedSecret } from "@/src/lib/secret";
 
 describe("DNS provider registry", () => {
+  it("redacts every credential value from API status metadata", () => {
+    const status = redactDnsProviderSettingsForApi({
+      providers: {
+        acmedns: {
+          username: "credential-username",
+          password: "credential-password",
+          server_url: "https://credential-host.invalid",
+          empty_optional: "",
+        },
+      },
+      default: "acmedns",
+    });
+    const serialized = JSON.stringify(status);
+
+    expect(status).toEqual({
+      providers: {
+        acmedns: {
+          configuredFields: ["password", "server_url", "username"],
+        },
+      },
+      default: "acmedns",
+    });
+    expect(serialized).not.toContain("credential-username");
+    expect(serialized).not.toContain("credential-password");
+    expect(serialized).not.toContain("credential-host");
+  });
+
+  it("redacts the legacy Cloudflare API token while retaining identifiers", () => {
+    const status = redactLegacyCloudflareSettingsForApi({
+      apiToken: "legacy-token-sentinel",
+      zoneId: "zone-id",
+      accountId: "account-id",
+    });
+
+    expect(status).toEqual({
+      hasApiToken: true,
+      zoneId: "zone-id",
+      accountId: "account-id",
+    });
+    expect(JSON.stringify(status)).not.toContain("legacy-token-sentinel");
+  });
+
   it("registers Njalla with the Caddy module path and API token field", () => {
     const provider = getProviderDefinition("njalla");
 

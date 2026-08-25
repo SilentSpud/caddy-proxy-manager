@@ -39,6 +39,22 @@ export type DnsProviderCredentials = {
   credentials: Record<string, string>;
 };
 
+/**
+ * Safe representation returned by the REST settings endpoint. Credential
+ * names are useful for showing which optional fields are configured, but the
+ * values themselves must remain write-only.
+ */
+export type DnsProviderApiStatus = {
+  providers: Record<string, { configuredFields: string[] }>;
+  default: string | null;
+};
+
+export type LegacyCloudflareApiStatus = {
+  hasApiToken: boolean;
+  zoneId?: string;
+  accountId?: string;
+};
+
 // ─── Registry ────────────────────────────────────────────────────────────────
 
 export const DNS_PROVIDERS: DnsProviderDefinition[] = [
@@ -266,6 +282,45 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
 
 export function getProviderDefinition(name: string): DnsProviderDefinition | undefined {
   return DNS_PROVIDERS.find((p) => p.name === name);
+}
+
+/**
+ * Reduce DNS-provider settings to non-secret metadata before crossing an API
+ * response boundary. This intentionally redacts every value, including fields
+ * whose registry type is not `password`, so newly-added credential fields are
+ * safe by default.
+ */
+export function redactDnsProviderSettingsForApi(settings: {
+  providers: Record<string, Record<string, string>>;
+  default: string | null;
+}): DnsProviderApiStatus {
+  return {
+    providers: Object.fromEntries(
+      Object.entries(settings.providers).map(([provider, credentials]) => [
+        provider,
+        {
+          configuredFields: Object.entries(credentials)
+            .filter(([, value]) => typeof value === "string" && value.length > 0)
+            .map(([key]) => key)
+            .sort(),
+        },
+      ])
+    ),
+    default: settings.default,
+  };
+}
+
+/** Redact the credential from the legacy single-provider settings group. */
+export function redactLegacyCloudflareSettingsForApi(settings: {
+  apiToken: string;
+  zoneId?: string;
+  accountId?: string;
+}): LegacyCloudflareApiStatus {
+  return {
+    hasApiToken: settings.apiToken.length > 0,
+    ...(settings.zoneId ? { zoneId: settings.zoneId } : {}),
+    ...(settings.accountId ? { accountId: settings.accountId } : {}),
+  };
 }
 
 /**

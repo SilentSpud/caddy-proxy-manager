@@ -17,11 +17,6 @@ test.describe('Wildcard host DNS-provider guard', () => {
     const origin = new URL(page.url()).origin;
     const headers = { Origin: origin };
 
-    // Preserve whatever DNS-provider config the stack already has.
-    const originalResp = await page.request.get(API_DNS_PROVIDER);
-    expect(originalResp.ok()).toBeTruthy();
-    const original = await originalResp.json();
-
     const createdIds: number[] = [];
     try {
       // ── No DNS provider configured ──────────────────────────────────────
@@ -53,6 +48,15 @@ test.describe('Wildcard host DNS-provider guard', () => {
       });
       expect(setResp.ok()).toBeTruthy();
 
+      const statusResp = await page.request.get(API_DNS_PROVIDER);
+      expect(statusResp.ok()).toBeTruthy();
+      const statusBody = await statusResp.text();
+      expect(JSON.parse(statusBody)).toEqual({
+        providers: { duckdns: { configuredFields: ['api_token'] } },
+        default: 'duckdns',
+      });
+      expect(statusBody).not.toContain('e2e-fake-token');
+
       const allowed = await page.request.post(API_PROXY_HOSTS, {
         headers,
         data: { name: 'Wildcard Allowed', domains: ['*.e2e-wildcard.test'], upstreams: ['localhost:9999'] },
@@ -65,7 +69,7 @@ test.describe('Wildcard host DNS-provider guard', () => {
       }
       await page.request.put(API_DNS_PROVIDER, {
         headers,
-        data: original && Object.keys(original).length ? original : { providers: {}, default: null },
+        data: { providers: {}, default: null },
       });
     }
   });

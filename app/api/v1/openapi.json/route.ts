@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 
-export const spec = {
+const spec = {
   openapi: "3.1.0",
   info: {
     title: "Caddy Proxy Manager API",
@@ -54,6 +54,9 @@ export const spec = {
       post: {
         tags: ["Tokens"],
         summary: "Create a token",
+        description:
+          "Requires an interactive cookie-authenticated management session. Bearer tokens cannot create replacement credentials.",
+        security: [{ sessionAuth: [] }],
         operationId: "createToken",
         requestBody: {
           required: true,
@@ -85,6 +88,7 @@ export const spec = {
           },
           "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
         },
       },
     },
@@ -879,8 +883,8 @@ export const spec = {
                 schema: {
                   oneOf: [
                     { $ref: "#/components/schemas/GeneralSettings" },
-                    { $ref: "#/components/schemas/CloudflareSettings" },
-                    { $ref: "#/components/schemas/DnsProviderSettings" },
+                    { $ref: "#/components/schemas/CloudflareStatus" },
+                    { $ref: "#/components/schemas/DnsProviderStatus" },
                     { $ref: "#/components/schemas/AuthentikSettings" },
                     { $ref: "#/components/schemas/MetricsSettings" },
                     { $ref: "#/components/schemas/LoggingSettings" },
@@ -941,6 +945,7 @@ export const spec = {
                   { $ref: "#/components/schemas/MetricsSettings" },
                   { $ref: "#/components/schemas/LoggingSettings" },
                   { $ref: "#/components/schemas/DnsSettings" },
+                  { $ref: "#/components/schemas/DnsProviderSettings" },
                   { $ref: "#/components/schemas/UpstreamDnsSettings" },
                   { $ref: "#/components/schemas/GeoBlockConfig" },
                   { $ref: "#/components/schemas/WafSettings" },
@@ -1852,15 +1857,17 @@ export const spec = {
           autoRenew: { type: "boolean" },
           providerOptions: {
             type: ["object", "null"],
-            description: "Provider-specific options (e.g. Cloudflare API token). Free-form key/value object passed through to the DNS provider.",
-            additionalProperties: true,
+            description: "Optional reference to a centrally configured DNS provider. Credential values are never returned here.",
+            properties: { provider: { type: "string" } },
+            required: ["provider"],
+            additionalProperties: false,
           },
           certificatePem: { type: ["string", "null"], description: "PEM-encoded certificate (imported type only)" },
-          privateKeyPem: { type: ["string", "null"], description: "PEM-encoded private key (imported type only)" },
+          hasPrivateKey: { type: "boolean", description: "Whether write-only private key material is stored" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
-        required: ["id", "name", "type", "domainNames", "createdAt", "updatedAt"],
+        required: ["id", "name", "type", "domainNames", "hasPrivateKey", "createdAt", "updatedAt"],
       },
       CertificateInput: {
         type: "object",
@@ -1869,9 +1876,14 @@ export const spec = {
           type: { type: "string", enum: ["managed", "imported"] },
           domainNames: { type: "array", items: { type: "string" } },
           autoRenew: { type: "boolean" },
-          providerOptions: { type: ["object", "null"], additionalProperties: true },
+          providerOptions: {
+            type: ["object", "null"],
+            properties: { provider: { type: "string" } },
+            required: ["provider"],
+            additionalProperties: false,
+          },
           certificatePem: { type: ["string", "null"] },
-          privateKeyPem: { type: ["string", "null"] },
+          privateKeyPem: { type: ["string", "null"], writeOnly: true },
         },
         required: ["name", "type", "domainNames"],
       },
@@ -1989,22 +2001,33 @@ export const spec = {
       },
       CloudflareSettings: {
         type: "object",
+        description: "Write-only legacy Cloudflare settings. The API token is accepted on update but never returned by GET.",
         properties: {
-          apiToken: { type: "string", description: "Cloudflare API token" },
+          apiToken: { type: "string", description: "Cloudflare API token", writeOnly: true },
           zoneId: { type: "string" },
           accountId: { type: "string" },
         },
         required: ["apiToken"],
       },
+      CloudflareStatus: {
+        type: "object",
+        description: "Non-secret metadata for the legacy Cloudflare settings group.",
+        properties: {
+          hasApiToken: { type: "boolean" },
+          zoneId: { type: "string" },
+          accountId: { type: "string" },
+        },
+        required: ["hasApiToken"],
+      },
       DnsProviderSettings: {
         type: "object",
-        description: "DNS provider configuration for ACME DNS-01 challenges. Supports multiple configured providers with a default.",
+        description: "Write-only DNS provider configuration for ACME DNS-01 challenges. Credential values are accepted on update but never returned by GET.",
         properties: {
           providers: {
             type: "object",
             additionalProperties: {
               type: "object",
-              additionalProperties: { type: "string" },
+              additionalProperties: { type: "string", writeOnly: true },
               description: "Credential key-value pairs for this provider",
             },
             description: "Configured providers keyed by name (e.g. { cloudflare: { api_token: '...' }, route53: { ... } })",
@@ -2013,6 +2036,32 @@ export const spec = {
             type: "string",
             nullable: true,
             description: "Name of the default provider used for DNS-01 challenges (null = HTTP-01 only)",
+          },
+        },
+        required: ["providers", "default"],
+      },
+      DnsProviderStatus: {
+        type: "object",
+        description: "Non-secret metadata for configured DNS providers. Credential values are write-only.",
+        properties: {
+          providers: {
+            type: "object",
+            additionalProperties: {
+              type: "object",
+              properties: {
+                configuredFields: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Credential field names which have a stored, non-empty value",
+                },
+              },
+              required: ["configuredFields"],
+            },
+            description: "Configured providers keyed by provider name; values contain metadata only",
+          },
+          default: {
+            type: ["string", "null"],
+            description: "Name of the default provider used for DNS-01 challenges",
           },
         },
         required: ["providers", "default"],
@@ -2154,7 +2203,12 @@ export const spec = {
         properties: {
           name: { type: "string", example: "Slave 1" },
           baseUrl: { type: "string", example: "https://slave.example.com:3000" },
-          apiToken: { type: "string", description: "Sync token for the slave instance" },
+          apiToken: {
+            type: "string",
+            minLength: 32,
+            maxLength: 512,
+            description: "Random sync token for the slave instance (generate with: openssl rand -hex 32)",
+          },
           enabled: { type: "boolean" },
         },
         required: ["name", "baseUrl", "apiToken"],

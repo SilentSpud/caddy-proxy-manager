@@ -43,8 +43,11 @@ vi.mock('../../src/lib/db', async () => {
 });
 
 // These imports must come AFTER vi.mock to pick up the mocked module.
-import { buildSyncPayload, applySyncPayload, type SyncPayload } from '../../src/lib/instance-sync';
+import { buildSyncPayload, applySyncPayload, getSlaveLastSync, syncInstances, type SyncPayload } from '../../src/lib/instance-sync';
 import * as schema from '../../src/lib/db/schema';
+import { decryptSecret, encryptSecret, isEncryptedSecret } from '../../src/lib/secret';
+import { listInstances } from '../../src/lib/models/instances';
+import { setSetting } from '../../src/lib/settings';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -87,6 +90,7 @@ async function clearTables() {
   await ctx.db.delete(schema.issuedClientCertificates);
   await ctx.db.delete(schema.certificates);
   await ctx.db.delete(schema.caCertificates);
+  await ctx.db.delete(schema.instances);
   await ctx.db.delete(schema.settings);
 }
 
@@ -119,6 +123,9 @@ function makeL4Host(overrides: Partial<typeof schema.l4ProxyHosts.$inferInsert> 
 }
 
 beforeEach(async () => {
+  delete process.env.INSTANCE_MODE;
+  delete process.env.INSTANCE_SLAVES;
+  delete process.env.INSTANCE_SYNC_ALLOW_HTTP;
   await clearTables();
   cleanTmpDir();
 });
@@ -250,6 +257,47 @@ describe('buildSyncPayload', () => {
     expect(payload.data.certificates[0].name).toBe('Test Cert');
   });
 
+  it('decrypts certificate keys only for authenticated sync transport', async () => {
+    const now = nowIso();
+    const privateKeyPem = '-----BEGIN PRIVATE KEY-----\nsync-key-sentinel\n-----END PRIVATE KEY-----';
+    await ctx.db.insert(schema.certificates).values({
+      name: 'Encrypted Cert',
+      type: 'imported',
+      domainNames: JSON.stringify(['sync-cert.example.com']),
+      autoRenew: false,
+      certificatePem: '-----BEGIN CERTIFICATE-----\npublic\n-----END CERTIFICATE-----',
+      privateKeyPem: encryptSecret(privateKeyPem),
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const payload = await buildSyncPayload();
+    expect(payload.data.certificates[0].privateKeyPem).toBe(privateKeyPem);
+
+    await applySyncPayload(payload);
+    const stored = await ctx.db.query.certificates.findFirst();
+    expect(isEncryptedSecret(stored!.privateKeyPem!)).toBe(true);
+    expect(decryptSecret(stored!.privateKeyPem!)).toBe(privateKeyPem);
+  });
+
+  it('never transports or stores legacy certificate provider secrets', async () => {
+    const now = nowIso();
+    const providerSecret = 'sync-provider-option-secret-sentinel';
+    await ctx.db.insert(schema.certificates).values({
+      name: 'Legacy provider options',
+      type: 'managed',
+      domainNames: JSON.stringify(['provider.example.com']),
+      autoRenew: true,
+      providerOptions: JSON.stringify({ provider: 'cloudflare', api_token: providerSecret }),
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const payload = await buildSyncPayload();
+    expect(payload.data.certificates[0].providerOptions).toBe('{"provider":"cloudflare"}');
+    expect(JSON.stringify(payload)).not.toContain(providerSecret);
+  });
+
   it('sanitizes access list createdBy to null', async () => {
     const now = nowIso();
     await ctx.db.insert(schema.accessLists).values({
@@ -284,6 +332,62 @@ describe('buildSyncPayload', () => {
     const payload = await buildSyncPayload();
     expect(payload.data.accessListEntries).toHaveLength(1);
     expect(payload.data.accessListEntries[0].username).toBe('user1');
+  });
+});
+
+describe('syncInstances token policy', () => {
+  it('never sends legacy weak plaintext or encrypted target tokens', async () => {
+    process.env.INSTANCE_MODE = 'master';
+    const now = nowIso();
+    await ctx.db.insert(schema.instances).values([
+      {
+        name: 'Legacy plaintext',
+        baseUrl: 'https://plain-slave.example.com',
+        apiToken: 'weak-plaintext',
+        enabled: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        name: 'Legacy encrypted',
+        baseUrl: 'https://encrypted-slave.example.com',
+        apiToken: encryptSecret('weak-encrypted'),
+        enabled: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await syncInstances();
+
+    expect(result).toEqual({ total: 2, success: 0, failed: 2, skippedHttp: 0 });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const rows = await ctx.db.query.instances.findMany();
+    expect(rows.every((row) => row.lastSyncError?.includes('security policy'))).toBe(true);
+    fetchSpy.mockRestore();
+  });
+
+  it('redacts legacy raw sync errors at every API/browser read boundary', async () => {
+    const legacySecret = 'legacy-sync-error-secret-sentinel';
+    const now = nowIso();
+    await ctx.db.insert(schema.instances).values({
+      name: 'Legacy error target',
+      baseUrl: 'https://legacy.example.com',
+      apiToken: encryptSecret('a'.repeat(32)),
+      enabled: true,
+      lastSyncError: `Sync failed: 500 ${legacySecret}`,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await setSetting('instance_last_sync_error', `Caddy rejected: ${legacySecret}`);
+
+    const instances = await listInstances();
+    const slaveStatus = await getSlaveLastSync();
+
+    expect(instances[0].lastSyncError).toBe('Previous synchronization failed');
+    expect(slaveStatus.error).toBe('Previous synchronization failed');
+    expect(JSON.stringify({ instances, slaveStatus })).not.toContain(legacySecret);
   });
 });
 
@@ -325,6 +429,48 @@ describe('applySyncPayload', () => {
 
   it('runs without error on an empty payload', async () => {
     await expect(applySyncPayload(emptyPayload())).resolves.toBeUndefined();
+  });
+
+  it('scrubs hostile legacy certificate provider options on inbound sync', async () => {
+    const now = nowIso();
+    const providerSecret = 'hostile-inbound-provider-secret-sentinel';
+    const payload = emptyPayload();
+    payload.data.certificates = [
+      {
+        id: 1,
+        name: 'Legacy options',
+        type: 'managed',
+        domainNames: JSON.stringify(['legacy.example.com']),
+        autoRenew: true,
+        providerOptions: JSON.stringify({ provider: 'cloudflare', api_token: providerSecret }),
+        certificatePem: null,
+        privateKeyPem: null,
+        createdBy: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 2,
+        name: 'Malformed options',
+        type: 'managed',
+        domainNames: JSON.stringify(['malformed.example.com']),
+        autoRenew: true,
+        providerOptions: `{not-json-${providerSecret}`,
+        certificatePem: null,
+        privateKeyPem: null,
+        createdBy: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+
+    await applySyncPayload(payload);
+
+    const rows = await ctx.db.query.certificates.findMany();
+    const storedById = new Map(rows.map((row) => [row.id, row]));
+    expect(storedById.get(1)?.providerOptions).toBe('{"provider":"cloudflare"}');
+    expect(storedById.get(2)?.providerOptions).toBeNull();
+    expect(JSON.stringify(rows)).not.toContain(providerSecret);
   });
 
   it('clears existing proxy hosts when payload has empty array', async () => {

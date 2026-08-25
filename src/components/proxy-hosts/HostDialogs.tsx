@@ -10,7 +10,7 @@ import {
 } from "@/app/(dashboard)/proxy-hosts/actions";
 import { INITIAL_ACTION_STATE } from "@/lib/actions";
 import { AccessList } from "@/lib/models/access-lists";
-import { Certificate } from "@/lib/models/certificates";
+import type { CertificatePickerOption } from "@/lib/certificate-api";
 import { ProxyHost } from "@/lib/models/proxy-hosts";
 import { AuthentikSettings } from "@/lib/settings";
 import { AppDialog } from "@/components/ui/AppDialog";
@@ -54,7 +54,7 @@ export function CreateHostDialog({
 }: {
     open: boolean;
     onClose: () => void;
-    certificates: Certificate[];
+    certificates: CertificatePickerOption[];
     accessLists: AccessList[];
     authentikDefaults: AuthentikSettings | null;
     initialData?: ProxyHost | null;
@@ -219,7 +219,7 @@ export function EditHostDialog({
     open: boolean;
     host: ProxyHost;
     onClose: () => void;
-    certificates: Certificate[];
+    certificates: CertificatePickerOption[];
     accessLists: AccessList[];
     // Required, matching CreateHostDialog — see AuthentikFields (#232).
     authentikDefaults: AuthentikSettings | null;

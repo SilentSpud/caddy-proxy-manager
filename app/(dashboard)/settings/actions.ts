@@ -10,30 +10,42 @@ import { listProxyHosts, updateProxyHost, sanitizeErrorPageRules } from "@/src/l
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import type { CloudflareSettings, DnsProviderSettings, GeoBlockSettings, WafSettings } from "@/src/lib/settings";
 import { getProviderDefinition, encryptProviderCredentials } from "@/src/lib/dns-providers";
+import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
+import {
+  instanceSyncTokenValidationError,
+  MIN_INSTANCE_SYNC_TOKEN_LENGTH,
+} from "@/src/lib/instance-sync-token";
+import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
 
 type ActionResult = {
   success: boolean;
   message?: string;
 };
 
-const MIN_TOKEN_LENGTH = 32;
 const VALID_UPSTREAM_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
+
+function serializedSettingsAction<TArgs extends unknown[], TResult>(
+  action: (...args: TArgs) => Promise<TResult>
+): (...args: TArgs) => Promise<TResult> {
+  return async (...args: TArgs) => withSettingsUpdateLock(() => action(...args));
+}
 
 /**
  * Validates that a sync token meets minimum security requirements.
  * Tokens must be at least 32 characters to provide adequate entropy.
  */
 function validateSyncToken(token: string): { valid: boolean; error?: string } {
-  if (token.length < MIN_TOKEN_LENGTH) {
+  const error = instanceSyncTokenValidationError(token);
+  if (error) {
     return {
       valid: false,
-      error: `Token must be at least ${MIN_TOKEN_LENGTH} characters for security. Consider using a randomly generated token.`
+      error: `${error}. Consider using a randomly generated ${MIN_INSTANCE_SYNC_TOKEN_LENGTH}-byte token.`
     };
   }
   return { valid: true };
 }
 
-export async function updateGeneralSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateGeneralSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -57,7 +69,7 @@ export async function updateGeneralSettingsAction(_prevState: ActionResult | nul
   }
 }
 
-export async function updateAcmeSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateAcmeSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -114,7 +126,7 @@ export async function updateAcmeSettingsAction(_prevState: ActionResult | null, 
   }
 }
 
-export async function updateCloudflareSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateCloudflareSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -171,7 +183,7 @@ export async function updateCloudflareSettingsAction(_prevState: ActionResult | 
   }
 }
 
-export async function updateDnsProviderSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateDnsProviderSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -287,7 +299,7 @@ export async function updateDnsProviderSettingsAction(_prevState: ActionResult |
   }
 }
 
-export async function updateAuthentikSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateAuthentikSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -321,7 +333,7 @@ export async function updateAuthentikSettingsAction(_prevState: ActionResult | n
   }
 }
 
-export async function updateMetricsSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateMetricsSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -373,7 +385,7 @@ export async function updateMetricsSettingsAction(_prevState: ActionResult | nul
   }
 }
 
-export async function updateLoggingSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateLoggingSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -437,7 +449,7 @@ function parseResolverList(value: string | null): string[] {
     .filter((s) => s.length > 0);
 }
 
-export async function updateTrustedProxiesSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateTrustedProxiesSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -488,7 +500,7 @@ export async function updateTrustedProxiesSettingsAction(_prevState: ActionResul
   }
 }
 
-export async function updateDnsSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateDnsSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
@@ -550,7 +562,7 @@ export async function updateDnsSettingsAction(_prevState: ActionResult | null, f
   }
 }
 
-export async function updateUpstreamDnsResolutionSettingsAction(
+async function updateUpstreamDnsResolutionSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
@@ -610,7 +622,7 @@ export async function updateUpstreamDnsResolutionSettingsAction(
   }
 }
 
-export async function updateInstanceModeAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateInstanceModeActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = String(formData.get("mode") ?? "").trim() as "standalone" | "master" | "slave";
@@ -626,12 +638,11 @@ export async function updateInstanceModeAction(_prevState: ActionResult | null, 
   }
 }
 
-export async function updateSlaveMasterTokenAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateSlaveMasterTokenActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
     const clearToken = formData.get("clearToken") === "on";
     const rawToken = formData.get("masterToken") ? String(formData.get("masterToken")).trim() : "";
-    const current = await getSlaveMasterToken();
 
     // If clearing, allow empty token
     if (clearToken) {
@@ -652,6 +663,7 @@ export async function updateSlaveMasterTokenAction(_prevState: ActionResult | nu
     }
 
     // No change - keep existing token
+    const current = await getSlaveMasterToken();
     if (!current) {
       return { success: false, message: "No token provided. Please enter a sync token." };
     }
@@ -762,7 +774,7 @@ function parseGeoBlockResponseHeaders(formData: FormData): Record<string, string
   return headers;
 }
 
-export async function updateGeoBlockSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateGeoBlockSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
 
@@ -824,7 +836,7 @@ export async function updateGeoBlockSettingsAction(_prevState: ActionResult | nu
   }
 }
 
-export async function updateErrorPagesSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateErrorPagesSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
 
@@ -873,7 +885,7 @@ function parseDefaultResponseHeaders(value: FormDataEntryValue | null): Record<s
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
-export async function updateDefaultResponseSettingsAction(
+async function updateDefaultResponseSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
@@ -976,7 +988,7 @@ export async function lookupWafRuleMessageAction(ruleId: number): Promise<{ mess
   return { message: map[ruleId] ?? null };
 }
 
-export async function removeWafRuleGloballyAction(ruleId: number): Promise<ActionResult> {
+async function removeWafRuleGloballyActionUnlocked(ruleId: number): Promise<ActionResult> {
   try {
     await requireAdmin();
     const current = await getWafSettings();
@@ -992,7 +1004,7 @@ export async function removeWafRuleGloballyAction(ruleId: number): Promise<Actio
   }
 }
 
-export async function suppressWafRuleGloballyAction(ruleId: number): Promise<ActionResult> {
+async function suppressWafRuleGloballyActionUnlocked(ruleId: number): Promise<ActionResult> {
   try {
     await requireAdmin();
     const current = await getWafSettings();
@@ -1014,20 +1026,10 @@ export async function suppressWafRuleGloballyAction(ruleId: number): Promise<Act
   }
 }
 
-function redactProviderSecrets<T extends { clientId: string; clientSecret: string }>(provider: T): T {
-  const clientId = provider.clientId;
-  return {
-    ...provider,
-    clientId: clientId.length > 4 ? "••••" + clientId.slice(-4) : "••••",
-    clientSecret: "••••••••",
-  };
-}
-
 export async function getOAuthProvidersAction() {
   await requireAdmin();
   const { listOAuthProviders } = await import("@/src/lib/models/oauth-providers");
-  const providers = await listOAuthProviders();
-  return providers.map(redactProviderSecrets);
+  return listOAuthProviders();
 }
 
 export async function createOAuthProviderAction(data: {
@@ -1057,7 +1059,7 @@ export async function createOAuthProviderAction(data: {
     data: JSON.stringify({ providerId: provider.id }),
   });
   revalidatePath("/settings");
-  return redactProviderSecrets(provider);
+  return toOAuthProviderView(provider);
 }
 
 export async function updateOAuthProviderAction(
@@ -1091,7 +1093,7 @@ export async function updateOAuthProviderAction(
     data: JSON.stringify({ providerId: id, fields: Object.keys(data) }),
   });
   revalidatePath("/settings");
-  return updated ? redactProviderSecrets(updated) : null;
+  return updated ? toOAuthProviderView(updated) : null;
 }
 
 export async function deleteOAuthProviderAction(id: string) {
@@ -1135,7 +1137,7 @@ export async function suppressWafRuleForHostAction(ruleId: number, hostname: str
   }
 }
 
-export async function updateWafSettingsAction(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+async function updateWafSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin();
 
@@ -1173,3 +1175,22 @@ export async function updateWafSettingsAction(_prevState: ActionResult | null, f
     return { success: false, message: error instanceof Error ? error.message : "Failed to save WAF settings" };
   }
 }
+
+export const updateGeneralSettingsAction = serializedSettingsAction(updateGeneralSettingsActionUnlocked);
+export const updateAcmeSettingsAction = serializedSettingsAction(updateAcmeSettingsActionUnlocked);
+export const updateCloudflareSettingsAction = serializedSettingsAction(updateCloudflareSettingsActionUnlocked);
+export const updateDnsProviderSettingsAction = serializedSettingsAction(updateDnsProviderSettingsActionUnlocked);
+export const updateAuthentikSettingsAction = serializedSettingsAction(updateAuthentikSettingsActionUnlocked);
+export const updateMetricsSettingsAction = serializedSettingsAction(updateMetricsSettingsActionUnlocked);
+export const updateLoggingSettingsAction = serializedSettingsAction(updateLoggingSettingsActionUnlocked);
+export const updateTrustedProxiesSettingsAction = serializedSettingsAction(updateTrustedProxiesSettingsActionUnlocked);
+export const updateDnsSettingsAction = serializedSettingsAction(updateDnsSettingsActionUnlocked);
+export const updateUpstreamDnsResolutionSettingsAction = serializedSettingsAction(updateUpstreamDnsResolutionSettingsActionUnlocked);
+export const updateInstanceModeAction = serializedSettingsAction(updateInstanceModeActionUnlocked);
+export const updateSlaveMasterTokenAction = serializedSettingsAction(updateSlaveMasterTokenActionUnlocked);
+export const updateGeoBlockSettingsAction = serializedSettingsAction(updateGeoBlockSettingsActionUnlocked);
+export const updateErrorPagesSettingsAction = serializedSettingsAction(updateErrorPagesSettingsActionUnlocked);
+export const updateDefaultResponseSettingsAction = serializedSettingsAction(updateDefaultResponseSettingsActionUnlocked);
+export const removeWafRuleGloballyAction = serializedSettingsAction(removeWafRuleGloballyActionUnlocked);
+export const suppressWafRuleGloballyAction = serializedSettingsAction(suppressWafRuleGloballyActionUnlocked);
+export const updateWafSettingsAction = serializedSettingsAction(updateWafSettingsActionUnlocked);

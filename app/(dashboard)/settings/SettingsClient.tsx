@@ -32,18 +32,17 @@ import type {
   MetricsSettings,
   LoggingSettings,
   DnsSettings,
-  DnsProviderSettings,
   UpstreamDnsResolutionSettings,
   GeoBlockSettings,
   ErrorPagesSettings,
   TrustedProxiesSettings,
   DefaultResponseSettings,
 } from "@/lib/settings";
-import type { DnsProviderDefinition } from "@/src/lib/dns-providers";
+import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
 import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
 import OAuthProvidersSection from "./OAuthProvidersSection";
-import type { OAuthProvider } from "@/src/lib/models/oauth-providers";
+import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import {
   updateDnsProviderSettingsAction,
   updateGeneralSettingsAction,
@@ -383,7 +382,7 @@ function DetailHeader({ activeId }: { activeId: string }) {
 type Props = {
   general: GeneralSettings | null;
   acme: AcmeSettings | null;
-  dnsProvider: DnsProviderSettings | null;
+  dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
   authentik: AuthentikSettings | null;
   metrics: MetricsSettings | null;
@@ -394,7 +393,7 @@ type Props = {
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
-  oauthProviders: OAuthProvider[];
+  oauthProviders: OAuthProviderView[];
   baseUrl: string;
   instanceSync: {
     mode: "standalone" | "master" | "slave";
@@ -1202,7 +1201,7 @@ function DnsProvidersSection({
   dnsProviderOverride,
   setDnsProviderOverride,
 }: {
-  dnsProvider: DnsProviderSettings | null;
+  dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
   dnsProviderState: { success: boolean; message?: string } | null;
   dnsProviderFormAction: (payload: FormData) => void;
@@ -1765,7 +1764,7 @@ function OAuthSection({
   oauthProviders,
   baseUrl,
 }: {
-  oauthProviders: OAuthProvider[];
+  oauthProviders: OAuthProviderView[];
   baseUrl: string;
 }) {
   return (

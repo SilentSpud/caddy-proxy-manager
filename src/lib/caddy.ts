@@ -63,6 +63,16 @@ import { buildClientAuthentication, groupMtlsDomainsByCaSet, buildMtlsRbacSubrou
 import { buildRoleFingerprintMap, buildCertFingerprintMap, buildRoleCertIdMap } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
+import {
+  FORWARD_AUTH_PROXY_PROOF_HEADER,
+  getForwardAuthProxyProof,
+} from "./forward-auth-trust";
+import { decryptSecret } from "./secret";
+import {
+  CaddyApplyError,
+  logCaddyApplyFailure,
+  safeSystemErrorCode,
+} from "./caddy-apply-error";
 
 const CERTS_DIR = process.env.CERTS_DIRECTORY || join(process.cwd(), "data", "certs");
 mkdirSync(CERTS_DIR, { recursive: true, mode: 0o700 });
@@ -1388,6 +1398,7 @@ async function buildProxyRoutes(
       // Uses CPM itself as the auth provider (replaces Authentik)
       const cpmDialAddress = getCpmDialAddress();
       if (cpmDialAddress) {
+        const cpmProxyProof = getForwardAuthProxyProof();
         const CPM_COPY_HEADERS = [
           "X-CPM-User",
           "X-CPM-Email",
@@ -1451,8 +1462,9 @@ async function buildProxyRoutes(
               set: {
                 "X-Forwarded-Method": ["{http.request.method}"],
                 "X-Forwarded-Uri": ["{http.request.uri}"],
-                "X-Forwarded-Host": ["{http.request.host}"],
-                "X-Forwarded-Proto": ["{http.request.scheme}"]
+                "X-Forwarded-Host": ["{http.request.hostport}"],
+                "X-Forwarded-Proto": ["{http.request.scheme}"],
+                [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof]
               }
             }
           },
@@ -1471,7 +1483,7 @@ async function buildProxyRoutes(
                       status_code: 302,
                       headers: {
                         Location: [
-                          `${config.baseUrl}/portal?rd={http.request.scheme}://{http.request.host}{http.request.uri}`
+                          `${config.baseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri}`
                         ]
                       }
                     }
@@ -1496,8 +1508,9 @@ async function buildProxyRoutes(
               headers: {
                 request: {
                   set: {
-                    "X-Forwarded-Host": ["{http.request.host}"],
-                    "X-Forwarded-Proto": ["{http.request.scheme}"]
+                    "X-Forwarded-Host": ["{http.request.hostport}"],
+                    "X-Forwarded-Proto": ["{http.request.scheme}"],
+                    [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof]
                   }
                 }
               }
@@ -2392,7 +2405,7 @@ export async function buildCaddyDocument() {
     type: c.type as "managed" | "imported",
     domainNames: c.domainNames,
     certificatePem: c.certificatePem,
-    privateKeyPem: c.privateKeyPem,
+    privateKeyPem: c.privateKeyPem ? decryptSecret(c.privateKeyPem) : null,
     autoRenew: c.autoRenew ? 1 : 0,
     providerOptions: c.providerOptions
   }));
@@ -2742,29 +2755,34 @@ export async function applyCaddyConfig() {
   const hash = crypto.createHash("sha256").update(payload).digest("hex");
   setSetting("caddy_config_hash", { hash, updatedAt: nowIso() });
 
+  let response: { status: number; text: string };
   try {
-    const response = await caddyRequest(`${config.caddyApiUrl}/load`, "POST", payload);
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Caddy config load failed: ${response.status} ${response.text}`);
+    response = await caddyRequest(`${config.caddyApiUrl}/load`, "POST", payload);
+  } catch (error) {
+    const systemCode = safeSystemErrorCode(error);
+    logCaddyApplyFailure("Caddy admin request failed", error);
+    if (systemCode === "ENOTFOUND" || systemCode === "ECONNREFUSED") {
+      throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
     }
+    throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
+  }
 
+  if (response.status < 200 || response.status >= 300) {
+    logCaddyApplyFailure("Caddy rejected configuration", undefined, {
+      status: response.status,
+      responseBytes: Buffer.byteLength(response.text),
+    });
+    throw new CaddyApplyError("Caddy rejected configuration", "CADDY_REJECTED");
+  }
+
+  try {
     await syncInstances();
   } catch (error) {
-    console.error("Failed to apply Caddy config", error);
-
-    // Check if it's a fetch error with ECONNREFUSED or ENOTFOUND
-    const err = error as { cause?: NodeJS.ErrnoException };
-    const causeCode = err?.cause?.code;
-
-    if (causeCode === "ENOTFOUND" || causeCode === "ECONNREFUSED") {
-      throw new Error(
-        `Unable to reach Caddy API at ${config.caddyApiUrl}. Ensure Caddy is running and accessible.`,
-        { cause: error }
-      );
-    }
-
-    throw error;
+    logCaddyApplyFailure("Instance synchronization failed after Caddy apply", error);
+    throw new CaddyApplyError(
+      "Caddy configuration applied but instance synchronization failed",
+      "INSTANCE_SYNC_FAILED"
+    );
   }
 }
 

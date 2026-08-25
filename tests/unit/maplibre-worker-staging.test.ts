@@ -6,6 +6,7 @@ import {
   copyMaplibreWorker,
   WORKER_PUBLIC_PATH,
 } from '../../scripts/copy-maplibre-worker.mjs';
+import { buildCsp } from '@/src/lib/csp';
 
 /**
  * maplibre-gl v6 loads its tile worker from a separate ES module that Turbopack
@@ -64,8 +65,10 @@ describe('maplibre worker staging', () => {
   });
 
   it("CSP allows loading the worker from 'self'", () => {
-    const proxy = readFileSync(join(projectRoot, 'proxy.ts'), 'utf8');
-    const workerSrc = proxy.match(/"worker-src ([^"]+)"/);
-    expect(workerSrc?.[1]).toContain("'self'");
+    const workerSrc = buildCsp('map-worker-test')
+      .split(';')
+      .map((directive) => directive.trim())
+      .find((directive) => directive.startsWith('worker-src '));
+    expect(workerSrc).toContain("'self'");
   });
 });

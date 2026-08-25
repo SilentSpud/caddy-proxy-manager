@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Globe, MoreHorizontal, ArrowRight, Shield, Bug, MapPin, Scale, KeyRound, UserCheck, CornerRightDown, Replace, Ban, GitBranch, ShieldCheck, LogIn } from "lucide-react";
 import type { AccessList } from "@/lib/models/access-lists";
-import type { Certificate } from "@/lib/models/certificates";
+import type { CertificatePickerOption } from "@/lib/certificate-api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { AuthentikSettings } from "@/lib/settings";
@@ -34,7 +34,7 @@ type ForwardAuthAccessMap = Record<number, { userIds: number[]; groupIds: number
 
 type Props = {
   hosts: ProxyHost[];
-  certificates: Certificate[];
+  certificates: CertificatePickerOption[];
   accessLists: AccessList[];
   caCertificates: CaCertificate[];
   authentikDefaults: AuthentikSettings | null;

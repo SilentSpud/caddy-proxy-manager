@@ -78,9 +78,8 @@ test.describe('Certificates', () => {
     const domain = `acme-wc-${Date.now()}.example`;
 
     // Auto-managed wildcard hosts require a DNS provider (ACME DNS-01 challenge).
-    // Configure one for this test and restore the original afterwards.
+    // Configure one for this isolated test stack and clear it afterwards.
     const dnsProviderUrl = `${API}/settings/dns-provider`;
-    const originalDns = await (await page.request.get(dnsProviderUrl, { headers: { Origin: BASE_URL } })).json();
     const setDnsRes = await page.request.put(dnsProviderUrl, {
       data: { providers: { duckdns: { api_token: 'e2e-fake-token' } }, default: 'duckdns' },
       headers,
@@ -129,7 +128,7 @@ test.describe('Certificates', () => {
       if (subHostId) await page.request.delete(`${API}/proxy-hosts/${subHostId}`, { headers });
       if (wcHostId) await page.request.delete(`${API}/proxy-hosts/${wcHostId}`, { headers });
       await page.request.put(dnsProviderUrl, {
-        data: originalDns && Object.keys(originalDns).length ? originalDns : { providers: {}, default: null },
+        data: { providers: {}, default: null },
         headers,
       });
     }
@@ -180,7 +179,7 @@ test.describe('Certificates', () => {
     }
   });
 
-  test('imports a certificate via the UI form preserving PEM newlines (#157)', async ({ page }) => {
+  test('imports a multiline private key without exposing it through the API (#157)', async ({ page }) => {
     const BASE_URL = 'http://localhost:3000';
     const API = `${BASE_URL}/api/v1`;
     const headers = { 'Content-Type': 'application/json', 'Origin': BASE_URL };
@@ -216,23 +215,24 @@ test.describe('Certificates', () => {
       const keyField = drawer.getByLabel(/private key pem/i);
       await keyField.click();
       await keyField.fill(privateKeyPem);
+      expect(await keyField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
+      expect(await keyField.inputValue()).toBe(privateKeyPem);
 
       await drawer.getByRole('button', { name: /import certificate|save changes/i }).click();
       await expect(drawer).not.toBeVisible({ timeout: 10_000 });
 
-      // Verify via the API that the persisted PEM still contains its original
-      // newlines — this is what would fail if the password-input regressed.
+      // The ordinary API confirms that a key is stored but must never return
+      // the key itself. The textarea assertions above guard newline handling.
       const listRes = await page.request.get(`${API}/certificates`, { headers: { Origin: BASE_URL } });
       expect(listRes.ok()).toBe(true);
-      const list = await listRes.json() as Array<{ id: number; name: string; privateKeyPem: string | null }>;
+      const listBody = await listRes.text();
+      const list = JSON.parse(listBody) as Array<{ id: number; name: string; hasPrivateKey: boolean }>;
       const created = list.find((c) => c.name === certName);
       expect(created).toBeTruthy();
       createdId = created!.id;
-      expect(created!.privateKeyPem).toContain('-----BEGIN');
-      expect(created!.privateKeyPem).toContain('-----END');
-      expect(created!.privateKeyPem!.split('\n').length).toBeGreaterThan(3);
-      // The persisted key must round-trip byte-for-byte (ignoring trailing whitespace).
-      expect(created!.privateKeyPem!.trimEnd()).toBe(privateKeyPem.trimEnd());
+      expect(created!.hasPrivateKey).toBe(true);
+      expect(listBody).not.toContain(privateKeyPem);
+      expect(listBody).not.toContain('privateKeyPem');
     } finally {
       if (createdId !== null) {
         await page.request.delete(`${API}/certificates/${createdId}`, { headers }).catch(() => undefined);

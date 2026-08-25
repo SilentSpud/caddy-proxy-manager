@@ -1,11 +1,13 @@
 import SettingsClient from "./SettingsClient";
 import { getGeneralSettings, getAcmeSettings, getAuthentikSettings, getMetricsSettings, getLoggingSettings, getDnsSettings, getDnsProviderSettings, getSetting, getUpstreamDnsResolutionSettings, getGeoBlockSettings, getErrorPagesSettings, getTrustedProxiesSettings, getDefaultResponseSettings } from "@/src/lib/settings";
 import { getInstanceMode, getSlaveLastSync, getSlaveMasterToken, isInstanceModeFromEnv, isSyncTokenFromEnv, getEnvSlaveInstances } from "@/src/lib/instance-sync";
+import { toEnvSlaveInstanceView } from "@/src/lib/instance-sync-view";
 import { listInstances } from "@/src/lib/models/instances";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
+import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
 
 export default async function SettingsPage() {
   await requireAdmin();
@@ -52,13 +54,15 @@ export default async function SettingsPage() {
     : [null, null];
 
   const instances = instanceMode === "master" ? await listInstances() : [];
-  const envInstances = instanceMode === "master" ? getEnvSlaveInstances() : [];
+  const envInstances = instanceMode === "master"
+    ? getEnvSlaveInstances().map(toEnvSlaveInstanceView)
+    : [];
 
   return (
     <SettingsClient
       general={general}
       acme={acme}
-      dnsProvider={dnsProvider}
+      dnsProvider={dnsProvider ? redactDnsProviderSettingsForApi(dnsProvider) : null}
       dnsProviderDefinitions={DNS_PROVIDERS}
       authentik={authentik}
       metrics={metrics}
