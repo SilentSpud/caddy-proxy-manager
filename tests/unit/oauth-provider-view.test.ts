@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  oauthCallbackUrl,
   toOAuthProviderView,
   withOAuthClientSecretRotation,
 } from "@/src/lib/oauth-provider-view";
@@ -25,6 +26,13 @@ const provider = {
 };
 
 describe("OAuth provider browser boundary", () => {
+  it("uses Better Auth 1.7's standard, path-safe social callback URL", () => {
+    expect(oauthCallbackUrl("https://cpm.example.com/", "team/provider"))
+      .toBe("https://cpm.example.com/api/auth/callback/team%2Fprovider");
+    expect(oauthCallbackUrl("https://cpm.example.com", "provider-id"))
+      .not.toContain("/oauth2/callback/");
+  });
+
   it("uses an allowlisted view that cannot serialize existing or future secrets", () => {
     const view = toOAuthProviderView({
       ...provider,

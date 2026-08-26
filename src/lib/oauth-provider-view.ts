@@ -43,6 +43,12 @@ export function toOAuthProviderView(provider: OAuthProvider): OAuthProviderView 
   };
 }
 
+/** Better Auth 1.7 uses the standard social-provider callback route. */
+export function oauthCallbackUrl(baseUrl: string, providerId: string): string {
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+  return `${normalizedBaseUrl}/api/auth/callback/${encodeURIComponent(providerId)}`;
+}
+
 /**
  * Preserve the stored secret unless the administrator explicitly supplies a
  * replacement. Omitting the property is important: an empty string would

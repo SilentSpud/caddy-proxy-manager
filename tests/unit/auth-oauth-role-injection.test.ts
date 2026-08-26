@@ -130,4 +130,24 @@ describe('mapOAuthProvider — OAuth self-registration gating (M2)', () => {
     const cfg = mapOAuthProvider(sampleProvider);
     expect(cfg.disableImplicitSignUp).toBe(true);
   });
+
+  it('uses a trusted stable account issuer and the Better Auth 1.7 config shape', () => {
+    const cfg = mapOAuthProvider(sampleProvider);
+
+    expect(cfg.accountIssuer).toBe('https://idp.example/');
+    expect(cfg.discoveryUrl).toBe('https://idp.example/.well-known/openid-configuration');
+    expect(cfg).not.toHaveProperty('issuer');
+  });
+
+  it('isolates issuerless OAuth providers in an encoded synthetic namespace', () => {
+    const cfg = mapOAuthProvider({
+      ...sampleProvider,
+      id: 'team/provider',
+      issuer: null,
+      authorizationUrl: 'https://idp.example/authorize',
+      tokenUrl: 'https://idp.example/token',
+    });
+
+    expect(cfg.accountIssuer).toBe('local:oauth:team%2Fprovider');
+  });
 });

@@ -163,7 +163,7 @@ function ensureTestUser(username: string, password: string, role: string) {
       if (acc) {
         db.run("UPDATE accounts SET password = ?, updatedAt = ? WHERE id = ?", [hash, now, acc.id]);
       } else {
-        db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+        db.run("INSERT INTO accounts (userId, issuer, accountId, providerId, password, createdAt, updatedAt) VALUES (?, 'local:credential', ?, 'credential', ?, ?, ?)",
           [existing.id, String(existing.id), hash, now, now]);
       }
     } else {
@@ -172,7 +172,7 @@ function ensureTestUser(username: string, password: string, role: string) {
         [email, "${username}", hash, "${role}", "${username}", "${username}", now, now]
       );
       const user = db.query("SELECT id FROM users WHERE email = ?").get(email);
-      db.run("INSERT INTO accounts (userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?)",
+      db.run("INSERT INTO accounts (userId, issuer, accountId, providerId, password, createdAt, updatedAt) VALUES (?, 'local:credential', ?, 'credential', ?, ?, ?)",
         [user.id, String(user.id), hash, now, now]);
     }
   `;

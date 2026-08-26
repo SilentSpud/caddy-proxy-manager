@@ -7,6 +7,7 @@ import { config } from "./config";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
 import type { OAuthProvider } from "./models/oauth-providers";
 import type { GenericOAuthConfig } from "better-auth/plugins";
+import { resolveOAuthAccountIssuer } from "./account-issuer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedAuth: any = null;
@@ -25,12 +26,15 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     // auto-provisioning of an unknown identity is gated. Controlled by its own
     // flag, independent of credential self-registration.
     disableImplicitSignUp: !config.auth.allowOauthRegistration,
+    // Better Auth 1.7 scopes external identities by (issuer, accountId).
+    // Pin the namespace to trusted application configuration so a provider
+    // cannot choose or change its account namespace through profile claims.
+    accountIssuer: resolveOAuthAccountIssuer(p.id, p.issuer),
   };
   if (p.authorizationUrl) cfg.authorizationUrl = p.authorizationUrl;
   if (p.tokenUrl) cfg.tokenUrl = p.tokenUrl;
   if (p.userinfoUrl) cfg.userInfoUrl = p.userinfoUrl;
   if (p.issuer) {
-    cfg.issuer = p.issuer;
     // Only use discovery when explicit URLs are not provided
     if (!p.authorizationUrl && !p.tokenUrl) {
       cfg.discoveryUrl = p.issuer.replace(/\/$/, "") + "/.well-known/openid-configuration";

@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+  oauthCallbackUrl,
   withOAuthClientSecretRotation,
   type OAuthProviderView,
 } from "@/src/lib/oauth-provider-view";
@@ -70,7 +71,7 @@ export default function OAuthProvidersSection({ initialProviders, baseUrl }: OAu
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const callbackUrl = useCallback(
-    (providerId: string) => `${baseUrl}/api/auth/oauth2/callback/${providerId}`,
+    (providerId: string) => oauthCallbackUrl(baseUrl, providerId),
     [baseUrl]
   );
 
