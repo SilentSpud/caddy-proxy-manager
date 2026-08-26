@@ -176,11 +176,13 @@ export async function deleteOAuthProvider(id: string): Promise<void> {
   await db.delete(oauthProviders).where(eq(oauthProviders.id, id));
 }
 
-export async function getProviderDisplayList(): Promise<Array<{ id: string; name: string }>> {
+export async function getProviderDisplayList(): Promise<
+  Array<{ id: string; name: string; autoLink: boolean }>
+> {
   const rows = await db.query.oauthProviders.findMany({
     where: (table, { eq }) => eq(table.enabled, true),
     orderBy: (table, { asc }) => asc(table.name),
-    columns: { id: true, name: true },
+    columns: { id: true, name: true, autoLink: true },
   });
-  return rows.map((r) => ({ id: r.id, name: r.name }));
+  return rows.map((r) => ({ id: r.id, name: r.name, autoLink: r.autoLink }));
 }

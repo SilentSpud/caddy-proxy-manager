@@ -364,7 +364,18 @@ The `BASE_URL` environment variable must match exactly where users access your d
 
 > **Upgrading from < 1.0-RC:** The old callback URL (`/api/auth/callback/oauth2`) no longer works. Update your OAuth provider's redirect URI to the new format shown in **Settings → OAuth Providers**.
 
-OAuth login appears on the login page alongside credentials. Users can link OAuth to existing accounts from the Profile page.
+OAuth login appears on the login page alongside credentials.
+
+**Account linking:**
+
+Attaching an OAuth identity to an existing CPM user requires **Auto-link accounts** to be enabled for that provider (**Settings → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers). The switch marks the provider as trusted to prove that its identity owns the CPM account carrying the same email address, so leave it off for any IdP where users can register an arbitrary email themselves.
+
+With it enabled:
+
+- Signing in through the provider links the identity to the existing user with the matching email.
+- **Profile → OAuth Connections** can link the provider to the signed-in account. The provider's email must match the signed-in user's email.
+
+With it disabled, both paths are refused and the provider redirects to `/api/auth/error?error=account_not_linked`.
 
 ---
 

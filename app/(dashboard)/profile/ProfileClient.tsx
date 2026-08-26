@@ -72,7 +72,7 @@ interface UserData {
 
 interface ProfileClientProps {
   user: UserData;
-  enabledProviders: Array<{ id: string; name: string }>;
+  enabledProviders: Array<{ id: string; name: string; autoLink: boolean }>;
   apiTokens: ApiToken[];
   sessions: ActiveSession[];
 }
@@ -181,22 +181,22 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
     setLoading(true);
 
     try {
-      // Set a cookie to indicate this is a linking attempt
-      const response = await fetch("/api/user/link-oauth-start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: providerId })
+      // linkSocial (not signIn.social) binds the identity to the session user
+      // and requires the provider email to match, so an unrelated IdP account
+      // cannot silently swap the browser onto a different CPM user.
+      const { error: linkError } = await authClient.linkSocial({
+        provider: providerId,
+        callbackURL: "/profile",
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        setError(data.error || "Failed to start OAuth linking");
+      if (linkError) {
+        setError(
+          linkError.message ||
+            "Failed to start OAuth linking. Enable \"Auto-link accounts\" for this provider first."
+        );
         setLoading(false);
-        return;
       }
-
-      // Now initiate OAuth flow
-      await authClient.signIn.social({ provider: providerId, callbackURL: "/profile" });
+      // On success the client follows the provider redirect.
     } catch {
       setError("An error occurred while linking OAuth");
       setLoading(false);
@@ -575,15 +575,23 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
 
                   <div className="flex flex-col gap-2">
                     {enabledProviders.map((provider) => (
-                      <Button
-                        key={provider.id}
-                        variant="outline"
-                        onClick={() => handleLinkOAuth(provider.id)}
-                        className="w-full"
-                      >
-                        <LogIn className="h-4 w-4 mr-2" />
-                        Link {provider.name}
-                      </Button>
+                      <div key={provider.id} className="flex flex-col gap-1">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleLinkOAuth(provider.id)}
+                          disabled={!provider.autoLink}
+                          className="w-full"
+                        >
+                          <LogIn className="h-4 w-4 mr-2" />
+                          Link {provider.name}
+                        </Button>
+                        {!provider.autoLink && (
+                          <p className="text-xs text-muted-foreground">
+                            Enable &quot;Auto-link accounts&quot; for {provider.name} in
+                            Settings → OAuth Providers to allow linking.
+                          </p>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
