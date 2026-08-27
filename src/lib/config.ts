@@ -1,3 +1,5 @@
+import { passwordPolicyFailures } from "./password-policy";
+
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
 const DEFAULT_ADMIN_USERNAME = "admin";
 const DEFAULT_ADMIN_PASSWORD = "admin";
@@ -8,7 +10,6 @@ const DISALLOWED_SESSION_SECRETS = new Set([
 const DEFAULT_CADDY_URL =
   process.env.NODE_ENV === "development" ? "http://localhost:2019" : "http://caddy:2019";
 const MIN_SESSION_SECRET_LENGTH = 32;
-const MIN_ADMIN_PASSWORD_LENGTH = 12;
 const DEFAULT_APP_NAME = "Caddy Proxy Manager";
 
 /**
@@ -26,6 +27,12 @@ const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
  * which is how an air-gapped or privacy-sensitive deployment guarantees no
  * browser ever reaches out to gravatar.com.
  */
+function resolveLegacyPasswordChangeEnv(): boolean | null {
+  const raw = process.env.AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return null;
+  return raw !== "false" && raw !== "0" && raw !== "no";
+}
+
 function resolveGravatarEnv(): boolean | null {
   const raw = process.env.AVATAR_GRAVATAR?.trim().toLowerCase();
   if (raw === undefined || raw === "") return null;
@@ -137,17 +144,8 @@ function resolveAdminCredentials(): { username: string | null; password: string 
     if (!rawPassword || password === DEFAULT_ADMIN_PASSWORD) {
       errors.push("ADMIN_PASSWORD must be set to a custom value in production (not 'admin')");
     } else {
-      if (password.length < MIN_ADMIN_PASSWORD_LENGTH) {
-        errors.push(`ADMIN_PASSWORD must be at least ${MIN_ADMIN_PASSWORD_LENGTH} characters long`);
-      }
-      if (!/[A-Z]/.test(password) || !/[a-z]/.test(password)) {
-        errors.push("ADMIN_PASSWORD must include both uppercase and lowercase letters");
-      }
-      if (!/[0-9]/.test(password)) {
-        errors.push("ADMIN_PASSWORD must include at least one number");
-      }
-      if (!/[^A-Za-z0-9]/.test(password)) {
-        errors.push("ADMIN_PASSWORD must include at least one special character");
+      for (const failure of passwordPolicyFailures(password)) {
+        errors.push(`ADMIN_PASSWORD ${failure}`);
       }
     }
 
@@ -215,6 +213,10 @@ export const config = {
     // Defaults to false: role/status are forced to safe defaults regardless of
     // claims. Only enable if you control the IdP and want it to manage roles.
     allowOauthRoleFromClaims: process.env.AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS === "true",
+    // Force a password reset for anyone still on a pre-argon2id bcrypt hash.
+    // true/false when AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH pins it, null
+    // when the stored setting decides.
+    requirePasswordChangeOnLegacyHashFromEnv: resolveLegacyPasswordChangeEnv(),
   },
   oauth: {
     enabled: process.env.OAUTH_ENABLED === "true",

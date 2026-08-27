@@ -55,6 +55,10 @@ test.describe('Profile', () => {
       .last()
       .click();
 
-    await expect(page.locator('text=/at least 12 characters/i')).toBeVisible({ timeout: 5000 });
+    // Scoped to the error banner (role="alert"): the field's own hint states the
+    // same rule, so an unscoped text match now finds both and fails on strict mode.
+    await expect(
+      page.getByRole('alert').filter({ hasText: /at least 12 characters/i }),
+    ).toBeVisible({ timeout: 5000 });
   });
 });

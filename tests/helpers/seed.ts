@@ -52,7 +52,7 @@ export function ensureTestUser(username: string, password: string, role: string)
     const db = new Database(${JSON.stringify(DB)});
     db.run("PRAGMA busy_timeout = 5000");
     const email = ${JSON.stringify(`${username}@localhost`)};
-    const hash = await Bun.password.hash(${JSON.stringify(password)}, { algorithm: "bcrypt", cost: 12 });
+    const hash = await Bun.password.hash(${JSON.stringify(password)}, { algorithm: "argon2id" });
     const now = new Date().toISOString();
     const existing = db.query("SELECT id FROM users WHERE email = ?").get(email);
     if (existing) {
@@ -153,4 +153,65 @@ export function getUserRecord(email: string): SeededUserRecord {
   // container's stdout, so take the JSON object rather than the whole stream.
   const json = output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1);
   return JSON.parse(json) as SeededUserRecord;
+}
+
+/**
+ * Rewrite an existing user's password hash to bcrypt, the algorithm this app
+ * used before argon2id.
+ *
+ * Fixtures for the legacy-password gate cannot be produced through the UI —
+ * every path there now writes argon2id — so the "old" state has to be planted
+ * directly. Both the `users` row and the `credential` account row are rewritten,
+ * because Better Auth authenticates against the account while the gate reads the
+ * user, and updating one without the other tests nothing real.
+ */
+export function downgradeUserToBcrypt(email: string, password: string): void {
+  runSeedScript(`
+    import { Database } from "bun:sqlite";
+    const db = new Database(${JSON.stringify(DB)});
+    db.run("PRAGMA busy_timeout = 5000");
+    const hash = await Bun.password.hash(${JSON.stringify(password)}, { algorithm: "bcrypt", cost: 10 });
+    const now = new Date().toISOString();
+    const user = db.query("SELECT id FROM users WHERE email = ?").get(${JSON.stringify(email)});
+    if (!user) {
+      console.error("User not found");
+      process.exit(1);
+    }
+    db.run("UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?", [hash, now, user.id]);
+    db.run("UPDATE accounts SET password = ?, updatedAt = ? WHERE userId = ? AND providerId = 'credential'",
+      [hash, now, user.id]);
+  `);
+}
+
+/** The algorithm prefix of a user's stored hash, e.g. "$argon2id" or "$2b". */
+export function getUserHashAlgorithm(email: string): string {
+  return runSeedScript(`
+    import { Database } from "bun:sqlite";
+    const db = new Database(${JSON.stringify(DB)});
+    const user = db.query("SELECT passwordHash FROM users WHERE email = ?").get(${JSON.stringify(email)});
+    console.log((user?.passwordHash ?? "").split("$").slice(0, 2).join("$"));
+  `).trim();
+}
+
+/** Write a settings row directly, for policies with no seeding API of their own. */
+export function setSettingRow(key: string, value: unknown): void {
+  runSeedScript(`
+    import { Database } from "bun:sqlite";
+    const db = new Database(${JSON.stringify(DB)});
+    db.run("PRAGMA busy_timeout = 5000");
+    db.run(
+      "INSERT INTO settings (key, value, updatedAt) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt",
+      [${JSON.stringify(key)}, ${JSON.stringify(JSON.stringify(value))}, new Date().toISOString()]
+    );
+  `);
+}
+
+/** Remove a settings row, restoring the built-in default. */
+export function clearSettingRow(key: string): void {
+  runSeedScript(`
+    import { Database } from "bun:sqlite";
+    const db = new Database(${JSON.stringify(DB)});
+    db.run("PRAGMA busy_timeout = 5000");
+    db.run("DELETE FROM settings WHERE key = ?", [${JSON.stringify(key)}]);
+  `);
 }

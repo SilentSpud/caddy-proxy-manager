@@ -16,6 +16,7 @@ import {
 } from "./oidc-groups";
 import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
+import { hashPassword, verifyPassword } from "./password";
 
 // biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
 let cachedAuth: any = null;
@@ -216,12 +217,10 @@ function createAuth(): any {
       disableSignUp: !config.auth.allowSelfRegistration,
       password: {
         async hash(password: string) {
-          const bcrypt = await import("bcryptjs");
-          return bcrypt.default.hashSync(password, 12);
+          return hashPassword(password);
         },
         async verify({ hash, password }: { hash: string; password: string }) {
-          const bcrypt = await import("bcryptjs");
-          return bcrypt.default.compareSync(password, hash);
+          return verifyPassword(password, hash);
         },
       },
     },

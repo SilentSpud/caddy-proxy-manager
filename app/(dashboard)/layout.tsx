@@ -5,10 +5,20 @@ import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import { getModuleGateState } from "@/src/lib/caddy-build";
 import { ModuleGateProvider } from "@/components/caddy-modules/ModuleGate";
+import { requiresLegacyPasswordChange } from "@/src/lib/services/legacy-password";
+import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireUser();
+
+  // Gate the whole dashboard rather than individual pages: a user still on a
+  // bcrypt hash must land on the reset screen no matter which URL they opened.
+  // The reset page lives outside this layout, so this cannot loop.
+  if (await requiresLegacyPasswordChange(Number(session.user.id))) {
+    redirect("/password-change");
+  }
+
   // auth() reads email/role fresh from the database, so the session already
   // carries everything the avatar needs.
   const avatar = resolveAvatar(

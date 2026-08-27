@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import { hashPassword } from "./password";
 import db, { nowIso } from "./db";
 import { CREDENTIAL_ISSUER } from "./account-issuer";
 import { config } from "./config";
@@ -35,7 +35,7 @@ export async function ensureAdminUser(): Promise<void> {
   const subject = adminUsername;
 
   // Hash the admin password for secure storage
-  const passwordHash = bcrypt.hashSync(adminPassword, 12);
+  const passwordHash = await hashPassword(adminPassword);
 
   // Check if admin user already exists
   const existingUser = await db.query.users.findFirst({

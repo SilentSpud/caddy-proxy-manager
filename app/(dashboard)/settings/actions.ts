@@ -30,6 +30,7 @@ import {
   saveErrorPagesSettings,
   saveTrustedProxiesSettings,
   saveAvatarSettings,
+  savePasswordPolicySettings,
   saveCaddyBuildSettings,
 } from "@/src/lib/settings";
 import {
@@ -423,6 +424,42 @@ export async function updateAuthentikSettingsAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save Authentik settings",
+    };
+  }
+}
+
+export async function updatePasswordPolicySettingsAction(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    // The env var pins the behaviour; refuse rather than silently storing a
+    // preference the environment overrides.
+    if (config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null) {
+      return {
+        success: false,
+        message:
+          "This policy is controlled by the AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH environment variable and cannot be changed here.",
+      };
+    }
+
+    const requireChangeOnLegacyHash = formData.get("requireChangeOnLegacyHash") === "on";
+    await savePasswordPolicySettings({ requireChangeOnLegacyHash });
+
+    revalidatePath("/settings");
+    return {
+      success: true,
+      message: requireChangeOnLegacyHash
+        ? "Users with an older password hash will be asked to choose a new password at next sign-in"
+        : "Password migration prompt disabled",
+    };
+  } catch (error) {
+    console.error("Failed to save password policy settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save password policy settings",
     };
   }
 }

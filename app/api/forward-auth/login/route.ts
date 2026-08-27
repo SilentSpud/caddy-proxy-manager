@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
+import { verifyPassword } from "@/src/lib/password";
 import db from "@/src/lib/db";
 import { config } from "@/src/lib/config";
 import { lastHeaderValue } from "@/src/lib/request-headers";
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+    const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
       registerFailedAttempt(ip);
       logAuditEvent({

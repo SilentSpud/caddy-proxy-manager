@@ -13,6 +13,7 @@ import {
   getErrorPagesSettings,
   getTrustedProxiesSettings,
   getAvatarSettings,
+  getPasswordPolicySettings,
   getCaddyBuildSettings,
 } from "@/src/lib/settings";
 import {
@@ -56,6 +57,7 @@ export default async function SettingsPage() {
     trustedProxies,
     oauthProviders,
     avatarSettings,
+    passwordPolicySettings,
     caddyBuild,
   ] = await Promise.all([
     getGeneralSettings(),
@@ -72,6 +74,7 @@ export default async function SettingsPage() {
     getTrustedProxiesSettings(),
     listOAuthProviders(),
     getAvatarSettings(),
+    getPasswordPolicySettings(),
     getCaddyBuildSettings(),
   ]);
 
@@ -130,6 +133,14 @@ export default async function SettingsPage() {
         // The stored toggle only applies when AVATAR_GRAVATAR leaves the choice open.
         gravatarEnabled: config.avatars.gravatarFromEnv ?? avatarSettings?.gravatarEnabled ?? true,
         fromEnv: config.avatars.gravatarFromEnv !== null,
+      }}
+      passwordPolicy={{
+        // The stored toggle only applies when the env var leaves the choice open.
+        requireChangeOnLegacyHash:
+          config.auth.requirePasswordChangeOnLegacyHashFromEnv ??
+          passwordPolicySettings?.requireChangeOnLegacyHash ??
+          false,
+        fromEnv: config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null,
       }}
       caddyBuild={caddyBuild}
       baseUrl={config.baseUrl}

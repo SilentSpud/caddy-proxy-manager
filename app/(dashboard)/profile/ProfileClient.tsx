@@ -33,6 +33,7 @@ import { formatDistanceToNow } from "date-fns";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
+import { PASSWORD_POLICY_HINT, passwordPolicyError } from "@/src/lib/password-policy";
 
 interface ActiveSession {
   id: number;
@@ -162,8 +163,9 @@ export default function ProfileClient({
       return;
     }
 
-    if (newPassword.length < 12) {
-      setError("Password must be at least 12 characters long");
+    const policyError = passwordPolicyError(newPassword);
+    if (policyError) {
+      setError(policyError);
       return;
     }
 
@@ -744,7 +746,7 @@ export default function ProfileClient({
             type="password"
             value={newPassword}
             onChange={setNewPassword}
-            description="Minimum 12 characters"
+            description={PASSWORD_POLICY_HINT}
           />
           <TextInput
             {...AUTOFILL_NEW_PASSWORD}

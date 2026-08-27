@@ -12,6 +12,7 @@ import {
 } from "@/src/lib/models/user";
 import { logAuditEvent } from "@/src/lib/audit";
 import { config } from "@/src/lib/config";
+import { hashPassword } from "@/src/lib/password";
 
 const VALID_ROLES = new Set<User["role"]>(["admin", "user", "viewer"]);
 
@@ -35,8 +36,7 @@ export async function createUserAction(formData: FormData) {
     throw new Error("Email and password are required");
   }
 
-  const bcrypt = await import("bcryptjs");
-  const passwordHash = bcrypt.default.hashSync(password, 12);
+  const passwordHash = await hashPassword(password);
 
   const user = await createUser({
     email,

@@ -43,7 +43,6 @@ export interface IssuedClientCertificateConfig {
   commonName: string;
   exportPassword: string;
   validityDays?: number;
-  compatibilityMode?: boolean;
 }
 
 async function openCertificatesTab(page: Page, tabName: RegExp): Promise<void> {
@@ -236,11 +235,6 @@ export async function issueClientCertificate(
     await dialog.getByRole('spinbutton', { name: /^Validity/ }).fill(String(config.validityDays));
   }
   await dialog.getByRole('textbox', { name: /^Export Password/ }).fill(config.exportPassword);
-
-  const shouldBeChecked = config.compatibilityMode ?? true;
-  if (!shouldBeChecked) {
-    await dialog.locator('input[name="compatibility_mode"]').click({ force: true });
-  }
 
   await dialog.getByRole('button', { name: /issue certificate/i }).click();
   await expect(dialog.getByRole('button', { name: /download client certificate/i })).toBeVisible({

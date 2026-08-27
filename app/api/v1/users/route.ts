@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
 import { config } from "@/src/lib/config";
+import { hashPassword } from "@/src/lib/password";
 
 const VALID_ROLES = new Set(["admin", "user", "viewer"]);
 
@@ -45,8 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    const bcrypt = await import("bcryptjs");
-    const passwordHash = bcrypt.default.hashSync(password, 12);
+    const passwordHash = await hashPassword(password);
 
     const user = await createUser({
       email,

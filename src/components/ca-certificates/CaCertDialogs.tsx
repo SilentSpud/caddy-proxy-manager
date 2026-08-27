@@ -13,6 +13,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
+import { PASSWORD_POLICY_HINT, passwordPolicyError } from "@/src/lib/password-policy";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
@@ -82,13 +83,11 @@ export function IssueClientCertDialog({
     pkcs12Base64: string;
     name: string;
     passwordProtected: boolean;
-    exportAlgorithm: "3des" | "aes256";
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [commonName, setCommonName] = useState("");
   const [validityDays, setValidityDays] = useState(365);
   const [exportPassword, setExportPassword] = useState("");
-  const [compatibilityMode, setCompatibilityMode] = useState(true);
   const formRef = useRef<HTMLFormElement>(null);
 
   // Controlled fields, so a reopened dialog starts clean rather than showing
@@ -98,7 +97,6 @@ export function IssueClientCertDialog({
     setCommonName("");
     setValidityDays(365);
     setExportPassword("");
-    setCompatibilityMode(true);
   }, [open]);
 
   function handleClose() {
@@ -111,6 +109,15 @@ export function IssueClientCertDialog({
     e.preventDefault();
     const formData = new FormData(formRef.current!);
     setError(null);
+
+    // The server enforces this too; checking here just avoids a round trip and
+    // a 4096-bit keygen for a password that was never going to be accepted.
+    const policyError = passwordPolicyError(exportPassword, "Export password");
+    if (policyError) {
+      setError(policyError);
+      return;
+    }
+
     startTransition(async () => {
       try {
         const result = await issueClientCertificateAction(cert.id, formData);
@@ -156,8 +163,7 @@ export function IssueClientCertDialog({
             description="Download the .p12 bundle now. It contains the client certificate, private key, and CA chain, and the private key will not be stored."
           />
           <Text type="body" size="sm" color="secondary">
-            Export format:{" "}
-            {issued.exportAlgorithm === "3des" ? "Compatibility mode (3DES)" : "AES-256"}.
+            Export format: AES-256.
           </Text>
           <Button
             variant="secondary"
@@ -208,14 +214,7 @@ export function IssueClientCertDialog({
               value={exportPassword}
               onChange={setExportPassword}
               isRequired
-              description="Used to protect the .p12 bundle when importing it into operating systems and browsers"
-            />
-            <Switch
-              label="Compatibility mode"
-              htmlName="compatibility_mode"
-              value={compatibilityMode}
-              onChange={setCompatibilityMode}
-              description="Enabled uses 3DES for broader OS/browser import compatibility. Disabled uses AES-256."
+              description={`Protects the .p12 when importing it into an OS or browser. ${PASSWORD_POLICY_HINT}.`}
             />
             {error && (
               <Banner status="error" title="Could not issue certificate" description={error} />

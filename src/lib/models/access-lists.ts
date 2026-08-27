@@ -1,4 +1,11 @@
-import bcrypt from "bcryptjs";
+import { hashBcrypt } from "../password";
+
+/**
+ * Caddy's http_basic provider verifies these hashes itself, so they must stay
+ * bcrypt even though user passwords have moved to argon2id. Cost 10 rather than
+ * 12 because Caddy re-verifies on every proxied request.
+ */
+const ACCESS_LIST_COST = 10;
 import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
@@ -145,15 +152,16 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
   }
 
   if (input.users && input.users.length > 0) {
-    await db.insert(accessListEntries).values(
-      input.users.map((account) => ({
+    const entryRows = await Promise.all(
+      input.users.map(async (account) => ({
         accessListId: accessList.id,
         username: account.username,
-        passwordHash: bcrypt.hashSync(account.password, 10),
+        passwordHash: await hashBcrypt(account.password, ACCESS_LIST_COST),
         createdAt: now,
         updatedAt: now,
       })),
     );
+    await db.insert(accessListEntries).values(entryRows);
   }
 
   logAuditEvent({
@@ -213,7 +221,7 @@ export async function addAccessListEntry(
   }
 
   const now = nowIso();
-  const hash = bcrypt.hashSync(entry.password, 10);
+  const hash = await hashBcrypt(entry.password, ACCESS_LIST_COST);
   await db.insert(accessListEntries).values({
     accessListId,
     username: entry.username,

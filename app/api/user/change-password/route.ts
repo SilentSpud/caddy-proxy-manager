@@ -4,7 +4,8 @@ import { getUserById, updateUserPassword } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 import { config } from "@/src/lib/config";
-import bcrypt from "bcryptjs";
+import { hashPassword, verifyPassword } from "@/src/lib/password";
+import { passwordPolicyError } from "@/src/lib/password-policy";
 
 export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
@@ -43,28 +44,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
-    // Enforce password complexity matching production admin password requirements
-    if (!newPassword || newPassword.length < 12) {
-      return NextResponse.json(
-        { error: "New password must be at least 12 characters long" },
-        { status: 400 },
-      );
-    }
-    const complexityErrors: string[] = [];
-    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword)) {
-      complexityErrors.push("must include both uppercase and lowercase letters");
-    }
-    if (!/[0-9]/.test(newPassword)) {
-      complexityErrors.push("must include at least one number");
-    }
-    if (!/[^A-Za-z0-9]/.test(newPassword)) {
-      complexityErrors.push("must include at least one special character");
-    }
-    if (complexityErrors.length > 0) {
-      return NextResponse.json(
-        { error: `Password ${complexityErrors.join(", ")}` },
-        { status: 400 },
-      );
+    const policyError = passwordPolicyError(newPassword ?? "", "New password");
+    if (policyError) {
+      return NextResponse.json({ error: policyError }, { status: 400 });
     }
 
     const userId = Number(session.user.id);
@@ -80,7 +62,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Current password is required" }, { status: 400 });
       }
 
-      const isValid = bcrypt.compareSync(currentPassword, user.passwordHash);
+      const isValid = await verifyPassword(currentPassword, user.passwordHash);
       if (!isValid) {
         registerFailedAttempt(rateLimitKey);
         return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
@@ -91,7 +73,7 @@ export async function POST(request: NextRequest) {
     resetAttempts(rateLimitKey);
 
     // Hash new password
-    const newPasswordHash = bcrypt.hashSync(newPassword, 12);
+    const newPasswordHash = await hashPassword(newPassword);
 
     // Update password
     await updateUserPassword(userId, newPasswordHash);

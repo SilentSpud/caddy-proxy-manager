@@ -22,6 +22,15 @@ export type AvatarSettings = {
   gravatarEnabled: boolean;
 };
 
+export type PasswordPolicySettings = {
+  /**
+   * Force a password reset at next sign-in for anyone whose stored hash is still
+   * bcrypt. Changing the password rehashes it with argon2id, so this is how a
+   * deployment finishes migrating off the old algorithm.
+   */
+  requireChangeOnLegacyHash: boolean;
+};
+
 export type AcmeSettings = {
   /** Custom ACME directory URL (e.g. an internal CA). Empty = Let's Encrypt default. */
   caUrl?: string;
@@ -229,6 +238,29 @@ export async function isGravatarEnabled(): Promise<boolean> {
   if (config.avatars.gravatarFromEnv !== null) return config.avatars.gravatarFromEnv;
   const stored = await getAvatarSettings();
   return stored?.gravatarEnabled ?? true;
+}
+
+export async function getPasswordPolicySettings(): Promise<PasswordPolicySettings | null> {
+  return await getEffectiveSetting<PasswordPolicySettings>("password_policy");
+}
+
+export async function savePasswordPolicySettings(settings: PasswordPolicySettings): Promise<void> {
+  await setSetting("password_policy", settings);
+}
+
+/**
+ * Whether a bcrypt-hashed user must change their password before continuing.
+ * AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH wins when set; otherwise the
+ * stored setting decides, defaulting to off so an upgrade never locks anyone out
+ * of a running deployment unannounced.
+ */
+export async function isLegacyPasswordChangeRequired(): Promise<boolean> {
+  const { config } = await import("./config");
+  if (config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null) {
+    return config.auth.requirePasswordChangeOnLegacyHashFromEnv;
+  }
+  const stored = await getPasswordPolicySettings();
+  return stored?.requireChangeOnLegacyHash ?? false;
 }
 
 export async function getAcmeSettings(): Promise<AcmeSettings | null> {

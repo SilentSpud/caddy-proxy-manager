@@ -12,8 +12,35 @@ import {
   createIssuedClientCertificate,
   revokeIssuedClientCertificate,
 } from "@/src/lib/models/issued-client-certificates";
-import { X509Certificate } from "node:crypto";
+import { generateKeyPair as generateKeyPairCb, X509Certificate } from "node:crypto";
+import { promisify } from "node:util";
+import { passwordPolicyError } from "@/src/lib/password-policy";
 import forge from "node-forge";
+
+const generateKeyPairAsync = promisify(generateKeyPairCb);
+
+/** The declared options plus `prfAlgorithm`, which forge honours but does not type. */
+type Pkcs12ExportOptions = NonNullable<Parameters<typeof forge.pkcs12.toPkcs12Asn1>[3]> & {
+  prfAlgorithm?: "sha1" | "sha256" | "sha384" | "sha512";
+};
+
+/**
+ * RSA keygen on the crypto threadpool rather than forge's pure-JS implementation,
+ * which blocks the event loop for the whole generation (~150-450ms at 4096 bits).
+ * The result is handed back as forge key objects so certificate building and the
+ * stored PEM encoding stay byte-identical to what forge produced before.
+ */
+async function generateForgeKeyPair(bits: number) {
+  const { privateKey, publicKey } = await generateKeyPairAsync("rsa", {
+    modulusLength: bits,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  });
+  return {
+    privateKey: forge.pki.privateKeyFromPem(privateKey),
+    publicKey: forge.pki.publicKeyFromPem(publicKey),
+  };
+}
 
 function validatePem(pem: string): void {
   try {
@@ -89,7 +116,7 @@ export async function generateCaCertificateAction(formData: FormData): Promise<{
 
   if (!name) throw new Error("Name is required");
 
-  const keypair = forge.pki.rsa.generateKeyPair({ bits: 4096 });
+  const keypair = await generateForgeKeyPair(4096);
   const cert = forge.pki.createCertificate();
   cert.publicKey = keypair.publicKey;
   cert.serialNumber = "01";
@@ -125,7 +152,6 @@ export async function generateCaCertificateAction(formData: FormData): Promise<{
 export type IssuedClientCert = {
   pkcs12Base64: string;
   passwordProtected: boolean;
-  exportAlgorithm: "3des" | "aes256";
 };
 
 export async function issueClientCertificateAction(
@@ -140,13 +166,16 @@ export async function issueClientCertificateAction(
     Math.max(1, parseInt(String(formData.get("validity_days") ?? "365"), 10) || 365),
   );
   const exportPassword = String(formData.get("export_password") ?? "");
-  const compatibilityMode = formData.get("compatibility_mode") === "on";
-  const exportAlgorithm: IssuedClientCert["exportAlgorithm"] = compatibilityMode
-    ? "3des"
-    : "aes256";
 
   if (!commonName) throw new Error("Common name is required");
   if (!exportPassword) throw new Error("Export password is required");
+
+  // The .p12 leaves this deployment as a file, and forge's PKCS#12 MAC is still
+  // SHA-1, so this password is the only thing standing between whoever holds the
+  // bundle and the client private key. Hold it to the same bar as a login
+  // password rather than accepting anything non-empty.
+  const exportPasswordError = passwordPolicyError(exportPassword, "Export password");
+  if (exportPasswordError) throw new Error(exportPasswordError);
 
   const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
   if (!caPrivateKeyPem)
@@ -160,7 +189,7 @@ export async function issueClientCertificateAction(
   const caKey = forge.pki.privateKeyFromPem(caPrivateKeyPem);
   const caCert = forge.pki.certificateFromPem(caCertRecord.certificatePem);
 
-  const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+  const keypair = await generateForgeKeyPair(2048);
   const cert = forge.pki.createCertificate();
   cert.publicKey = keypair.publicKey;
   cert.serialNumber = Date.now().toString(16);
@@ -194,16 +223,33 @@ export async function issueClientCertificateAction(
   );
   revalidatePath("/certificates");
 
-  const pkcs12Asn1 = forge.pkcs12.toPkcs12Asn1(keypair.privateKey, [cert, caCert], exportPassword, {
-    algorithm: exportAlgorithm,
+  // AES-256 unconditionally: the legacy 3DES PBE only matters to keystores that
+  // predate OpenSSL 3's PBES2 default, which this fork does not target. forge's
+  // defaults (2048 iterations, 8-byte salt, SHA-1 PRF) are too weak for a bundle
+  // the user carries around, so raise all three. `prfAlgorithm` is undeclared in
+  // @types/node-forge but forwarded to pki.encryptPrivateKeyInfo, where it is a
+  // documented option — client-cert-p12-export.test.ts pins the emitted PRF so a
+  // forge upgrade cannot silently revert it to SHA-1. The outer PKCS#12 MAC does
+  // stay SHA-1; pkcs12.js hardcodes a 20-byte digest with no option to change it.
+  const pkcs12Options = {
+    algorithm: "aes256",
     friendlyName: commonName,
-  });
+    count: 100000,
+    saltSize: 16,
+    prfAlgorithm: "sha256",
+  } satisfies Pkcs12ExportOptions;
+
+  const pkcs12Asn1 = forge.pkcs12.toPkcs12Asn1(
+    keypair.privateKey,
+    [cert, caCert],
+    exportPassword,
+    pkcs12Options,
+  );
   const pkcs12Der = forge.asn1.toDer(pkcs12Asn1).getBytes();
 
   return {
     pkcs12Base64: forge.util.encode64(pkcs12Der),
     passwordProtected: true,
-    exportAlgorithm,
   };
 }
 

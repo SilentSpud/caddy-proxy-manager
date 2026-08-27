@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import { verifyPassword } from "../password";
 import { randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { config } from "../config";
@@ -210,7 +210,7 @@ export async function verifyAndLinkOAuth(
   }
 
   // Verify password
-  const isValid = bcrypt.compareSync(password, user.passwordHash);
+  const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
     return false;
   }

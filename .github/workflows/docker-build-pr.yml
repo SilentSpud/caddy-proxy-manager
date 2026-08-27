@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   build:
+    name: "${{ matrix.name }}"
     runs-on: ubuntu-latest
     # See docker-build-trusted.yml: without this a wedged step runs for 6 hours.
     timeout-minutes: 30
@@ -28,13 +29,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - service: web
+          - name: Web Dashboard
+            service: web
             dockerfile: docker/web/Dockerfile
             context: .
-          - service: caddy
+          - name: Caddy Handler
+            service: caddy
             dockerfile: docker/caddy/Dockerfile
             context: .
-          - service: l4-port-manager
+          - name: Layer 4 Port Manager
+            service: l4-port-manager
             dockerfile: docker/l4-port-manager/Dockerfile
             context: .
 

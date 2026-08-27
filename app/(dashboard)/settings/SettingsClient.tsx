@@ -77,6 +77,7 @@ import {
   updateAuthentikSettingsAction,
   updateMetricsSettingsAction,
   updateAvatarSettingsAction,
+  updatePasswordPolicySettingsAction,
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
   updateUpstreamDnsResolutionSettingsAction,
@@ -197,6 +198,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         icon: UserCheck,
       },
       { id: "oauth", name: "OAuth Providers", desc: "OAuth/OIDC SSO providers", icon: KeyRound },
+      {
+        id: "password-policy",
+        name: "Password Policy",
+        desc: "Migrate users off older password hashes",
+        icon: KeyRound,
+      },
     ],
   },
   {
@@ -487,6 +494,7 @@ type Props = {
   oauthProviders: OAuthProvider[];
   localUsersDisabled: boolean;
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
+  passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   caddyBuild: CaddyBuildSettings | null;
   baseUrl: string;
   instanceSync: {
@@ -545,6 +553,7 @@ export default function SettingsClient({
   oauthProviders,
   localUsersDisabled,
   avatars,
+  passwordPolicy,
   caddyBuild,
   baseUrl,
   instanceSync,
@@ -580,6 +589,10 @@ export default function SettingsClient({
   const [authentikState, authentikFormAction] = useActionState(updateAuthentikSettingsAction, null);
   const [metricsState, metricsFormAction] = useActionState(updateMetricsSettingsAction, null);
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
+  const [passwordPolicyState, passwordPolicyFormAction] = useActionState(
+    updatePasswordPolicySettingsAction,
+    null,
+  );
   const [loggingState, loggingFormAction] = useActionState(updateLoggingSettingsAction, null);
   const [dnsState, dnsFormAction] = useActionState(updateDnsSettingsAction, null);
   const [upstreamDnsResolutionState, upstreamDnsResolutionFormAction] = useActionState(
@@ -770,6 +783,13 @@ export default function SettingsClient({
                     oauthProviders={oauthProviders}
                     localUsersDisabled={localUsersDisabled}
                     baseUrl={baseUrl}
+                  />
+                )}
+                {active === "password-policy" && (
+                  <PasswordPolicySection
+                    passwordPolicy={passwordPolicy}
+                    passwordPolicyState={passwordPolicyState}
+                    passwordPolicyFormAction={passwordPolicyFormAction}
                   />
                 )}
                 {active === "avatars" && (
@@ -1857,6 +1877,54 @@ function OAuthSection({
         baseUrl={baseUrl}
         localUsersDisabled={localUsersDisabled}
       />
+    </FormCard>
+  );
+}
+
+// ─── Section: Password Policy ────────────────────────────────────────────────
+
+/**
+ * Not offered as a slave override: whether to force a password reset is a local
+ * security decision, and inheriting it from a master would let one instance lock
+ * another's users out of their own dashboard.
+ */
+function PasswordPolicySection({
+  passwordPolicy,
+  passwordPolicyState,
+  passwordPolicyFormAction,
+}: {
+  passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
+  passwordPolicyState: { success: boolean; message?: string } | null;
+  passwordPolicyFormAction: (payload: FormData) => void;
+}) {
+  const [requireChange, setRequireChange] = useState(passwordPolicy.requireChangeOnLegacyHash);
+
+  return (
+    <FormCard title="Legacy password hashes">
+      <form action={passwordPolicyFormAction}>
+        <VStack gap={3}>
+          {passwordPolicy.fromEnv && (
+            <InfoAlert title="This policy is set by the AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH environment variable">
+              It cannot be changed here.
+            </InfoAlert>
+          )}
+          {passwordPolicyState?.message && (
+            <StatusAlert
+              message={passwordPolicyState.message}
+              success={passwordPolicyState.success}
+            />
+          )}
+          <CheckboxInput
+            label="Require a password change for users still on an older hash"
+            description="New passwords are hashed with argon2id. Accounts created before that change still use bcrypt, which caps the password at 72 bytes. Turning this on sends those users to a reset screen at their next sign-in; choosing a new password upgrades the hash and clears the prompt. Users who sign in through an OAuth/OIDC provider have no password and are never asked."
+            htmlName="requireChangeOnLegacyHash"
+            value={requireChange}
+            onChange={setRequireChange}
+            isDisabled={passwordPolicy.fromEnv}
+          />
+          <SaveButton label="Save password policy" isDisabled={passwordPolicy.fromEnv} />
+        </VStack>
+      </form>
     </FormCard>
   );
 }
