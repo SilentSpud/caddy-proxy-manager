@@ -1,20 +1,20 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 
 async function loadAllowSelfRegistration(value?: string): Promise<boolean> {
-  vi.resetModules();
   if (value === undefined) {
     vi.stubEnv('AUTH_ALLOW_SELF_REGISTRATION', undefined);
   } else {
     vi.stubEnv('AUTH_ALLOW_SELF_REGISTRATION', value);
   }
 
-  const { config } = await import('../../src/lib/config');
+  const { config } = await import(`../../src/lib/config${fresh()}`);
   return config.auth.allowSelfRegistration;
 }
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.resetModules();
 });
 
 describe('email self-registration configuration', () => {

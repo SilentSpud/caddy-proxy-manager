@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { l4ProxyHosts } from '../../src/lib/db/schema';
 import { eq } from 'drizzle-orm';

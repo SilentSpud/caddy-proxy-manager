@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 
 describe('clickhouse client analytics enablement', () => {
   afterEach(() => {
-    vi.resetModules();
     vi.unstubAllEnvs();
-    vi.doUnmock('@clickhouse/client');
   });
 
   it('treats analytics as enabled when CLICKHOUSE_PASSWORD is configured before init runs', async () => {
@@ -24,11 +24,13 @@ describe('clickhouse client analytics enablement', () => {
       close: vi.fn(),
     }));
 
-    vi.doMock('@clickhouse/client', () => ({
+    vi.mock('@clickhouse/client', () => ({
       createClient,
     }));
 
-    const { isAnalyticsEnabled, querySummary } = await import('@/src/lib/clickhouse/client');
+    const { isAnalyticsEnabled, querySummary } = await import(
+      `@/src/lib/clickhouse/client${fresh()}`
+    );
 
     expect(isAnalyticsEnabled()).toBe(true);
 
@@ -56,9 +58,11 @@ describe('clickhouse client analytics enablement', () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', '');
 
     const createClient = vi.fn();
-    vi.doMock('@clickhouse/client', () => ({ createClient }));
+    vi.mock('@clickhouse/client', () => ({ createClient }));
 
-    const { isAnalyticsEnabled, querySummary } = await import('@/src/lib/clickhouse/client');
+    const { isAnalyticsEnabled, querySummary } = await import(
+      `@/src/lib/clickhouse/client${fresh()}`
+    );
 
     expect(isAnalyticsEnabled()).toBe(false);
 
@@ -86,11 +90,13 @@ describe('clickhouse client analytics enablement', () => {
       json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(30)' }],
     }));
 
-    vi.doMock('@clickhouse/client', () => ({
+    vi.mock('@clickhouse/client', () => ({
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
     }));
 
-    const { getRetentionDays, initClickHouse } = await import('@/src/lib/clickhouse/client');
+    const { getRetentionDays, initClickHouse } = await import(
+      `@/src/lib/clickhouse/client${fresh()}`
+    );
     expect(getRetentionDays()).toBe(30);
 
     await initClickHouse();
@@ -118,11 +124,13 @@ describe('clickhouse client analytics enablement', () => {
       json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(90)' }],
     }));
 
-    vi.doMock('@clickhouse/client', () => ({
+    vi.mock('@clickhouse/client', () => ({
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
     }));
 
-    const { getRetentionDays, initClickHouse } = await import('@/src/lib/clickhouse/client');
+    const { getRetentionDays, initClickHouse } = await import(
+      `@/src/lib/clickhouse/client${fresh()}`
+    );
     expect(getRetentionDays()).toBe(7);
 
     await initClickHouse();
@@ -139,7 +147,7 @@ describe('clickhouse client analytics enablement', () => {
   it('throws when CLICKHOUSE_RETENTION_DAYS is not a positive integer', async () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
     vi.stubEnv('CLICKHOUSE_RETENTION_DAYS', 'not-a-number');
-    vi.doMock('@clickhouse/client', () => ({ createClient: vi.fn() }));
+    vi.mock('@clickhouse/client', () => ({ createClient: vi.fn() }));
 
     await expect(import('@/src/lib/clickhouse/client')).rejects.toThrow(
       /CLICKHOUSE_RETENTION_DAYS/,
@@ -176,7 +184,7 @@ describe('clickhouse client analytics enablement', () => {
         return { json: async () => [{ create_table_query: 'TTL ts + toIntervalDay(30)' }] };
       },
     );
-    vi.doMock('@clickhouse/client', () => ({
+    vi.mock('@clickhouse/client', () => ({
       createClient: vi.fn(() => ({ query, command, insert: vi.fn(), close: vi.fn() })),
     }));
     return calls;
@@ -197,7 +205,7 @@ describe('clickhouse client analytics enablement', () => {
     ];
     const calls = mockClient(liveTables);
 
-    const { initClickHouse } = await import('@/src/lib/clickhouse/client');
+    const { initClickHouse } = await import(`@/src/lib/clickhouse/client${fresh()}`);
     await initClickHouse();
 
     // The enumeration matches the disabled families plus an optional _<N> suffix,
@@ -232,7 +240,7 @@ describe('clickhouse client analytics enablement', () => {
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const { initClickHouse } = await import('@/src/lib/clickhouse/client');
+    const { initClickHouse } = await import(`@/src/lib/clickhouse/client${fresh()}`);
     // Best-effort: a privilege error must not reject and abort startup.
     await expect(initClickHouse()).resolves.toBeUndefined();
 
@@ -260,11 +268,11 @@ describe('clickhouse client analytics enablement', () => {
       ],
     });
 
-    vi.doMock('@clickhouse/client', () => ({
+    vi.mock('@clickhouse/client', () => ({
       createClient: vi.fn(() => ({ query, command: vi.fn(), insert: vi.fn(), close: vi.fn() })),
     }));
 
-    const { queryWafEventStatsWithSearch } = await import('@/src/lib/clickhouse/client');
+    const { queryWafEventStatsWithSearch } = await import(`@/src/lib/clickhouse/client${fresh()}`);
 
     await expect(queryWafEventStatsWithSearch('example.com')).resolves.toEqual({
       total: 5400,

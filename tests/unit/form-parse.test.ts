@@ -2,7 +2,7 @@
  * Unit tests for src/lib/form-parse.ts
  * Tests all pure FormData parsing helpers.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   parseCsv,
   parseUpstreams,

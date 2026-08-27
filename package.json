@@ -1,7 +1,9 @@
 {
   "name": "caddy-proxy-manager",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "description": "Web UI for managing Caddy reverse proxies",
+  "type": "module",
+  "private": true,
   "contributors": [
     "fuomag9 <1580624+fuomag9@users.noreply.github.com>",
     "SilentSpud <1478389+SilentSpud@users.noreply.github.com>"
@@ -22,7 +24,6 @@
   "astryx": {
     "theme": "neutral"
   },
-  "private": true,
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build && bun scripts/inject-runtime-guard.mjs",
@@ -36,10 +37,9 @@
     "test:all": "./scripts/test-all.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "bun vitest run --config tests/vitest.config.ts",
-    "test:watch": "bun vitest --config tests/vitest.config.ts",
-    "test:ui": "bun vitest --ui --config tests/vitest.config.ts",
-    "test:coverage": "bun vitest run --coverage --config tests/vitest.config.ts",
+    "test": "bun test --parallel tests/unit tests/integration",
+    "test:watch": "bun test --watch tests/unit tests/integration",
+    "test:coverage": "bun test --isolate --coverage tests/unit tests/integration && bun scripts/coverage-ratchet.ts",
     "test:e2e": "playwright test --config tests/playwright.config.ts",
     "test:e2e:ui": "playwright test --ui --config tests/playwright.config.ts",
     "test:e2e:headed": "playwright test --headed --config tests/playwright.config.ts",
@@ -82,14 +82,10 @@
     "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.1.0",
     "@vitejs/plugin-rsc": "^0.5.34",
-    "@vitest/coverage-istanbul": "4.1.11",
-    "@vitest/ui": "^4.1.11",
     "bcryptjs": "^3.0.3",
     "drizzle-kit": "^0.31.10",
     "typescript": "^7.0.2",
     "vinext": "^1.0.0-beta.8",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
-  },
-  "type": "module"
+    "vite": "^8.2.2"
+  }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { encryptSecret, decryptSecret, isEncryptedSecret } from '@/src/lib/secret';
 
 describe('secret', () => {

@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 // Mock the api-tokens model
 vi.mock('@/src/lib/models/api-tokens', () => ({
@@ -136,7 +137,7 @@ describe('requireApiAdmin', () => {
 
     try {
       await requireApiAdmin(createMockRequest({ authorization: 'Bearer token' }));
-      expect.fail('Should have thrown');
+      expect.unreachable('Should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ApiAuthError);
       expect((e as ApiAuthError).status).toBe(403);

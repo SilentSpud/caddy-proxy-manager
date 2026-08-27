@@ -12,7 +12,9 @@
  * the running Caddy, so a snippet that no longer adapts has to be skipped
  * rather than allowed to fail the build.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
@@ -27,9 +29,10 @@ const ctx = vi.hoisted(() => {
   return { db: null as unknown as TestDb, tmpDir: dir };
 });
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
@@ -44,6 +47,13 @@ vi.mock('../../src/lib/db', async () => {
 });
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
+
+// caddy-build resolves its data directory once, when the module is first
+// evaluated — before this file's body sets L4_PORTS_DIR above. Evaluate a
+// second copy now and point the plain specifier at it, so buildCaddyDocument
+// gates on the applied-module record this test writes.
+const freshCaddyBuild = await import(`../../src/lib/caddy-build${fresh()}`);
+vi.mock('../../src/lib/caddy-build', () => ({ ...freshCaddyBuild }));
 
 import { setCaddyAdminTransport, type CaddyAdminRequest } from '../../src/lib/caddy-admin';
 import { buildCaddyDocument } from '../../src/lib/caddy';

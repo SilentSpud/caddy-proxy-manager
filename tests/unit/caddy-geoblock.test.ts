@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 import { buildBlockerHandler, resolveEffectiveGeoBlock } from '@/src/lib/caddy';
 import type { GeoBlockSettings } from '@/src/lib/settings';

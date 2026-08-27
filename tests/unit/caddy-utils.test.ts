@@ -2,7 +2,7 @@
  * Unit tests for src/lib/caddy-utils.ts
  * Pure functions only — no DB, network, or filesystem.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   expandPrivateRanges,
   PRIVATE_RANGES_CIDRS,
@@ -58,7 +58,7 @@ describe('expandPrivateRanges', () => {
 
 describe('mergeDeep', () => {
   it('merges top-level keys', () => {
-    const target = { a: 1 };
+    const target: Record<string, unknown> = { a: 1 };
     mergeDeep(target, { b: 2 });
     expect(target).toEqual({ a: 1, b: 2 });
   });
@@ -132,7 +132,7 @@ describe('parseJson', () => {
   });
 
   it('parses arrays', () => {
-    expect(parseJson('[1,2,3]', [])).toEqual([1, 2, 3]);
+    expect(parseJson('[1,2,3]', [] as number[])).toEqual([1, 2, 3]);
   });
 });
 

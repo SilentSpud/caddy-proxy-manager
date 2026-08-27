@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 // db returns the configured proxy-host domain rows; clickhouse returns hosts
 // observed in traffic. getAnalyticsHosts merges them and flags which ones are

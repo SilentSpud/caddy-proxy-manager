@@ -3,7 +3,7 @@
  * validation, change-password, the forced-reset screen, and .p12 export). These
  * tests pin the rule itself; the callers are covered where they are used.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   MIN_PASSWORD_LENGTH,
   PASSWORD_POLICY_HINT,

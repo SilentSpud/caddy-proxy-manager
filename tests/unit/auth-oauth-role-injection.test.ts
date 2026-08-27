@@ -10,14 +10,16 @@
  * both the transform and the fact that the hook is actually wired into the
  * better-auth config.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
@@ -32,7 +34,7 @@ vi.mock('../../src/lib/db', async () => {
 });
 
 // Stub better-auth so importing auth-server doesn't pull in the full runtime
-// (which fails under vitest's module resolution). `betterAuth` returns the raw
+// (which fails to resolve fully under the test runner). `betterAuth` returns the raw
 // options object, so getAuth().options is exactly the config createAuth() built
 // — including our real databaseHooks — which is what we want to assert on.
 vi.mock('better-auth', () => ({

@@ -12,14 +12,16 @@
  * skip_https_hostname_validation, load_balancer, dns_resolver, custom_*,
  * location_rules, and the L4 listen_addresses / matchers fields.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
@@ -36,10 +38,11 @@ vi.mock('../../src/lib/audit', () => ({
   logAuditEvent: vi.fn(),
 }));
 
-vi.mock('../../src/lib/api-auth', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/api-auth')>();
+const actualApiAuth = await import('../../src/lib/api-auth');
+
+vi.mock('../../src/lib/api-auth', () => {
   return {
-    ...actual,
+    ...actualApiAuth,
     requireApiAdmin: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
     requireApiUser: vi.fn().mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' }),
   };

@@ -7,7 +7,7 @@
  * silently dropped is the worst outcome, because the proxy rule the operator
  * wrote simply stops existing.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 
 import { setCaddyAdminTransport, type CaddyAdminRequest } from '@/src/lib/caddy-admin';
 import {

@@ -6,7 +6,7 @@
  * exist.
  */
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   avatarInitial,
   gravatarUrl,

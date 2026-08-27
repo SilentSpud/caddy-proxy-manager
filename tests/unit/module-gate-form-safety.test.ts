@@ -19,7 +19,7 @@
  * every value-carrying input mounted and submitting. These tests inspect source
  * rather than rendering, matching the convention in l4-ports-apply-banner.test.ts.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

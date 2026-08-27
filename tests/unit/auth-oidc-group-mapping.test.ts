@@ -6,14 +6,16 @@
  * The mapping rules themselves live in oidc-groups.test.ts; this file is about
  * mapOAuthProvider handing better-auth the right callbacks.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,

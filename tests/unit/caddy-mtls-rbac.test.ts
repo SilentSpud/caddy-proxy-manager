@@ -7,7 +7,7 @@
  *  - buildMtlsRbacSubroutes: full subroute generation with path rules
  *  - normalizeFingerprint: colon stripping + lowercase
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   resolveAllowedFingerprints,
   buildFingerprintCelExpression,

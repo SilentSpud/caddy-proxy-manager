@@ -4,7 +4,8 @@
  * Tests the port computation, override file generation, diff detection,
  * and status lifecycle.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
@@ -23,9 +24,10 @@ const ctx = vi.hoisted(() => {
   return { db: null as unknown as TestDb, tmpDir: dir };
 });
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
@@ -43,13 +45,8 @@ vi.mock('../../src/lib/audit', () => ({
 }));
 
 import * as schema from '../../src/lib/db/schema';
-import {
-  getRequiredL4Ports,
-  getAppliedL4Ports,
-  getL4PortsDiff,
-  applyL4Ports,
-  getL4PortsStatus,
-} from '../../src/lib/l4-ports';
+const { getRequiredL4Ports, getAppliedL4Ports, getL4PortsDiff, applyL4Ports, getL4PortsStatus } =
+  await import('../../src/lib/l4-ports');
 
 // ---------------------------------------------------------------------------
 // Helpers

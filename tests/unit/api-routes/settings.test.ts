@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/settings', () => ({
   getGeneralSettings: vi.fn(),
@@ -66,7 +67,7 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET, PUT } from '@/app/api/v1/settings/[group]/route';
+const { GET, PUT } = await import('@/app/api/v1/settings/[group]/route');
 import {
   getGeneralSettings,
   saveGeneralSettings,

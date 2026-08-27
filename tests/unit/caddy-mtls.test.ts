@@ -12,7 +12,7 @@
  * single policy — otherwise a client cert signed by CA_B can authenticate against
  * app.example.com (which only trusts CA_A) and vice-versa.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   pemToBase64Der,
   buildClientAuthentication,

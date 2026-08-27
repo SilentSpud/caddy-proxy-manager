@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import {
   mtlsRoles,
@@ -146,12 +146,16 @@ describe('mtls_certificate_roles table', () => {
       createdAt: now,
     });
 
+    // drizzle's query builder is a thenable, not a Promise; bun:test's
+    // .rejects needs a real one before it will run the query.
     await expect(
-      db.insert(mtlsCertificateRoles).values({
-        issuedClientCertificateId: cert.id,
-        mtlsRoleId: role.id,
-        createdAt: now,
-      }),
+      Promise.resolve(
+        db.insert(mtlsCertificateRoles).values({
+          issuedClientCertificateId: cert.id,
+          mtlsRoleId: role.id,
+          createdAt: now,
+        }),
+      ),
     ).rejects.toThrow();
   });
 
@@ -228,13 +232,17 @@ describe('mtls_access_rules table', () => {
       updatedAt: now,
     });
 
+    // drizzle's query builder is a thenable, not a Promise; bun:test's
+    // .rejects needs a real one before it will run the query.
     await expect(
-      db.insert(mtlsAccessRules).values({
-        proxyHostId: host.id,
-        pathPattern: '/admin/*',
-        createdAt: now,
-        updatedAt: now,
-      }),
+      Promise.resolve(
+        db.insert(mtlsAccessRules).values({
+          proxyHostId: host.id,
+          pathPattern: '/admin/*',
+          createdAt: now,
+          updatedAt: now,
+        }),
+      ),
     ).rejects.toThrow();
   });
 

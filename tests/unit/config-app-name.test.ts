@@ -6,18 +6,18 @@
  * `title: { absolute: ... }` rather than through configuration — the forward
  * auth portal is the one that does.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 
 async function loadAppName(env: Record<string, string | undefined>): Promise<string> {
-  vi.resetModules();
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-  const { config } = await import('../../src/lib/config');
+  const { config } = await import(`../../src/lib/config${fresh()}`);
   return config.appName;
 }
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.resetModules();
 });
 
 describe('APP_NAME', () => {

@@ -5,13 +5,16 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
- * The environment every Vitest run must see. Consumed by `test.env` in
- * tests/vitest.config.ts, and re-applied by clearDotEnv() below so the two
- * cannot drift apart.
+ * The environment every test run must see. Applied by clearDotEnv() below,
+ * which the preload calls before any test file is imported.
  */
-export const VITEST_ENV: Record<string, string> = {
+export const TEST_ENV: Record<string, string> = {
   DATABASE_URL: ':memory:',
-  SESSION_SECRET: 'test-session-secret-for-vitest-unit-tests-12345',
+  // Read by the backstop in src/lib/caddy-admin.ts, which refuses to open a
+  // real socket when it is set. `bun test` sets no marker of its own beyond
+  // NODE_ENV=test, so the suite declares one explicitly.
+  CPM_TEST: '1',
+  SESSION_SECRET: 'test-session-secret-for-unit-tests-12345',
   NODE_ENV: 'test',
 };
 
@@ -26,7 +29,7 @@ const ASSIGNMENT = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
  *
  * Bun loads .env automatically; Node did not, so under Node the suite ran with
  * only what the shell exported and every test saw the same baseline. Now that
- * Vitest runs on Bun, a developer's local .env reaches src/lib/config.ts and
+ * the suite runs on Bun, a developer's local .env reaches src/lib/config.ts and
  * silently changes the defaults under test — AUTH_ALLOW_OAUTH_REGISTRATION in
  * the committed .env is enough to fail
  * tests/unit/config-local-users-disabled.test.ts.
@@ -39,7 +42,7 @@ const ASSIGNMENT = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
  * Keys are dropped whether they came from the dotenv file or the shell — a test
  * suite that behaves differently depending on the developer's shell is the
  * thing being prevented. Variables the suite genuinely needs belong in
- * VITEST_ENV.
+ * TEST_ENV.
  */
 export function clearDotEnv(): void {
   for (const file of DOTENV_FILES) {
@@ -54,5 +57,5 @@ export function clearDotEnv(): void {
       if (name) delete process.env[name];
     }
   }
-  Object.assign(process.env, VITEST_ENV);
+  Object.assign(process.env, TEST_ENV);
 }

@@ -6,7 +6,9 @@
  * database, giving full control over table content without affecting
  * any real db file.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 import { rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
@@ -27,9 +29,10 @@ const ctx = vi.hoisted(() => {
   return { db: null as unknown as TestDb, tmpDir: dir };
 });
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
@@ -41,6 +44,13 @@ vi.mock('../../src/lib/db', async () => {
     },
   };
 });
+
+// l4-ports resolves its data directory once, when the module is first
+// evaluated — which happens before this file's body sets L4_PORTS_DIR above.
+// Evaluate a second copy now and point the plain specifier at it, so
+// applySyncPayload writes into the temp directory instead of /app/data.
+const freshL4Ports = await import(`../../src/lib/l4-ports${fresh()}`);
+vi.mock('../../src/lib/l4-ports', () => ({ ...freshL4Ports }));
 
 // These imports must come AFTER vi.mock to pick up the mocked module.
 import { buildSyncPayload, applySyncPayload, type SyncPayload } from '../../src/lib/instance-sync';

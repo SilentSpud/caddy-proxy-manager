@@ -28,3 +28,30 @@ export function createTestDb(): TestDb {
   migrate(db, { migrationsFolder });
   return db;
 }
+
+/**
+ * A stand-in for the `db` module's default export that always forwards to
+ * whichever database the current test is using.
+ *
+ * Under Vitest a mock factory could return `get default() { return db }` and
+ * the getter would re-run on every access, so a `db` reassigned in `beforeEach`
+ * was picked up automatically. Bun evaluates the factory's getters once, when
+ * the mocked module is linked, and stores the resulting values — so that
+ * pattern captures whatever `db` held at import time, which is `undefined`.
+ *
+ * This returns a single object with a stable identity, safe to snapshot, whose
+ * every property read is resolved against `current()` at call time. Methods are
+ * bound to the real database so drizzle's internals still see the right `this`.
+ */
+export function currentDb(current: () => TestDb): TestDb {
+  return new Proxy({} as TestDb, {
+    get(_target, property) {
+      const db = current() as unknown as Record<string | symbol, unknown>;
+      const value = db[property];
+      return typeof value === 'function' ? value.bind(db) : value;
+    },
+    has(_target, property) {
+      return property in (current() as unknown as object);
+    },
+  });
+}

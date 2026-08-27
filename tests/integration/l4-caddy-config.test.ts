@@ -5,7 +5,7 @@
  * correct caddy-l4 JSON config structures. Tests the config shape that
  * buildL4Servers() would produce by reconstructing it from DB rows.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { l4ProxyHosts } from '../../src/lib/db/schema';
 

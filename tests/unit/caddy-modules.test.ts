@@ -9,7 +9,7 @@
  * in the registry but not the Dockerfile is a toggle that promises a plugin the
  * default image does not have.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

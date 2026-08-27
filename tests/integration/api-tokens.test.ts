@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { apiTokens, users } from '@/src/lib/db/schema';
 import { createHash } from 'node:crypto';
@@ -176,13 +176,17 @@ describe('api-tokens integration', () => {
     const user = await insertUser();
     const { token } = await insertApiToken(user.id);
 
+    // drizzle's query builder is a thenable, not a Promise; bun:test's
+    // .rejects needs a real one before it will run the query.
     await expect(
-      db.insert(apiTokens).values({
-        name: 'Duplicate',
-        tokenHash: token.tokenHash,
-        createdBy: user.id,
-        createdAt: nowIso(),
-      }),
+      Promise.resolve(
+        db.insert(apiTokens).values({
+          name: 'Duplicate',
+          tokenHash: token.tokenHash,
+          createdBy: user.id,
+          createdAt: nowIso(),
+        }),
+      ),
     ).rejects.toThrow();
   });
 

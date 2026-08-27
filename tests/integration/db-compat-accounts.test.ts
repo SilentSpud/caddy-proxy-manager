@@ -1,7 +1,9 @@
 import { Database } from 'bun:sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -9,7 +11,6 @@ import { join, resolve } from 'node:path';
 const migrationsFolder = resolve(process.cwd(), 'drizzle');
 
 function resetDbModuleState() {
-  vi.resetModules();
   delete (globalThis as typeof globalThis & { __DRIZZLE_DB__?: unknown }).__DRIZZLE_DB__;
   delete (globalThis as typeof globalThis & { __SQLITE_CLIENT__?: unknown }).__SQLITE_CLIENT__;
   delete (globalThis as typeof globalThis & { __MIGRATIONS_RAN__?: boolean }).__MIGRATIONS_RAN__;
@@ -86,8 +87,15 @@ describe('database compatibility for accounts schema', () => {
       process.env.DATABASE_URL = `file:${dbPath}`;
       resetDbModuleState();
 
+      // Re-evaluate the db module so it opens the broken database and runs its
+      // repair on import. A query suffix makes a distinct module, but it does
+      // not propagate: models/user still imports the plain specifier. So point
+      // that specifier at the freshly evaluated module too, which rewrites the
+      // live bindings every already-imported consumer reads through.
+      const freshDb = await import(`@/src/lib/db${fresh()}`);
+      vi.mock('@/src/lib/db', () => ({ ...freshDb }));
+      appSqlite = freshDb.sqlite;
       const { createUser } = await import('@/src/lib/models/user');
-      appSqlite = (await import('@/src/lib/db')).sqlite;
       await createUser({
         email: 'compat-user@example.com',
         name: 'Compat User',

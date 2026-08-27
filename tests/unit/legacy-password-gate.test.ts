@@ -4,7 +4,8 @@
  * federated user with no password) locks them out permanently, so the negative
  * cases matter more than the positive one.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import bcrypt from 'bcryptjs';
 
 vi.mock('@/src/lib/models/user', () => ({ getUserById: vi.fn() }));

@@ -3,19 +3,18 @@
  * Tests all CRUD operations and the fingerprint/cert-id map builders
  * using a real in-memory SQLite database.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createTestDb, type TestDb } from '../helpers/db';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import { issuedClientCertificates, caCertificates, users } from '../../src/lib/db/schema';
 
 let db: TestDb;
 
 // Mock the modules that mtls-roles.ts imports
-vi.mock('../../src/lib/db', async () => {
+vi.mock('../../src/lib/db', () => {
   // This gets re-evaluated per test via beforeEach
   return {
-    get default() {
-      return db;
-    },
+    default: currentDb(() => db),
     nowIso: () => new Date().toISOString(),
     toIso: (v: string | null) => v,
   };

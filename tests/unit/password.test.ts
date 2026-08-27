@@ -4,7 +4,7 @@
  * compatibility that lets pre-argon2id rows keep working, and the two places
  * Bun.password behaves differently from the bcryptjs this replaced.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import bcrypt from 'bcryptjs';
 import {
   hashPassword,

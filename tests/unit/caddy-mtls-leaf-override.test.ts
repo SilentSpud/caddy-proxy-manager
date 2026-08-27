@@ -4,7 +4,7 @@
  * Tests buildClientAuthentication with the mTlsDomainLeafOverride parameter
  * to ensure the new "trust user X" model works correctly alongside the legacy CA model.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { buildClientAuthentication } from '../../src/lib/caddy-mtls';
 
 function makeCaPem(label: string): string {

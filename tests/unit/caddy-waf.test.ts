@@ -9,7 +9,7 @@
  * filesystem causes:
  *   "failed to readfile: open @coraza.conf-recommended: no such file or directory"
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   buildWafHandler,
   buildWafHandlerEntry,

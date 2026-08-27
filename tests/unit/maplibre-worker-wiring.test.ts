@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

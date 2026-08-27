@@ -8,7 +8,7 @@
  * These tests inspect the component source rather than rendering it,
  * to avoid the cost of a jsdom environment.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

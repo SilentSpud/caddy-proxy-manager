@@ -11,7 +11,7 @@
 import { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';
 
 const migrationSql = readFileSync(

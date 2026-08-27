@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/models/waf-events', () => ({
   listWafEvents: vi.fn(),

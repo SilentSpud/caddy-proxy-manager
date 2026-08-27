@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import { NextRequest } from 'next/server';
 
 // Not network suppression (the global guard covers that): this route test mocks
@@ -71,6 +72,6 @@ describe('POST /api/instances/sync', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(mockApplySyncPayload).toHaveBeenCalledOnce();
+    expect(mockApplySyncPayload).toHaveBeenCalledTimes(1);
   });
 });

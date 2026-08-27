@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 import { createTestDb, type TestDb } from '../helpers/db';
 import {
@@ -104,13 +104,17 @@ describe('forward auth sessions', () => {
       createdAt: now,
     });
 
+    // drizzle's query builder is a thenable, not a Promise; bun:test's
+    // .rejects needs a real one before it will run the query.
     await expect(
-      db.insert(forwardAuthSessions).values({
-        userId: user.id,
-        tokenHash,
-        expiresAt: futureIso(3600),
-        createdAt: now,
-      }),
+      Promise.resolve(
+        db.insert(forwardAuthSessions).values({
+          userId: user.id,
+          tokenHash,
+          expiresAt: futureIso(3600),
+          createdAt: now,
+        }),
+      ),
     ).rejects.toThrow();
   });
 
@@ -257,13 +261,17 @@ describe('forward auth access', () => {
       createdAt: now,
     });
 
+    // drizzle's query builder is a thenable, not a Promise; bun:test's
+    // .rejects needs a real one before it will run the query.
     await expect(
-      db.insert(forwardAuthAccess).values({
-        proxyHostId: host.id,
-        userId: user.id,
-        groupId: null,
-        createdAt: now,
-      }),
+      Promise.resolve(
+        db.insert(forwardAuthAccess).values({
+          proxyHostId: host.id,
+          userId: user.id,
+          groupId: null,
+          createdAt: now,
+        }),
+      ),
     ).rejects.toThrow();
   });
 

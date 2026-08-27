@@ -7,8 +7,9 @@
  * cascade explicitly. Without it, orphaned issued certs linger in the DB and
  * keep showing up as selectable in the mTLS picker.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createTestDb, type TestDb } from '../helpers/db';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import {
   issuedClientCertificates,
   mtlsCertificateRoles,
@@ -20,10 +21,8 @@ import { eq } from 'drizzle-orm';
 
 let db: TestDb;
 
-vi.mock('../../src/lib/db', async () => ({
-  get default() {
-    return db;
-  },
+vi.mock('../../src/lib/db', () => ({
+  default: currentDb(() => db),
   nowIso: () => new Date().toISOString(),
   toIso: (v: string | null) => v,
 }));

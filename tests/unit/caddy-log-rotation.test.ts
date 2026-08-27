@@ -5,14 +5,16 @@
  * is to spell out roll settings explicitly instead of relying on upstream
  * defaults — these tests guard against that regressing silently again.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,

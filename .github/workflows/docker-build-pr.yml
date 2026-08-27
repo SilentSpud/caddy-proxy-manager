@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: caddy-proxman
 
 # One build per PR. A force-push supersedes the in-flight run for that PR
 # instead of leaving it to finish against a commit nobody is looking at.

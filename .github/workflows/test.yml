@@ -37,14 +37,14 @@ jobs:
         run: bun run lint
 
       # Coverage is collected here rather than in a separate job so the
-      # thresholds in tests/vitest.config.ts actually gate a pull request: the
-      # step fails if coverage drops below the ratchet.
+      # thresholds in scripts/coverage-ratchet.ts actually gate a pull request:
+      # the step fails if coverage drops below the ratchet.
       - name: Run unit and integration tests with coverage
         run: bun run test:coverage
 
       - name: Upload coverage report
-        # Always: a threshold failure is exactly when the line-by-line HTML
-        # report is worth reading.
+        # Always: a threshold failure is exactly when the per-file breakdown in
+        # coverage/lcov.info is worth reading.
         if: always()
         uses: actions/upload-artifact@v7
         with:

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { Color } from '@maplibre/maplibre-gl-style-spec';
 import { resolveThemeTokens } from '@astryxdesign/core/theme/tokens';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
@@ -31,7 +31,7 @@ function paintColors(p: MapPalette): string[] {
 const MODES = ['light', 'dark'] as const;
 
 describe('analytics map palette', () => {
-  it.each(MODES)('resolves every token to a concrete colour in %s mode', (mode) => {
+  it.each([...MODES])('resolves every token to a concrete colour in %s mode', (mode) => {
     for (const color of paintColors(paletteFor(mode))) {
       expect(color).not.toBe('');
       // MapLibre paints in WebGL and cannot resolve CSS custom properties or a
@@ -42,7 +42,7 @@ describe('analytics map palette', () => {
     }
   });
 
-  it.each(MODES)('produces colours MapLibre can parse in %s mode', (mode) => {
+  it.each([...MODES])('produces colours MapLibre can parse in %s mode', (mode) => {
     for (const color of paintColors(paletteFor(mode))) {
       // Color.parse returns undefined rather than throwing on a bad value, so
       // an unparseable colour would otherwise fail silently at paint time.
@@ -56,7 +56,7 @@ describe('analytics map palette', () => {
 
     // Same three stops, opposite order: "more traffic" has to read as darker on
     // a light ocean and lighter on a dark one.
-    expect(dark.ramp).toEqual([...light.ramp].reverse());
+    expect([...dark.ramp]).toEqual([...light.ramp].reverse());
     expect(new Set(light.ramp).size).toBe(3);
   });
 

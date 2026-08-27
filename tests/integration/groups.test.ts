@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { groups, groupMembers, users } from '@/src/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -84,8 +84,12 @@ describe('groups integration', () => {
     const now = nowIso();
 
     await db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now });
+    // drizzle's query builder is a thenable, not a Promise; bun:test's
+    // .rejects needs a real one before it will run the query.
     await expect(
-      db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now }),
+      Promise.resolve(
+        db.insert(groupMembers).values({ groupId: group.id, userId: user.id, createdAt: now }),
+      ),
     ).rejects.toThrow();
   });
 

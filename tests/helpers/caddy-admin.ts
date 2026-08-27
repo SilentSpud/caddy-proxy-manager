@@ -8,7 +8,7 @@
  * server listening anywhere.
  *
  * Tests that only need the guard get one of these installed globally by
- * tests/setup.vitest.ts. Tests that want to assert on what was sent, or to
+ * tests/setup.bun.ts. Tests that want to assert on what was sent, or to
  * simulate Caddy misbehaving, should create their own via `installFakeCaddy()`.
  */
 import type {

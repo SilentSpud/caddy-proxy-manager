@@ -8,7 +8,7 @@
  * documented DATABASE_URL for Docker, and on POSIX "/C:/x" is a legitimate path
  * under a directory named "C:".
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { stripLeadingSlashBeforeDriveLetter } from '../../src/lib/db';
 
 describe('stripLeadingSlashBeforeDriveLetter', () => {

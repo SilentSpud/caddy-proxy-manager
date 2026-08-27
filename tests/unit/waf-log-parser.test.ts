@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 // Mock heavy dependencies before importing
 vi.mock('@/src/lib/db', () => ({

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { auditEvents, users } from '@/src/lib/db/schema';
 import { desc, eq, like } from 'drizzle-orm';

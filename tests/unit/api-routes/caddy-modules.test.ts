@@ -10,7 +10,8 @@
  *   - a selection that is accepted regenerates the Caddy config, so the stored
  *     config stops naming a module that is on its way out of the binary.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/settings', () => ({
   getCaddyBuildSettings: vi.fn().mockResolvedValue(null),

@@ -29,7 +29,7 @@
  * - Status files are valid JSON, with control characters stripped
  * - Exit codes are captured without `set -e` killing the failure branch
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

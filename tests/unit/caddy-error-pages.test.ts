@@ -3,7 +3,7 @@
  * (src/lib/caddy.ts) and the sanitizeErrorPageRules input sanitizer
  * (src/lib/models/proxy-hosts.ts).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 import { buildErrorPageRoute } from '@/src/lib/caddy';
 import { sanitizeErrorPageRules } from '@/src/lib/models/proxy-hosts';

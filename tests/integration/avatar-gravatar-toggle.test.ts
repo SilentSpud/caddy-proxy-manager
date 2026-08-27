@@ -8,18 +8,19 @@
  * The toggle is a synced setting, so a slave inherits its master's choice
  * unless it has stored an override of its own.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
-  // Memoised: these tests call vi.resetModules() to re-read env, which re-runs
-  // this factory. Building a new database each time would discard the setting
-  // saved a moment earlier and the env-overrides-toggle cases could not be
-  // written at all.
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
+  // Memoised so a re-run of this factory never discards the setting saved a
+  // moment earlier — the env-overrides-toggle cases depend on it surviving.
   ctx.db ??= createTestDb();
   return {
     default: ctx.db,
@@ -36,10 +37,20 @@ import { settings } from '../../src/lib/db/schema';
 // every other reference to the module is dynamic, to pick up stubbed env.
 import '../../src/lib/settings';
 
-/** Re-imports settings and config so the env stubs take effect. */
+/**
+ * Applies the env stubs and re-points the config module at a freshly evaluated
+ * copy of itself, so the stubs actually reach the code under test.
+ *
+ * isGravatarEnabled() reads its env-pinned value through a dynamic
+ * import of ./config, and config snapshots process.env when it is first
+ * evaluated. A query suffix gives a second, freshly evaluated copy, but it does
+ * not propagate to importers — so the plain specifier is mocked to point at
+ * that copy, which is what settings.ts resolves.
+ */
 async function load(env: Record<string, string | undefined> = {}) {
-  vi.resetModules();
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+  const config = await import(`../../src/lib/config${fresh()}`);
+  vi.mock('../../src/lib/config', () => ({ ...config }));
   return import('../../src/lib/settings');
 }
 
@@ -49,7 +60,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.resetModules();
 });
 
 describe('isGravatarEnabled', () => {

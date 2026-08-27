@@ -2,16 +2,15 @@
  * Integration tests for src/lib/models/mtls-access-rules.ts
  * Tests all CRUD operations and the bulk query function.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createTestDb, type TestDb } from '../helpers/db';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import { mtlsAccessRules, proxyHosts, users } from '../../src/lib/db/schema';
 
 let db: TestDb;
 
-vi.mock('../../src/lib/db', async () => ({
-  get default() {
-    return db;
-  },
+vi.mock('../../src/lib/db', () => ({
+  default: currentDb(() => db),
   nowIso: () => new Date().toISOString(),
   toIso: (v: string | null) => v,
 }));

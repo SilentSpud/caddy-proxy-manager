@@ -269,8 +269,8 @@ integration suites instead, from the repository root:
 bun run test:coverage
 ```
 
-That writes `coverage/index.html` and enforces the ratchet thresholds in
-`tests/vitest.config.ts`.
+That writes `coverage/lcov.info` and enforces the ratchet thresholds in
+`scripts/coverage-ratchet.ts`.
 
 ## Debugging a failure
 

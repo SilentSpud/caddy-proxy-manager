@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import { NextRequest } from 'next/server';
 
 vi.mock('@/src/lib/api-auth', () => {

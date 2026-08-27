@@ -8,7 +8,9 @@
  * have, so emitting a handler for a module that has been selected but not yet
  * built would take every unrelated host offline.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
@@ -25,9 +27,10 @@ const ctx = vi.hoisted(() => {
   return { db: null as unknown as TestDb, tmpDir: dir };
 });
 
-vi.mock('../../src/lib/db', async () => {
-  const { createTestDb } = await import('../helpers/db');
-  const schemaModule = await import('../../src/lib/db/schema');
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
@@ -40,7 +43,7 @@ vi.mock('../../src/lib/db', async () => {
   };
 });
 
-import {
+const {
   applyCaddyBuild,
   defaultModuleSpecs,
   generateCaddyBuildOverride,
@@ -55,7 +58,7 @@ import {
   resolveEnabledModuleIds,
   resolveModuleSpecs,
   sanitizeCaddyBuildSettings,
-} from '../../src/lib/caddy-build';
+} = await import(`../../src/lib/caddy-build${fresh()}`);
 import { CADDY_MODULES, dnsModuleId } from '../../src/lib/caddy-modules';
 import { saveCaddyBuildSettings } from '../../src/lib/settings';
 import { installFakeCaddy, type FakeCaddy } from '../helpers/caddy-admin';

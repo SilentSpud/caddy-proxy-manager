@@ -2,7 +2,7 @@
  * Group-claim → role/group mapping. These rules decide who becomes an admin, so
  * every shape an IdP can return and every prefix edge case is pinned here.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   extractGroups,
   mapGroupsToLocalGroups,

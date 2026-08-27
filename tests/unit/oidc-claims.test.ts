@@ -3,7 +3,8 @@
  * better-auth's default cannot handle: an ID token that identifies the user but
  * carries no group claim, so userinfo has to be consulted as well.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import {
   clearDiscoveryCache,
   decodeJwtPayload,

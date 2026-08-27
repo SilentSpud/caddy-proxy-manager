@@ -5,7 +5,7 @@
  * load balancer) survive a round-trip through the database — stored as JSON,
  * retrieved and deserialized correctly.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';
 import { proxyHosts } from '@/src/lib/db/schema';
 

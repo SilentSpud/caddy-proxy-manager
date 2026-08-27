@@ -17,7 +17,7 @@ run_step() {
 
 lint_status=0
 typecheck_status=0
-vitest_status=0
+unit_status=0
 e2e_status=0
 
 run_step "Lint" bun run lint
@@ -27,9 +27,9 @@ run_step "Typecheck" bun run typecheck
 typecheck_status=$?
 
 # Coverage rather than a bare run: this is the "check everything" entry point,
-# so it is where the coverage ratchet in tests/vitest.config.ts belongs.
-run_step "Vitest + coverage" bun run test:coverage
-vitest_status=$?
+# so it is where the coverage ratchet in scripts/coverage-ratchet.ts belongs.
+run_step "Unit + integration + coverage" bun run test:coverage
+unit_status=$?
 
 run_step "Playwright" bun run test:e2e
 e2e_status=$?
@@ -37,9 +37,9 @@ e2e_status=$?
 printf '\n==> Summary\n'
 printf '    Lint: %s\n' "$( [ "$lint_status" -eq 0 ] && printf PASS || printf FAIL )"
 printf '    Typecheck: %s\n' "$( [ "$typecheck_status" -eq 0 ] && printf PASS || printf FAIL )"
-printf '    Vitest + coverage: %s\n' "$( [ "$vitest_status" -eq 0 ] && printf PASS || printf FAIL )"
+printf '    Unit + integration + coverage: %s\n' "$( [ "$unit_status" -eq 0 ] && printf PASS || printf FAIL )"
 printf '    Playwright: %s\n' "$( [ "$e2e_status" -eq 0 ] && printf PASS || printf FAIL )"
 
-if [ "$lint_status" -ne 0 ] || [ "$typecheck_status" -ne 0 ] || [ "$vitest_status" -ne 0 ] || [ "$e2e_status" -ne 0 ]; then
+if [ "$lint_status" -ne 0 ] || [ "$typecheck_status" -ne 0 ] || [ "$unit_status" -ne 0 ] || [ "$e2e_status" -ne 0 ]; then
   exit 1
 fi

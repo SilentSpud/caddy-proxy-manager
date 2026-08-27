@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 
 // Reset the module between tests so the in-memory Map is cleared
 let registerFailedAttempt: typeof import('@/src/lib/rate-limit').registerFailedAttempt;
@@ -6,8 +8,7 @@ let isRateLimited: typeof import('@/src/lib/rate-limit').isRateLimited;
 let resetAttempts: typeof import('@/src/lib/rate-limit').resetAttempts;
 
 beforeEach(async () => {
-  vi.resetModules();
-  const mod = await import('@/src/lib/rate-limit');
+  const mod = await import(`@/src/lib/rate-limit${fresh()}`);
   registerFailedAttempt = mod.registerFailedAttempt;
   isRateLimited = mod.isRateLimited;
   resetAttempts = mod.resetAttempts;

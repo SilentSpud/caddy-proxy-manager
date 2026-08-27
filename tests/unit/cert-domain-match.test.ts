@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { isDomainCoveredByWildcard, isDomainCoveredByCert } from '@/src/lib/cert-domain-match';
 
 describe('isDomainCoveredByWildcard', () => {

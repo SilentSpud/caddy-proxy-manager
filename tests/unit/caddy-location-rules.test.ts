@@ -2,7 +2,7 @@
  * Unit tests for buildLocationReverseProxy (src/lib/caddy.ts).
  * Tests the Caddy config building block for location-based routing.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 import { buildLocationReverseProxy } from '@/src/lib/caddy';
 

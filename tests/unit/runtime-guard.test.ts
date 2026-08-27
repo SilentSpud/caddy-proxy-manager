@@ -5,7 +5,8 @@
  * Node case is reproduced by removing `process.versions.bun` for the duration
  * of a test rather than by mocking the module.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import { assertBunRuntime } from '@/src/lib/runtime-guard';
 
 /** Stands in for process.exit, which the real signature declares as `never`. */

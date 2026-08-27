@@ -5,7 +5,7 @@
  * live `fetch()` against a closed port and an unresolvable host under Bun
  * 1.4.0, not from the changelog.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { isConnectionError } from '@/src/lib/net-errors';
 import { lastHeaderValue } from '@/src/lib/request-headers';
 

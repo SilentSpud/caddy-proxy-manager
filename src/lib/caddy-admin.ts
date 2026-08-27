@@ -68,10 +68,11 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   timeoutMs,
   contentType,
 }) => {
-  // Backstop for the guard installed by tests/setup.vitest.ts: if a test swaps
+  // Backstop for the guard installed by tests/setup.bun.ts: if a test swaps
   // the real transport back in, fail loudly instead of quietly opening a socket
-  // to whatever happens to be listening on the admin port.
-  if (process.env.VITEST) {
+  // to whatever happens to be listening on the admin port. CPM_TEST is set by
+  // tests/helpers/env.ts — `bun test` sets no marker of its own.
+  if (process.env.CPM_TEST) {
     throw new Error(
       "The real Caddy admin transport was used inside a test. Tests must install an " +
         "in-memory adapter via setCaddyAdminTransport() — see tests/helpers/caddy-admin.ts.",

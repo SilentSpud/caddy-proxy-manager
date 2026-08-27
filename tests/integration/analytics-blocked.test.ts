@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 // Mock dependencies so we can import collectBlockedSignatures and parseLine.
 vi.mock('@/src/lib/db', () => ({

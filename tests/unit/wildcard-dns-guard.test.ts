@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 // The model module imports audit; keep it inert for this unit test.
 vi.mock('@/src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
-vi.mock('@/src/lib/settings', async (orig) => {
-  const actual = await orig<typeof import('@/src/lib/settings')>();
-  return { ...actual, getDnsProviderSettings: vi.fn() };
-});
+const actualSettings = await import('@/src/lib/settings');
+
+vi.mock('@/src/lib/settings', () => ({ ...actualSettings, getDnsProviderSettings: vi.fn() }));
 
 import { assertWildcardIssuable } from '@/src/lib/models/proxy-hosts';
 import { getDnsProviderSettings } from '@/src/lib/settings';

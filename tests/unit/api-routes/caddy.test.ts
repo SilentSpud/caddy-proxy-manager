@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 
 vi.mock('@/src/lib/caddy', () => ({
   applyCaddyConfig: vi.fn().mockResolvedValue({ ok: true }),

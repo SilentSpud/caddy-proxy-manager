@@ -8,7 +8,7 @@
  * against better-auth's exported helpers rather than against copied literals —
  * if upstream changes the scheme, this test breaks instead of production.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';
 import { accountIssuerFor, CREDENTIAL_ISSUER } from '@/src/lib/account-issuer';
 

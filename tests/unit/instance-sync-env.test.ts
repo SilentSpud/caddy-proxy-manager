@@ -5,7 +5,7 @@
  * These functions have no DB or network dependency — they only read
  * from process.env and do simple parsing/validation.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import {
   getEnvSlaveInstances,
   getSyncIntervalMs,

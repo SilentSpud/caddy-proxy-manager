@@ -6,7 +6,8 @@
  * the file in place once it has been fully ingested and crosses a size
  * threshold. These tests pin that behavior.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import { Readable } from 'node:stream';
 
 // Matches AUDIT_LOG_TRUNCATE_THRESHOLD in src/lib/waf-log-parser.ts
@@ -22,8 +23,10 @@ const store = new Map<string, string>();
 
 // Reduce `eq(column, value)` to the key itself so the db mock's `where()` can
 // look it up without interpreting drizzle's SQL objects.
-vi.mock('drizzle-orm', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('drizzle-orm')>()),
+const drizzleOrm = await import('drizzle-orm');
+
+vi.mock('drizzle-orm', () => ({
+  ...drizzleOrm,
   eq: (_column: unknown, value: string) => ({ __key: value }),
 }));
 

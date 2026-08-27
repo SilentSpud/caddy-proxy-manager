@@ -3,17 +3,16 @@
  * backing the profile "Active sessions" view: list active sessions, revoke one
  * (ownership-scoped), and revoke all others.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createTestDb, type TestDb } from '../helpers/db';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { createTestDb, currentDb, type TestDb } from '../helpers/db';
 import { users, sessions } from '../../src/lib/db/schema';
 
 let db: TestDb;
 
-vi.mock('../../src/lib/db', async () => {
+vi.mock('../../src/lib/db', () => {
   return {
-    get default() {
-      return db;
-    },
+    default: currentDb(() => db),
     get sqlite() {
       return undefined;
     },

@@ -4,7 +4,9 @@
  * is that no local account exists to give credentials to — while leaving the
  * normal mode's strict validation untouched.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import { fresh } from '@/tests/helpers/fresh';
 
 type AuthConfig = {
   disableLocalUsers: boolean;
@@ -13,15 +15,13 @@ type AuthConfig = {
 };
 
 async function loadAuthConfig(env: Record<string, string | undefined>): Promise<AuthConfig> {
-  vi.resetModules();
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-  const { config } = await import('../../src/lib/config');
+  const { config } = await import(`../../src/lib/config${fresh()}`);
   return config.auth;
 }
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.resetModules();
 });
 
 describe('AUTH_DISABLE_LOCAL_USERS', () => {
@@ -73,9 +73,8 @@ describe('admin credentials in OIDC-only mode', () => {
   };
 
   async function loadConfigModule(env: Record<string, string | undefined>) {
-    vi.resetModules();
     for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-    return import('../../src/lib/config');
+    return import(`../../src/lib/config${fresh()}`);
   }
 
   it('resolves to no credentials instead of demanding them', async () => {
