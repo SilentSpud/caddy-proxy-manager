@@ -2,10 +2,42 @@
 # cross-compile Caddy for the target arch via GOOS/GOARCH. This avoids QEMU
 # emulation when producing the linux/arm64 image on an x86 GitHub runner —
 # native cross-compilation is several times faster.
-FROM --platform=$BUILDPLATFORM golang:1.27 AS builder
+#
+# caddy:<version>-builder rather than golang:: it ships xcaddy already installed
+# and a Go toolchain the Caddy maintainers built that release with. That buys two
+# things over `golang: + go install xcaddy@latest`. The xcaddy compile step
+# disappears from every cold build — including the ones operators trigger from
+# Settings -> Caddy Build — and the version stops floating, so an upstream xcaddy
+# release can no longer change this image with no commit here.
+#
+# Pinned to an exact tag for that second reason: the bare `builder` tag follows
+# the newest Caddy release and would put the toolchain back on a moving target.
+# The tag selects a Go and xcaddy version only — what actually gets compiled is
+# CADDY_VERSION below, which need not be the same release.
+FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
+
+# The Caddy source to compile, pinned so that an image rebuilt tomorrow contains
+# what one rebuilt today does. With a moving source an upstream bug appears and
+# disappears with no commit in this repo — which is exactly how the L4 TCP e2e
+# failure behaved: it failed against a stale image and passed the moment the
+# image was rebuilt, with nothing here having changed.
+#
+# This is a master commit rather than a release tag, and deliberately so. The
+# plugin list below carries no versions, so Go resolves each to its latest,
+# and those track Caddy's master. Building the v2.11.4 *release* against them
+# fails to compile: the plugins pull a cel-go new enough to have renamed
+# interpreter.Interpretable, which that release's own celmatcher.go predates.
+# Master has absorbed that change; the last release has not.
+#
+# The consequence to know about: pinning Caddy while the plugins float means a
+# future plugin release can break this build the same way. That surfaces as a
+# compile error in the sidecar's build status, not as a silent behaviour change,
+# and the fix is to move this pin forward. Pinning every plugin too would remove
+# even that, at the cost of 21 more versions to maintain.
+ARG CADDY_VERSION=d6637934e866
 
 # Plugins compiled into the binary, whitespace-separated Go module paths with an
 # optional @version. The default is the full set Caddy Proxy Manager supports,
@@ -45,9 +77,6 @@ github.com/mholt/caddy-l4 \
 github.com/fuomag9/caddy-blocker-plugin \
 github.com/corazawaf/coraza-caddy/v2"
 
-# Install xcaddy
-RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
-
 # Build Caddy with the selected plugins.
 #
 # The module list is expanded into `--with` flags here rather than being passed
@@ -56,16 +85,36 @@ RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
 # validated against an allowlist before they reach this point
 # (validateCustomModule in src/lib/caddy-modules.ts) — word splitting is what
 # separates them, so a path containing shell metacharacters must never get here.
-RUN set -eu; \
+# The cache mounts matter most for the rebuild-from-the-UI flow: without them
+# every module-list change re-downloads all of Caddy's and the plugins'
+# dependencies and recompiles from scratch. BuildKit keeps these on the host
+# daemon — the same daemon the sidecar's `docker compose build caddy` talks to —
+# so repeat rebuilds reuse them.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eu; \
     args=""; \
     for module in ${CADDY_MODULES}; do \
         args="${args} --with ${module}"; \
     done; \
     echo "Building Caddy with:${args:- no plugins}"; \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH xcaddy build master ${args} --output /usr/bin/caddy; \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH xcaddy build ${CADDY_VERSION} ${args} --output /usr/bin/caddy; \
     printf '%s\n' "${CADDY_MODULES}" > /caddy-modules.txt
 
-FROM ubuntu:26.04
+# Alpine rather than ubuntu:, matching the builder's base. The binary xcaddy
+# produces is statically linked, so it does not care which libc is here — but
+# keeping both stages on the same distro means it never will, even if a plugin
+# one day pulls in cgo. It also takes the image from ~262MB to well under half.
+#
+# Not caddy:<version> itself: this stage overwrites /usr/bin/caddy with our own
+# build, so the official image's binary would sit in a lower layer as ~50MB of
+# shadowed dead weight. What that image would otherwise give us — a Caddyfile
+# and the XDG variables below — this file already sets for itself.
+#
+# wget is busybox's, and the compose healthcheck
+# (wget --quiet --tries=1 -O /dev/null http://localhost:2019/config/) works with
+# it unchanged, so nothing needs installing for that.
+FROM alpine:3.23
 
 # Accept build args for user/group IDs to support rootless operation
 # Using 10000 as default to avoid conflicts with system users
@@ -73,23 +122,28 @@ ARG PUID=10000
 ARG PGID=10000
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates
 
 # Copy caddy binary from builder
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
 # Create caddy user and directories with configurable IDs for rootless operation
 # Remove any existing users/groups with the same UID/GID to avoid conflicts
-RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
+# `shadow` supplies useradd/groupadd/userdel/groupdel, which busybox does not:
+# Alpine ships adduser/addgroup with different flags and different semantics.
+# Installing it for this one layer and removing it again keeps the ID-remapping
+# logic identical to what it has always been — this is what decides ownership of
+# the /data, /config and /logs volumes, so it is the wrong place to be clever —
+# without leaving user-management tooling in the shipped image.
+RUN apk add --no-cache --virtual .user-setup shadow && \
+    (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
     (getent passwd ${PUID} && userdel $(getent passwd ${PUID} | cut -d: -f1) || true) && \
     groupadd -g ${PGID} caddy && \
     useradd -r -u ${PUID} -g caddy -m -d /home/caddy caddy && \
     mkdir -p /data /config /logs /acme-ca && \
     chown -R caddy:caddy /data /config /logs /home/caddy && \
-    chmod 0777 /acme-ca
+    chmod 0777 /acme-ca && \
+    apk del .user-setup
 
 # Record what this image was built with. The app learns the module set from the
 # record its sidecar writes after a successful rebuild (caddy-build.applied.json

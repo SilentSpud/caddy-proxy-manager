@@ -5,6 +5,13 @@
 export async function register() {
   // Only run on the server side
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Refuse to run under anything but Bun. This catches the paths where the app
+    // gets to execute at all; the standalone build dies earlier, while its module
+    // graph is still linking, so `bun run build` plants an equivalent check at the
+    // top of dist/standalone/server.js (scripts/inject-runtime-guard.mjs).
+    const { assertBunRuntime } = await import("./lib/runtime-guard");
+    assertBunRuntime();
+
     // Validate production configuration early to catch misconfigurations
     const { validateProductionConfig } = await import("./lib/config");
     try {

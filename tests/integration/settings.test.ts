@@ -58,7 +58,7 @@ describe('settings integration', () => {
   });
 
   it('stores object and retrieves it correctly', async () => {
-    const obj = { enabled: true, resolvers: ['1.1.1.1', '8.8.8.8'], timeout: '5s' };
+    const obj = { enabled: true, resolvers: ['1.1.1.1', '9.9.9.9'], timeout: '5s' };
     await setSetting('dns', obj);
     const retrieved = await getSetting<typeof obj>('dns');
     expect(retrieved).toEqual(obj);

@@ -4,25 +4,41 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import MapGL, { Layer, Popup, Source, type MapLayerMouseEvent } from "react-map-gl/maplibre";
 import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
-import {
-  setWorkerUrl,
-  type ExpressionSpecification,
-  type FillLayerSpecification,
-  type LineLayerSpecification,
-} from "maplibre-gl";
+import { setWorkerUrl, type ExpressionSpecification } from "maplibre-gl";
+import { useTheme } from "@astryxdesign/core";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack } from "@astryxdesign/core/Stack";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+import {
+  fillLayerFor,
+  hoverLayerFor,
+  mapPalette,
+  mapStyleFor,
+  outlineLayerFor,
+  selectedLayerFor,
+} from "./map-theme";
+
+// The atlas ships with the `world-atlas` package rather than being copied into
+// public/. `?url` has the bundler emit it as a hashed static asset and hand back
+// its path, so this stays a same-origin fetch — allowed by the CSP's
+// `connect-src 'self'` (proxy.ts) — instead of inlining 756 KB into a JS chunk.
+import atlasUrl from "world-atlas/countries-50m.json?url";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+
 // maplibre-gl v6 loads its tile worker from a separate file resolved at runtime
-// from `import.meta.url`. Under Turbopack that lookup does not survive bundling,
-// so the worker never starts and the map renders as an empty ocean. The worker
-// is staged under public/ at build time (scripts/copy-maplibre-worker.mjs) and
-// pointed at explicitly here. Requires `worker-src 'self'` in the CSP (proxy.ts) —
-// the worker is a same-origin URL now, not the blob: URL v5 used.
+// from `import.meta.url`, and that lookup does not survive bundling — the worker
+// never starts and the map renders as an empty ocean. `?worker&url` has Vite
+// bundle the worker's whole module graph (it imports a sibling
+// `./maplibre-gl-shared.mjs`, which a plain `?url` copy would 404 on) into one
+// self-contained chunk and hand back its emitted path, which is pointed at
+// explicitly here. Requires `worker.format: "es"` in vite.config.ts, since
+// maplibre constructs it with `{ type: "module" }`, and `worker-src 'self'` in
+// the CSP (proxy.ts) — the worker is a same-origin URL now, not the blob: URL
+// v5 used.
 if (typeof window !== "undefined") {
-  setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+  setWorkerUrl(maplibreWorkerUrl);
 }
 
 const A2N: Record<string, string> = {
@@ -462,64 +478,6 @@ function cutAntimeridian(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollecti
   };
 }
 
-const OCEAN = "#0a1628";
-
-// biome-ignore lint/suspicious/noExplicitAny: maplibre's StyleSpecification is far stricter than a blank base style needs
-const MAP_STYLE: any = {
-  version: 8,
-  name: "blank",
-  sources: {},
-  layers: [{ id: "bg", type: "background", paint: { "background-color": OCEAN } }],
-};
-
-const FILL_LAYER: Omit<FillLayerSpecification, "source"> = {
-  id: "countries-fill",
-  type: "fill",
-  paint: {
-    "fill-color": [
-      "interpolate",
-      ["linear"],
-      ["coalesce", ["get", "norm"], 0],
-      0,
-      "#1e293b", // no traffic — slate-800, clearly distinct from ocean
-      0.001,
-      "#1e3a8a", // any traffic
-      0.4,
-      "#3b82f6",
-      1,
-      "#93c5fd",
-    ] as ExpressionSpecification,
-    "fill-opacity": 1,
-  },
-};
-
-const SELECTED_LAYER: Omit<FillLayerSpecification, "source"> = {
-  id: "countries-selected",
-  type: "fill",
-  paint: {
-    "fill-color": "#7dd3fc",
-    "fill-opacity": 0.45,
-  },
-};
-
-const HOVER_LAYER: Omit<FillLayerSpecification, "source"> = {
-  id: "countries-hover",
-  type: "fill",
-  paint: {
-    "fill-color": "#7dd3fc",
-    "fill-opacity": 0.3,
-  },
-};
-
-const OUTLINE_LAYER: Omit<LineLayerSpecification, "source"> = {
-  id: "countries-outline",
-  type: "line",
-  paint: {
-    "line-color": "rgba(148,163,184,0.18)",
-    "line-width": 0.6,
-  },
-};
-
 export interface CountryStats {
   countryCode: string;
   total: number;
@@ -544,21 +502,43 @@ export default function WorldMapInner({
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
+  // `tokens` is memoized on theme + mode, so every layer spec below stays
+  // referentially stable until the mode actually flips — react-map-gl diffs
+  // these against the live style, and a new object each render would make it
+  // re-apply paint properties continuously.
+  const { mode, tokens } = useTheme();
+  const palette = useMemo(
+    () => mapPalette(mode, (name: string) => tokens[name] ?? ""),
+    [mode, tokens],
+  );
+  const mapStyle = useMemo(() => mapStyleFor(palette.ocean), [palette.ocean]);
+  const fillLayer = useMemo(() => fillLayerFor(palette), [palette]);
+  const selectedLayer = useMemo(() => selectedLayerFor(palette), [palette]);
+  const hoverLayer = useMemo(() => hoverLayerFor(palette), [palette]);
+  const outlineLayer = useMemo(() => outlineLayerFor(palette), [palette]);
+
   const countMap = useMemo(() => new Map(data.map((d) => [d.countryCode, d.total])), [data]);
   const blockedMap = useMemo(() => new Map(data.map((d) => [d.countryCode, d.blocked])), [data]);
   const max = useMemo(() => data.reduce((m, d) => Math.max(m, d.total), 0), [data]);
 
   useEffect(() => {
-    fetch("/geo/countries-50m.json")
+    let cancelled = false;
+    fetch(atlasUrl)
       .then((r) => r.json())
       .then((topo: Topology) => {
+        if (cancelled) return;
         const fc = feature(
           topo,
           topo.objects.countries as GeometryCollection,
         ) as GeoJSON.FeatureCollection;
         setBaseGeojson(cutAntimeridian(fc));
       })
-      .catch(() => setBaseGeojson({ type: "FeatureCollection", features: [] }));
+      .catch(() => {
+        if (!cancelled) setBaseGeojson({ type: "FeatureCollection", features: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const geojson = useMemo<GeoJSON.FeatureCollection | null>(() => {
@@ -647,15 +627,18 @@ export default function WorldMapInner({
 
   return (
     <div className="relative h-full flex flex-col">
-      {/* Override MapLibre popup chrome to match dark theme */}
+      {/* MapLibre renders the popup into its own DOM with its own classes, so
+          its chrome can only be reached by overriding them. The values are
+          plain custom properties rather than resolved colours: unlike the WebGL
+          layers above, this is ordinary CSS, so it follows the theme on its own
+          and needs no re-render when the mode flips. */}
       <style>{`
         .wm-popup .maplibregl-popup-content {
-          background: rgba(8,16,30,0.96) !important;
-          border: 1px solid rgba(148,163,184,0.15) !important;
-          border-radius: 10px !important;
+          background: var(--color-background-popover) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-element) !important;
           padding: 10px 14px !important;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
-          backdrop-filter: blur(12px) !important;
+          box-shadow: var(--shadow-high) !important;
           min-width: 152px;
         }
         .wm-popup .maplibregl-popup-tip { display: none !important; }
@@ -668,9 +651,9 @@ export default function WorldMapInner({
           collapsed height clips the canvas away completely — the map still runs
           and answers queryRenderedFeatures, but paints nothing and hit-tests
           nothing. */}
-      <div className="relative rounded-lg overflow-hidden border border-white/[0.08] flex-1 min-h-[280px] min-w-[400px] w-full">
+      <div className="relative rounded-lg overflow-hidden border border-border flex-1 min-h-[280px] min-w-[400px] w-full">
         <MapGL
-          mapStyle={MAP_STYLE}
+          mapStyle={mapStyle}
           initialViewState={{
             bounds: [
               [-168, -56],
@@ -689,16 +672,16 @@ export default function WorldMapInner({
           cursor={hoverInfo ? "crosshair" : "grab"}
         >
           <Source id="countries" type="geojson" data={geojson}>
-            <Layer {...FILL_LAYER} source="countries" />
+            <Layer {...fillLayer} source="countries" />
             {/* Selected: data-driven via isSelected property baked into geojson — reliable on click */}
             <Layer
-              {...SELECTED_LAYER}
+              {...selectedLayer}
               source="countries"
               filter={["==", ["get", "isSelected"], true]}
             />
             {/* Hover: filter-driven, changes on mousemove */}
-            <Layer {...HOVER_LAYER} source="countries" filter={hoverFilter} />
-            <Layer {...OUTLINE_LAYER} source="countries" />
+            <Layer {...hoverLayer} source="countries" filter={hoverFilter} />
+            <Layer {...outlineLayer} source="countries" />
           </Source>
 
           {/* Hover popup (takes precedence) or selected-country popup */}
@@ -715,7 +698,13 @@ export default function WorldMapInner({
                   anchor="bottom"
                   className="wm-popup"
                 >
-                  <div style={{ color: "#f1f5f9", fontFamily: "inherit", fontSize: 13 }}>
+                  <div
+                    style={{
+                      color: "var(--color-text-primary)",
+                      fontFamily: "inherit",
+                      fontSize: 13,
+                    }}
+                  >
                     <div
                       style={{
                         display: "flex",
@@ -732,10 +721,10 @@ export default function WorldMapInner({
                       <span>{info.alpha2 ? (NAMES[info.alpha2] ?? info.alpha2) : "Territory"}</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 20 }}>
-                      <span style={{ color: "#94a3b8" }}>Requests</span>
+                      <span style={{ color: "var(--color-text-secondary)" }}>Requests</span>
                       <span
                         style={{
-                          color: "#60a5fa",
+                          color: "var(--color-text-accent)",
                           fontWeight: 700,
                           fontVariantNumeric: "tabular-nums",
                         }}
@@ -752,10 +741,10 @@ export default function WorldMapInner({
                           marginTop: 3,
                         }}
                       >
-                        <span style={{ color: "#94a3b8" }}>Blocked</span>
+                        <span style={{ color: "var(--color-text-secondary)" }}>Blocked</span>
                         <span
                           style={{
-                            color: "#f87171",
+                            color: "var(--color-error)",
                             fontWeight: 700,
                             fontVariantNumeric: "tabular-nums",
                           }}
@@ -765,7 +754,9 @@ export default function WorldMapInner({
                       </div>
                     )}
                     {info.total === 0 && (
-                      <div style={{ color: "#475569", marginTop: 3, fontSize: 12 }}>
+                      <div
+                        style={{ color: "var(--color-text-disabled)", marginTop: 3, fontSize: 12 }}
+                      >
                         No traffic recorded
                       </div>
                     )}
@@ -781,14 +772,15 @@ export default function WorldMapInner({
           <Text type="body" size="xsm" color="secondary">
             Low
           </Text>
-          {/* The ramp mirrors the map's own fill-colour interpolation, so it
-              stays in the map's palette rather than the theme's. */}
+          {/* Mirrors the map's own fill-colour interpolation — same stops, same
+              order — so the key stays true to the map after a theme flip
+              inverts the ramp. */}
           <div
             style={{
               flex: 1,
               height: 5,
               borderRadius: 999,
-              background: "linear-gradient(to right, #1e3a8a, #3b82f6, #93c5fd)",
+              background: `linear-gradient(to right, ${palette.ramp[0]}, ${palette.ramp[1]}, ${palette.ramp[2]})`,
             }}
           />
           <Text type="body" size="xsm" color="secondary">

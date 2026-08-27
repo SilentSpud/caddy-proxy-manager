@@ -1,6 +1,6 @@
-import Database from 'better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { Database } from 'bun:sqlite';
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -163,6 +163,13 @@ describe('database compatibility for accounts schema', () => {
     } finally {
       reader?.close();
       appSqlite?.close();
+      // close() is not enough on bun:sqlite: it defers the actual handle release
+      // until every prepared statement is finalized, and the statements drizzle
+      // and the migrator keep are only finalized when they are collected. Until
+      // then Windows still considers compat.db open and the removal below fails
+      // with EBUSY. A synchronous full GC finalizes them; on POSIX this is
+      // simply redundant, since unlinking an open file there is legal.
+      Bun.gc(true);
       rmSync(tempDir, { recursive: true, force: true });
     }
   });

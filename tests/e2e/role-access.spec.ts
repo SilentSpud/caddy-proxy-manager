@@ -13,13 +13,11 @@
  * - Logs in as each role in separate browser contexts.
  */
 import { test, expect, type BrowserContext } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
+import { ensureTestUser } from '../helpers/seed';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
-
-const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 // Pages that require admin role (via requireAdmin in their own page.tsx)
 const ADMIN_ONLY_PAGES = [
@@ -41,46 +39,6 @@ const USER_ACCESSIBLE_PAGES = ['/', '/profile'];
 
 // All dashboard pages (union of both sets)
 const ALL_DASHBOARD_PAGES = [...USER_ACCESSIBLE_PAGES, ...ADMIN_ONLY_PAGES];
-
-/**
- * Create a test user inside the running web container using bun.
- * Uses Bun's built-in Bun.password.hash (bcrypt) — no npm deps needed.
- */
-function ensureTestUser(username: string, password: string, role: string) {
-  const script = `
-    import { Database } from "bun:sqlite";
-    const db = new Database("./data/caddy-proxy-manager.db");
-    const email = "${username}@localhost";
-    const hash = await Bun.password.hash("${password}", { algorithm: "bcrypt", cost: 12 });
-    const now = new Date().toISOString();
-    const existing = db.query("SELECT id FROM users WHERE email = ?").get(email);
-    if (existing) {
-      db.run("UPDATE users SET passwordHash = ?, role = ?, status = 'active', updatedAt = ? WHERE email = ?",
-        [hash, "${role}", now, email]);
-      // Update or create credential account for Better Auth
-      const acc = db.query("SELECT id FROM accounts WHERE userId = ? AND providerId = 'credential'").get(existing.id);
-      if (acc) {
-        db.run("UPDATE accounts SET password = ?, updatedAt = ? WHERE id = ?", [hash, now, acc.id]);
-      } else {
-        db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
-          [existing.id, String(existing.id), hash, now, now]);
-      }
-    } else {
-      db.run(
-        "INSERT INTO users (email, name, passwordHash, role, provider, subject, username, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, 'credentials', ?, ?, 'active', ?, ?)",
-        [email, "${username}", hash, "${role}", "${username}", "${username}", now, now]
-      );
-      const user = db.query("SELECT id FROM users WHERE email = ?").get(email);
-      // Create credential account for Better Auth
-      db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
-        [user.id, String(user.id), hash, now, now]);
-    }
-  `;
-  execFileSync('docker', [...COMPOSE_ARGS, 'exec', '-T', 'web', 'bun', '-e', script], {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-  });
-}
 
 /**
  * Log in as the given user and return an authenticated browser context.

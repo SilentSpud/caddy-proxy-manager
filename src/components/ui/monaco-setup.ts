@@ -64,10 +64,15 @@ function registerCaddyfile(m: Monaco): void {
 
 async function bootstrap(): Promise<Monaco | null> {
   try {
+    // The worker specifiers are the short `monaco-editor/<path>` form rather
+    // than the deep `monaco-editor/esm/vs/<path>` one. Monaco 0.56 added an
+    // `exports` map to its package.json which maps `./*` onto `./esm/vs/*.js`,
+    // so the deep paths no longer resolve at all — the bundler fails on them
+    // rather than falling back, and the `esm/vs` prefix is now implicit.
     const [monaco, editorWorker, jsonWorker] = await Promise.all([
       import("monaco-editor"),
-      import("monaco-editor/esm/vs/editor/editor.worker?worker"),
-      import("monaco-editor/esm/vs/language/json/json.worker?worker"),
+      import("monaco-editor/editor/editor.worker?worker"),
+      import("monaco-editor/language/json/json.worker?worker"),
     ]);
 
     // Monaco reads this global when a language service needs a worker. Only the

@@ -5,60 +5,9 @@
  * Runs as admin (testadmin) — the page requires admin role.
  */
 import { test, expect } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
+import { getUserRecord } from '../helpers/seed';
 
 const BASE = 'http://localhost:3000';
-const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
-
-type CreatedUserRecord = {
-  email: string;
-  provider: string | null;
-  subject: string | null;
-  username: string | null;
-  displayUsername: string | null;
-  accountProviderId: string | null;
-  accountId: string | null;
-  accountHasPassword: boolean;
-  role: string;
-};
-
-function execInContainer(script: string): string {
-  return execFileSync('docker', [...COMPOSE_ARGS, 'exec', '-T', 'web', 'bun', '-e', script], {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-    encoding: 'utf8',
-  });
-}
-
-function getCreatedUserRecord(email: string): CreatedUserRecord {
-  const output = execInContainer(`
-    import { Database } from "bun:sqlite";
-    const db = new Database("./data/caddy-proxy-manager.db");
-    const user = db.query(
-      "SELECT id, email, provider, subject, username, displayUsername, role FROM users WHERE email = ?"
-    ).get(${JSON.stringify(email)});
-    if (!user) {
-      console.error("User not found");
-      process.exit(1);
-    }
-    const account = db.query(
-      "SELECT providerId, accountId, password FROM accounts WHERE userId = ? AND providerId = 'credential'"
-    ).get(user.id);
-    console.log(JSON.stringify({
-      email: user.email,
-      provider: user.provider,
-      subject: user.subject,
-      username: user.username,
-      displayUsername: user.displayUsername,
-      accountProviderId: account?.providerId ?? null,
-      accountId: account?.accountId ?? null,
-      accountHasPassword: !!account?.password,
-      role: user.role,
-    }));
-  `).trim();
-
-  return JSON.parse(output) as CreatedUserRecord;
-}
 
 async function loginWithCredentials(
   browser: import('@playwright/test').Browser,
@@ -198,7 +147,7 @@ test.describe('Users page', () => {
       page.getByText('New Test User', { exact: true }).filter({ visible: true }),
     ).toBeVisible({ timeout: 5000 });
 
-    const created = getCreatedUserRecord(email);
+    const created = getUserRecord(email);
     expect(created.provider).toBe('credentials');
     expect(created.subject).toBe(expectedUsername);
     expect(created.username).toBe(expectedUsername);
@@ -239,7 +188,7 @@ test.describe('Users page', () => {
     await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('viewer', { exact: true }).first()).toBeVisible({ timeout: 5000 });
 
-    const created = getCreatedUserRecord(email);
+    const created = getUserRecord(email);
     expect(created.role).toBe('viewer');
     expect(created.provider).toBe('credentials');
     expect(created.subject).toBe(expectedUsername);
@@ -290,7 +239,7 @@ test.describe('Users API v1 — create user (POST)', () => {
     expect(body.role).toBe('user');
     expect(body.passwordHash).toBeUndefined();
 
-    const created = getCreatedUserRecord(email);
+    const created = getUserRecord(email);
     expect(created.provider).toBe('credentials');
     expect(created.subject).toBe(expectedUsername);
     expect(created.username).toBe(expectedUsername);
@@ -322,7 +271,7 @@ test.describe('Users API v1 — create user (POST)', () => {
     const body = await response.json();
     expect(body.role).toBe('viewer');
 
-    const created = getCreatedUserRecord(email);
+    const created = getUserRecord(email);
     expect(created.role).toBe('viewer');
     expect(created.provider).toBe('credentials');
     expect(created.accountProviderId).toBe('credential');
@@ -346,7 +295,7 @@ test.describe('Users API v1 — create user (POST)', () => {
     const body = await response.json();
     expect(body.role).toBe('user');
 
-    const created = getCreatedUserRecord(email);
+    const created = getUserRecord(email);
     expect(created.role).toBe('user');
   });
 

@@ -1,0 +1,60 @@
+/**
+ * The guard is the app's first line of defence against being started with the
+ * wrong interpreter, so it has to behave correctly in the case it exists for —
+ * a runtime that is not Bun — which is not the runtime this suite runs on. The
+ * Node case is reproduced by removing `process.versions.bun` for the duration
+ * of a test rather than by mocking the module.
+ */
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { assertBunRuntime } from '@/src/lib/runtime-guard';
+
+/** Stands in for process.exit, which the real signature declares as `never`. */
+const exitSpy = () => {
+  const calls: number[] = [];
+  const exit = vi.fn((code: number) => {
+    calls.push(code);
+    return undefined as never;
+  });
+  return { exit, calls };
+};
+
+function asNonBunRuntime(run: () => void) {
+  const original = process.versions.bun;
+  delete (process.versions as { bun?: string }).bun;
+  try {
+    run();
+  } finally {
+    process.versions.bun = original;
+  }
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('assertBunRuntime', () => {
+  it('does nothing when Bun is the runtime', () => {
+    const { exit, calls } = exitSpy();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    assertBunRuntime(exit);
+
+    expect(calls).toEqual([]);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('exits non-zero, naming the runtime and how to start it, when Bun is absent', () => {
+    const { exit, calls } = exitSpy();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    asNonBunRuntime(() => assertBunRuntime(exit));
+
+    expect(calls).toEqual([1]);
+    const message = error.mock.calls[0]?.[0] as string;
+    // A bare "wrong runtime" message leaves the operator guessing; the whole
+    // point of failing here is to say what to run instead.
+    expect(message).toContain('requires the Bun runtime');
+    expect(message).toContain(`Node.js ${process.versions.node}`);
+    expect(message).toContain('bun server.js');
+  });
+});

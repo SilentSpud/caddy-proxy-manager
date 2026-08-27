@@ -32,8 +32,24 @@ import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 
+import { useChartTheme } from "./chart-theme";
+
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
+// `ssr: false` is deliberate, not a leftover ApexCharts v6 workaround. v7 does
+// render on the server, but through `react-apexcharts/server`, which is an async
+// Server Component — unreachable from this file, which is a client component
+// driven by user-adjustable filters.
+//
+// Server rendering would gain nothing here anyway: this page takes no props and
+// fetches every dataset from /api/analytics/* in an effect, so during the server
+// pass `timeline`, `protocols`, `userAgents` and `wafStats` are all still empty
+// and each chart's `length === 0` guard renders an EmptyState in place of the
+// chart. Dropping `ssr: false` would pull ApexCharts into the SSR graph without
+// server-rendering a single chart. (The theme tokens are not what blocks this —
+// Astryx's `useTheme` supplies a server snapshot and resolves fine without a
+// DOM.) Worth revisiting only if this page starts receiving initial data as
+// props, at which point the charts have something to draw before hydration.
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 const WorldMap = dynamic(() => import("./WorldMapInner"), {
@@ -186,13 +202,6 @@ function formatTs(ts: number, rangeSeconds: number): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-const DARK_CHART: ApexOptions = {
-  chart: { background: "transparent", toolbar: { show: false }, animations: { enabled: false } },
-  theme: { mode: "dark" },
-  grid: { borderColor: "rgba(255,255,255,0.06)" },
-  tooltip: { theme: "dark" },
-};
-
 // ── Local DateTimePicker ───────────────────────────────────────────────────────
 
 /**
@@ -233,16 +242,28 @@ function DateTimePicker({
  * red block-rate figure matches the red in the series beside it, and the chart
  * library is not theme-token aware.
  */
+/**
+ * `tone` names the meaning rather than the colour: the value is read from an
+ * Astryx token at paint time, so it follows the theme without this component
+ * needing to know which mode is active.
+ */
+type StatTone = "error" | "warning";
+
+const STAT_TONE_VAR: Record<StatTone, string> = {
+  error: "var(--color-error)",
+  warning: "var(--color-warning)",
+};
+
 function StatCard({
   label,
   value,
   sub,
-  color,
+  tone,
 }: {
   label: string;
   value: string;
   sub?: string;
-  color?: string;
+  tone?: StatTone;
 }) {
   return (
     <Card padding={5} height="100%">
@@ -251,7 +272,7 @@ function StatCard({
           {label}
         </Text>
         <Text type="display-3" hasTabularNumbers>
-          <span style={color ? { color } : undefined}>{value}</span>
+          <span style={tone ? { color: STAT_TONE_VAR[tone] } : undefined}>{value}</span>
         </Text>
         {sub && (
           <Text type="body" size="sm" color="secondary">
@@ -477,23 +498,25 @@ export default function AnalyticsClient() {
 
   // ── Chart configs ─────────────────────────────────────────────────────────
 
+  const chartTheme = useChartTheme();
+
   const timelineLabels = timeline.map((b) => formatTs(b.ts, rangeSeconds));
   const timelineOptions: ApexOptions = {
-    ...DARK_CHART,
-    chart: { ...DARK_CHART.chart, type: "area", stacked: false, id: "timeline" },
-    colors: ["#3b82f6", "#ef4444"],
+    ...chartTheme.base,
+    chart: { ...chartTheme.base.chart, type: "area", stacked: false, id: "timeline" },
+    colors: [chartTheme.series.blue, chartTheme.series.red],
     fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 } },
     stroke: { curve: "smooth", width: 2 },
     dataLabels: { enabled: false },
     xaxis: {
       categories: timelineLabels,
-      labels: { rotate: 0, style: { colors: "#94a3b8", fontSize: "11px" } },
+      labels: { rotate: 0, style: { colors: chartTheme.labelColor, fontSize: "11px" } },
       axisBorder: { show: false },
       axisTicks: { show: false },
     },
-    yaxis: { labels: { style: { colors: "#94a3b8" } } },
-    legend: { labels: { colors: "#94a3b8" } },
-    tooltip: { theme: "dark", shared: true, intersect: false },
+    yaxis: { labels: { style: { colors: chartTheme.labelColor } } },
+    legend: { labels: { colors: chartTheme.labelColor } },
+    tooltip: { theme: chartTheme.mode, shared: true, intersect: false },
   };
   const timelineSeries = [
     { name: "Allowed", data: timeline.map((b) => b.total - b.blocked) },
@@ -501,40 +524,48 @@ export default function AnalyticsClient() {
   ];
 
   const donutOptions: ApexOptions = {
-    ...DARK_CHART,
-    chart: { ...DARK_CHART.chart, type: "donut", id: "protocols" },
-    colors: ["#3b82f6", "#8b5cf6", "#06b6d4", "#f59e0b"],
+    ...chartTheme.base,
+    chart: { ...chartTheme.base.chart, type: "donut", id: "protocols" },
+    colors: [
+      chartTheme.series.blue,
+      chartTheme.series.purple,
+      chartTheme.series.cyan,
+      chartTheme.series.orange,
+    ],
     labels: protocols.map((p) => p.proto),
-    legend: { position: "bottom", labels: { colors: "#94a3b8" } },
-    dataLabels: { style: { colors: ["#fff"] } },
+    legend: { position: "bottom", labels: { colors: chartTheme.labelColor } },
+    dataLabels: { style: { colors: [chartTheme.onSeries] } },
     plotOptions: { pie: { donut: { size: "65%" } } },
   };
   const donutSeries = protocols.map((p) => p.count);
 
   const uaNames = userAgents.map((u) => parseUA(u.userAgent));
   const barOptions: ApexOptions = {
-    ...DARK_CHART,
-    chart: { ...DARK_CHART.chart, type: "bar", id: "ua" },
-    colors: ["#7f5bff"],
+    ...chartTheme.base,
+    chart: { ...chartTheme.base.chart, type: "bar", id: "ua" },
+    colors: [chartTheme.series.purple],
     plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
     dataLabels: { enabled: false },
-    xaxis: { categories: uaNames, labels: { style: { colors: "#94a3b8", fontSize: "12px" } } },
-    yaxis: { labels: { style: { colors: "#94a3b8", fontSize: "12px" } } },
+    xaxis: {
+      categories: uaNames,
+      labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
+    },
+    yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
   };
   const barSeries = [{ name: "Requests", data: userAgents.map((u) => u.count) }];
 
   const wafRuleLabels = (wafStats?.topRules ?? []).map((r) => `#${r.ruleId}`);
   const wafBarOptions: ApexOptions = {
-    ...DARK_CHART,
-    chart: { ...DARK_CHART.chart, type: "bar", id: "waf-rules" },
-    colors: ["#f59e0b"],
+    ...chartTheme.base,
+    chart: { ...chartTheme.base.chart, type: "bar", id: "waf-rules" },
+    colors: [chartTheme.series.orange],
     plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
     dataLabels: { enabled: false },
     xaxis: {
       categories: wafRuleLabels,
-      labels: { style: { colors: "#94a3b8", fontSize: "12px" } },
+      labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
     },
-    yaxis: { labels: { style: { colors: "#94a3b8", fontSize: "12px" } } },
+    yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
   };
   const wafBarSeries = [{ name: "Hits", data: (wafStats?.topRules ?? []).map((r) => r.count) }];
 
@@ -910,13 +941,13 @@ export default function AnalyticsClient() {
                   ? `${wafStats!.total.toLocaleString()} from WAF`
                   : undefined
               }
-              color={summary.blockedRequests > 0 ? "#ef4444" : undefined}
+              tone={summary.blockedRequests > 0 ? "error" : undefined}
             />
             <StatCard
               label="Block Rate"
               value={`${summary.blockedPercent}%`}
               sub={`${formatBytes(summary.bytesServed)} served`}
-              color={summary.blockedPercent > 10 ? "#f59e0b" : undefined}
+              tone={summary.blockedPercent > 10 ? "warning" : undefined}
             />
             <StatCard
               label="WAF Events"
@@ -926,7 +957,7 @@ export default function AnalyticsClient() {
                   ? `${wafStats.topRules.length} rules triggered`
                   : "No WAF events"
               }
-              color={(wafStats?.total ?? 0) > 0 ? "#f59e0b" : undefined}
+              tone={(wafStats?.total ?? 0) > 0 ? "warning" : undefined}
             />
           </Grid>
 

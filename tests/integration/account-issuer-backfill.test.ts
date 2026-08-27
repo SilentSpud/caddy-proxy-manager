@@ -8,7 +8,7 @@
  * of an account they still nominally have. So the values are asserted against
  * better-auth's own helpers, not against literals copied from the SQL.
  */
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

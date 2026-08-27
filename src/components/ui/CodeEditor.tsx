@@ -24,7 +24,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@astryxdesign/core";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack, HStack } from "@astryxdesign/core/Stack";
@@ -66,7 +66,7 @@ export function CodeEditor({
   isDisabled,
   height = "md",
 }: CodeEditorProps) {
-  const { resolvedTheme } = useTheme();
+  const { mode } = useTheme();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -87,7 +87,7 @@ export function CodeEditor({
   // then again whenever the app theme changes. Read through a ref here so the
   // create-effect does not re-run — and therefore rebuild the editor — every
   // time someone flips light/dark.
-  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  const monacoTheme = mode === "dark" ? "vs-dark" : "vs";
   const monacoThemeRef = useRef(monacoTheme);
   monacoThemeRef.current = monacoTheme;
 

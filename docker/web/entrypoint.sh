@@ -8,4 +8,6 @@ echo "Ensuring database directory exists..."
 mkdir -p "$DB_DIR"
 
 echo "Starting application..."
-exec env HOSTNAME=0.0.0.0 bun server.js
+# The compiled binary; it resolves the build output relative to its own location
+# on disk, so it does not depend on the working directory.
+exec /app/cpm-server

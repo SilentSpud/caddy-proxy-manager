@@ -484,7 +484,7 @@ export async function applySyncPayload(payload: SyncPayload) {
   // clears the synced value instead of leaving a stale one behind.
   await setSyncedSetting("avatars", payload.settings.avatars ?? null);
 
-  // better-sqlite3 is synchronous, so transaction callback must be synchronous
+  // bun:sqlite is synchronous, so transaction callback must be synchronous
   db.transaction((tx) => {
     tx.delete(l4ProxyHosts).run();
     tx.delete(proxyHosts).run();

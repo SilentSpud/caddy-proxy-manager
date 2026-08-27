@@ -360,7 +360,7 @@ describe('L4 Caddy config generation', () => {
       name: 'DNS Proxy',
       protocol: 'udp',
       listenAddress: ':5353',
-      upstreams: JSON.stringify(['8.8.8.8:53', '8.8.4.4:53']),
+      upstreams: JSON.stringify(['1.1.1.1:53', '1.0.0.1:53']),
     });
 
     const rows = await db.select().from(l4ProxyHosts);
@@ -502,8 +502,8 @@ describe('L4 Caddy config generation', () => {
       meta: JSON.stringify({
         dns_resolver: {
           enabled: true,
-          resolvers: ['1.1.1.1', '8.8.8.8'],
-          fallbacks: ['8.8.4.4'],
+          resolvers: ['1.1.1.1', '9.9.9.9'],
+          fallbacks: ['1.0.0.1', '149.112.112.112'],
           timeout: '5s',
         },
       }),
@@ -512,8 +512,8 @@ describe('L4 Caddy config generation', () => {
     const rows = await db.select().from(l4ProxyHosts);
     const meta = JSON.parse(rows[0].meta!);
     expect(meta.dns_resolver.enabled).toBe(true);
-    expect(meta.dns_resolver.resolvers).toEqual(['1.1.1.1', '8.8.8.8']);
-    expect(meta.dns_resolver.fallbacks).toEqual(['8.8.4.4']);
+    expect(meta.dns_resolver.resolvers).toEqual(['1.1.1.1', '9.9.9.9']);
+    expect(meta.dns_resolver.fallbacks).toEqual(['1.0.0.1', '149.112.112.112']);
     expect(meta.dns_resolver.timeout).toBe('5s');
   });
 

@@ -483,8 +483,8 @@ describe('GET dns settings', () => {
   it('returns dns settings', async () => {
     const settings = {
       enabled: true,
-      resolvers: ['1.1.1.1', '8.8.8.8'],
-      fallbacks: ['9.9.9.9'],
+      resolvers: ['1.1.1.1', '9.9.9.9'],
+      fallbacks: ['1.0.0.1', '149.112.112.112'],
       timeout: '5s',
     };
     mockGetDns.mockResolvedValue(settings as any);
@@ -504,8 +504,8 @@ describe('PUT dns settings', () => {
 
     const body = {
       enabled: true,
-      resolvers: ['1.1.1.1', '8.8.8.8'],
-      fallbacks: ['9.9.9.9'],
+      resolvers: ['1.1.1.1', '9.9.9.9'],
+      fallbacks: ['1.0.0.1', '149.112.112.112'],
       timeout: '5s',
     };
     const response = await PUT(createMockRequest({ method: 'PUT', body }), {

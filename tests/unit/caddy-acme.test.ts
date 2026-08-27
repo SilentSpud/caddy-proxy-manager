@@ -118,10 +118,10 @@ describe('buildTlsAutomation — DNS-01 challenge resolvers', () => {
   it('appends fallback resolvers after the primaries', async () => {
     const challenge = await dnsChallenge({
       enabled: true,
-      resolvers: ['1.1.1.1', '8.8.8.8'],
-      fallbacks: ['9.9.9.9'],
+      resolvers: ['1.1.1.1', '9.9.9.9'],
+      fallbacks: ['1.0.0.1', '149.112.112.112'],
     });
-    expect(challenge.resolvers).toEqual(['1.1.1.1', '8.8.8.8', '9.9.9.9']);
+    expect(challenge.resolvers).toEqual(['1.1.1.1', '9.9.9.9', '1.0.0.1', '149.112.112.112']);
   });
 
   it('omits resolvers entirely when DNS settings are disabled', async () => {

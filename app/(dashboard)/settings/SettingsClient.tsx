@@ -1513,7 +1513,7 @@ function DnsResolversSection({
               htmlName="resolvers"
               value={resolvers}
               onChange={setResolvers}
-              placeholder={"1.1.1.1\n8.8.8.8"}
+              placeholder={"1.1.1.1\n9.9.9.9"}
               rows={2}
               isDisabled={disabled}
             />
@@ -1523,7 +1523,7 @@ function DnsResolversSection({
               htmlName="fallbacks"
               value={fallbacks}
               onChange={setFallbacks}
-              placeholder={"8.8.4.4\n1.0.0.1"}
+              placeholder={"1.0.0.1\n149.112.112.112"}
               rows={2}
               isDisabled={disabled}
             />
@@ -1544,7 +1544,7 @@ function DnsResolversSection({
       </FormCard>
       <InfoAlert title="When to use custom resolvers">
         Useful when your DNS provider has slow propagation or when using split-horizon DNS. Common
-        public resolvers: 1.1.1.1 (Cloudflare), 8.8.8.8 (Google), 9.9.9.9 (Quad9).
+        public resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9).
       </InfoAlert>
     </>
   );

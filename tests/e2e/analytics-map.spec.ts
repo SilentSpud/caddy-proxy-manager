@@ -8,10 +8,12 @@ import { test, expect, type Page } from '@playwright/test';
  * worker silently failed to start and the map rendered as an empty ocean — no
  * countries, no hover popups, and no visible error in the UI.
  *
- * The fix stages the worker under /maplibre/ (scripts/copy-maplibre-worker.mjs)
- * and points maplibre at it via setWorkerUrl(). These tests cover both the
- * plumbing (worker assets served, CSP allows the worker) and the observable
- * outcome (country geometry is actually rendered and hit-testable).
+ * The fix imports the worker as `?worker&url` (WorldMapInner.tsx), which has the
+ * bundler emit its whole module graph as one self-contained, content-hashed
+ * chunk and hand back the path, and points maplibre at it via setWorkerUrl().
+ * These tests cover both the plumbing (worker chunk served, CSP allows the
+ * worker) and the observable outcome (country geometry is actually rendered and
+ * hit-testable).
  */
 
 const MAP_CANVAS = 'canvas.maplibregl-canvas';
@@ -23,22 +25,29 @@ async function gotoAnalyticsMap(page: Page) {
 }
 
 test.describe('Analytics world map', () => {
-  test('maplibre worker assets are served from /maplibre/', async ({ page }) => {
+  test('maplibre worker is served as one self-contained chunk', async ({ page }) => {
     const mapRequests: { url: string; status: number }[] = [];
     page.on('response', (res) => {
       const url = new URL(res.url()).pathname;
-      if (url.startsWith('/maplibre/')) mapRequests.push({ url, status: res.status() });
+      if (url.includes('maplibre')) mapRequests.push({ url, status: res.status() });
     });
 
     await gotoAnalyticsMap(page);
-    // The worker is spawned lazily once the map starts loading its source.
+    // The worker is spawned lazily once the map starts loading its source. Its
+    // filename is content-hashed and its directory is the bundler's to choose,
+    // so match the stem rather than pinning a path the build is free to move.
     await expect
       .poll(() => mapRequests.map((r) => r.url), { timeout: 15_000 })
-      .toContain('/maplibre/maplibre-gl-worker.mjs');
+      .toEqual(expect.arrayContaining([expect.stringContaining('maplibre-gl-worker-')]));
 
-    // The worker is an ES module that imports ./maplibre-gl-shared.mjs relative
-    // to itself — staging only the entry file leaves that import 404ing.
-    expect(mapRequests.map((r) => r.url)).toContain('/maplibre/maplibre-gl-shared.mjs');
+    // The worker imports a sibling ./maplibre-gl-shared.mjs, and `?worker&url`
+    // bundles that into the same chunk. Seeing it arrive as a request of its own
+    // means the build went back to emitting the entry file alone — the shape
+    // whose relative import 404s, leaving the map an empty ocean.
+    expect(
+      mapRequests.filter((r) => r.url.includes('maplibre-gl-shared')),
+      'maplibre-gl-shared should be bundled into the worker chunk, not fetched separately',
+    ).toEqual([]);
 
     const failed = mapRequests.filter((r) => r.status >= 400);
     expect(failed, `maplibre assets failed to load: ${JSON.stringify(failed)}`).toEqual([]);

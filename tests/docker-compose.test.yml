@@ -1,4 +1,26 @@
 services:
+  # Fixture seeding for the e2e suite.
+  #
+  # The web image is a compiled binary with no Bun CLI, no package manager and no
+  # shell runtime, so the suite cannot execute code inside it — and deliberately
+  # so: the tests run the same image that ships. Seeding instead happens in this
+  # throwaway container, which mounts the same data volume and therefore opens
+  # the same SQLite file the web container is using. `working_dir: /app` with the
+  # volume at /app/data keeps the database at ./data/caddy-proxy-manager.db, the
+  # path the app itself uses.
+  #
+  # `profiles` keeps it out of `docker compose up`; it is started on demand with
+  # `docker compose run --rm db-seed -e '<script>'` (see tests/helpers/seed.ts).
+  db-seed:
+    image: oven/bun:1-slim
+    profiles: ["tools"]
+    working_dir: /app
+    entrypoint: ["bun"]
+    volumes:
+      - caddy-manager-data:/app/data
+    networks:
+      - caddy-network
+
   web:
     environment:
       SESSION_SECRET: "test-session-secret-32chars!xxxY"
@@ -51,7 +73,7 @@ services:
     networks:
       - caddy-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health',r=>{process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -197,7 +219,7 @@ services:
     networks:
       - caddy-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health',r=>{process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -229,7 +251,7 @@ services:
     networks:
       - caddy-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health',r=>{process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 12

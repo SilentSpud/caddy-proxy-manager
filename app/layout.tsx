@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import "./globals.css";
 import Providers from "./providers";
 import { config } from "@/src/lib/config";
+import { THEME_COOKIE, parseThemeMode, themeAttr } from "@/src/lib/theme-mode";
 
 // Each page sets its own `title`; the template appends the app name so tabs read
 // "Proxy Hosts · Caddy Proxy Manager". APP_NAME renames it everywhere.
@@ -20,20 +21,20 @@ export const metadata: Metadata = {
   description: "Web UI for managing Caddy reverse proxies, certificates, and access control.",
 };
 
-function getNonce(csp: string | null): string | undefined {
-  if (!csp) return undefined;
-  const m = csp.match(/'nonce-([A-Za-z0-9+/=]+)'/);
-  return m?.[1];
-}
-
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const h = await headers();
-  const nonce = getNonce(h.get("Content-Security-Policy"));
+  const themeMode = parseThemeMode((await cookies()).get(THEME_COOKIE)?.value);
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    // data-theme is rendered here, from the cookie, so the very first paint is
+    // already in the right mode — Astryx's reset.css maps the attribute to
+    // color-scheme, and its tokens are light-dark() pairs that follow. Omitted
+    // for "system", which reset.css treats as `color-scheme: light dark`.
+    //
+    // suppressHydrationWarning stays: Astryx's Theme also writes data-theme and
+    // data-astryx-theme onto <html> once mounted.
+    <html lang="en" data-theme={themeAttr(themeMode)} suppressHydrationWarning>
       <body>
-        <Providers nonce={nonce}>{children}</Providers>
+        <Providers initialThemeMode={themeMode}>{children}</Providers>
       </body>
     </html>
   );

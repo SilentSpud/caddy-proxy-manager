@@ -32,7 +32,7 @@ function location(res: Awaited<ReturnType<typeof httpGet>>): string {
 // ---------------------------------------------------------------------------
 
 test.describe
-  .serial('Redirect Rules – full URLs, cross-domain, wildcards', () => {
+  .serial('Redirect Rules - full URLs, cross-domain, wildcards', () => {
     test('setup: create proxy host with advanced redirect rules', async ({ page }) => {
       await page.goto('/proxy-hosts');
       await page.getByRole('button', { name: /create host/i }).click();

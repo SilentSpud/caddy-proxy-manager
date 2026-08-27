@@ -1,26 +1,9 @@
-import { copyMaplibreWorker } from "./scripts/copy-maplibre-worker.mjs";
-
-// When building under Node.js (not Bun), redirect bun:sqlite to a better-sqlite3 shim
-// so `next build` works locally without Bun installed.
-const isBun = typeof globalThis.Bun !== "undefined";
-
-// maplibre-gl v6 loads its tile worker from a separate file that Turbopack cannot
-// resolve correctly; stage it under public/ so it is served from a stable URL.
-// See scripts/copy-maplibre-worker.mjs for the full explanation.
-copyMaplibreWorker(import.meta.dirname);
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: isBun ? ["bun:sqlite"] : ["better-sqlite3"],
-  ...(!isBun && {
-    turbopack: {
-      resolveAlias: {
-        "bun:sqlite": "./tests/helpers/bun-sqlite-compat.ts",
-        "drizzle-orm/bun-sqlite/migrator": "drizzle-orm/better-sqlite3/migrator",
-        "drizzle-orm/bun-sqlite": "drizzle-orm/better-sqlite3",
-      },
-    },
-  }),
+  // bun:sqlite is a Bun built-in: leave it to the runtime rather than letting
+  // the bundler try to resolve it. Bun is the only supported runtime, so there
+  // is no Node.js fallback to alias it to.
+  serverExternalPackages: ["bun:sqlite"],
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",

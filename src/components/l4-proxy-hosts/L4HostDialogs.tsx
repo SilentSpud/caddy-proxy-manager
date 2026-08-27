@@ -468,7 +468,7 @@ function L4HostForm({
             label="DNS Resolvers"
             isOptional
             htmlName="dnsResolvers"
-            placeholder={"1.1.1.1\n8.8.8.8"}
+            placeholder={"1.1.1.1\n9.9.9.9"}
             value={text.dnsResolvers}
             onChange={set("dnsResolvers")}
             rows={2}
@@ -478,7 +478,7 @@ function L4HostForm({
             label="Fallback Resolvers"
             isOptional
             htmlName="dnsFallbacks"
-            placeholder="8.8.4.4"
+            placeholder={"1.0.0.1\n149.112.112.112"}
             value={text.dnsFallbacks}
             onChange={set("dnsFallbacks")}
             rows={1}

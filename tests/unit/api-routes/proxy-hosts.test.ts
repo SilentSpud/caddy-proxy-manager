@@ -245,8 +245,8 @@ describe('POST /api/v1/proxy-hosts (all optional fields)', () => {
       },
       dns_resolver: {
         enabled: true,
-        resolvers: ['1.1.1.1', '8.8.8.8'],
-        fallbacks: ['9.9.9.9'],
+        resolvers: ['1.1.1.1', '9.9.9.9'],
+        fallbacks: ['1.0.0.1', '149.112.112.112'],
         timeout: '5s',
       },
       upstream_dns_resolution: {

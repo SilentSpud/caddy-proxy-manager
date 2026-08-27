@@ -3,11 +3,9 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
 
   // Mirrors the ignore list the old eslint.config.mjs carried, plus generated and
-  // vendored data Biome would otherwise rewrite. public/ is all static assets:
-  // maplibre-gl's minified worker bundle, staged from node_modules at build time,
-  // and the world-atlas TopoJSON, which is minified to one line — formatting it
-  // expands a 756 KB asset into 85,000 lines. drizzle/meta holds drizzle-kit's
-  // snapshots; dist/coverage/.next are build and report output.
+  // vendored data Biome would otherwise rewrite. public/ is static assets, which
+  // may be minified or generated; drizzle/meta holds drizzle-kit's snapshots;
+  // dist/coverage/.next are build and report output.
   "files": {
     "includes": [
       "**",

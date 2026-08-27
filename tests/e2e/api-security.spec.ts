@@ -10,12 +10,10 @@
  * 4. Admin role → allowed on all endpoints
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
+import * as seed from '../helpers/seed';
 
 const BASE = 'http://localhost:3000/api/v1';
 const ORIGIN = 'http://localhost:3000';
-
-const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 // ── Endpoint definitions ────────────────────────────────────────────────
 
@@ -204,63 +202,12 @@ const ENDPOINTS: Endpoint[] = [
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-function ensureTestUser(username: string, password: string, role: string) {
-  const script = `
-    import { Database } from "bun:sqlite";
-    const db = new Database("./data/caddy-proxy-manager.db");
-    const email = "${username}@localhost";
-    const hash = await Bun.password.hash("${password}", { algorithm: "bcrypt", cost: 12 });
-    const now = new Date().toISOString();
-    const existing = db.query("SELECT id FROM users WHERE email = ?").get(email);
-    if (existing) {
-      db.run("UPDATE users SET passwordHash = ?, role = ?, status = 'active', updatedAt = ? WHERE email = ?",
-        [hash, "${role}", now, email]);
-      const acc = db.query("SELECT id FROM accounts WHERE userId = ? AND providerId = 'credential'").get(existing.id);
-      if (acc) {
-        db.run("UPDATE accounts SET password = ?, updatedAt = ? WHERE id = ?", [hash, now, acc.id]);
-      } else {
-        db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
-          [existing.id, String(existing.id), hash, now, now]);
-      }
-    } else {
-      db.run(
-        "INSERT INTO users (email, name, passwordHash, role, provider, subject, username, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, 'credentials', ?, ?, 'active', ?, ?)",
-        [email, "${username}", hash, "${role}", "${username}", "${username}", now, now]
-      );
-      const user = db.query("SELECT id FROM users WHERE email = ?").get(email);
-      db.run("INSERT INTO accounts (userId, accountId, providerId, issuer, password, createdAt, updatedAt) VALUES (?, ?, 'credential', 'local:credential', ?, ?, ?)",
-        [user.id, String(user.id), hash, now, now]);
-    }
-  `;
-  execFileSync('docker', [...COMPOSE_ARGS, 'exec', '-T', 'web', 'bun', '-e', script], {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-  });
-}
-
-/**
- * Create a Bearer API token for a user directly in the DB.
- * Returns the raw token string (not hashed).
- */
 function createApiToken(username: string): string {
-  const token = `test-api-token-${username}-${Date.now()}`;
-  const script = `
-    import { Database } from "bun:sqlite";
-    import { createHash } from "crypto";
-    const db = new Database("./data/caddy-proxy-manager.db");
-    const email = "${username}@localhost";
-    const user = db.query("SELECT id FROM users WHERE email = ?").get(email);
-    if (!user) { console.error("User not found: ${username}"); process.exit(1); }
-    const hash = createHash("sha256").update("${token}").digest("hex");
-    const now = new Date().toISOString();
-    db.run("INSERT INTO api_tokens (name, tokenHash, createdBy, createdAt) VALUES (?, ?, ?, ?)",
-      ["e2e-security-test", hash, user.id, now]);
-  `;
-  execFileSync('docker', [...COMPOSE_ARGS, 'exec', '-T', 'web', 'bun', '-e', script], {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-  });
-  return token;
+  return seed.createApiToken(
+    `${username}@localhost`,
+    'e2e-security-test',
+    `test-api-token-${username}-${Date.now()}`,
+  );
 }
 
 async function apiRequest(
@@ -309,8 +256,8 @@ test.beforeAll(async () => {
   // Retry user creation — Docker exec can transiently fail under load
   for (let i = 0; i < 3; i++) {
     try {
-      ensureTestUser('apisec-user', 'ApiSecUser2026!', 'user');
-      ensureTestUser('apisec-viewer', 'ApiSecViewer2026!', 'viewer');
+      seed.ensureTestUser('apisec-user', 'ApiSecUser2026!', 'user');
+      seed.ensureTestUser('apisec-viewer', 'ApiSecViewer2026!', 'viewer');
       break;
     } catch (e) {
       if (i === 2) throw e;

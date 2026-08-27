@@ -63,7 +63,7 @@ export type TrustedProxiesSettings = {
 
 export type DnsSettings = {
   enabled: boolean;
-  resolvers: string[]; // Primary DNS resolvers (e.g., "1.1.1.1", "8.8.8.8")
+  resolvers: string[]; // Primary DNS resolvers (e.g., "1.1.1.1", "9.9.9.9")
   fallbacks?: string[]; // Fallback DNS resolvers if primary fails
   timeout?: string; // DNS query timeout (e.g., "5s")
 };

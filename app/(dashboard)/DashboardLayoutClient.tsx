@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
+import { useTheme } from "@astryxdesign/core";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -29,6 +29,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
+import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 
 type User = {
@@ -55,15 +56,19 @@ const NAV_ITEMS = [
 ] as const;
 
 function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  // Astryx's useTheme reports the *resolved* mode, so "system" already reads as
+  // light or dark here and tracks the OS if it changes. Clicking pins the
+  // opposite mode, which is what leaves "system" behind.
+  const { mode } = useTheme();
+  const { setMode } = useThemeMode();
+  const isDark = mode === "dark";
   return (
     <IconButton
       variant="ghost"
       size="sm"
       label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       icon={isDark ? <Moon /> : <Sun />}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={() => setMode(isDark ? "light" : "dark")}
     />
   );
 }

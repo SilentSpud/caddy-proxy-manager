@@ -30,6 +30,34 @@ Access at `http://localhost:3000/login`
 
 Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, caddy-logs).
 
+### Runtime
+
+[Bun](https://bun.sh) is the only supported runtime. The app uses `bun:sqlite`, a Bun
+built-in with no Node.js equivalent, so it refuses to start under Node.js and tells you
+what to run instead.
+
+For local work:
+
+```bash
+bun install
+bun run dev
+```
+
+The web image does not need Bun installed, and does not contain the Bun CLI. What it
+runs is `cpm-server`, a single executable produced by `bun build --compile`, holding
+the Bun runtime and the production server. The application bundle itself stays on disk
+beside the binary, in `dist/` — vinext loads it with a runtime `import()`, which Bun's
+embedded-asset filesystem cannot serve, so it cannot be compiled in.
+
+There is one runtime image, and the end-to-end suite runs that same image rather than a
+variant with extra tooling, so what the tests exercise is what ships. Since the image
+has no interpreter to execute a script with, the suite seeds its fixtures through the
+`db-seed` container in `tests/docker-compose.test.yml` — a throwaway `oven/bun:1-slim`
+that mounts the same data volume. See `tests/helpers/seed.ts`.
+
+The container health check is `cpm-server --healthcheck`, which probes `/api/health`
+from inside the image — the runtime has no shell HTTP client to call instead.
+
 ---
 
 ## Features
@@ -651,11 +679,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- **[Caddy Server](https://caddyserver.com/)** – The amazing web server that powers this project
-- **[Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager)** – The original project
-- **[Next.js](https://nextjs.org/)** – React framework for production
-- **[Astryx](https://ui.shadcn.com/)** – Beautifully designed components built on Radix UI and Tailwind CSS
-- **[Drizzle ORM](https://orm.drizzle.team/)** – Lightweight SQL migrations and type-safe queries
+- **[Caddy Server](https://caddyserver.com/)** - The amazing web server that powers this project
+- **[Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager)** - The original project
+- **[Next.js](https://nextjs.org/)** - React framework for production
+- **[Astryx](https://ui.shadcn.com/)** - Beautifully designed components built on Radix UI and Tailwind CSS
+- **[Drizzle ORM](https://orm.drizzle.team/)** - Lightweight SQL migrations and type-safe queries
 
 ---
 

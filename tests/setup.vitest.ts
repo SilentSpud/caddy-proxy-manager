@@ -1,5 +1,13 @@
 import { vi, beforeEach } from 'vitest';
+import { clearDotEnv } from './helpers/env';
 import { installFakeCaddy } from './helpers/caddy-admin';
+
+/**
+ * Runs before any test file is imported, so no module reads a value the
+ * repository's .env put there. See tests/helpers/env.ts for why this is needed
+ * now that the suite runs on Bun.
+ */
+clearDotEnv();
 
 /**
  * Caddy network guard.

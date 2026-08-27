@@ -52,17 +52,17 @@ export function DnsResolverFields({
             <TextArea
               label="DNS Resolvers"
               htmlName="dnsResolvers"
-              placeholder={"1.1.1.1\n8.8.8.8"}
+              placeholder={"1.1.1.1\n9.9.9.9"}
               value={resolvers}
               onChange={setResolvers}
               rows={2}
-              description="One resolver per line (e.g., 1.1.1.1, 8.8.8.8). Used for dynamic upstream DNS resolution."
+              description="One resolver per line (e.g., 1.1.1.1, 9.9.9.9). Used for dynamic upstream DNS resolution."
             />
             <TextArea
               label="Fallback DNS Resolvers"
               isOptional
               htmlName="dnsFallbacks"
-              placeholder={"8.8.4.4\n1.0.0.1"}
+              placeholder={"1.0.0.1\n149.112.112.112"}
               value={fallbacks}
               onChange={setFallbacks}
               rows={2}
@@ -79,7 +79,7 @@ export function DnsResolverFields({
             <Banner
               status="info"
               title="Per-host resolvers override global DNS settings"
-              description="Useful for upstream services that require specific DNS resolution, such as internal DNS or service discovery. Common resolvers: 1.1.1.1 (Cloudflare), 8.8.8.8 (Google), 9.9.9.9 (Quad9)."
+              description="Useful for upstream services that require specific DNS resolution, such as internal DNS or service discovery. Common resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9)."
             />
           </VStack>
         )}

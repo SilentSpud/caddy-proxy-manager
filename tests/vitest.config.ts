@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitest/config';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,26 +18,23 @@ const root = resolve(moduleDir, '..');
 const testGlob = (pattern: string) => resolve(moduleDir, pattern).split(sep).join('/');
 
 export default defineConfig({
-  plugins: [tsconfigPaths({ root })],
   resolve: {
-    alias: {
-      // bun:sqlite is a Bun built-in unavailable in Node.js/Vitest. Redirect both
-      // the protocol import and the drizzle bun-sqlite adapter to their better-sqlite3
-      // equivalents so tests that transitively import src/lib/db.ts don't crash.
-      // Tests that need a real database use tests/helpers/db.ts (better-sqlite3 directly).
-      'bun:sqlite': resolve(moduleDir, 'helpers/bun-sqlite-compat.ts'),
-      'drizzle-orm/bun-sqlite/migrator': 'drizzle-orm/better-sqlite3/migrator',
-      'drizzle-orm/bun-sqlite': 'drizzle-orm/better-sqlite3',
-    },
+    // Vite 8 resolves tsconfig `paths` natively, so the vite-tsconfig-paths
+    // plugin is no longer needed. Root is the repo root (where tsconfig.json
+    // lives), which is also the cwd `bun run test` starts from.
+    tsconfigPaths: true,
   },
   test: {
+    // Vitest's environment names the global set (no DOM), not the interpreter.
+    // The interpreter is Bun — the test scripts in package.json run Vitest with
+    // `bun --bun` so that bun:sqlite and the other Bun built-ins resolve.
     environment: 'node',
     setupFiles: [resolve(moduleDir, 'setup.vitest.ts')],
-    env: {
-      DATABASE_URL: ':memory:',
-      SESSION_SECRET: 'test-session-secret-for-vitest-unit-tests-12345',
-      NODE_ENV: 'test',
-    },
+    // The suite's environment is set by clearDotEnv() in tests/setup.vitest.ts
+    // rather than by `test.env` here. Bun loads the repository's .env before
+    // Vitest starts, and anything `test.env` set would have to be re-applied
+    // after that is stripped back out — so it is defined in one place instead,
+    // as VITEST_ENV in tests/helpers/env.ts.
     include: [testGlob('unit/**/*.test.ts'), testGlob('integration/**/*.test.ts')],
     // Suppress console output from production code during tests (e.g. expected
     // warn/error calls when intentionally feeding bad input to parsers).

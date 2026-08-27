@@ -11,7 +11,7 @@ const FAKE_KEY = '-----BEGIN PRIVATE KEY-----\nMIIBfake\n-----END PRIVATE KEY---
 /**
  * Regression: deleting a CA certificate must also remove the client
  * certificates it issued. The schema declares onDelete: "cascade", but
- * better-sqlite3 runs with PRAGMA foreign_keys OFF, so the cascade never
+ * bun:sqlite runs with PRAGMA foreign_keys OFF, so the cascade never
  * fired — orphaned issued certs kept appearing as selectable entries in the
  * Mutual TLS (mTLS) "Trusted Certificates" picker, grouped under a dangling
  * "CA #<id>" header.

@@ -231,8 +231,8 @@ describe('l4-proxy-hosts meta', () => {
     const meta = {
       dns_resolver: {
         enabled: true,
-        resolvers: ['1.1.1.1', '8.8.8.8'],
-        fallbacks: ['8.8.4.4'],
+        resolvers: ['1.1.1.1', '9.9.9.9'],
+        fallbacks: ['1.0.0.1', '149.112.112.112'],
         timeout: '5s',
       },
     };
@@ -240,7 +240,8 @@ describe('l4-proxy-hosts meta', () => {
     const row = await db.query.l4ProxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
     const parsed = JSON.parse(row!.meta!);
     expect(parsed.dns_resolver.enabled).toBe(true);
-    expect(parsed.dns_resolver.resolvers).toEqual(['1.1.1.1', '8.8.8.8']);
+    expect(parsed.dns_resolver.resolvers).toEqual(['1.1.1.1', '9.9.9.9']);
+    expect(parsed.dns_resolver.fallbacks).toEqual(['1.0.0.1', '149.112.112.112']);
     expect(parsed.dns_resolver.timeout).toBe('5s');
   });
 

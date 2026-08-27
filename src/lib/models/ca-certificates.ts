@@ -190,7 +190,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
 
   // Cascade-delete the CA's issued client certificates and their role
   // mappings. The schema declares onDelete: "cascade" for these foreign keys,
-  // but better-sqlite3 leaves PRAGMA foreign_keys OFF, so the cascade never
+  // but bun:sqlite leaves PRAGMA foreign_keys OFF, so the cascade never
   // fires automatically — without this, deleting a CA orphans its issued
   // certificates, which keep appearing as selectable in the mTLS picker.
   if (issuedCertIds.length > 0) {

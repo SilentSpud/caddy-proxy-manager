@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { version as appVersion } from "@/package.json";
 
 export const spec = {
   openapi: "3.1.0",
   info: {
     title: "Caddy Proxy Manager API",
-    version: "1.0.0",
+    version: appVersion,
     description:
       "REST API for managing Caddy reverse proxy configurations, certificates, access lists, and more.",
   },
@@ -1863,7 +1864,7 @@ export const spec = {
         description: "Custom DNS resolver for upstream resolution",
         properties: {
           enabled: { type: "boolean" },
-          resolvers: { type: "array", items: { type: "string" }, example: ["1.1.1.1", "8.8.8.8"] },
+          resolvers: { type: "array", items: { type: "string" }, example: ["1.1.1.1", "9.9.9.9"] },
           fallbacks: { type: ["array", "null"], items: { type: "string" } },
           timeout: { type: ["string", "null"], example: "5s" },
         },
@@ -2597,7 +2598,7 @@ export const spec = {
         type: "object",
         properties: {
           enabled: { type: "boolean" },
-          resolvers: { type: "array", items: { type: "string" }, example: ["1.1.1.1", "8.8.8.8"] },
+          resolvers: { type: "array", items: { type: "string" }, example: ["1.1.1.1", "9.9.9.9"] },
           fallbacks: { type: "array", items: { type: "string" } },
           timeout: { type: "string", example: "5s" },
         },

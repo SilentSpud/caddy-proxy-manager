@@ -228,7 +228,7 @@ describe('log-parser', () => {
         ts: 1700000400,
         msg: 'handled request',
         status: 200,
-        request: { client_ip: '8.8.8.8', host: 'test.com', method: 'GET', uri: '/' },
+        request: { client_ip: '1.1.1.1', host: 'test.com', method: 'GET', uri: '/' },
       });
       const result = parseLine(entry, emptyBlocked);
       expect(result!.country_code).toBeNull();

@@ -500,7 +500,7 @@ function SettingsTab({
         icon={<AlertTriangle />}
         title="Danger zone"
         description="Delete this access list"
-        defaultIsExpanded
+        collapsible={{ defaultIsOpen: true }}
       >
         <VStack gap={3}>
           <Text type="body" size="xsm" color="secondary">

@@ -3,7 +3,7 @@
  *
  * Focus: deleting a CA must cascade to the client certificates it issued (and
  * their role mappings). The schema declares onDelete: "cascade", but
- * better-sqlite3 runs with PRAGMA foreign_keys OFF, so the model performs the
+ * bun:sqlite runs with PRAGMA foreign_keys OFF in production, so the model performs the
  * cascade explicitly. Without it, orphaned issued certs linger in the DB and
  * keep showing up as selectable in the mTLS picker.
  */

@@ -51,6 +51,4 @@ tests/.auth/
 test-results/
 playwright-report/
 
-# Staged from node_modules by scripts/copy-maplibre-worker.mjs at build time
-/public/maplibre/
 /geoip-data

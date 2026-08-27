@@ -146,7 +146,7 @@ describe('L4 proxy host create validation', () => {
       name: 'Test',
       protocol: 'udp',
       listenAddress: ':5353',
-      upstreams: ['8.8.8.8:53'],
+      upstreams: ['1.1.1.1:53'],
       tlsTermination: true,
     };
     await expect(createL4ProxyHost(input, 1)).rejects.toThrow(
@@ -233,7 +233,7 @@ describe('L4 proxy host create validation', () => {
       name: 'DNS',
       protocol: 'udp',
       listenAddress: ':5353',
-      upstreams: ['8.8.8.8:53'],
+      upstreams: ['1.1.1.1:53'],
     };
     const result = await createL4ProxyHost(input, 1);
     expect(result).toBeDefined();
