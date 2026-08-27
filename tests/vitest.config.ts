@@ -43,7 +43,12 @@ export default defineConfig({
       return false;
     },
     coverage: {
-      provider: 'v8',
+      // istanbul rather than v8: the v8 provider merges raw coverage through
+      // @bcoe/v8-coverage, whose range-tree merge recurses per range and blows
+      // Bun's stack on a graph this size — the run dies with "Maximum call
+      // stack size exceeded" after every test has already passed. istanbul
+      // instruments at transform time instead, so there is nothing to merge.
+      provider: 'istanbul',
       reportsDirectory: resolve(root, 'coverage'),
       reporter: [
         ['text', { maxCols: 120 }], // terminal summary
@@ -72,14 +77,19 @@ export default defineConfig({
       // with no tests at all is exactly the case worth seeing.
 
       // A ratchet, not an aspiration: these sit just under the numbers the
-      // suite actually achieves today (54.2 / 50.6 / 54.6 / 54.5), so a real
+      // suite actually achieves today (54.7 / 50.3 / 56.2 / 54.8), so a real
       // drop fails the run while ordinary churn does not. Raise them as
       // coverage improves; do not lower them to make a build pass.
+      //
+      // Rebaselined when the provider moved from v8 to istanbul. The two count
+      // differently — istanbul counts the statements it instruments, v8 counts
+      // executed byte ranges — so the numbers are not comparable across that
+      // change, and neither are these thresholds to the ones before it.
       thresholds: {
-        statements: 53,
+        statements: 54,
         branches: 49,
-        functions: 53,
-        lines: 53,
+        functions: 55,
+        lines: 54,
       },
     },
   },

@@ -8,6 +8,7 @@ import {
   setSlaveLastSync,
   type SyncPayload,
 } from "@/src/lib/instance-sync";
+import { lastHeaderValue } from "@/src/lib/request-headers";
 
 const DEFAULT_MAX_SYNC_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
 const _parsedMaxBytes = Number(process.env.INSTANCE_SYNC_MAX_BYTES);
@@ -32,16 +33,11 @@ function secureTokenCompare(a: string, b: string): boolean {
 }
 
 function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const parts = forwarded.split(",");
-    return parts[parts.length - 1]?.trim() || "unknown";
-  }
-  const real = request.headers.get("x-real-ip");
-  if (real) {
-    return real.trim();
-  }
-  return "unknown";
+  return (
+    lastHeaderValue(request.headers.get("x-forwarded-for")) ||
+    lastHeaderValue(request.headers.get("x-real-ip")) ||
+    "unknown"
+  );
 }
 
 function checkSyncRateLimit(key: string): { blocked: boolean; retryAfterMs?: number } {

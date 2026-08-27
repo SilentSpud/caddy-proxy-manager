@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { Resolver } from "node:dns/promises";
 import { join, dirname } from "node:path";
 import { isIP } from "node:net";
+import { isConnectionError } from "./net-errors";
 import {
   expandPrivateRanges,
   isPlainObject,
@@ -3075,11 +3076,7 @@ export async function applyCaddyConfig() {
   } catch (error) {
     console.error("Failed to apply Caddy config", error);
 
-    // Check if it's a fetch error with ECONNREFUSED or ENOTFOUND
-    const err = error as { cause?: NodeJS.ErrnoException };
-    const causeCode = err?.cause?.code;
-
-    if (causeCode === "ENOTFOUND" || causeCode === "ECONNREFUSED") {
+    if (isConnectionError(error)) {
       throw new Error(
         `Unable to reach Caddy API at ${config.caddyApiUrl}. Ensure Caddy is running and accessible.`,
         { cause: error },

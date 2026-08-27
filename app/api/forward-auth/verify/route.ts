@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { validateForwardAuthSession, checkHostAccessByDomain } from "@/src/lib/models/forward-auth";
 import { getUserById } from "@/src/lib/models/user";
 import { getGroupsForUser } from "@/src/lib/models/groups";
+import { lastHeaderValue } from "@/src/lib/request-headers";
 
 const COOKIE_NAME = "_cpm_fa";
 
@@ -25,9 +26,12 @@ export async function GET(request: NextRequest) {
     return new NextResponse(null, { status: 401 });
   }
 
-  // Check host access using X-Forwarded-Host header set by Caddy
+  // Check host access using X-Forwarded-Host header set by Caddy. Duplicate
+  // headers arrive comma-combined (see request-headers.ts), so take Caddy's value
+  // rather than a joined "client-supplied, caddy" string that matches no host.
   const forwardedHost =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+    lastHeaderValue(request.headers.get("x-forwarded-host")) ||
+    lastHeaderValue(request.headers.get("host"));
   if (!forwardedHost) {
     return new NextResponse(null, { status: 401 });
   }

@@ -12,6 +12,7 @@ import {
   type TopWafRule,
   type TopWafRuleWithHosts,
 } from "../clickhouse/client";
+import { isConnectionError } from "../net-errors";
 
 export type { WafEvent, WafEventStats, TopWafRule, TopWafRuleWithHosts };
 
@@ -23,21 +24,13 @@ const EMPTY_WAF_STATS: WafEventStats = {
   ruleIdsTriggered: 0,
 };
 
+/**
+ * The ClickHouse client rejects with anything from a coded error to a bare
+ * object wrapping one, so the shared check walks the cause chain for both a
+ * connection code and the runtime's message.
+ */
 function isClickHouseConnectionError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  const code = "code" in error ? (error as { code?: unknown }).code : undefined;
-  if (code === "ECONNREFUSED" || code === "FailedToOpenSocket") return true;
-
-  const cause = "cause" in error ? (error as { cause?: unknown }).cause : undefined;
-  if (cause && cause !== error && isClickHouseConnectionError(cause)) return true;
-
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("ECONNREFUSED") ||
-    message.includes("FailedToOpenSocket") ||
-    message.includes("Was there a typo in the url or port?")
-  );
+  return isConnectionError(error);
 }
 
 async function withWafAnalyticsFallback<T>(

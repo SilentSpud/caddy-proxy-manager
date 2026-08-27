@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import db from "@/src/lib/db";
 import { config } from "@/src/lib/config";
+import { lastHeaderValue } from "@/src/lib/request-headers";
 import {
   createForwardAuthSession,
   createExchangeCode,
@@ -47,8 +48,8 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting — prefer x-real-ip (set by reverse proxy) over x-forwarded-for
     const ip =
-      request.headers.get("x-real-ip")?.trim() ||
-      request.headers.get("x-forwarded-for")?.split(",").pop()?.trim() ||
+      lastHeaderValue(request.headers.get("x-real-ip")) ||
+      lastHeaderValue(request.headers.get("x-forwarded-for")) ||
       "unknown";
     const rateLimitResult = isRateLimited(ip);
     if (rateLimitResult.blocked) {
