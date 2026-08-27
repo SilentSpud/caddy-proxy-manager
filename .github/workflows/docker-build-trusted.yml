@@ -13,9 +13,20 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# One build per ref. Pushing twice in quick succession supersedes the older run
+# rather than stacking another 3-image matrix beside it; tags get their own ref
+# and so never cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # A wedged build step inherits the runner's 6-hour default and burns the
+    # whole budget silently. Healthy runs land in a couple of minutes; anything
+    # past half an hour is broken, and should fail fast enough to notice.
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write

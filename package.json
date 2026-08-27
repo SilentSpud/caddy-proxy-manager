@@ -26,7 +26,7 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build && bun scripts/inject-runtime-guard.mjs",
-    "build:binary": "bun build --compile --target=bun --outfile dist/standalone/cpm-server scripts/standalone-entry.ts",
+    "build:binary": "bun build --compile --target=${BUN_COMPILE_TARGET:-bun} --outfile dist/standalone/cpm-server scripts/standalone-entry.ts",
     "start": "vinext start",
     "lint": "biome check",
     "lint:fix": "biome check --write",

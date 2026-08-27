@@ -3,7 +3,20 @@
 # Bun is the only supported runtime (see src/lib/runtime-guard.ts). The build
 # stages need the full Bun toolchain; the runtime stage does not, because what
 # ships is a single compiled binary with the Bun runtime inside it.
-FROM oven/bun:1-slim AS base
+#
+# Pinned to $BUILDPLATFORM, so `deps` and `builder` — the only stages built on
+# top of this one — run natively on the host arch rather than under QEMU when
+# the target is linux/arm64. That is not a speed preference: emulated, the
+# Rolldown-backed `vinext build` deadlocks partway through its first transform
+# pass and never returns, wedging the job until the runner's 6-hour cap. The
+# same reasoning moved the Caddy image off emulation; see docker/caddy/Dockerfile.
+#
+# The runtime stage below is unaffected and still builds per-target, which is
+# what makes this safe: the only architecture-specific artifact it receives is
+# the compiled binary, cross-compiled for the target a few lines down. The
+# standalone bundle it ships alongside is pure JavaScript — no .node addons, no
+# platform-gated packages — so producing it on the host arch changes nothing.
+FROM --platform=$BUILDPLATFORM oven/bun:1-slim AS base
 WORKDIR /app
 
 FROM base AS deps
@@ -17,6 +30,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --ignore-scripts
 
 FROM base AS builder
+ARG TARGETARCH
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_PATH=/tmp/build.db
@@ -25,9 +39,20 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # `build` emits dist/standalone (app bundle, client assets, pruned node_modules);
 # `build:binary` compiles scripts/standalone-entry.ts — and the vinext production
-# server it imports — into the dist/standalone/cpm-server executable. Built here
-# rather than cross-compiled, so it matches this image's libc and architecture.
-RUN bun run build && bun run build:binary && rm -f /tmp/build.db
+# server it imports — into the dist/standalone/cpm-server executable.
+#
+# This stage runs on the host arch (see the base stage), so the binary has to be
+# cross-compiled for the target rather than picking up the builder's own. Bun
+# names its targets by libc and arch; the glibc variants are the ones that match
+# the debian:bookworm-slim runtime below. BUN_COMPILE_TARGET feeds the
+# `build:binary` script in package.json, which defaults to the host target so a
+# plain `bun run build:binary` still works outside Docker.
+RUN case "$TARGETARCH" in \
+      amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
+      arm64) export BUN_COMPILE_TARGET=bun-linux-arm64 ;; \
+      *) echo "docker/web/Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
+    esac && \
+    bun run build && bun run build:binary && rm -f /tmp/build.db
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than oven/bun: the compiled binary carries its own Bun runtime,

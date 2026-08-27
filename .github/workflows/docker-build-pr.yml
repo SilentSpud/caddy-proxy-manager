@@ -10,9 +10,17 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# One build per PR. A force-push supersedes the in-flight run for that PR
+# instead of leaving it to finish against a commit nobody is looking at.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    # See docker-build-trusted.yml: without this a wedged step runs for 6 hours.
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: read
