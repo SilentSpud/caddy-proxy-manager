@@ -25,6 +25,7 @@ import {
   PATH_BLOCK_STATUS_CODES,
   sanitizeErrorPageRules
 } from "@/src/lib/models/proxy-hosts";
+import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { setForwardAuthAccess } from "@/src/lib/models/forward-auth";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
@@ -362,6 +363,14 @@ function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null } {
     return { waf: { enabled: false, waf_mode: wafMode } };
   }
 
+  // Blank means "inherit" — the global body limits (or Coraza's own defaults)
+  // apply. createProxyHost/updateProxyHost re-validate the resulting config.
+  const requestBodyLimit = parseBodyLimitMib(formData.get("wafRequestBodyLimitMb"), "WAF request body limit");
+  const requestBodyInMemoryLimit = parseBodyLimitMib(formData.get("wafRequestBodyInMemoryLimitMb"), "WAF in-memory body limit");
+  const rawLimitAction = formData.get("wafRequestBodyLimitAction");
+  const requestBodyLimitAction =
+    rawLimitAction === "Reject" || rawLimitAction === "ProcessPartial" ? rawLimitAction : undefined;
+
   return {
     waf: {
       enabled: true,
@@ -370,6 +379,9 @@ function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null } {
       custom_directives: customDirectives,
       excluded_rule_ids,
       waf_mode: wafMode,
+      ...(requestBodyLimit !== undefined ? { request_body_limit: requestBodyLimit } : {}),
+      ...(requestBodyInMemoryLimit !== undefined ? { request_body_in_memory_limit: requestBodyInMemoryLimit } : {}),
+      ...(requestBodyLimitAction ? { request_body_limit_action: requestBodyLimitAction } : {}),
     }
   };
 }

@@ -300,6 +300,14 @@ export type WafSettings = {
   load_owasp_crs: boolean;
   custom_directives: string;
   excluded_rule_ids?: number[];
+  // Request body limits, in bytes. Unset means Coraza's own default applies
+  // (12.5 MiB from @coraza.conf-recommended when load_owasp_crs is on, else
+  // 128 MiB). Coraza caps both at 1 GiB — see CORAZA_MAX_BODY_LIMIT.
+  request_body_limit?: number;
+  request_body_in_memory_limit?: number;
+  // ProcessPartial inspects the leading bytes and forwards the rest instead of
+  // rejecting oversized uploads outright.
+  request_body_limit_action?: 'Reject' | 'ProcessPartial';
 };
 
 export async function getWafSettings(): Promise<WafSettings | null> {

@@ -5,6 +5,94 @@
 import { type WafSettings } from "./settings";
 import { type WafHostConfig } from "./models/proxy-hosts";
 
+// ---------------------------------------------------------------------------
+// Request body limits
+// ---------------------------------------------------------------------------
+
+/**
+ * Coraza refuses to build a WAF whose request body limit exceeds 1 GiB
+ * (internal/corazawaf/waf.go — "request body limit should be at most 1GiB").
+ * coraza-caddy constructs its WAF while Caddy is loading the config, so a
+ * single out-of-range value makes Caddy reject the ENTIRE config document —
+ * every host goes unapplied, not just the offending one. Never emit a value
+ * above this.
+ */
+export const CORAZA_MAX_BODY_LIMIT = 1_073_741_824; // 1 GiB
+
+/** Below ~1 KiB the limit is meaningless and only serves to break uploads. */
+export const CORAZA_MIN_BODY_LIMIT = 1_024;
+
+/** Coraza's built-in default when no SecRequestBodyLimit directive is parsed. */
+export const CORAZA_DEFAULT_BODY_LIMIT = 134_217_728; // 128 MiB
+
+/**
+ * SecRequestBodyLimit / SecRequestBodyInMemoryLimit set by
+ * `@coraza.conf-recommended`, which we Include when load_owasp_crs is on.
+ * The 12.5 MiB limit is why large uploads (Nextcloud/Immich chunks) fail with
+ * the CRS enabled while the same host works with it off.
+ */
+export const CRS_BODY_LIMIT = 13_107_200; // 12.5 MiB
+export const CRS_IN_MEMORY_BODY_LIMIT = 131_072; // 128 KiB
+
+/** True when `value` is a byte count Coraza will accept for a body limit. */
+export function isValidBodyLimit(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= CORAZA_MIN_BODY_LIMIT &&
+    value <= CORAZA_MAX_BODY_LIMIT
+  );
+}
+
+export function bodyLimitRangeMessage(label: string): string {
+  return `${label} must be an integer between ${CORAZA_MIN_BODY_LIMIT} and ${CORAZA_MAX_BODY_LIMIT} bytes (1 GiB is Coraza's hard maximum)`;
+}
+
+/**
+ * The settings are stored in bytes (what SecLang takes), but the forms ask for
+ * MiB — nobody sizes an upload limit in bytes. Anything finer stays reachable
+ * through the custom directives.
+ */
+export const BYTES_PER_MIB = 1_048_576;
+export const MIN_BODY_LIMIT_MIB = 1;
+export const MAX_BODY_LIMIT_MIB = CORAZA_MAX_BODY_LIMIT / BYTES_PER_MIB; // 1024
+
+export function bytesToMib(bytes: number | undefined): string {
+  return typeof bytes === "number" && bytes > 0 ? String(Math.round(bytes / BYTES_PER_MIB)) : "";
+}
+
+/** Parses a MiB form field into bytes. Blank means "unset — inherit the default". */
+export function parseBodyLimitMib(raw: unknown, label: string): number | undefined {
+  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  const mib = Number(raw.trim());
+  if (!Number.isInteger(mib) || mib < MIN_BODY_LIMIT_MIB || mib > MAX_BODY_LIMIT_MIB) {
+    throw new Error(`${label} must be a whole number of MiB between ${MIN_BODY_LIMIT_MIB} and ${MAX_BODY_LIMIT_MIB}`);
+  }
+  return mib * BYTES_PER_MIB;
+}
+
+/** SecRequestBody*Limit directives that carry a byte count. */
+const BODY_LIMIT_DIRECTIVE =
+  /^(SecRequestBodyLimit|SecRequestBodyNoFilesLimit|SecRequestBodyInMemoryLimit)\s+(\d+)\s*$/i;
+const BODY_LIMIT_ACTION_DIRECTIVE = /^SecRequestBodyLimitAction\s+(?:Reject|ProcessPartial)\s*$/i;
+
+/**
+ * Returns the first custom directive whose byte count Coraza would reject, or
+ * null when every body-limit line is in range. Input layers call this so the
+ * user gets a precise error at save time instead of a silent drop here plus an
+ * opaque "Caddy rejected configuration" later.
+ */
+export function findInvalidBodyLimitDirective(directives: string | null | undefined): string | null {
+  if (!directives?.trim()) return null;
+  for (const line of directives.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const match = BODY_LIMIT_DIRECTIVE.exec(trimmed);
+    if (match && !isValidBodyLimit(Number(match[2]))) return trimmed;
+  }
+  return null;
+}
+
 /**
  * Resolves the effective WAF settings for a proxy host by merging or overriding
  * the global WAF settings with the per-host WAF config.
@@ -33,6 +121,9 @@ export function resolveEffectiveWaf(
       load_owasp_crs: host.load_owasp_crs ?? false,
       custom_directives: host.custom_directives ?? '',
       excluded_rule_ids: host.excluded_rule_ids,
+      request_body_limit: host.request_body_limit,
+      request_body_in_memory_limit: host.request_body_in_memory_limit,
+      request_body_limit_action: host.request_body_limit_action,
     };
   }
 
@@ -49,6 +140,13 @@ export function resolveEffectiveWaf(
         ...(global.excluded_rule_ids ?? []),
         ...(host.excluded_rule_ids ?? []),
       ],
+      // Body limits are scalars, not lists: the host value wins when set,
+      // otherwise the global one applies.
+      request_body_limit: host.request_body_limit ?? global.request_body_limit,
+      request_body_in_memory_limit:
+        host.request_body_in_memory_limit ?? global.request_body_in_memory_limit,
+      request_body_limit_action:
+        host.request_body_limit_action ?? global.request_body_limit_action,
     };
   }
 
@@ -59,6 +157,9 @@ export function resolveEffectiveWaf(
       load_owasp_crs: host.load_owasp_crs ?? false,
       custom_directives: host.custom_directives ?? '',
       excluded_rule_ids: host.excluded_rule_ids,
+      request_body_limit: host.request_body_limit,
+      request_body_in_memory_limit: host.request_body_in_memory_limit,
+      request_body_limit_action: host.request_body_limit_action,
     };
   }
   if (global?.enabled) return global;
@@ -140,6 +241,19 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     'SecResponseBodyAccess Off',
   );
 
+  // Body limits from the dedicated settings fields. Emitted after the CRS
+  // include (so they override @coraza.conf-recommended's 12.5 MiB) but before
+  // custom_directives, which stay the escape hatch that wins over the UI.
+  if (isValidBodyLimit(waf.request_body_limit)) {
+    parts.push(`SecRequestBodyLimit ${waf.request_body_limit}`);
+  }
+  if (isValidBodyLimit(waf.request_body_in_memory_limit)) {
+    parts.push(`SecRequestBodyInMemoryLimit ${waf.request_body_in_memory_limit}`);
+  }
+  if (waf.request_body_limit_action === 'Reject' || waf.request_body_limit_action === 'ProcessPartial') {
+    parts.push(`SecRequestBodyLimitAction ${waf.request_body_limit_action}`);
+  }
+
   // Allowlist approach: only permit known-safe directive prefixes in custom directives
   if (waf.custom_directives?.trim()) {
     const directives = waf.custom_directives.trim();
@@ -148,12 +262,6 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
       /^SecAction\s/,
       /^SecMarker\s/,
       /^SecDefaultAction\s/,
-    ];
-    const allowedBodyLimitDirectives = [
-      /^SecRequestBodyLimit\s+\d+\s*$/i,
-      /^SecRequestBodyNoFilesLimit\s+\d+\s*$/i,
-      /^SecRequestBodyInMemoryLimit\s+\d+\s*$/i,
-      /^SecRequestBodyLimitAction\s+(?:Reject|ProcessPartial)\s*$/i,
     ];
     // SecRule* variants that are NOT plain SecRule (must be rejected)
     const blockedSecRulePrefixes = [
@@ -171,11 +279,16 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
       if (!trimmed || trimmed.startsWith('#')) return true;
       // Reject Include directives (prevents file inclusion from container filesystem)
       if (/^Include\s/i.test(trimmed)) return false;
+      // Body limits are allowed, but only inside the range Coraza accepts —
+      // an out-of-range value would make Caddy reject the whole config
+      // document. Input validation reports these; dropping here is the net.
+      // (SecRequestBodyNoFilesLimit parses but is not enforced by Coraza:
+      // corazawaf/coraza#896. Kept accepted so existing configs keep loading.)
+      const bodyLimit = BODY_LIMIT_DIRECTIVE.exec(trimmed);
+      if (bodyLimit) return isValidBodyLimit(Number(bodyLimit[2]));
+      if (BODY_LIMIT_ACTION_DIRECTIVE.test(trimmed)) return true;
       // Check against allowlist
-      const matchesAllowed =
-        allowedPrefixes.some(pattern => pattern.test(trimmed)) ||
-        allowedBodyLimitDirectives.some(pattern => pattern.test(trimmed));
-      if (!matchesAllowed) return false;
+      if (!allowedPrefixes.some(pattern => pattern.test(trimmed))) return false;
       // Reject blocked SecRule* variants (e.g. SecRuleEngine)
       if (blockedSecRulePrefixes.some(pattern => pattern.test(trimmed))) return false;
       // Reject ctl:ruleEngine inside allowed lines (can conditionally disable WAF)
@@ -187,9 +300,41 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     }
   }
 
-  const handler: Record<string, unknown> = { handler: 'waf', directives: parts.join('\n') };
+  const handler: Record<string, unknown> = {
+    handler: 'waf',
+    directives: reconcileInMemoryBodyLimit(parts.join('\n'), waf.load_owasp_crs),
+  };
   if (waf.load_owasp_crs) handler.load_owasp_crs = true;
   return handler;
+}
+
+/**
+ * Coraza also validates `SecRequestBodyInMemoryLimit <= SecRequestBodyLimit`
+ * and fails config load when it doesn't hold. That pairing is easy to break by
+ * accident: lowering only the request limit leaves the CRS's 128 KiB in-memory
+ * value above it, and the resulting rejection takes down every host's config,
+ * not just this handler's.
+ *
+ * Coraza validates the FINAL parsed values, so only the last directive of each
+ * kind matters. When they conflict, append a corrective in-memory line — the
+ * last one wins, so the config stays loadable with the user's request limit
+ * intact.
+ */
+function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): string {
+  let requestLimit = crsLoaded ? CRS_BODY_LIMIT : CORAZA_DEFAULT_BODY_LIMIT;
+  let inMemoryLimit = crsLoaded ? CRS_IN_MEMORY_BODY_LIMIT : null;
+
+  for (const line of directives.split('\n')) {
+    const match = BODY_LIMIT_DIRECTIVE.exec(line.trim());
+    if (!match) continue;
+    const name = match[1].toLowerCase();
+    const value = Number(match[2]);
+    if (name === 'secrequestbodylimit') requestLimit = value;
+    else if (name === 'secrequestbodyinmemorylimit') inMemoryLimit = value;
+  }
+
+  if (inMemoryLimit === null || inMemoryLimit <= requestLimit) return directives;
+  return `${directives}\nSecRequestBodyInMemoryLimit ${requestLimit}`;
 }
 
 /**

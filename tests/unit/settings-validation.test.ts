@@ -80,6 +80,39 @@ describe("REST settings runtime validation", () => {
     })).toThrow(/IP address or CIDR/);
   });
 
+  // Coraza rejects a body limit above 1 GiB while Caddy loads the config, which
+  // takes down the whole document — so it has to fail at save time, with a
+  // message that says which value is wrong.
+  it("rejects WAF body limits Coraza would refuse", () => {
+    expect(() => validateSettingsGroup("waf", {
+      ...validGroups.waf,
+      request_body_limit: 10737418240,
+    })).toThrow(/waf\.request_body_limit must be an integer between/);
+    expect(() => validateSettingsGroup("waf", {
+      ...validGroups.waf,
+      request_body_limit: 1048576,
+      request_body_in_memory_limit: 2097152,
+    })).toThrow(/must not exceed/);
+    expect(() => validateSettingsGroup("waf", {
+      ...validGroups.waf,
+      request_body_limit_action: "Drop",
+    })).toThrow(/Reject or ProcessPartial/);
+    expect(() => validateSettingsGroup("waf", {
+      ...validGroups.waf,
+      custom_directives: "SecRequestBodyLimit 10737418240",
+    })).toThrow(/out-of-range body limit/);
+  });
+
+  it("accepts WAF body limits inside Coraza's range", () => {
+    const input = {
+      ...validGroups.waf,
+      request_body_limit: 1073741824,
+      request_body_in_memory_limit: 1048576,
+      request_body_limit_action: "ProcessPartial",
+    };
+    expect(validateSettingsGroup("waf", input)).toBe(input);
+  });
+
   it("rejects unsupported DNS providers and credential keys", () => {
     expect(() => validateSettingsGroup("dns-provider", {
       providers: { malicious: { command: "run" } },

@@ -8,6 +8,7 @@ import { Search, X, ShieldOff, Trash2, Copy, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-waf";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -747,6 +748,9 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
   const [wafEnabled, setWafEnabled] = useState(globalWaf?.enabled ?? false);
   const [wafLoadOwaspCrs, setWafLoadOwaspCrs]     = useState(globalWaf?.load_owasp_crs ?? true);
   const [wafCustomDirectives, setWafCustomDirectives]     = useState(globalWaf?.custom_directives ?? "");
+  const [wafBodyLimitMb, setWafBodyLimitMb]               = useState(bytesToMib(globalWaf?.request_body_limit));
+  const [wafInMemoryLimitMb, setWafInMemoryLimitMb]       = useState(bytesToMib(globalWaf?.request_body_in_memory_limit));
+  const [wafLimitAction, setWafLimitAction]               = useState(globalWaf?.request_body_limit_action ?? "");
   const [wafShowTemplates, setWafShowTemplates]   = useState(false);
 
   useEffect(() => { setSearchTerm(initialSearch); }, [initialSearch]);
@@ -1039,6 +1043,70 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
                   className="font-mono text-[0.8rem] resize-y"
                 />
                 <p className="text-xs text-muted-foreground">ModSecurity SecLang syntax. Applied after OWASP CRS if enabled.</p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Request body limits</Label>
+                <p className="text-xs text-muted-foreground">
+                  Coraza buffers each request body for inspection and rejects anything larger than its
+                  limit — 12.5 MiB with the OWASP CRS loaded, which is what makes large uploads fail.
+                  Leave blank to keep that default. Coraza&apos;s hard maximum is {MAX_BODY_LIMIT_MIB} MiB.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-col gap-1 min-w-[160px] flex-1">
+                    <Input
+                      id="waf_request_body_limit_mb"
+                      name="wafRequestBodyLimitMb"
+                      type="number"
+                      min={MIN_BODY_LIMIT_MIB}
+                      max={MAX_BODY_LIMIT_MIB}
+                      step={1}
+                      placeholder="Coraza default"
+                      value={wafBodyLimitMb}
+                      onChange={(e) => setWafBodyLimitMb(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">Max body size (MiB)</span>
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-[160px] flex-1">
+                    <Input
+                      id="waf_request_body_in_memory_limit_mb"
+                      name="wafRequestBodyInMemoryLimitMb"
+                      type="number"
+                      min={MIN_BODY_LIMIT_MIB}
+                      max={MAX_BODY_LIMIT_MIB}
+                      step={1}
+                      placeholder="Coraza default"
+                      value={wafInMemoryLimitMb}
+                      onChange={(e) => setWafInMemoryLimitMb(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">Buffered in memory (MiB)</span>
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-[160px] flex-1">
+                    <input type="hidden" name="wafRequestBodyLimitAction" value={wafLimitAction} />
+                    <div className="flex gap-2">
+                      {([
+                        { value: "", label: "Default" },
+                        { value: "Reject", label: "Reject" },
+                        { value: "ProcessPartial", label: "Partial" },
+                      ] as const).map((option) => (
+                        <div
+                          key={option.value}
+                          onClick={() => setWafLimitAction(option.value)}
+                          className={cn(
+                            "flex-1 h-9 px-2 rounded-md border cursor-pointer flex items-center justify-center select-none transition-colors",
+                            wafLimitAction === option.value
+                              ? "border-primary bg-primary/10 font-medium"
+                              : "border-input text-muted-foreground hover:border-muted-foreground"
+                          )}
+                        >
+                          <span className="text-sm">{option.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Over-limit action — Reject returns 413, Partial forwards the rest
+                    </span>
+                  </div>
+                </div>
               </div>
               <div>
                 <Button type="button" variant="ghost" size="sm" className="text-muted-foreground px-0" onClick={() => setWafShowTemplates((v) => !v)}>

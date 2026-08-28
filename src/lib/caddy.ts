@@ -70,6 +70,7 @@ import {
 import { decryptSecret } from "./secret";
 import {
   CaddyApplyError,
+  describeCaddyRejection,
   logCaddyApplyFailure,
   safeSystemErrorCode,
 } from "./caddy-apply-error";
@@ -2768,11 +2769,16 @@ export async function applyCaddyConfig() {
   }
 
   if (response.status < 200 || response.status >= 300) {
+    const reason = describeCaddyRejection(response.text);
     logCaddyApplyFailure("Caddy rejected configuration", undefined, {
       status: response.status,
       responseBytes: Buffer.byteLength(response.text),
+      knownReason: reason !== null,
     });
-    throw new CaddyApplyError("Caddy rejected configuration", "CADDY_REJECTED");
+    throw new CaddyApplyError(
+      reason ? `Caddy rejected configuration: ${reason}` : "Caddy rejected configuration",
+      "CADDY_REJECTED"
+    );
   }
 
   try {

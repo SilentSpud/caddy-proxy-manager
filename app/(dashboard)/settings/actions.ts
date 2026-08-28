@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { applyCaddyConfig } from "@/src/lib/caddy";
+import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { getInstanceMode, getSlaveMasterToken, setInstanceMode, setSlaveMasterToken, syncInstances } from "@/src/lib/instance-sync";
 import { createInstance, deleteInstance, updateInstance } from "@/src/lib/models/instances";
 import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings, saveDefaultResponseSettings, type DefaultResponseSettings } from "@/src/lib/settings";
@@ -1157,7 +1158,29 @@ async function updateWafSettingsActionUnlocked(_prevState: ActionResult | null, 
       excluded_rule_ids = existing?.excluded_rule_ids ?? [];
     }
 
-    const config: WafSettings = { enabled, mode, load_owasp_crs: loadOwasp, custom_directives: customDirectives, excluded_rule_ids };
+    const requestBodyLimit = parseBodyLimitMib(formData.get("wafRequestBodyLimitMb"), "Request body limit");
+    const requestBodyInMemoryLimit = parseBodyLimitMib(formData.get("wafRequestBodyInMemoryLimitMb"), "In-memory body limit");
+    const rawAction = formData.get("wafRequestBodyLimitAction");
+    const requestBodyLimitAction =
+      rawAction === "Reject" || rawAction === "ProcessPartial" ? rawAction : undefined;
+    if (
+      requestBodyLimit !== undefined &&
+      requestBodyInMemoryLimit !== undefined &&
+      requestBodyInMemoryLimit > requestBodyLimit
+    ) {
+      return { success: false, message: "In-memory body limit must not exceed the request body limit." };
+    }
+
+    const config: WafSettings = {
+      enabled,
+      mode,
+      load_owasp_crs: loadOwasp,
+      custom_directives: customDirectives,
+      excluded_rule_ids,
+      ...(requestBodyLimit !== undefined ? { request_body_limit: requestBodyLimit } : {}),
+      ...(requestBodyInMemoryLimit !== undefined ? { request_body_in_memory_limit: requestBodyInMemoryLimit } : {}),
+      ...(requestBodyLimitAction ? { request_body_limit_action: requestBodyLimitAction } : {}),
+    };
     await saveWafSettings(config);
 
     try {

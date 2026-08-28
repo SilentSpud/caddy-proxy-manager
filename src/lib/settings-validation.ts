@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { bodyLimitRangeMessage, findInvalidBodyLimitDirective, isValidBodyLimit } from "./caddy-waf";
 import { normalizeDefaultResponseSettings } from "./caddy-default-response";
 import { getProviderDefinition } from "./dns-providers";
 
@@ -307,15 +308,55 @@ function validateGeoBlock(value: Record<string, unknown>): void {
 }
 
 function validateWaf(value: Record<string, unknown>): void {
-  onlyKeys(value, ["enabled", "mode", "load_owasp_crs", "custom_directives", "excluded_rule_ids"], "WAF settings");
+  onlyKeys(
+    value,
+    [
+      "enabled",
+      "mode",
+      "load_owasp_crs",
+      "custom_directives",
+      "excluded_rule_ids",
+      "request_body_limit",
+      "request_body_in_memory_limit",
+      "request_body_limit_action",
+    ],
+    "WAF settings"
+  );
   booleanValue(required(value, "enabled", "WAF settings"), "waf.enabled");
   const mode = required(value, "mode", "WAF settings");
   if (mode !== "Off" && mode !== "On" && mode !== "DetectionOnly") {
     invalid("waf.mode must be Off, On, or DetectionOnly");
   }
   booleanValue(required(value, "load_owasp_crs", "WAF settings"), "waf.load_owasp_crs");
-  stringValue(required(value, "custom_directives", "WAF settings"), "waf.custom_directives", { max: 100_000, controls: true });
+  const directives = stringValue(required(value, "custom_directives", "WAF settings"), "waf.custom_directives", { max: 100_000, controls: true });
+  const badDirective = findInvalidBodyLimitDirective(directives);
+  if (badDirective) {
+    invalid(`waf.custom_directives has an out-of-range body limit: "${badDirective}" — ${bodyLimitRangeMessage("the byte count")}`);
+  }
   if (value.excluded_rule_ids !== undefined) validateNumberList(value.excluded_rule_ids, "waf.excluded_rule_ids");
+  validateBodyLimits(value, "waf");
+}
+
+/**
+ * Shared by the global WAF settings and the per-host WAF config. Values above
+ * Coraza's 1 GiB ceiling make Caddy reject the whole config document, so they
+ * are refused at the input layer rather than silently dropped later.
+ */
+export function validateBodyLimits(value: Record<string, unknown>, prefix: string): void {
+  for (const key of ["request_body_limit", "request_body_in_memory_limit"] as const) {
+    const raw = value[key];
+    if (raw === undefined || raw === null) continue;
+    if (!isValidBodyLimit(raw)) invalid(bodyLimitRangeMessage(`${prefix}.${key}`));
+  }
+  const action = value.request_body_limit_action;
+  if (action !== undefined && action !== null && action !== "Reject" && action !== "ProcessPartial") {
+    invalid(`${prefix}.request_body_limit_action must be Reject or ProcessPartial`);
+  }
+  const limit = value.request_body_limit;
+  const inMemory = value.request_body_in_memory_limit;
+  if (typeof limit === "number" && typeof inMemory === "number" && inMemory > limit) {
+    invalid(`${prefix}.request_body_in_memory_limit must not exceed ${prefix}.request_body_limit`);
+  }
 }
 
 function validateErrorPages(value: Record<string, unknown>): void {

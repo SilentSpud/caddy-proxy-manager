@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   CaddyApplyError,
+  describeCaddyRejection,
   logCaddyApplyFailure,
 } from "@/src/lib/caddy-apply-error";
 
@@ -26,6 +27,29 @@ describe("Caddy apply error redaction", () => {
       status: 502,
     }));
     consoleSpy.mockRestore();
+  });
+
+  // Coraza validates its body limits during config load, so the rejection takes
+  // down the whole document. Naming the cause is the difference between a
+  // fixable error and every host silently freezing on its old config.
+  it("names known config rejections without echoing the response body", () => {
+    const body = JSON.stringify({
+      error: "loading new config: ... position 1: loading module 'waf': provision http.handlers.waf: "
+        + "request body limit should be at most 1GiB (host secret-internal.example)",
+    });
+    const reason = describeCaddyRejection(body);
+
+    expect(reason).toBe("a WAF request body limit exceeds Coraza's maximum of 1 GiB");
+    expect(reason).not.toContain("secret-internal.example");
+  });
+
+  it("recognises the in-memory/request limit mismatch", () => {
+    expect(describeCaddyRejection("request body limit should be at least the memory limit"))
+      .toBe("a WAF in-memory body limit is larger than its request body limit");
+  });
+
+  it("returns null for rejections it cannot explain", () => {
+    expect(describeCaddyRejection('{"error":"unrelated failure for host secret.example"}')).toBeNull();
   });
 
   it("never constructs an exception from Caddy response text", () => {
