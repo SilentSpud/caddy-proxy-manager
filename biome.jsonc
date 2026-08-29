@@ -20,7 +20,8 @@
       "!public",
       "!drizzle/meta",
       "!skills-lock.json",
-      "!bun.lock"
+      "!bun.lock",
+      "!.vscode"
     ]
   },
 
