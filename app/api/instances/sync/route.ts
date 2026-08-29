@@ -205,10 +205,7 @@ function isL4ProxyHost(
   );
 }
 
-/**
- * Validate the semantic content of proxy host fields, to prevent config injection via a
- * compromised master or a stolen sync token.
- */
+/** Validate proxy host field content, against config injection via a stolen sync token. */
 function validateProxyHostContent(host: Record<string, unknown>): string | null {
   // Validate domains are valid hostnames
   if (typeof host.domains === "string" && host.domains) {

@@ -1,9 +1,7 @@
 /**
  * SECURITY-AUDIT H2: mTLS must FAIL CLOSED when a host has it enabled but nothing resolves to an
- * active client certificate (role-only trust fully revoked, or an empty role). The bug dropped such
- * a host from mTlsDomainMap, so Caddy emitted a plain TLS policy with no client_authentication and
- * served the backend to anyone. The fix keeps the domain with an empty CA set (→ drop-all) and
- * forces require_and_verify.
+ * active certificate. The bug dropped such a host from mTlsDomainMap, so Caddy emitted a plain TLS
+ * policy and served the backend to anyone. The fix keeps an empty CA set and require_and_verify.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -14,10 +14,7 @@ type Props = {
   onFilter: (f: string | null) => void;
 };
 
-/**
- * The filter chips above the certificate tabs. ToggleButton is the design system's own pressable
- * control, so the pressed state comes with it and the counts move into a Badge.
- */
+/** The filter chips above the certificate tabs. ToggleButton owns the pressed state. */
 const FILTERS: ReadonlyArray<{ key: string; label: string; icon: ReactNode }> = [
   { key: "expired", label: "Expired", icon: <AlertCircle /> },
   { key: "expiring_soon", label: "Expiring soon", icon: <Clock /> },

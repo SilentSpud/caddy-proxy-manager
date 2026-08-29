@@ -1,7 +1,7 @@
 /**
  * Claim resolution for OIDC providers driving group-based roles. better-auth's `getUserInfo` stops
- * once the ID token has `sub` and `email`, so a provider exposing groups only on userinfo would
- * never surface them. With group mapping on we read the ID token and fall back to userinfo.
+ * once the ID token has `sub` and `email`, so groups exposed only on userinfo never surface — with
+ * group mapping on we read the ID token and fall back to userinfo.
  */
 
 import { readClaim } from "./oidc-groups";
@@ -42,10 +42,7 @@ export function decodeJwtPayload(token: string | null | undefined): Record<strin
   }
 }
 
-/**
- * The token is only decoded, never verified: it arrived over the back-channel token exchange with
- * the IdP — the same trust better-auth's own default `getUserInfo` places in it.
- */
+/** Decoded, never verified — it came over the back-channel exchange, as better-auth trusts it. */
 async function discoverUserinfoUrl(issuer: string): Promise<string | null> {
   const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
   const cached = discoveryCache.get(discoveryUrl);
@@ -97,8 +94,8 @@ async function fetchUserinfoClaims(
 }
 
 /**
- * The full claim set for a sign-in: ID token claims, plus userinfo claims when the group claim is
- * absent from the ID token. userinfo wins on conflict, being the fresher, authoritative profile.
+ * The full claim set for a sign-in: ID token claims, plus userinfo when the group claim is absent.
+ * userinfo wins on conflict, being the fresher profile.
  */
 export async function fetchOidcClaims(
   cfg: ClaimSourceConfig,
@@ -119,10 +116,7 @@ export async function fetchOidcClaims(
   return claims;
 }
 
-/**
- * Shapes claims the way better-auth's generic-OAuth plugin expects, keeping the raw claims
- * alongside so `mapProfileToUser` can read the group claim.
- */
+/** Shapes claims for better-auth's generic-OAuth plugin, keeping the raw claims alongside. */
 export function toOAuthUserInfo(claims: Record<string, unknown>): Record<string, unknown> {
   return {
     ...claims,

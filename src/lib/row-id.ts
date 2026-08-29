@@ -1,8 +1,7 @@
 /**
- * Client-side identity for the rows of an editable list. The field-array editors used to key rows
- * on the array index, so deleting row 1 of 3 made row 2 inherit row 1's DOM node and any state it
- * had not pushed into React. Each row now carries an id minted where it is created. The ids are
- * render-only, so each editor builds its hidden-input JSON from explicit fields.
+ * Client-side identity for editable-list rows. Keying on the array index made React reconcile a
+ * deleted row's DOM node onto its successor, so uncommitted input state surfaced in the wrong row.
+ * The ids are render-only, never part of the serialized payload.
  */
 
 let fallbackCounter = 0;

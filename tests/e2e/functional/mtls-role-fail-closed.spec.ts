@@ -11,9 +11,8 @@ import {
 
 /**
  * SECURITY-AUDIT H2: role-based mTLS must FAIL CLOSED when the trusted role resolves to no active
- * certificate (its only issued cert revoked). The bug dropped such a host from the trust map, so
- * Caddy served a plain TLS policy and the backend was reachable with no client certificate. Drives
- * the real REST API over real TLS against the test Caddy + echo-server stack.
+ * certificate. The bug dropped such a host from the trust map, so Caddy served a plain TLS policy
+ * and the backend was reachable with no client certificate. Drives the real REST API over TLS.
  */
 
 const API_CA = 'http://localhost:3000/api/v1/ca-certificates';

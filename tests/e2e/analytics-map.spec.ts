@@ -3,8 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 /**
  * "Traffic by Country" world map. maplibre-gl v6 resolves its tile worker from `import.meta.url`,
  * which the bundler cannot follow — the worker never starts and the map is empty ocean. The fix
- * imports it as `?worker&url` and calls setWorkerUrl(). Covers the plumbing (chunk served, CSP)
- * and the outcome (country geometry rendered and hit-testable).
+ * imports it as `?worker&url` and calls setWorkerUrl(). Covers plumbing and rendered geometry.
  */
 
 const MAP_CANVAS = 'canvas.maplibregl-canvas';
@@ -61,11 +60,9 @@ test.describe('Analytics world map', () => {
   test('map renders country geometry that responds to hover', async ({ page }) => {
     await gotoAnalyticsMap(page);
 
-    // MapLibre's own container carries `overflow: hidden`, so if it collapses to
-    // zero height the canvas is clipped away entirely: nothing paints and nothing
-    // hit-tests, while the map instance still reports rendered features. Assert
-    // the container has real height first, so that regression reports itself
-    // instead of masquerading as "the map has no geometry".
+    // MapLibre's container carries `overflow: hidden`, so if it collapses to zero height the canvas
+    // is clipped away entirely while the map still reports rendered features. Assert real height
+    // first, so that regression reports itself instead of looking like "no geometry".
     const mapContainer = page.locator('.maplibregl-map');
     await expect
       .poll(async () => Math.round((await mapContainer.boundingBox())?.height ?? 0), {

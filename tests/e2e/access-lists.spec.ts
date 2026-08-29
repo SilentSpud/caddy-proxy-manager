@@ -587,8 +587,7 @@ test.describe('Access Lists — members empty state', () => {
 
 /**
  * The settings tab's Name / Description inputs. The "New access list" dialog is a native <dialog>
- * that stays in the DOM when closed, so its own Name and Description fields match the same label
- * and make a bare getByLabel ambiguous. Only one pair is ever visible.
+ * that stays in the DOM when closed, so a bare getByLabel is ambiguous — only one pair is visible.
  */
 function settingsNameField(page: Page) {
   return page.getByLabel(/^Name/).filter({ visible: true });

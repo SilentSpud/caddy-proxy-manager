@@ -5,9 +5,9 @@ import { useTheme } from "@astryxdesign/core";
 import type { ApexOptions } from "apexcharts";
 
 /**
- * ApexCharts options derived from the active Astryx theme. ApexCharts writes concrete colours into
- * SVG attributes, so it cannot take `var(--color-…)`; `useTheme().token()` resolves each token's
- * `light-dark()` pair to the value in effect, and re-resolves when the mode changes.
+ * ApexCharts options from the active Astryx theme. ApexCharts writes concrete colours into SVG
+ * attributes, so it cannot take `var(--color-…)`; `useTheme().token()` resolves each `light-dark()`
+ * pair to the value in effect, and re-resolves on mode change.
  */
 export interface ChartTheme {
   /** Resolved mode — ApexCharts has its own light/dark defaults keyed off this. */
@@ -16,10 +16,7 @@ export interface ChartTheme {
   base: ApexOptions;
   /** Axis and legend label colour, ready to drop into a `style.colors`. */
   labelColor: string;
-  /**
-   * Categorical series colours. Astryx's categorical tokens are identical in light and dark on
-   * purpose — a series keeps its identity when the mode flips — so these are stable by design.
-   */
+  /** Categorical colours. Identical in light and dark on purpose, so a series keeps identity. */
   series: {
     blue: string;
     red: string;

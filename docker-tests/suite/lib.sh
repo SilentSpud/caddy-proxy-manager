@@ -156,10 +156,9 @@ with_token() {
 
 # cpm_sign_in BASE_URL COOKIE_JAR USERNAME PASSWORD -> prints the HTTP status
 #
-# The seeded admin has an email of <username>@localhost and a username, and
-# which of the two better-auth accepts depends on how the account was created.
-# Try email first, then the username plugin, and report the status of whichever
-# attempt got furthest.
+# The seeded admin has both an email (<username>@localhost) and a username, and which better-auth
+# accepts depends on how the account was created. Try email, then the username plugin, and report
+# whichever got furthest.
 cpm_sign_in() {
   local base="$1" jar="$2" user="$3" password="$4"
   local out="$STATE_DIR/signin-$$.json" status

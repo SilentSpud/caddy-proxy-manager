@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Anti-clickjacking headers on public pages. The login and portal forms previously shipped with no
- * framing protection (headers were set only on the authenticated middleware branch); both
- * X-Frame-Options: DENY and CSP frame-ancestors 'none' are now required.
+ * Anti-clickjacking headers on public pages. The login and portal forms shipped with none — headers
+ * were set only on the authenticated branch — so both X-Frame-Options and frame-ancestors are now
+ * required.
  */
 
 const BASE_URL = 'http://localhost:3000';

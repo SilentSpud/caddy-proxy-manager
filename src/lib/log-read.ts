@@ -1,9 +1,9 @@
 import { createReadStream } from "node:fs";
 
 /**
- * Read complete (newline-terminated) lines from `file` starting at `startOffset`. The offset only
- * advances past the last newline, so a line still being written is left intact and re-read next
- * pass rather than split into a fragment that fails to parse. A missing file yields zero lines.
+ * Read complete (newline-terminated) lines from `startOffset`. The offset advances only past the
+ * last newline, so a half-written line is re-read next pass rather than split into an unparseable
+ * fragment. A missing file yields zero lines.
  */
 export async function readLines(
   startOffset: number,

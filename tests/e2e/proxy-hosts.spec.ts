@@ -59,9 +59,8 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression test for #119: Advanced Options (HSTS Subdomains, Skip HTTPS Validation) were not
-   * saved because the form field names used camelCase (hstsSubdomains, skipHttpsHostnameValidation)
-   * while the server action expected snake_case.
+   * Regression (#119): Advanced Options were not saved — the form used camelCase field names while
+   * the server action expected snake_case.
    */
   test('advanced options are saved and persist after edit (#119)', async ({ page }) => {
     // Create a host (defaults: HSTS Subdomains ON, Skip HTTPS OFF)
@@ -170,9 +169,8 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression test for #120: toggling a proxy host disabled then re-enabled via the row-level
-   * switch wiped custom configs (redirects, rewrite, location_rules), because they were not in
-   * existingMeta when updateProxyHost was called with only { enabled }.
+   * Regression (#120): toggling a host off and on via the row switch wiped redirects, rewrite and
+   * location_rules, which were not in existingMeta when updateProxyHost got only { enabled }.
    */
   test('toggling enabled/disabled preserves redirects and rewrite config (#120)', async ({
     page,
@@ -314,9 +312,8 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression (#232): Authentik defaults reached the create dialog but not the edit dialog, which
-   * never accepted an `authentikDefaults` prop — so enabling Authentik on an existing host left the
-   * required Outpost fields blank and the save failed.
+   * Regression (#232): Authentik defaults reached the create dialog but not the edit one, which
+   * never accepted an `authentikDefaults` prop — so the required Outpost fields stayed blank.
    */
   test('edit host Authentik fields are prefilled from global defaults (#232)', async ({ page }) => {
     const origin = new URL(page.url()).origin;
@@ -477,8 +474,7 @@ test.describe('Proxy Hosts', () => {
 
   /**
    * Regression: the per-host geoblock "Override global" toggle was dropped — `parseGeoBlockConfig`
-   * returned `geoblock_mode` while ProxyHostInput uses `geoblockMode`, so the spread lost it and
-   * the host stayed in merge mode.
+   * returned `geoblock_mode` while ProxyHostInput uses `geoblockMode`, so the spread lost it.
    */
   test('per-host geoblock override mode persists after save', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();
@@ -638,11 +634,10 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression: the index-key row-identity bug. The field-array editors keyed rows on the array
-   * index, so removing one made React reconcile later rows onto their predecessors' DOM nodes —
-   * state the input had not yet pushed into React surfaced in a different row. Values alone cannot
-   * catch it (the inputs are controlled), so the test stamps each node with an expando React never
-   * touches and checks which survive the delete.
+   * Regression: the index-key row-identity bug. Keying rows on the array index made React reconcile
+   * later rows onto their predecessors' DOM nodes, so uncommitted input state surfaced in the wrong
+   * row. Controlled inputs hide it from value assertions, so each node is stamped with an expando
+   * React never touches and the survivors are checked after a delete.
    */
   test('removing an upstream keeps every other row on its own DOM node', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();

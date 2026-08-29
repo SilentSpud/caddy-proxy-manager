@@ -29,10 +29,7 @@ function formatFull(validTo: string): string {
   });
 }
 
-/**
- * Icon and variant carry the same meaning, so expiry never reads by colour
- * alone — "12d" and "3d" are otherwise identical but for the green/amber.
- */
+/** Icon and variant carry the meaning too, so expiry never reads by colour alone. */
 const STATUS_CONFIG: Record<
   CertExpiryStatus,
   { variant: "error" | "warning" | "success"; icon: ReactNode }

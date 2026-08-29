@@ -1,7 +1,6 @@
 /**
- * Functional: CPM Forward Auth with excluded_paths (#108) — excluded paths reach the upstream
- * directly, others still redirect to the portal, and the callback still completes auth.
- * Domain: func-fwd-auth-excl.test
+ * Functional: CPM Forward Auth with excluded_paths (#108) — excluded paths reach the upstream,
+ * others redirect to the portal, the callback still completes auth. Domain: func-fwd-auth-excl.test
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';

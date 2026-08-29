@@ -1,7 +1,6 @@
 /**
  * In OIDC-only mode better-auth must not accept credentials at all — hiding the login form is
- * cosmetic, the email/password endpoints have to be off. The flag is read from env at config
- * import, so it is set in a hoisted block.
+ * cosmetic, the endpoints have to be off. The flag is read at config import, so it is hoisted.
  */
 import { describe, it, expect, afterAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

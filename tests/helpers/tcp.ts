@@ -72,10 +72,9 @@ export function tcpConnect(host: string, port: number, timeoutMs = 5_000): Promi
 }
 
 /**
- * Poll until a TCP port actually *proxies* data, not merely accepts a socket. Docker's port
- * publisher accepts connections whether or not Caddy has an L4 listener behind it, so a socket
- * opens as soon as the container is up — well before a new route is live. Requiring a probe to come
- * back closes that gap. Only safe against echo upstreams, which is what the L4 suite proxies to.
+ * Poll until a TCP port actually *proxies* data, not merely accepts a socket: Docker's publisher
+ * accepts connections whether or not Caddy has a listener behind it, so a socket opens well before
+ * a new route is live. Only safe against echo upstreams, which is what the L4 suite proxies to.
  */
 export async function waitForTcpEcho(
   host: string,

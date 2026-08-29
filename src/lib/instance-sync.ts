@@ -111,10 +111,7 @@ export function getSyncIntervalMs(): number {
   return Math.max(seconds, 30) * 1000;
 }
 
-/**
- * Whether HTTP sync is explicitly allowed. HTTP transmits tokens in plaintext, so it belongs
- * only on trusted networks.
- */
+/** Whether HTTP sync is allowed. It sends tokens in plaintext, so trusted networks only. */
 export function isHttpSyncAllowed(): boolean {
   const envValue = process.env[ENV_SYNC_ALLOW_HTTP];
   return envValue === "true" || envValue === "1";

@@ -1,7 +1,6 @@
 /**
  * Regression: Caddy's file-writer rotation defaults silently stopped compressing and cleaning up
- * rolled logs in production, filling the host disk (11GB+). Roll settings are now spelled out
- * explicitly; these guard against that regressing silently again.
+ * rolled logs, filling the host disk (11GB+). Roll settings are now spelled out explicitly.
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

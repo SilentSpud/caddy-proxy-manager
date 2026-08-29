@@ -1,8 +1,7 @@
 /**
  * SECURITY-AUDIT H3: an OAuth IdP must not set privileged user fields. better-auth's generic-OAuth
- * signup spreads raw profile claims into the new user and ignores `input:false` on `role`/`status`.
- * The fix forces safe defaults in a databaseHooks.user.create.before hook; these lock both the
- * transform and the fact that the hook is wired into the config.
+ * signup spreads raw claims into the new user and ignores `input:false`. The fix forces safe
+ * defaults in a databaseHooks.user.create.before hook; these lock the transform and its wiring.
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

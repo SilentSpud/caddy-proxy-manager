@@ -2,7 +2,7 @@
 
 /**
  * The three raw-config escape hatches a proxy host offers, shared so create and edit cannot drift.
- * Each label says where in the request path its content lands, not just the format.
+ * Each label says where in the request path its content lands.
  */
 
 import { useState } from "react";

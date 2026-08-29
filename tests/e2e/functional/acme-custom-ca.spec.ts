@@ -1,7 +1,6 @@
 /**
  * Functional: custom ACME directory + internal CA trust (#192). Points CPM's ACME settings at
- * Step-CA with its root pasted in, creates an auto-managed host for `acme-e2e.test`, and asserts
- * the leaf cert Caddy serves was issued by Step-CA — the path unit tests cannot reach.
+ * Step-CA with its root pasted in and asserts the leaf cert Caddy serves was issued by Step-CA.
  */
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';

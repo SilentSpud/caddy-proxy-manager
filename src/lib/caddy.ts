@@ -776,18 +776,14 @@ function attachHostToRoute(route: CaddyHttpRoute, host: string | string[]): Cadd
   };
 }
 
-/**
- * Normalize configured trusted-proxy ranges: trim, drop blanks, and expand the
- * "private_ranges" shorthand into CIDRs (as the geoblock and Authentik handlers do).
- */
+/** Normalize trusted-proxy ranges: trim, drop blanks, expand the "private_ranges" shorthand. */
 export function normalizeTrustedProxyRanges(ranges: string[] | undefined | null): string[] {
   return expandPrivateRanges((ranges ?? []).map((r) => r.trim()).filter(Boolean));
 }
 
 /**
- * Server-level trusted-proxy fields for `servers.cpm`. Caddy resolves `{http.request.client_ip}`
- * in core, before any handler, so this is the only place a global list fixes IP attribution.
- * Empty object unless at least one range is configured.
+ * Server-level trusted-proxy fields for `servers.cpm`. Caddy resolves client_ip in core, before any
+ * handler, so this is the only place a global list fixes IP attribution. Empty unless configured.
  */
 export function buildServerTrustedProxies(settings: TrustedProxiesSettings | null | undefined): {
   trusted_proxies?: { source: string; ranges: string[] };
@@ -825,9 +821,8 @@ type CaddyBuildContext = {
   globalGeoBlock?: GeoBlockSettings | null;
   globalWaf?: WafSettings | null;
   /**
-   * Which plugin-backed features the running binary can serve. Caddy validates a posted config as
-   * a whole, so one handler naming an uncompiled module takes every host offline — every
-   * plugin-backed handler is gated on this.
+   * Which plugin-backed features the running binary can serve. Caddy validates a posted config as a
+   * whole, so one handler naming an uncompiled module takes every host offline.
    */
   moduleAvailability: CaddyModuleAvailability;
   mtlsRbac?: {
@@ -1200,10 +1195,9 @@ async function buildProxyRoutes(
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
   const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
 
-  // Adapt every host's Caddyfile snippet up front, concurrently: each adapt is an admin-API round
-  // trip and this runs on every config apply, so the cost becomes the slowest rather than the sum.
-  // Not cached across applies — a cache outliving a rebuild would hand back routes for a module
-  // that is gone.
+  // Adapt every host's snippet up front, concurrently: each adapt is an admin-API round trip on
+  // every config apply, so the cost becomes the slowest rather than the sum. Not cached — a cache
+  // outliving a rebuild would hand back routes for a module that is gone.
   const adaptedCaddyfiles = new Map<number, Awaited<ReturnType<typeof adaptCaddyfileSnippet>>>();
   await Promise.all(
     rows
@@ -1304,10 +1298,9 @@ async function buildProxyRoutes(
       }
     }
 
-    // Path blocks (terminal static_response) and path rewrites (URI rewrite). Path Allows are not
-    // standalone routes — a terminal match with an empty handle would stop the subroute and return
-    // an empty 200 — so each allow pattern is folded into every block's matcher as a `not` clause.
-    // Rewrites keep their original matchers.
+    // Path blocks (terminal static_response) and rewrites (URI rewrite). Allows are not standalone
+    // routes — a terminal match with an empty handle returns an empty 200 — so each allow pattern
+    // is folded into every block's matcher as a `not` clause. Rewrites keep their own matchers.
     const pathAllows = meta.path_allows ?? [];
     const pathBlocks = meta.path_blocks ?? [];
     const pathRewrites = meta.path_rewrites ?? [];
@@ -1685,11 +1678,10 @@ async function buildProxyRoutes(
         // "X-CPM-User" resolves to nothing and every upstream sees an anonymous request.
         const CPM_COPY_HEADERS = ["X-Cpm-User", "X-Cpm-Email", "X-Cpm-Groups", "X-Cpm-User-Id"];
 
-        // Security: strip client-supplied CPM identity headers inbound — CPM injects these only
-        // from the verify response, so accepting them would let a caller spoof identity. Must run
-        // on EVERY route: unauthenticated ones have nothing else to remove them, and the copy step
-        // below only overwrites when the verify value is non-empty (a user in no group returns an
-        // empty X-CPM-Groups).
+        // Security: strip client-supplied CPM identity headers inbound — CPM sets these only from
+        // the verify response, so accepting them lets a caller spoof identity. Must run on EVERY
+        // route: unauthenticated ones have nothing else to remove them, and the copy step below
+        // only overwrites when the verify value is non-empty.
         const cpmStripHeadersHandler: Record<string, unknown> = {
           handler: "headers",
           request: {
@@ -2041,10 +2033,7 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
       mode,
     );
 
-  /**
-   * One TLS policy per unique CA set in `mTlsDomains`, so a cert from CA_B cannot authenticate
-   * against a host that only trusts CA_A.
-   */
+  /** One TLS policy per unique CA set, so a CA_B cert cannot authenticate against a CA_A host. */
   const pushMtlsPolicies = (mTlsDomains: string[]) => {
     const scopedDomains = mTlsDomains.filter((domain) => mTlsOptionalAuthDomains.has(domain));
     const requiredDomains = mTlsDomains.filter((domain) => !mTlsOptionalAuthDomains.has(domain));
@@ -2235,9 +2224,9 @@ export async function buildTlsAutomation(
   }
 
   /**
-   * A DNS-01 challenge names its provider module, so an uncompiled caddy-dns plugin cannot be used.
-   * Dropping just `challenges.dns` degrades the subject to HTTP-01 (wildcards fail) instead of
-   * having Caddy reject the whole config.
+   * A DNS-01 challenge names its provider module, so an uncompiled caddy-dns plugin is unusable.
+   * Dropping just `challenges.dns` degrades to HTTP-01 (wildcards fail) rather than having Caddy
+   * reject the whole config.
    */
   const dnsProviderAllowed = (providerName: string): boolean => {
     const availability = options.moduleAvailability;
@@ -3020,8 +3009,8 @@ export async function applyCaddyConfig() {
 }
 
 /**
- * Dial address (host:port) for Caddy to reach CPM internally: FORWARD_AUTH_INTERNAL_URL if set,
- * else "web:3000" when CADDY_API_URL names a Docker service, else derived from BASE_URL.
+ * Dial address for Caddy to reach CPM internally: FORWARD_AUTH_INTERNAL_URL if set, else
+ * "web:3000" when CADDY_API_URL names a Docker service, else derived from BASE_URL.
  */
 function getCpmDialAddress(): string | null {
   const internalUrl = config.forwardAuthInternalUrl;

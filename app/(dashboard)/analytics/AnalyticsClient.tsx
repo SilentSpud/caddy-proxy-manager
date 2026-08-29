@@ -193,10 +193,7 @@ function formatTs(ts: number, rangeSeconds: number): string {
 
 // ── Local DateTimePicker ───────────────────────────────────────────────────────
 
-/**
- * A date and a time in one control. DateTimeInput owns both halves, so this only converts between
- * its ISO string and the Dayjs value the rest of the page uses.
- */
+/** A date and a time in one control. Converts between DateTimeInput's ISO string and Dayjs. */
 function DateTimePicker({
   value,
   onChange,
@@ -265,10 +262,7 @@ function StatCard({
 
 const INCLUDE_UNCONFIGURED_KEY = "analytics:includeUnconfiguredHosts";
 
-/**
- * Host filter. MultiSelector supplies search, select-all and the badge summary; only the
- * include-unconfigured checkbox is rendered here.
- */
+/** Host filter. MultiSelector supplies search, select-all and badges; this adds the toggle. */
 function HostsCombobox({
   allHosts,
   selectedHosts,
@@ -334,9 +328,9 @@ function HostsCombobox({
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
 /**
- * Fetch JSON, treating a non-2xx response as a failure. The analytics endpoints answer errors with
- * `{ error: "…" }` and a 4xx/5xx, which parsed without checking `response.ok` lands an object in
- * array-typed state — the first `.map()` then throws during render and blanks the whole page.
+ * Fetch JSON, treating a non-2xx as a failure. The analytics endpoints answer errors with
+ * `{ error: "…" }`, which parsed without checking `response.ok` lands an object in array-typed
+ * state — the first `.map()` then throws during render and blanks the page.
  */
 async function fetchJson(url: string): Promise<unknown> {
   const response = await fetch(url);
@@ -353,10 +347,7 @@ async function fetchJson(url: string): Promise<unknown> {
   return body;
 }
 
-/**
- * Defensive cast for list-shaped payloads. Renders empty rather than throwing if an endpoint ever
- * answers 200 with something unexpected.
- */
+/** Defensive cast for list payloads: renders empty rather than throwing on an odd 200. */
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }

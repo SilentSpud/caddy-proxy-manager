@@ -1,7 +1,6 @@
 /**
- * Regression: geoblockMode must round-trip through createProxyHost and updateProxyHost.
- * `parseGeoBlockConfig` returned `geoblock_mode` while ProxyHostInput keys are camelCase, so the
- * spread silently dropped the field and override mode was never persisted.
+ * Regression: geoblockMode must round-trip through create/updateProxyHost. `parseGeoBlockConfig`
+ * returned `geoblock_mode` while ProxyHostInput keys are camelCase, so the spread dropped it.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

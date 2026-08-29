@@ -1,8 +1,7 @@
 /**
- * src/lib/caddy-mtls.ts: pemToBase64Der, buildClientAuthentication (CA trust per domain set), and
- * groupMtlsDomainsByCaSet (CA-set isolation per TLS policy). The bug they document: two hosts
- * sharing an auto-managed cert but trusting different CAs must not share one policy, or a CA_B cert
- * authenticates against the CA_A host.
+ * src/lib/caddy-mtls.ts: pemToBase64Der, buildClientAuthentication and groupMtlsDomainsByCaSet. The
+ * bug they document: two hosts sharing an auto-managed cert but trusting different CAs must not
+ * share one policy, or a CA_B cert authenticates against the CA_A host.
  */
 import { describe, it, expect } from 'bun:test';
 import {

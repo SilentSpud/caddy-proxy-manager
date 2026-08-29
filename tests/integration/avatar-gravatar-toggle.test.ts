@@ -1,7 +1,6 @@
 /**
- * Gravatar fallback has two controls: AVATAR_GRAVATAR and a Settings toggle. The env var wins when
- * set; otherwise the stored toggle decides, defaulting to enabled. The toggle is a synced setting,
- * so a slave inherits its master's choice unless it stored an override.
+ * Gravatar fallback has two controls: AVATAR_GRAVATAR and a Settings toggle. The env var wins;
+ * otherwise the toggle decides, default on. It is a synced setting, so a slave inherits its master.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -33,9 +32,9 @@ import { settings } from '../../src/lib/db/schema';
 import '../../src/lib/settings';
 
 /**
- * Applies the env stubs and re-points the config module at a freshly evaluated copy, so the stubs
- * reach the code under test. config snapshots process.env on first evaluation; a query suffix gives
- * a fresh copy but does not propagate to importers, so the plain specifier is mocked to point at it.
+ * Applies the env stubs and re-points config at a freshly evaluated copy. config snapshots
+ * process.env on first evaluation, and a query suffix does not propagate to importers, so the plain
+ * specifier is mocked to point at the fresh copy.
  */
 async function load(env: Record<string, string | undefined> = {}) {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);

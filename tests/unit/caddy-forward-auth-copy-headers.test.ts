@@ -1,9 +1,8 @@
 /**
- * Regression: the identity headers a forward-auth host copies onto the upstream must use a
- * placeholder in Go's canonical MIME casing. Caddy resolves `{http.reverse_proxy.header.<name>}` by
- * literal lookup in Go's canonicalised map, so `X-CPM-User` resolves to nothing — and each copy
- * route is guarded by `not vars <placeholder> ""`, so it is skipped and the header never set. Every
- * app behind forward auth then sees an anonymous request.
+ * Regression: the identity headers a forward-auth host copies onto the upstream must use Go's
+ * canonical MIME casing. Caddy resolves `{http.reverse_proxy.header.<name>}` by literal lookup, so
+ * `X-CPM-User` resolves to nothing — and the `not vars <placeholder> ""` guard then skips the copy
+ * route entirely, so every app behind forward auth sees an anonymous request.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -268,10 +268,7 @@ export function getProviderDefinition(name: string): DnsProviderDefinition | und
   return DNS_PROVIDERS.find((p) => p.name === name);
 }
 
-/**
- * Encrypt password-type credential fields for storage. Non-password fields and already-encrypted
- * values are left unchanged.
- */
+/** Encrypt password-type credential fields; others and already-encrypted values pass through. */
 export function encryptProviderCredentials(
   providerName: string,
   credentials: Record<string, string>,
@@ -305,10 +302,7 @@ export function decryptProviderCredentials(
   return result;
 }
 
-/**
- * The Caddy DNS challenge provider config from a provider name + credentials — the object to set
- * as `issuer.challenges.dns`.
- */
+/** The Caddy DNS challenge config for `issuer.challenges.dns`, from a provider + credentials. */
 export function buildDnsChallengeConfig(
   providerName: string,
   credentials: Record<string, string>,

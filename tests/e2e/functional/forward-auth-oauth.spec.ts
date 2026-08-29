@@ -1,8 +1,7 @@
 /**
  * Functional: Forward Auth with OAuth (Dex OIDC) — host creation, Dex login, allowed vs disallowed
- * users, group-based access, session cookie lifecycle. Test domains are not DNS-resolvable, so
- * browser navigation uses localhost:3000 and the callback goes through httpGet with a Host header.
- * Requires Dex on port 5556. Domain: func-fwd-oauth.test
+ * users, group-based access, session lifecycle. Test domains are not DNS-resolvable, so browser
+ * navigation uses localhost:3000 and the callback goes through httpGet. Domain: func-fwd-oauth.test
  */
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
@@ -79,9 +78,8 @@ async function freshContext(page: Page): Promise<BrowserContext> {
 }
 
 /**
- * Perform an OAuth login through the /login page and verify the user was created.
- * Uses a fresh browser context to avoid session conflicts between users.
- * Retries once on failure (Better Auth OAuth state can race between rapid logins).
+ * OAuth login through /login, verifying the user was created. Fresh browser context per user, and
+ * one retry — Better Auth OAuth state can race between rapid logins.
  */
 async function doOAuthLogin(page: Page, user: { email: string; password: string }) {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -133,9 +131,8 @@ async function doOAuthLogin(page: Page, user: { email: string; password: string 
 }
 
 /**
- * Perform OAuth login on the portal and return the callback URL.
- * Does NOT navigate to the callback (test domains aren't DNS-resolvable).
- * Instead, intercepts the session-login API response to extract the redirect URL.
+ * OAuth login on the portal, returning the callback URL. Does not navigate there (test domains are
+ * not resolvable); intercepts the session-login response for the redirect instead.
  */
 async function oauthPortalLogin(
   page: Page,

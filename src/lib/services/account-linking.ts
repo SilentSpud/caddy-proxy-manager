@@ -12,7 +12,7 @@ import { accountIssuerFor } from "../account-issuer";
 const LINKING_TOKEN_EXPIRY = 5 * 60; // 5 minutes in seconds
 
 /**
- * The issuer to stamp on a linked OAuth account row. From better-auth 1.7 accounts are keyed by
+ * The issuer to stamp on a linked OAuth account row. better-auth 1.7 keys accounts by
  * (issuer, accountId), so a mismatch means the link exists but never resolves.
  */
 async function issuerForProvider(providerId: string): Promise<string> {
@@ -136,10 +136,7 @@ export async function verifyLinkingToken(token: string): Promise<LinkingTokenPay
   }
 }
 
-/**
- * Store a linking JWT in the DB and return an opaque 64-char hex ID. Expired rows are purged on
- * each insert to prevent unbounded table growth.
- */
+/** Store a linking JWT and return an opaque 64-char hex ID. Expired rows are purged on insert. */
 export async function storeLinkingToken(token: string): Promise<string> {
   const id = randomBytes(32).toString("hex");
   const now = nowIso();
@@ -158,8 +155,8 @@ export async function storeLinkingToken(token: string): Promise<string> {
 }
 
 /**
- * Peek at a linking token by its opaque ID without consuming it, so the link-account page can show
- * provider and email while leaving the token for the API call. Null if unknown or expired.
+ * Peek at a linking token without consuming it, so the link-account page can show provider and
+ * email while leaving the token for the API call. Null if unknown or expired.
  */
 export async function peekLinkingToken(id: string): Promise<string | null> {
   const now = nowIso();
@@ -170,10 +167,7 @@ export async function peekLinkingToken(id: string): Promise<string | null> {
   return rows[0].token;
 }
 
-/**
- * Retrieve and delete a linking token by its opaque ID (one-time use). Returns null if the ID
- * is unknown or the token is expired.
- */
+/** Retrieve and delete a linking token by opaque ID (one-time). Null if unknown or expired. */
 export async function retrieveLinkingToken(id: string): Promise<string | null> {
   const now = nowIso();
   const rows = await db.select().from(linkingTokens).where(eq(linkingTokens.id, id)).limit(1);

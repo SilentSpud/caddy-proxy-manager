@@ -1,18 +1,13 @@
 /**
- * Invariants of the compose-manager sidecar's entrypoint script. It runs in its own container,
- * driven by files on a shared volume, so these assertions read the shipped source directly —
- * weaker than executing it, but the alternative is Docker-in-Docker for a 400-line shell script.
+ * Invariants of the compose-manager sidecar's entrypoint script. It runs in its own container, so
+ * these assertions read the shipped source directly — weaker than executing it, but the alternative
+ * is Docker-in-Docker for a 400-line shell script.
  *
- * Ports: applies the override on startup, touches only the caddy service (--no-deps
- * --force-recreate), auto-detects the compose project from container labels, pre-loads LAST_TRIGGER
- * so startup does not double-apply, supports COMPOSE_HOST_DIR, never pulls images.
- *
- * Rebuilds: build and port overrides always passed together; the build is timeout-bounded; a failed
- * build leaves the container alone; the applied-module record is written only once healthy, since
- * earlier would let the app emit config for plugins the binary lacks; a stale "building" status is
- * cleared on startup.
- *
- * Status: files are valid JSON with control characters stripped, and exit codes survive `set -e`.
+ * Ports: applies the override on startup, touches only caddy, auto-detects the compose project,
+ * pre-loads LAST_TRIGGER, supports COMPOSE_HOST_DIR, never pulls images. Rebuilds: both overrides
+ * always passed together, timeout-bounded, a failed build leaves the container alone, the
+ * applied-module record is written only once healthy, a stale "building" status is cleared. Status
+ * files are valid JSON with control characters stripped, and exit codes survive `set -e`.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';

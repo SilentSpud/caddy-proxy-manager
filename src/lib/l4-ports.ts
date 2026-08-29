@@ -1,8 +1,7 @@
 /**
- * L4 Port Management. Generates a Docker Compose override with the ports enabled L4 hosts need and
- * manages the apply/status lifecycle through files on a shared volume: web writes
- * docker-compose.l4-ports.yml plus l4-ports.trigger; the sidecar runs `docker compose up -d caddy`
- * and writes l4-ports.status; web reads that to report the outcome.
+ * L4 Port Management. Generates a Docker Compose override with the ports enabled L4 hosts need:
+ * web writes docker-compose.l4-ports.yml plus l4-ports.trigger, the sidecar runs
+ * `docker compose up -d caddy` and writes l4-ports.status, and web reads that for the outcome.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";

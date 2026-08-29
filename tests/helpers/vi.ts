@@ -3,10 +3,9 @@ import { type Mock, vi as bunVi } from 'bun:test';
 /**
  * The `vi` object the suite imports, in place of Vitest's. Bun's `bun:test` alias covers
  * fn/spyOn/mock/timers but not `mocked`, `hoisted`, `stubEnv` or `unstubAllEnvs`, and its type
- * cannot be merged declaratively — hence a wrapper. `mock` passes through by reference, so it still
- * resolves specifiers relative to the calling file. `resetModules` and `doMock` are deliberately
+ * cannot be merged declaratively — hence a wrapper. `resetModules` and `doMock` are deliberately
  * absent: Bun cannot drop a module from the registry, so a no-op would leave tests asserting
- * against a cached one — the suites that needed them use an injectable seam instead.
+ * against a cached one.
  */
 
 /** Env vars stubbed since the last unstubAllEnvs(), with their prior values. */
@@ -15,18 +14,16 @@ const stubbedEnv = new Map<string, string | undefined>();
 function mocked<T extends (...args: never[]) => unknown>(item: T): Mock<T>;
 function mocked<T>(item: T): T;
 /**
- * Identity at runtime, a cast for the type checker. Under Vitest this narrowed a statically-typed
- * import to its mocked shape; Bun replaces the module's live bindings in place, so the value
- * already *is* the mock and only the static type needs help.
+ * Identity at runtime, a cast for the type checker. Bun replaces the module's live bindings in
+ * place, so the value already *is* the mock and only the static type needs help.
  */
 function mocked(item: unknown): unknown {
   return item;
 }
 
 /**
- * Runs `factory` immediately and returns its value. Vitest hoisted `vi.mock` above the imports, so
- * anything a factory closed over had to be hoisted too. Bun does not hoist — a `vi.mock` runs where
- * it is written — so the only rule left is to declare this above the `vi.mock` that uses it.
+ * Runs `factory` immediately and returns its value. Bun does not hoist `vi.mock`, so the only rule
+ * left is to declare this above the `vi.mock` that uses it.
  */
 function hoisted<T>(factory: () => T): T {
   return factory();

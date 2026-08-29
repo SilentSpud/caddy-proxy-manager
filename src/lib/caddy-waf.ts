@@ -1,13 +1,10 @@
-/**
- * WAF handler builder and effective-config resolver for Caddy. Extracted from caddy.ts so
- * these functions can be unit tested.
- */
+/** WAF handler builder and effective-config resolver, split from caddy.ts for unit testing. */
 import type { WafSettings } from "./settings";
 import type { WafHostConfig } from "./models/proxy-hosts";
 
 /**
- * Effective WAF settings for a host: null host → global as-is; `enabled === false` → opt out
- * entirely; `waf_mode === "override"` → host only; `"merge"` (default) → host over global.
+ * Effective WAF settings for a host: null host → global as-is; `enabled === false` → opt out;
+ * `waf_mode === "override"` → host only; `"merge"` (default) → host over global.
  */
 export function resolveEffectiveWaf(
   global: WafSettings | null,
@@ -58,10 +55,7 @@ export function resolveEffectiveWaf(
   return null;
 }
 
-/**
- * Caddy matcher for a WebSocket upgrade handshake. Mirrors Caddy's built-in `@websockets`, so
- * detection matches what `reverse_proxy` uses to switch into tunnel mode.
- */
+/** Caddy matcher for a WebSocket upgrade, mirroring the built-in `@websockets`. */
 export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
   header: {
     Connection: ["*Upgrade*"],
@@ -71,16 +65,15 @@ export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
 
 /**
  * Builds the Caddy `waf` handler. @-prefixed SecLang paths resolve from the embedded
- * coraza-coreruleset filesystem, which the plugin mounts only when `load_owasp_crs` is true —
- * including them otherwise fails the config load, so every @-include is gated on that flag.
+ * coraza-coreruleset filesystem, mounted only when `load_owasp_crs` is true — so every @-include
+ * is gated on that flag, or the config load fails.
  */
 export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
   const parts: string[] = [];
 
-  // `mode` is interpolated straight into the directive block and settings are stored without
-  // validation, so anything but a known engine mode (e.g. "On\nSecRuleRemoveById 1-999999")
-  // would smuggle in SecLang that the custom_directives allowlist exists to reject. Clamp to
-  // Coraza's three real values and fall back to the safe one.
+  // `mode` is interpolated straight into the directive block and settings are stored unvalidated,
+  // so anything but a known engine mode would smuggle in SecLang past the allowlist. Clamp to
+  // Coraza's three real values.
   const engineMode = waf.mode === "Off" || waf.mode === "DetectionOnly" ? waf.mode : "On";
 
   if (waf.load_owasp_crs) {
@@ -112,10 +105,9 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     "SecAuditEngine RelevantOnly",
     "SecAuditLog /logs/waf-audit.log",
     "SecAuditLogFormat JSON",
-    // The audit log is owned by caddy with mode 0644, so the web container can read but not
-    // truncate it; SecAuditLogFileMode can't fix that (the 0022 umask strips group-write), so
-    // waf-log-parser treats truncation as best-effort. Part H carries the matched rules it reads;
-    // bodies (I, J, E) and intermediate response headers (D) are omitted to avoid huge payloads.
+    // The audit log is caddy-owned mode 0644, so web can read but not truncate it, and the 0022
+    // umask defeats SecAuditLogFileMode — waf-log-parser treats truncation as best-effort. Part H
+    // carries the matched rules; bodies (I, J, E) and headers (D) are omitted to avoid huge writes.
     "SecAuditLogParts ABFHZ",
     "SecResponseBodyAccess Off",
   );
@@ -170,12 +162,10 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
 /**
  * The handler-chain entry applying the WAF for a proxy route.
  *
- * With allowWebsocket, the handler sits in a non-terminal subroute that runs only for
- * NON-WebSocket requests. Upgrades must bypass coraza entirely, not just disable the rule engine
- * (issue #195): coraza-caddy wraps the response writer, and that wrapper breaks the `101 Switching
- * Protocols` connection hijack — raw bytes leak out with no status line and the handshake fails.
- * A `subroute` compiles inner routes with the OUTER `next`, so ordinary requests still get the WAF;
- * only the matched-out upgrade falls through. Without allowWebsocket, upgrades are inspected too.
+ * With allowWebsocket the handler sits in a non-terminal subroute that skips upgrades. They must
+ * bypass coraza entirely, not just disable the rule engine (#195): coraza-caddy wraps the response
+ * writer, breaking the `101 Switching Protocols` hijack — raw bytes leak out with no status line.
+ * A `subroute` compiles inner routes with the OUTER `next`, so ordinary requests still get the WAF.
  */
 export function buildWafHandlerEntry(
   waf: WafSettings,

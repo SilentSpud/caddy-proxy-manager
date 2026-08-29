@@ -1,7 +1,6 @@
 /**
- * E2E: role-based access control. Non-admins (user, viewer) reach / and /profile but not admin
- * pages; unauthenticated users go to /login; admins reach everything. Setup seeds "testuser" and
- * "testviewer" via a bun script in the web container and signs in as each in its own context.
+ * E2E: role-based access control. Non-admins reach / and /profile but not admin pages,
+ * unauthenticated users go to /login, admins reach everything. Seeds "testuser" and "testviewer".
  */
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { ensureTestUser } from '../helpers/seed';

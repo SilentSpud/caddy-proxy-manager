@@ -43,10 +43,7 @@ type DataTableProps<T> = {
   loading?: boolean;
   /** Renders a trailing "open" control on each row, rather than a bare row click. */
   onRowClick?: (row: T) => void;
-  /**
-   * Per-row status indicator. Replaces the old rowClassName, which tinted rows with hardcoded
-   * colours that conveyed meaning by colour alone.
-   */
+  /** Per-row status indicator. Replaces rowClassName, which conveyed meaning by colour alone. */
   rowStatus?: (row: T) => TableRowStatus | null;
   pagination?: {
     total: number;
@@ -55,10 +52,7 @@ type DataTableProps<T> = {
   };
   sort?: { sortBy: string; sortDir: "asc" | "desc" };
   mobileCard?: (row: T) => ReactNode;
-  /**
-   * Detail panel shown below an expanded row. Supplying this adds the expand chevron column; the
-   * open set is owned here, since no caller so far needs to drive it from outside.
-   */
+  /** Detail panel below an expanded row; adds the chevron column. The open set is owned here. */
   expandedRow?: (row: T) => ReactNode;
 };
 
@@ -104,8 +98,8 @@ function PaginationBar({ page, perPage, total }: { page: number; perPage: number
 }
 
 /**
- * A column heading that toggles sort order through the URL. The table's own sortable plugin sorts
- * client-side; this app sorts server-side, so the heading just pushes a new URL.
+ * A column heading that toggles sort order through the URL — this app sorts server-side, so the
+ * heading just pushes a new URL.
  */
 function SortableHeader<T>({
   col,

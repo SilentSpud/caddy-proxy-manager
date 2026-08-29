@@ -1,8 +1,7 @@
 /**
  * Canonical cascade layer order. In its own file, imported first, because webpack hoists `@import`
- * content above the inline CSS that follows — an `@layer` written inline in globals.css would land
- * after the imports it orders. A later layer beats an earlier one regardless of specificity, and
- * unlayered styles beat every layer; Astryx components sit in astryx-base/astryx-theme, so resets
- * and Tailwind preflight come before, app utilities after.
+ * above the inline CSS that follows. A later layer beats an earlier one regardless of specificity,
+ * and unlayered styles beat every layer — so resets come before astryx-base/astryx-theme, and app
+ * utilities after.
  */
 @layer reset, theme, base, astryx-base, astryx-theme, components, utilities;

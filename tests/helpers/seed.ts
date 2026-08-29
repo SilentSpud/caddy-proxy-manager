@@ -1,8 +1,7 @@
 /**
- * Fixture seeding for the end-to-end suite. The web image is a compiled binary with no Bun CLI and
- * no interpreter — deliberately, so the suite runs the image that ships — so seeding happens in the
- * throwaway `db-seed` container (tests/docker-compose.test.yml), which mounts the same data volume
- * and opens the same SQLite file. Writes take `PRAGMA busy_timeout` against the running server.
+ * Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI —
+ * deliberately, so the suite runs the image that ships — so seeding happens in the throwaway
+ * `db-seed` container, which mounts the same volume and opens the same SQLite file.
  */
 import { execFileSync } from 'node:child_process';
 
@@ -24,9 +23,8 @@ export function runSeedScript(script: string): string {
 }
 
 /**
- * Create the user, or reset an existing one to a known role, password and active state. Writes both
- * a `users` row and a `credential` account row — Better Auth reads the account, the dashboard reads
- * the user, and a fixture with only one fails in ways that look like application bugs.
+ * Create the user, or reset one to a known role, password and active state. Writes both a `users`
+ * row and a `credential` account row — Better Auth reads the account, the dashboard the user.
  */
 export function ensureTestUser(username: string, password: string, role: string): void {
   runSeedScript(`
@@ -136,9 +134,8 @@ export function getUserRecord(email: string): SeededUserRecord {
 }
 
 /**
- * Rewrite a user's password hash to bcrypt, the pre-argon2id algorithm. Legacy-gate fixtures
- * cannot be made through the UI, so the old state is planted directly — in both the `users` row and
- * the `credential` account row, since Better Auth reads one and the gate reads the other.
+ * Rewrite a user's password hash to bcrypt. Legacy-gate fixtures cannot be made through the UI, so
+ * the old state is planted in both the `users` row and the `credential` account row.
  */
 export function downgradeUserToBcrypt(email: string, password: string): void {
   runSeedScript(`

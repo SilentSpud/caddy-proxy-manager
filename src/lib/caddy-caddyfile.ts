@@ -1,8 +1,7 @@
 /**
- * Turning a per-host Caddyfile snippet into JSON handlers. Everything else here builds Caddy's JSON
- * directly, which is precise but unwriteable by hand. The translation is Caddy's own — `/adapt` on
- * the admin API, so the running binary with its actual plugin set does the parsing; a hand-rolled
- * parser would drift and would accept directives for plugins that are not compiled in.
+ * Turning a per-host Caddyfile snippet into JSON handlers. The translation is Caddy's own —
+ * `/adapt` on the admin API, so the running binary with its actual plugin set does the parsing; a
+ * hand-rolled parser would drift and accept directives for plugins that are not compiled in.
  */
 
 import { caddyAdminRequest } from "./caddy-admin";
@@ -46,10 +45,7 @@ type AdaptResponse = {
   error?: string;
 };
 
-/**
- * Adapt a Caddyfile snippet into HTTP routes. Throws CaddyfileAdaptError carrying Caddy's own
- * message, which names the line and the directive.
- */
+/** Adapt a snippet into HTTP routes. Throws CaddyfileAdaptError with Caddy's own message. */
 export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCaddyfile> {
   const trimmed = snippet.trim();
   if (!trimmed) return { routes: [], warnings: [], ignoredApps: [] };
@@ -100,9 +96,9 @@ export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCad
 }
 
 /**
- * The handler entry carrying a snippet's routes into a host's chain. A `subroute` rather than flat
- * handlers: the adapted routes carry their own matchers, and flattening would apply a snippet's
- * path-scoped directives to every request.
+ * The handler entry carrying a snippet's routes into a host's chain. A `subroute`, not flat
+ * handlers: the adapted routes carry their own matchers, and flattening would apply path-scoped
+ * directives to every request.
  */
 export function buildCaddyfileSubrouteHandler(
   routes: Record<string, unknown>[],
@@ -111,10 +107,7 @@ export function buildCaddyfileSubrouteHandler(
   return { handler: "subroute", routes };
 }
 
-/**
- * Validate a snippet by adapting it, returning an error message or null. Used on save so a
- * snippet that cannot be adapted never reaches the database.
- */
+/** Validate a snippet by adapting it; error message or null. Used on save. */
 export async function validateCaddyfileSnippet(snippet: string): Promise<string | null> {
   if (!snippet.trim()) return null;
   try {

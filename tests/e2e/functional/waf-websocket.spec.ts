@@ -1,8 +1,7 @@
 /**
- * Issue #195, "Websockets mangled by WAF": coraza wraps the response writer, which broke the
- * `101 Switching Protocols` connection hijack and leaked the upstream body out with no status
- * line. The fix routes upgrades around the WAF handler (allow_websocket defaults true). Upstream:
- * traefik/whoami's /echo. Domain: func-waf-ws.test
+ * Issue #195, "Websockets mangled by WAF": coraza wraps the response writer, breaking the
+ * `101 Switching Protocols` hijack and leaking the body out with no status line. The fix routes
+ * upgrades around the handler. Upstream: traefik/whoami's /echo. Domain: func-waf-ws.test
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

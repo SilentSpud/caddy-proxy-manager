@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * Which plugin-backed features are on, in context so every client component under the dashboard
- * can read it. Honesty, not enforcement — config generation already refuses handlers for absent
- * modules (caddy-build.ts); this just greys the control and names the module to turn back on.
+ * Which plugin-backed features are on, in context for the dashboard's client components. Honesty,
+ * not enforcement — config generation already refuses handlers for absent modules.
  */
 
 import { createContext, useContext, type ReactNode } from "react";
@@ -15,10 +14,7 @@ export type ModuleGateState = {
   features: Record<CaddyFeatureId, boolean>;
   /** Feature -> human-readable module name(s) to name in the tooltip. */
   moduleNames: Record<CaddyFeatureId, string>;
-  /**
-   * Module ids the admin selected. `null` = unknown (no provider above); `[]` = a real "all
-   * disabled". Conflating them makes the DNS provider picker offer providers that are not there.
-   */
+  /** Module ids the admin selected. `null` = unknown (no provider above); `[]` = all disabled. */
   enabledModuleIds: string[] | null;
   /** True when the selection has not been built into the image yet. */
   pendingRebuild: boolean;
@@ -49,10 +45,7 @@ export function useModuleGate(): ModuleGateState {
   return useContext(ModuleGateContext);
 }
 
-/**
- * Whether one specific module is selected. Outside a provider (null) everything reads as
- * enabled — see FALLBACK.
- */
+/** Whether one module is selected. Outside a provider (null) everything reads as enabled. */
 export function useModuleEnabled(moduleId: string): boolean {
   const { enabledModuleIds } = useModuleGate();
   if (enabledModuleIds === null) return true;
@@ -64,10 +57,7 @@ export function useFeatureEnabled(feature: CaddyFeatureId): boolean {
   return useModuleGate().features[feature] ?? true;
 }
 
-/**
- * The sentence shown when a feature is off: names the module, and where to turn it on. Null when
- * the feature is available.
- */
+/** The sentence shown when a feature is off — names the module. Null when it is available. */
 export function useDisabledReason(feature: CaddyFeatureId): string | null {
   const gate = useModuleGate();
   if (gate.features[feature] ?? true) return null;
@@ -78,8 +68,8 @@ export function useDisabledReason(feature: CaddyFeatureId): string | null {
 }
 
 /**
- * Wrap controls that depend on a Caddy module. Renders children untouched when it is on; wraps
- * them in a tooltip naming the module when off. Callers disable their own inputs.
+ * Wrap controls that depend on a Caddy module: children untouched when on, tooltipped when off.
+ * Callers disable their own inputs.
  */
 export function ModuleGated({
   feature,

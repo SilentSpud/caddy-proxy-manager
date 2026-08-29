@@ -1,7 +1,6 @@
 /**
- * These helpers exist because Bun 1.4 changed the shape of what `fetch()` rejects with and how
- * duplicate request headers read. The cases below are the shapes both runtimes actually produce —
- * the Bun ones taken from live fetches under 1.4.0, not from the changelog.
+ * These helpers exist because Bun 1.4 changed what `fetch()` rejects with and how duplicate headers
+ * read. The cases below are the shapes both runtimes actually produce, taken from live fetches.
  */
 import { describe, expect, it } from 'bun:test';
 import { isConnectionError } from '@/src/lib/net-errors';

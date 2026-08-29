@@ -1,7 +1,4 @@
-/**
- * Pure utility functions extracted from caddy.ts. No DB, network, or filesystem dependencies —
- * safe to unit-test directly.
- */
+/** Pure helpers extracted from caddy.ts — no DB, network or filesystem, so directly testable. */
 import { isIP } from "node:net";
 
 // ── Private range expansion ──────────────────────────────────────────────────
@@ -24,8 +21,8 @@ export function expandPrivateRanges(proxies: string[]): string[] {
 
 /**
  * Rewrites a header name into Go's canonical MIME form ("X-CPM-User" → "X-Cpm-User"). Caddy
- * resolves `{http.reverse_proxy.header.<name>}` by literal lookup in Go's canonicalised map with no
- * case-folding, so a non-canonical spelling resolves to nothing.
+ * resolves `{http.reverse_proxy.header.<name>}` by literal lookup with no case-folding, so a
+ * non-canonical spelling resolves to nothing.
  */
 export function canonicalHeaderName(name: string): string {
   return name
@@ -34,10 +31,7 @@ export function canonicalHeaderName(name: string): string {
     .join("-");
 }
 
-/**
- * The `{http.reverse_proxy.header.*}` placeholder for a response header, safe regardless of how
- * the caller spelled the header name.
- */
+/** The `{http.reverse_proxy.header.*}` placeholder, however the caller spelled the name. */
 export function upstreamHeaderPlaceholder(name: string): string {
   return `{http.reverse_proxy.header.${canonicalHeaderName(name)}}`;
 }

@@ -9,11 +9,8 @@ import { rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
 
-// ---------------------------------------------------------------------------
-// Mock src/lib/db — must be declared before any import that uses the db.
-// vi.hoisted() creates the mutable container at hoist time so the vi.mock
-// factory (which also runs during hoisting) can populate it safely.
-// ---------------------------------------------------------------------------
+// Mock src/lib/db — must be declared before any import that uses it. vi.hoisted() creates the
+// mutable container at hoist time so the vi.mock factory, hoisted too, can populate it safely.
 
 const ctx = vi.hoisted(() => {
   const { mkdirSync } = require('node:fs');

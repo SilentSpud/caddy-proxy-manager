@@ -2,9 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Analytics page resilience when the API misbehaves. The endpoints answer failures with
- * `{ error: "…" }` and a 5xx; calling `response.json()` without checking `response.ok` landed that
- * object in array-typed state and the first `.map()` threw, blanking the page. Routes are stubbed
- * rather than stopping ClickHouse, so the shared stack stays untouched.
+ * `{ error: "…" }` and a 5xx; `response.json()` without checking `response.ok` landed that object
+ * in array-typed state and the first `.map()` threw, blanking the page. Routes are stubbed.
  */
 
 const ANALYTICS_API = '**/api/analytics/**';

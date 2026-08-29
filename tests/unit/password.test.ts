@@ -1,7 +1,6 @@
 /**
- * User passwords hash with argon2id; access list passwords stay bcrypt because Caddy verifies
- * those itself. Pins that split, the pre-argon2id compatibility, and where Bun.password differs
- * from bcryptjs.
+ * User passwords hash with argon2id; access list passwords stay bcrypt because Caddy verifies those
+ * itself. Pins that split, the pre-argon2id compatibility, and where Bun.password differs.
  */
 import { describe, it, expect } from 'bun:test';
 import bcrypt from 'bcryptjs';

@@ -1,8 +1,7 @@
 /**
- * What to show for a user's icon: their own image, else their Gravatar, else their initial.
- * Locally created accounts get a synthetic `<username>@localhost` that was never a mailbox, so
- * they skip to the initial rather than leaking the username to Gravatar for nothing. Resolved on
- * the server (hashing needs node:crypto) and handed to the client as plain strings.
+ * What to show for a user's icon: their own image, else Gravatar, else their initial. Locally
+ * created accounts get a synthetic `<username>@localhost`, so they skip to the initial rather than
+ * leaking the username. Resolved server-side (hashing needs node:crypto).
  */
 
 import { createHash } from "node:crypto";
@@ -10,8 +9,8 @@ import { createHash } from "node:crypto";
 export const GRAVATAR_ORIGIN = "https://www.gravatar.com";
 
 /**
- * Hostnames that only exist inside this deployment: `localhost` (synthesised by init-db and the
- * portal) plus the RFC 6761/8375 special-use names, which take no public mail.
+ * Hostnames that only exist inside this deployment: `localhost` plus the RFC 6761/8375 special-use
+ * names, which take no public mail.
  */
 const NON_ROUTABLE_EMAIL_DOMAINS = new Set([
   "localhost",
@@ -45,10 +44,7 @@ function normalizeEmail(email: string | null | undefined): string | null {
   return normalized || null;
 }
 
-/**
- * True when the address could not receive mail outside this deployment, and so cannot have a
- * Gravatar behind it.
- */
+/** True when the address cannot receive mail outside this deployment, so has no Gravatar. */
 export function isNonRoutableEmail(email: string | null | undefined): boolean {
   const normalized = normalizeEmail(email);
   if (!normalized) return true;
@@ -70,8 +66,7 @@ export function isNonRoutableEmail(email: string | null | undefined): boolean {
 
 /**
  * Gravatar's identifier: SHA-256 of the trimmed, lowercased address; null when it cannot have one.
- * `d=404` is deliberate — Gravatar 404s for an unknown address instead of serving a generated
- * placeholder, so the browser reports a load failure and the caller falls back to the initial.
+ * `d=404` is deliberate — Gravatar 404s an unknown address, so the caller falls back to the initial.
  */
 export function gravatarUrl(email: string | null | undefined, size = 160): string | null {
   const normalized = normalizeEmail(email);

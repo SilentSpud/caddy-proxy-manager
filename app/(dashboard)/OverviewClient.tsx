@@ -42,10 +42,7 @@ type TrafficSummary = {
 /** Per-position card tints. Decorative only, so they use the theme's non-semantic variants. */
 const CARD_VARIANTS = ["purple", "green", "orange"] as const;
 
-/**
- * The activity dot's colour used to be the only signal of what kind of change an event was.
- * StatusDot carries a label too, so the distinction reaches screen readers as well.
- */
+/** StatusDot carries a label as well as colour, so the change kind reaches screen readers. */
 function getEventStatus(summary: string): {
   variant: "success" | "error" | "accent";
   label: string;

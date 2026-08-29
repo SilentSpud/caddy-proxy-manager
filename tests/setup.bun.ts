@@ -16,8 +16,7 @@ clearDotEnv();
 
 /**
  * Suppress console output from production code during tests — Bun's equivalent of Vitest's
- * `onConsoleLog() { return false }`. spyOn still works, since it replaces the property on this same
- * object. TEST_LOG=1 restores the output while debugging.
+ * `onConsoleLog() { return false }`. spyOn still works; TEST_LOG=1 restores the output.
  */
 if (!process.env.TEST_LOG) {
   for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
@@ -26,11 +25,10 @@ if (!process.env.TEST_LOG) {
 }
 
 /**
- * Caddy network guard. The stubbed seam is the admin-API transport (src/lib/caddy-admin.ts), not
- * the whole caddy module, so every builder stays real and only the socket is replaced by a spoofed
- * Caddy. Installed and reinstalled before each test, so state never leaks; a test that asserts on
- * what was sent calls installFakeCaddy() itself from beforeEach or the body, not beforeAll. If
- * anything swaps the real transport back in, the HTTP adapter throws rather than opening a socket.
+ * Caddy network guard. The stubbed seam is the admin-API transport, not the whole caddy module, so
+ * every builder stays real and only the socket is a spoofed Caddy. Reinstalled before each test; a
+ * test asserting on what was sent calls installFakeCaddy() from beforeEach or the body, not
+ * beforeAll. If anything swaps the real transport back, the HTTP adapter throws.
  */
 installFakeCaddy();
 beforeEach(() => {

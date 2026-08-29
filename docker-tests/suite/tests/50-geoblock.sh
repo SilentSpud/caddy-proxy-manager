@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-# IP-based blocking, per host and globally.
-#
-# Country/continent/ASN rules need MaxMind databases, which are a licensed
-# download and deliberately absent from this offline rig. CIDR and bare-IP
-# rules go through the same blocker handler and need no database, so those are
-# what the suite asserts on. If the handler refuses to load at all without a
-# database, the whole file skips with that reason rather than failing.
+# IP-based blocking, per host and globally. Country/continent/ASN rules need MaxMind databases,
+# which are a licensed download and absent from this offline rig; CIDR and bare-IP rules go through
+# the same handler and need none, so those are what is asserted. If the handler refuses to load at
+# all without a database, the file skips with that reason rather than failing.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "geo/IP blocking"

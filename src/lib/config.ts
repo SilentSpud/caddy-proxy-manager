@@ -13,15 +13,15 @@ const MIN_SESSION_SECRET_LENGTH = 32;
 const DEFAULT_APP_NAME = "Caddy Proxy Manager";
 
 /**
- * Display name in the sidebar, on the login card, and as the page-title suffix. A page opts out of
- * the suffix with `title: { absolute: ... }` — see app/layout.tsx.
+ * Display name in the sidebar, on the login card, and as the page-title suffix. A page opts out
+ * with `title: { absolute: ... }` — see app/layout.tsx.
  */
 const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
 
 /**
  * Gravatar fallback for users with no icon. `null` leaves the choice to the Settings toggle;
- * setting AVATAR_GRAVATAR pins it and locks the toggle, so an air-gapped deployment can guarantee
- * no browser ever reaches gravatar.com.
+ * AVATAR_GRAVATAR pins it and locks the toggle, so an air-gapped deployment can guarantee no
+ * browser reaches gravatar.com.
  */
 function resolveLegacyPasswordChangeEnv(): boolean | null {
   const raw = process.env.AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH?.trim().toLowerCase();
@@ -235,10 +235,7 @@ export const config = {
   forwardAuthInternalUrl: process.env.FORWARD_AUTH_INTERNAL_URL ?? null,
 };
 
-/**
- * Validates configuration at server startup in production, throwing if insecure default values
- * are in use. Safe to call during build — only validates when actually serving.
- */
+/** Validates config at production startup, throwing on insecure defaults. Safe during build. */
 export function validateProductionConfig() {
   if (isRuntimeProduction) {
     // Access the config values to force validation; throws if defaults are used in production

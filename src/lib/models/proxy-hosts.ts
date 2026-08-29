@@ -9,8 +9,8 @@ import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
 
 /**
- * Wildcard certificates can only be issued via ACME DNS-01, so a wildcard host on auto-managed TLS
- * silently fails to get a certificate without a DNS provider. Block that up front.
+ * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
+ * get one without a DNS provider. Block that up front.
  */
 export async function assertWildcardIssuable(domains: string[], certificateId: number | null) {
   // An explicitly assigned certificate (imported, or managed with its own provider) is the
@@ -382,10 +382,9 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
     }
   }
 
-  // Reject enabling mTLS with no trust material at all: such a config would fail open, since no
-  // client_authentication block is emitted for the host. This cannot catch a role later emptied
-  // by revocation — the config still references a valid role — which is why Caddy config
-  // generation also fails closed for the zero-resolved-trust case.
+  // Reject enabling mTLS with no trust material: it would fail open, since no
+  // client_authentication block is emitted. A role emptied later by revocation still looks valid
+  // here, which is why config generation also fails closed for zero resolved trust.
   if (
     !normalized.trusted_client_cert_ids &&
     !normalized.trusted_role_ids &&
@@ -421,8 +420,8 @@ type ProxyHostMeta = {
   custom_reverse_proxy_json?: string;
   custom_pre_handlers_json?: string;
   /**
-   * Raw Caddyfile directives, adapted to JSON handlers at config-build time. Stored as written so
-   * the operator gets their own text back; the adapted JSON is a build artefact.
+   * Raw Caddyfile directives, adapted to JSON handlers at build time. Stored as written so the
+   * operator gets their own text back; the adapted JSON is a build artefact.
    */
   custom_caddyfile?: string;
   authentik?: ProxyHostAuthentikMeta;
@@ -2164,9 +2163,9 @@ export async function listProxyHostsPaginated(
 }
 
 /**
- * Reject a Caddyfile snippet the running Caddy cannot adapt. Enforced in the model, not the server
- * action, so the REST API is held to the same rule: an unadaptable snippet would not break the
- * host (the builder skips it with a warning) but would quietly stop doing what it was written for.
+ * Reject a Caddyfile snippet the running Caddy cannot adapt. In the model, not the server action,
+ * so the REST API is held to the same rule: the builder would skip an unadaptable snippet with a
+ * warning, quietly dropping whatever it was written for.
  */
 async function assertCaddyfileAdapts(snippet: string | null | undefined): Promise<void> {
   if (!snippet?.trim()) return;

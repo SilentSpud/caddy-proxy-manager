@@ -87,11 +87,9 @@ describe('database compatibility for accounts schema', () => {
       process.env.DATABASE_URL = `file:${dbPath}`;
       resetDbModuleState();
 
-      // Re-evaluate the db module so it opens the broken database and runs its
-      // repair on import. A query suffix makes a distinct module, but it does
-      // not propagate: models/user still imports the plain specifier. So point
-      // that specifier at the freshly evaluated module too, which rewrites the
-      // live bindings every already-imported consumer reads through.
+      // Re-evaluate the db module so it opens the broken database and repairs on import. A query
+      // suffix makes a distinct module but does not propagate, so point the plain specifier at the
+      // fresh one too — that rewrites the live bindings every consumer already reads through.
       const freshDb = await import(`@/src/lib/db${fresh()}`);
       vi.mock('@/src/lib/db', () => ({ ...freshDb }));
       appSqlite = freshDb.sqlite;

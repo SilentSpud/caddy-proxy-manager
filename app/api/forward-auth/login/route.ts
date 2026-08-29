@@ -12,10 +12,7 @@ import {
 import { logAuditEvent } from "@/src/lib/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 
-/**
- * Forward auth login — validates credentials and starts the exchange flow. Called by the portal
- * login form with an opaque redirect intent ID (rid).
- */
+/** Forward auth login — validates credentials and starts the exchange flow, given a rid. */
 export async function POST(request: NextRequest) {
   try {
     // CSRF: verify the request originates from the CPM portal

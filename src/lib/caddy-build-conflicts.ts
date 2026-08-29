@@ -1,7 +1,6 @@
 /**
- * Refusing a module selection that something is still using. Kept out of caddy-build.ts because it
- * reaches into models that import caddy.ts, which imports caddy-build.ts — an import cycle. Only
- * the two write paths (settings action, REST endpoint) need it.
+ * Refusing a module selection something still uses. Kept out of caddy-build.ts to avoid an import
+ * cycle; only the two write paths (settings action, REST endpoint) need it.
  */
 
 import { resolveEnabledModuleIds } from "./caddy-build";
@@ -16,8 +15,8 @@ import {
 } from "./settings";
 
 /**
- * Why a selection cannot be applied yet, in the operator's terms, or null when it can. Naming what
- * uses the module ("3 enabled L4 proxy hosts") is what makes the refusal actionable.
+ * Why a selection cannot be applied yet, in the operator's terms, or null. Naming what uses the
+ * module ("3 enabled L4 proxy hosts") is what makes the refusal actionable.
  */
 export async function describeModuleConflicts(
   settings: CaddyBuildSettings,
@@ -91,9 +90,8 @@ export async function describeModuleConflicts(
 }
 
 /**
- * A non-blocking heads-up about per-host Caddyfile snippets, or null. Snippets are free-form text
- * that can name any compiled-in plugin's directive, and only Caddy's adapter could say which — and
- * only for the binary running now. So this warns rather than refuses.
+ * A non-blocking heads-up about per-host Caddyfile snippets, or null. Only Caddy's adapter could
+ * say which plugin a snippet needs, and only for the binary running now — so warn, don't refuse.
  */
 export async function describeCaddyfileSnippetWarning(
   settings: CaddyBuildSettings,

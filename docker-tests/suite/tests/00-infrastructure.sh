@@ -60,14 +60,10 @@ fetch "$CPM_API/api/health"
 t_eq "the CPM API reports healthy" "200" "$FETCH_CODE"
 t_eq "the health payload is well formed" "ok" "$(fetch_json '.status')"
 
-# Caddy's admin API pins the origins it will accept, which is the control that
-# stops a page in the operator's browser — or anything else that can make a
-# cross-origin request from inside the network — from reconfiguring the proxy.
-#
-# Note the Host header is *not* part of that check here: binding the admin
-# endpoint to 0.0.0.0 (which CPM does, so the web container can reach it) makes
-# Caddy log "admin endpoint on open interface; host checking disabled" and skip
-# Host validation. The Origin check is what remains, so that is what is pinned.
+# Caddy's admin API pins the origins it accepts, which is what stops a page in the operator's
+# browser reconfiguring the proxy. The Host header is not part of that check: binding to 0.0.0.0
+# (needed so the web container can reach it) makes Caddy skip Host validation, so the Origin check
+# is all that remains — and all that is pinned here.
 admin_code=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' \
   -H 'Origin: http://attacker.example' "http://caddy:2019/config/" 2>/dev/null)
 t_eq "the Caddy admin API refuses a foreign Origin" "403" "$admin_code"

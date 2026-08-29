@@ -1,9 +1,8 @@
 /**
- * Plants the Bun runtime check at the top of the standalone server entry. `vinext build` gives
- * dist/standalone/server.js a `node` shebang and tells you to run it with node — which fails with
- * ERR_UNSUPPORTED_ESM_URL_SCHEME from a `bun:sqlite` import while the module graph is still
- * linking. No application code runs before that, so runtime-guard.ts cannot catch it from inside.
- * Re-run each build, since the entry is regenerated.
+ * Plants the Bun runtime check atop the standalone server entry. `vinext build` gives
+ * dist/standalone/server.js a `node` shebang, and running it that way fails with
+ * ERR_UNSUPPORTED_ESM_URL_SCHEME from `bun:sqlite` while the module graph is still linking — before
+ * any application code, so runtime-guard.ts cannot catch it. Re-run each build.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

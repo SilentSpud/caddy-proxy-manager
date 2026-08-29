@@ -1,7 +1,6 @@
 /**
  * Regression: removing a profile picture must actually remove it. updateUserProfile wrote
- * `data.avatarUrl ?? current.avatarUrl`, which cannot tell "not supplied" from "cleared" — so the
- * remove button reported success and left the old icon in place.
+ * `data.avatarUrl ?? current.avatarUrl`, which cannot tell "not supplied" from "cleared".
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

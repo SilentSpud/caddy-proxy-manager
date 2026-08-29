@@ -1,8 +1,4 @@
-/**
- * Unit tests for error-page support: the buildErrorPageRoute config builder
- * (src/lib/caddy.ts) and the sanitizeErrorPageRules input sanitizer
- * (src/lib/models/proxy-hosts.ts).
- */
+/** Error pages: the buildErrorPageRoute builder and the sanitizeErrorPageRules sanitizer. */
 import { describe, it, expect } from 'bun:test';
 
 import { buildErrorPageRoute } from '@/src/lib/caddy';

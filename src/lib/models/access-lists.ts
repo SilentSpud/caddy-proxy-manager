@@ -1,8 +1,8 @@
 import { hashBcrypt } from "../password";
 
 /**
- * Caddy's http_basic verifies these hashes itself, so they stay bcrypt even though user passwords
- * moved to argon2id. Cost 10, not 12, because Caddy re-verifies on every proxied request.
+ * Caddy's http_basic verifies these itself, so they stay bcrypt though user passwords moved to
+ * argon2id. Cost 10, not 12, because Caddy re-verifies on every proxied request.
  */
 const ACCESS_LIST_COST = 10;
 import db, { nowIso, toIso } from "../db";

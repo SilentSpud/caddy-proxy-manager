@@ -1,7 +1,4 @@
-/**
- * Pure FormData parsing utilities extracted from proxy-hosts/actions.ts.
- * No DB or network dependencies — safe to unit-test directly.
- */
+/** Pure FormData parsing helpers from proxy-hosts/actions.ts — no DB or network. */
 
 export function parseCsv(value: FormDataEntryValue | null): string[] {
   if (!value || typeof value !== "string") return [];

@@ -113,11 +113,9 @@ test.describe('ClickHouse retention TTL', () => {
         ],
       });
 
-      // Don't assert both rows are visible here: ClickHouse schedules a TTL
-      // merge as soon as it ingests a part containing already-expired rows, so a
-      // count() right after insert races that merge (and reads filter expired
-      // rows before physical removal anyway). Force the purge deterministically,
-      // then assert only the fresh row survives.
+      // Don't assert both rows here: ClickHouse schedules a TTL merge as soon as it ingests a part
+      // with already-expired rows, so a count() right after insert races it. Force the purge, then
+      // assert only the fresh row survives.
       await forceTtl(ch, 'traffic_events');
 
       expect(await countRows(ch, 'traffic_events', marker, retentionBoundary)).toBe(0);

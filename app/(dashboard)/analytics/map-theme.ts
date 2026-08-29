@@ -5,10 +5,9 @@ import type {
 } from "maplibre-gl";
 
 /**
- * The map's palette, resolved from Astryx tokens for the mode in effect — MapLibre paints into
- * WebGL and takes concrete colour strings, as the charts do (see chart-theme.ts). The choropleth
- * ramp must *invert* between modes ("more traffic" is darker on a light ocean), so the direction
- * is chosen here while the stops come from the ramp.
+ * The map's palette, resolved from Astryx tokens for the mode in effect — MapLibre takes concrete
+ * colour strings, as the charts do. The choropleth ramp must *invert* between modes ("more traffic"
+ * is darker on a light ocean), so the direction is chosen here and the stops come from the ramp.
  */
 export interface MapPalette {
   ocean: string;

@@ -3,9 +3,8 @@
 /**
  * Form-safe wrappers around the design system's boolean controls. React 19 resets a
  * `<form action={serverAction}>` after the action, restoring each control to its *attribute*
- * default — so a toggled Switch snaps back while React state keeps the user's choice, and the next
- * submit sends the stale value. These carry the value in a hidden input rendered from React state.
- * Use them wherever a control participates in a form via `htmlName`.
+ * default — so a toggled Switch snaps back and the next submit sends the stale value. These carry
+ * the value in a hidden input from React state. Use wherever a control submits via `htmlName`.
  */
 
 import { CheckboxInput as BaseCheckboxInput } from "@astryxdesign/core/CheckboxInput";

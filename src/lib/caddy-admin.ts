@@ -1,8 +1,7 @@
 /**
- * The seam between this app and the Caddy admin API: all admin traffic goes through one transport,
- * so production installs `httpCaddyAdminTransport` while tests install an in-memory adapter (see
- * tests/helpers/caddy-admin.ts) and exercise the whole build-and-apply path with nothing
- * listening. Callers pass a path relative to `config.caddyApiUrl` and never build the URL.
+ * The seam between this app and the Caddy admin API: all traffic goes through one transport, so
+ * production installs `httpCaddyAdminTransport` and tests an in-memory adapter, exercising the
+ * whole build-and-apply path with nothing listening.
  */
 import http from "node:http";
 import https from "node:https";
@@ -14,10 +13,7 @@ export type CaddyAdminRequest = {
   body?: string;
   /** Abort the request after this many ms. Omitted means no client-side timeout. */
   timeoutMs?: number;
-  /**
-   * Content-Type for the body. Defaults to application/json, which is right for every config
-   * endpoint; /adapt is the exception — it needs text/caddyfile to know which adapter to run.
-   */
+  /** Content-Type for the body. Defaults to application/json; /adapt needs text/caddyfile. */
   contentType?: string;
 };
 
@@ -30,9 +26,8 @@ export type CaddyAdminResponse = {
 export type CaddyAdminTransport = (request: CaddyAdminRequest) => Promise<CaddyAdminResponse>;
 
 /**
- * Absolute URL for an admin path. `./config` is imported lazily because config snapshots
- * process.env on first load and the test setup imports this module to install the fake adapter — a
- * static import would freeze env before a test's hoisted block could set it.
+ * Absolute URL for an admin path. `./config` is imported lazily: it snapshots process.env on first
+ * load, and a static import would freeze env before a test's hoisted block could set it.
  */
 async function caddyAdminUrl(path: string): Promise<string> {
   const { config } = await import("./config");
@@ -41,8 +36,8 @@ async function caddyAdminUrl(path: string): Promise<string> {
 }
 
 /**
- * Real transport: a plain node:http request. Deliberately not `fetch` — native fetch sends
- * browser-security headers (Sec-Fetch-*) that trigger Caddy's CORS origin enforcement.
+ * Real transport: a plain node:http request. Not `fetch` — that sends Sec-Fetch-* headers, which
+ * trigger Caddy's CORS origin enforcement.
  */
 export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   path,

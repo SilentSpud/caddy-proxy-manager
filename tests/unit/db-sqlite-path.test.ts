@@ -1,7 +1,6 @@
 /**
  * A `file:` URL hands back its path with a leading slash, so a Windows absolute path arrives as
- * "/C:/data/app.db" and resolves against the drive root. The rewrite is Windows-only:
- * "file:/app/data/…" is the documented Docker DATABASE_URL, and on POSIX "/C:/x" is a real path.
+ * "/C:/data/app.db" and resolves against the drive root. Windows-only — on POSIX it is a real path.
  */
 import { describe, expect, it } from 'bun:test';
 import { stripLeadingSlashBeforeDriveLetter } from '../../src/lib/db';

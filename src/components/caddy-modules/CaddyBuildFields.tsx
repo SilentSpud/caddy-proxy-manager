@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * The module picker for the Caddy image. Save records the selection (config generation honours it
- * immediately); Rebuild recompiles Caddy and recreates the container, which takes minutes and
- * restarts the proxy — hence two separate, separately-confirmed buttons.
+ * The module picker. Save records the selection; Rebuild recompiles Caddy and restarts the proxy —
+ * hence two separately-confirmed buttons.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -149,10 +148,8 @@ export function CaddyBuildFields({
     try {
       const res = await fetch("/api/caddy-build", { method: "POST" });
       if (!res.ok) {
-        // Deliberately not left to the status poll. The failures that land here — an invalid
-        // custom module, Caddy unreachable, an expired session — all abort before the sidecar
-        // writes any status, and the poll only runs while the status says pending/building.
-        // Without this the spinner just stops and the button looks broken.
+        // Not left to the status poll: these failures abort before the sidecar writes any status,
+        // and the poll only runs while it says pending/building — the spinner would just stop.
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setRebuildError(body?.error ?? `Rebuild could not be started (HTTP ${res.status}).`);
         return;

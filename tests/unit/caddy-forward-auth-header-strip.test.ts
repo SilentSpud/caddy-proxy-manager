@@ -1,8 +1,7 @@
 /**
- * Regression (SECURITY-AUDIT H1): forward-auth hosts must STRIP client-supplied X-CPM-* headers
- * inbound on EVERY proxying route. Without it a caller can spoof identity: unprotected and excluded
- * paths pass the forged headers straight through, and on authenticated routes the copy step only
- * overwrites when the verify value is non-empty.
+ * Regression (SECURITY-AUDIT H1): forward-auth hosts must STRIP client-supplied X-CPM-* headers on
+ * EVERY proxying route. Otherwise unprotected and excluded paths pass forged headers through, and
+ * authenticated routes only overwrite when the verify value is non-empty.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

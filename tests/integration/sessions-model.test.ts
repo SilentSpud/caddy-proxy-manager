@@ -1,7 +1,6 @@
 /**
- * Integration tests for the session-management model (src/lib/models/sessions.ts)
- * backing the profile "Active sessions" view: list active sessions, revoke one
- * (ownership-scoped), and revoke all others.
+ * Integration: the session model behind the profile's "Active sessions" view — list, revoke one
+ * (ownership-scoped), revoke all others.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

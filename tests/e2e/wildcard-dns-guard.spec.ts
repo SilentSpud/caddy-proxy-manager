@@ -1,7 +1,6 @@
 /**
- * E2E: a wildcard proxy host requires a DNS provider. Wildcard certs need ACME DNS-01, so an
- * auto-managed wildcard host is rejected without one and accepted with it. Exact domains are
- * unaffected.
+ * E2E: a wildcard proxy host requires a DNS provider — wildcard certs need ACME DNS-01, so an
+ * auto-managed wildcard host is rejected without one. Exact domains are unaffected.
  */
 import { test, expect } from '@playwright/test';
 

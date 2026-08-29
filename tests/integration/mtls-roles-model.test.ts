@@ -1,7 +1,6 @@
 /**
- * Integration tests for src/lib/models/mtls-roles.ts
- * Tests all CRUD operations and the fingerprint/cert-id map builders
- * using a real in-memory SQLite database.
+ * Integration: src/lib/models/mtls-roles.ts CRUD plus the fingerprint/cert-id map builders, against
+ * a real in-memory SQLite database.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

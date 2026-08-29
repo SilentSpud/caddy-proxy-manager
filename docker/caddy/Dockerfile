@@ -9,11 +9,9 @@ ARG TARGETOS
 ARG TARGETARCH
 
 # The Caddy source to compile, pinned so an image rebuilt tomorrow matches one rebuilt today. A
-# master commit rather than a release tag, deliberately: the plugin list below carries no versions,
-# so Go resolves each to its latest and those track master — building the v2.11.4 release against
-# them fails to compile (cel-go renamed interpreter.Interpretable). The trade-off: a future plugin
-# release can break this build the same way, surfacing as a compile error in the sidecar's build
-# status; the fix is to move this pin forward.
+# master commit, not a release tag: the plugin list carries no versions, so Go tracks master, and
+# the v2.11.4 release fails to compile against them (cel-go renamed interpreter.Interpretable). A
+# future plugin release can break this the same way — the fix is to move this pin forward.
 ARG CADDY_VERSION=d6637934e866
 
 # Plugins compiled into the binary: whitespace-separated Go module paths with an optional @version.
@@ -64,7 +62,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # stages on one distro means it stays that way even if a plugin pulls in cgo. Not caddy:<version>
 # itself — this stage overwrites /usr/bin/caddy, so the official binary would sit in a lower layer
 # as ~50MB of dead weight. wget is busybox's, which the compose healthcheck uses unchanged.
-FROM alpine:3.23
+FROM alpine:3.24
 
 # Accept build args for user/group IDs to support rootless operation
 # Using 10000 as default to avoid conflicts with system users
@@ -78,12 +76,9 @@ RUN apk add --no-cache ca-certificates
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
 # Create the caddy user and directories with configurable IDs for rootless operation, removing any
-# existing user/group with the same UID/GID to avoid conflicts.
-#
-# `shadow` supplies useradd/groupadd/userdel/groupdel, which busybox does not — Alpine's
-# adduser/addgroup have different flags and semantics. Installing it for this one layer and
-# removing it again keeps the ID-remapping logic identical to what it has always been (it decides
-# ownership of the /data, /config and /logs volumes) without leaving the tooling in the image.
+# existing user/group with the same UID/GID. `shadow` supplies useradd/userdel, which busybox does
+# not; installing it for one layer and removing it keeps the ID-remapping logic — which decides
+# ownership of /data, /config and /logs — unchanged, without shipping the tooling.
 RUN apk add --no-cache --virtual .user-setup shadow && \
     (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
     (getent passwd ${PUID} && userdel $(getent passwd ${PUID} | cut -d: -f1) || true) && \

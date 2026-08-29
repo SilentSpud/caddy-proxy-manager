@@ -1,8 +1,7 @@
 /**
- * Functional: CPM Forward Auth (credential login) — unauthenticated requests redirect to the
- * portal with ?rd=, the portal rejects non-forward-auth domains, a successful login completes the
- * redirect, the _cpm_fa cookie reaches the upstream, and an invalid cookie redirects again.
- * Domain: func-fwd-auth.test
+ * Functional: CPM Forward Auth (credential login) — unauthenticated requests redirect to the portal
+ * with ?rd=, non-forward-auth domains are rejected, a successful login completes the redirect, the
+ * _cpm_fa cookie reaches the upstream, an invalid one redirects again. Domain: func-fwd-auth.test
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';

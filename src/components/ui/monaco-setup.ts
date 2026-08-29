@@ -1,7 +1,6 @@
 /**
- * One-time Monaco bootstrap, reached only through dynamic imports: Monaco is ~3.5 MB, so every
- * import below is deferred until an editor mounts. Not loaded from a CDN — this app is routinely
- * deployed on isolated networks.
+ * One-time Monaco bootstrap, reached only through dynamic imports: it is ~3.5 MB, so every import
+ * below waits for an editor to mount. Not from a CDN — this app is deployed on isolated networks.
  */
 
 export type Monaco = typeof import("monaco-editor");
@@ -12,8 +11,8 @@ export const CADDYFILE_LANGUAGE_ID = "caddyfile";
 let monacoPromise: Promise<Monaco | null> | null = null;
 
 /**
- * A small Monarch tokenizer for Caddyfile, which has no upstream grammar: comments, placeholders,
- * matchers, strings and leading directives. Readability only — Caddy validates at adapt time.
+ * A small Monarch tokenizer for Caddyfile, which has no upstream grammar. Readability only —
+ * Caddy validates at adapt time.
  */
 function registerCaddyfile(m: Monaco): void {
   if (m.languages.getLanguages().some((lang) => lang.id === CADDYFILE_LANGUAGE_ID)) return;
@@ -51,10 +50,8 @@ function registerCaddyfile(m: Monaco): void {
 
 async function bootstrap(): Promise<Monaco | null> {
   try {
-    // The worker specifiers use the short `monaco-editor/<path>` form rather than the deep
-    // `monaco-editor/esm/vs/<path>` one. Monaco 0.56 added an `exports` map mapping `./*` onto
-    // `./esm/vs/*.js`, so the deep paths no longer resolve at all — the bundler fails on them
-    // rather than falling back, and the `esm/vs` prefix is now implicit.
+    // Short `monaco-editor/<path>` specifiers, not the deep `esm/vs` ones: Monaco 0.56 added an
+    // `exports` map onto `./esm/vs/*.js`, so the deep paths no longer resolve at all.
     const [monaco, editorWorker, jsonWorker] = await Promise.all([
       import("monaco-editor"),
       import("monaco-editor/editor/editor.worker?worker"),
@@ -81,9 +78,8 @@ async function bootstrap(): Promise<Monaco | null> {
 }
 
 /**
- * Load Monaco, wiring workers and the Caddyfile grammar exactly once. Null when it cannot
- * initialise, so CodeEditor keeps its textarea fallback. The promise is cached, not the result, so
- * editors mounting in one tick share a download instead of racing to register the language.
+ * Load Monaco, wiring workers and the Caddyfile grammar once. Null when it cannot initialise, so
+ * CodeEditor keeps its textarea fallback. The promise is cached, so editors share one download.
  */
 export function loadMonaco(): Promise<Monaco | null> {
   if (typeof window === "undefined") return Promise.resolve(null);

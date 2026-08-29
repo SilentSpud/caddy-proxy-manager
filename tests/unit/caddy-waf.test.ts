@@ -1,8 +1,7 @@
 /**
  * src/lib/caddy-waf.ts. Key regression: with WAF on but OWASP CRS not loaded, the directives must
  * contain no @-prefixed Include paths — those resolve only from the embedded coraza-coreruleset
- * filesystem, which the plugin mounts only when load_owasp_crs=true, so including them fails the
- * config load.
+ * filesystem, mounted when load_owasp_crs=true, so including them fails the config load.
  */
 import { describe, it, expect } from 'bun:test';
 import {

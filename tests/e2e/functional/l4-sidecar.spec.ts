@@ -1,8 +1,7 @@
 /**
  * Functional: L4 port manager sidecar (#117). "Apply Ports" reaches "applied", and the sidecar
- * re-applies the override on startup after a container restart. The bug: NETWORKS: 0 in the
- * docker-socket-proxy blocked the GET /networks/{id} compose makes when recreating caddy. Must run
- * after l4-proxy-routing.spec.ts, so L4 hosts and an override file already exist.
+ * re-applies the override on startup after a restart. The bug: NETWORKS: 0 in the socket proxy
+ * blocked the GET /networks/{id} compose makes. Must run after l4-proxy-routing.spec.ts.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
@@ -99,11 +98,9 @@ test.describe
       const prevAppliedAt = before?.appliedAt ?? '';
       await page.waitForTimeout(1_500);
 
-      // Restart the sidecar container.  On startup it finds the override file and
-      // calls `docker compose up --force-recreate caddy`.  With NETWORKS: 0 in the
-      // docker-socket-proxy this always failed because docker compose needs
-      // GET /networks/{id} to inspect caddy-network before reconnecting the container.
-      // The fix adds NETWORKS: 1 so the network inspection succeeds.
+      // Restarting the sidecar makes it find the override file and run `docker compose up
+      // --force-recreate caddy`. With NETWORKS: 0 that always failed, since compose needs
+      // GET /networks/{id} to inspect caddy-network before reconnecting.
       execFileSync('docker', ['restart', L4_CONTAINER], {
         stdio: 'inherit',
         cwd: process.cwd(),

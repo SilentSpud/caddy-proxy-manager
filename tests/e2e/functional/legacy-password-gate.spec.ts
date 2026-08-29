@@ -1,7 +1,6 @@
 /**
- * The legacy-password gate end to end. Unit tests cover the decision; only a real browser shows
- * that the redirect terminates — if /password-change ever moved inside the dashboard route group,
- * the two would bounce forever.
+ * The legacy-password gate end to end. Unit tests cover the decision; only a real browser shows the
+ * redirect terminates — if /password-change moved inside the dashboard group, they would bounce.
  */
 import { test, expect } from '@playwright/test';
 import {

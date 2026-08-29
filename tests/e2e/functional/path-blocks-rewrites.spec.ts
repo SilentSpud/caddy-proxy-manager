@@ -1,9 +1,7 @@
 /**
- * Functional: structured Path Blocks and Path Rewrites. A host blocks /dns-query → 403, rewrites
- * /secretpath → /dns-query, and otherwise proxies to whoami-server (which echoes the request line).
- * Blocked paths return the configured status and body; rewrites change the upstream URI; a rewrite
- * onto a blocked path does NOT re-match the block, since subroute routes run sequentially. The
- * pathBlocksJson / pathRewritesJson fields are injected directly. Domain: func-path-rules.test
+ * Functional: Path Blocks and Path Rewrites. A host blocks /dns-query → 403, rewrites /secretpath →
+ * /dns-query, and otherwise proxies to whoami-server. A rewrite onto a blocked path does NOT
+ * re-match the block, since subroute routes run sequentially. Domain: func-path-rules.test
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';

@@ -23,10 +23,7 @@ export type AvatarSettings = {
 };
 
 export type PasswordPolicySettings = {
-  /**
-   * Force a password reset at next sign-in for anyone still on a bcrypt hash. Changing the
-   * password rehashes with argon2id, which is how a deployment finishes migrating off it.
-   */
+  /** Force a password reset for anyone still on bcrypt; changing it rehashes with argon2id. */
   requireChangeOnLegacyHash: boolean;
 };
 
@@ -143,9 +140,8 @@ export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
 }
 
 async function getInstanceModeForSettings(): Promise<InstanceMode> {
-  // Environment variable takes precedence — mirrors getInstanceMode() in instance-sync.ts. An
-  // env-configured slave never writes the mode to the DB (setInstanceMode refuses when
-  // env-set), so reading the DB alone here would report "standalone" and getEffectiveSetting
+  // Env takes precedence — mirrors getInstanceMode(). An env-configured slave never writes the
+  // mode to the DB, so reading the DB alone would report "standalone" and getEffectiveSetting
   // would never serve synced:* values.
   const envMode = process.env.INSTANCE_MODE;
   if (envMode === "master" || envMode === "slave" || envMode === "standalone") {
@@ -226,10 +222,7 @@ export async function saveAvatarSettings(settings: AvatarSettings): Promise<void
   await setSetting("avatars", settings);
 }
 
-/**
- * Whether user icons may fall back to Gravatar. AVATAR_GRAVATAR wins when set; otherwise the
- * stored toggle decides, defaulting to enabled.
- */
+/** Whether icons may fall back to Gravatar. AVATAR_GRAVATAR wins; else the toggle, default on. */
 export async function isGravatarEnabled(): Promise<boolean> {
   const { config } = await import("./config");
   if (config.avatars.gravatarFromEnv !== null) return config.avatars.gravatarFromEnv;
@@ -246,8 +239,8 @@ export async function savePasswordPolicySettings(settings: PasswordPolicySetting
 }
 
 /**
- * Whether a bcrypt-hashed user must change their password before continuing. Pinned by
- * AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH; otherwise the stored setting decides, default off.
+ * Whether a bcrypt-hashed user must change their password. Pinned by
+ * AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH; otherwise the stored setting, default off.
  */
 export async function isLegacyPasswordChangeRequired(): Promise<boolean> {
   const { config } = await import("./config");
@@ -378,9 +371,9 @@ export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<voi
 // ─── Caddy build ─────────────────────────────────────────────────────────────
 
 /**
- * Which Caddy plugins this instance's image is built with. Read with getSetting, not
- * getEffectiveSetting: the list describes a binary on *this* host, so inheriting a master's would
- * tell a slave it has plugins it never compiled and its own Caddy would reject the config.
+ * Which Caddy plugins this instance's image is built with. getSetting, not getEffectiveSetting:
+ * the list describes a binary on *this* host, so inheriting a master's would tell a slave it has
+ * plugins it never compiled.
  */
 export type CaddyBuildSettings = {
   /** Built-in module id -> enabled. Absent ids fall back to enabled. */

@@ -14,8 +14,8 @@ export type Session = {
 };
 
 /**
- * The current session, or null. `auth()` reads next/headers; `auth(req)` reads request headers
- * (middleware). Role is always fetched fresh from the DB, so a demotion takes effect immediately.
+ * The current session, or null. `auth()` reads next/headers, `auth(req)` request headers. Role is
+ * fetched fresh from the DB, so a demotion takes effect immediately.
  */
 export async function auth(req?: NextRequest): Promise<Session | null> {
   const hdrs = req ? req.headers : (await import("next/headers")).headers();
@@ -74,8 +74,8 @@ export async function getSession(): Promise<Session | null> {
 }
 
 /**
- * The DB id of the caller's better-auth session, or null without cookie auth (e.g. a Bearer call).
- * Marks the "current" session and excludes it from "revoke other sessions".
+ * The DB id of the caller's better-auth session, or null without cookie auth. Marks the "current"
+ * session and excludes it from "revoke other sessions".
  */
 export async function getCurrentSessionId(req?: NextRequest): Promise<number | null> {
   const hdrs = req ? req.headers : (await import("next/headers")).headers();
@@ -110,8 +110,8 @@ export async function requireAdmin(): Promise<Session> {
 }
 
 /**
- * Defense-in-depth CSRF check: 403 when Origin is present and does not match Host, else null.
- * Browsers always send Origin cross-origin, so a mismatch means another site sent it.
+ * Defense-in-depth CSRF check: 403 when Origin is present and mismatches Host, else null.
+ * Browsers always send Origin cross-origin.
  */
 export function checkSameOrigin(request: NextRequest): NextResponse | null {
   const origin = request.headers.get("origin");

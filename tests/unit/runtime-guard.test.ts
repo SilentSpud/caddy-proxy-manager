@@ -1,7 +1,6 @@
 /**
- * The guard has to behave correctly in the case it exists for — a runtime that is not Bun — which
- * is not the runtime this suite runs on. The Node case is reproduced by removing
- * `process.versions.bun` for the duration of a test rather than by mocking the module.
+ * The guard must behave correctly in the case it exists for — a runtime that is not Bun, which is
+ * not the one this suite runs on. Reproduced by removing `process.versions.bun` for a test.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

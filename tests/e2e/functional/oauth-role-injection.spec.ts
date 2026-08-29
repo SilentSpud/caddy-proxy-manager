@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * SECURITY-AUDIT H3: an OAuth IdP must not be able to set privileged user fields. better-auth's
- * generic-OAuth signup spreads raw profile claims into the new user and ignores `input:false` on
- * `role`/`status`. The hostile IdP is `mock-oauth2-server`, configured to inject `role: "admin"`
- * into every token; after a real sign-in the created user must be role "user".
+ * SECURITY-AUDIT H3: an OAuth IdP must not set privileged user fields. better-auth's generic-OAuth
+ * signup spreads raw claims into the new user and ignores `input:false` on `role`/`status`. The
+ * hostile IdP injects `role: "admin"` into every token; the created user must be role "user".
  */
 
 const BASE_URL = 'http://localhost:3000';

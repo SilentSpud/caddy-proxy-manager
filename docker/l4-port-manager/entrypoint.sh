@@ -136,13 +136,11 @@ detect_project_name() {
 }
 
 # Assemble the -f/-p/--env-file arguments every compose invocation shares, and echo them. Both
-# overrides are included whenever they exist: a rebuild must not drop the L4 port bindings, and a
-# port change must not rebuild caddy without the module selection.
+# overrides are always included: a rebuild must not drop the L4 port bindings, and a port change
+# must not rebuild caddy without the module selection.
 #
-# Callers set COMPOSE_PROJECT first; this reads it rather than assigning it. The function is always
-# invoked as `$(build_compose_args)`, and an assignment made inside that command-substitution
-# subshell is discarded when it exits — so assigning here would leave the caller's "Using compose
-# project" log line empty, the one line you want when diagnosing a rebuild that hit the wrong stack.
+# Callers set COMPOSE_PROJECT first; this reads it rather than assigning, since it runs as
+# `$(build_compose_args)` and a subshell assignment would be discarded.
 build_compose_args() {
   args="-p $COMPOSE_PROJECT"
   # COMPOSE_HOST_DIR (when set) is passed as --project-directory so the Docker daemon resolves
@@ -292,12 +290,9 @@ do_build() {
 
   HEALTH="$(wait_for_caddy_health 60)"
   if [ "$HEALTH" = "healthy" ]; then
-    # Record what the binary now actually contains. This is the web app's source
-    # of truth for which plugin-backed handlers it may emit, so it is written
-    # here and nowhere else: only at this point — build succeeded, container
-    # recreated, healthy — is the new module set genuinely in the running binary.
-    # Writing it any earlier (e.g. when the override is generated) would tell the
-    # app a module is available while the old binary is still serving.
+    # Record what the binary now contains. Written here and nowhere else: only after a successful
+    # build, recreate and health check is the new module set genuinely in the running binary.
+    # Writing it earlier would tell the app a module is available while the old one is serving.
     write_applied_modules
     write_build_status "applied" "Caddy rebuilt with the selected modules and is healthy."
     log "Caddy is healthy."
@@ -314,11 +309,9 @@ do_build() {
 }
 
 # ---------------------------------------------------------------------------
-# Startup: always apply the override so caddy has the correct ports bound (the main compose stack
-# starts caddy without the L4 ports override file), but only if the override file exists.
-#
-# If the apply lock was written less than 10 s ago, this container was just recreated as a side
-# effect of a compose "up" targeting caddy — skip the re-apply, that operation is already running.
+# Startup: apply the override so caddy has the right ports bound (the main stack starts it without
+# them), if the file exists. A lock written under 10 s ago means this container was just recreated
+# by a compose "up" on caddy — skip, that operation is already running.
 # ---------------------------------------------------------------------------
 if [ -f "$OVERRIDE_FILE" ]; then
   SKIP_APPLY=0

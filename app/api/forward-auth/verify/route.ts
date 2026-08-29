@@ -6,10 +6,7 @@ import { lastHeaderValue } from "@/src/lib/request-headers";
 
 const COOKIE_NAME = "_cpm_fa";
 
-/**
- * Forward auth verify endpoint — called by Caddy as a subrequest.
- * Returns 200 + user headers on success, 401 on failure.
- */
+/** Forward auth verify, called by Caddy as a subrequest: 200 + user headers, or 401. */
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value;
   if (!token) {

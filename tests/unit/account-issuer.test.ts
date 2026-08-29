@@ -1,7 +1,6 @@
 /**
- * src/lib/account-issuer.ts mirrors better-auth's account namespacing, so rows CPM writes match the
- * ones better-auth writes. Drift is silent — nothing throws, the account just stops resolving at
- * sign-in — so the mirror is pinned against better-auth's exported helpers, not copied literals.
+ * src/lib/account-issuer.ts mirrors better-auth's account namespacing. Drift is silent — nothing
+ * throws, the account just stops resolving at sign-in — so it is pinned against their helpers.
  */
 import { describe, it, expect } from 'bun:test';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';

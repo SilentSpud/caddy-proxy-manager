@@ -1,20 +1,14 @@
-/**
- * mTLS helpers for Caddy TLS connection policies and HTTP-layer RBAC route enforcement.
- * Extracted from caddy.ts so they can be unit-tested independently.
- */
+/** mTLS helpers for Caddy TLS connection policies and HTTP-layer RBAC routes. */
 
 /**
- * Normalise a fingerprint to Caddy's format — lowercase hex, no colons. Node's
- * X509Certificate.fingerprint256 gives "AB:CD:EF:…"; Caddy's placeholder gives "abcdef…".
+ * Normalise a fingerprint to Caddy's format — lowercase hex, no colons. Node gives "AB:CD:EF:…";
+ * Caddy's placeholder gives "abcdef…".
  */
 export function normalizeFingerprint(fp: string): string {
   return fp.replace(/:/g, "").toLowerCase();
 }
 
-/**
- * Minimal type matching MtlsAccessRule from the models layer, redeclared here to avoid
- * importing models (which pulls in db.ts).
- */
+/** Minimal MtlsAccessRule, redeclared here to avoid importing models (which pulls in db.ts). */
 export type MtlsAccessRuleLike = {
   pathPattern: string;
   allowedRoleIds: number[];
@@ -22,10 +16,7 @@ export type MtlsAccessRuleLike = {
   denyAll: boolean;
 };
 
-/**
- * PEM certificate → base64-encoded DER, the form Caddy's `trusted_ca_certs` and
- * `trusted_leaf_certs` fields expect.
- */
+/** PEM → base64 DER, the form `trusted_ca_certs` and `trusted_leaf_certs` expect. */
 export function pemToBase64Der(pem: string): string {
   return pem
     .replace(/-----BEGIN CERTIFICATE-----/, "")
@@ -35,10 +26,9 @@ export function pemToBase64Der(pem: string): string {
 
 /**
  * Builds a Caddy `client_authentication` block for the given domains, unioning their CA cert IDs —
- * so callers must pre-group domains sharing a CA config (see `groupMtlsDomainsByCaSet`). Per CA:
- * unmanaged (no tracked certs) → trust anything it signed; managed with active certs → CA in
- * `trusted_ca_certs` plus active leaves in `trusted_leaf_certs`; all revoked → excluded, so chain
- * validation fails. Null when no CA certs are left to trust.
+ * so callers must pre-group domains sharing a CA config (`groupMtlsDomainsByCaSet`). Per CA:
+ * unmanaged → trust anything it signed; managed with active certs → CA plus active leaves in
+ * `trusted_leaf_certs`; all revoked → excluded. Null when no CA certs are left to trust.
  */
 export function buildClientAuthentication(
   domains: string[],
@@ -129,8 +119,6 @@ export function buildValidClientCertCelExpression(): string {
 /**
  * Groups mTLS domains by sorted CA ID fingerprint, so each group gets its own TLS policy with an
  * isolated trust set — a cert from CA_B cannot authenticate against a host that configured CA_A.
- * @param mTlsDomainMap - Lowercased domain → its CA cert IDs.
- * @returns CA-set fingerprint → the domains sharing it.
  */
 export function groupMtlsDomainsByCaSet(
   domains: string[],
@@ -150,8 +138,8 @@ export function groupMtlsDomainsByCaSet(
 // ── mTLS RBAC HTTP-layer route enforcement ───────────────────────────
 
 /**
- * Resolve one access rule's allowed fingerprints: the union of active cert fingerprints from
- * certs holding any of the allowed roles and from directly-allowed cert IDs.
+ * One access rule's allowed fingerprints: the union of active certs holding an allowed role and
+ * directly-allowed cert IDs.
  */
 export function resolveAllowedFingerprints(
   rule: MtlsAccessRuleLike,
@@ -175,10 +163,7 @@ export function resolveAllowedFingerprints(
   return allowed;
 }
 
-/**
- * A CEL expression checking whether the client certificate's fingerprint is in the allowed
- * set, via Caddy's `{http.request.tls.client.fingerprint}` placeholder.
- */
+/** A CEL expression testing the client fingerprint against the allowed set. */
 export function buildFingerprintCelExpression(fingerprints: Set<string>): string {
   const fps = Array.from(fingerprints).sort();
   const quoted = fps.map((fp) => `'${fp}'`).join(", ");
@@ -187,8 +172,8 @@ export function buildFingerprintCelExpression(fingerprints: Set<string>): string
 
 /**
  * Subroutes enforcing a host's path-based mTLS RBAC at the HTTP layer; null when there are no
- * rules. Per rule (priority desc): a path+fingerprint allow route, then a path-only 403. A
- * catch-all afterwards admits any valid cert, for paths without rules.
+ * rules. Per rule: a path+fingerprint allow route, then a path-only 403. A catch-all afterwards
+ * admits any valid cert.
  */
 export function buildMtlsRbacSubroutes(
   accessRules: MtlsAccessRuleLike[],

@@ -146,8 +146,7 @@ function ttlDaysFromCreateQuery(createQuery: string): number | null {
 
 /**
  * Bring an existing table's TTL in line with CH_RETENTION_DAYS. `CREATE TABLE IF NOT EXISTS` never
- * alters an existing table, so an explicit MODIFY TTL is needed — issued only when the TTL
- * differs, since it materializes a mutation that rewrites parts.
+ * alters one, so an explicit MODIFY TTL is needed — only when it differs, since it rewrites parts.
  */
 async function ensureRetentionTtl(
   ch: ClickHouseClient,
@@ -166,10 +165,9 @@ async function ensureRetentionTtl(
   });
 }
 
-// Diagnostic system-log tables that docker/clickhouse/config.d/low-disk-write.xml turns off. On
-// stock ClickHouse these flush every few seconds regardless of traffic, so a deployment that ran
-// before the override accumulated gigabytes we can now reclaim. Disabling only stops new writes;
-// the old data lingers until the tables are dropped, which is what this list drives.
+// Diagnostic system-log tables that low-disk-write.xml turns off. On stock ClickHouse they flush
+// every few seconds regardless of traffic; disabling stops new writes, and dropping them reclaims
+// what a deployment accumulated before the override.
 const DISABLED_SYSTEM_LOGS = [
   "metric_log",
   "asynchronous_metric_log",
@@ -193,8 +191,8 @@ const DISABLED_SYSTEM_LOGS = [
 const DISABLED_SYSTEM_LOG_PATTERN = `^(${DISABLED_SYSTEM_LOGS.join("|")})(_[0-9]+)?$`;
 
 /**
- * Drop the diagnostic system-log tables we disable via config, including numbered `_<N>`
- * leftovers, to reclaim their data. Best-effort — the analytics user often lacks DROP on `system`.
+ * Drop the diagnostic system-log tables we disable via config, including numbered `_<N>` leftovers.
+ * Best-effort — the analytics user often lacks DROP on `system`.
  */
 async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
   let names: string[];
@@ -310,10 +308,7 @@ export async function insertWafEvents(rows: WafEventRow[]): Promise<void> {
 
 type QueryParams = Record<string, unknown>;
 
-/**
- * A host filter clause using parameterized query placeholders: the SQL fragment plus the params
- * to merge into query_params.
- */
+/** A host filter clause with parameterized placeholders: the SQL fragment plus its params. */
 function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
   if (hosts.length === 0) return { sql: "", params: {} };
   const params: QueryParams = {};

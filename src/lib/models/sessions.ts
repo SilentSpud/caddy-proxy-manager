@@ -3,8 +3,8 @@ import db from "../db";
 import { sessions } from "../db/schema";
 
 /**
- * Active management-UI session for a user, as shown in the profile's "Active sessions" view.
- * (Forward-auth `_cpm_fa` sessions are tracked separately.)
+ * Active management-UI session for a user, as shown in the profile. (Forward-auth `_cpm_fa`
+ * sessions are tracked separately.)
  */
 export interface UserSession {
   id: number;
@@ -38,10 +38,7 @@ export async function listUserSessions(userId: number): Promise<UserSession[]> {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-/**
- * Revoke a single session, but only if it belongs to the given user. Returns false when no such
- * session exists for that user, so callers can 404.
- */
+/** Revoke one session, only if it belongs to the user. False when none, so callers can 404. */
 export async function revokeUserSession(userId: number, sessionId: number): Promise<boolean> {
   const [existing] = await db
     .select({ id: sessions.id })
@@ -52,10 +49,7 @@ export async function revokeUserSession(userId: number, sessionId: number): Prom
   return true;
 }
 
-/**
- * Revoke all of a user's sessions except `exceptSessionId` (typically the caller's current one).
- * Returns the number of sessions revoked.
- */
+/** Revoke all a user's sessions except `exceptSessionId`. Returns the number revoked. */
 export async function revokeOtherUserSessions(
   userId: number,
   exceptSessionId: number | null,

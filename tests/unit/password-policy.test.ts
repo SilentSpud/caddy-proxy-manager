@@ -1,7 +1,6 @@
 /**
- * The password rule is now defined once and enforced in four places (admin env
- * validation, change-password, the forced-reset screen, and .p12 export). These
- * tests pin the rule itself; the callers are covered where they are used.
+ * The password rule is defined once and enforced in four places (admin env validation,
+ * change-password, the forced-reset screen, .p12 export). These pin the rule itself.
  */
 import { describe, it, expect } from 'bun:test';
 import {

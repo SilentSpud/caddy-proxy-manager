@@ -1,7 +1,6 @@
 /**
- * Functional: per-path redirect rules — matched paths get the right redirect, unmatched ones are
- * proxied. The redirects_json hidden field is injected directly, so the test need not click
- * through the MUI Select per status code. Domain: func-redirects.test
+ * Functional: per-path redirect rules — matched paths redirect, unmatched are proxied. The
+ * redirects_json field is injected directly. Domain: func-redirects.test
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';

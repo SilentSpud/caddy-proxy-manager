@@ -1,9 +1,8 @@
 /**
- * Functional: custom error pages (Caddy handle_errors) — the real error path the custom-JSON
- * fields could not reach (#168). Hosts point at `whoami-server:9999`, which resolves but never
- * listens, so every request 502s and triggers the error route; a healthy host proves successful
- * responses are untouched. Covers status matching, catch-all, Content-Type, and global-vs-per-host
- * precedence.
+ * Functional: custom error pages (Caddy handle_errors) — the path the custom-JSON fields could not
+ * reach (#168). Hosts point at `whoami-server:9999`, which resolves but never listens, so every
+ * request 502s and triggers the error route. Covers status matching, catch-all, Content-Type, and
+ * global-vs-per-host precedence.
  */
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';

@@ -1,8 +1,4 @@
-/**
- * E2E tests: Dashboard (overview) home page.
- *
- * Verifies stat cards, navigation links, welcome header, and recent activity.
- */
+/** E2E: dashboard overview — stat cards, navigation links, welcome header, recent activity. */
 import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Dashboard home page', () => {

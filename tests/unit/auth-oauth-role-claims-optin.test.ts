@@ -1,7 +1,6 @@
 /**
- * AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true opts out of the H3 enforcement: with an explicitly trusted
- * IdP, the user.create.before hook leaves role/status intact. The flag is read at config import, so
- * it is set in a hoisted block. (The default-secure path is in auth-oauth-role-injection.test.ts.)
+ * AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true opts out of the H3 enforcement: with a trusted IdP, the
+ * user.create.before hook leaves role/status intact. The default-secure path is tested separately.
  */
 import { describe, it, expect, afterAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

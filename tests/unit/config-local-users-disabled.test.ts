@@ -1,7 +1,6 @@
 /**
  * AUTH_DISABLE_LOCAL_USERS=true is the OIDC-only switch. It must hold in production without
- * ADMIN_USERNAME/ADMIN_PASSWORD — no local account exists — while leaving normal-mode validation
- * untouched.
+ * ADMIN_USERNAME/ADMIN_PASSWORD, while leaving normal-mode validation untouched.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

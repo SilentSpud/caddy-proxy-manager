@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * A Monaco-backed replacement for TextArea on code fields: bracket matching, folding and inline
- * JSON errors. Monaco has no form-associated element, so the value rides in a hidden input (as
- * FormBooleanControls does); a real TextArea renders until it loads, or forever if it never does.
+ * A Monaco-backed TextArea replacement for code fields. Monaco has no form-associated element, so
+ * the value rides in a hidden input; a real TextArea renders until it loads, or forever if never.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

@@ -1,8 +1,4 @@
-/**
- * E2E tests: L4 Proxy Hosts page.
- *
- * Verifies the L4 Proxy Hosts UI — navigation, list, create/edit/delete dialogs.
- */
+/** E2E: L4 Proxy Hosts page — navigation, list, create/edit/delete dialogs. */
 import { test, expect, type Page } from '@playwright/test';
 
 const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';

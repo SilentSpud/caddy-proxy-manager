@@ -26,9 +26,8 @@ export function createTestDb(): TestDb {
 /**
  * A stand-in for the `db` module's default export, forwarding to whichever database the current
  * test uses. Bun evaluates a mock factory's getters once at link time, so Vitest's
- * `get default() { return db }` pattern would capture `undefined`. This is one object with a stable
- * identity whose property reads resolve against `current()` at call time, with methods bound to the
- * real database so drizzle's internals see the right `this`.
+ * `get default() { return db }` would capture `undefined`. This has a stable identity, resolves
+ * every read against `current()`, and binds methods so drizzle sees the right `this`.
  */
 export function currentDb(current: () => TestDb): TestDb {
   return new Proxy({} as TestDb, {

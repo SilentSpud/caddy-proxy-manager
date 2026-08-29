@@ -1,7 +1,6 @@
 /**
- * Unit tests for the mTLS RBAC functions in src/lib/caddy-mtls.ts: resolveAllowedFingerprints
- * (union of role + cert fingerprints), buildFingerprintCelExpression, buildMtlsRbacSubroutes (full
- * subroute generation with path rules), and normalizeFingerprint (colon stripping + lowercase).
+ * The mTLS RBAC functions: resolveAllowedFingerprints, buildFingerprintCelExpression,
+ * buildMtlsRbacSubroutes and normalizeFingerprint.
  */
 import { describe, it, expect } from 'bun:test';
 import {

@@ -1,8 +1,8 @@
 /**
- * Recognising "the other end was not reachable" across runtimes. Bun 1.4 puts a network failure's
- * code on `TypeError.code` with no `.cause`, where Node uses `.cause.code`, and the names differ
- * (`ConnectionRefused` vs `ECONNREFUSED`; `ENOTFOUND` in both). So match the union of codes, walk
- * `.cause` for wrapped errors, and match the message too — the ClickHouse client keeps only text.
+ * Recognising "the other end was not reachable" across runtimes. Bun 1.4 puts the code on
+ * `TypeError.code` with no `.cause`, Node on `.cause.code`, and the names differ
+ * (`ConnectionRefused` vs `ECONNREFUSED`). So match the union, walk `.cause` for wrapped errors,
+ * and match the message too — the ClickHouse client keeps only text.
  */
 
 /** Codes meaning "could not open a connection to the host". */
@@ -19,8 +19,8 @@ const CONNECTION_ERROR_CODES = new Set([
 ]);
 
 /**
- * Message fragments the runtimes use when no code survives the wrapping. Kept narrow enough that
- * an application-level failure — a bad query, a 500 from the server — cannot match by accident.
+ * Message fragments the runtimes use when no code survives wrapping. Narrow enough that an
+ * application failure — a bad query, a 500 — cannot match by accident.
  */
 const CONNECTION_ERROR_MESSAGES = [
   "ECONNREFUSED",
@@ -39,7 +39,7 @@ function errorCode(error: unknown): string | undefined {
 
 /**
  * True when `error` — or anything it wraps — is a failure to reach the host. `depth` bounds the
- * `.cause` walk so a self-referential or deeply nested chain cannot spin.
+ * `.cause` walk so a self-referential chain cannot spin.
  */
 export function isConnectionError(error: unknown, depth = 4): boolean {
   if (!error || typeof error !== "object" || depth < 0) return false;

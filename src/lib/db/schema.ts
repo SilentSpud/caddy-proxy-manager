@@ -53,10 +53,9 @@ export const accounts = sqliteTable(
       .notNull(),
     accountId: text("accountId").notNull(),
     providerId: text("providerId").notNull(),
-    // better-auth 1.7 scopes account identity by issuer rather than providerId: `local:credential`
-    // for password accounts, the provider's own issuer URL for OIDC providers that have one, and
-    // `local:oauth:<id>` for plain OAuth2 providers that don't. Set by better-auth on write; see
-    // migration 0024 for how existing rows were backfilled.
+    // better-auth 1.7 scopes account identity by issuer, not providerId: `local:credential` for
+    // passwords, the provider's issuer URL for OIDC, `local:oauth:<id>` otherwise. Set on write;
+    // migration 0024 backfilled existing rows.
     issuer: text("issuer").notNull(),
     accessToken: text("accessToken"),
     refreshToken: text("refreshToken"),

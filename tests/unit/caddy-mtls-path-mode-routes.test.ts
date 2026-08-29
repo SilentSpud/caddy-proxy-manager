@@ -1,11 +1,8 @@
 /**
  * Regression: the HTTP route shape per mTLS path mode. full-site — the TLS policy already runs
- * require_and_verify, so the catch-all is a plain proxy route. whitelist — TLS auth is optional, so
- * only listed paths carry a fingerprint expression. exclusion — everything but the listed paths
- * carries it, plus a 403 fallback.
- *
- * A host with mTLS off resolves to "full" too, so a regression takes down every ordinary host:
- * gating the catch-all on a fingerprint never requested means every request gets 403.
+ * require_and_verify, so the catch-all is a plain proxy route. whitelist — only listed paths carry
+ * a fingerprint expression. exclusion — everything but those, plus a 403 fallback. A host with mTLS
+ * off resolves to "full" too, so gating the catch-all on a fingerprint would 403 every request.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

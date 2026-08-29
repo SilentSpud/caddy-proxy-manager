@@ -68,10 +68,7 @@ type Props = {
   forwardAuthAccessMap?: ForwardAuthAccessMap;
 };
 
-/**
- * The feature badges as data rather than thirteen near-identical JSX blocks. `variant` marks the
- * two that mean "traffic is being restricted".
- */
+/** The feature badges as data. `variant` marks the two meaning "traffic is being restricted". */
 const FEATURES: ReadonlyArray<{
   key: string;
   label: string;
@@ -131,8 +128,8 @@ function summarize(values: string[]) {
 }
 
 /**
- * The enable switch plus the row menu, shared by the table and the cards. At module scope because
- * nesting it would make a new component type each render, remounting the menu mid-use.
+ * The enable switch plus the row menu, shared by table and cards. At module scope — nesting it
+ * would make a new component type each render, remounting the menu mid-use.
  */
 function HostActions({
   host,

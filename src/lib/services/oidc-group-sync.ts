@@ -1,8 +1,8 @@
 /**
- * Applies an IdP's group claim to a CPM user: role assignment, and optionally CPM group membership
- * mirrored from the IdP. The claims are read in the OAuth callback's `mapProfileToUser`, which has
- * no user id yet, so the result is parked in a short-lived registry keyed by provider + subject and
- * consumed at session creation, once better-auth has written both the user and the account row.
+ * Applies an IdP's group claim to a CPM user: role assignment, and optionally mirrored CPM groups.
+ * The claims are read in the OAuth callback's `mapProfileToUser`, which has no user id yet, so the
+ * result is parked in a short-lived registry keyed by provider + subject and consumed at session
+ * creation.
  */
 
 import { and, eq } from "drizzle-orm";
@@ -175,8 +175,8 @@ export async function applyOidcSync(userId: number, entry: PendingOidcSync): Pro
 }
 
 /**
- * Called after better-auth creates a session. Finds this user's pending mapping by matching their
- * linked accounts against the registry, so concurrent sign-ins cannot pick up each other's claims.
+ * Called after better-auth creates a session. Finds this user's pending mapping via their linked
+ * accounts, so concurrent sign-ins cannot pick up each other's claims.
  */
 export async function reconcileOidcUserAfterSignIn(userId: number): Promise<void> {
   if (pending.size === 0 || !Number.isFinite(userId)) return;

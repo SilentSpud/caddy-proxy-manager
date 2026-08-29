@@ -1458,9 +1458,9 @@ export async function updateWafSettingsAction(
 // ─── Caddy Build ─────────────────────────────────────────────────────────────
 
 /**
- * Save the module selection. This does not rebuild — plugins are compiled in — but it does change
- * what the config builder will emit, so applyCaddyConfig runs here: switching a module off stops
- * producing its handlers at once, rather than leaving config naming a plugin about to vanish.
+ * Save the module selection. Does not rebuild — plugins are compiled in — but it changes what the
+ * config builder will emit, so applyCaddyConfig runs here: a module switched off stops producing
+ * handlers at once, rather than leaving config naming a plugin about to vanish.
  */
 export async function updateCaddyBuildSettingsAction(
   _prevState: ActionResult | null,

@@ -62,8 +62,8 @@ type Props = {
 };
 
 /**
- * Controlled per-location-rule load balancer / health check editor. Mirrors LoadBalancerFields but
- * drives a single object via onChange, for serializing into the location-rules JSON.
+ * Controlled per-location-rule load balancer editor. Mirrors LoadBalancerFields but drives one
+ * object via onChange, for serializing into the location-rules JSON.
  */
 export function LocationLoadBalancerFields({ value, onChange }: Props) {
   const lb = value;

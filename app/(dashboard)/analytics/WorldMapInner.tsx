@@ -20,17 +20,14 @@ import {
   selectedLayerFor,
 } from "./map-theme";
 
-// The atlas ships with the `world-atlas` package rather than being copied into
-// public/. `?url` has the bundler emit it as a hashed static asset and hand back
-// its path, so this stays a same-origin fetch — allowed by the CSP's
-// `connect-src 'self'` (proxy.ts) — instead of inlining 756 KB into a JS chunk.
+// The atlas ships with the `world-atlas` package. `?url` emits it as a hashed static asset, keeping
+// this a same-origin fetch (CSP `connect-src 'self'`) instead of inlining 756 KB into a JS chunk.
 import atlasUrl from "world-atlas/countries-50m.json?url";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
-// maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling
-// — the worker never starts and the map renders as empty ocean. `?worker&url` bundles the worker's
-// whole module graph into one chunk and hands back its path. Needs `worker.format: "es"` in
-// vite.config.ts and `worker-src 'self'` in the CSP (proxy.ts).
+// maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling —
+// the worker never starts and the map is empty ocean. `?worker&url` bundles its module graph into
+// one chunk and returns the path. Needs `worker.format: "es"` and CSP `worker-src 'self'`.
 if (typeof window !== "undefined") {
   setWorkerUrl(maplibreWorkerUrl);
 }

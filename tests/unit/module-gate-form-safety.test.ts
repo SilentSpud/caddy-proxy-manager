@@ -1,13 +1,9 @@
 /**
  * Module gating must never remove a value from a form submission. The form actions read an absent
- * field as "empty", not "unchanged" (`parseWafConfig` → `[]`, `updateWafSettingsAction` → `""`),
- * while the `wafPresent` / `geoblockPresent` markers submit unconditionally — so the parser always
- * runs and always writes.
- *
- * That makes greying-out dangerous: unmounting a rule editor, or disabling a field, silently erases
- * tuned WAF suppressions and geo allow-lists the next time anything on the form is saved. So gating
- * locks the *enable* switch and leaves every value-carrying input mounted. Inspects source rather
- * than rendering.
+ * field as "empty", not "unchanged", while the `wafPresent` / `geoblockPresent` markers submit
+ * unconditionally — so the parser always runs and always writes. Unmounting a rule editor, or
+ * disabling a field, would silently erase tuned WAF suppressions and geo allow-lists. So gating
+ * locks the *enable* switch and leaves every value-carrying input mounted.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';

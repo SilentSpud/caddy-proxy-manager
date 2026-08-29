@@ -284,10 +284,7 @@ function FormCard({
   );
 }
 
-/**
- * The "Override master settings" toggle a slave shows above each form. CheckboxInput carries its
- * own label, so the association is real rather than positional.
- */
+/** The "Override master settings" toggle a slave shows above each form. */
 function OverrideToggle({
   value,
   onChange,
@@ -412,10 +409,7 @@ function SettingsSidebar({
   );
 }
 
-/**
- * Narrow-screen navigation: a select naming the current section, replacing a horizontally
- * scrolling strip of fourteen pills.
- */
+/** Narrow-screen navigation: a select naming the current section, replacing a strip of pills. */
 function MobileSettingsNav({
   active,
   onSelect,
@@ -1878,8 +1872,8 @@ function OAuthSection({
 // ─── Section: Password Policy ────────────────────────────────────────────────
 
 /**
- * Not offered as a slave override: whether to force a password reset is a local security decision,
- * and inheriting it from a master would let one instance lock another's users out.
+ * Not offered as a slave override: forcing a password reset is a local security decision, and
+ * inheriting it would let one instance lock another's users out.
  */
 function PasswordPolicySection({
   passwordPolicy,
@@ -1975,7 +1969,7 @@ function AvatarsSection({
 
 /**
  * Not offered as a slave override: the module list describes a binary built on this host, so
- * inheriting a master's choice would tell a slave its Caddy has plugins it never compiled.
+ * inheriting a master's would tell a slave its Caddy has plugins it never compiled.
  */
 function CaddyBuildSection({
   caddyBuild,

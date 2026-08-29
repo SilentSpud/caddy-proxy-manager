@@ -3,17 +3,11 @@ import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
 
-/**
- * Next.js Proxy for route protection: defense-in-depth auth checks at the edge, before requests
- * reach page components. Always runs on the Node.js runtime.
- */
+/** Next.js Proxy: defense-in-depth auth at the edge, before page components. Node runtime. */
 
 const isDev = process.env.NODE_ENV === "development";
 
-/**
- * Build a nonce-based Content-Security-Policy per request. Next.js reads the nonce from the CSP
- * request header and applies it to every inline script it generates.
- */
+/** A nonce-based CSP per request; Next.js reads the nonce from the CSP request header. */
 function buildCsp(nonce: string): string {
   const directives = [
     "default-src 'self'",
@@ -23,10 +17,8 @@ function buildCsp(nonce: string): string {
     // style-src still needs 'unsafe-inline' for React JSX inline style props
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
     "font-src 'self' https://fonts.gstatic.com",
-    // gravatar.com is listed so user icons can fall back to Gravatar. It is
-    // named explicitly rather than opening img-src to all of https: — a
-    // provider's `picture` claim is also a remote URL and stays blocked, in
-    // which case the avatar steps down to the Gravatar or the initial.
+    // gravatar.com is named explicitly rather than opening img-src to all https:, so a provider's
+    // `picture` claim stays blocked and the avatar steps down to Gravatar or the initial.
     "img-src 'self' data: blob: https://www.gravatar.com https://secure.gravatar.com",
     // 'self' is needed by maplibre-gl v6, which loads its tile worker from a
     // bundled /_next/static asset instead of the blob: URL it used in v5.
@@ -51,10 +43,8 @@ export default async function middleware(req: NextRequest) {
     pathname.startsWith("/api/forward-auth/")
   ) {
     const publicResponse = NextResponse.next();
-    // Anti-clickjacking for public pages (/login, /portal): the authenticated
-    // branch below sets the full security-header set, but public pages returned
-    // here previously carried none, leaving the login and forward-auth portal
-    // forms framable. Apply the framing protections to every public response.
+    // Anti-clickjacking for public pages (/login, /portal): the authenticated branch below sets the
+    // full header set, but public responses carried none, leaving those forms framable.
     publicResponse.headers.set("X-Frame-Options", "DENY");
     publicResponse.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
     publicResponse.headers.set("X-Content-Type-Options", "nosniff");
@@ -100,8 +90,8 @@ export const config = {
   matcher: [
     /*
      * Everything except _next/static, _next/image, favicon.ico, the public folder, and maplibre
-     * (the tile worker bundle — it must load as a module script even with an expired session, or
-     * the redirect to /login is parsed as JS and the map breaks).
+     * (the tile worker must load as a module script even with an expired session, or the redirect
+     * to /login is parsed as JS and the map breaks).
      */
     "/((?!_next/static|_next/image|favicon.ico|maplibre/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],

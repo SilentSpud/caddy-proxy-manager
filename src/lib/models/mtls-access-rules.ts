@@ -167,10 +167,7 @@ export async function deleteMtlsAccessRule(id: number, actorUserId: number): Pro
   await applyCaddyConfig();
 }
 
-/**
- * Bulk-query access rules for multiple proxy hosts at once.
- * Used during Caddy config generation.
- */
+/** Bulk-query access rules for many proxy hosts at once, for Caddy config generation. */
 export async function getAccessRulesForHosts(
   proxyHostIds: number[],
 ): Promise<Map<number, MtlsAccessRule[]>> {

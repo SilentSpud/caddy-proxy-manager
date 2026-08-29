@@ -1,7 +1,7 @@
 /**
- * Issue #171: the analytics host dropdown hides traffic-only hosts by default and offers an
- * "Include unconfigured hosts" toggle. Seeds a configured proxy host and a traffic-only ClickHouse
- * host, then verifies the toggle reveals the latter.
+ * Issue #171: the analytics host dropdown hides traffic-only hosts by default, behind an "Include
+ * unconfigured hosts" toggle. Seeds one configured and one traffic-only host, then checks the
+ * toggle reveals the latter.
  */
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
@@ -82,11 +82,9 @@ test.describe('Analytics host filter (#171)', () => {
       const configuredOption = page.getByRole('option', { name: configuredHost });
       const unconfiguredOption = page.getByRole('option', { name: unconfiguredHost });
 
-      // Open the hosts selector and narrow the list to our two markers.
-      // In `hasSearch` mode the MultiSelector trigger is deliberately NOT a
-      // combobox — the popup's search input owns that role and the
-      // aria-activedescendant cursor, so the trigger is a plain button that
-      // opens the listbox. It is the only such trigger on the analytics page.
+      // Open the hosts selector. In `hasSearch` mode the MultiSelector trigger is deliberately NOT
+      // a combobox — the popup's search input owns that role — so it is a plain listbox-opening
+      // button, the only one on the page.
       const openHostList = async () => {
         await page.locator('button[aria-haspopup="listbox"]').click();
         await page.getByPlaceholder('Search hosts...').fill(tag);

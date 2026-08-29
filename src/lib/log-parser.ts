@@ -110,10 +110,9 @@ const BLOCKED_CARRYOVER_WINDOW_SEC = 120;
 // boundary can fall between the two lines; carrying them forward lets the next pass mark them.
 let pendingBlocked: Map<string, number> = new Map();
 
-// Build counted signatures from caddy-blocker's "request blocked" entries so the corresponding
-// "handled request" rows can be marked correctly, instead of using status === 403 (which would
-// also catch legitimate upstream 403s). Pass an existing map via `into` to merge new signatures
-// onto carried-over ones.
+// Counted signatures from caddy-blocker's "request blocked" entries, so the matching "handled
+// request" rows can be marked without using status === 403 (which also catches upstream 403s).
+// `into` merges new signatures onto carried-over ones.
 export function collectBlockedSignatures(
   lines: string[],
   into?: Map<string, number>,

@@ -13,10 +13,7 @@ type SearchFieldProps = {
   hasAutoFocus?: boolean;
 };
 
-/**
- * The app's search box. TextInput owns the icon slot and the clear affordance,
- * so this no longer positions an icon over a padded input by hand.
- */
+/** The app's search box. TextInput owns the icon slot and the clear affordance. */
 export function SearchField({
   value,
   onChange,

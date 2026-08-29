@@ -96,9 +96,8 @@ export async function waitForStatus(
 }
 
 /**
- * Poll until the response body for a route contains a substring. Needed for error-page tests: with
- * the upstream down the status stays 502 before and after the reload, so only the body shows that
- * the config applied.
+ * Poll until a route's response body contains a substring. Needed for error-page tests: with the
+ * upstream down the status stays 502 either side of the reload, so only the body shows the apply.
  */
 export async function waitForBody(
   domain: string,
@@ -138,9 +137,8 @@ export interface WsHandshakeResult {
 }
 
 /**
- * A raw WebSocket upgrade handshake against Caddy over a plain TCP socket, returning the parsed
- * response head. At socket level on purpose: #195's symptom was a corrupt "HTTP/0.9" response with
- * no status line, which a normal client reports as an opaque parse error.
+ * A raw WebSocket upgrade handshake over a plain TCP socket, returning the parsed response head. At
+ * socket level on purpose: #195's symptom was a corrupt "HTTP/0.9" response with no status line.
  */
 export function wsHandshake(
   domain: string,

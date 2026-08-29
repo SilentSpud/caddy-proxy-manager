@@ -29,20 +29,16 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     clientSecret: p.clientSecret,
     scopes: p.scopes ? p.scopes.split(/[\s,]+/).filter(Boolean) : undefined,
     pkce: true,
-    // Security: do not let an OAuth sign-in implicitly create a brand-new account unless OAuth
-    // self-registration is explicitly enabled. Existing users and (where configured) account
-    // linking still work — only first-time auto-provisioning of an unknown identity is gated,
-    // under its own flag, independent of credential self-registration.
+    // Security: an OAuth sign-in must not implicitly create an account unless OAuth
+    // self-registration is on. Only first-time auto-provisioning is gated; linking still works.
     disableImplicitSignUp: !config.auth.allowOauthRegistration,
   };
   if (p.authorizationUrl) cfg.authorizationUrl = p.authorizationUrl;
   if (p.tokenUrl) cfg.tokenUrl = p.tokenUrl;
   if (p.userinfoUrl) cfg.userInfoUrl = p.userinfoUrl;
   if (p.issuer) {
-    // better-auth 1.7 renamed `issuer` to `accountIssuer`: the stable namespace paired with the
-    // provider account id. Discovery providers fall back to the issuer in the discovery
-    // document, but providers configured with explicit endpoints have none, so setting it keeps
-    // account identity stable across both shapes.
+    // better-auth 1.7 renamed `issuer` to `accountIssuer`. Discovery providers fall back to the
+    // discovery document's issuer; ones with explicit endpoints have none, so set it here.
     cfg.accountIssuer = p.issuer;
     // Only use discovery when explicit URLs are not provided
     if (!p.authorizationUrl && !p.tokenUrl) {
@@ -145,9 +141,8 @@ function loadProvidersSync(): GenericOAuthConfig[] {
 
 /**
  * Security: force privileged fields to safe defaults on every better-auth-managed user creation.
- * better-auth's generic-OAuth signup spreads raw IdP claims into the new user and ignores the
- * `input:false` flags, so an IdP returning `role: "admin"` could self-provision an admin.
- * Admin-initiated creation goes through models/user.ts, which bypasses these hooks.
+ * Its generic-OAuth signup spreads raw IdP claims into the new user and ignores `input:false`, so
+ * an IdP returning `role: "admin"` could self-provision one. models/user.ts bypasses these hooks.
  */
 export function enforceSafeUserDefaults<T extends object>(
   user: T,
@@ -279,10 +274,8 @@ function createAuth(): any {
       },
     },
     plugins: [
-      // Cast via unknown: better-auth's `username` plugin declares databaseHooks.user.create
-      // .before's `email: string` (required) while BetterAuthPlugin expects `email?: any`. The
-      // mismatch surfaces in some environments and not others, so the cast keeps the typecheck
-      // stable across local and Docker builds.
+      // Cast via unknown: better-auth's `username` plugin types `email: string` where
+      // BetterAuthPlugin expects `email?: any`, and the mismatch is environment-dependent.
       username({
         maxUsernameLength: 255,
         usernameValidator: (username) => /^[a-zA-Z0-9_.@-]+$/.test(username),

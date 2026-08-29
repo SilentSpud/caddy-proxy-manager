@@ -8,10 +8,7 @@ export const metadata: Metadata = {
   title: "Update your password",
 };
 
-/**
- * Lives outside the dashboard route group on purpose: the dashboard layout
- * redirects here, so being inside it would loop.
- */
+/** Outside the dashboard route group on purpose: the dashboard layout redirects here. */
 export default async function PasswordChangePage() {
   const session = await requireUser();
 

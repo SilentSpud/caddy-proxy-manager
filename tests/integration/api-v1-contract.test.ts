@@ -1,8 +1,7 @@
 /**
  * v1 REST API contract: posts payloads with the field names OpenAPI documents (camelCase) and
- * verifies the model persists them, catching snake/camel drift. Before 2026-05 the spec documented
- * snake_case while the model expected camelCase, so the spread silently dropped `geoblock_mode`,
- * `certificate_id`, `ssl_forced`, `load_balancer`, `location_rules` and the L4 fields.
+ * verifies the model persists them. Before 2026-05 the spec documented snake_case while the model
+ * expected camelCase, so the spread silently dropped `geoblock_mode`, `ssl_forced` and others.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

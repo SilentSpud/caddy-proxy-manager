@@ -45,9 +45,8 @@ function cidrInput(
 
 test.describe('Geo Blocking — form persistence', () => {
   /**
-   * Mutating v1 API calls are same-origin checked, so a request without an Origin header 403s. This
-   * reset silently did nothing while it lacked one, leaving every test here running against
-   * whatever the previous run left in the persisted volume. Assert the status.
+   * Mutating v1 API calls are same-origin checked, so one without an Origin header 403s. This reset
+   * silently did nothing while it lacked one, leaving tests running against the persisted volume.
    */
   async function resetGeoblock(page: any) {
     const res = await page.request.put(API_GEOBLOCK, {
@@ -71,9 +70,8 @@ test.describe('Geo Blocking — form persistence', () => {
   });
 
   /**
-   * Regression: Radix Tabs unmount inactive tab content, so only the currently-visible tab's hidden
-   * inputs were submitted. Saving while on the "Block Rules" tab would wipe all allow rules and
-   * vice-versa. Uses RFC 5737 test ranges to avoid blocking real traffic.
+   * Regression: Radix Tabs unmount inactive content, so only the visible tab's hidden inputs were
+   * submitted — saving on "Block Rules" wiped every allow rule. Uses RFC 5737 ranges.
    */
   test('saving block rules does not wipe allow rules', async ({ page }) => {
     const geoSection = page.locator('form', {
@@ -202,9 +200,8 @@ test.describe('Geo Blocking — form persistence', () => {
   });
 
   /**
-   * Regression: Radix Accordion unmounts closed content, so advanced
-   * settings (redirect URL, trusted proxies, response status/body) were
-   * wiped when saving with the accordion collapsed.
+   * Regression: Radix Accordion unmounts closed content, so advanced settings (redirect URL,
+   * trusted proxies, response status/body) were wiped when saving with it collapsed.
    */
   test('advanced settings survive save when accordion is collapsed', async ({ page }) => {
     const geoSection = page.locator('form', {
@@ -291,9 +288,8 @@ test.describe('Geo Blocking — form persistence', () => {
   });
 
   /**
-   * Tests that the LAN Only preset persists after save.
-   * Saves via UI form, then immediately reads back via API and resets Caddy
-   * to minimize the window where 0.0.0.0/0 blocks all traffic.
+   * The LAN Only preset persists after save. Reads back via API immediately and resets Caddy, to
+   * minimise the window where 0.0.0.0/0 blocks all traffic.
    */
   test('LAN Only preset: values persist after save', async ({ page }) => {
     const geoSection = page.locator('form', {

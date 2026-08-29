@@ -53,10 +53,7 @@ export function AuthentikFields({
   defaults,
 }: {
   authentik?: ProxyHost["authentik"] | null;
-  /**
-   * Global Authentik defaults for prefilling blank fields. Required, not optional, so a call site
-   * cannot silently omit it as the edit dialog did (#232). Pass `null` when there are none.
-   */
+  /** Global Authentik defaults for blank fields. Required so a call site cannot omit it (#232). */
   defaults: AuthentikSettings | null;
 }) {
   const initial = authentik ?? null;

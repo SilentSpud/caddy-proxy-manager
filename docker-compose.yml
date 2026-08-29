@@ -40,18 +40,13 @@ services:
       # suffix on every page title ("Users · <APP_NAME>").
       APP_NAME: ${APP_NAME:-}
 
-      # User icons fall back to Gravatar when a user has no icon of their own and
-      # has a routable email address. Their browser contacts gravatar.com directly.
-      # Set false to disable and pin it, locking the Settings toggle; leave unset
-      # to let Settings → User Avatars decide. That toggle is synced from master
-      # to slaves, so pin it here on any instance that must not reach the network.
+      # User icons fall back to Gravatar when a user has no icon and a routable email; their browser
+      # contacts gravatar.com directly. Set false to pin it off and lock the Settings toggle, which
+      # is synced master → slave, so pin it on any instance that must not reach the network.
       AVATAR_GRAVATAR:
 
-      # REQUIRED unless AUTH_DISABLE_LOCAL_USERS=true: admin credentials for login
-      # SECURITY: You MUST set these to secure values in production!
-      # Password must be 12+ chars with uppercase, lowercase, numbers, and special chars
-      # The app refuses to start in production if these are missing or weak, so they
-      # are not enforced here — an OIDC-only deployment has no local admin to seed
+      # REQUIRED unless AUTH_DISABLE_LOCAL_USERS=true. Must be 12+ chars with upper, lower, digit
+      # and special — the app refuses to start in production if these are missing or weak.
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
 

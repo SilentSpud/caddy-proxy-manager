@@ -1,8 +1,7 @@
 /**
- * Native <input> attributes Astryx forwards but does not type, so they need a cast to get through.
- * Dropping them changes behaviour: `autoComplete` (password managers), `minLength` (sometimes the
- * only enforcement), and `required` — `isRequired` only sets `aria-required`, so NATIVE_REQUIRED is
- * what actually stops an empty submit.
+ * Native <input> attributes Astryx forwards but does not type, so they need a cast. Dropping them
+ * changes behaviour: `autoComplete` (password managers), `minLength` (sometimes the only
+ * enforcement), `required` — `isRequired` only sets `aria-required`.
  */
 type NativeAttrs = Record<string, string | number | boolean>;
 
@@ -15,10 +14,7 @@ export const AUTOFILL_ONE_TIME_CODE = autofill("one-time-code");
 export const AUTOFILL_EMAIL = autofill("email");
 export const AUTOFILL_OFF = autofill("off");
 
-/**
- * Restores the browser's own empty-field gate. Pair with `isRequired`, which supplies the visible
- * indicator and the accessible state.
- */
+/** Restores the browser's empty-field gate. Pair with `isRequired` for the visible indicator. */
 export const NATIVE_REQUIRED: NativeAttrs = { required: true };
 
 /** Native constraint-validation attributes, e.g. `nativeAttrs({ minLength: 8 })`. */

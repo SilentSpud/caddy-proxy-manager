@@ -1,7 +1,6 @@
 /**
- * Claim resolution for group-mapping providers. The interesting case is the one
- * better-auth's default cannot handle: an ID token that identifies the user but
- * carries no group claim, so userinfo has to be consulted as well.
+ * Claim resolution for group-mapping providers. The interesting case is the one better-auth's
+ * default cannot handle: an ID token identifying the user but carrying no group claim.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

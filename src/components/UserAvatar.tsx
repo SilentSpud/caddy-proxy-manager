@@ -14,10 +14,7 @@ interface UserAvatarProps {
   tooltip?: boolean;
 }
 
-/**
- * Renders a user's icon. Astryx's Avatar owns the cascade: `src` → `fallbackSrc` (Gravatar, which
- * 404s when absent) → initials. `avatar.initial` is the last resort.
- */
+/** Renders a user's icon. Astryx's Avatar cascades `src` → `fallbackSrc` (Gravatar) → initials. */
 export function UserAvatar({ avatar, alt, size = "md", tooltip }: UserAvatarProps) {
   return (
     <Avatar

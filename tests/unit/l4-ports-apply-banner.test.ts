@@ -1,7 +1,6 @@
 /**
  * L4PortsApplyBanner's refresh-signal contract: it re-fetches port status whenever refreshSignal
- * changes, so create/edit/delete/toggle shows immediately. Inspects source rather than rendering,
- * to avoid a jsdom environment.
+ * changes. Inspects source rather than rendering, to avoid a jsdom environment.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';

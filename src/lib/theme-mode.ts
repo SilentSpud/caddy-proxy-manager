@@ -1,15 +1,14 @@
 /**
  * Colour-mode preference: what the user picked, not the mode in effect — "system" stays "system".
  * Astryx handles it natively: `<Theme mode="system">` leaves `data-theme` off `<html>`, which its
- * reset.css maps to `color-scheme: light dark`, so it needs no JS and no media-query listener.
+ * reset.css maps to `color-scheme: light dark`, so no JS and no media-query listener.
  */
 export type ThemeMode = "light" | "dark" | "system";
 
 /**
  * Cookie rather than localStorage: the server must know the mode to render `<html data-theme>` on
- * the first paint, and localStorage is unreadable there — which is why the old next-themes setup
- * needed a render-blocking inline script and a CSP nonce. Not HttpOnly; the toggle writes it from
- * the client and a display preference is not worth protecting.
+ * the first paint, which is why the old next-themes setup needed a render-blocking inline script.
+ * Not HttpOnly — the toggle writes it from the client, and a display preference needs no guarding.
  */
 export const THEME_COOKIE = "cpm-theme";
 

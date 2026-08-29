@@ -5,8 +5,8 @@ import { HStack } from "@astryxdesign/core/Stack";
 type StatusType = "active" | "inactive" | "error" | "warning";
 
 /**
- * A status dot with its label beside it. StatusDot carries the semantic colour and accessible
- * name; the visible Text keeps status from depending on colour alone.
+ * A status dot with its label. StatusDot carries the semantic colour and accessible name; the
+ * visible Text keeps status from depending on colour alone.
  */
 const STATUS_CONFIG: Record<
   StatusType,

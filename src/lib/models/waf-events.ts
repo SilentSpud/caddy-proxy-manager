@@ -25,8 +25,8 @@ const EMPTY_WAF_STATS: WafEventStats = {
 };
 
 /**
- * The ClickHouse client rejects with anything from a coded error to a bare object wrapping one, so
- * the shared check walks the cause chain for both a connection code and the runtime's message.
+ * The ClickHouse client rejects with anything from a coded error to a bare wrapper, so the shared
+ * check walks the cause chain for both a connection code and the runtime's message.
  */
 function isClickHouseConnectionError(error: unknown): boolean {
   return isConnectionError(error);

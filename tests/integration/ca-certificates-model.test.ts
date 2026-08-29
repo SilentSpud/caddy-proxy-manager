@@ -1,7 +1,7 @@
 /**
- * Integration: deleting a CA must cascade to the client certificates it issued and their role
- * mappings. The schema declares onDelete: "cascade", but bun:sqlite runs with PRAGMA foreign_keys
- * OFF, so the model cascades explicitly — otherwise orphaned certs linger in the mTLS picker.
+ * Integration: deleting a CA must cascade to the certs it issued and their role mappings. The
+ * schema declares onDelete: "cascade", but bun:sqlite leaves PRAGMA foreign_keys OFF, so the model
+ * cascades explicitly.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

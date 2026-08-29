@@ -1,7 +1,6 @@
 /**
- * Server-level trusted_proxies / client_ip_headers (#222). Caddy resolves client_ip in core, before
- * any handler, so servers.cpm is the only place a global list can fix attribution. Covers the pure
- * builder plus its emission into the generated document.
+ * Server-level trusted_proxies / client_ip_headers (#222). Caddy resolves client_ip in core, so
+ * servers.cpm is the only place a global list can fix attribution.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

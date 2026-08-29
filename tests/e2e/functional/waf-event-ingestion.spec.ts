@@ -1,9 +1,8 @@
 /**
  * Functional: WAF event ingestion (#233). waf-blocking.spec.ts proves Coraza *blocks*; nothing
- * asserted a block is *recorded*, leaving the whole pipeline (audit log → waf-log-parser →
- * ClickHouse → /api/waf-events → the WAF page) uncovered. The tick-boundary race behind #233 is
- * pinned in tests/unit/waf-log-parser.test.ts; these guarantee a real audit log reaches the table
- * with its rule populated. Domain: func-waf-ingest.test
+ * asserted a block is *recorded*, leaving the audit log → parser → ClickHouse → API → page pipeline
+ * uncovered. The tick-boundary race is pinned in waf-log-parser.test.ts; these prove a real audit
+ * log reaches the table with its rule populated. Domain: func-waf-ingest.test
  */
 import { test, expect, type Page } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

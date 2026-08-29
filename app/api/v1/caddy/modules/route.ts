@@ -7,8 +7,8 @@ import { CADDY_MODULES } from "@/src/lib/caddy-modules";
 import { getCaddyBuildSettings, saveCaddyBuildSettings } from "@/src/lib/settings";
 
 /**
- * GET /api/v1/caddy/modules — the module catalog, the current selection, and how it differs from
- * the running image. The catalog ships along because module ids are what PUT expects.
+ * GET /api/v1/caddy/modules — the catalog, the current selection, and how it differs from the
+ * running image. The catalog ships along because module ids are what PUT expects.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PUT /api/v1/caddy/modules — replace the selection. Does not rebuild: the running container keeps
- * its module set until POST /api/caddy-build. The returned diff says what a rebuild would change.
+ * PUT /api/v1/caddy/modules — replace the selection. Does not rebuild; the container keeps its
+ * module set until POST /api/caddy-build. The diff says what a rebuild would change.
  */
 export async function PUT(request: NextRequest) {
   try {

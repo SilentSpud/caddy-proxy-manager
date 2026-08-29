@@ -1,8 +1,7 @@
 /**
  * The one definition of what makes a password acceptable — previously duplicated between config.ts
- * and the change-password route, which restated it by hand. Anything asking a human to choose a
- * password imports from here. Dependency-free: config.ts loads it at module scope, and client
- * components import it to give the same feedback the server will.
+ * and the change-password route. Dependency-free, so config.ts can load it at module scope and
+ * client components can give the same feedback the server will.
  */
 
 export const MIN_PASSWORD_LENGTH = 12;
@@ -11,8 +10,8 @@ export const MIN_PASSWORD_LENGTH = 12;
 export const PASSWORD_POLICY_HINT = `At least ${MIN_PASSWORD_LENGTH} characters, including upper and lower case, a number, and a special character`;
 
 /**
- * Every requirement the password fails, phrased as a predicate so the caller can supply the
- * subject — "ADMIN_PASSWORD must be…", "Export password must be…". Empty means acceptable.
+ * Every requirement the password fails, phrased as a predicate so the caller supplies the subject
+ * ("ADMIN_PASSWORD must be…"). Empty means acceptable.
  */
 export function passwordPolicyFailures(password: string): string[] {
   const failures: string[] = [];
@@ -33,10 +32,7 @@ export function passwordPolicyFailures(password: string): string[] {
   return failures;
 }
 
-/**
- * One sentence naming every failure, or null when the password is acceptable. Reports all
- * failures at once rather than one per attempt.
- */
+/** One sentence naming every failure, or null. Reports all at once, not one per attempt. */
 export function passwordPolicyError(password: string, subject = "Password"): string | null {
   const failures = passwordPolicyFailures(password);
   return failures.length > 0 ? `${subject} ${failures.join(", ")}` : null;

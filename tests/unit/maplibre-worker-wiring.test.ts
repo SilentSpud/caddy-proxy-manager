@@ -5,9 +5,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * WorldMapInner imports maplibre-gl's tile worker with Vite's `?worker&url` and hands the emitted
- * chunk to setWorkerUrl(), because the worker's own `import.meta.url` lookup does not survive
- * bundling. These fail loudly if an upgrade renames the worker entry — otherwise a blank map.
+ * WorldMapInner imports maplibre-gl's tile worker with `?worker&url` and hands the chunk to
+ * setWorkerUrl(), since the worker's own `import.meta.url` lookup does not survive bundling. These
+ * fail loudly if an upgrade renames the entry — otherwise a blank map.
  */
 
 const require = createRequire(import.meta.url);

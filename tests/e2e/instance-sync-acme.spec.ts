@@ -1,7 +1,6 @@
 /**
- * Functional: master → slave settings sync for the ACME group (#192). A custom ACME directory set
- * on web-master:3002 is pushed to web-slave:3003 and surfaces as the slave's effective setting;
- * both point at an unreachable Caddy, so the slave persists before its own failing apply. Guards
+ * Functional: master → slave settings sync for the ACME group (#192). A directory set on
+ * web-master:3002 is pushed to web-slave:3003 and surfaces as the slave's effective setting. Guards
  * the regression where a new setting group is missing from the SyncSettings allowlist.
  */
 import { test, expect, type BrowserContext, type Browser } from '@playwright/test';

@@ -1,7 +1,6 @@
 /**
- * E2E: per-location-rule load balancer / health checks (#200). A 201 proves the live Caddy accepted
- * the generated per-rule load_balancing/health_checks JSON; the read-back proves the model
- * hydrated the nested config.
+ * E2E: per-location-rule load balancer / health checks (#200). A 201 proves live Caddy accepted the
+ * generated per-rule JSON; the read-back proves the model hydrated the nested config.
  */
 import { test, expect } from '@playwright/test';
 

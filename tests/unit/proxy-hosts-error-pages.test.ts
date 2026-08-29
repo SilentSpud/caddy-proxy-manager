@@ -1,8 +1,7 @@
 /**
- * Regression: per-host custom error pages must round-trip through createProxyHost /
- * updateProxyHost. serializeMeta did not copy `error_pages` into the stored meta, so a host created
- * with them persisted nothing and Caddy never emitted the handle_errors route. Global error pages
- * live in settings and were unaffected, which is why only the per-host e2e tests failed.
+ * Regression: per-host error pages must round-trip through create/updateProxyHost. serializeMeta
+ * did not copy `error_pages` into the stored meta, so a host created with them persisted nothing.
+ * Global error pages live in settings and were unaffected.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

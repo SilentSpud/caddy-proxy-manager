@@ -1,17 +1,14 @@
 /**
  * Caddy image build management.
  *
- * Plugins are compiled in, so changing the module list means rebuilding and recreating the caddy
- * container: the web app writes a compose override plus a trigger file to the shared data volume,
- * and the sidecar builds, recreates, and writes caddy-build.status — plus caddy-build.applied.json
- * on success only.
+ * Plugins are compiled in, so a module-list change means rebuilding and recreating the container:
+ * the web app writes a compose override plus a trigger to the shared volume, and the sidecar builds
+ * and writes caddy-build.status — plus caddy-build.applied.json on success only.
  *
- * Two module sets exist at once. *desired* is the admin's selection, held in the compose override
- * and driving the UI; *applied* is what the running binary was built with, per the sidecar's
- * record. Config generation must never emit a handler outside *applied*, since Caddy rejects a
- * config naming an unknown module in full. Separate files because the override is written before
- * the build — see getAppliedModuleSpecs. Generation uses the intersection: off applies at once, on
- * waits for the rebuild.
+ * *desired* is the admin's selection (the compose override, drives the UI); *applied* is what the
+ * running binary was built with (the sidecar's record). Generation must never emit a handler
+ * outside *applied*, since Caddy rejects a config naming an unknown module in full — hence separate
+ * files, since the override is written before the build. Generation uses the intersection.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -66,7 +63,7 @@ export type CaddyBuildDiff = {
 
 /**
  * Resolve stored settings into a complete selection. A missing module id counts as enabled, so a
- * module added to the catalog after the operator last saved appears on, matching their image.
+ * module added to the catalog after the operator last saved appears on.
  */
 export function resolveEnabledModuleIds(settings: CaddyBuildSettings | null): string[] {
   const overrides = settings?.modules ?? {};
@@ -79,10 +76,7 @@ export function resolveCustomModules(settings: CaddyBuildSettings | null): Caddy
   );
 }
 
-/**
- * The full `--with` argument list for a selection, sorted so an unchanged selection always
- * hashes to the same value regardless of toggle order.
- */
+/** The `--with` list for a selection, sorted so toggle order never changes the hash. */
 export function resolveModuleSpecs(settings: CaddyBuildSettings | null): string[] {
   const builtIn = resolveEnabledModuleIds(settings).map(
     (id) => findCaddyModule(id)?.modulePath ?? id,
@@ -101,14 +95,12 @@ export function defaultModuleSpecs(): string[] {
 /**
  * The module specs actually compiled into the running binary.
  *
- * Read from the record the sidecar writes only after a build succeeds and the container is
- * healthy — not from the compose override, which holds the *desired* list and is written before
- * the build. Reading that would make applied equal desired the instant a rebuild is requested, so
- * any config apply during the build would emit handlers the binary lacks, and a failed build would
- * keep every later apply rejected.
+ * From the record the sidecar writes only after a successful, healthy build — not the compose
+ * override, which holds the *desired* list and is written first. Using that would make applied
+ * equal desired the instant a rebuild is requested, so any apply during the build would emit
+ * handlers the binary lacks, and a failed build would reject every later apply.
  *
- * No record means no rebuild has happened, so the container is the shipped image with the full
- * catalog — returning an empty list would drop every plugin handler on a healthy install.
+ * No record means no rebuild yet, so the container is the shipped image with the full catalog.
  */
 export function getAppliedModuleSpecs(): string[] {
   const filePath = join(DATA_DIR, APPLIED_FILE);
@@ -197,10 +189,7 @@ function stripVersion(spec: string): string {
   return at > 0 ? spec.slice(0, at) : spec;
 }
 
-/**
- * Whether config generation may emit handlers for a feature: the module must be both
- * selected and actually compiled into the running binary.
- */
+/** Whether generation may emit a feature's handlers: selected *and* compiled into the binary. */
 export function isFeatureUsable(
   availability: CaddyModuleAvailability,
   feature: CaddyFeatureId,
@@ -209,8 +198,8 @@ export function isFeatureUsable(
 }
 
 /**
- * Whether a DNS provider can be used for an ACME DNS-01 challenge. Per-provider, unlike the
- * coarser feature check: Cloudflare compiled in says nothing about Route 53.
+ * Whether a DNS provider can serve an ACME DNS-01 challenge. Per-provider, unlike the coarser
+ * feature check: Cloudflare compiled in says nothing about Route 53.
  */
 export function isDnsProviderUsable(
   availability: CaddyModuleAvailability,
@@ -260,8 +249,8 @@ services:
 }
 
 /**
- * Persist the current selection as a compose override and signal the sidecar. Validated here as
- * well as in the UI, since the REST API reaches this too and a bad path would fail opaquely later.
+ * Persist the selection as a compose override and signal the sidecar. Validated here as well as in
+ * the UI, since the REST API reaches it too and a bad path would fail opaquely later.
  */
 export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
   const settings = await getCaddyBuildSettings();
@@ -272,10 +261,9 @@ export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
     if (error) throw new Error(error);
   }
 
-  // Re-apply the config before the rebuild, not after. Caddy runs with `--resume`, so a recreated
-  // container reloads the last autosaved config; if that names a module the new binary lacks,
-  // Caddy refuses to load and the proxy stays down with no admin API to correct it. Doing it here
-  // covers every entry point. Imported lazily — caddy.ts imports this module for feature gating.
+  // Re-apply the config before the rebuild. Caddy runs with `--resume`, so a recreated container
+  // reloads the last autosaved config; if that names a module the new binary lacks, the proxy stays
+  // down with no admin API to correct it. Imported lazily — caddy.ts imports this for gating.
   const { applyCaddyConfig } = await import("./caddy");
   await applyCaddyConfig();
 
@@ -309,10 +297,7 @@ export function getCaddyBuildStatus(): CaddyBuildStatus {
   }
 }
 
-/**
- * Normalize a settings payload from a form or the REST API: drop unknown module ids, clean
- * up and validate custom entries.
- */
+/** Normalize a settings payload: drop unknown module ids, clean and validate custom entries. */
 export function sanitizeCaddyBuildSettings(input: {
   modules?: Record<string, boolean>;
   customModules?: CaddyCustomModule[];
@@ -352,8 +337,7 @@ const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "dns01"];
 
 /**
  * The serializable snapshot the dashboard hands to client components. Gates on *desired*, not
- * applied: a control following applied would stay greyed out right after being switched on. The
- * pending-rebuild flag is what says the change is not live yet.
+ * applied — a control following applied would stay greyed out right after being switched on.
  */
 export async function getModuleGateState(): Promise<{
   features: Record<CaddyFeatureId, boolean>;

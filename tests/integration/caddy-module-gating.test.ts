@@ -1,8 +1,7 @@
 /**
- * What buildCaddyDocument will emit once a module is switched off. Caddy validates a posted config
- * as a single document, so one handler naming an absent module rejects the whole thing and takes
- * every unrelated host offline — a disabled module's handler must not appear at all. The per-host
- * Caddyfile escape hatch is covered too: a snippet that no longer adapts is skipped, not fatal.
+ * What buildCaddyDocument emits once a module is switched off. Caddy validates a posted config as
+ * one document, so a handler naming an absent module takes every host offline — the handler must
+ * not appear at all. The Caddyfile escape hatch is covered too: an unadaptable snippet is skipped.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

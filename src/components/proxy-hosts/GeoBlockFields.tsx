@@ -89,8 +89,8 @@ const CONTINENT_OPTIONS = CONTINENTS.map((c) => ({
 }));
 
 /**
- * MultiSelector replaces ~200 lines of hand-built chips and headers. The hidden input keeps the
- * submitted comma-joined value byte-identical, so the server action is untouched.
+ * MultiSelector replaces ~200 lines of hand-built chips. The hidden input keeps the submitted
+ * comma-joined value byte-identical, so the server action is untouched.
  */
 function CodeMultiSelect({
   name,

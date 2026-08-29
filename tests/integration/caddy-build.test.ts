@@ -1,8 +1,7 @@
 /**
- * Module selection, the compose override it produces, and the gate it feeds. The idea under test is
- * *desired* modules (what the admin selected) vs *applied* (what the binary was built with). Config
- * generation uses the intersection: Caddy rejects a whole document naming a module it lacks, so an
- * unbuilt handler would take every unrelated host offline.
+ * Module selection, the compose override it produces, and the gate it feeds: *desired* modules
+ * (what the admin selected) vs *applied* (what the binary was built with). Generation uses the
+ * intersection — Caddy rejects a whole document naming a module it lacks.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -71,9 +70,8 @@ const BLOCKER = 'github.com/fuomag9/caddy-blocker-plugin';
 const CLOUDFLARE = 'github.com/caddy-dns/cloudflare';
 
 /**
- * Pretend a rebuild already completed with exactly these modules. Writes the *applied record* — the
- * file the sidecar produces only after a successful build — not the compose override, which carries
- * the desired list into a build that has not happened.
+ * Pretend a rebuild already completed with these modules. Writes the *applied record* — what the
+ * sidecar produces only after a successful build — not the compose override.
  */
 function setAppliedModules(specs: string[]) {
   writeFileSync(APPLIED_PATH, JSON.stringify({ modules: specs.join(' ') }), 'utf-8');

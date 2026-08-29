@@ -38,13 +38,10 @@ RUN case "$TARGETARCH" in \
     bun run build && bun run build:binary && rm -f /tmp/build.db
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-# Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package
-# manager, a Bun CLI and a `bun -e` execution surface would all be dead weight here. Bookworm
-# matches oven/bun:1-slim's base, so the binary finds the glibc it was linked against.
-#
-# This is the only runtime stage — the end-to-end suite runs this same image rather than a variant
-# with extra tooling, so what the tests exercise is what ships. The suite seeds its fixtures
-# through the `db-seed` container in tests/docker-compose.test.yml instead of executing code here.
+# Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package manager
+# and Bun CLI would be dead weight. Bookworm matches oven/bun:1-slim's base, so the glibc matches.
+# The only runtime stage — the e2e suite runs this same image, seeding through the `db-seed`
+# container rather than executing code here.
 FROM debian:bookworm-slim AS runner
 ARG PUID=10001
 ARG PGID=10001
@@ -65,14 +62,11 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
     groupadd -g ${PGID} cpm && \
     useradd -r -u ${PUID} -g cpm cpm
 
-# The whole standalone directory, copied verbatim so the relative layout is preserved: the compiled
-# binary (cpm-server), the application bundle and client assets it serves (dist/), the runtime
-# dependencies the bundle still imports from disk (node_modules/ — react and react-dom are
-# externals), and the package.json whose "type": "module" tells the runtime how to load dist/*.js.
-#
-# The application bundle deliberately stays on disk: vinext's production server loads it with a
-# runtime import() of a real file path, and Bun's embedded-asset filesystem does not support
-# import() — so it cannot be compiled into the binary, only read from beside it.
+# The whole standalone directory, copied verbatim so the layout is preserved: the binary
+# (cpm-server), the app bundle and client assets (dist/), the runtime deps the bundle still imports
+# (node_modules/), and the package.json whose "type": "module" says how to load dist/*.js. The
+# bundle stays on disk because vinext loads it with a runtime import() of a real path, which Bun's
+# embedded-asset filesystem does not support.
 COPY --from=builder --chown=cpm:cpm /app/dist/standalone ./
 
 # Migrations are read at startup and live outside the bundle.

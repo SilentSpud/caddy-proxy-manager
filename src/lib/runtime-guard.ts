@@ -1,7 +1,7 @@
 /**
  * Bun is the only supported runtime: the database layer imports `bun:sqlite`. Under Node the
- * process dies while linking the module graph on an unsupported `bun:` URL, which reads as a
- * packaging bug rather than the wrong interpreter — so say so plainly, and say what to run.
+ * process dies while linking on an unsupported `bun:` URL, which reads as a packaging bug — so say
+ * so plainly, and say what to run.
  */
 
 /** `{runtime}` is filled in by describeRuntime() at the point of failure. */
@@ -21,9 +21,9 @@ export function describeRuntime(): string {
 }
 
 /**
- * Aborts unless the process is running under Bun. Covers the paths where app code runs at all; the
- * standalone build fails earlier, while linking, so scripts/inject-runtime-guard.mjs plants an
- * equivalent check atop dist/standalone/server.js. `exit` is injected so this is testable.
+ * Aborts unless running under Bun. Covers the paths where app code runs at all; the standalone
+ * build fails earlier, while linking, so inject-runtime-guard.mjs plants an equivalent check atop
+ * dist/standalone/server.js. `exit` is injected so this is testable.
  */
 export function assertBunRuntime(exit: (code: number) => never = process.exit): void {
   if (process.versions.bun) {

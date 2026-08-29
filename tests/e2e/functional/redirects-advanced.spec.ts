@@ -1,7 +1,6 @@
 /**
- * Functional: redirect rules with full URLs, cross-domain destinations and wildcard paths.
- * Requests go to Caddy on port 80 with a custom Host header; responses are asserted, not followed.
- * Caddy "from" wildcards: "/foo/bar" exact, "/foo/bar*" suffix glob, "/foo/*" dir glob.
+ * Functional: redirect rules with full URLs, cross-domain destinations and wildcard paths, asserted
+ * without following. Caddy "from" wildcards: "/foo/bar" exact, "/foo/bar*" suffix, "/foo/*" dir.
  * Domain: func-redirects-adv.test
  */
 import { test, expect } from '@playwright/test';

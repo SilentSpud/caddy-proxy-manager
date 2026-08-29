@@ -5,10 +5,7 @@ import { config } from "./config";
 import { users, accounts } from "./db/schema";
 import { and, eq } from "drizzle-orm";
 
-/**
- * Ensures the admin user from environment variables exists, hashing the password before storing
- * it. Called during application startup.
- */
+/** Ensures the env-configured admin user exists, hashing the password. Called at startup. */
 
 //Todo: this could probably be handled better, especially for the adminid.
 export async function ensureAdminUser(): Promise<void> {
@@ -87,10 +84,7 @@ export async function ensureAdminUser(): Promise<void> {
   await ensureCredentialAccount(adminId, passwordHash);
 }
 
-/**
- * Ensures a credential account row exists for Better Auth, which requires one with
- * providerId="credential" and the password hash.
- */
+/** Ensures the `credential` account row Better Auth needs, with the password hash. */
 async function ensureCredentialAccount(userId: number, passwordHash: string): Promise<void> {
   const now = nowIso();
   const existing = await db

@@ -16,11 +16,10 @@ type GlobalForDrizzle = typeof globalThis & {
 };
 
 /**
- * A `file:` URL exposes its path with a leading slash, so a Windows absolute path round-trips as
- * "/C:/data/app.db" and resolves against the drive root. Drop the slash when a drive letter
- * follows. Not `fileURLToPath`: on Windows it rejects POSIX-style file URLs, and
- * `file:/app/data/app.db` is the documented Docker default. Windows-only — on POSIX "/C:/x" is a
- * real path. `platform` is a parameter so tests can cover both.
+ * A `file:` URL exposes its path with a leading slash, so a Windows absolute path arrives as
+ * "/C:/data/app.db" and resolves against the drive root — drop the slash when a drive letter
+ * follows. Not `fileURLToPath`, which rejects POSIX-style file URLs on Windows. Windows-only; on
+ * POSIX "/C:/x" is a real path. `platform` is a parameter so tests can cover both.
  */
 export function stripLeadingSlashBeforeDriveLetter(
   pathname: string,
@@ -94,10 +93,7 @@ if (process.env.NODE_ENV !== "production") {
 
 const migrationsFolder = resolvePath(process.cwd(), "drizzle");
 
-/**
- * Rename a column when the snake_case form exists and the camelCase form does not. No-ops if
- * the table is missing or the column is already correct.
- */
+/** Rename a column when only the snake_case form exists. No-op if missing or already correct. */
 function renameColumnIfNeeded(table: string, from: string, to: string) {
   try {
     const cols = db.$client.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
@@ -112,10 +108,7 @@ function renameColumnIfNeeded(table: string, from: string, to: string) {
   }
 }
 
-/**
- * Add a column if absent. Checks both snake_case and camelCase forms so a column already
- * renamed by a later migration isn't re-added.
- */
+/** Add a column if absent, checking both snake_case and camelCase so a rename isn't undone. */
 function addColumnIfMissing(table: string, snake: string, camel: string, definition: string) {
   try {
     const cols = db.$client.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
@@ -132,9 +125,9 @@ function addColumnIfMissing(table: string, snake: string, camel: string, definit
 }
 
 /**
- * Ensure `sessions.id` is INTEGER PRIMARY KEY AUTOINCREMENT. Better Auth uses
- * generateId:"serial" and omits `id` from INSERT, which an older `id TEXT NOT NULL` schema
- * rejects. Sessions are ephemeral, so just recreate the table.
+ * Ensure `sessions.id` is INTEGER PRIMARY KEY AUTOINCREMENT. Better Auth uses generateId:"serial"
+ * and omits `id` from INSERT, which an older `id TEXT NOT NULL` schema rejects. Sessions are
+ * ephemeral, so just recreate the table.
  */
 function fixSessionsSchema() {
   try {
@@ -249,9 +242,9 @@ function fixAccountsSchema() {
 }
 
 /**
- * Pre-migration patch for deployments that ran an older migration 0020 with different column
- * names. 0021 renames columns in many tables but not `accounts`, `sessions` or `verifications`, so
- * snake_case survivors break Better Auth. Runs before `migrate()` to fix them up.
+ * Pre-migration patch for deployments that ran an older 0020 with different column names. 0021
+ * renames columns in many tables but not `accounts`, `sessions` or `verifications`, so snake_case
+ * survivors break Better Auth. Runs before `migrate()`.
  */
 function patchTablesForMigration020() {
   // ── users ────────────────────────────────────────────────────────────────────
@@ -276,9 +269,8 @@ function patchTablesForMigration020() {
   fixAccountsSchema();
 
   // ── sessions ─────────────────────────────────────────────────────────────────
-  // auth-server.ts uses generateId:"serial" — Better Auth omits `id` from INSERT and relies on
-  // INTEGER PRIMARY KEY AUTOINCREMENT, so an older `id TEXT NOT NULL` schema fails. Recreate
-  // the table when needed; sessions are ephemeral, so data loss is acceptable.
+  // Better Auth omits `id` from INSERT (generateId:"serial") and relies on AUTOINCREMENT, so an
+  // older `id TEXT NOT NULL` schema fails. Recreate; sessions are ephemeral.
   fixSessionsSchema();
   renameColumnIfNeeded("sessions", "user_id", "userId");
   renameColumnIfNeeded("sessions", "expires_at", "expiresAt");
@@ -432,10 +424,7 @@ function runBetterAuthDataMigration() {
   console.log("Better Auth data migration complete: populated accounts table");
 }
 
-/**
- * Sync OAUTH_* env vars into the oauthProviders table (synchronous). Raw Drizzle queries,
- * since this runs at module load time.
- */
+/** Sync OAUTH_* env vars into oauthProviders. Raw Drizzle — this runs at module load. */
 function runEnvProviderSync() {
   if (sqlitePath === ":memory:") return;
 
@@ -549,10 +538,7 @@ function runEnvProviderSync() {
   }
 }
 
-/**
- * One-time migration: convert legacy Cloudflare DNS settings to the generic dns_provider
- * format. Idempotent — skips if already run or if the new setting already exists.
- */
+/** One-time migration: legacy Cloudflare DNS settings → the generic dns_provider format. */
 function runCloudflareToProviderMigration() {
   if (sqlitePath === ":memory:") return;
 

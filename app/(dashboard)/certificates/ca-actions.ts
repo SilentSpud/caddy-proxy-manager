@@ -25,8 +25,8 @@ type Pkcs12ExportOptions = NonNullable<Parameters<typeof forge.pkcs12.toPkcs12As
 };
 
 /**
- * RSA keygen on the crypto threadpool rather than forge's pure-JS version, which blocks the event
- * loop for the whole generation (~150-450ms at 4096 bits). Returns forge key objects, so the built
+ * RSA keygen on the crypto threadpool rather than forge's pure-JS version, which blocks the loop
+ * for the whole generation (~150-450ms at 4096 bits). Returns forge key objects, so the built
  * certificate and stored PEM stay byte-identical.
  */
 async function generateForgeKeyPair(bits: number) {
@@ -222,9 +222,8 @@ export async function issueClientCertificateAction(
   revalidatePath("/certificates");
 
   // AES-256 unconditionally, with forge's weak defaults (2048 iterations, 8-byte salt, SHA-1 PRF)
-  // all raised: this bundle leaves the deployment as a file. `prfAlgorithm` is undeclared in
-  // @types/node-forge but forwarded to pki.encryptPrivateKeyInfo; client-cert-p12-export.test.ts
-  // pins the emitted PRF. The outer PKCS#12 MAC stays SHA-1 — pkcs12.js hardcodes it.
+  // raised — this bundle leaves the deployment as a file. `prfAlgorithm` is undeclared in
+  // @types/node-forge but forwarded to pki.encryptPrivateKeyInfo; the PKCS#12 MAC stays SHA-1.
   const pkcs12Options = {
     algorithm: "aes256",
     friendlyName: commonName,

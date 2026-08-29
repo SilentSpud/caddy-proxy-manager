@@ -1,18 +1,16 @@
 /**
- * The catalog of Caddy modules this app knows how to drive.
- *
- * Caddy is one static binary: a plugin was either compiled in by xcaddy or does not exist. This is
- * the one place recording that, so three concerns agree — `docker/caddy/Dockerfile` (what gets
- * compiled), `src/lib/caddy.ts` (which handlers may be emitted; naming an absent module makes Caddy
- * reject the *entire* config), and the Settings UI (which controls are live). DNS provider modules
- * derive from DNS_PROVIDERS: the credentials form and the Go module path are the same fact.
+ * The catalog of Caddy modules this app knows how to drive. Caddy is one static binary: a plugin
+ * was either compiled in by xcaddy or does not exist. This is the one place recording that, so
+ * `docker/caddy/Dockerfile` (what gets compiled), `src/lib/caddy.ts` (which handlers may be
+ * emitted — an absent module makes Caddy reject the *entire* config) and the Settings UI agree.
+ * DNS provider modules derive from DNS_PROVIDERS.
  */
 
 import { DNS_PROVIDERS } from "./dns-providers";
 
 /**
- * A capability the rest of the app can ask about. Features are what UI and config generation gate
- * on, modules are what the operator toggles — one module can power several features.
+ * A capability the rest of the app can ask about. Features are what the UI and generation gate on,
+ * modules are what the operator toggles — one module can power several features.
  */
 export type CaddyFeatureId =
   | "l4"
@@ -35,10 +33,7 @@ export type CaddyModuleDefinition = {
   category: CaddyModuleCategory;
   /** Features that stop working when this module is not compiled in. */
   features: CaddyFeatureId[];
-  /**
-   * DNS provider name (DnsProviderDefinition.name) for provider modules, so the DNS Providers
-   * UI can find the module backing each entry.
-   */
+  /** DNS provider name for provider modules, so the DNS Providers UI can find its module. */
   dnsProvider?: string;
 };
 
@@ -124,9 +119,8 @@ export type CaddyCustomModule = {
 };
 
 /**
- * Go module paths are pasted from READMEs, so they arrive with schemes, slashes and whitespace,
- * and they land verbatim in a shell command in the Dockerfile. An allowlist is the only form of
- * this that stays correct when the Dockerfile's quoting changes.
+ * Go module paths arrive pasted from READMEs, with schemes and stray whitespace, and land verbatim
+ * in a shell command in the Dockerfile — so an allowlist, not escaping.
  */
 const MODULE_PATH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._~/-]*[a-zA-Z0-9]$/;
 const VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._+-]*$/;
@@ -140,10 +134,7 @@ export function normalizeModulePath(raw: string): string {
   return path.slice(0, end);
 }
 
-/**
- * Validate a custom module entry, returning an error message or null. Exported so the server
- * action and the REST API reject the same inputs.
- */
+/** Validate a custom module entry; error message or null. Shared by the action and the REST API. */
 export function validateCustomModule(entry: CaddyCustomModule): string | null {
   const path = normalizeModulePath(entry.modulePath);
   if (!path) return "Module path is required";

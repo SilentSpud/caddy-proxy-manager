@@ -10,9 +10,8 @@ const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings navigation"]'
 const SETTINGS_ORIGIN = 'http://localhost:3000';
 
 /**
- * Opens the settings command palette with its keyboard shortcut. The shortcut binds to `window` in
- * a useEffect, so pressing it straight after goto() does nothing — wait for the sidebar's search
- * control first. Click-driven tests auto-wait for actionability, which is why only these failed.
+ * Opens the settings command palette by keyboard. The shortcut binds to `window` in a useEffect, so
+ * pressing it straight after goto() does nothing — wait for the sidebar's search control first.
  */
 async function openPaletteWithKeyboard(page: Page) {
   await expect(page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...')).toBeVisible();

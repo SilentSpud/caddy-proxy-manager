@@ -25,11 +25,9 @@ const ASSIGNMENT = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
 
 /**
  * Removes the repository's dotenv values from process.env. Bun loads .env automatically where Node
- * did not, so a developer's local .env reaches src/lib/config.ts and changes the defaults under
- * test — AUTH_ALLOW_OAUTH_REGISTRATION alone fails config-local-users-disabled.test.ts.
- * `--env-file` does not help: `bun run test` already loaded it into the inherited environment.
- * Keys are dropped whether they came from the file or the shell; what the suite needs is in
- * TEST_ENV.
+ * did not, so a developer's local .env changes the defaults under test —
+ * AUTH_ALLOW_OAUTH_REGISTRATION alone fails config-local-users-disabled.test.ts. `--env-file` does
+ * not help: `bun run test` already loaded it. What the suite needs is in TEST_ENV.
  */
 export function clearDotEnv(): void {
   for (const file of DOTENV_FILES) {

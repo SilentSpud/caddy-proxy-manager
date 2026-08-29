@@ -1,11 +1,8 @@
 /**
- * Password hashing on Bun's native implementations.
- *
- * User passwords use argon2id: memory-hard, and it consumes the whole password rather than
- * bcrypt's first 72 bytes. Access list passwords must stay bcrypt — Caddy's `http_basic` verifies
- * those itself and understands nothing else. Neither blocks the event loop, unlike the pure-JS
- * bcryptjs this replaced (~170ms per hash, serializing sign-ins). `verifyPassword` detects the
- * algorithm from the stored hash, so pre-argon2id rows keep working with no migration.
+ * Password hashing on Bun's natives. User passwords use argon2id: memory-hard, and it consumes the
+ * whole password rather than bcrypt's first 72 bytes. Access list passwords must stay bcrypt —
+ * Caddy's `http_basic` verifies those itself. Neither blocks the event loop, unlike the pure-JS
+ * bcryptjs this replaced. `verifyPassword` detects the algorithm, so old rows need no migration.
  */
 
 /** bcrypt hashes only the first 72 bytes of a password; the rest is discarded. */
@@ -17,9 +14,9 @@ const BCRYPT_PREFIX = /^\$2[aby]\$/;
 export const DEFAULT_BCRYPT_COST = 12;
 
 /**
- * bcryptjs silently truncated at 72 bytes while Bun.password hashes the full input, so without
- * this a longer password would stop matching its stored hash. By bytes, the unit bcrypt counts,
- * and only for bcrypt — clamping argon2id would throw away real password material.
+ * bcryptjs silently truncated at 72 bytes while Bun.password hashes the full input, so a longer
+ * password would stop matching its stored hash. By bytes, and only for bcrypt — clamping argon2id
+ * would throw away real material.
  */
 function clampToBcryptLimit(password: string): string | Uint8Array {
   const bytes = Buffer.from(password, "utf8");
@@ -31,18 +28,12 @@ export function isLegacyPasswordHash(hash: string | null | undefined): boolean {
   return typeof hash === "string" && BCRYPT_PREFIX.test(hash);
 }
 
-/**
- * Hashes a user password with argon2id at Bun's defaults (m=64MiB, t=2, p=1), which already
- * exceed OWASP's floor of m=19MiB.
- */
+/** Hashes with argon2id at Bun's defaults (m=64MiB, t=2, p=1), above OWASP's m=19MiB floor. */
 export async function hashPassword(password: string): Promise<string> {
   return Bun.password.hash(password, { algorithm: "argon2id" });
 }
 
-/**
- * Hashes with bcrypt. Only for hashes something outside this app verifies — today, Caddy
- * basicauth. User passwords want {@link hashPassword}.
- */
+/** Hashes with bcrypt — only for hashes verified outside this app (Caddy basicauth). */
 export async function hashBcrypt(
   password: string,
   cost: number = DEFAULT_BCRYPT_COST,

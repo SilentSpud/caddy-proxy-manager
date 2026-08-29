@@ -183,10 +183,8 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     throw new Error(`CA certificate is in use by proxy host(s): ${names}`);
   }
 
-  // Cascade-delete the CA's issued client certificates and their role mappings. The schema
-  // declares onDelete: "cascade" for these foreign keys, but bun:sqlite leaves PRAGMA
-  // foreign_keys OFF, so the cascade never fires — without this, deleting a CA orphans its issued
-  // certificates, which keep appearing as selectable in the mTLS picker.
+  // Cascade-delete the CA's issued certs and role mappings by hand: the schema declares
+  // onDelete: "cascade", but bun:sqlite leaves PRAGMA foreign_keys OFF, so it never fires.
   if (issuedCertIds.length > 0) {
     await db
       .delete(mtlsCertificateRoles)

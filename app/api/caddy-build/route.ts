@@ -4,7 +4,7 @@ import { applyCaddyBuild, getCaddyBuildDiff, getCaddyBuildStatus } from "@/src/l
 
 /**
  * GET /api/caddy-build — the module diff plus the sidecar's rebuild status. Polled by the settings
- * panel: compiling Caddy takes minutes, far too long for a server action to hold open.
+ * panel: compiling Caddy takes minutes, too long for a server action to hold open.
  */
 export async function GET(request: NextRequest) {
   try {

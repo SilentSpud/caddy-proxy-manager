@@ -1,9 +1,8 @@
 /**
  * Entry point for the compiled server binary. `vinext build` emits its own
- * dist/standalone/server.js, but that cannot be the compile entry: it locates the build output
- * with `import.meta.dirname`, which `bun build --compile` freezes to the build machine's path.
- * This resolves the same directory from `process.execPath` instead. The application bundle stays
- * outside the compiled graph — vinext imports it from disk at runtime (see docker/web/Dockerfile).
+ * dist/standalone/server.js, but that cannot be the compile entry: it locates the build output with
+ * `import.meta.dirname`, which `bun build --compile` freezes to the build machine's path. This uses
+ * `process.execPath` instead. The app bundle stays outside the compiled graph, read from disk.
  */
 import { dirname, join } from "node:path";
 import { startProdServer } from "vinext/server/prod-server";
@@ -16,10 +15,7 @@ function resolveAppRoot(): string {
   return process.env.CPM_APP_ROOT?.trim() || dirname(process.execPath);
 }
 
-/**
- * `--healthcheck` mode for the container HEALTHCHECK. The runtime image has no shell HTTP client
- * and no Bun CLI, so the binary probes itself rather than adding curl.
- */
+/** `--healthcheck` for the container HEALTHCHECK — no curl in the image, so it self-probes. */
 function runHealthCheck(): void {
   const url = process.env.CPM_HEALTHCHECK_URL ?? `http://127.0.0.1:${port}/api/health`;
   fetch(url, { signal: AbortSignal.timeout(5_000) })

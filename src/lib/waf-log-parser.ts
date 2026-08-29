@@ -65,9 +65,8 @@ function lookupCountry(ip: string): string | null {
 }
 
 // ── WAF rules log parsing ─────────────────────────────────────────────────────
-// Caddy's http.handlers.waf logger emits one JSON line per matched rule holding the
-// ModSecurity-format message, e.g. `[id "941100"] [msg "XSS Attack ..."] [unique_id "abc123"]`.
-// Parsed into a map of unique_id → first matched rule.
+// Caddy's http.handlers.waf logger emits one JSON line per matched rule holding a ModSecurity
+// message, e.g. `[id "941100"] [msg "XSS Attack ..."] [unique_id "abc123"]`. Mapped by unique_id.
 
 interface RuleInfo {
   ruleId: number | null;
@@ -148,9 +147,8 @@ interface CorazaAuditEntry {
 
 /**
  * The first specific (non anomaly-evaluation) matched rule from a Coraza audit entry's own
- * `messages` array — the same ModSecurity-format string waf-rules.log gets, provided audit part H
- * is on (buildWafHandler sets `SecAuditLogParts ABFHZ`). Reading it from the entry makes
- * attribution deterministic; joining against waf-rules.log loses the event on a tick boundary.
+ * `messages` array, which carries the same string waf-rules.log gets when audit part H is on.
+ * Reading it from the entry makes attribution deterministic; a join loses events on tick edges.
  */
 export function ruleInfoFromAuditEntry(entry: CorazaAuditEntry): RuleInfo | null {
   for (const m of entry.messages ?? []) {
@@ -225,8 +223,8 @@ async function readAuditLog(startOffset: number): Promise<{ lines: string[]; new
 
 /**
  * Reset the stored audit-log position so the next pass starts from the top. Used when the tracked
- * file is gone or replaced: an offset from a different inode would park the parser past EOF
- * forever, since the rotation guard only fires when the file is *smaller* than last recorded.
+ * file is gone or replaced: an offset from a different inode would park the parser past EOF, since
+ * the rotation guard only fires when the file is *smaller* than last recorded.
  */
 function resetAuditLogState(): void {
   setState("waf_audit_log_offset", "0");
@@ -256,10 +254,9 @@ export async function initWafLogParser(): Promise<void> {
 export async function parseNewWafLogEntries(): Promise<void> {
   if (stopped) return;
 
-  // Coraza holds the audit log open, so a deleted file keeps receiving writes on the now
-  // unlinked inode and is never recreated. Returning silently here (as this used to) left WAF
-  // ingestion permanently dead with no trace in the logs — surface it, and clear the stale
-  // offset so a recreated file is read from the start.
+  // Coraza holds the audit log open, so a deleted file keeps receiving writes on the unlinked inode
+  // and is never recreated — returning silently left ingestion dead with no trace. Surface it, and
+  // clear the stale offset so a recreated file is read from the start.
   if (!existsSync(AUDIT_LOG)) {
     if (!warnedAuditLogMissing) {
       console.warn(
@@ -329,10 +326,9 @@ export async function parseNewWafLogEntries(): Promise<void> {
       }
     }
 
-    // Persist progress BEFORE attempting truncation. Truncation is a best-effort disk-space
-    // guard that fails with EACCES whenever web and caddy run as different UIDs (Coraza creates
-    // the file owned by caddy), and doing it first meant that failure aborted the pass and
-    // froze these offsets — so every later pass re-read and re-inserted the same tail forever.
+    // Persist progress BEFORE truncating. Truncation is a best-effort disk guard that fails with
+    // EACCES when web and caddy run as different UIDs, and doing it first froze these offsets — so
+    // every later pass re-read and re-inserted the same tail forever.
     setState("waf_audit_log_offset", String(newOffset));
     setState("waf_audit_log_size", String(currentSize));
     setState("waf_audit_log_inode", String(currentInode));

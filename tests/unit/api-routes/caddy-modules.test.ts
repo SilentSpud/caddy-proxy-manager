@@ -1,7 +1,6 @@
 /**
- * PUT /api/v1/caddy/modules is a second write path into the module selection, so it must be held to
- * the Settings UI's rules: a selection disabling a module something still uses is refused, and an
- * accepted one regenerates the Caddy config. Getting either wrong takes the proxy down.
+ * PUT /api/v1/caddy/modules is a second write path into the module selection, so it must obey the
+ * Settings UI's rules: refuse a selection disabling a module in use, regenerate the config on save.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

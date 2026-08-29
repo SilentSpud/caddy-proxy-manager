@@ -1,7 +1,6 @@
 /**
- * The Caddy module registry and custom-module validation. The registry is the contract between the
- * Dockerfile that compiles the binary, the config builder that decides which handlers may appear,
- * and the UI that decides which settings are live — none of which can check each other at runtime.
+ * The Caddy module registry and custom-module validation — the contract between the Dockerfile that
+ * compiles the binary, the config builder, and the UI, none of which can check each other.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';

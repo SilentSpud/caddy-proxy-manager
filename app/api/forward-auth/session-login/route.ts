@@ -11,7 +11,7 @@ import { logAuditEvent } from "@/src/lib/audit";
 
 /**
  * Forward auth session login: turns an existing NextAuth session into a forward auth session.
- * Called automatically when the portal finds the user already signed in (e.g. after OAuth).
+ * Called when the portal finds the user already signed in (e.g. after OAuth).
  */
 export async function POST(request: NextRequest) {
   try {

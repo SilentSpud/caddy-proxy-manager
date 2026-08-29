@@ -55,8 +55,8 @@ function summarizeUpstreams(upstreams: string[]) {
 }
 
 /**
- * The enable switch plus the row menu, shared by the table and the cards. At module scope because
- * nesting it would make a new component type each render, remounting the menu mid-use.
+ * The enable switch plus the row menu, shared by table and cards. At module scope — nesting it
+ * would make a new component type each render, remounting the menu mid-use.
  */
 function HostActions({
   host,

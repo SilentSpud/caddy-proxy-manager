@@ -13,10 +13,7 @@ interface ThemeModeContextValue {
 
 const ThemeModeContext = createContext<ThemeModeContextValue | null>(null);
 
-/**
- * The preference the user picked — "system" stays "system". For the resolved light/dark (what
- * Monaco needs) use Astryx's own `useTheme()`.
- */
+/** The preference the user picked; "system" stays "system". Resolved light/dark: `useTheme()`. */
 export function useThemeMode(): ThemeModeContextValue {
   const ctx = use(ThemeModeContext);
   if (!ctx) {

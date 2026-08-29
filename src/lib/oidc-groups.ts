@@ -1,7 +1,4 @@
-/**
- * Pure mapping from an OIDC group claim to a CPM role and group names. No I/O, so the rules stay
- * testable — side effects live in services/oidc-group-sync.ts.
- */
+/** Pure OIDC group-claim → role/group mapping. No I/O; side effects in oidc-group-sync.ts. */
 
 export type AppRole = "admin" | "user" | "viewer";
 
@@ -60,10 +57,7 @@ export function needsGroupClaims(cfg: GroupMappingConfig): boolean {
   return cfg.roleMappingEnabled || cfg.syncGroups;
 }
 
-/**
- * Groups are compared case-insensitively and with any Keycloak-style path prefix
- * ("/Parent/CPM_Admin" → "CPM_Admin") removed, because IdPs are inconsistent about both.
- */
+/** Compared case-insensitively, with any Keycloak path prefix ("/Parent/X" → "X") removed. */
 export function normalizeGroupName(value: string): string {
   const trimmed = value.trim();
   const lastSegment = trimmed.includes("/") ? trimmed.slice(trimmed.lastIndexOf("/") + 1) : trimmed;
@@ -76,7 +70,7 @@ function comparableGroupName(value: string): string {
 
 /**
  * Reads a (possibly nested) claim. `path` is dot-separated, so providers that bury groups —
- * Keycloak's `resource_access.<client>.roles`, say — work without a bespoke option.
+ * Keycloak's `resource_access.<client>.roles` — work without a bespoke option.
  */
 export function readClaim(claims: Record<string, unknown>, path: string): unknown {
   if (!path) return undefined;
@@ -102,8 +96,8 @@ function coerceGroupEntry(entry: unknown): string | null {
 }
 
 /**
- * Normalises the shapes a group claim can take: string array, object array, comma-separated
- * string, or JSON-encoded array. Only commas split a string — group names contain spaces.
+ * Normalises the shapes a group claim takes: string array, object array, comma-separated string,
+ * or JSON-encoded array. Only commas split a string — group names contain spaces.
  */
 export function extractGroups(claims: Record<string, unknown>, groupsClaim: string): string[] {
   const raw = readClaim(claims, groupsClaim);
@@ -145,8 +139,8 @@ export function extractGroups(claims: Record<string, unknown>, groupsClaim: stri
 }
 
 /**
- * Splits a configured group setting into names. Commas separate, so several groups can grant
- * the same role — matching how a string-valued claim is parsed, and keeping spaces in names.
+ * Splits a configured group setting into names. Commas separate, matching how a string-valued
+ * claim is parsed, so names keep their spaces.
  */
 export function parseGroupNames(value: string | null): string[] {
   if (!value) return [];
@@ -164,8 +158,8 @@ export function parseGroupNames(value: string | null): string[] {
 }
 
 /**
- * The groups granting each role: the names configured for it, else `<groupPrefix><Role>` (prefix
- * "CPM_" → "CPM_Admin"). The two mix freely — a role with its own names ignores the prefix.
+ * The groups granting each role: the names configured for it, else `<groupPrefix><Role>`. The two
+ * mix freely — a role with its own names ignores the prefix.
  */
 export function resolveRoleGroups(cfg: GroupMappingConfig): Record<AppRole, string[]> {
   const configured: Record<AppRole, string | null> = {
@@ -183,8 +177,8 @@ export function resolveRoleGroups(cfg: GroupMappingConfig): Record<AppRole, stri
 }
 
 /**
- * Maps claimed groups to a role: `null` when mapping is off, `cfg.defaultRole` when it is on but
- * nothing matched — so an enabled mapping is authoritative and losing the admin group demotes.
+ * Claimed groups → role: `null` when mapping is off, `cfg.defaultRole` when on but nothing
+ * matched — so an enabled mapping is authoritative and losing the admin group demotes.
  */
 export function mapGroupsToRole(groups: string[], cfg: GroupMappingConfig): AppRole | null {
   if (!cfg.roleMappingEnabled) return null;
