@@ -204,3 +204,18 @@ export function toDurationMs(value: string | null | undefined): number | null {
   const rounded = Math.round(total);
   return rounded > 0 ? rounded : null;
 }
+
+// ── Placeholder stripping ────────────────────────────────────────────────────
+
+/**
+ * Strips Caddy placeholders (`{http.request.uri}`) out of an admin-supplied path or domain before
+ * it lands in generated config, so a host's own rules can't reach into request state.
+ *
+ * The class excludes `{` as well as `}` on purpose: with `[^}]*`, an unterminated run of braces
+ * makes the global replace rescan to end-of-string from every start position, which is quadratic
+ * in the input length. Excluding `{` makes each failed position O(1). Caddy placeholders don't
+ * nest, so nothing that should match stops matching.
+ */
+export function stripCaddyPlaceholders(value: string): string {
+  return value.replace(/\{[^{}]*\}/g, "");
+}

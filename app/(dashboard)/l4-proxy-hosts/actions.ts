@@ -279,7 +279,7 @@ export async function updateL4ProxyHostAction(
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess("L4 proxy host updated.");
   } catch (error) {
-    console.error(`Failed to update L4 proxy host ${id}:`, error);
+    console.error("Failed to update L4 proxy host:", id, error);
     return actionError(error, "Failed to update L4 proxy host.");
   }
 }
@@ -296,7 +296,7 @@ export async function deleteL4ProxyHostAction(
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess("L4 proxy host deleted.");
   } catch (error) {
-    console.error(`Failed to delete L4 proxy host ${id}:`, error);
+    console.error("Failed to delete L4 proxy host:", id, error);
     return actionError(error, "Failed to delete L4 proxy host.");
   }
 }
@@ -309,7 +309,7 @@ export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Pro
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess(`L4 proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {
-    console.error(`Failed to toggle L4 proxy host ${id}:`, error);
+    console.error("Failed to toggle L4 proxy host:", id, error);
     return actionError(error, "Failed to toggle L4 proxy host.");
   }
 }

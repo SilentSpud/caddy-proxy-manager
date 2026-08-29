@@ -791,7 +791,7 @@ export async function updateProxyHostAction(
     }
     return actionSuccess("Proxy host updated.");
   } catch (error) {
-    console.error(`Failed to update proxy host ${id}:`, error);
+    console.error("Failed to update proxy host:", id, error);
     return actionError(error, "Failed to update proxy host. Please check the logs for details.");
   }
 }
@@ -808,7 +808,7 @@ export async function deleteProxyHostAction(
     revalidatePath("/proxy-hosts");
     return actionSuccess("Proxy host deleted.");
   } catch (error) {
-    console.error(`Failed to delete proxy host ${id}:`, error);
+    console.error("Failed to delete proxy host:", id, error);
     return actionError(error, "Failed to delete proxy host. Please check the logs for details.");
   }
 }
@@ -821,7 +821,7 @@ export async function toggleProxyHostAction(id: number, enabled: boolean): Promi
     revalidatePath("/proxy-hosts");
     return actionSuccess(`Proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {
-    console.error(`Failed to toggle proxy host ${id}:`, error);
+    console.error("Failed to toggle proxy host:", id, error);
     return actionError(error, "Failed to toggle proxy host. Please check the logs for details.");
   }
 }

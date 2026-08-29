@@ -14,6 +14,7 @@ import {
   parseUpstreamTarget,
   formatDialAddress,
   toDurationMs,
+  stripCaddyPlaceholders,
 } from '@/src/lib/caddy-utils';
 
 // ---------------------------------------------------------------------------
@@ -377,5 +378,23 @@ describe('toDurationMs', () => {
 
   it('returns null for zero-duration', () => {
     expect(toDurationMs('0s')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stripCaddyPlaceholders
+// ---------------------------------------------------------------------------
+
+describe('stripCaddyPlaceholders', () => {
+  it('removes placeholders and leaves the rest of the path', () => {
+    expect(stripCaddyPlaceholders('/api/{http.request.uri}/v1')).toBe('/api//v1');
+    expect(stripCaddyPlaceholders('/plain/path')).toBe('/plain/path');
+  });
+
+  it('stays linear on an unterminated run of braces', () => {
+    // The earlier /\{[^}]*\}/g rescanned to end-of-string from every start position here.
+    const start = performance.now();
+    expect(stripCaddyPlaceholders('{'.repeat(100_000))).toBe('{'.repeat(100_000));
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });

@@ -15,6 +15,7 @@ import {
   toDurationMs,
   canonicalHeaderName,
   upstreamHeaderPlaceholder,
+  stripCaddyPlaceholders,
 } from "./caddy-utils";
 import {
   groupHostPatternsByPriority,
@@ -845,7 +846,7 @@ export function buildLocationReverseProxy(
   const hasHttps = parsedTargets.some((t) => t.scheme === "https");
 
   // Sanitize path to prevent Caddy placeholder injection
-  const safePath = rule.path.replace(/\{[^}]*\}/g, "");
+  const safePath = stripCaddyPlaceholders(rule.path);
 
   const reverseProxyHandler: Record<string, unknown> = {
     handler: "reverse_proxy",
@@ -1312,12 +1313,12 @@ async function buildProxyRoutes(
     const pathRewrites = meta.path_rewrites ?? [];
     if (pathBlocks.length > 0 || pathRewrites.length > 0) {
       const allowPatterns = pathAllows
-        .map((a) => a.path.replace(/\{[^}]*\}/g, ""))
+        .map((a) => stripCaddyPlaceholders(a.path))
         .filter((p) => p.length > 0);
       const pathRoutes: CaddyHttpRoute[] = [];
       for (const block of pathBlocks) {
         // Sanitize path to prevent Caddy placeholder injection
-        const safePath = block.path.replace(/\{[^}]*\}/g, "");
+        const safePath = stripCaddyPlaceholders(block.path);
         if (!safePath) continue;
         const handle: Record<string, unknown> = {
           handler: "static_response",
@@ -1337,8 +1338,8 @@ async function buildProxyRoutes(
         });
       }
       for (const rw of pathRewrites) {
-        const safeFrom = rw.from.replace(/\{[^}]*\}/g, "");
-        const safeTo = rw.to.replace(/\{[^}]*\}/g, "");
+        const safeFrom = stripCaddyPlaceholders(rw.from);
+        const safeTo = stripCaddyPlaceholders(rw.to);
         if (!safeFrom || !safeTo) continue;
         pathRoutes.push({
           match: [{ path: [safeFrom] }],
@@ -1446,16 +1447,15 @@ async function buildProxyRoutes(
         };
       }
 
+      // Sanitize outpostDomain to prevent path traversal and placeholder injection
+      const safeOutpostPath = stripCaddyPlaceholders(
+        authentik.outpostDomain.replace(/\.\./g, ""),
+      ).replace(/\/+/g, "/");
+
       outpostRoute = {
         match: [
           {
-            // Sanitize outpostDomain to prevent path traversal and placeholder injection
-            path: [
-              `/${authentik.outpostDomain
-                .replace(/\.\./g, "")
-                .replace(/\{[^}]*\}/g, "")
-                .replace(/\/+/g, "/")}/*`,
-            ],
+            path: [`/${safeOutpostPath}/*`],
           },
         ],
         handle: [outpostHandler],
@@ -1542,7 +1542,7 @@ async function buildProxyRoutes(
     // Structured path prefix rewrite
     // Sanitize path_prefix to prevent Caddy placeholder injection
     if (meta.rewrite?.path_prefix) {
-      const safePrefix = meta.rewrite.path_prefix.replace(/\{[^}]*\}/g, "");
+      const safePrefix = stripCaddyPlaceholders(meta.rewrite.path_prefix);
       if (safePrefix) {
         handlers.push({
           handler: "rewrite",

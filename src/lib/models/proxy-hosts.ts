@@ -6,6 +6,7 @@ import { proxyHosts } from "../db/schema";
 import { asc, desc, eq, count, like, or } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
+import { stripCaddyPlaceholders } from "../caddy-utils";
 
 /**
  * Wildcard certificates can only be issued via ACME DNS-01, so a wildcard host on auto-managed TLS
@@ -356,8 +357,8 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
 
   if (Array.isArray(meta.protected_paths)) {
     const paths = meta.protected_paths
-      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
-      .filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+      .map((path) => stripCaddyPlaceholders(path?.trim() ?? ""))
+      .filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
@@ -365,8 +366,8 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
 
   if (Array.isArray(meta.excluded_paths)) {
     const paths = meta.excluded_paths
-      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
-      .filter((path): path is string => Boolean(path)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+      .map((path) => stripCaddyPlaceholders(path?.trim() ?? ""))
+      .filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -548,7 +549,7 @@ function sanitizeAuthentikMeta(
 
   const authEndpoint = normalizeMetaValue(meta.auth_endpoint ?? null);
   if (authEndpoint) {
-    normalized.auth_endpoint = authEndpoint.replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    normalized.auth_endpoint = stripCaddyPlaceholders(authEndpoint);
   }
 
   if (Array.isArray(meta.copy_headers)) {
@@ -575,7 +576,7 @@ function sanitizeAuthentikMeta(
 
   if (Array.isArray(meta.protected_paths)) {
     const paths = meta.protected_paths
-      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
+      .map((path) => stripCaddyPlaceholders(path?.trim() ?? ""))
       .filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
@@ -584,7 +585,7 @@ function sanitizeAuthentikMeta(
 
   if (Array.isArray(meta.excluded_paths)) {
     const paths = meta.excluded_paths
-      .map((path) => path?.trim().replace(/\{[^}]*\}/g, ""))
+      .map((path) => stripCaddyPlaceholders(path?.trim() ?? ""))
       .filter((path): path is string => Boolean(path));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
@@ -795,16 +796,16 @@ function sanitizeCpmForwardAuthMeta(
   }
   if (Array.isArray(meta.protected_paths)) {
     const paths = meta.protected_paths
-      .map((p) => p?.trim().replace(/\{[^}]*\}/g, ""))
-      .filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+      .map((p) => stripCaddyPlaceholders(p?.trim() ?? ""))
+      .filter((p): p is string => Boolean(p));
     if (paths.length > 0) {
       normalized.protected_paths = paths;
     }
   }
   if (Array.isArray(meta.excluded_paths)) {
     const paths = meta.excluded_paths
-      .map((p) => p?.trim().replace(/\{[^}]*\}/g, ""))
-      .filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+      .map((p) => stripCaddyPlaceholders(p?.trim() ?? ""))
+      .filter((p): p is string => Boolean(p));
     if (paths.length > 0) {
       normalized.excluded_paths = paths;
     }
@@ -923,10 +924,9 @@ function sanitizeRedirectRules(value: unknown): RedirectRule[] {
       item.to.trim() &&
       [301, 302, 307, 308].includes(item.status)
     ) {
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
       valid.push({
-        from: item.from.trim().replace(/\{[^}]*\}/g, ""),
-        to: item.to.trim().replace(/\{[^}]*\}/g, ""),
+        from: stripCaddyPlaceholders(item.from.trim()),
+        to: stripCaddyPlaceholders(item.to.trim()),
         status: item.status,
       });
     }
@@ -947,8 +947,7 @@ function sanitizePathAllows(value: unknown): PathAllowRule[] {
   const valid: PathAllowRule[] = [];
   for (const item of value) {
     if (item && typeof item === "object" && typeof item.path === "string" && item.path.trim()) {
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      const path = item.path.trim().replace(/\{[^}]*\}/g, "");
+      const path = stripCaddyPlaceholders(item.path.trim());
       if (path) {
         valid.push({ path });
       }
@@ -970,8 +969,7 @@ function sanitizePathBlocks(value: unknown): PathBlockRule[] {
       (PATH_BLOCK_STATUS_CODES as readonly number[]).includes(item.status)
     ) {
       const rule: PathBlockRule = {
-        // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-        path: item.path.trim().replace(/\{[^}]*\}/g, ""),
+        path: stripCaddyPlaceholders(item.path.trim()),
         status: item.status as PathBlockStatusCode,
       };
       if (typeof item.body === "string" && item.body.length > 0) {
@@ -997,10 +995,8 @@ function sanitizePathRewrites(value: unknown): PathRewriteRule[] {
       typeof item.to === "string" &&
       item.to.trim()
     ) {
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      const from = item.from.trim().replace(/\{[^}]*\}/g, "");
-      // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
-      const to = item.to.trim().replace(/\{[^}]*\}/g, "");
+      const from = stripCaddyPlaceholders(item.from.trim());
+      const to = stripCaddyPlaceholders(item.to.trim());
       if (from && to) {
         valid.push({ from, to });
       }

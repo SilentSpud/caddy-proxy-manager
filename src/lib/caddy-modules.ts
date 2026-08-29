@@ -132,10 +132,12 @@ const MODULE_PATH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._~/-]*[a-zA-Z0-9]$/;
 const VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._+-]*$/;
 
 export function normalizeModulePath(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^https?:\/\//, "")
-    .replace(/\/+$/, "");
+  const path = raw.trim().replace(/^https?:\/\//, "");
+  // Trailing slashes are trimmed by index rather than with /\/+$/: that pattern rescans the whole
+  // string from every start position on input that is all slashes, which is quadratic.
+  let end = path.length;
+  while (end > 0 && path[end - 1] === "/") end--;
+  return path.slice(0, end);
 }
 
 /**

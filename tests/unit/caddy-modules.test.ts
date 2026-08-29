@@ -108,6 +108,13 @@ describe('normalizeModulePath', () => {
     expect(normalizeModulePath('https://github.com/owner/repo/')).toBe('github.com/owner/repo');
     expect(normalizeModulePath('  github.com/owner/repo  ')).toBe('github.com/owner/repo');
   });
+
+  it('stays linear on an all-slash path', () => {
+    // The earlier /\/+$/ rescanned from every start position on this input.
+    const start = performance.now();
+    expect(normalizeModulePath('/'.repeat(100_000))).toBe('');
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });
 
 describe('validateCustomModule', () => {
