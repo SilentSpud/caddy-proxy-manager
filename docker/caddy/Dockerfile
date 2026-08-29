@@ -1,18 +1,20 @@
 # Builder on the host arch (BUILDPLATFORM) with xcaddy cross-compiling via GOOS/GOARCH — avoids QEMU
 # when building linux/arm64 on an x86 runner. caddy:<version>-builder rather than golang:: it ships
 # xcaddy and the Go toolchain that release was built with, so cold builds skip the xcaddy compile
-# and the version stops floating. Pinned to an exact tag for that second reason; it selects Go and
-# xcaddy only — what gets compiled is CADDY_VERSION below.
+# and the version stops floating. Pinned to an exact tag for that second reason; it selects the Go
+# toolchain and xcaddy only — what gets compiled is pinned in docker/caddy/go.mod. The two are
+# allowed to drift: this tag is the xcaddy pin, go.mod is the Caddy and plugin pin.
 FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
 
-# The Caddy source to compile, pinned so an image rebuilt tomorrow matches one rebuilt today. A
-# master commit, not a release tag: the plugin list carries no versions, so Go tracks master, and
-# the v2.11.4 release fails to compile against them (cel-go renamed interpreter.Interpretable). A
-# future plugin release can break this the same way — the fix is to move this pin forward.
-ARG CADDY_VERSION=d6637934e866
+# What gets compiled — Caddy's own version and every plugin's — is pinned in docker/caddy/go.mod,
+# which build.sh reads. Dependabot updates it weekly, and update-compatibility-pins.sh keeps the
+# cel-go replacement consistent with the pinned Caddy release — which is what lets that be a release
+# tag rather than the master commit this used to track.
+WORKDIR /build
+COPY docker/caddy/go.mod docker/caddy/go.sum docker/caddy/build.sh ./
 
 # Plugins compiled into the binary: whitespace-separated Go module paths with an optional @version.
 # Settings → Caddy Build overrides this through a generated compose override. Keep in sync with
@@ -42,20 +44,20 @@ github.com/mholt/caddy-l4 \
 github.com/fuomag9/caddy-blocker-plugin \
 github.com/corazawaf/coraza-caddy/v2"
 
-# Build Caddy with the selected plugins. The module list is expanded into `--with` flags here, so
-# the build arg stays a plain list the app can generate and diff without knowing xcaddy's syntax;
-# word splitting separates them, and paths are allowlisted upstream (validateCustomModule). The
-# cache mounts matter for the rebuild-from-the-UI flow — without them every module change recompiles
-# from scratch. BuildKit keeps them on the same daemon the sidecar talks to.
+# build.sh expands the list into `--with path@version` flags, resolving each version from go.mod, so
+# the build arg stays a plain list the app can generate and diff without knowing xcaddy's syntax or
+# carrying versions; word splitting separates the entries, and paths are allowlisted upstream
+# (validateCustomModule). The cache mounts matter for the rebuild-from-the-UI flow — without them
+# every module change recompiles from scratch. BuildKit keeps them on the same daemon the sidecar
+# talks to.
+#
+# What lands in /caddy-modules.txt is the requested list, not build.sh's resolved one: the sidecar
+# records that same unresolved list as "applied", and the two must match or the UI reports a rebuild
+# that already happened. The exact versions go to /caddy-modules.resolved.txt instead.
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eu; \
-    args=""; \
-    for module in ${CADDY_MODULES}; do \
-        args="${args} --with ${module}"; \
-    done; \
-    echo "Building Caddy with:${args:- no plugins}"; \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH xcaddy build ${CADDY_VERSION} ${args} --output /usr/bin/caddy; \
+    CADDY_MODULES="${CADDY_MODULES}" TARGETOS="$TARGETOS" TARGETARCH="$TARGETARCH" sh ./build.sh; \
     printf '%s\n' "${CADDY_MODULES}" > /caddy-modules.txt
 
 # Alpine, matching the builder's base: the xcaddy binary is statically linked, and keeping both
@@ -94,6 +96,7 @@ RUN apk add --no-cache --virtual .user-setup shadow && \
 # re-read from a build arg — ARG is per stage, and this is written from the very variable the build
 # looped over, so it cannot disagree with the binary beside it.
 COPY --from=builder /caddy-modules.txt /etc/caddy/caddy-modules.txt
+COPY --from=builder /caddy-modules.resolved.txt /etc/caddy/caddy-modules.resolved.txt
 
 COPY --chown=caddy:caddy docker/caddy/Caddyfile /etc/caddy/Caddyfile
 

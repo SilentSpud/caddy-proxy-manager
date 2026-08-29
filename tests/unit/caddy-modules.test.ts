@@ -21,6 +21,20 @@ import { DNS_PROVIDERS } from '@/src/lib/dns-providers';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const DOCKERFILE = readFileSync(resolve(moduleDir, '../../docker/caddy/Dockerfile'), 'utf-8');
+const GO_MOD = readFileSync(resolve(moduleDir, '../../docker/caddy/go.mod'), 'utf-8');
+
+/** Module paths carrying a pinned version in the Caddy build's go.mod. */
+function pinnedModulePaths(): Set<string> {
+  const requireBlock = GO_MOD.match(/require \(([\s\S]*?)\)/);
+  expect(requireBlock, 'go.mod must declare a require block').toBeTruthy();
+  return new Set(
+    requireBlock![1]
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('//'))
+      .map((line) => line.split(/\s+/)[0]),
+  );
+}
 
 /** The whitespace-separated module list from the Dockerfile's ARG default. */
 function dockerfileDefaultModules(): string[] {
@@ -58,6 +72,20 @@ describe('caddy module registry', () => {
     );
   });
 
+  it('pins every catalog module in the Caddy build go.mod', () => {
+    // build.sh resolves a bare path to `path@version` by looking it up here. A module missing a
+    // pin still compiles, but floats to whatever is latest at build time — which is the
+    // reproducibility hole go.mod exists to close, and it fails silently.
+    const pinned = pinnedModulePaths();
+    const unpinned = CADDY_MODULES.map((m) => m.modulePath).filter((p) => !pinned.has(p));
+    expect(unpinned).toEqual([]);
+  });
+
+  it('pins Caddy itself, so the Dockerfile needs no version of its own', () => {
+    expect(pinnedModulePaths().has('github.com/caddyserver/caddy/v2')).toBe(true);
+    expect(DOCKERFILE).not.toContain('CADDY_VERSION');
+  });
+
   it('records the resolved module list inside the image', () => {
     // The label this replaced came out empty on every build that did not pass
     // --build-arg, because ARG is scoped per stage and the runtime stage had no
@@ -66,8 +94,14 @@ describe('caddy module registry', () => {
     expect(DOCKERFILE).toContain('> /caddy-modules.txt');
     // Shell interpolation of the build arg, not a JS template placeholder.
     expect(DOCKERFILE).toContain(['"$', '{CADDY_MODULES}"'].join(''));
+    // The arg reaches build.sh as an environment variable, not as a positional or a here-doc.
+    expect(DOCKERFILE).toMatch(/CADDY_MODULES="\$\{CADDY_MODULES\}".*sh \.\/build\.sh/s);
     expect(DOCKERFILE).toContain(
       'COPY --from=builder /caddy-modules.txt /etc/caddy/caddy-modules.txt',
+    );
+    // Exact versions ride alongside, for auditing an image without rebuilding it.
+    expect(DOCKERFILE).toContain(
+      'COPY --from=builder /caddy-modules.resolved.txt /etc/caddy/caddy-modules.resolved.txt',
     );
   });
 

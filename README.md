@@ -349,6 +349,25 @@ the binary running *now* rather than the one a rebuild would produce. Saving a
 module change while any host has a snippet therefore adds an advisory note
 listing those hosts, so you can review them before rebuilding.
 
+### Version pinning
+
+Which modules get compiled is your choice; *which version* of each is pinned in
+`docker/caddy/go.mod`, and `docker/caddy/build.sh` turns the two into
+`xcaddy build --with <path>@<version>` flags. So a rebuild next month produces
+the same binary as one today, and `go.sum` authenticates every module it pulls.
+
+Dependabot proposes updates to those pins weekly. Caddy's own version is pinned
+there too, as a release tag: `docker/caddy/update-compatibility-pins.sh` derives
+the `cel-go` replacement from that release, which is what keeps the build off a
+floating master commit. A scheduled workflow reruns it and opens a PR when the
+replacement moves.
+
+You can see exactly what an image was built with, without rebuilding it:
+
+```bash
+docker run --rm ghcr.io/fuomag9/caddy-proxy-manager-caddy:latest cat /etc/caddy/caddy-modules.resolved.txt
+```
+
 ### Custom modules
 
 Any Caddy plugin published as a Go module can be added by path, with an optional
