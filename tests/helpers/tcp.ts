@@ -1,8 +1,6 @@
 /**
- * Low-level TCP and UDP helpers for L4 proxy functional tests.
- *
- * Sends raw TCP connections and UDP datagrams to Caddy's L4 proxy ports
- * and reads responses.
+ * Low-level TCP and UDP helpers for L4 proxy functional tests: raw TCP connections and UDP
+ * datagrams to Caddy's L4 proxy ports, plus reading the responses.
  */
 import net from 'node:net';
 import dgram from 'node:dgram';
@@ -13,8 +11,8 @@ export interface TcpResponse {
 }
 
 /**
- * Open a TCP connection to the given host:port, send a payload,
- * and collect whatever comes back within the timeout window.
+ * Open a TCP connection to host:port, send a payload, and collect whatever comes back within the
+ * timeout window.
  */
 export function tcpSend(
   host: string,
@@ -55,9 +53,7 @@ export function tcpSend(
   });
 }
 
-/**
- * Test if a TCP port is accepting connections.
- */
+/** Test whether a TCP port is accepting connections. */
 export function tcpConnect(host: string, port: number, timeoutMs = 5_000): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port }, () => {
@@ -76,16 +72,10 @@ export function tcpConnect(host: string, port: number, timeoutMs = 5_000): Promi
 }
 
 /**
- * Poll until a TCP port actually *proxies* data, not merely accepts a socket.
- *
- * Docker's port publisher accepts connections on a published port whether or
- * not Caddy has an L4 listener bound behind it, so merely opening a socket
- * succeeds as soon as the container is up — well before a newly created,
- * re-enabled or re-applied route is live. Anything that then asserts on echoed data races
- * against Caddy's reload. This helper closes that gap by requiring a probe to
- * come back, which only happens once the route reaches the upstream.
- *
- * Only safe against echo upstreams, which is what the L4 suite proxies to.
+ * Poll until a TCP port actually *proxies* data, not merely accepts a socket. Docker's port
+ * publisher accepts connections whether or not Caddy has an L4 listener behind it, so a socket
+ * opens as soon as the container is up — well before a new route is live. Requiring a probe to come
+ * back closes that gap. Only safe against echo upstreams, which is what the L4 suite proxies to.
  */
 export async function waitForTcpEcho(
   host: string,
@@ -96,10 +86,9 @@ export async function waitForTcpEcho(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      // tcpSend rejects (rather than resolving) when the socket errors before
-      // it ever connects — ECONNREFUSED while the caddy container is being
-      // recreated, for one. That is precisely the window this helper exists to
-      // wait through, so treat it as "not ready yet" and keep polling.
+      // tcpSend rejects (rather than resolving) when the socket errors before it ever connects —
+      // ECONNREFUSED while the caddy container is being recreated, for one. That is exactly the
+      // window this helper exists to wait through, so treat it as "not ready yet" and keep polling.
       const res = await tcpSend(host, port, `${probe}\n`, 2_000);
       if (res.data.includes(probe)) return;
     } catch {
@@ -112,18 +101,14 @@ export async function waitForTcpEcho(
   );
 }
 
-// ---------------------------------------------------------------------------
-// UDP helpers
-// ---------------------------------------------------------------------------
+// ── UDP helpers ──────────────────────────────────────────────────────────────
 
 export interface UdpResponse {
   data: string;
   received: boolean;
 }
 
-/**
- * Send a UDP datagram and wait for a response.
- */
+/** Send a UDP datagram and wait for a response. */
 export function udpSend(
   host: string,
   port: number,
@@ -158,9 +143,7 @@ export function udpSend(
   });
 }
 
-/**
- * Poll until a UDP port responds to a test datagram.
- */
+/** Poll until a UDP port responds to a test datagram. */
 export async function waitForUdpRoute(
   host: string,
   port: number,

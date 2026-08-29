@@ -60,7 +60,7 @@ export async function consumeRedirectIntent(rid: string): Promise<string | null>
   const ridHash = hashToken(rid);
   const now = nowIso();
 
-  // Atomic claim: only succeeds if the intent exists, is unconsumed, and not expired
+  // Atomic claim: succeeds only if the intent exists, is unconsumed, and not expired
   const claimed = await db
     .update(forwardAuthRedirectIntents)
     .set({ consumed: true })
@@ -186,7 +186,7 @@ export async function redeemExchangeCode(
   const codeHash = hashToken(rawCode);
   const now = nowIso();
 
-  // Atomic claim: only succeeds if the exchange exists, is unused, and not expired
+  // Atomic claim: succeeds only if the exchange exists, is unused, and not expired
   const claimed = await db
     .update(forwardAuthExchanges)
     .set({ used: true })
@@ -273,8 +273,8 @@ export async function checkHostAccessByDomain(
     where: (table, operators) => operators.eq(table.enabled, true),
   });
 
-  // Exact-match hosts take precedence over wildcard-covered ones, mirroring
-  // how Caddy itself prioritizes routes (see host-pattern-priority.ts).
+  // Exact-match hosts take precedence over wildcard-covered ones, mirroring how Caddy itself
+  // prioritizes routes (see host-pattern-priority.ts).
   let wildcardMatch: (typeof allHosts)[number] | null = null;
   for (const ph of allHosts) {
     let parsed: string[];
@@ -374,10 +374,9 @@ export async function isForwardAuthDomain(host: string): Promise<boolean> {
     where: (table, operators) => operators.eq(table.enabled, true),
   });
 
-  // Exact-match hosts take precedence over wildcard-covered ones: if an
-  // explicit host exists for this domain, its own forward-auth setting
-  // decides the outcome and the wildcard host is never consulted — this
-  // mirrors the routing precedence Caddy itself applies.
+  // Exact-match hosts take precedence over wildcard-covered ones: if an explicit host exists for
+  // this domain, its own forward-auth setting decides and the wildcard host is never consulted —
+  // mirroring the routing precedence Caddy itself applies.
   let exactMatchFound = false;
   let wildcardMatch: (typeof allHosts)[number] | null = null;
 

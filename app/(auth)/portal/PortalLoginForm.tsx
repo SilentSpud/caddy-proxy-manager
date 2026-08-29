@@ -99,9 +99,8 @@ export default function PortalLoginForm({
     setError(null);
     setPending(true);
 
-    // Read from state, not FormData: Astryx withholds an input's `name` while
-    // it is disabled, and these fields disable themselves once a sign-in is
-    // pending, so a FormData read here would be racing that re-render.
+    // Read from state, not FormData: Astryx withholds an input's `name` while it is disabled, and
+    // these fields disable themselves once a sign-in is pending.
     const trimmedUsername = username.trim();
 
     if (!trimmedUsername || !password) {

@@ -1,8 +1,6 @@
 /**
- * Unit tests for the new cert-based mTLS model (leaf override / trusted_client_cert_ids).
- *
- * Tests buildClientAuthentication with the mTlsDomainLeafOverride parameter
- * to ensure the new "trust user X" model works correctly alongside the legacy CA model.
+ * The cert-based mTLS model (leaf override / trusted_client_cert_ids): buildClientAuthentication
+ * with mTlsDomainLeafOverride, alongside the legacy CA model.
  */
 import { describe, it, expect } from 'bun:test';
 import { buildClientAuthentication } from '../../src/lib/caddy-mtls';

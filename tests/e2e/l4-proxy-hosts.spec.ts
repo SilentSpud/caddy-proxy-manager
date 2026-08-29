@@ -9,11 +9,8 @@ const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';
 const ORIGIN = 'http://localhost:3000';
 
 /**
- * The sortable column headers only exist once the table has rows — an empty
- * list renders an EmptyState instead. These tests used to rely on hosts left
- * behind by the functional L4 specs, which made them silently order-dependent
- * (and made them fail outright once cleanup started working). Own the fixture
- * instead.
+ * The sortable column headers only exist once the table has rows. These tests used to rely on
+ * hosts left by the functional L4 specs, making them order-dependent — own the fixture instead.
  */
 async function createFixtureHost(page: Page, name: string, listenAddress: string) {
   const res = await page.request.post(API_L4_HOSTS, {

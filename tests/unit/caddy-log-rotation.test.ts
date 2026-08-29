@@ -1,9 +1,7 @@
 /**
- * Regression: the Caddy file-writer's built-in rotation defaults silently
- * stopped compressing and cleaning up rolled log files in production,
- * filling the host disk (11GB+ of unrotated access/waf-rules logs). The fix
- * is to spell out roll settings explicitly instead of relying on upstream
- * defaults — these tests guard against that regressing silently again.
+ * Regression: Caddy's file-writer rotation defaults silently stopped compressing and cleaning up
+ * rolled logs in production, filling the host disk (11GB+). Roll settings are now spelled out
+ * explicitly; these guard against that regressing silently again.
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -1,13 +1,7 @@
 /**
- * E2E test for issue #171: the analytics host dropdown hides traffic-only hosts
- * (random/scanned domains that merely showed up in ClickHouse traffic) by
- * default and offers an "Include unconfigured hosts" toggle to surface them
- * again — useful when a proxy host was removed but the user still wants stats.
- *
- * Setup seeds two hosts:
- *   - a configured proxy host (SQLite, via the v1 API) — always listed
- *   - a traffic-only host (ClickHouse traffic_events, no matching proxy host)
- * then verifies the toggle reveals the traffic-only one.
+ * Issue #171: the analytics host dropdown hides traffic-only hosts by default and offers an
+ * "Include unconfigured hosts" toggle. Seeds a configured proxy host and a traffic-only ClickHouse
+ * host, then verifies the toggle reveals the latter.
  */
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';

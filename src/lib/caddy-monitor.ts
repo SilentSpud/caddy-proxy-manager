@@ -1,6 +1,5 @@
 /**
- * Caddy health monitoring service
- * Monitors Caddy for restarts/crashes and automatically reapplies configuration
+ * Caddy health monitoring: watches for restarts/crashes and reapplies configuration.
  */
 
 import { caddyAdminRequest } from "./caddy-admin";
@@ -28,8 +27,7 @@ let monitorInterval: NodeJS.Timeout | null = null;
 let isMonitoring = false;
 
 /**
- * Get the current Caddy config ID from the admin API
- * This is used to detect when Caddy has restarted (config ID changes)
+ * The current Caddy config ID from the admin API, used to detect a restart (the ID changes).
  */
 async function getCaddyConfigId(): Promise<string | null> {
   try {
@@ -56,9 +54,7 @@ async function getCaddyConfigId(): Promise<string | null> {
   }
 }
 
-/**
- * Check if Caddy is healthy and detect restarts
- */
+/** Check whether Caddy is healthy, detecting restarts. */
 async function checkCaddyHealth(): Promise<void> {
   const now = Date.now();
   monitorState.lastCheckTime = now;
@@ -118,9 +114,7 @@ async function checkCaddyHealth(): Promise<void> {
   }
 }
 
-/**
- * Start monitoring Caddy health
- */
+/** Start monitoring Caddy health. */
 export function startCaddyMonitoring(): void {
   if (isMonitoring) {
     console.log("[CaddyMonitor] Already monitoring");
@@ -145,9 +139,7 @@ export function startCaddyMonitoring(): void {
   }, HEALTH_CHECK_INTERVAL);
 }
 
-/**
- * Stop monitoring Caddy health
- */
+/** Stop monitoring Caddy health. */
 export function stopCaddyMonitoring(): void {
   if (!isMonitoring) {
     return;
@@ -162,9 +154,7 @@ export function stopCaddyMonitoring(): void {
   }
 }
 
-/**
- * Get current monitoring state (useful for debugging)
- */
+/** Current monitoring state (useful for debugging). */
 export function getMonitorState(): Readonly<CaddyMonitorState> {
   return { ...monitorState };
 }

@@ -1,16 +1,8 @@
 /**
- * v1 REST API contract test.
- *
- * Posts payloads using the field names documented in OpenAPI (camelCase) and
- * verifies the model actually persists them. Catches snake/camel mismatches
- * between the OpenAPI spec and the model input contract.
- *
- * Background: prior to 2026-05, OpenAPI documented snake_case for most
- * resource inputs while the model layer expected camelCase. The spread
- * silently dropped fields — `geoblock_mode` was the user-visible symptom but
- * the same shape applied to certificate_id, ssl_forced, hsts_subdomains,
- * skip_https_hostname_validation, load_balancer, dns_resolver, custom_*,
- * location_rules, and the L4 listen_addresses / matchers fields.
+ * v1 REST API contract: posts payloads with the field names OpenAPI documents (camelCase) and
+ * verifies the model persists them, catching snake/camel drift. Before 2026-05 the spec documented
+ * snake_case while the model expected camelCase, so the spread silently dropped `geoblock_mode`,
+ * `certificate_id`, `ssl_forced`, `load_balancer`, `location_rules` and the L4 fields.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -88,10 +80,8 @@ beforeEach(async () => {
 });
 
 /**
- * Static guard against drift: top-level properties in every Input/resource
- * schema must be camelCase. Snake_case is allowed inside meta-JSON
- * sub-schemas (geoblock_*, waf inner fields, redirect_url, etc.) and on a
- * handful of legacy endpoints that read snake_case body fields directly.
+ * Static guard against drift: top-level properties in every Input/resource schema must be
+ * camelCase. Snake_case is allowed inside meta-JSON sub-schemas and on a few legacy endpoints.
  */
 describe('v1 OpenAPI schemas: no top-level snake_case', () => {
   // Schemas whose properties are stored as snake_case JSON in meta/settings.

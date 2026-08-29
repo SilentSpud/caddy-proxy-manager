@@ -1,9 +1,4 @@
-/**
- * Integration tests for L4 port management.
- *
- * Tests the port computation, override file generation, diff detection,
- * and status lifecycle.
- */
+/** Integration: L4 port computation, override file generation, diff detection, status lifecycle. */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

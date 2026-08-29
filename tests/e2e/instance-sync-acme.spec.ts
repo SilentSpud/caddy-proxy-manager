@@ -1,16 +1,8 @@
 /**
- * Functional test: master → slave settings sync for the ACME group (issue #192).
- *
- * Verifies the cross-instance sync path end-to-end: a custom ACME directory set
- * on a master instance (web-master:3002) is pushed over HTTP to a slave
- * (web-slave:3003) and surfaces as the slave's effective ACME setting.
- *
- * Both instances point at an unreachable Caddy, so they never touch the shared
- * Caddy stack — the slave persists synced settings before its own (failing)
- * Caddy apply, which is exactly what we assert.
- *
- * Guards against the regression where a new setting group is added but not wired
- * into instance-sync's SyncSettings allowlist (so it silently never syncs).
+ * Functional: master → slave settings sync for the ACME group (#192). A custom ACME directory set
+ * on web-master:3002 is pushed to web-slave:3003 and surfaces as the slave's effective setting;
+ * both point at an unreachable Caddy, so the slave persists before its own failing apply. Guards
+ * the regression where a new setting group is missing from the SyncSettings allowlist.
  */
 import { test, expect, type BrowserContext, type Browser } from '@playwright/test';
 

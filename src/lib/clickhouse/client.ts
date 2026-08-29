@@ -136,8 +136,8 @@ const RETENTION_TABLES = ["traffic_events", "waf_events"] as const;
 
 /** Extract the retention (in days) from a table's TTL clause, if present. */
 function ttlDaysFromCreateQuery(createQuery: string): number | null {
-  // ClickHouse normalizes `INTERVAL N DAY` to `toIntervalDay(N)` in create_table_query,
-  // but older servers may report the literal form — match both.
+  // ClickHouse normalizes `INTERVAL N DAY` to `toIntervalDay(N)` in create_table_query, but
+  // older servers may report the literal form — match both.
   const match =
     createQuery.match(/TTL\s+ts\s*\+\s*toIntervalDay\((\d+)\)/i) ??
     createQuery.match(/TTL\s+ts\s*\+\s*INTERVAL\s+(\d+)\s+DAY/i);
@@ -145,13 +145,9 @@ function ttlDaysFromCreateQuery(createQuery: string): number | null {
 }
 
 /**
- * Bring an existing table's TTL in line with CH_RETENTION_DAYS.
- *
- * `CREATE TABLE IF NOT EXISTS` never alters an existing table, so deployments
- * created under a different retention keep their old TTL forever unless we
- * issue an explicit MODIFY TTL. We only do so when the current TTL differs,
- * since MODIFY TTL materializes a mutation that rewrites parts to drop expired
- * rows — cheap to skip, wasteful to repeat on every restart.
+ * Bring an existing table's TTL in line with CH_RETENTION_DAYS. `CREATE TABLE IF NOT EXISTS` never
+ * alters an existing table, so an explicit MODIFY TTL is needed — issued only when the TTL
+ * differs, since it materializes a mutation that rewrites parts.
  */
 async function ensureRetentionTtl(
   ch: ClickHouseClient,
@@ -170,11 +166,10 @@ async function ensureRetentionTtl(
   });
 }
 
-// Diagnostic system-log tables that docker/clickhouse/config.d/low-disk-write.xml
-// turns off. On stock ClickHouse these flush every few seconds regardless of
-// traffic, so a deployment that ran before the override accumulated gigabytes we
-// can now reclaim. Disabling only stops new writes; the old data lingers until
-// the tables are dropped, which is what this list drives.
+// Diagnostic system-log tables that docker/clickhouse/config.d/low-disk-write.xml turns off. On
+// stock ClickHouse these flush every few seconds regardless of traffic, so a deployment that ran
+// before the override accumulated gigabytes we can now reclaim. Disabling only stops new writes;
+// the old data lingers until the tables are dropped, which is what this list drives.
 const DISABLED_SYSTEM_LOGS = [
   "metric_log",
   "asynchronous_metric_log",
@@ -192,21 +187,14 @@ const DISABLED_SYSTEM_LOGS = [
   "histogram_metric_log",
 ] as const;
 
-// Matches a disabled log table and its numbered upgrade leftovers. When a
-// ClickHouse upgrade changes a system-log table's schema, the server renames
-// the old table to `<name>_<N>` (e.g. trace_log_3) and creates a fresh one;
-// those frozen copies are never cleaned up and, on long-lived deployments,
-// dwarf the live table. An exact-name drop misses them, so we match the
-// `_<N>` suffix too. Anchored to full names built from the trusted constant
-// list above — no user input reaches this regex.
+// Matches a disabled log table and its numbered upgrade leftovers: a ClickHouse upgrade renames the
+// old table to `<name>_<N>` and never cleans it up, so an exact-name drop misses it. Anchored to
+// names built from the trusted constant list above — no user input reaches this regex.
 const DISABLED_SYSTEM_LOG_PATTERN = `^(${DISABLED_SYSTEM_LOGS.join("|")})(_[0-9]+)?$`;
 
 /**
- * Drop the diagnostic system-log tables we disable via config — including the
- * numbered `_<N>` copies left behind by past version upgrades — so their
- * already-written data is reclaimed. Best-effort: the analytics user often
- * lacks DROP on the `system` database, so a failure is logged once and ignored
- * rather than aborting startup.
+ * Drop the diagnostic system-log tables we disable via config, including numbered `_<N>`
+ * leftovers, to reclaim their data. Best-effort — the analytics user often lacks DROP on `system`.
  */
 async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
   let names: string[];
@@ -323,8 +311,8 @@ export async function insertWafEvents(rows: WafEventRow[]): Promise<void> {
 type QueryParams = Record<string, unknown>;
 
 /**
- * Build a host filter clause using parameterized query placeholders.
- * Returns the SQL fragment and the params to merge into query_params.
+ * A host filter clause using parameterized query placeholders: the SQL fragment plus the params
+ * to merge into query_params.
  */
 function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
   if (hosts.length === 0) return { sql: "", params: {} };
@@ -809,7 +797,7 @@ export async function queryTopWafRulesWithHosts(
   const topRules = await queryTopWafRules(from, to, limit);
   if (topRules.length === 0) return [];
 
-  // Rule IDs come from ClickHouse query results — they are integers, safe for IN clause
+  // Rule IDs come from ClickHouse query results — integers, so safe for an IN clause
   const ruleIds = topRules.map((r) => r.ruleId);
   const tp = timeParams(from, to);
   const ruleParams: QueryParams = {};

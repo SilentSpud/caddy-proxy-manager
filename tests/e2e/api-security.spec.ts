@@ -1,13 +1,6 @@
 /**
- * E2E tests: API endpoint security.
- *
- * Verifies that ALL /api/v1/ endpoints properly enforce authentication
- * and role-based access control:
- *
- * 1. Unauthenticated requests → 401
- * 2. User role → 403 on admin-only endpoints, allowed on user endpoints
- * 3. Viewer role → 403 on admin-only endpoints, allowed on user endpoints
- * 4. Admin role → allowed on all endpoints
+ * E2E: every /api/v1/ endpoint enforces auth and RBAC — 401 unauthenticated, 403 for user/viewer
+ * on admin-only endpoints, allowed on user endpoints, admins everywhere.
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import * as seed from '../helpers/seed';

@@ -1,8 +1,7 @@
 /**
- * The gate that sends users still on a bcrypt hash to the reset screen.
- * Its failure modes are asymmetric: gating someone who cannot satisfy it (a
- * federated user with no password) locks them out permanently, so the negative
- * cases matter more than the positive one.
+ * The gate sending bcrypt-hashed users to the reset screen. Its failure modes are asymmetric —
+ * gating someone who cannot satisfy it (a federated user with no password) locks them out — so the
+ * negative cases matter more than the positive one.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -13,8 +13,8 @@ import { logAuditEvent } from "@/src/lib/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 
 /**
- * Forward auth login endpoint — validates credentials and starts the exchange flow.
- * Called by the portal login form with an opaque redirect intent ID (rid).
+ * Forward auth login — validates credentials and starts the exchange flow. Called by the portal
+ * login form with an opaque redirect intent ID (rid).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
     // Successful credential check — reset rate limiter for this IP
     resetAttempts(ip);
 
-    // Consume the redirect intent — returns the server-stored redirect URI.
-    // This is a one-time operation: the intent is deleted after consumption.
+    // Consume the redirect intent — a one-time read that returns the server-stored redirect URI
+    // and deletes it.
     const redirectUri = await consumeRedirectIntent(rid);
     if (!redirectUri) {
       return NextResponse.json(

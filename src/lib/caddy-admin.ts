@@ -1,18 +1,8 @@
 /**
- * The seam between this app and the Caddy admin API.
- *
- * Caddy runs in its own container, so every call to it crosses a network
- * boundary we own. Rather than let each caller reach for node:http directly,
- * all admin traffic goes through one port here:
- *
- *   - production installs `httpCaddyAdminTransport` (node:http / node:https);
- *   - tests install an in-memory adapter (see tests/helpers/caddy-admin.ts),
- *     so the whole config-building and applying path can be exercised against
- *     a spoofed Caddy instance with no real server listening.
- *
- * Callers pass a path relative to `config.caddyApiUrl` and never assemble the
- * URL themselves, so redirecting the entire app at a fake Caddy is a single
- * `setCaddyAdminTransport` call.
+ * The seam between this app and the Caddy admin API: all admin traffic goes through one transport,
+ * so production installs `httpCaddyAdminTransport` while tests install an in-memory adapter (see
+ * tests/helpers/caddy-admin.ts) and exercise the whole build-and-apply path with nothing
+ * listening. Callers pass a path relative to `config.caddyApiUrl` and never build the URL.
  */
 import http from "node:http";
 import https from "node:https";
@@ -25,9 +15,8 @@ export type CaddyAdminRequest = {
   /** Abort the request after this many ms. Omitted means no client-side timeout. */
   timeoutMs?: number;
   /**
-   * Content-Type for the body. Defaults to application/json, which is right for
-   * every config endpoint; /adapt is the exception — it needs text/caddyfile to
-   * know which adapter to run.
+   * Content-Type for the body. Defaults to application/json, which is right for every config
+   * endpoint; /adapt is the exception — it needs text/caddyfile to know which adapter to run.
    */
   contentType?: string;
 };
@@ -41,13 +30,9 @@ export type CaddyAdminResponse = {
 export type CaddyAdminTransport = (request: CaddyAdminRequest) => Promise<CaddyAdminResponse>;
 
 /**
- * Absolute URL for an admin path, so every caller resolves it the same way.
- *
- * `./config` is imported lazily rather than at module scope: config snapshots
- * process.env when it first loads, and this module is imported by the test
- * setup to install the fake adapter. A static import would freeze env before a
- * test file's hoisted block could set it. Nothing outside the real HTTP
- * adapter needs the URL, so deferring costs nothing.
+ * Absolute URL for an admin path. `./config` is imported lazily because config snapshots
+ * process.env on first load and the test setup imports this module to install the fake adapter — a
+ * static import would freeze env before a test's hoisted block could set it.
  */
 async function caddyAdminUrl(path: string): Promise<string> {
   const { config } = await import("./config");
@@ -56,10 +41,8 @@ async function caddyAdminUrl(path: string): Promise<string> {
 }
 
 /**
- * Real transport: a plain node:http request.
- *
- * Deliberately not `fetch` — native fetch sends browser-security headers
- * (Sec-Fetch-*) that trigger Caddy's CORS origin enforcement.
+ * Real transport: a plain node:http request. Deliberately not `fetch` — native fetch sends
+ * browser-security headers (Sec-Fetch-*) that trigger Caddy's CORS origin enforcement.
  */
 export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   path,
@@ -68,10 +51,9 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   timeoutMs,
   contentType,
 }) => {
-  // Backstop for the guard installed by tests/setup.bun.ts: if a test swaps
-  // the real transport back in, fail loudly instead of quietly opening a socket
-  // to whatever happens to be listening on the admin port. CPM_TEST is set by
-  // tests/helpers/env.ts — `bun test` sets no marker of its own.
+  // Backstop for the guard installed by tests/setup.bun.ts: if a test swaps the real transport
+  // back in, fail loudly instead of quietly opening a socket to whatever is listening on the
+  // admin port. CPM_TEST is set by tests/helpers/env.ts — `bun test` sets no marker of its own.
   if (process.env.CPM_TEST) {
     throw new Error(
       "The real Caddy admin transport was used inside a test. Tests must install an " +

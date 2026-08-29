@@ -1,15 +1,8 @@
 /**
- * Regression: the generated Caddy config for CPM forward-auth hosts must STRIP
- * client-supplied X-CPM-* identity headers from the inbound request on EVERY
- * route that proxies to the upstream — protected, unprotected catch-all,
- * excluded, and location routes alike.
- *
- * Without this, a caller could spoof identity / group membership to upstream
- * apps: on unprotected/excluded paths the forged headers pass straight through
- * (no verify runs), and on authenticated routes the copy step only overwrites a
- * header when the verify response is non-empty (a user in no group returns an
- * empty X-CPM-Groups, which would otherwise leave the client's forged value
- * intact). See SECURITY-AUDIT H1.
+ * Regression (SECURITY-AUDIT H1): forward-auth hosts must STRIP client-supplied X-CPM-* headers
+ * inbound on EVERY proxying route. Without it a caller can spoof identity: unprotected and excluded
+ * paths pass the forged headers straight through, and on authenticated routes the copy step only
+ * overwrites when the verify value is non-empty.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -14,13 +14,8 @@ export type Session = {
 };
 
 /**
- * Get the current session, optionally from a specific request.
- *
- * - `auth()` — uses `headers()` from next/headers (server components, route handlers)
- * - `auth(req)` — uses request headers (middleware)
- *
- * Returns `Session | null`. The user's role is always fetched fresh from the database
- * so that role changes (e.g. demotion) take effect immediately.
+ * The current session, or null. `auth()` reads next/headers; `auth(req)` reads request headers
+ * (middleware). Role is always fetched fresh from the DB, so a demotion takes effect immediately.
  */
 export async function auth(req?: NextRequest): Promise<Session | null> {
   const hdrs = req ? req.headers : (await import("next/headers")).headers();
@@ -55,7 +50,7 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
   };
   const userId = typeof baUser.id === "string" ? Number(baUser.id) : baUser.id;
 
-  // Always fetch current role/status from database to reflect changes immediately
+  // Always fetch role/status from the database so changes take effect immediately
   const currentUser = await getUserById(userId);
   if (currentUser?.status !== "active") {
     return null;
@@ -73,17 +68,14 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
   };
 }
 
-/**
- * Alias for auth() — get the current session on the server.
- */
+/** Alias for auth() — get the current session on the server. */
 export async function getSession(): Promise<Session | null> {
   return auth();
 }
 
 /**
- * Returns the DB id of the caller's current better-auth session, or null when
- * there is no session-cookie auth (e.g. a Bearer-token API call). Used to mark
- * the "current" session and to exclude it from "revoke other sessions".
+ * The DB id of the caller's better-auth session, or null without cookie auth (e.g. a Bearer call).
+ * Marks the "current" session and excludes it from "revoke other sessions".
  */
 export async function getCurrentSessionId(req?: NextRequest): Promise<number | null> {
   const hdrs = req ? req.headers : (await import("next/headers")).headers();
@@ -97,9 +89,7 @@ export async function getCurrentSessionId(req?: NextRequest): Promise<number | n
   }
 }
 
-/**
- * Require authentication. Redirects to /login if not authenticated.
- */
+/** Require authentication. Redirects to /login if not authenticated. */
 export async function requireUser(): Promise<Session> {
   const session = await auth();
   if (!session?.user) {
@@ -110,9 +100,7 @@ export async function requireUser(): Promise<Session> {
   return session;
 }
 
-/**
- * Require admin privileges. Throws if not authenticated or not admin.
- */
+/** Require admin privileges. Throws if not authenticated or not admin. */
 export async function requireAdmin(): Promise<Session> {
   const session = await requireUser();
   if (session.user.role !== "admin") {
@@ -122,15 +110,12 @@ export async function requireAdmin(): Promise<Session> {
 }
 
 /**
- * Defense-in-depth CSRF check: verifies the Origin header matches the Host.
- * Returns a 403 response if the origin is present and mismatched; otherwise null.
- * Browsers always include Origin on cross-origin requests, so a mismatch means
- * the request came from a different site.
+ * Defense-in-depth CSRF check: 403 when Origin is present and does not match Host, else null.
+ * Browsers always send Origin cross-origin, so a mismatch means another site sent it.
  */
 export function checkSameOrigin(request: NextRequest): NextResponse | null {
   const origin = request.headers.get("origin");
-  // For mutating requests, require Origin header to be present.
-  // Browsers always send Origin on cross-origin POST/PUT/DELETE.
+  // Mutating requests must carry Origin; browsers always send it on cross-origin POST/PUT/DELETE
   const method = request.method.toUpperCase();
   const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
   if (!origin) {

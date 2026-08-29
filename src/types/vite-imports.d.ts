@@ -1,8 +1,6 @@
 /**
- * Vite's `?worker` import suffix, declared locally rather than by pulling in
- * `vite/client` types wholesale — that would also add Vite's `ImportMeta`
- * augmentation and its asset-module declarations, which conflict with the
- * Next.js and Bun types this project already loads.
+ * Vite's `?worker` import suffix, declared locally rather than pulling in `vite/client` types,
+ * whose `ImportMeta` augmentation and asset declarations clash with the Next.js and Bun types.
  */
 declare module "*?worker" {
   const workerConstructor: new () => Worker;
@@ -10,9 +8,8 @@ declare module "*?worker" {
 }
 
 /**
- * Vite's `?worker&url` combination — bundles the worker's module graph like
- * `?worker`, but resolves to the URL of the emitted chunk rather than to a
- * constructor, for libraries that want to spawn the worker themselves.
+ * Vite's `?worker&url` — bundles the worker's module graph like `?worker`, but resolves to the
+ * emitted chunk's URL rather than a constructor, for libraries that spawn the worker themselves.
  */
 declare module "*?worker&url" {
   const url: string;
@@ -20,8 +17,8 @@ declare module "*?worker&url" {
 }
 
 /**
- * Vite's `?url` import suffix — resolves an asset to the URL the bundler emits
- * it at. Declared here for the same reason as `?worker` above.
+ * Vite's `?url` import suffix — resolves an asset to the URL the bundler emits it at. Declared
+ * here for the same reason as `?worker` above.
  */
 declare module "*?url" {
   const url: string;

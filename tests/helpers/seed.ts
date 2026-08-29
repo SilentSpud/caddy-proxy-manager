@@ -1,19 +1,8 @@
 /**
- * Fixture seeding for the end-to-end suite.
- *
- * The web image ships as a compiled binary (`bun build --compile`) on a base
- * with no Bun CLI, no package manager and no interpreter, so there is nothing in
- * it to execute an ad-hoc script with — which is the point: the suite runs the
- * same image that ships rather than a variant carrying extra tooling.
- *
- * Seeding therefore runs in the `db-seed` service (tests/docker-compose.test.yml),
- * a throwaway `oven/bun:1-slim` container that mounts the same data volume. The
- * scripts are unchanged in substance from when they ran via
- * `docker compose exec web bun -e` — same SQL, same bcrypt via Bun.password, and
- * the same relative database path, since db-seed mounts the volume at the same
- * place. Writing from a second process is not new either: `bun -e` inside the web
- * container was already a separate process from the server, and the writes still
- * take `PRAGMA busy_timeout` against the running server's connection.
+ * Fixture seeding for the end-to-end suite. The web image is a compiled binary with no Bun CLI and
+ * no interpreter — deliberately, so the suite runs the image that ships — so seeding happens in the
+ * throwaway `db-seed` container (tests/docker-compose.test.yml), which mounts the same data volume
+ * and opens the same SQLite file. Writes take `PRAGMA busy_timeout` against the running server.
  */
 import { execFileSync } from 'node:child_process';
 
@@ -23,11 +12,8 @@ const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker
 const DB = './data/caddy-proxy-manager.db';
 
 /**
- * Run a Bun script against the application database and return its stdout.
- *
- * `--rm` so containers do not accumulate over a run, `--no-deps` so seeding
- * never starts the rest of the stack, and `-T` because Playwright's runner has
- * no TTY and the callers below read stdout.
+ * Run a Bun script against the application database and return its stdout. `--rm` so containers
+ * don't accumulate, `--no-deps` so seeding never starts the stack, `-T` because there is no TTY.
  */
 export function runSeedScript(script: string): string {
   return execFileSync(
@@ -38,13 +24,9 @@ export function runSeedScript(script: string): string {
 }
 
 /**
- * Create the user, or bring an existing one back to a known state: given role,
- * given password, active.
- *
- * Both a `users` row and a matching `credential` account row are written —
- * Better Auth authenticates against the account, while the dashboard reads the
- * user, and a fixture with only one of the two fails in ways that look like
- * application bugs.
+ * Create the user, or reset an existing one to a known role, password and active state. Writes both
+ * a `users` row and a `credential` account row — Better Auth reads the account, the dashboard reads
+ * the user, and a fixture with only one fails in ways that look like application bugs.
  */
 export function ensureTestUser(username: string, password: string, role: string): void {
   runSeedScript(`
@@ -89,10 +71,8 @@ export function setUserStatus(email: string, status: 'active' | 'disabled'): voi
 }
 
 /**
- * Issue a Bearer API token for a user and return the raw value.
- *
- * Only the SHA-256 hash is stored, matching what the application does, so the
- * caller gets the one and only copy of the plaintext.
+ * Issue a Bearer API token for a user and return the raw value. Only the SHA-256 hash is stored,
+ * matching what the application does, so the caller gets the one and only copy of the plaintext.
  */
 export function createApiToken(email: string, name: string, token: string): string {
   runSeedScript(`
@@ -156,14 +136,9 @@ export function getUserRecord(email: string): SeededUserRecord {
 }
 
 /**
- * Rewrite an existing user's password hash to bcrypt, the algorithm this app
- * used before argon2id.
- *
- * Fixtures for the legacy-password gate cannot be produced through the UI —
- * every path there now writes argon2id — so the "old" state has to be planted
- * directly. Both the `users` row and the `credential` account row are rewritten,
- * because Better Auth authenticates against the account while the gate reads the
- * user, and updating one without the other tests nothing real.
+ * Rewrite a user's password hash to bcrypt, the pre-argon2id algorithm. Legacy-gate fixtures
+ * cannot be made through the UI, so the old state is planted directly — in both the `users` row and
+ * the `credential` account row, since Better Auth reads one and the gate reads the other.
  */
 export function downgradeUserToBcrypt(email: string, password: string): void {
   runSeedScript(`

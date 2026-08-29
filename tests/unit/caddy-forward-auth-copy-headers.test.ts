@@ -1,19 +1,9 @@
 /**
- * Regression: the identity headers a forward-auth host copies from the verify
- * response onto the upstream request must be read back with a placeholder
- * spelled in Go's canonical MIME casing.
- *
- * Caddy resolves `{http.reverse_proxy.header.<name>}` by indexing the response
- * header map with the literal name from the placeholder, and Go stores that map
- * under the canonical key. So `{http.reverse_proxy.header.X-CPM-User}` resolves
- * to nothing while `{...X-Cpm-User}` resolves to the value. Because each copy
- * route is guarded by `not vars <placeholder> ""`, an unresolvable placeholder
- * does not merely copy the wrong text — the guard matches the empty string, the
- * route is skipped, and the header is never set at all.
- *
- * The symptom is silent and total: every application behind CPM forward auth
- * receives an anonymous request. Found by the docker integration suite
- * (docker-tests/suite/tests/60-forward-auth.sh), which asserts it end to end.
+ * Regression: the identity headers a forward-auth host copies onto the upstream must use a
+ * placeholder in Go's canonical MIME casing. Caddy resolves `{http.reverse_proxy.header.<name>}` by
+ * literal lookup in Go's canonicalised map, so `X-CPM-User` resolves to nothing — and each copy
+ * route is guarded by `not vars <placeholder> ""`, so it is skipped and the header never set. Every
+ * app behind forward auth then sees an anonymous request.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

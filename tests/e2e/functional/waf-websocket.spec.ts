@@ -1,16 +1,8 @@
 /**
- * Functional regression test for issue #195: "Websockets mangled by WAF".
- *
- * When WAF (coraza) is enabled on a proxy host, WebSocket connections used to be
- * corrupted into a raw "HTTP/0.9" response: the coraza middleware wraps the
- * response writer to inspect the upstream response, and that wrapper broke the
- * `101 Switching Protocols` connection hijack, leaking the upstream body out
- * without any HTTP status line. The fix routes WebSocket upgrades AROUND the WAF
- * handler entirely (allow_websocket defaults to true), so the handshake reaches
- * the upstream untouched.
- *
- * Upstream: traefik/whoami exposes a WebSocket echo endpoint at /echo.
- * Domain: func-waf-ws.test
+ * Issue #195, "Websockets mangled by WAF": coraza wraps the response writer, which broke the
+ * `101 Switching Protocols` connection hijack and leaked the upstream body out with no status
+ * line. The fix routes upgrades around the WAF handler (allow_websocket defaults true). Upstream:
+ * traefik/whoami's /echo. Domain: func-waf-ws.test
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

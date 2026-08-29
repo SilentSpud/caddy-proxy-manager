@@ -1,13 +1,8 @@
 /**
- * Unit tests for src/lib/caddy-waf.ts
- *
- * Key regression: when WAF is enabled but OWASP CRS is NOT loaded,
- * the generated directives must NOT contain any @-prefixed Include paths
- * (e.g. @coraza.conf-recommended).  Those paths only resolve from the
- * embedded coraza-coreruleset filesystem which is mounted by the Caddy
- * plugin only when load_owasp_crs=true.  Including them without the
- * filesystem causes:
- *   "failed to readfile: open @coraza.conf-recommended: no such file or directory"
+ * src/lib/caddy-waf.ts. Key regression: with WAF on but OWASP CRS not loaded, the directives must
+ * contain no @-prefixed Include paths — those resolve only from the embedded coraza-coreruleset
+ * filesystem, which the plugin mounts only when load_owasp_crs=true, so including them fails the
+ * config load.
  */
 import { describe, it, expect } from 'bun:test';
 import {
@@ -23,12 +18,9 @@ const baseWaf = {
   custom_directives: '',
 };
 
-// ---------------------------------------------------------------------------
-// SecRuleEngine mode is interpolated into the directive block, and WAF settings
-// are persisted without validation — so an unrecognised mode must never reach
-// the config, or it would smuggle in SecLang past the custom_directives
-// allowlist (e.g. disabling rules the allowlist explicitly refuses).
-// ---------------------------------------------------------------------------
+// SecRuleEngine mode is interpolated into the directive block and WAF settings are persisted
+// without validation, so an unrecognised mode must never reach the config — it would smuggle in
+// SecLang past the custom_directives allowlist.
 
 describe('buildWafHandler — SecRuleEngine mode sanitising', () => {
   function directives(mode: string): string {
@@ -337,17 +329,10 @@ describe('resolveEffectiveWaf — override mode', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// buildWafHandlerEntry — WebSocket bypass (issue #195)
-//
-// Regression: enabling WAF on a proxy host mangled WebSocket connections into a
-// corrupt "HTTP/0.9" response. The coraza middleware wraps the response writer
-// to inspect the upstream response, and that wrapper breaks the 101 Switching
-// Protocols connection hijack. The previous `ctl:ruleEngine=off` SecLang bypass
-// did NOT help because it only disables rule evaluation, leaving the response
-// wrapper in place. The fix routes WebSocket upgrades AROUND the WAF handler at
-// the Caddy routing level via a subroute that excludes the upgrade request.
-// ---------------------------------------------------------------------------
+// ── buildWafHandlerEntry — WebSocket bypass (issue #195) ─────────────────────
+// Enabling WAF mangled WebSocket connections into a corrupt "HTTP/0.9" response: coraza wraps the
+// response writer, breaking the 101 connection hijack. `ctl:ruleEngine=off` did not help — it only
+// disables rule evaluation, leaving the wrapper. The fix routes upgrades around the handler.
 
 // Pull a deeply-nested handler tree apart for assertions
 function subrouteOf(entry: Record<string, unknown>) {

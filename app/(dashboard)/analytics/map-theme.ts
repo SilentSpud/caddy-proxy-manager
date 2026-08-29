@@ -5,17 +5,10 @@ import type {
 } from "maplibre-gl";
 
 /**
- * The map's palette, resolved from Astryx tokens for the mode in effect.
- *
- * MapLibre paints into WebGL and takes concrete colour strings, so these are
- * resolved values rather than `var(--…)` references — the same constraint that
- * applies to the charts (see chart-theme.ts).
- *
- * The choropleth ramp has to *invert* between modes, which is why it is not a
- * straight token lookup: "more traffic" reads as darker against a light ocean
- * and lighter against a dark one. Astryx's sequential ramp tokens are
- * deliberately mode-independent, so the direction is chosen here and the stops
- * come from the ramp either way.
+ * The map's palette, resolved from Astryx tokens for the mode in effect — MapLibre paints into
+ * WebGL and takes concrete colour strings, as the charts do (see chart-theme.ts). The choropleth
+ * ramp must *invert* between modes ("more traffic" is darker on a light ocean), so the direction
+ * is chosen here while the stops come from the ramp.
  */
 export interface MapPalette {
   ocean: string;
@@ -38,8 +31,8 @@ export function mapPalette(mode: "light" | "dark", token: (name: string) => stri
     ocean: token("--color-background-body"),
     empty: token("--color-border-emphasized"),
     ramp,
-    // The end of the ramp the data never reaches, so a highlighted country
-    // stands out however much traffic it has.
+    // The end of the ramp the data never reaches, so a highlighted country stands out however much
+    // traffic it has.
     highlight: mode === "dark" ? token("--color-data-blue-1") : token("--color-data-blue-5"),
     outline: token("--color-border"),
   };

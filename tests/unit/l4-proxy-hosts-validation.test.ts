@@ -1,9 +1,4 @@
-/**
- * Unit tests for L4 proxy host input validation.
- *
- * Tests the validation logic in the L4 proxy hosts model
- * without requiring a database connection.
- */
+/** L4 proxy host input validation, exercised without a database connection. */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';

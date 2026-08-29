@@ -130,9 +130,8 @@ function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInput | un
     return undefined;
   }
 
-  // The boolean is carried by a hidden input that is always present (see
-  // FormBooleanControls), so presence no longer distinguishes on from off —
-  // only the value does.
+  // The boolean is carried by a hidden input that is always present (see FormBooleanControls), so
+  // presence no longer distinguishes on from off — only the value does.
   const enabledIndicator = formData.has("cpmForwardAuthEnabledPresent");
   const enabledValue = enabledIndicator
     ? parseCheckbox(formData.get("cpmForwardAuthEnabled"))
@@ -345,7 +344,7 @@ function parseGeoBlockConfig(formData: FormData): {
   return { geoblock: config, geoblockMode: mode };
 }
 
-// Helper: parse response headers from geoblock_response_headers_keys[] and geoblock_response_headers_values[]
+// Parse response headers from geoblock_response_headers_keys[] / _values[]
 function parseResponseHeaders(formData: FormData): Record<string, string> {
   const keys = formData.getAll("geoblockResponseHeadersKeys[]") as string[];
   const values = formData.getAll("geoblockResponseHeadersValues[]") as string[];

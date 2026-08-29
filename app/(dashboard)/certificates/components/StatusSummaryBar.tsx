@@ -15,12 +15,8 @@ type Props = {
 };
 
 /**
- * The filter chips above the certificate tabs.
- *
- * These were `<button aria-pressed>` elements carrying two hand-written class
- * strings each — one resting, one active — plus a coloured glow. ToggleButton
- * is the design system's own pressable control, so the pressed state comes with
- * it and the counts move into a Badge rather than a bolded span.
+ * The filter chips above the certificate tabs. ToggleButton is the design system's own pressable
+ * control, so the pressed state comes with it and the counts move into a Badge.
  */
 const FILTERS: ReadonlyArray<{ key: string; label: string; icon: ReactNode }> = [
   { key: "expired", label: "Expired", icon: <AlertCircle /> },

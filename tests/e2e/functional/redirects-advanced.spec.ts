@@ -1,15 +1,7 @@
 /**
- * Functional tests: redirect rules with full URLs, cross-domain destinations,
- * and wildcard path patterns.
- *
- * All tests send real HTTP requests to Caddy (port 80) with a custom Host
- * header and assert the response from Caddy — no redirect following.
- *
- * Caddy path matcher wildcard behaviour (used in the "from" field):
- *   - Exact:          "/foo/bar"  — only that path
- *   - Suffix glob:    "/foo/bar*" — anything starting with /foo/bar
- *   - Dir glob:       "/foo/*"    — anything under /foo/ (requires the slash)
- *
+ * Functional: redirect rules with full URLs, cross-domain destinations and wildcard paths.
+ * Requests go to Caddy on port 80 with a custom Host header; responses are asserted, not followed.
+ * Caddy "from" wildcards: "/foo/bar" exact, "/foo/bar*" suffix glob, "/foo/*" dir glob.
  * Domain: func-redirects-adv.test
  */
 import { test, expect } from '@playwright/test';

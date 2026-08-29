@@ -1,11 +1,6 @@
 /**
- * E2E tests: Access Lists page (redesigned split layout).
- *
- * Covers: page load, rail navigation, search, sort, create dialog,
- * members tab (add/remove/bulk/regenerate), settings tab (edit/delete with confirmation),
- * used-by tab, keyboard shortcuts, and empty states.
- *
- * Runs as admin (testadmin) — the page requires admin role.
+ * E2E: Access Lists page — load, rail navigation, search, sort, create dialog, members, settings,
+ * used-by, keyboard shortcuts, empty states. Runs as admin.
  */
 import { test, expect, type Page } from '@playwright/test';
 
@@ -40,9 +35,7 @@ async function apiDeleteList(page: Page, id: number) {
     .catch(() => undefined);
 }
 
-// ---------------------------------------------------------------------------
-// Page load / structure
-// ---------------------------------------------------------------------------
+// ── Page load / structure ────────────────────────────────────────────────────
 
 test.describe('Access Lists — page load', () => {
   test('page loads without redirecting to login', async ({ page }) => {
@@ -77,9 +70,7 @@ test.describe('Access Lists — page load', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
+// ── Empty state ──────────────────────────────────────────────────────────────
 
 test.describe('Access Lists — empty state', () => {
   test('shows "Select an access list" when no list is selected', async ({ page }) => {
@@ -95,9 +86,7 @@ test.describe('Access Lists — empty state', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Create dialog
-// ---------------------------------------------------------------------------
+// ── Create dialog ────────────────────────────────────────────────────────────
 
 test.describe('Access Lists — create dialog', () => {
   test('clicking New opens the create dialog', async ({ page }) => {
@@ -223,9 +212,7 @@ test.describe('Access Lists — create dialog', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Rail — selection, search, sort
-// ---------------------------------------------------------------------------
+// ── Rail — selection, search, sort ───────────────────────────────────────────
 
 test.describe('Access Lists — rail interaction', () => {
   let listA: { id: number; name: string };
@@ -288,10 +275,9 @@ test.describe('Access Lists — rail interaction', () => {
   test('no-match search shows "No lists match" message', async ({ page }) => {
     await page.goto('/access-lists');
     const search = page.getByPlaceholder(/search lists or members/i);
-    // Wait for the rail to be populated before typing. The search input exists
-    // in the server-rendered markup, so filling it can land before hydration
-    // wires up onChange — the value sticks but no filtering happens, and an
-    // assertion on an absence-driven message can never retry into existence.
+    // Wait for the rail to be populated before typing. The search input exists in the
+    // server-rendered markup, so filling it can land before hydration wires up onChange — the value
+    // sticks but no filtering happens, and an absence-driven assertion can never retry into being.
     await expect(page.locator('ul').getByText(listA.name)).toBeVisible();
     await search.fill('zzz-nonexistent-zzz');
 
@@ -347,9 +333,7 @@ test.describe('Access Lists — rail interaction', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Detail pane — tabs
-// ---------------------------------------------------------------------------
+// ── Detail pane — tabs ───────────────────────────────────────────────────────
 
 test.describe('Access Lists — detail pane tabs', () => {
   let list: { id: number; name: string };
@@ -403,9 +387,7 @@ test.describe('Access Lists — detail pane tabs', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Members tab
-// ---------------------------------------------------------------------------
+// ── Members tab ──────────────────────────────────────────────────────────────
 
 test.describe('Access Lists — members tab', () => {
   let list: { id: number; name: string; entries: { id: number; username: string }[] };
@@ -570,9 +552,7 @@ test.describe('Access Lists — members tab', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Members tab — empty state
-// ---------------------------------------------------------------------------
+// ── Members tab — empty state ────────────────────────────────────────────────
 
 test.describe('Access Lists — members empty state', () => {
   let list: { id: number; name: string };
@@ -603,16 +583,12 @@ test.describe('Access Lists — members empty state', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Settings tab
-// ---------------------------------------------------------------------------
+// ── Settings tab ─────────────────────────────────────────────────────────────
 
 /**
- * The settings tab's Name / Description inputs.
- *
- * The "New access list" dialog is a native <dialog>, which stays in the DOM when
- * closed, so its own Name and Description fields match the same label and make a
- * bare getByLabel ambiguous. Only one pair is ever visible.
+ * The settings tab's Name / Description inputs. The "New access list" dialog is a native <dialog>
+ * that stays in the DOM when closed, so its own Name and Description fields match the same label
+ * and make a bare getByLabel ambiguous. Only one pair is ever visible.
  */
 function settingsNameField(page: Page) {
   return page.getByLabel(/^Name/).filter({ visible: true });

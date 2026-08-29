@@ -1,21 +1,10 @@
 # syntax=docker/dockerfile:1.6
 
-# Bun is the only supported runtime (see src/lib/runtime-guard.ts). The build
-# stages need the full Bun toolchain; the runtime stage does not, because what
-# ships is a single compiled binary with the Bun runtime inside it.
-#
-# Pinned to $BUILDPLATFORM, so `deps` and `builder` — the only stages built on
-# top of this one — run natively on the host arch rather than under QEMU when
-# the target is linux/arm64. That is not a speed preference: emulated, the
-# Rolldown-backed `vinext build` deadlocks partway through its first transform
-# pass and never returns, wedging the job until the runner's 6-hour cap. The
-# same reasoning moved the Caddy image off emulation; see docker/caddy/Dockerfile.
-#
-# The runtime stage below is unaffected and still builds per-target, which is
-# what makes this safe: the only architecture-specific artifact it receives is
-# the compiled binary, cross-compiled for the target a few lines down. The
-# standalone bundle it ships alongside is pure JavaScript — no .node addons, no
-# platform-gated packages — so producing it on the host arch changes nothing.
+# Bun is the only supported runtime (src/lib/runtime-guard.ts); the runtime stage needs no toolchain
+# because what ships is one compiled binary. Pinned to $BUILDPLATFORM so `deps` and `builder` run
+# natively: emulated, the Rolldown-backed `vinext build` deadlocks in its first transform pass and
+# wedges the job until the runner's 6-hour cap. The runtime stage still builds per-target, and the
+# only arch-specific artifact it gets is the binary, cross-compiled a few lines down.
 FROM --platform=$BUILDPLATFORM oven/bun:1-slim AS base
 WORKDIR /app
 
@@ -37,16 +26,10 @@ ENV DATABASE_PATH=/tmp/build.db
 ENV DATABASE_URL=file:/tmp/build.db
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# `build` emits dist/standalone (app bundle, client assets, pruned node_modules);
-# `build:binary` compiles scripts/standalone-entry.ts — and the vinext production
-# server it imports — into the dist/standalone/cpm-server executable.
-#
-# This stage runs on the host arch (see the base stage), so the binary has to be
-# cross-compiled for the target rather than picking up the builder's own. Bun
-# names its targets by libc and arch; the glibc variants are the ones that match
-# the debian:bookworm-slim runtime below. BUN_COMPILE_TARGET feeds the
-# `build:binary` script in package.json, which defaults to the host target so a
-# plain `bun run build:binary` still works outside Docker.
+# `build` emits dist/standalone; `build:binary` compiles scripts/standalone-entry.ts and the vinext
+# production server into dist/standalone/cpm-server. This stage runs on the host arch, so the binary
+# is cross-compiled for the target — Bun names targets by libc and arch, and the glibc variants
+# match the debian:bookworm-slim runtime. BUN_COMPILE_TARGET feeds the package.json script.
 RUN case "$TARGETARCH" in \
       amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
       arm64) export BUN_COMPILE_TARGET=bun-linux-arm64 ;; \
@@ -55,15 +38,13 @@ RUN case "$TARGETARCH" in \
     bun run build && bun run build:binary && rm -f /tmp/build.db
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-# Debian rather than oven/bun: the compiled binary carries its own Bun runtime,
-# so a package manager, a Bun CLI, and a `bun -e` execution surface would all be
-# dead weight here. Bookworm matches oven/bun:1-slim's base, so the binary finds
-# the glibc it was linked against.
+# Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package
+# manager, a Bun CLI and a `bun -e` execution surface would all be dead weight here. Bookworm
+# matches oven/bun:1-slim's base, so the binary finds the glibc it was linked against.
 #
-# This is the only runtime stage — the end-to-end suite runs this same image
-# rather than a variant with extra tooling, so what the tests exercise is what
-# ships. The suite seeds its fixtures through the `db-seed` container defined in
-# tests/docker-compose.test.yml instead of executing code in this one.
+# This is the only runtime stage — the end-to-end suite runs this same image rather than a variant
+# with extra tooling, so what the tests exercise is what ships. The suite seeds its fixtures
+# through the `db-seed` container in tests/docker-compose.test.yml instead of executing code here.
 FROM debian:bookworm-slim AS runner
 ARG PUID=10001
 ARG PGID=10001
@@ -84,16 +65,14 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
     groupadd -g ${PGID} cpm && \
     useradd -r -u ${PUID} -g cpm cpm
 
-# The whole standalone directory, copied verbatim so the relative layout is
-# preserved: the compiled binary (cpm-server), the application bundle and client
-# assets it serves (dist/), the runtime dependencies the bundle still imports
-# from disk (node_modules/ — react and react-dom are externals), and the
-# package.json whose "type": "module" tells the runtime how to load dist/*.js.
+# The whole standalone directory, copied verbatim so the relative layout is preserved: the compiled
+# binary (cpm-server), the application bundle and client assets it serves (dist/), the runtime
+# dependencies the bundle still imports from disk (node_modules/ — react and react-dom are
+# externals), and the package.json whose "type": "module" tells the runtime how to load dist/*.js.
 #
-# The application bundle deliberately stays on disk. vinext's production server
-# loads it with a runtime import() of a real file path, and Bun's embedded-asset
-# filesystem does not support import() — so it cannot be compiled into the
-# binary, only read from beside it.
+# The application bundle deliberately stays on disk: vinext's production server loads it with a
+# runtime import() of a real file path, and Bun's embedded-asset filesystem does not support
+# import() — so it cannot be compiled into the binary, only read from beside it.
 COPY --from=builder --chown=cpm:cpm /app/dist/standalone ./
 
 # Migrations are read at startup and live outside the bundle.
@@ -101,10 +80,10 @@ COPY --from=builder --chown=cpm:cpm /app/drizzle ./drizzle
 
 RUN mkdir -p /app/data && chown -R cpm:cpm /app/data
 
-# Shared volume for the custom ACME CA root PEM (issue #192). The web container
-# writes it here; Caddy mounts the same volume read-only. Mode 0777 so it stays
-# writable regardless of which container (with differing UIDs) initializes the
-# named volume first. The file only ever holds a public CA certificate.
+# Shared volume for the custom ACME CA root PEM (issue #192). The web container writes it here;
+# Caddy mounts the same volume read-only. Mode 0777 so it stays writable regardless of which
+# container (with differing UIDs) initializes the named volume first — the file only ever holds a
+# public CA certificate.
 RUN mkdir -p /acme-ca && chmod 0777 /acme-ca
 
 COPY --chown=cpm:cpm docker/web/entrypoint.sh /entrypoint.sh

@@ -1,11 +1,7 @@
 /**
- * Per-host Caddyfile snippets, adapted through the Caddy admin API.
- *
- * The adapter itself is Caddy's, so what needs covering here is everything
- * around it: how the snippet is framed before being sent, what is extracted
- * from the result, and how failures are reported — a snippet that parses but is
- * silently dropped is the worst outcome, because the proxy rule the operator
- * wrote simply stops existing.
+ * Per-host Caddyfile snippets, adapted through the Caddy admin API. The adapter is Caddy's, so what
+ * matters here is the framing, the extraction, and the failure reporting — a snippet that parses
+ * but is silently dropped is the worst outcome, since the operator's rule just stops existing.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 

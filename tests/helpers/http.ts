@@ -1,8 +1,6 @@
 /**
- * Low-level HTTP helper for functional tests.
- *
- * Sends requests directly to Caddy on port 80 using a custom Host header,
- * bypassing DNS so test domains don't need to be resolvable.
+ * Low-level HTTP helper for functional tests. Sends requests directly to Caddy on port 80 with a
+ * custom Host header, bypassing DNS so test domains need not be resolvable.
  */
 import http from 'node:http';
 import net from 'node:net';
@@ -50,9 +48,8 @@ export function httpGet(
 }
 
 /**
- * Poll until the route responds with a status other than 502/503/504
- * (which Caddy returns while the config reload is in-flight or the
- * upstream hasn't been wired up yet).
+ * Poll until the route responds with a status other than 502/503/504 — what Caddy returns while a
+ * config reload is in flight or the upstream is not wired up yet.
  */
 export async function waitForRoute(domain: string, timeoutMs = 15_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -73,8 +70,8 @@ export async function waitForRoute(domain: string, timeoutMs = 15_000): Promise<
 }
 
 /**
- * Poll until the route returns a specific expected status code.
- * Useful for forward auth routes where you expect 302 (redirect to portal).
+ * Poll until the route returns a specific expected status code. Useful for forward auth routes,
+ * where a 302 to the portal is what you expect.
  */
 export async function waitForStatus(
   domain: string,
@@ -99,12 +96,9 @@ export async function waitForStatus(
 }
 
 /**
- * Poll until the response body for a route contains the given substring.
- *
- * Needed for error-page tests: when the upstream is down the status stays 502
- * both before the config reload (default Caddy body) and after (custom body),
- * so waiting on status alone can't tell the config has applied — wait on the
- * body instead.
+ * Poll until the response body for a route contains a substring. Needed for error-page tests: with
+ * the upstream down the status stays 502 before and after the reload, so only the body shows that
+ * the config applied.
  */
 export async function waitForBody(
   domain: string,
@@ -144,15 +138,9 @@ export interface WsHandshakeResult {
 }
 
 /**
- * Perform a raw WebSocket upgrade handshake against Caddy (localhost:80) over a
- * plain TCP socket and return the parsed HTTP response head.
- *
- * Done at the socket level on purpose: issue #195's symptom was a corrupt
- * "HTTP/0.9" response — the upstream's body leaking out with no HTTP status
- * line because the WAF response wrapper broke the 101 connection hijack. A
- * normal HTTP client would just throw an opaque parse error; reading raw bytes
- * lets the test assert the handshake actually produced `101 Switching
- * Protocols` with the expected upgrade headers.
+ * A raw WebSocket upgrade handshake against Caddy over a plain TCP socket, returning the parsed
+ * response head. At socket level on purpose: #195's symptom was a corrupt "HTTP/0.9" response with
+ * no status line, which a normal client reports as an opaque parse error.
  */
 export function wsHandshake(
   domain: string,

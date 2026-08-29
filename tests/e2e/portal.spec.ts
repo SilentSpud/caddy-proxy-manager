@@ -1,8 +1,6 @@
 /**
- * E2E tests: Forward Auth Portal login page (/portal).
- *
- * Verifies the portal login flow — error states, form rendering, credential submit.
- * Portal tests run WITHOUT pre-authenticated state since this is a login page.
+ * E2E: forward auth portal (/portal) — error states, form rendering, credential submit. Runs
+ * without pre-authenticated state, since this is a login page.
  */
 import { test, expect } from '@playwright/test';
 

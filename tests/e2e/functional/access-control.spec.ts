@@ -1,11 +1,6 @@
 /**
- * Functional tests: HTTP Basic Auth via access lists.
- *
- * Creates an access list with a test user, attaches it to a proxy host,
- * and verifies Caddy enforces authentication before forwarding requests
- * to the upstream echo server.
- *
- * Domain: func-auth.test
+ * Functional: HTTP Basic Auth via access lists. Attaches a list to a proxy host and verifies Caddy
+ * authenticates before forwarding. Domain: func-auth.test
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost, createAccessList } from '../../helpers/proxy-api';

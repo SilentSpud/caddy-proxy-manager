@@ -101,20 +101,19 @@ function consumeBlockedSignature(blocked: BlockedSignatures, key: string): boole
   return blocked.has(key);
 }
 
-// How long an unmatched "request blocked" signature is carried across parse
-// passes while waiting for its paired "handled request" row to be written.
+// How long an unmatched "request blocked" signature is carried across parse passes while waiting
+// for its paired "handled request" row to be written.
 const BLOCKED_CARRYOVER_WINDOW_SEC = 120;
 
-// Signatures collected in one pass but not yet matched to a "handled request"
-// row. caddy-blocker logs "request blocked" immediately before Caddy logs the
-// "handled request", so a parse-tick boundary can fall between the two lines.
-// Carrying the unmatched signatures forward lets the next pass mark them.
+// Signatures collected in one pass but not yet matched to a "handled request" row. caddy-blocker
+// logs "request blocked" immediately before Caddy logs the "handled request", so a parse-tick
+// boundary can fall between the two lines; carrying them forward lets the next pass mark them.
 let pendingBlocked: Map<string, number> = new Map();
 
-// Build counted signatures from caddy-blocker's "request blocked" entries so we
-// can mark the corresponding "handled request" rows correctly instead of using
-// status === 403 (which would also catch legitimate upstream 403s). Pass an
-// existing map via `into` to merge new signatures onto carried-over ones.
+// Build counted signatures from caddy-blocker's "request blocked" entries so the corresponding
+// "handled request" rows can be marked correctly, instead of using status === 403 (which would
+// also catch legitimate upstream 403s). Pass an existing map via `into` to merge new signatures
+// onto carried-over ones.
 export function collectBlockedSignatures(
   lines: string[],
   into?: Map<string, number>,
@@ -135,9 +134,9 @@ export function collectBlockedSignatures(
   return blocked;
 }
 
-// Drop carried-over signatures older than the carry-over window so the pending
-// map can't grow unbounded when a "request blocked" line never gets a paired
-// "handled request" row. The timestamp is the first field of the key.
+// Drop carried-over signatures older than the carry-over window so the pending map can't grow
+// unbounded when a "request blocked" line never gets a paired "handled request" row. The
+// timestamp is the first field of the key.
 export function pruneBlockedSignatures(
   blocked: Map<string, number>,
   refTs: number,
@@ -189,9 +188,8 @@ export function parseLine(line: string, blocked: BlockedSignatures): TrafficEven
   };
 }
 
-// Re-exported so existing callers/tests keep importing `readLines` from here.
-// The implementation lives in ./log-read because waf-log-parser needs the same
-// newline-safe offset accounting.
+// Re-exported so existing callers/tests keep importing `readLines` from here. The implementation
+// lives in ./log-read because waf-log-parser needs the same newline-safe offset accounting.
 export async function readLines(
   startOffset: number,
   file: string = LOG_FILE,
@@ -233,13 +231,13 @@ export async function parseNewLogEntries(): Promise<void> {
     const { lines, newOffset } = await readLines(startOffset);
 
     if (lines.length > 0) {
-      // Merge any signatures carried over from the previous pass (a "request
-      // blocked" line whose "handled request" row hadn't been written yet).
+      // Merge signatures carried over from the previous pass (a "request blocked" line whose
+      // "handled request" row hadn't been written yet).
       const blocked = collectBlockedSignatures(lines, pendingBlocked);
       const rows = lines.map((l) => parseLine(l, blocked)).filter((r) => r !== null);
       await insertBatch(rows);
-      // Whatever signatures weren't consumed are unmatched blocks; carry the
-      // recent ones forward and drop stale ones so the map can't grow forever.
+      // Unconsumed signatures are unmatched blocks; carry the recent ones forward and drop stale
+      // ones so the map can't grow forever.
       const latestTs = rows.length
         ? Math.max(...rows.map((r) => r.ts))
         : Math.floor(Date.now() / 1000);

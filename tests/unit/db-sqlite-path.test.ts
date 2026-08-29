@@ -1,12 +1,7 @@
 /**
- * A `file:` URL hands back its path with a leading slash, so a Windows absolute
- * path arrives as "/C:/data/app.db". Passing that to mkdir/open resolves it
- * against the current drive root — "C:\C:\data\app.db" — and the database is
- * created (or fails to be created) in the wrong place.
- *
- * The rewrite is deliberately Windows-only: "file:/app/data/…" is the
- * documented DATABASE_URL for Docker, and on POSIX "/C:/x" is a legitimate path
- * under a directory named "C:".
+ * A `file:` URL hands back its path with a leading slash, so a Windows absolute path arrives as
+ * "/C:/data/app.db" and resolves against the drive root. The rewrite is Windows-only:
+ * "file:/app/data/…" is the documented Docker DATABASE_URL, and on POSIX "/C:/x" is a real path.
  */
 import { describe, expect, it } from 'bun:test';
 import { stripLeadingSlashBeforeDriveLetter } from '../../src/lib/db';

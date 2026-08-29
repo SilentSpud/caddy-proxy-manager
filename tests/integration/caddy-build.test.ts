@@ -1,12 +1,8 @@
 /**
- * Module selection, the compose override it produces, and the gate it feeds.
- *
- * The load-bearing idea under test is the split between *desired* modules (what
- * the admin selected) and *applied* modules (what the running binary was
- * actually compiled with). Config generation must use the intersection: Caddy
- * rejects a whole config document if any handler names a module it does not
- * have, so emitting a handler for a module that has been selected but not yet
- * built would take every unrelated host offline.
+ * Module selection, the compose override it produces, and the gate it feeds. The idea under test is
+ * *desired* modules (what the admin selected) vs *applied* (what the binary was built with). Config
+ * generation uses the intersection: Caddy rejects a whole document naming a module it lacks, so an
+ * unbuilt handler would take every unrelated host offline.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -75,12 +71,9 @@ const BLOCKER = 'github.com/fuomag9/caddy-blocker-plugin';
 const CLOUDFLARE = 'github.com/caddy-dns/cloudflare';
 
 /**
- * Pretend a rebuild already completed with exactly these modules.
- *
- * Writes the *applied record* — the file the sidecar produces only after a
- * successful build — not the compose override. The override carries the desired
- * list into a build that has not happened yet, so writing that here would be
- * asserting the very confusion this separation exists to prevent.
+ * Pretend a rebuild already completed with exactly these modules. Writes the *applied record* — the
+ * file the sidecar produces only after a successful build — not the compose override, which carries
+ * the desired list into a build that has not happened.
  */
 function setAppliedModules(specs: string[]) {
   writeFileSync(APPLIED_PATH, JSON.stringify({ modules: specs.join(' ') }), 'utf-8');
@@ -145,9 +138,8 @@ describe('selection resolution', () => {
 
 describe('applied module specs', () => {
   it('reports the full catalog when no rebuild has happened', () => {
-    // No applied record means the container is still the shipped image, which
-    // is built with everything. Returning an empty list here would make config
-    // generation drop every plugin handler on a healthy default install.
+    // No applied record means the container is still the shipped image, which is built with
+    // everything. Returning an empty list here would make config generation drop every handler.
     expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 
@@ -157,9 +149,8 @@ describe('applied module specs', () => {
   });
 
   it('ignores the compose override entirely', () => {
-    // The override is the build's *input*, written before anything is compiled.
-    // Reading it as the applied set is precisely the bug this split fixes, so a
-    // stray override must not be able to move the answer.
+    // The override is the build's *input*, written before anything is compiled. Reading it as the
+    // applied set is exactly the bug this split fixes, so a stray override must not move the answer.
     writeFileSync(OVERRIDE_PATH, generateCaddyBuildOverride([L4]), 'utf-8');
     expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
@@ -171,10 +162,9 @@ describe('applied module specs', () => {
 
 describe("the sidecar's applied record", () => {
   it('parses the exact JSON shape entrypoint.sh writes', () => {
-    // Verified by running the real script: this is byte-for-byte what
-    // write_applied_modules produces, including the two-space indent from its
-    // heredoc and the trailing newline. The app and the sidecar are separate
-    // programs in separate containers, so nothing else checks this seam.
+    // Verified by running the real script: byte-for-byte what write_applied_modules produces,
+    // including the two-space indent from its heredoc and the trailing newline. The app and the
+    // sidecar are separate programs in separate containers, so nothing else checks this seam.
     const fromSidecar = [
       '{',
       '  "modules": "github.com/mholt/caddy-l4 github.com/o/x@v1.2.3",',
@@ -188,9 +178,8 @@ describe("the sidecar's applied record", () => {
   });
 
   it('falls back to the full catalog when the record is absent or unreadable', () => {
-    // Absent means no rebuild has happened, so the container is still the
-    // shipped image. Claiming an empty module set would drop every
-    // plugin-backed handler on a perfectly healthy install.
+    // Absent means no rebuild has happened, so the container is still the shipped image. Claiming
+    // an empty module set would drop every plugin-backed handler on a perfectly healthy install.
     expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
 
     writeFileSync(APPLIED_PATH, '{"modules": ', 'utf-8');
@@ -266,9 +255,8 @@ describe('feature gating', () => {
 
 describe('module gate state for the UI', () => {
   it('gates on the selection, not on the built image', async () => {
-    // Following the applied set would leave a freshly enabled feature greyed
-    // out after being switched on, which reads as broken. pendingRebuild is
-    // what says "saved, not live yet".
+    // Following the applied set would leave a freshly enabled feature greyed out after being
+    // switched on, which reads as broken. pendingRebuild is what says "saved, not live yet".
     setAppliedModules([L4]);
     await saveCaddyBuildSettings({ modules: {}, customModules: [] });
 
@@ -327,11 +315,10 @@ describe('sanitizeCaddyBuildSettings', () => {
 
 describe('applyCaddyBuild', () => {
   it('regenerates the config before signalling the rebuild', async () => {
-    // Caddy runs with --resume, so the recreated container reloads the last
-    // autosaved config. If that config still names a module the new binary does
-    // not have, Caddy refuses to load it and the proxy stays down — with no way
-    // in, because the admin API never comes up either. The apply has to happen
-    // before the trigger is written, not after.
+    // Caddy runs with --resume, so the recreated container reloads the last autosaved config. If
+    // that still names a module the new binary does not have, Caddy refuses to load it and the
+    // proxy stays down — with no way in, because the admin API never comes up either. The apply
+    // has to happen before the trigger is written, not after.
     const caddy: FakeCaddy = installFakeCaddy();
     await saveCaddyBuildSettings({ modules: { 'coraza-waf': false }, customModules: [] });
 
@@ -365,10 +352,9 @@ describe('applyCaddyBuild', () => {
   });
 
   it('does not claim the new modules are applied until the build succeeds', async () => {
-    // Requesting a rebuild changes nothing about the binary that is running.
-    // Treating the request as if it had already landed is how the applied set
-    // gets poisoned: config generation would emit handlers for a module the
-    // live binary does not have, and Caddy rejects such a document wholesale.
+    // Requesting a rebuild changes nothing about the binary that is running. Treating the request
+    // as already landed is how the applied set gets poisoned: config generation would emit handlers
+    // for a module the live binary lacks, and Caddy rejects such a document wholesale.
     setAppliedModules([L4, CORAZA]);
     await saveCaddyBuildSettings({
       modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, true])),
@@ -384,9 +370,8 @@ describe('applyCaddyBuild', () => {
   });
 
   it('leaves the applied set untouched when a build never completes', async () => {
-    // A failed xcaddy compile is routine. The override stays on disk either
-    // way, so if that file were the applied record the wrong answer would
-    // persist across restarts and every later config apply would be rejected.
+    // A failed xcaddy compile is routine. The override stays on disk either way, so if that file
+    // were the applied record the wrong answer would persist across restarts.
     setAppliedModules([L4]);
     await saveCaddyBuildSettings({
       modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, true])),

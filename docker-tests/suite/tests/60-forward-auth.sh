@@ -106,16 +106,11 @@ fetch "https://$domain/private/page" -b "$JAR"
 t_eq "the authenticated request is served" "200" "$FETCH_CODE"
 t_eq "it reaches the upstream" "origin-a" "$(fetch_json '.origin')"
 
-# Regression: these four were red when the rig was first run, against a real
-# defect. The generated handle_response block read each value back through
-# `{http.reverse_proxy.header.X-CPM-User}`, and that placeholder does not
-# resolve — Go canonicalises the stored header key to `X-Cpm-User` and Caddy
-# indexes the map with the literal name from the placeholder. The empty-value
-# guard (`not vars ... ""`) then matched, the copy route was skipped, and every
-# upstream behind CPM forward auth received an anonymous request.
-#
-# Fixed by canonicalising the placeholder in caddy.ts; pinned at the unit level
-# too, in tests/unit/caddy-forward-auth-copy-headers.test.ts.
+# Regression: these four were red on the rig's first run, against a real defect. The generated
+# handle_response block read values back through `{http.reverse_proxy.header.X-CPM-User}`, which
+# does not resolve — Go canonicalises the key to `X-Cpm-User`. The empty-value guard then matched,
+# the copy route was skipped, and every upstream received an anonymous request. Fixed by
+# canonicalising the placeholder in caddy.ts; also pinned in caddy-forward-auth-copy-headers.test.ts.
 t_eq "the upstream is told who the user is" "$CPM_ADMIN_USER" "$(fetch_json '.headers["x-cpm-user"]')"
 t_eq "the upstream is told the user's email" "$CPM_ADMIN_USER@localhost" "$(fetch_json '.headers["x-cpm-email"]')"
 t_eq "the upstream is told the user's id" "1" "$(fetch_json '.headers["x-cpm-user-id"]')"

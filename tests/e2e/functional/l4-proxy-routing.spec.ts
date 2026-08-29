@@ -1,17 +1,6 @@
 /**
- * Functional tests: L4 (TCP/UDP) proxy routing.
- *
- * Creates real L4 proxy hosts pointing at echo containers,
- * then sends raw TCP connections and UDP datagrams through Caddy
- * and asserts the traffic reaches the upstream.
- *
- * Test ports exposed on the Caddy container:
- *   TCP: 15432, 15433
- *   UDP: 15353
- *
- * Upstream services:
- *   tcp-echo (cjimti/go-echo on port 9000) — echoes TCP data
- *   udp-echo (alpine/socat on port 9001) — echoes UDP datagrams
+ * Functional: L4 (TCP/UDP) proxy routing — raw connections and datagrams through Caddy to echo
+ * containers. Ports TCP 15432/15433, UDP 15353; upstreams tcp-echo:9000, udp-echo:9001.
  */
 import { test, expect } from '@playwright/test';
 import { createL4ProxyHost } from '../../helpers/l4-proxy-api';

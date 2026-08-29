@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
-# Mutual TLS, end to end: a CA registered with CPM, client certificates issued
-# against it, roles, the three path modes, per-path RBAC, and revocation.
-#
-# mTLS is enforced at two different layers depending on the mode, and this file
-# is written to tell them apart:
-#
-#   full-site  — the TLS connection policy runs require_and_verify, so a client
-#                with no certificate never completes a handshake (code 000).
-#   whitelist  — TLS auth is optional; only the listed paths are gated, and a
-#                request without a certificate gets an HTTP 403.
-#   exclusion  — TLS auth is optional; everything except the listed paths is
-#                gated the same way.
+# Mutual TLS end to end: a CA registered with CPM, client certs issued against it, roles, the three
+# path modes, per-path RBAC, and revocation. The modes differ by enforcement layer:
+#   full-site  — the TLS policy runs require_and_verify, so a certless client never handshakes (000)
+#   whitelist  — TLS auth optional; only listed paths gated, certless requests get HTTP 403
+#   exclusion  — TLS auth optional; everything except the listed paths gated the same way
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "mutual TLS"

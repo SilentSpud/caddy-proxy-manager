@@ -1,14 +1,7 @@
 /**
- * Functional tests: CPM Forward Auth (credential-based login).
- *
- * Creates a proxy host with CPM forward auth enabled via the REST API, then verifies:
- * - Unauthenticated requests get redirected to the portal with ?rd= param
- * - The portal page shows a login form when ?rd= is present
- * - The portal rejects invalid ?rd= values (non-forward-auth domains)
- * - Successful credential login completes the redirect flow
- * - Authenticated requests (with _cpm_fa cookie) reach the upstream
- * - Requests with an invalid session cookie get redirected again
- *
+ * Functional: CPM Forward Auth (credential login) — unauthenticated requests redirect to the
+ * portal with ?rd=, the portal rejects non-forward-auth domains, a successful login completes the
+ * redirect, the _cpm_fa cookie reaches the upstream, and an invalid cookie redirects again.
  * Domain: func-fwd-auth.test
  */
 import { test, expect } from '@playwright/test';

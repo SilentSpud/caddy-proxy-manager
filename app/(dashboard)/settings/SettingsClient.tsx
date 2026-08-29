@@ -285,10 +285,8 @@ function FormCard({
 }
 
 /**
- * The "Override master settings" toggle a slave instance shows above each form.
- *
- * Replaces a Checkbox paired with a loose <Label>; CheckboxInput carries its own
- * label, so the association is real rather than positional.
+ * The "Override master settings" toggle a slave shows above each form. CheckboxInput carries its
+ * own label, so the association is real rather than positional.
  */
 function OverrideToggle({
   value,
@@ -333,8 +331,8 @@ const PALETTE_ITEMS: PaletteItem[] = ALL_ITEMS.map((item) => ({
   auxiliaryData: { desc: item.desc, group: item.groupLabel },
 }));
 
-// Keywords let a search match a setting's description or its group, which is
-// what the old CommandItem `value` string concatenation was doing.
+// Keywords let a search match a setting's description or its group, as the old CommandItem
+// `value` string concatenation did.
 const PALETTE_SOURCE = createStaticSource(PALETTE_ITEMS, {
   keywords: (item) => [item.auxiliaryData.desc, item.auxiliaryData.group],
 });
@@ -415,11 +413,8 @@ function SettingsSidebar({
 }
 
 /**
- * Narrow-screen navigation.
- *
- * Was a horizontally scrolling strip of fourteen pills, which needed a drag or
- * a shift-scroll to reach the last of them. A select names the current section
- * and reaches any other in one press.
+ * Narrow-screen navigation: a select naming the current section, replacing a horizontally
+ * scrolling strip of fourteen pills.
  */
 function MobileSettingsNav({
   active,
@@ -641,9 +636,9 @@ export default function SettingsClient({
     instanceSync.overrides.trustedProxies,
   );
 
-  // The page has two navigations — the sidebar panel and the compact picker in
-  // the content column — and neither carried a media gate, so both rendered at
-  // every width. Same breakpoint DataTable uses for its card layout.
+  // The page has two navigations — the sidebar panel and the compact picker in the content column
+  // — and neither carried a media gate, so both rendered at every width. Same breakpoint DataTable
+  // uses for its card layout.
   const isNarrow = useMediaQuery("(max-width: 767px)");
 
   return (
@@ -1240,8 +1235,8 @@ function DnsProviderCredentialFields({
   providerDef: DnsProviderDefinition;
   isDisabled: boolean;
 }) {
-  // Keyed on the provider so switching providers resets the credentials
-  // instead of carrying the previous provider's values across.
+  // Keyed on the provider so switching providers resets the credentials instead of carrying the
+  // previous provider's values across.
   const [values, setValues] = useState<Record<string, string>>({});
 
   return (
@@ -1295,10 +1290,9 @@ function DnsProvidersSection({
   setDnsProviderOverride: (v: boolean) => void;
 }) {
   const { enabledModuleIds } = useModuleGate();
-  // Each provider is a separate caddy-dns plugin, so availability is per
-  // provider — not one blanket "DNS-01 works" flag. A provider whose module is
-  // switched off would produce a config Caddy rejects outright, so it is taken
-  // out of the picker rather than left to fail at certificate-issuance time.
+  // Each provider is a separate caddy-dns plugin, so availability is per provider, not one blanket
+  // "DNS-01 works" flag. A provider whose module is switched off would produce a config Caddy
+  // rejects outright, so it leaves the picker rather than failing at certificate-issuance time.
   const isProviderAvailable = (name: string) =>
     enabledModuleIds === null || enabledModuleIds.includes(dnsModuleId(name));
 
@@ -1317,8 +1311,8 @@ function DnsProvidersSection({
     ...dnsProviderDefinitions.map((p) => ({
       value: p.name,
       label: `${p.displayName}${configuredProviders.includes(p.name) ? " (update)" : ""}`,
-      // Kept in the list rather than filtered out, so an admin looking for a
-      // provider finds it and learns why it is unavailable.
+      // Kept in the list rather than filtered out, so an admin looking for a provider finds it and
+      // learns why it is unavailable.
       disabled: !isProviderAvailable(p.name),
       description: isProviderAvailable(p.name)
         ? undefined
@@ -1884,9 +1878,8 @@ function OAuthSection({
 // ─── Section: Password Policy ────────────────────────────────────────────────
 
 /**
- * Not offered as a slave override: whether to force a password reset is a local
- * security decision, and inheriting it from a master would let one instance lock
- * another's users out of their own dashboard.
+ * Not offered as a slave override: whether to force a password reset is a local security decision,
+ * and inheriting it from a master would let one instance lock another's users out.
  */
 function PasswordPolicySection({
   passwordPolicy,
@@ -1981,9 +1974,8 @@ function AvatarsSection({
 // ─── Section: Caddy Build ────────────────────────────────────────────────────
 
 /**
- * Not offered as a slave override: the module list describes a binary built on
- * this host, so inheriting a master's choice would tell a slave its Caddy has
- * plugins it never compiled.
+ * Not offered as a slave override: the module list describes a binary built on this host, so
+ * inheriting a master's choice would tell a slave its Caddy has plugins it never compiled.
  */
 function CaddyBuildSection({
   caddyBuild,

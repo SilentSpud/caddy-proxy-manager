@@ -1,9 +1,6 @@
 /**
- * E2E tests: Link Account page (/link-account).
- *
- * This page requires a valid LINKING_REQUIRED: error param with a valid JWT linking token.
- * Without that, it redirects to /login. We test the redirect behavior and the fallback
- * "Sign in with Password Instead" button.
+ * E2E: /link-account. The page needs a LINKING_REQUIRED error param with a valid JWT linking
+ * token, and redirects to /login without one. Covers that redirect and the password fallback.
  */
 import { test, expect } from '@playwright/test';
 

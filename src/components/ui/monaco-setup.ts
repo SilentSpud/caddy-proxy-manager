@@ -1,17 +1,7 @@
 /**
- * One-time Monaco bootstrap, reached only through dynamic imports.
- *
- * Monaco is roughly 3.5 MB of JavaScript — larger than the rest of this app's
- * client bundle put together. Every import of it below is therefore deferred
- * until an editor actually mounts, so pages that merely *contain* a code field
- * inside an unopened dialog never pay for it. A static `import * as monaco`
- * here would defeat that: the chunk would be pulled in with whichever page
- * imports CodeEditor, opened dialog or not.
- *
- * Loading Monaco from a CDN (the default for most React wrappers) is
- * deliberately avoided: this app is routinely deployed on isolated networks,
- * and an editor that silently degrades to nothing without internet access is
- * worse than one that is a little larger to ship.
+ * One-time Monaco bootstrap, reached only through dynamic imports: Monaco is ~3.5 MB, so every
+ * import below is deferred until an editor mounts. Not loaded from a CDN — this app is routinely
+ * deployed on isolated networks.
  */
 
 export type Monaco = typeof import("monaco-editor");
@@ -22,11 +12,8 @@ export const CADDYFILE_LANGUAGE_ID = "caddyfile";
 let monacoPromise: Promise<Monaco | null> | null = null;
 
 /**
- * Caddyfile has no Monaco grammar upstream, so this is a deliberately small
- * Monarch tokenizer: comments, environment/request placeholders, matcher
- * names, strings, and directives at the start of a line. It is here to make
- * snippets readable, not to validate them — Caddy itself does that when the
- * config is adapted, and that is the only judgement that counts.
+ * A small Monarch tokenizer for Caddyfile, which has no upstream grammar: comments, placeholders,
+ * matchers, strings and leading directives. Readability only — Caddy validates at adapt time.
  */
 function registerCaddyfile(m: Monaco): void {
   if (m.languages.getLanguages().some((lang) => lang.id === CADDYFILE_LANGUAGE_ID)) return;
@@ -64,10 +51,9 @@ function registerCaddyfile(m: Monaco): void {
 
 async function bootstrap(): Promise<Monaco | null> {
   try {
-    // The worker specifiers are the short `monaco-editor/<path>` form rather
-    // than the deep `monaco-editor/esm/vs/<path>` one. Monaco 0.56 added an
-    // `exports` map to its package.json which maps `./*` onto `./esm/vs/*.js`,
-    // so the deep paths no longer resolve at all — the bundler fails on them
+    // The worker specifiers use the short `monaco-editor/<path>` form rather than the deep
+    // `monaco-editor/esm/vs/<path>` one. Monaco 0.56 added an `exports` map mapping `./*` onto
+    // `./esm/vs/*.js`, so the deep paths no longer resolve at all — the bundler fails on them
     // rather than falling back, and the `esm/vs` prefix is now implicit.
     const [monaco, editorWorker, jsonWorker] = await Promise.all([
       import("monaco-editor"),
@@ -95,14 +81,9 @@ async function bootstrap(): Promise<Monaco | null> {
 }
 
 /**
- * Load Monaco, wiring up workers and the Caddyfile grammar exactly once.
- *
- * Returns null when Monaco cannot be initialised at all, which lets CodeEditor
- * stay on its plain-textarea fallback rather than rendering an empty box. A
- * settings field that cannot be edited is a much worse failure than one that
- * loses syntax highlighting. The promise is cached rather than the result, so
- * several editors mounting in the same tick share one download instead of
- * racing to register the language twice.
+ * Load Monaco, wiring workers and the Caddyfile grammar exactly once. Null when it cannot
+ * initialise, so CodeEditor keeps its textarea fallback. The promise is cached, not the result, so
+ * editors mounting in one tick share a download instead of racing to register the language.
  */
 export function loadMonaco(): Promise<Monaco | null> {
   if (typeof window === "undefined") return Promise.resolve(null);

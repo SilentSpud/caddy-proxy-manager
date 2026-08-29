@@ -1,17 +1,7 @@
 /**
- * Functional test: custom ACME directory + internal CA trust (issue #192).
- *
- * Proves the full end-to-end path that unit/integration tests can't reach:
- * a real certificate is issued by an internal ACME server (Step-CA) instead of
- * Let's Encrypt, and Caddy trusts that CA's HTTPS endpoint via the CA-root PEM
- * written to the shared `acme-ca` volume.
- *
- * Flow:
- *   1. Read Step-CA's auto-generated root cert out of its container.
- *   2. Point CPM's global ACME settings at Step-CA's directory + paste the root.
- *   3. Create an auto-managed proxy host for `acme-e2e.test` (aliased to Caddy,
- *      so Step-CA can validate the HTTP-01 / TLS-ALPN-01 challenge).
- *   4. Assert the leaf cert Caddy serves for that domain was issued by Step-CA.
+ * Functional: custom ACME directory + internal CA trust (#192). Points CPM's ACME settings at
+ * Step-CA with its root pasted in, creates an auto-managed host for `acme-e2e.test`, and asserts
+ * the leaf cert Caddy serves was issued by Step-CA — the path unit tests cannot reach.
  */
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';

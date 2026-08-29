@@ -15,10 +15,8 @@ function nowIso() {
 }
 
 /**
- * Simulates what syncEnvOAuthProviders does:
- * - If no env-sourced provider with this name exists, create one
- * - If env-sourced provider exists, update it
- * - If UI-sourced provider with same name exists, skip
+ * Simulates syncEnvOAuthProviders: create when no env-sourced provider of this name exists, update
+ * when one does, skip when a UI-sourced provider shares the name.
  */
 async function syncProvider(envConfig: {
   name: string;

@@ -93,11 +93,8 @@ describe('buildTlsAutomation — custom ACME directory', () => {
 });
 
 /**
- * Regression: DNS-01 challenges must keep their fallback resolvers.
- *
- * The resolver list feeds Caddy's ACME DNS challenge. Dropping `fallbacks` leaves
- * validation with a single resolver, so an unreachable primary silently breaks
- * certificate issuance and renewal.
+ * Regression: DNS-01 challenges must keep their fallback resolvers. Dropping `fallbacks` leaves
+ * validation with one resolver, so an unreachable primary silently breaks issuance and renewal.
  */
 describe('buildTlsAutomation — DNS-01 challenge resolvers', () => {
   const DNS_PROVIDER = {

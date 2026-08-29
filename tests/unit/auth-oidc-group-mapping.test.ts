@@ -1,10 +1,6 @@
 /**
- * Wiring check for group mapping in the better-auth provider config: the hooks
- * are only attached when a provider actually asks for group mapping, and the
- * profile hook parks a result the sign-in can pick up later.
- *
- * The mapping rules themselves live in oidc-groups.test.ts; this file is about
- * mapOAuthProvider handing better-auth the right callbacks.
+ * Wiring check for group mapping: the hooks attach only when a provider asks for it, and the
+ * profile hook parks a result the sign-in picks up. Mapping rules live in oidc-groups.test.ts.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -72,10 +68,8 @@ function provider(overrides: Partial<OAuthProvider> = {}): OAuthProvider {
 }
 
 /**
- * better-auth's GenericOAuthUserInfo carries the full set of standard OIDC
- * fields. These tests only care about the subject and the group claim, so the
- * remaining required fields are filled in here rather than repeated at every
- * call site.
+ * better-auth's GenericOAuthUserInfo carries every standard OIDC field. These tests only need the
+ * subject and the group claim, so the rest are filled in here rather than at each call site.
  */
 function profile(claims: Record<string, unknown>) {
   return { emailVerified: false, ...claims } as Parameters<

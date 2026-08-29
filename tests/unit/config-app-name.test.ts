@@ -1,10 +1,6 @@
 /**
- * Branding: APP_NAME is the single knob. It renames the app in the sidebar and
- * on the login card, and it is the suffix every page title carries.
- *
- * A page that should not carry the suffix opts out per page with
- * `title: { absolute: ... }` rather than through configuration — the forward
- * auth portal is the one that does.
+ * Branding: APP_NAME is the single knob — the sidebar, the login card, and the page-title suffix.
+ * A page opts out per page with `title: { absolute: ... }`; the forward auth portal is the one.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

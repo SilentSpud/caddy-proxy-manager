@@ -1,12 +1,10 @@
 /**
- * Pure utility functions extracted from caddy.ts.
- * No DB, network, or filesystem dependencies — safe to unit-test directly.
+ * Pure utility functions extracted from caddy.ts. No DB, network, or filesystem dependencies —
+ * safe to unit-test directly.
  */
 import { isIP } from "node:net";
 
-// ---------------------------------------------------------------------------
-// Private range expansion
-// ---------------------------------------------------------------------------
+// ── Private range expansion ──────────────────────────────────────────────────
 
 export const PRIVATE_RANGES_CIDRS = [
   "10.0.0.0/8",
@@ -22,20 +20,12 @@ export function expandPrivateRanges(proxies: string[]): string[] {
   return proxies.flatMap((p) => (p === "private_ranges" ? PRIVATE_RANGES_CIDRS : [p]));
 }
 
-// ---------------------------------------------------------------------------
-// Header names
-// ---------------------------------------------------------------------------
+// ── Header names ─────────────────────────────────────────────────────────────
 
 /**
- * Rewrites a header name into Go's canonical MIME form: each hyphen-separated
- * word capitalised, the rest lower-cased. "X-CPM-User" becomes "X-Cpm-User".
- *
- * This matters for `{http.reverse_proxy.header.<name>}`. Go stores response
- * headers under the canonical key and Caddy resolves that placeholder by
- * indexing the map with the literal name from the placeholder — no
- * case-folding — so a non-canonical spelling silently resolves to nothing and
- * the placeholder text reaches the upstream verbatim (or, behind an
- * emptiness guard, the header is dropped entirely).
+ * Rewrites a header name into Go's canonical MIME form ("X-CPM-User" → "X-Cpm-User"). Caddy
+ * resolves `{http.reverse_proxy.header.<name>}` by literal lookup in Go's canonicalised map with no
+ * case-folding, so a non-canonical spelling resolves to nothing.
  */
 export function canonicalHeaderName(name: string): string {
   return name
@@ -45,24 +35,20 @@ export function canonicalHeaderName(name: string): string {
 }
 
 /**
- * The `{http.reverse_proxy.header.*}` placeholder for a response header, safe
- * to use regardless of how the caller spelled the header name.
+ * The `{http.reverse_proxy.header.*}` placeholder for a response header, safe regardless of how
+ * the caller spelled the header name.
  */
 export function upstreamHeaderPlaceholder(name: string): string {
   return `{http.reverse_proxy.header.${canonicalHeaderName(name)}}`;
 }
 
-// ---------------------------------------------------------------------------
-// Type helpers
-// ---------------------------------------------------------------------------
+// ── Type helpers ─────────────────────────────────────────────────────────────
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-// ---------------------------------------------------------------------------
-// Deep merge (prototype-pollution safe)
-// ---------------------------------------------------------------------------
+// ── Deep merge (prototype-pollution safe) ────────────────────────────────────
 
 export function mergeDeep(target: Record<string, unknown>, source: Record<string, unknown>) {
   for (const [key, value] of Object.entries(source)) {
@@ -78,9 +64,7 @@ export function mergeDeep(target: Record<string, unknown>, source: Record<string
   }
 }
 
-// ---------------------------------------------------------------------------
-// JSON helpers
-// ---------------------------------------------------------------------------
+// ── JSON helpers ─────────────────────────────────────────────────────────────
 
 export function parseJson<T>(value: string | null, fallback: T): T {
   if (!value) return fallback;
@@ -117,9 +101,7 @@ export function parseCustomHandlers(value: string | null | undefined): Record<st
   return handlers;
 }
 
-// ---------------------------------------------------------------------------
-// Address / upstream parsing
-// ---------------------------------------------------------------------------
+// ── Address / upstream parsing ───────────────────────────────────────────────
 
 export function formatDialAddress(host: string, port: string) {
   return isIP(host) === 6 ? `[${host}]:${port}` : `${host}:${port}`;
@@ -191,9 +173,7 @@ export function parseUpstreamTarget(upstream: string): ParsedUpstreamTarget {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Duration parsing
-// ---------------------------------------------------------------------------
+// ── Duration parsing ─────────────────────────────────────────────────────────
 
 export function toDurationMs(value: string | null | undefined): number | null {
   if (!value) return null;

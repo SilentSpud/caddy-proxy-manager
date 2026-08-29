@@ -25,10 +25,9 @@ type Pkcs12ExportOptions = NonNullable<Parameters<typeof forge.pkcs12.toPkcs12As
 };
 
 /**
- * RSA keygen on the crypto threadpool rather than forge's pure-JS implementation,
- * which blocks the event loop for the whole generation (~150-450ms at 4096 bits).
- * The result is handed back as forge key objects so certificate building and the
- * stored PEM encoding stay byte-identical to what forge produced before.
+ * RSA keygen on the crypto threadpool rather than forge's pure-JS version, which blocks the event
+ * loop for the whole generation (~150-450ms at 4096 bits). Returns forge key objects, so the built
+ * certificate and stored PEM stay byte-identical.
  */
 async function generateForgeKeyPair(bits: number) {
   const { privateKey, publicKey } = await generateKeyPairAsync("rsa", {
@@ -170,10 +169,9 @@ export async function issueClientCertificateAction(
   if (!commonName) throw new Error("Common name is required");
   if (!exportPassword) throw new Error("Export password is required");
 
-  // The .p12 leaves this deployment as a file, and forge's PKCS#12 MAC is still
-  // SHA-1, so this password is the only thing standing between whoever holds the
-  // bundle and the client private key. Hold it to the same bar as a login
-  // password rather than accepting anything non-empty.
+  // The .p12 leaves this deployment as a file, and forge's PKCS#12 MAC is still SHA-1, so this
+  // password is the only thing between whoever holds the bundle and the client private key. Hold
+  // it to the same bar as a login password rather than accepting anything non-empty.
   const exportPasswordError = passwordPolicyError(exportPassword, "Export password");
   if (exportPasswordError) throw new Error(exportPasswordError);
 
@@ -223,14 +221,10 @@ export async function issueClientCertificateAction(
   );
   revalidatePath("/certificates");
 
-  // AES-256 unconditionally: the legacy 3DES PBE only matters to keystores that
-  // predate OpenSSL 3's PBES2 default, which this fork does not target. forge's
-  // defaults (2048 iterations, 8-byte salt, SHA-1 PRF) are too weak for a bundle
-  // the user carries around, so raise all three. `prfAlgorithm` is undeclared in
-  // @types/node-forge but forwarded to pki.encryptPrivateKeyInfo, where it is a
-  // documented option — client-cert-p12-export.test.ts pins the emitted PRF so a
-  // forge upgrade cannot silently revert it to SHA-1. The outer PKCS#12 MAC does
-  // stay SHA-1; pkcs12.js hardcodes a 20-byte digest with no option to change it.
+  // AES-256 unconditionally, with forge's weak defaults (2048 iterations, 8-byte salt, SHA-1 PRF)
+  // all raised: this bundle leaves the deployment as a file. `prfAlgorithm` is undeclared in
+  // @types/node-forge but forwarded to pki.encryptPrivateKeyInfo; client-cert-p12-export.test.ts
+  // pins the emitted PRF. The outer PKCS#12 MAC stays SHA-1 — pkcs12.js hardcodes it.
   const pkcs12Options = {
     algorithm: "aes256",
     friendlyName: commonName,

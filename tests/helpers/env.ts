@@ -10,9 +10,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
  */
 export const TEST_ENV: Record<string, string> = {
   DATABASE_URL: ':memory:',
-  // Read by the backstop in src/lib/caddy-admin.ts, which refuses to open a
-  // real socket when it is set. `bun test` sets no marker of its own beyond
-  // NODE_ENV=test, so the suite declares one explicitly.
+  // Read by the backstop in src/lib/caddy-admin.ts, which refuses to open a real socket when it is
+  // set. `bun test` sets no marker of its own beyond NODE_ENV=test, so the suite declares one.
   CPM_TEST: '1',
   SESSION_SECRET: 'test-session-secret-for-unit-tests-12345',
   NODE_ENV: 'test',
@@ -25,23 +24,11 @@ const DOTENV_FILES = ['.env', '.env.local', '.env.test', '.env.test.local'];
 const ASSIGNMENT = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
 
 /**
- * Removes the repository's dotenv values from process.env.
- *
- * Bun loads .env automatically; Node did not, so under Node the suite ran with
- * only what the shell exported and every test saw the same baseline. Now that
- * the suite runs on Bun, a developer's local .env reaches src/lib/config.ts and
- * silently changes the defaults under test — AUTH_ALLOW_OAUTH_REGISTRATION in
- * the committed .env is enough to fail
- * tests/unit/config-local-users-disabled.test.ts.
- *
- * Passing `--env-file` to the inner `bun` does not help: `bun run test` has
- * already loaded .env into the environment the inner process inherits. So undo
- * it here instead, from a setup file, which works however the suite is
- * launched.
- *
- * Keys are dropped whether they came from the dotenv file or the shell — a test
- * suite that behaves differently depending on the developer's shell is the
- * thing being prevented. Variables the suite genuinely needs belong in
+ * Removes the repository's dotenv values from process.env. Bun loads .env automatically where Node
+ * did not, so a developer's local .env reaches src/lib/config.ts and changes the defaults under
+ * test — AUTH_ALLOW_OAUTH_REGISTRATION alone fails config-local-users-disabled.test.ts.
+ * `--env-file` does not help: `bun run test` already loaded it into the inherited environment.
+ * Keys are dropped whether they came from the file or the shell; what the suite needs is in
  * TEST_ENV.
  */
 export function clearDotEnv(): void {

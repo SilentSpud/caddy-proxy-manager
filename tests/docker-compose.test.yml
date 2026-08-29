@@ -1,16 +1,8 @@
 services:
-  # Fixture seeding for the e2e suite.
-  #
-  # The web image is a compiled binary with no Bun CLI, no package manager and no
-  # shell runtime, so the suite cannot execute code inside it — and deliberately
-  # so: the tests run the same image that ships. Seeding instead happens in this
-  # throwaway container, which mounts the same data volume and therefore opens
-  # the same SQLite file the web container is using. `working_dir: /app` with the
-  # volume at /app/data keeps the database at ./data/caddy-proxy-manager.db, the
-  # path the app itself uses.
-  #
-  # `profiles` keeps it out of `docker compose up`; it is started on demand with
-  # `docker compose run --rm db-seed -e '<script>'` (see tests/helpers/seed.ts).
+  # Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI or shell
+  # runtime — deliberately, so the tests run the image that ships — so seeding happens in this
+  # throwaway container, which mounts the same data volume and opens the same SQLite file.
+  # `profiles` keeps it out of `docker compose up`; see tests/helpers/seed.ts.
   db-seed:
     image: oven/bun:1-slim
     profiles: ["tools"]

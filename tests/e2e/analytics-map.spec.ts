@@ -1,19 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Regression tests for the "Traffic by Country" world map.
- *
- * maplibre-gl v6 moved its tile worker into a separate ES module resolved at
- * runtime from `import.meta.url`, which Turbopack cannot resolve correctly. The
- * worker silently failed to start and the map rendered as an empty ocean — no
- * countries, no hover popups, and no visible error in the UI.
- *
- * The fix imports the worker as `?worker&url` (WorldMapInner.tsx), which has the
- * bundler emit its whole module graph as one self-contained, content-hashed
- * chunk and hand back the path, and points maplibre at it via setWorkerUrl().
- * These tests cover both the plumbing (worker chunk served, CSP allows the
- * worker) and the observable outcome (country geometry is actually rendered and
- * hit-testable).
+ * "Traffic by Country" world map. maplibre-gl v6 resolves its tile worker from `import.meta.url`,
+ * which the bundler cannot follow — the worker never starts and the map is empty ocean. The fix
+ * imports it as `?worker&url` and calls setWorkerUrl(). Covers the plumbing (chunk served, CSP)
+ * and the outcome (country geometry rendered and hit-testable).
  */
 
 const MAP_CANVAS = 'canvas.maplibregl-canvas';
@@ -92,13 +83,9 @@ test.describe('Analytics world map', () => {
     // the canvas is visible well before any geometry exists.
     await page.waitForTimeout(3_000);
 
-    // Hovering a country only produces a popup when the fill layer is actually
-    // rendered; with a broken worker the map is all ocean and every hover is a
-    // miss. Sweep a grid rather than a handful of hand-picked offsets: the
-    // exact projection depends on how maplibre fits the configured bounds to
-    // the current canvas size, so fixed fractions are not a safe bet for
-    // "this point is over land". A map with no geometry still misses all of
-    // them, which is the condition this test exists to catch.
+    // A hover only produces a popup when the fill layer actually rendered. Sweep a grid rather
+    // than hand-picked offsets: the projection depends on how maplibre fits the bounds to the
+    // canvas. A map with no geometry misses every point, which is what this catches.
     const targets: [number, number][] = [];
     for (const fy of [0.3, 0.4, 0.5, 0.62, 0.72]) {
       for (const fx of [0.2, 0.3, 0.5, 0.55, 0.72, 0.85]) {

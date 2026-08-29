@@ -1,10 +1,7 @@
 /**
- * E2E: per-location-rule load balancer / health checks (issue #200).
- *
- * Creates a proxy host whose location rule carries a load balancer with active
- * and passive health checks via the REST API. A 201 response proves the live
- * Caddy accepted the generated per-rule load_balancing/health_checks JSON; the
- * read-back proves the model hydrated the nested config.
+ * E2E: per-location-rule load balancer / health checks (#200). A 201 proves the live Caddy accepted
+ * the generated per-rule load_balancing/health_checks JSON; the read-back proves the model
+ * hydrated the nested config.
  */
 import { test, expect } from '@playwright/test';
 

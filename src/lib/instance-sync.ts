@@ -53,19 +53,14 @@ const SYNCED_PREFIX = "synced:";
 const SLAVE_LAST_SYNC_AT_KEY = "instance_last_sync_at";
 const SLAVE_LAST_SYNC_ERROR_KEY = "instance_last_sync_error";
 
-/**
- * Environment variable names for instance sync configuration.
- * These take precedence over database settings when set.
- */
+/** Environment variable names for instance sync config; these beat database settings. */
 const ENV_INSTANCE_MODE = "INSTANCE_MODE";
 const ENV_INSTANCE_SYNC_TOKEN = "INSTANCE_SYNC_TOKEN";
 const ENV_INSTANCE_SLAVES = "INSTANCE_SLAVES";
 const ENV_SYNC_INTERVAL = "INSTANCE_SYNC_INTERVAL";
 const ENV_SYNC_ALLOW_HTTP = "INSTANCE_SYNC_ALLOW_HTTP";
 
-/**
- * Type for slave instances configured via environment variable.
- */
+/** A slave instance configured via environment variable. */
 export type EnvSlaveInstance = {
   name: string;
   url: string;
@@ -73,9 +68,8 @@ export type EnvSlaveInstance = {
 };
 
 /**
- * Parses INSTANCE_SLAVES environment variable.
- * Expected format: JSON array of {name, url, token} objects
- * Example: [{"name":"slave1","url":"http://slave:3000","token":"secret"}]
+ * Parses INSTANCE_SLAVES: a JSON array of {name, url, token} objects, e.g.
+ * [{"name":"slave1","url":"http://slave:3000","token":"secret"}]
  */
 export function getEnvSlaveInstances(): EnvSlaveInstance[] {
   const envValue = process.env[ENV_INSTANCE_SLAVES];
@@ -104,9 +98,7 @@ export function getEnvSlaveInstances(): EnvSlaveInstance[] {
 }
 
 /**
- * Gets the sync interval in milliseconds from environment variable.
- * Default is 0 (disabled). Set INSTANCE_SYNC_INTERVAL to enable periodic sync.
- * Value is in seconds.
+ * Sync interval in milliseconds, from INSTANCE_SYNC_INTERVAL (in seconds). Default 0 = off.
  */
 export function getSyncIntervalMs(): number {
   const envValue = process.env[ENV_SYNC_INTERVAL];
@@ -120,17 +112,15 @@ export function getSyncIntervalMs(): number {
 }
 
 /**
- * Checks if HTTP sync is explicitly allowed via environment variable.
- * HTTP sync transmits tokens in plaintext and should only be used in trusted networks.
+ * Whether HTTP sync is explicitly allowed. HTTP transmits tokens in plaintext, so it belongs
+ * only on trusted networks.
  */
 export function isHttpSyncAllowed(): boolean {
   const envValue = process.env[ENV_SYNC_ALLOW_HTTP];
   return envValue === "true" || envValue === "1";
 }
 
-/**
- * Checks if a URL uses HTTP (not HTTPS).
- */
+/** Whether a URL uses HTTP rather than HTTPS. */
 function isHttpUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -140,18 +130,13 @@ function isHttpUrl(url: string): boolean {
   }
 }
 
-/**
- * Checks if instance mode is configured via environment variable.
- * Environment variables take precedence over database settings.
- */
+/** Whether instance mode is configured via environment variable, which beats DB settings. */
 export function isInstanceModeFromEnv(): boolean {
   const envMode = process.env[ENV_INSTANCE_MODE];
   return envMode === "master" || envMode === "slave" || envMode === "standalone";
 }
 
-/**
- * Checks if sync token is configured via environment variable.
- */
+/** Whether the sync token is configured via environment variable. */
 export function isSyncTokenFromEnv(): boolean {
   const envToken = process.env[ENV_INSTANCE_SYNC_TOKEN];
   return typeof envToken === "string" && envToken.length > 0;
@@ -484,7 +469,7 @@ export async function applySyncPayload(payload: SyncPayload) {
   // clears the synced value instead of leaving a stale one behind.
   await setSyncedSetting("avatars", payload.settings.avatars ?? null);
 
-  // bun:sqlite is synchronous, so transaction callback must be synchronous
+  // bun:sqlite is synchronous, so the transaction callback must be too
   db.transaction((tx) => {
     tx.delete(l4ProxyHosts).run();
     tx.delete(proxyHosts).run();
@@ -517,8 +502,8 @@ export async function applySyncPayload(payload: SyncPayload) {
     }
   });
 
-  // If the synced L4 proxy hosts require different ports than currently applied,
-  // write the override file and trigger the sidecar to recreate the caddy container.
+  // When the synced L4 proxy hosts need different ports than currently applied, write the
+  // override file and trigger the sidecar to recreate the caddy container.
   const diff = await getL4PortsDiff();
   if (diff.needsApply) {
     await applyL4Ports();

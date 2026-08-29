@@ -44,8 +44,8 @@ type DataTableProps<T> = {
   /** Renders a trailing "open" control on each row, rather than a bare row click. */
   onRowClick?: (row: T) => void;
   /**
-   * Per-row status indicator. Replaces the old rowClassName, which tinted rows
-   * with hardcoded colours that conveyed meaning by colour alone.
+   * Per-row status indicator. Replaces the old rowClassName, which tinted rows with hardcoded
+   * colours that conveyed meaning by colour alone.
    */
   rowStatus?: (row: T) => TableRowStatus | null;
   pagination?: {
@@ -56,16 +56,14 @@ type DataTableProps<T> = {
   sort?: { sortBy: string; sortDir: "asc" | "desc" };
   mobileCard?: (row: T) => ReactNode;
   /**
-   * Detail panel shown below a row when it is expanded. Supplying this adds the
-   * expand chevron column; the open set is owned here, since no caller so far
-   * needs to drive it from outside.
+   * Detail panel shown below an expanded row. Supplying this adds the expand chevron column; the
+   * open set is owned here, since no caller so far needs to drive it from outside.
    */
   expandedRow?: (row: T) => ReactNode;
 };
 
-// Fixed-length placeholder lists. The keys are built once here rather than from
-// the map index so the loading skeleton needs no index keys of its own; nothing
-// is ever inserted into or removed from either list.
+// Fixed-length placeholder lists. Keys are built once here rather than from the map index, so the
+// loading skeleton needs no index keys; nothing is ever inserted into or removed from either.
 const SKELETON_ROW_KEYS = ["row-1", "row-2", "row-3", "row-4", "row-5"];
 const SKELETON_CARD_KEYS = ["card-1", "card-2", "card-3"];
 
@@ -106,11 +104,8 @@ function PaginationBar({ page, perPage, total }: { page: number; perPage: number
 }
 
 /**
- * A column heading that toggles sort order through the URL.
- *
- * The table's own sortable plugin sorts client-side; this app sorts on the
- * server and carries the order in the query string, so the heading stays a
- * plain control that pushes a new URL.
+ * A column heading that toggles sort order through the URL. The table's own sortable plugin sorts
+ * client-side; this app sorts server-side, so the heading just pushes a new URL.
  */
 function SortableHeader<T>({
   col,
@@ -161,13 +156,12 @@ export function DataTable<T>({
   expandedRow,
 }: DataTableProps<T>) {
   const isEmpty = data.length === 0 && !loading;
-  // Replaces the paired `block md:hidden` / `hidden md:block` wrappers, so only
-  // one of the two views is ever mounted.
+  // Replaces the paired `block md:hidden` / `hidden md:block` wrappers, so only one of the two
+  // views is ever mounted.
   const isNarrow = useMediaQuery("(max-width: 767px)");
 
-  // Astryx's Table requires rows to carry an index signature. The app's domain
-  // types are plain interfaces, so the cast is confined to this boundary rather
-  // than pushed onto every model as `extends Record<string, unknown>`.
+  // Astryx's Table requires rows to carry an index signature. The app's domain types are plain
+  // interfaces, so the cast is confined to this boundary rather than pushed onto every model.
   const getStatus = useCallback(
     (row: TableRow) => (rowStatus ? rowStatus(row as T) : null),
     [rowStatus],
@@ -207,8 +201,8 @@ export function DataTable<T>({
   }));
 
   if (onRowClick) {
-    // The old table opened a row on click, which no keyboard user could reach.
-    // An explicit trailing control keeps the affordance and makes it focusable.
+    // The old table opened a row on click, which no keyboard user could reach. An explicit
+    // trailing control keeps the affordance and makes it focusable.
     tableColumns.push({
       key: "__open",
       header: "",

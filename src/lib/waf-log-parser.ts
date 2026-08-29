@@ -10,10 +10,9 @@ const AUDIT_LOG = "/logs/waf-audit.log";
 const RULES_LOG = "/logs/waf-rules.log";
 const GEOIP_DB = "/usr/share/GeoIP/GeoLite2-Country.mmdb";
 const BATCH_SIZE = 200;
-// Coraza's SecAuditLog writes directly to AUDIT_LOG with no rotation of its
-// own (unlike access.log/waf-rules.log, which go through Caddy's file writer
-// and roll automatically). Once fully ingested, truncate it in place past
-// this size so it can't grow unbounded and fill the disk.
+// Coraza's SecAuditLog writes straight to AUDIT_LOG with no rotation of its own (unlike
+// access.log/waf-rules.log, which roll through Caddy's file writer). Once fully ingested,
+// truncate it in place past this size so it can't grow unbounded and fill the disk.
 const AUDIT_LOG_TRUNCATE_THRESHOLD = 100 * 1024 * 1024;
 
 let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
@@ -66,10 +65,9 @@ function lookupCountry(ip: string): string | null {
 }
 
 // ── WAF rules log parsing ─────────────────────────────────────────────────────
-// Caddy's http.handlers.waf logger emits a JSON line per matched rule containing
-// the ModSecurity-format message string, e.g.:
-//   [id "941100"] [msg "XSS Attack ..."] [severity "critical"] [unique_id "abc123"]
-// We parse these to build a map of unique_id → first matched rule info.
+// Caddy's http.handlers.waf logger emits one JSON line per matched rule holding the
+// ModSecurity-format message, e.g. `[id "941100"] [msg "XSS Attack ..."] [unique_id "abc123"]`.
+// Parsed into a map of unique_id → first matched rule.
 
 interface RuleInfo {
   ruleId: number | null;
@@ -82,8 +80,8 @@ export function extractBracketField(msg: string, field: string): string | null {
   return m ? m[1] : null;
 }
 
-// Anomaly-evaluation rules are not specific attacks — they only report the
-// accumulated score, so they must never be picked as an event's rule.
+// Anomaly-evaluation rules only report the accumulated score, not a specific attack, so they
+// must never be picked as an event's rule.
 function isAnomalyEvaluationRule(ruleId: number | null): boolean {
   return ruleId === 949110 || ruleId === 980130;
 }
@@ -143,22 +141,16 @@ interface CorazaAuditEntry {
       headers?: Record<string, string[]>;
     };
   };
-  // Populated when audit log part H (or K) is enabled: one entry per matched
-  // rule, carrying the ModSecurity-format rule string.
+  // Populated when audit log part H (or K) is enabled: one entry per matched rule, carrying
+  // the ModSecurity-format rule string.
   messages?: { message?: string; error_message?: string }[];
 }
 
 /**
- * Extract the first specific (non anomaly-evaluation) matched rule from a
- * Coraza audit entry's own `messages` array.
- *
- * Coraza populates `messages[].error_message` with the same ModSecurity-format
- * string that Caddy's http.handlers.waf logger writes to waf-rules.log, as long
- * as audit log part H is enabled (buildWafHandler sets `SecAuditLogParts ABFHZ`).
- * Reading it from the audit entry itself is what makes rule attribution
- * deterministic: joining against waf-rules.log only works when both files
- * happen to be written within the same parse tick, and silently loses the rule
- * — and therefore the whole event — whenever they aren't.
+ * The first specific (non anomaly-evaluation) matched rule from a Coraza audit entry's own
+ * `messages` array — the same ModSecurity-format string waf-rules.log gets, provided audit part H
+ * is on (buildWafHandler sets `SecAuditLogParts ABFHZ`). Reading it from the entry makes
+ * attribution deterministic; joining against waf-rules.log loses the event on a tick boundary.
  */
 export function ruleInfoFromAuditEntry(entry: CorazaAuditEntry): RuleInfo | null {
   for (const m of entry.messages ?? []) {
@@ -232,12 +224,9 @@ async function readAuditLog(startOffset: number): Promise<{ lines: string[]; new
 }
 
 /**
- * Reset the stored audit-log position so the next pass starts from the top.
- *
- * Used whenever the file we were tracking is gone or has been replaced: a
- * stored offset that belongs to a different (or deleted) inode would otherwise
- * park the parser past the end of the new file forever, since the rotation
- * guard only fires when the file is *smaller* than the last recorded size.
+ * Reset the stored audit-log position so the next pass starts from the top. Used when the tracked
+ * file is gone or replaced: an offset from a different inode would park the parser past EOF
+ * forever, since the rotation guard only fires when the file is *smaller* than last recorded.
  */
 function resetAuditLogState(): void {
   setState("waf_audit_log_offset", "0");
@@ -245,9 +234,9 @@ function resetAuditLogState(): void {
   setState("waf_audit_log_inode", "0");
 }
 
-// Only warn once per episode so a deleted audit log — or one we're never going
-// to be allowed to truncate — doesn't spam a line every 30s, while still
-// surfacing the condition instead of failing silently the way this used to.
+// Warn once per episode so a deleted audit log — or one we are never allowed to truncate —
+// doesn't spam a line every 30s, while still surfacing the condition instead of failing
+// silently the way this used to.
 let warnedAuditLogMissing = false;
 let warnedTruncateFailed = false;
 
@@ -267,11 +256,10 @@ export async function initWafLogParser(): Promise<void> {
 export async function parseNewWafLogEntries(): Promise<void> {
   if (stopped) return;
 
-  // Coraza holds the audit log open, so if the file is deleted it keeps writing
-  // to the now-unlinked inode and never recreates it. Returning silently here
-  // (as this used to) leaves WAF ingestion permanently dead with no trace in
-  // the logs — surface it, and clear the stale offset so a recreated file is
-  // read from the start.
+  // Coraza holds the audit log open, so a deleted file keeps receiving writes on the now
+  // unlinked inode and is never recreated. Returning silently here (as this used to) left WAF
+  // ingestion permanently dead with no trace in the logs — surface it, and clear the stale
+  // offset so a recreated file is read from the start.
   if (!existsSync(AUDIT_LOG)) {
     if (!warnedAuditLogMissing) {
       console.warn(
@@ -318,10 +306,9 @@ export async function parseNewWafLogEntries(): Promise<void> {
       return;
     }
 
-    // Restart from the top when the file was rotated (shrank) or replaced by a
-    // different inode. Size alone is not enough: a delete-and-recreate that has
-    // already grown past the last recorded size would otherwise leave the
-    // stored offset stranded beyond EOF with no way back.
+    // Restart from the top when the file was rotated (shrank) or replaced by a different
+    // inode. Size alone is not enough: a delete-and-recreate that already grew past the last
+    // recorded size would strand the stored offset beyond EOF with no way back.
     const replaced = storedInode !== 0 && currentInode !== storedInode;
     const startOffset = currentSize < storedSize || replaced ? 0 : storedOffset;
     if (replaced) {
@@ -342,18 +329,16 @@ export async function parseNewWafLogEntries(): Promise<void> {
       }
     }
 
-    // Persist progress BEFORE attempting truncation. Truncation is a best-effort
-    // disk-space guard that fails with EACCES whenever web and caddy run as
-    // different UIDs (Coraza creates the file owned by caddy), and doing it
-    // first meant that failure aborted the pass and froze these offsets — so
-    // every later pass re-read and re-inserted the same tail forever.
+    // Persist progress BEFORE attempting truncation. Truncation is a best-effort disk-space
+    // guard that fails with EACCES whenever web and caddy run as different UIDs (Coraza creates
+    // the file owned by caddy), and doing it first meant that failure aborted the pass and
+    // froze these offsets — so every later pass re-read and re-inserted the same tail forever.
     setState("waf_audit_log_offset", String(newOffset));
     setState("waf_audit_log_size", String(currentSize));
     setState("waf_audit_log_inode", String(currentInode));
 
-    // Once we've read through to the current end of file, it's safe to
-    // truncate: Coraza appends via O_APPEND, so writes after truncation land
-    // correctly at the new (empty) end of file.
+    // Having read through to the current end of file, truncation is safe: Coraza appends via
+    // O_APPEND, so writes after truncation land at the new (empty) end of file.
     if (newOffset === currentSize && currentSize > AUDIT_LOG_TRUNCATE_THRESHOLD) {
       try {
         truncateSync(AUDIT_LOG, 0);

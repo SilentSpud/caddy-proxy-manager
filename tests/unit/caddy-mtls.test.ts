@@ -1,16 +1,8 @@
 /**
- * Unit tests for src/lib/caddy-mtls.ts
- *
- * Covers:
- *  - pemToBase64Der: PEM stripping
- *  - buildClientAuthentication: CA trust configuration per domain set
- *  - groupMtlsDomainsByCaSet: isolation of CA sets per TLS policy
- *
- * The key bug these tests document and verify the fix for:
- * If two proxy hosts (app.example.com → CA_A, api.example.com → CA_B) share an
- * auto-managed TLS certificate, their mTLS domains must NOT be grouped into a
- * single policy — otherwise a client cert signed by CA_B can authenticate against
- * app.example.com (which only trusts CA_A) and vice-versa.
+ * src/lib/caddy-mtls.ts: pemToBase64Der, buildClientAuthentication (CA trust per domain set), and
+ * groupMtlsDomainsByCaSet (CA-set isolation per TLS policy). The bug they document: two hosts
+ * sharing an auto-managed cert but trusting different CAs must not share one policy, or a CA_B cert
+ * authenticates against the CA_A host.
  */
 import { describe, it, expect } from 'bun:test';
 import {

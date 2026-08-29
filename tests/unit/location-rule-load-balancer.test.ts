@@ -1,9 +1,7 @@
 /**
- * Per-location-rule load balancer / health checks (issue #200).
- *
- * Verifies the model layer hydrates/dehydrates a location rule's nested load
- * balancer, that it survives an unrelated update, and that buildCaddyDocument
- * emits load_balancing/health_checks on the matching path's reverse_proxy.
+ * Per-location-rule load balancer / health checks (#200): the model hydrates and dehydrates the
+ * nested config, it survives an unrelated update, and buildCaddyDocument emits
+ * load_balancing/health_checks on the matching path's reverse_proxy.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

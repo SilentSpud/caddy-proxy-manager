@@ -1,7 +1,5 @@
 /**
- * Integration tests: bcrypt password hashing in access list entries.
- *
- * Verifies that the model layer hashes passwords before storage and that
+ * Integration: the model layer hashes access-list entry passwords with bcrypt before storage, and
  * bcrypt.compare() succeeds with the correct password.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';

@@ -1,11 +1,7 @@
 /**
- * End-to-end coverage for the legacy-password gate.
- *
- * The unit tests cover the decision in isolation; what they cannot show is that
- * the redirect actually terminates. The dashboard layout redirects to
- * /password-change, so if that page were ever pulled inside the dashboard route
- * group the two would bounce forever — a failure that only appears when a real
- * browser follows the chain.
+ * The legacy-password gate end to end. Unit tests cover the decision; only a real browser shows
+ * that the redirect terminates — if /password-change ever moved inside the dashboard route group,
+ * the two would bounce forever.
  */
 import { test, expect } from '@playwright/test';
 import {

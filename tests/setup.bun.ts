@@ -4,11 +4,8 @@ import { clearDotEnv } from './helpers/env';
 import { vi } from './helpers/vi';
 
 /**
- * Preloaded by `[test] preload` in bunfig.toml, so it runs once per test file
- * before that file is imported. Under `--isolate` each file gets a fresh global
- * and module registry, so everything installed here is re-installed per file
- * and nothing leaks between them — which is what `bun test` needs in order to
- * behave like Vitest's per-file isolation.
+ * Preloaded by `[test] preload` in bunfig.toml, so it runs once per test file before that file is
+ * imported. Under `--isolate` everything installed here is re-installed per file and nothing leaks.
  */
 
 /**
@@ -18,12 +15,9 @@ import { vi } from './helpers/vi';
 clearDotEnv();
 
 /**
- * Suppress console output from production code during tests (e.g. expected
- * warn/error calls when intentionally feeding bad input to parsers). This is
- * the Bun equivalent of Vitest's `onConsoleLog() { return false }`.
- *
- * Tests that assert on console calls still work: spyOn replaces the property on
- * this same object. Set TEST_LOG=1 to get the output back while debugging.
+ * Suppress console output from production code during tests — Bun's equivalent of Vitest's
+ * `onConsoleLog() { return false }`. spyOn still works, since it replaces the property on this same
+ * object. TEST_LOG=1 restores the output while debugging.
  */
 if (!process.env.TEST_LOG) {
   for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
@@ -32,21 +26,11 @@ if (!process.env.TEST_LOG) {
 }
 
 /**
- * Caddy network guard.
- *
- * The Caddy container and the web container are separate runtime boundaries, so
- * the seam we stub is the admin-API transport (src/lib/caddy-admin.ts) — not the
- * whole caddy module. Every builder stays real and fully testable; only the
- * socket is replaced, by a spoofed Caddy instance that accepts config loads and
- * serves them back.
- *
- * Installed here for every test file, and reinstalled before each test so state
- * never leaks between them. A test that wants to assert on what was sent, or to
- * simulate Caddy failing, should call installFakeCaddy() itself and keep the
- * handle — from beforeEach or the test body, not beforeAll, since this hook runs
- * before each test and would otherwise replace it. Should anything swap the real
- * transport back in, the HTTP adapter throws rather than opening a socket — see
- * httpCaddyAdminTransport.
+ * Caddy network guard. The stubbed seam is the admin-API transport (src/lib/caddy-admin.ts), not
+ * the whole caddy module, so every builder stays real and only the socket is replaced by a spoofed
+ * Caddy. Installed and reinstalled before each test, so state never leaks; a test that asserts on
+ * what was sent calls installFakeCaddy() itself from beforeEach or the body, not beforeAll. If
+ * anything swaps the real transport back in, the HTTP adapter throws rather than opening a socket.
  */
 installFakeCaddy();
 beforeEach(() => {
@@ -54,15 +38,9 @@ beforeEach(() => {
 });
 
 /**
- * Mock the auth entry point so API route tests can control session state.
- *
- * Only `auth` is replaced; the rest of the module is passed through. Vitest
- * could get away with a factory returning `auth` alone because it linked
- * mocked modules lazily — a route importing `checkSameOrigin` only failed if it
- * called it. Bun links eagerly, so a missing name is a SyntaxError at import
- * time for every route that imports one. Spreading the real module also means
- * route tests exercise the genuine same-origin and role guards rather than
- * holes in a stub.
+ * Mock the auth entry point so API route tests can control session state. Only `auth` is replaced;
+ * the rest passes through, because Bun links eagerly and a missing name is a SyntaxError at import
+ * time. Spreading the real module also keeps the genuine same-origin and role guards under test.
  */
 const actualAuth = await import('@/src/lib/auth');
 

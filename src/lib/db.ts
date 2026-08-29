@@ -16,18 +16,11 @@ type GlobalForDrizzle = typeof globalThis & {
 };
 
 /**
- * A `file:` URL always exposes its path with a leading slash, so a Windows
- * absolute path round-trips as "/C:/data/app.db". Left alone, that resolves
- * against the current drive root and yields "C:\C:\data" — so drop the slash
- * when a drive letter follows it.
- *
- * This mirrors what `fileURLToPath` does, but cannot use it: on Windows that
- * helper rejects POSIX-style file URLs outright, and `file:/app/data/app.db`
- * is the documented default for Docker deployments. On POSIX "/C:/x" really is
- * a path under a directory named "C:", so the rewrite is Windows-only.
- *
- * Exported for tests; `platform` is a parameter so both behaviours can be
- * covered from either host.
+ * A `file:` URL exposes its path with a leading slash, so a Windows absolute path round-trips as
+ * "/C:/data/app.db" and resolves against the drive root. Drop the slash when a drive letter
+ * follows. Not `fileURLToPath`: on Windows it rejects POSIX-style file URLs, and
+ * `file:/app/data/app.db` is the documented Docker default. Windows-only — on POSIX "/C:/x" is a
+ * real path. `platform` is a parameter so tests can cover both.
  */
 export function stripLeadingSlashBeforeDriveLetter(
   pathname: string,
@@ -102,8 +95,8 @@ if (process.env.NODE_ENV !== "production") {
 const migrationsFolder = resolvePath(process.cwd(), "drizzle");
 
 /**
- * Rename a column if the snake_case form exists and the camelCase form does not.
- * No-ops silently if the table doesn't exist or the column is already correct.
+ * Rename a column when the snake_case form exists and the camelCase form does not. No-ops if
+ * the table is missing or the column is already correct.
  */
 function renameColumnIfNeeded(table: string, from: string, to: string) {
   try {
@@ -120,8 +113,8 @@ function renameColumnIfNeeded(table: string, from: string, to: string) {
 }
 
 /**
- * Add a column if it is absent from the table (checks both snake_case and camelCase
- * forms so we don't add a column that was already renamed by a later migration).
+ * Add a column if absent. Checks both snake_case and camelCase forms so a column already
+ * renamed by a later migration isn't re-added.
  */
 function addColumnIfMissing(table: string, snake: string, camel: string, definition: string) {
   try {
@@ -139,11 +132,9 @@ function addColumnIfMissing(table: string, snake: string, camel: string, definit
 }
 
 /**
- * Ensure the sessions table uses INTEGER PRIMARY KEY AUTOINCREMENT for `id`.
- * Better Auth is configured with generateId:"serial" so it omits `id` from INSERT
- * and relies on the DB to generate it. If the table was created with `id TEXT NOT NULL`
- * (older schema), the insert fails with NOT NULL constraint. Sessions are ephemeral
- * so we simply recreate the table with the correct schema when needed.
+ * Ensure `sessions.id` is INTEGER PRIMARY KEY AUTOINCREMENT. Better Auth uses
+ * generateId:"serial" and omits `id` from INSERT, which an older `id TEXT NOT NULL` schema
+ * rejects. Sessions are ephemeral, so just recreate the table.
  */
 function fixSessionsSchema() {
   try {
@@ -185,10 +176,8 @@ function fixSessionsSchema() {
 }
 
 /**
- * Ensure the accounts table uses INTEGER PRIMARY KEY AUTOINCREMENT for `id`.
- * Some upgraded deployments can end up with an `accounts.id` column that is
- * NOT NULL but not rowid-backed, so inserts that omit `id` fail. Unlike
- * sessions, accounts are durable, so preserve rows while rebuilding the table.
+ * Ensure `accounts.id` is INTEGER PRIMARY KEY AUTOINCREMENT — some upgraded deployments have a
+ * NOT NULL non-rowid column, failing inserts that omit it. Accounts are durable, so preserve rows.
  */
 function fixAccountsSchema() {
   try {
@@ -202,10 +191,9 @@ function fixAccountsSchema() {
     if (!idCol) return;
     if (idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1) return;
 
-    // better-auth 1.7 requires `issuer`. A table old enough to need this repair
-    // predates it, so derive the value with the same rule migration 0024 uses;
-    // if a rebuilt-but-broken table already carries the column, keep what is
-    // there rather than recomputing it.
+    // better-auth 1.7 requires `issuer`. A table old enough to need this repair predates it, so
+    // derive the value the way migration 0024 does; keep an existing column's values rather
+    // than recomputing them.
     const issuerSelect = cols.some((c) => c.name === "issuer")
       ? '"issuer"'
       : `CASE WHEN "providerId" = 'credential' THEN 'local:credential' ELSE COALESCE(
@@ -261,13 +249,9 @@ function fixAccountsSchema() {
 }
 
 /**
- * Pre-migration compatibility patch for deployments that ran an older version of
- * migration 0020 with different column names. Migration 0021 renames columns in
- * many tables but does NOT touch `accounts`, `sessions`, or `verifications` — if
- * those were created with snake_case names they stay that way and Better Auth fails.
- *
- * This function runs before `migrate()` and brings any stale table schemas up to
- * the state that 0021/0022 expect, so the Drizzle migrations can complete cleanly.
+ * Pre-migration patch for deployments that ran an older migration 0020 with different column
+ * names. 0021 renames columns in many tables but not `accounts`, `sessions` or `verifications`, so
+ * snake_case survivors break Better Auth. Runs before `migrate()` to fix them up.
  */
 function patchTablesForMigration020() {
   // ── users ────────────────────────────────────────────────────────────────────
@@ -277,8 +261,8 @@ function patchTablesForMigration020() {
   addColumnIfMissing("users", "display_username", "displayUsername", "TEXT");
 
   // ── accounts ─────────────────────────────────────────────────────────────────
-  // 0020 should create these with camelCase; older versions used snake_case.
-  // 0021 does NOT rename accounts columns, so we must fix them here.
+  // 0020 should create these camelCase; older versions used snake_case, and 0021 does not
+  // rename accounts columns — fix them here.
   renameColumnIfNeeded("accounts", "user_id", "userId");
   renameColumnIfNeeded("accounts", "account_id", "accountId");
   renameColumnIfNeeded("accounts", "provider_id", "providerId");
@@ -292,10 +276,9 @@ function patchTablesForMigration020() {
   fixAccountsSchema();
 
   // ── sessions ─────────────────────────────────────────────────────────────────
-  // auth-server.ts uses generateId:"serial" — Better Auth omits `id` from INSERT
-  // and relies on INTEGER PRIMARY KEY AUTOINCREMENT. If the cloud's older schema
-  // had `id TEXT NOT NULL`, the insert fails. Recreate the table when needed.
-  // Sessions are ephemeral so data loss is acceptable.
+  // auth-server.ts uses generateId:"serial" — Better Auth omits `id` from INSERT and relies on
+  // INTEGER PRIMARY KEY AUTOINCREMENT, so an older `id TEXT NOT NULL` schema fails. Recreate
+  // the table when needed; sessions are ephemeral, so data loss is acceptable.
   fixSessionsSchema();
   renameColumnIfNeeded("sessions", "user_id", "userId");
   renameColumnIfNeeded("sessions", "expires_at", "expiresAt");
@@ -322,8 +305,8 @@ function runMigrations() {
     migrate(db, { migrationsFolder });
     globalForDrizzle.__MIGRATIONS_RAN__ = true;
   } catch (error: unknown) {
-    // During build, pages may be pre-rendered in parallel, causing race conditions
-    // with migrations. If tables already exist, just continue.
+    // Pages may be pre-rendered in parallel during the build, racing the migrations. If the
+    // tables already exist, continue.
     if (
       typeof error === "object" &&
       error !== null &&
@@ -345,8 +328,7 @@ try {
   runMigrations();
 } catch (error) {
   console.error("Failed to run database migrations:", error);
-  // In build mode, allow the build to continue even if migrations fail
-  // The runtime initialization will handle migrations properly
+  // In build mode let the build continue; runtime initialization handles migrations properly.
   if (
     process.env.NODE_ENV !== "production" ||
     process.env.NEXT_PHASE === "phase-production-build"
@@ -358,9 +340,8 @@ try {
 }
 
 /**
- * One-time migration: populate `accounts` table from existing users' provider/subject fields.
- * Also creates credential accounts for password users and syncs env OAuth providers.
- * Idempotent — skips if already run (checked via settings flag).
+ * One-time migration: populate `accounts` from users' provider/subject fields, add credential
+ * accounts for password users, sync env OAuth providers. Idempotent via a settings flag.
  */
 function runBetterAuthDataMigration() {
   if (sqlitePath === ":memory:") return;
@@ -371,8 +352,8 @@ function runBetterAuthDataMigration() {
   if (flag) return;
 
   const now = new Date().toISOString();
-  // Providers that declare an issuer key their accounts by it; the rest fall
-  // back to the synthetic local namespace. Read once rather than per user.
+  // Providers declaring an issuer key their accounts by it; the rest use the synthetic local
+  // namespace. Read once rather than per user.
   const providerIssuers = new Map(
     db
       .select({ id: oauthProviders.id, issuer: oauthProviders.issuer })
@@ -452,8 +433,8 @@ function runBetterAuthDataMigration() {
 }
 
 /**
- * Sync OAUTH_* env vars into the oauthProviders table (synchronous).
- * Uses raw Drizzle queries since this runs at module load time.
+ * Sync OAUTH_* env vars into the oauthProviders table (synchronous). Raw Drizzle queries,
+ * since this runs at module load time.
  */
 function runEnvProviderSync() {
   if (sqlitePath === ":memory:") return;
@@ -569,9 +550,8 @@ function runEnvProviderSync() {
 }
 
 /**
- * One-time migration: convert legacy Cloudflare DNS settings to the new
- * generic dns_provider format.  Idempotent — skips if already run or if
- * the new setting already exists.
+ * One-time migration: convert legacy Cloudflare DNS settings to the generic dns_provider
+ * format. Idempotent — skips if already run or if the new setting already exists.
  */
 function runCloudflareToProviderMigration() {
   if (sqlitePath === ":memory:") return;

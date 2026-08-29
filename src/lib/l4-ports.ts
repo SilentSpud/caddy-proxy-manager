@@ -1,17 +1,8 @@
 /**
- * L4 Port Management
- *
- * Generates a Docker Compose override file with the required port mappings
- * for L4 proxy hosts, and manages the apply/status lifecycle via trigger
- * files on a shared volume.
- *
- * Flow:
- * 1. Web app computes required ports from enabled L4 proxy hosts
- * 2. Web writes docker-compose.l4-ports.yml override file
- * 3. Web writes l4-ports.trigger to signal the sidecar
- * 4. Sidecar detects trigger, runs `docker compose up -d caddy`
- * 5. Sidecar writes l4-ports.status with result
- * 6. Web reads status to show user the outcome
+ * L4 Port Management. Generates a Docker Compose override with the ports enabled L4 hosts need and
+ * manages the apply/status lifecycle through files on a shared volume: web writes
+ * docker-compose.l4-ports.yml plus l4-ports.trigger; the sidecar runs `docker compose up -d caddy`
+ * and writes l4-ports.status; web reads that to report the outcome.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -41,10 +32,7 @@ export type L4PortsDiff = {
   needsApply: boolean;
 };
 
-/**
- * Compute the set of ports that need to be exposed on the caddy container
- * based on all enabled L4 proxy hosts.
- */
+/** The ports that must be exposed on the caddy container for all enabled L4 proxy hosts. */
 export async function getRequiredL4Ports(): Promise<string[]> {
   const hosts = await db
     .select({
@@ -68,9 +56,7 @@ export async function getRequiredL4Ports(): Promise<string[]> {
   return Array.from(portSet).sort();
 }
 
-/**
- * Read the currently applied ports from the override file on disk.
- */
+/** Read the currently applied ports from the override file on disk. */
 export function getAppliedL4Ports(): string[] {
   const filePath = join(DATA_DIR, OVERRIDE_FILE);
   if (!existsSync(filePath)) return [];
@@ -101,16 +87,12 @@ export function getAppliedL4Ports(): string[] {
   }
 }
 
-/**
- * Compute hash of a port list for change detection.
- */
+/** Hash of a port list, for change detection. */
 function hashPorts(ports: string[]): string {
   return crypto.createHash("sha256").update(ports.join(",")).digest("hex").slice(0, 16);
 }
 
-/**
- * Check if the current L4 proxy host config differs from applied ports.
- */
+/** Whether the current L4 proxy host config differs from the applied ports. */
 export async function getL4PortsDiff(): Promise<L4PortsDiff> {
   const requiredPorts = await getRequiredL4Ports();
   const currentPorts = getAppliedL4Ports();
@@ -119,8 +101,7 @@ export async function getL4PortsDiff(): Promise<L4PortsDiff> {
 }
 
 /**
- * Generate the Docker Compose override file and write the trigger.
- * Returns the status after triggering.
+ * Generate the Docker Compose override file and write the trigger. Returns the status after.
  */
 export async function applyL4Ports(): Promise<L4PortsStatus> {
   const requiredPorts = await getRequiredL4Ports();
@@ -169,9 +150,7 @@ ${portLines}
   };
 }
 
-/**
- * Read the current status from the status file written by the sidecar.
- */
+/** Read the current status from the status file written by the sidecar. */
 export function getL4PortsStatus(): L4PortsStatus {
   const statusPath = join(DATA_DIR, STATUS_FILE);
 
@@ -187,8 +166,7 @@ export function getL4PortsStatus(): L4PortsStatus {
 }
 
 /**
- * Check if the sidecar container is available by looking for the status file
- * or trigger file having been processed.
+ * Whether the sidecar is available, judged by the status file or a processed trigger file.
  */
 export function isSidecarAvailable(): boolean {
   const statusPath = join(DATA_DIR, STATUS_FILE);

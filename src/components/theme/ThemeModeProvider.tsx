@@ -14,12 +14,8 @@ interface ThemeModeContextValue {
 const ThemeModeContext = createContext<ThemeModeContextValue | null>(null);
 
 /**
- * Reads the preference the user picked.
- *
- * This is deliberately *not* the mode in effect: "system" stays "system" here.
- * For the resolved light/dark — what a non-CSS consumer such as Monaco needs —
- * use Astryx's own `useTheme()`, which resolves "system" against the OS and
- * tracks changes to it.
+ * The preference the user picked — "system" stays "system". For the resolved light/dark (what
+ * Monaco needs) use Astryx's own `useTheme()`.
  */
 export function useThemeMode(): ThemeModeContextValue {
   const ctx = use(ThemeModeContext);
@@ -30,8 +26,8 @@ export function useThemeMode(): ThemeModeContextValue {
 }
 
 function persist(mode: ThemeMode) {
-  // SameSite=Lax is enough: the cookie only picks a colour, and it must survive
-  // ordinary top-level navigation back into the app.
+  // SameSite=Lax is enough: the cookie only picks a colour, and it must survive ordinary top-level
+  // navigation back into the app.
   /* biome-ignore lint/suspicious/noDocumentCookie: the suggested Cookie Store API
      is Chromium-only — no Safari, no Firefox — and its async set would let a
      reload race the write. document.cookie is the portable, synchronous option,
@@ -41,12 +37,8 @@ function persist(mode: ThemeMode) {
 }
 
 /**
- * Owns the colour-mode preference and hands it to Astryx's `<Theme>`.
- *
- * `initialMode` comes from the cookie the server already read, so the first
- * client render matches the server's `<html data-theme>` exactly — no
- * hydration mismatch, and no post-mount correction that would show up as a
- * flash. Astryx's Theme keeps `<html>` in sync from then on.
+ * Owns the colour-mode preference and hands it to Astryx's `<Theme>`. `initialMode` comes from the
+ * cookie the server read, so the first client render matches `<html data-theme>` — no flash.
  */
 export function ThemeModeProvider({
   initialMode,

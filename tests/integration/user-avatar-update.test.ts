@@ -1,10 +1,7 @@
 /**
- * Regression: removing a profile picture has to actually remove it.
- *
- * updateUserProfile wrote `data.avatarUrl ?? current.avatarUrl`, which cannot
- * tell "not supplied" from "cleared" — so the remove button reported success,
- * wrote an audit entry, and left the old icon in place. It matters more now that
- * clearing the icon is how a user falls back to their Gravatar or initial.
+ * Regression: removing a profile picture must actually remove it. updateUserProfile wrote
+ * `data.avatarUrl ?? current.avatarUrl`, which cannot tell "not supplied" from "cleared" — so the
+ * remove button reported success and left the old icon in place.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

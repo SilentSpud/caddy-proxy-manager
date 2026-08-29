@@ -1,14 +1,9 @@
 /**
- * Regression: mTLS must FAIL CLOSED when a host has mTLS enabled but no trust
- * resolves to an active client certificate — e.g. trust is role-only and every
- * cert in the role has been revoked (or the role is empty).
- *
- * Bug (SECURITY-AUDIT H2): such a host was silently dropped from mTlsDomainMap,
- * so buildTlsConnectionPolicies emitted a plain TLS policy with no
- * client_authentication block — the backend was served to ANY client with no
- * certificate required. The fix keeps the domain in the map (empty CA set →
- * drop-all policy) and forces require_and_verify even for protected/excluded
- * path configs.
+ * SECURITY-AUDIT H2: mTLS must FAIL CLOSED when a host has it enabled but nothing resolves to an
+ * active client certificate (role-only trust fully revoked, or an empty role). The bug dropped such
+ * a host from mTlsDomainMap, so Caddy emitted a plain TLS policy with no client_authentication and
+ * served the backend to anyone. The fix keeps the domain with an empty CA set (→ drop-all) and
+ * forces require_and_verify.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

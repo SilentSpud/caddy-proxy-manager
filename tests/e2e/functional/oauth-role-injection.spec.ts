@@ -1,17 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Regression (SECURITY-AUDIT H3): an external OAuth identity provider must NOT
- * be able to set privileged user fields. better-auth's generic-OAuth signup
- * spreads the raw IdP profile claims into the new user record and bypasses the
- * `input:false` flags on `role`/`status`, so an IdP returning `role: "admin"`
- * could self-provision an admin account.
- *
- * The hostile IdP here is `mock-oauth2-server` (Dex can't emit custom claims),
- * configured in tests/mock-oidc/config.json to inject `role: "admin"` into
- * every issued token. We register it as an OAuth provider, complete a real
- * OAuth sign-in (auto-issued — interactiveLogin:false), then assert the created
- * user is role "user", not "admin".
+ * SECURITY-AUDIT H3: an OAuth IdP must not be able to set privileged user fields. better-auth's
+ * generic-OAuth signup spreads raw profile claims into the new user and ignores `input:false` on
+ * `role`/`status`. The hostile IdP is `mock-oauth2-server`, configured to inject `role: "admin"`
+ * into every token; after a real sign-in the created user must be role "user".
  */
 
 const BASE_URL = 'http://localhost:3000';

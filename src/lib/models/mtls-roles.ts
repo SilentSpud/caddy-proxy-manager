@@ -255,8 +255,8 @@ export async function getCertificateRoles(certId: number): Promise<MtlsRole[]> {
 }
 
 /**
- * Builds a map of roleId → Set<normalizedFingerprint> for all active (non-revoked) certs.
- * Used during Caddy config generation.
+ * roleId → Set<normalizedFingerprint> for all active (non-revoked) certs. Used during Caddy
+ * config generation.
  */
 export async function buildRoleFingerprintMap(): Promise<Map<number, Set<string>>> {
   const rows = await db
@@ -284,8 +284,8 @@ export async function buildRoleFingerprintMap(): Promise<Map<number, Set<string>
 }
 
 /**
- * Builds a map of certId → normalizedFingerprint for all active (non-revoked) certs.
- * Used during Caddy config generation for direct cert overrides.
+ * certId → normalizedFingerprint for all active (non-revoked) certs. Used during Caddy config
+ * generation for direct cert overrides.
  */
 export async function buildCertFingerprintMap(): Promise<Map<number, string>> {
   const rows = await db
@@ -304,8 +304,8 @@ export async function buildCertFingerprintMap(): Promise<Map<number, string>> {
 }
 
 /**
- * Builds a map of roleId → Set<certId> for all active (non-revoked) certs.
- * Used during Caddy config generation to resolve trusted_role_ids → cert IDs.
+ * roleId → Set<certId> for all active (non-revoked) certs. Used during Caddy config generation to
+ * resolve trusted_role_ids → cert IDs.
  */
 export async function buildRoleCertIdMap(): Promise<Map<number, Set<number>>> {
   const rows = await db
@@ -332,6 +332,5 @@ export async function buildRoleCertIdMap(): Promise<Map<number, Set<number>>> {
   return map;
 }
 
-// normalizeFingerprint is imported from caddy-mtls.ts (the canonical location)
-// and re-exported for convenience.
+// Re-exported for convenience; normalizeFingerprint's canonical home is caddy-mtls.ts.
 export { normalizeFingerprint } from "../caddy-mtls";

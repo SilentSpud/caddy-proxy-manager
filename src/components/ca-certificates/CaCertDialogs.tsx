@@ -70,13 +70,8 @@ export function IssueClientCertDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
-  // One of these dialogs is mounted per CA row, and a closed native <dialog>
-  // stays in the DOM — so a shared form id would appear many times over. The
-  // submit button associates by `form={id}`, which resolves through
-  // getElementById and would therefore target the *first* form in the
-  // document: a different, empty dialog whose required fields then block
-  // submission. With more than one CA, "Issue Certificate" silently did
-  // nothing. useId gives every instance its own form.
+  // One dialog per CA row, and a closed native <dialog> stays in the DOM, so a shared form id would
+  // resolve `form={id}` to the first (empty) form and block submission. useId per instance.
   const issueFormId = useId();
   const [isPending, startTransition] = useTransition();
   const [issued, setIssued] = useState<{

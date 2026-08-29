@@ -482,9 +482,8 @@ export async function countL4ProxyHosts(search?: string): Promise<number> {
 }
 
 /**
- * Enabled hosts only — used to refuse switching the caddy-l4 module off while
- * something is still listening. Disabled hosts emit no config, so they do not
- * block the change.
+ * Enabled hosts only — used to refuse switching the caddy-l4 module off while something is still
+ * listening. Disabled hosts emit no config, so they do not block the change.
  */
 export async function countEnabledL4ProxyHosts(): Promise<number> {
   const [row] = await db

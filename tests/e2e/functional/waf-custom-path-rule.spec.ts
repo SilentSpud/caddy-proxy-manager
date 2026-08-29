@@ -1,10 +1,6 @@
 /**
- * Functional test: custom WAF path rule.
- *
- * Reproduces the reported setup:
- * - global WAF enabled
- * - per-host WAF set to merge
- * - custom SecRule on REQUEST_URI blocking /admin
+ * Functional: custom WAF path rule — global WAF on, per-host WAF merging, and a custom SecRule on
+ * REQUEST_URI blocking /admin.
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

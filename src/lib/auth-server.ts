@@ -29,22 +29,20 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     clientSecret: p.clientSecret,
     scopes: p.scopes ? p.scopes.split(/[\s,]+/).filter(Boolean) : undefined,
     pkce: true,
-    // Security: do not let an OAuth sign-in implicitly create a brand-new
-    // account unless OAuth self-registration is explicitly enabled. Existing
-    // users and (where configured) account linking still work — only first-time
-    // auto-provisioning of an unknown identity is gated. Controlled by its own
-    // flag, independent of credential self-registration.
+    // Security: do not let an OAuth sign-in implicitly create a brand-new account unless OAuth
+    // self-registration is explicitly enabled. Existing users and (where configured) account
+    // linking still work — only first-time auto-provisioning of an unknown identity is gated,
+    // under its own flag, independent of credential self-registration.
     disableImplicitSignUp: !config.auth.allowOauthRegistration,
   };
   if (p.authorizationUrl) cfg.authorizationUrl = p.authorizationUrl;
   if (p.tokenUrl) cfg.tokenUrl = p.tokenUrl;
   if (p.userinfoUrl) cfg.userInfoUrl = p.userinfoUrl;
   if (p.issuer) {
-    // better-auth 1.7 renamed `issuer` to `accountIssuer`: the stable namespace
-    // paired with the provider account id. Discovery providers fall back to the
-    // issuer found in the discovery document, but providers configured with
-    // explicit endpoints have none, so setting it keeps account identity stable
-    // across both shapes.
+    // better-auth 1.7 renamed `issuer` to `accountIssuer`: the stable namespace paired with the
+    // provider account id. Discovery providers fall back to the issuer in the discovery
+    // document, but providers configured with explicit endpoints have none, so setting it keeps
+    // account identity stable across both shapes.
     cfg.accountIssuer = p.issuer;
     // Only use discovery when explicit URLs are not provided
     if (!p.authorizationUrl && !p.tokenUrl) {
@@ -54,9 +52,8 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
 
   const mapping = toGroupMappingConfig(p);
   if (needsGroupClaims(mapping)) {
-    // Resolve claims ourselves so the group claim is found whether the IdP puts
-    // it in the ID token or only on userinfo — better-auth's default stops at
-    // the ID token as soon as it has a sub and an email.
+    // Resolve claims ourselves so the group claim is found whether the IdP puts it in the ID
+    // token or only on userinfo — better-auth stops at the ID token once it has sub and email.
     cfg.getUserInfo = async (tokens) => {
       const claims = await fetchOidcClaims(
         { issuer: p.issuer, userinfoUrl: p.userinfoUrl },
@@ -64,16 +61,15 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
         mapping.groupsClaim,
       );
       if (!claims) return null;
-      // The raw claims ride along so mapProfileToUser can read the group claim;
-      // better-auth's OAuth2UserInfo type only declares the standard fields.
+      // The raw claims ride along so mapProfileToUser can read the group claim; better-auth's
+      // OAuth2UserInfo type declares only the standard fields.
       return toOAuthUserInfo(claims) as unknown as Awaited<
         ReturnType<NonNullable<GenericOAuthConfig["getUserInfo"]>>
       >;
     };
 
-    // Runs on every sign-in through this provider, for new and existing users
-    // alike. It only parks the result: the user id isn't known here, so the
-    // mapping is applied once the sign-in reaches session creation.
+    // Runs on every sign-in through this provider, new and existing users alike. It only parks
+    // the result: the user id isn't known here, so the mapping is applied at session creation.
     cfg.mapProfileToUser = (profile: Record<string, unknown>) => {
       const subject = profile.sub ?? profile.id;
       if (subject !== undefined && subject !== null) {
@@ -87,8 +83,8 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
           syncGroups: mapping.syncGroups,
         });
       }
-      // Privileged fields are never taken from the profile — see
-      // enforceSafeUserDefaults below. The role is applied by the sync instead.
+      // Privileged fields are never taken from the profile (see enforceSafeUserDefaults); the
+      // role is applied by the sync instead.
       return {};
     };
   }
@@ -103,7 +99,7 @@ function loadProvidersSync(): GenericOAuthConfig[] {
   // If we have a successful cache, use it
   if (cachedProviders !== null && providersLoadedSuccessfully) return cachedProviders;
 
-  // If cache is empty from a failed attempt, retry on every call until it succeeds
+  // A cache left empty by a failed attempt is retried on every call until it succeeds
   try {
     const rows = db
       .select()
@@ -148,18 +144,10 @@ function loadProvidersSync(): GenericOAuthConfig[] {
 }
 
 /**
- * Security: force privileged user fields to safe defaults on every
- * better-auth-managed user creation (OAuth signup, and credential signup when
- * enabled). better-auth's generic-OAuth signup spreads the raw IdP profile
- * claims into the new user record (createOAuthUser({...restUserInfo})) and does
- * NOT honour the `input:false` flags declared on these additionalFields, so
- * without this a permissive or attacker-influenced IdP returning a `role` (or
- * `status`) claim could self-provision an admin account.
- *
- * Admin-initiated user creation goes through models/user.ts (a direct insert
- * that bypasses better-auth's database hooks), so legitimate role assignment is
- * unaffected. `provider`/`subject` are informational, not access-control, and
- * are intentionally left untouched.
+ * Security: force privileged fields to safe defaults on every better-auth-managed user creation.
+ * better-auth's generic-OAuth signup spreads raw IdP claims into the new user and ignores the
+ * `input:false` flags, so an IdP returning `role: "admin"` could self-provision an admin.
+ * Admin-initiated creation goes through models/user.ts, which bypasses these hooks.
  */
 export function enforceSafeUserDefaults<T extends object>(
   user: T,
@@ -176,9 +164,9 @@ function createAuth(): any {
     secret: config.sessionSecret,
     baseURL: config.baseUrl,
     basePath: "/api/auth",
-    // Only trust the Host header when the operator explicitly opts in.
-    // baseURL already pins the canonical origin; trustHost is only needed
-    // behind reverse proxies that rewrite Host without setting X-Forwarded-Host.
+    // Only trust the Host header when the operator explicitly opts in. baseURL already pins the
+    // canonical origin; trustHost is needed only behind reverse proxies that rewrite Host
+    // without setting X-Forwarded-Host.
     trustHost: process.env.AUTH_TRUST_HOST === "true",
     trustedOrigins: [config.baseUrl],
     advanced: {
@@ -211,8 +199,7 @@ function createAuth(): any {
     account: { modelName: "accounts" },
     verification: { modelName: "verifications" },
     emailAndPassword: {
-      // OIDC-only mode turns credential sign-in off entirely — there are no
-      // local accounts to sign in with.
+      // OIDC-only mode turns credential sign-in off entirely — there are no local accounts.
       enabled: !config.auth.disableLocalUsers,
       disableSignUp: !config.auth.allowSelfRegistration,
       password: {
@@ -227,10 +214,9 @@ function createAuth(): any {
     databaseHooks: {
       user: {
         create: {
-          // By default, never let an external IdP set privileged fields
-          // (role/status) on a newly federated user — see enforceSafeUserDefaults
-          // above. Operators who trust their IdP to manage roles can opt out
-          // with AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true.
+          // By default, never let an external IdP set privileged fields (role/status) on a newly
+          // federated user — see enforceSafeUserDefaults above. Operators who trust their IdP to
+          // manage roles can opt out with AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true.
           before: async (user: Record<string, unknown>) => {
             if (config.auth.allowOauthRoleFromClaims) {
               return { data: user };
@@ -268,9 +254,8 @@ function createAuth(): any {
             const userId =
               typeof session.userId === "string" ? Number(session.userId) : session.userId;
 
-            // Apply the IdP's group claim now that the user and their account
-            // row exist. Runs before the audit entry so a role change is in
-            // effect for anything that reads the session afterwards.
+            // Apply the IdP's group claim now that the user and account rows exist. Runs before
+            // the audit entry so a role change is in effect for anything reading the session.
             try {
               await reconcileOidcUserAfterSignIn(userId);
             } catch (error) {
@@ -294,10 +279,10 @@ function createAuth(): any {
       },
     },
     plugins: [
-      // Cast via unknown: better-auth's `username` plugin declares
-      // databaseHooks.user.create.before's `email: string` (required) while BetterAuthPlugin
-      // expects `email?: any`. The mismatch surfaces in some environments and not others, so
-      // the cast keeps the typecheck stable across local and Docker builds.
+      // Cast via unknown: better-auth's `username` plugin declares databaseHooks.user.create
+      // .before's `email: string` (required) while BetterAuthPlugin expects `email?: any`. The
+      // mismatch surfaces in some environments and not others, so the cast keeps the typecheck
+      // stable across local and Docker builds.
       username({
         maxUsernameLength: 255,
         usernameValidator: (username) => /^[a-zA-Z0-9_.@-]+$/.test(username),

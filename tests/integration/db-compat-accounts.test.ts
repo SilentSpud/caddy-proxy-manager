@@ -171,12 +171,9 @@ describe('database compatibility for accounts schema', () => {
     } finally {
       reader?.close();
       appSqlite?.close();
-      // close() is not enough on bun:sqlite: it defers the actual handle release
-      // until every prepared statement is finalized, and the statements drizzle
-      // and the migrator keep are only finalized when they are collected. Until
-      // then Windows still considers compat.db open and the removal below fails
-      // with EBUSY. A synchronous full GC finalizes them; on POSIX this is
-      // simply redundant, since unlinking an open file there is legal.
+      // close() is not enough on bun:sqlite: the handle is released only once every prepared
+      // statement is finalized, and drizzle's are finalized on collection — until then Windows
+      // holds compat.db open and the removal fails with EBUSY. A sync GC finalizes them.
       Bun.gc(true);
       rmSync(tempDir, { recursive: true, force: true });
     }

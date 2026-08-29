@@ -96,19 +96,16 @@ import {
 const CERTS_DIR = process.env.CERTS_DIRECTORY || join(process.cwd(), "data", "certs");
 mkdirSync(CERTS_DIR, { recursive: true, mode: 0o700 });
 
-// Directory shared (via a Docker volume) with the Caddy container, so a
-// custom ACME CA root PEM written here by the web container is readable by
-// Caddy at the same path for `trusted_roots_pem_files`. Read lazily so tests
-// (and non-Docker deployments) can override ACME_CA_ROOT_DIR at runtime.
+// Shared with the Caddy container via a Docker volume, so a custom ACME CA root PEM written
+// here is readable by Caddy at the same path for `trusted_roots_pem_files`. Read lazily so
+// tests and non-Docker deployments can override ACME_CA_ROOT_DIR at runtime.
 function acmeCaRootFile(): string {
   return join(process.env.ACME_CA_ROOT_DIR || "/acme-ca", "custom-ca-root.pem");
 }
 
 /**
- * Persist (or clear) the custom ACME CA root PEM to the shared volume and
- * return the file path Caddy should reference, or null if no root is
- * configured or the file could not be written (in which case the issuer is
- * left without `trusted_roots_pem_files` rather than pointing at a missing file).
+ * Persist (or clear) the custom ACME CA root PEM and return the path Caddy should reference, or
+ * null — leaving the issuer without `trusted_roots_pem_files` rather than a missing file.
  */
 function syncAcmeCaRootFile(caRootPem: string | undefined): string | null {
   const file = acmeCaRootFile();
@@ -693,8 +690,8 @@ export function resolveEffectiveGeoBlock(
     return hostConfig.enabled ? hostConfig : null;
   }
 
-  // Host merge mode: only enabled host config should alter global behavior.
-  // A disabled host geoblock means "no per-host geoblock" in merge mode.
+  // Host merge mode: only enabled host config alters global behavior — a disabled host
+  // geoblock means "no per-host geoblock".
   if (hostConfig?.enabled && globalConfig) {
     return mergeGeoBlockSettings(globalConfig, hostConfig);
   }
@@ -779,22 +776,17 @@ function attachHostToRoute(route: CaddyHttpRoute, host: string | string[]): Cadd
 }
 
 /**
- * Normalize the configured trusted-proxy ranges: trim, drop blanks, and expand
- * the "private_ranges" shorthand into concrete CIDRs (matching how the geoblock
- * and Authentik handlers treat the same shorthand).
+ * Normalize configured trusted-proxy ranges: trim, drop blanks, and expand the
+ * "private_ranges" shorthand into CIDRs (as the geoblock and Authentik handlers do).
  */
 export function normalizeTrustedProxyRanges(ranges: string[] | undefined | null): string[] {
   return expandPrivateRanges((ranges ?? []).map((r) => r.trim()).filter(Boolean));
 }
 
 /**
- * Build the server-level trusted-proxy fields for the main HTTP server object
- * (`servers.cpm`). Caddy resolves `{http.request.client_ip}` in core — before
- * any handler runs — so this is the only place a global trusted-proxy list can
- * fix client-IP attribution for access logs, analytics and downstream handlers.
- *
- * Returns an empty object (nothing emitted, current behaviour preserved) unless
- * at least one range is configured.
+ * Server-level trusted-proxy fields for `servers.cpm`. Caddy resolves `{http.request.client_ip}`
+ * in core, before any handler, so this is the only place a global list fixes IP attribution.
+ * Empty object unless at least one range is configured.
  */
 export function buildServerTrustedProxies(settings: TrustedProxiesSettings | null | undefined): {
   trusted_proxies?: { source: string; ranges: string[] };
@@ -832,12 +824,9 @@ type CaddyBuildContext = {
   globalGeoBlock?: GeoBlockSettings | null;
   globalWaf?: WafSettings | null;
   /**
-   * Which plugin-backed features the running Caddy binary can actually serve.
-   *
-   * Caddy validates a posted config as a whole: one handler naming a module
-   * that was not compiled in is rejected along with everything else in the
-   * document, so a single stale WAF toggle would take every host offline. Every
-   * plugin-backed handler below is therefore gated on this.
+   * Which plugin-backed features the running binary can serve. Caddy validates a posted config as
+   * a whole, so one handler naming an uncompiled module takes every host offline — every
+   * plugin-backed handler is gated on this.
    */
   moduleAvailability: CaddyModuleAvailability;
   mtlsRbac?: {
@@ -892,9 +881,9 @@ export function buildLocationReverseProxy(
   return { safePath, reverseProxyHandler };
 }
 
-// Builds a Caddy server-level error route (handle_errors equivalent) that serves a
-// custom static response while preserving the original error status code. An empty
-// `statuses` list matches every error; `hosts`, when set, scopes the route to a host.
+// A Caddy server-level error route (handle_errors equivalent): serves a custom static
+// response while preserving the original status code. An empty `statuses` list matches every
+// error; `hosts`, when set, scopes the route to a host.
 export function buildErrorPageRoute(rule: ErrorPageRule, hosts?: string[]): CaddyHttpRoute {
   const matcher: Record<string, unknown> = {};
   if (hosts && hosts.length > 0) {
@@ -1181,9 +1170,9 @@ function appendMtlsPathModeRoutes(options: {
       continue;
     }
 
-    // Full-site mode: there are no path carve-outs to enforce here. Hosts with mTLS
-    // disabled land here too, so nothing may be gated ahead of the catch-all — the
-    // catch-all (or its RBAC subroutes) is what decides the requirement.
+    // Full-site mode: no path carve-outs to enforce. Hosts with mTLS disabled land here too,
+    // so nothing may be gated ahead of the catch-all — the catch-all (or its RBAC subroutes)
+    // decides the requirement.
     appendLocationRoutes({
       hostRoutes,
       domainGroup,
@@ -1205,23 +1194,15 @@ async function buildProxyRoutes(
   const errorRoutes: CaddyHttpRoute[] = [];
   const validClientCertExpression = buildValidClientCertCelExpression();
 
-  // Hoisted out of the per-host loop: the answer is the same for every host,
-  // and the cost of getting it wrong is the whole config being rejected.
+  // Hoisted out of the per-host loop: same answer for every host, and getting it wrong costs
+  // the whole config.
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
   const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
 
-  // Adapt every host's Caddyfile snippet up front, concurrently.
-  //
-  // Each adapt is a round trip to Caddy's admin API, and this runs on every
-  // config apply — a host edit, a cert renewal, a settings save. Doing them
-  // inside the loop made the cost the *sum* of those round trips; doing them
-  // here makes it the slowest one.
-  //
-  // Deliberately not cached across applies. The result depends on which plugins
-  // the running binary has, and a cache that outlived a rebuild would hand back
-  // routes for a module that is no longer there — producing exactly the
-  // whole-document rejection this file works to avoid. Latency is the cheaper
-  // thing to spend.
+  // Adapt every host's Caddyfile snippet up front, concurrently: each adapt is an admin-API round
+  // trip and this runs on every config apply, so the cost becomes the slowest rather than the sum.
+  // Not cached across applies — a cache outliving a rebuild would hand back routes for a module
+  // that is gone.
   const adaptedCaddyfiles = new Map<number, Awaited<ReturnType<typeof adaptCaddyfileSnippet>>>();
   await Promise.all(
     rows
@@ -1322,16 +1303,10 @@ async function buildProxyRoutes(
       }
     }
 
-    // Path blocks (terminal static_response) and path rewrites (URI rewrite).
-    //
-    // Path Allows are not emitted as standalone routes — a terminal match with
-    // an empty handle would stop the subroute without falling through to the
-    // reverse_proxy, returning an empty 200. Instead, every allow pattern is
-    // folded into each block's matcher as a `not` clause: a block matches when
-    // the request path matches the block pattern AND does not match any allow
-    // pattern. Allowed requests therefore skip every block and exit the
-    // subroute naturally, continuing to the outer reverse_proxy. Allows do not
-    // affect rewrites — those keep their original matchers.
+    // Path blocks (terminal static_response) and path rewrites (URI rewrite). Path Allows are not
+    // standalone routes — a terminal match with an empty handle would stop the subroute and return
+    // an empty 200 — so each allow pattern is folded into every block's matcher as a `not` clause.
+    // Rewrites keep their original matchers.
     const pathAllows = meta.path_allows ?? [];
     const pathBlocks = meta.path_blocks ?? [];
     const pathRewrites = meta.path_rewrites ?? [];
@@ -1549,9 +1524,9 @@ async function buildProxyRoutes(
       }
     }
 
-    // Security: This field allows admins to inject arbitrary Caddy reverse_proxy config.
-    // This is intentional — admins have full control of the proxy configuration.
-    // Prototype pollution is prevented by mergeDeep blocking __proto__/constructor/prototype.
+    // Security: this field lets admins inject arbitrary Caddy reverse_proxy config, which is
+    // intentional — admins have full control of the proxy configuration. mergeDeep blocks
+    // __proto__/constructor/prototype, so prototype pollution is not reachable.
     const customReverseProxy = parseOptionalJson(meta.custom_reverse_proxy_json);
     if (customReverseProxy) {
       if (isPlainObject(customReverseProxy)) {
@@ -1576,22 +1551,16 @@ async function buildProxyRoutes(
       }
     }
 
-    // Security: This field allows admins to inject arbitrary Caddy HTTP handlers.
-    // This is intentional — admins can add any handler (file_server, rewrite, etc.)
-    // before the reverse_proxy handler in the chain.
+    // Security: this field lets admins inject arbitrary Caddy HTTP handlers before the
+    // reverse_proxy. Intentional — admins can add any handler (file_server, rewrite, etc.).
     const customHandlers = parseCustomHandlers(meta.custom_pre_handlers_json);
     if (customHandlers.length > 0) {
       handlers.push(...customHandlers);
     }
 
-    // Per-host Caddyfile directives, adapted by the running Caddy binary.
-    //
-    // A snippet that no longer adapts — most likely because it used a plugin
-    // that has since been switched off in Settings → Caddy Build — is skipped
-    // with a warning rather than aborting the build. Failing here would take
-    // every other host down over one host's stale escape hatch, and would also
-    // block the very edit needed to fix it. Snippets are validated when saved,
-    // so reaching this path at all means something changed underneath them.
+    // Per-host Caddyfile directives, adapted by the running Caddy binary. A snippet that no longer
+    // adapts (usually a plugin switched off in Settings) is skipped with a warning: failing here
+    // would take every other host down, and block the edit needed to fix it.
     const adapted = adaptedCaddyfiles.get(row.id);
     if (adapted) {
       for (const warning of adapted.warnings) {
@@ -1616,9 +1585,9 @@ async function buildProxyRoutes(
         },
       ];
 
-      // Add header copying for each configured header. The name is canonicalised
-      // because the placeholder that reads the value back is matched literally
-      // against Go's canonical header key — see upstreamHeaderPlaceholder.
+      // Add header copying for each configured header. The name is canonicalised because the
+      // placeholder that reads the value back is matched literally against Go's canonical
+      // header key — see upstreamHeaderPlaceholder.
       for (const rawHeaderName of authentik.copyHeaders) {
         const headerName = canonicalHeaderName(rawHeaderName);
         const placeholder = upstreamHeaderPlaceholder(headerName);
@@ -1653,8 +1622,7 @@ async function buildProxyRoutes(
         ? ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fd00::/8", "::1/128"]
         : authentik.trustedProxies;
 
-      // Parse the outpost upstream to extract host:port for dial
-      // Remove http://, https://, and any trailing slashes
+      // Parse the outpost upstream into host:port for dial, dropping scheme and slashes
       let dialAddress = authentik.outpostUpstream.replace(/^https?:\/\//, "").replace(/\/$/, "");
       // Remove any path portion if accidentally included
       dialAddress = dialAddress.split("/")[0];
@@ -1712,34 +1680,23 @@ async function buildProxyRoutes(
       // Uses CPM itself as the auth provider (replaces Authentik)
       const cpmDialAddress = getCpmDialAddress();
       if (cpmDialAddress) {
-        // Canonical (Go MIME) casing is required, not cosmetic: the copy step
-        // below reads each value back through
-        // `{http.reverse_proxy.header.<name>}`, and Caddy resolves that by
-        // indexing the response header map with the literal name. Go stores
-        // the key canonicalised, so spelling these "X-CPM-User" resolves to
-        // nothing and every upstream behind forward auth sees an anonymous
-        // request. See upstreamHeaderPlaceholder in caddy-utils.
+        // Canonical (Go MIME) casing is required, not cosmetic: Caddy resolves
+        // `{http.reverse_proxy.header.<name>}` by literal lookup in Go's canonicalised map, so
+        // "X-CPM-User" resolves to nothing and every upstream sees an anonymous request.
         const CPM_COPY_HEADERS = ["X-Cpm-User", "X-Cpm-Email", "X-Cpm-Groups", "X-Cpm-User-Id"];
 
-        // Security: strip any client-supplied CPM identity headers from the
-        // inbound request before it ever reaches the upstream. These headers
-        // are injected solely by CPM from the verify response; accepting them
-        // from the client would let a caller spoof their identity / group
-        // membership to upstream apps. This must run on EVERY route — protected,
-        // unprotected catch-all, excluded, and location — because on routes
-        // without the auth handler nothing else would remove them, and on
-        // authenticated routes the copy step below only overwrites a header
-        // when the verify response value is non-empty (e.g. a user in no group
-        // returns an empty X-CPM-Groups, which would otherwise leave the
-        // client's forged value intact).
+        // Security: strip client-supplied CPM identity headers inbound — CPM injects these only
+        // from the verify response, so accepting them would let a caller spoof identity. Must run
+        // on EVERY route: unauthenticated ones have nothing else to remove them, and the copy step
+        // below only overwrites when the verify value is non-empty (a user in no group returns an
+        // empty X-CPM-Groups).
         const cpmStripHeadersHandler: Record<string, unknown> = {
           handler: "headers",
           request: {
             delete: [...CPM_COPY_HEADERS],
           },
         };
-        // Prepend the strip handler to the shared handler chain for all CPM
-        // forward-auth routes.
+        // Prepend the strip handler to the shared chain for all CPM forward-auth routes.
         const cpmHandlers = [cpmStripHeadersHandler, ...handlers];
 
         // Build handle_response routes for copying user headers on 2xx
@@ -1975,8 +1932,8 @@ async function buildProxyRoutes(
         ];
       };
 
-      // Open catch-all: no client certificate required. Used by whitelist mode (where
-      // only the listed paths are gated) and as the full-site fallback.
+      // Open catch-all: no client certificate required. Used by whitelist mode (only listed
+      // paths are gated) and as the full-site fallback.
       const buildUnprotectedCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => [
         {
           match: [{ host: domainGroup }],
@@ -1985,10 +1942,9 @@ async function buildProxyRoutes(
         },
       ];
 
-      // Full-site mode. RBAC rules, when present, carry their own per-path allow/deny
-      // decisions; requireValidClientCertByDefault stays false so paths without an
-      // explicit rule are proxied rather than denied. With no RBAC rules — including
-      // every host that has mTLS switched off entirely — the host is simply open.
+      // Full-site mode. RBAC rules, when present, carry their own per-path allow/deny, and
+      // requireValidClientCertByDefault stays false so unruled paths are proxied rather than
+      // denied. With no RBAC rules — including hosts with mTLS off entirely — the host is open.
       const buildDefaultCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => {
         if (hasMtlsRbac) {
           const rbacSubroutes = buildMtlsRbacSubroutes(
@@ -2086,10 +2042,8 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
     );
 
   /**
-   * Pushes one TLS policy per unique CA set found in `mTlsDomains`.
-   * Domains that share the same CA configuration are grouped into one policy;
-   * domains with different CAs get separate policies so a cert from CA_B cannot
-   * authenticate against a host that only trusts CA_A.
+   * One TLS policy per unique CA set in `mTlsDomains`, so a cert from CA_B cannot authenticate
+   * against a host that only trusts CA_A.
    */
   const pushMtlsPolicies = (mTlsDomains: string[]) => {
     const scopedDomains = mTlsDomains.filter((domain) => mTlsOptionalAuthDomains.has(domain));
@@ -2197,9 +2151,8 @@ type TlsAutomationContext = {
     dnsProviderSettings?: DnsProviderSettings | null;
     acmeSettings?: AcmeSettings | null;
     /**
-     * Omitted means "do not gate" — callers that only exercise ACME policy
-     * shapes have no module selection to consult. buildCaddyDocument always
-     * passes it, so the real config path is always gated.
+     * Omitted means "do not gate" — callers exercising only ACME policy shapes have no module
+     * selection. buildCaddyDocument always passes it, so the real config path is always gated.
      */
     moduleAvailability?: CaddyModuleAvailability;
   };
@@ -2267,8 +2220,8 @@ export async function buildTlsAutomation(
       : null;
 
   const dnsSettings = options.dnsSettings;
-  // Primary resolvers first, then the configured fallbacks, so DNS-01 validation
-  // still has somewhere to go when the primary resolver is unreachable.
+  // Primary resolvers first, then fallbacks, so DNS-01 validation still has somewhere to go
+  // when the primary is unreachable.
   const dnsResolvers: string[] = [];
   if (
     dnsSettings?.enabled &&
@@ -2282,11 +2235,9 @@ export async function buildTlsAutomation(
   }
 
   /**
-   * A DNS-01 challenge names its provider module in the config, so a provider
-   * whose caddy-dns plugin is not compiled in cannot be used. Dropping just the
-   * `challenges.dns` block degrades that subject to HTTP-01 (wildcards will
-   * fail to issue) instead of having Caddy reject the config outright and take
-   * every host down with it.
+   * A DNS-01 challenge names its provider module, so an uncompiled caddy-dns plugin cannot be used.
+   * Dropping just `challenges.dns` degrades the subject to HTTP-01 (wildcards fail) instead of
+   * having Caddy reject the whole config.
    */
   const dnsProviderAllowed = (providerName: string): boolean => {
     const availability = options.moduleAvailability;
@@ -2303,8 +2254,8 @@ export async function buildTlsAutomation(
   const managedCertificateIds = new Set<number>();
 
   // Custom ACME directory URL + trusted root for internal CAs (OpenBao, Step-CA, etc.).
-  // Resolved once per build: syncAcmeCaRootFile touches the filesystem, and it is
-  // applied to every issuer across every subject group.
+  // Resolved once per build: syncAcmeCaRootFile touches the filesystem, and the result applies
+  // to every issuer across every subject group.
   const customAcmeUrl = (options.acmeSettings?.caUrl ?? "").trim();
   const acmeRootPath = syncAcmeCaRootFile(options.acmeSettings?.caRootPem);
 
@@ -2416,9 +2367,8 @@ type L4BuildContext = Pick<
 >;
 
 async function buildL4Servers(context: L4BuildContext): Promise<Record<string, unknown> | null> {
-  // The entire layer4 app comes from caddy-l4. Without it there is no `layer4`
-  // key for Caddy to unmarshal, so emitting one would fail the whole config —
-  // including the HTTP hosts, which have nothing to do with L4.
+  // The entire layer4 app comes from caddy-l4. Without it there is no `layer4` key to
+  // unmarshal, so emitting one would fail the whole config — HTTP hosts included.
   if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
 
   const l4Hosts = await db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true));
@@ -2584,9 +2534,9 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
 
       route.handle = handlers;
 
-      // Geo blocking: add a blocking route BEFORE the proxy route.
-      // At L4, the blocker is a matcher (layer4.matchers.blocker) — blocked connections
-      // match this route and are closed. Non-blocked connections fall through to the proxy route.
+      // Geo blocking: a blocking route BEFORE the proxy route. At L4 the blocker is a matcher
+      // (layer4.matchers.blocker) — blocked connections match this route and are closed, the
+      // rest fall through to the proxy route.
       const effectiveGeoBlock = resolveEffectiveGeoBlock(context.globalGeoBlock ?? null, {
         geoblock: meta.geoblock ?? null,
         geoblock_mode: meta.geoblock_mode ?? "merge",
@@ -2610,8 +2560,7 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
       routes.push(route);
     }
 
-    // Determine protocol from the hosts on this listen address.
-    // All hosts sharing a listen address must use the same protocol.
+    // Protocol comes from the hosts on this listen address; all of them must agree.
     const protocol = hosts[0].protocol as string;
     const listenValue = protocol === "udp" ? `udp/${listenAddr}` : listenAddr;
 
@@ -2684,9 +2633,8 @@ export async function buildCaddyDocument() {
       })
       .from(issuedClientCertificates)
       .where(isNull(issuedClientCertificates.revokedAt)),
-    // Distinct CA IDs that have ever had a tracked issued cert (including revoked).
-    // Used to distinguish "managed" CAs (pin to leaf certs) from "unmanaged" CAs
-    // (trust any cert signed by that CA).
+    // Distinct CA IDs that have ever had a tracked issued cert (including revoked). Tells
+    // "managed" CAs (pin to leaf certs) from "unmanaged" ones (trust any cert they signed).
     db
       .selectDistinct({ caCertificateId: issuedClientCertificates.caCertificateId })
       .from(issuedClientCertificates),
@@ -2749,9 +2697,9 @@ export async function buildCaddyDocument() {
   // Resolve role IDs → cert IDs for trusted_role_ids in mTLS config
   const roleCertIdMap = await buildRoleCertIdMap();
 
-  // Build domain → CA cert IDs map for mTLS-enabled hosts.
-  // New model (trusted_client_cert_ids + trusted_role_ids): derive CAs from selected certs and pin to those certs.
-  // Old model (ca_certificate_ids): trust entire CAs as before.
+  // Domain → CA cert IDs map for mTLS-enabled hosts. New model (trusted_client_cert_ids +
+  // trusted_role_ids): derive CAs from the selected certs and pin to those certs. Old model
+  // (ca_certificate_ids): trust entire CAs.
   const mTlsDomainMap = new Map<string, number[]>();
   // Per-domain override: which specific leaf cert PEMs to pin (new model only)
   const mTlsDomainLeafOverride = new Map<string, string[]>();
@@ -2785,8 +2733,8 @@ export async function buildCaddyDocument() {
     }
 
     if (allCertIds.size > 0) {
-      // New model: pin trust to the explicitly-selected client certs — derive
-      // their CAs for chain validation and collect the leaf PEMs for pinning.
+      // New model: pin trust to the explicitly-selected client certs — derive their CAs for
+      // chain validation and collect the leaf PEMs for pinning.
       const derivedCaIds = new Set<number>();
       const leafPems: string[] = [];
       for (const certId of allCertIds) {
@@ -2803,13 +2751,9 @@ export async function buildCaddyDocument() {
           mTlsDomainLeafOverride.set(domain, leafPems);
         }
       } else {
-        // Every explicitly-selected cert/role resolved to ZERO active leaves
-        // (all revoked or deleted). FAIL CLOSED with a deny-all (drop) policy.
-        // Do NOT derive the CA and fall back to whole-CA trust: that would trust
-        // other active certs of the same CA that were never assigned to this
-        // host (and "request" mode would accept any presented cert). Force
-        // require_and_verify with an empty trust set → buildClientAuthentication
-        // returns null → buildTlsConnectionPolicies emits a drop-all policy.
+        // Every selected cert/role resolved to ZERO active leaves. FAIL CLOSED: do NOT fall back to
+        // whole-CA trust, which would admit other certs of that CA never assigned to this host.
+        // require_and_verify with an empty trust set → buildClientAuthentication null → drop-all.
         for (const domain of domains) {
           mTlsDomainMap.set(domain, []);
           mTlsOptionalAuthDomains.delete(domain);
@@ -2821,14 +2765,9 @@ export async function buildCaddyDocument() {
         mTlsDomainMap.set(domain, meta.mtls.ca_certificate_ids);
       }
     } else {
-      // mTLS is enabled but no trust resolved — e.g. trust is role-only and
-      // every cert in those roles was revoked or the role is empty, or nothing
-      // was selected — and there is no legacy CA trust. FAIL CLOSED: keep the
-      // domain in the mTLS map with an empty CA set (buildClientAuthentication
-      // returns null → buildTlsConnectionPolicies emits a drop-all policy) and
-      // force require_and_verify so even protected/excluded-path hosts reject
-      // all connections rather than silently serving the backend with no client
-      // certificate required.
+      // mTLS enabled but nothing resolved (role-only trust fully revoked, or nothing selected) and
+      // no legacy CA trust. FAIL CLOSED: keep the domain with an empty CA set (→ drop-all policy)
+      // and force require_and_verify, so even protected/excluded-path hosts reject everything.
       for (const domain of domains) {
         mTlsDomainMap.set(domain, []);
         mTlsOptionalAuthDomains.delete(domain);
@@ -2870,9 +2809,9 @@ export async function buildCaddyDocument() {
     getCaddyModuleAvailability(),
   ]);
 
-  // Optionally seed the global geoblock trusted-proxy list from the server-level
-  // value so the two can't silently disagree (issue #222). Only applied as a
-  // default: an explicit per-scope geoblock list is left untouched.
+  // Optionally seed the global geoblock trusted-proxy list from the server-level value so the
+  // two can't silently disagree (issue #222). Applied only as a default: an explicit per-scope
+  // geoblock list is left untouched.
   let effectiveGlobalGeoBlock = globalGeoBlock;
   if (trustedProxiesSettings?.default_geoblock && globalGeoBlock) {
     const serverRanges = (trustedProxiesSettings.ranges ?? []).map((r) => r.trim()).filter(Boolean);
@@ -2948,9 +2887,8 @@ export async function buildCaddyDocument() {
 
   const servers: Record<string, unknown> = {};
 
-  // Server-level trusted proxies / client-IP headers. Caddy resolves client_ip
-  // in core before any handler, so this is the only place a global list fixes
-  // client-IP attribution for access logs, analytics and downstream handlers.
+  // Server-level trusted proxies / client-IP headers. Caddy resolves client_ip in core before
+  // any handler, so this is the only place a global list fixes client-IP attribution.
   const serverTrustedProxies = buildServerTrustedProxies(trustedProxiesSettings);
 
   // Main HTTP/HTTPS server for proxy hosts
@@ -2958,8 +2896,8 @@ export async function buildCaddyDocument() {
     servers.cpm = {
       listen: hasTls ? [":80", ":443"] : [":80"],
       routes: httpRoutes,
-      // Only disable automatic HTTPS if we have TLS automation policies
-      // This allows Caddy to handle HTTP-01 challenges for managed certificates
+      // Only disable automatic HTTPS when TLS automation policies exist, so Caddy can still
+      // handle HTTP-01 challenges for managed certificates
       ...(tlsApp ? {} : { automatic_https: { disable: true } }),
       ...(hasTls ? { tls_connection_policies: tlsConnectionPolicies } : {}),
       // Custom error pages (handle_errors)
@@ -2993,12 +2931,9 @@ export async function buildCaddyDocument() {
 
   const httpApp = Object.keys(servers).length > 0 ? { http: { servers } } : {};
 
-  // Build logging configuration
-  // Roll settings are spelled out explicitly rather than relying on Caddy's
-  // built-in file-writer defaults — those defaults silently stopped rotating
-  // (no compression, no cleanup of old rolled files) on the deployed build,
-  // filling the host disk. Being explicit is defensive against future
-  // upstream default/behavior changes.
+  // Build logging configuration. Roll settings are spelled out rather than left to Caddy's
+  // file-writer defaults — those silently stopped rotating (no compression, no cleanup of old
+  // rolled files) on the deployed build and filled the host disk.
   const rollSettings = {
     roll: true,
     roll_size_mb: 100,
@@ -3007,12 +2942,9 @@ export async function buildCaddyDocument() {
     roll_keep_days: 30,
   };
   const loggingLogs: Record<string, unknown> = {
-    // WAF rule match logs. Modern Coraza puts the matched rules directly in the
-    // audit log (part H), and waf-log-parser reads them from there — this file is
-    // only a fallback for older builds that leave `messages` empty, plus a
-    // human-readable trail. Do not make event ingestion depend on it: correlating
-    // two independently-written files only works when both land in the same parse
-    // tick, which silently dropped every non-blocked event (issue #233).
+    // WAF rule match logs. Modern Coraza puts matched rules in the audit log (part H), which
+    // waf-log-parser reads; this file is a fallback for older builds plus a human-readable trail.
+    // Do not make ingestion depend on it — correlating two files dropped non-blocked events (#233).
     waf_rules: {
       writer: { output: "file", filename: "/logs/waf-rules.log", mode: "0640", ...rollSettings },
       encoder: { format: "json" },
@@ -3088,10 +3020,8 @@ export async function applyCaddyConfig() {
 }
 
 /**
- * Derives the dial address (host:port) for Caddy to reach CPM internally.
- * Uses FORWARD_AUTH_INTERNAL_URL env var if set. Otherwise, if CADDY_API_URL
- * points to a Docker service name (e.g. "caddy:2019"), assumes Docker networking
- * and defaults to "web:3000". Falls back to deriving from BASE_URL.
+ * Dial address (host:port) for Caddy to reach CPM internally: FORWARD_AUTH_INTERNAL_URL if set,
+ * else "web:3000" when CADDY_API_URL names a Docker service, else derived from BASE_URL.
  */
 function getCpmDialAddress(): string | null {
   const internalUrl = config.forwardAuthInternalUrl;
@@ -3100,8 +3030,7 @@ function getCpmDialAddress(): string | null {
     return internalUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   }
 
-  // If CADDY_API_URL uses a Docker service name, assume Docker networking
-  // and use the web service name directly
+  // CADDY_API_URL on a Docker service name → assume Docker networking, use the web service
   try {
     const caddyUrl = new URL(config.caddyApiUrl);
     if (
@@ -3431,8 +3360,7 @@ function buildResolverConfig(dnsConfig: DnsResolverRouteConfig): Record<string, 
     return null;
   }
 
-  // Build resolver addresses list (primary + fallbacks)
-  // DNS resolvers need port, default to :53 if not specified
+  // Resolver addresses (primary + fallbacks); DNS resolvers need a port, defaulting to :53
   const formatResolver = (r: string) => {
     if (r.includes(":")) return r;
     return `${r}:53`;

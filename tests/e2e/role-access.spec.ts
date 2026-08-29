@@ -1,16 +1,7 @@
 /**
- * E2E tests: Role-based access control.
- *
- * Verifies that:
- * - Non-admin users (user, viewer) CAN access / and /profile
- * - Non-admin users CANNOT access admin-only pages
- * - Unauthenticated users are redirected to /login everywhere
- * - Admin users can access all pages
- *
- * Test setup:
- * - Creates "testuser" (role=user) and "testviewer" (role=viewer) in the database
- *   via `docker compose exec` + bun script inside the web container.
- * - Logs in as each role in separate browser contexts.
+ * E2E: role-based access control. Non-admins (user, viewer) reach / and /profile but not admin
+ * pages; unauthenticated users go to /login; admins reach everything. Setup seeds "testuser" and
+ * "testviewer" via a bun script in the web container and signs in as each in its own context.
  */
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { ensureTestUser } from '../helpers/seed';

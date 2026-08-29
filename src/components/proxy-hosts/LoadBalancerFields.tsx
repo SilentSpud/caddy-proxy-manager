@@ -23,9 +23,8 @@ const LOAD_BALANCING_POLICIES = [
 ];
 
 /**
- * Every value is held in one state object because Astryx inputs are controlled,
- * where these were uncontrolled `defaultValue` fields. `htmlName` on each input
- * keeps the submitted FormData keys byte-identical to before.
+ * One state object because Astryx inputs are controlled where these were `defaultValue` fields.
+ * `htmlName` keeps the submitted FormData keys byte-identical.
  */
 type TextFields = {
   policyHeaderField: string;

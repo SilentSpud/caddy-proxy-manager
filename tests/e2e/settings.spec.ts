@@ -2,22 +2,17 @@ import { test, expect, type Page } from '@playwright/test';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** The settings page has its own sidebar, separate from the global dashboard
- *  sidebar. It is an astryx LayoutPanel, which renders a <div> carrying the
- *  landmark role and label rather than an <aside>. Use this selector everywhere. */
+/** The settings page has its own sidebar — an astryx LayoutPanel that renders a <div> carrying
+ *  the landmark role and label rather than an <aside>. Use this selector everywhere. */
 const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings navigation"]';
 
 /** Mutating v1 API calls are same-origin checked and 403 without this header. */
 const SETTINGS_ORIGIN = 'http://localhost:3000';
 
 /**
- * Opens the settings command palette with its keyboard shortcut.
- *
- * The shortcut is bound to `window` inside a useEffect, so pressing it straight
- * after goto() does nothing at all — the listener is not attached until the page
- * has hydrated. Waiting for the sidebar's search control first is what makes the
- * press land; a plain click auto-waits for actionability and never had the
- * problem, which is why only the keyboard tests were failing.
+ * Opens the settings command palette with its keyboard shortcut. The shortcut binds to `window` in
+ * a useEffect, so pressing it straight after goto() does nothing — wait for the sidebar's search
+ * control first. Click-driven tests auto-wait for actionability, which is why only these failed.
  */
 async function openPaletteWithKeyboard(page: Page) {
   await expect(page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...')).toBeVisible();
@@ -305,9 +300,8 @@ test.describe('Settings — ACME Server', () => {
   const CUSTOM_DIR = 'https://ca.internal.example.com/acme/acme/directory';
 
   test.afterEach(async ({ page }) => {
-    // Reset to the Let's Encrypt default so other tests/runs start clean.
-    // The Origin header is required: mutating v1 API calls are same-origin
-    // checked and reject with 403 without it, which made this reset a no-op.
+    // Reset to the Let's Encrypt default so other runs start clean. The Origin header is required:
+    // mutating v1 API calls are same-origin checked and 403 without it, which made this a no-op.
     const res = await page.request.put(API_SETTINGS_ACME, {
       headers: { Origin: SETTINGS_ORIGIN },
       data: { caUrl: '', caRootPem: '' },
@@ -364,9 +358,8 @@ test.describe('Settings — DNS Providers', () => {
   test('selecting a provider reveals its credential fields', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
     // Click the provider select and pick one (Cloudflare or first available)
-    // Selector runs with hasSearch, so the trigger is deliberately NOT a
-    // combobox — the popup's search input owns that role. The trigger is the
-    // form's only listbox-opening button.
+    // Selector runs with hasSearch, so the trigger is deliberately NOT a combobox — the popup's
+    // search input owns that role. The trigger is the form's only listbox-opening button.
     const providerSelect = page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]');
 
     await providerSelect.click();
@@ -379,9 +372,8 @@ test.describe('Settings — DNS Providers', () => {
     // Credential input fields should now appear
     // Most providers have at least one field (API token, etc.)
     const formInputs = page.locator(
-      // The Selector's own popover search box is a text input inside the form,
-      // so exclude comboboxes — otherwise `.first()` picks the hidden search
-      // field instead of a credential field.
+      // The Selector's own popover search box is a text input inside the form, so exclude
+      // comboboxes — otherwise `.first()` picks the hidden search field, not a credential field.
       'form#dnsp-add-form input[type="text"]:not([role="combobox"]), form#dnsp-add-form input[type="password"]',
     );
     await expect(formInputs.first()).toBeVisible({ timeout: 3000 });

@@ -2,43 +2,24 @@
 #
 # Caddy Compose Manager Sidecar (historically the "L4 port manager")
 #
-# The web container has no Docker API access by design, so anything that needs
-# the caddy *container* recreated — rather than its config reloaded over the
-# admin API — is signalled through files on the shared data volume and carried
-# out here. Two such things exist:
+# The web container has no Docker API access, so anything needing the caddy *container* recreated —
+# rather than its config reloaded over the admin API — is signalled through files on the shared data
+# volume and done here. Two such things: L4 ports (published ports are fixed at create time) and
+# Caddy builds (plugins are compiled in). Only ever touches the caddy container.
 #
-#   L4 ports    — published ports are fixed at container creation, so binding a
-#                 new L4 listener means recreating caddy.
-#   Caddy build — Caddy plugins are compiled in, so changing the module list
-#                 means rebuilding the image and then recreating caddy.
+# On startup it applies the current L4 ports override, since the main stack starts caddy without it,
+# and clears any stale "building" status from a sidecar killed mid-build.
 #
-# On startup: always applies the current L4 ports override so the caddy
-# container has the correct ports bound (the main compose stack starts caddy
-# without the L4 ports override file). Also clears any "building" build status
-# left behind by a sidecar that was killed mid-build, which would otherwise
-# leave the UI's Rebuild button disabled forever.
-#
-# During runtime: watches both trigger files and acts when the web app signals
-# that port configuration or the module selection has changed.
-#
-# Only ever touches the caddy container — never any other service.
-#
-# Files on the shared data volume ($DATA_DIR), all of them the interface to the
-# web container — there is no other channel between the two:
-#
+# Files on $DATA_DIR, the only interface to the web container:
 #   docker-compose.l4-ports.yml     read   port override, written by web
 #   l4-ports.trigger                r/w    web signals; deleted once handled
 #   l4-ports.status                 write  progress of the port apply
 #   docker-compose.caddy-build.yml  read   DESIRED module list, written by web
 #   caddy-build.trigger             r/w    web signals; deleted once handled
 #   caddy-build.status              write  progress of the rebuild
-#   caddy-build.applied.json        write  APPLIED module list — written ONLY
-#                                          after a build succeeds and caddy is
-#                                          healthy. The web app treats this as
-#                                          the authority on what the binary
-#                                          contains, so writing it any earlier
-#                                          would let it emit config for plugins
-#                                          that are not in the running binary.
+#   caddy-build.applied.json        write  APPLIED module list — written ONLY after a build succeeds
+#                                          and caddy is healthy; the web app treats it as the
+#                                          authority on what the binary contains
 #
 # Environment variables:
 #   DATA_DIR              - Path to shared data volume (default: /data)
@@ -65,27 +46,22 @@ OVERRIDE_FILE="$DATA_DIR/docker-compose.l4-ports.yml"
 BUILD_TRIGGER_FILE="$DATA_DIR/caddy-build.trigger"
 BUILD_STATUS_FILE="$DATA_DIR/caddy-build.status"
 BUILD_OVERRIDE_FILE="$DATA_DIR/docker-compose.caddy-build.yml"
-# The record of what the running binary was actually built with. Distinct from
-# BUILD_OVERRIDE_FILE, which carries the *desired* list into the build and is
-# written before it starts.
+# The record of what the running binary was actually built with. Distinct from BUILD_OVERRIDE_FILE,
+# which carries the *desired* list into the build and is written before it starts.
 BUILD_APPLIED_FILE="$DATA_DIR/caddy-build.applied.json"
 
 log() {
   echo "[caddy-compose-manager] $(date -u '+%Y-%m-%dT%H:%M:%SZ') $*"
 }
 
-# Escape a message for embedding in a JSON string literal. Compose output
-# contains quotes and backslashes often enough that writing it raw produces
-# status files the web app cannot parse — and an unparseable status reads to
-# the operator as "nothing happened".
+# Escape a message for embedding in a JSON string literal. Compose output contains quotes and
+# backslashes often enough that writing it raw produces status files the web app cannot parse —
+# and an unparseable status reads to the operator as "nothing happened".
 json_escape() {
-  # The `tr -d` pass removes every remaining C0 control byte. RFC 8259 forbids
-  # unescaped U+0000..U+001F inside a JSON string, and compose output carries
-  # them routinely — CR from BuildKit progress, ESC from ANSI colour, whatever a
-  # failing `go build` emits. Leaving one in produces a status file the web app
-  # cannot parse, which the operator reads as "nothing happened" — the exact
-  # failure this function exists to prevent. Tab and newline are folded to
-  # spaces first so they survive as separators rather than being deleted.
+  # The `tr -d` pass removes every remaining C0 control byte: RFC 8259 forbids unescaped
+  # U+0000..U+001F inside a JSON string, and compose output carries them routinely — CR from
+  # BuildKit progress, ESC from ANSI colour, whatever a failing `go build` emits. Tab and newline
+  # are folded to spaces first so they survive as separators rather than being deleted.
   printf '%s' "$1" \
     | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' \
     | tr '\t\n' '  ' \
@@ -130,10 +106,9 @@ write_build_status() {
 
 # Record the module list the running binary was just built with.
 #
-# Read back out of the override that fed the build, so the record can only ever
-# describe a build that actually happened. The web app treats this file as the
-# authority on which plugin-backed handlers it may emit; a handler for a module
-# the binary lacks makes Caddy reject the whole config document.
+# Read back out of the override that fed the build, so the record can only ever describe a build
+# that actually happened. The web app treats this file as the authority on which plugin-backed
+# handlers it may emit; a handler for a module the binary lacks makes Caddy reject the whole config.
 write_applied_modules() {
   modules="$(sed -n 's/^[[:space:]]*CADDY_MODULES:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$BUILD_OVERRIDE_FILE" 2>/dev/null || echo "")"
   cat > "$BUILD_APPLIED_FILE" <<APPLIEDEOF
@@ -145,8 +120,8 @@ APPLIEDEOF
   log "Recorded applied modules: ${modules:-none}"
 }
 
-# Auto-detect the Docker Compose project name from the running caddy container's labels.
-# This ensures we operate on the correct project regardless of where compose files are mounted.
+# Auto-detect the Docker Compose project name from the running caddy container's labels, so we
+# operate on the correct project regardless of where the compose files are mounted.
 detect_project_name() {
   if [ -n "$COMPOSE_PROJECT_NAME" ]; then
     echo "$COMPOSE_PROJECT_NAME"
@@ -160,22 +135,19 @@ detect_project_name() {
   fi
 }
 
-# Assemble the -f/-p/--env-file arguments every compose invocation shares, and
-# echo them. Both overrides are included whenever they exist: a rebuild must not
-# drop the L4 port bindings, and a port change must not rebuild caddy without
-# the module selection.
+# Assemble the -f/-p/--env-file arguments every compose invocation shares, and echo them. Both
+# overrides are included whenever they exist: a rebuild must not drop the L4 port bindings, and a
+# port change must not rebuild caddy without the module selection.
 #
-# Callers set COMPOSE_PROJECT first; this reads it rather than assigning it.
-# The function is always invoked as `$(build_compose_args)`, and an assignment
-# made inside that command-substitution subshell is discarded when the subshell
-# exits — so assigning here would leave the caller's "Using compose project"
-# log line empty, which is the one line you want when diagnosing a rebuild that
-# targeted the wrong stack.
+# Callers set COMPOSE_PROJECT first; this reads it rather than assigning it. The function is always
+# invoked as `$(build_compose_args)`, and an assignment made inside that command-substitution
+# subshell is discarded when it exits — so assigning here would leave the caller's "Using compose
+# project" log line empty, the one line you want when diagnosing a rebuild that hit the wrong stack.
 build_compose_args() {
   args="-p $COMPOSE_PROJECT"
-  # COMPOSE_HOST_DIR (when set) is passed as --project-directory so the Docker
-  # daemon resolves relative bind-mount paths (e.g. ./geoip-data) against the
-  # actual host project directory rather than the sidecar's /compose mount.
+  # COMPOSE_HOST_DIR (when set) is passed as --project-directory so the Docker daemon resolves
+  # relative bind-mount paths (e.g. ./geoip-data) against the real host project directory rather
+  # than the sidecar's /compose mount.
   if [ -n "$COMPOSE_HOST_DIR" ]; then
     args="$args --project-directory $COMPOSE_HOST_DIR"
   fi
@@ -342,13 +314,11 @@ do_build() {
 }
 
 # ---------------------------------------------------------------------------
-# Startup: always apply the override so caddy has the correct ports bound.
-# (The main compose stack starts caddy without the L4 ports override file.)
-# Only apply if the override file exists (created on first "Apply Ports").
+# Startup: always apply the override so caddy has the correct ports bound (the main compose stack
+# starts caddy without the L4 ports override file), but only if the override file exists.
 #
-# If the apply lock was written less than 10 s ago, this container was just
-# recreated as a side effect of a compose "up" targeting caddy. In that
-# case skip the re-apply — the compose operation is already in progress.
+# If the apply lock was written less than 10 s ago, this container was just recreated as a side
+# effect of a compose "up" targeting caddy — skip the re-apply, that operation is already running.
 # ---------------------------------------------------------------------------
 if [ -f "$OVERRIDE_FILE" ]; then
   SKIP_APPLY=0

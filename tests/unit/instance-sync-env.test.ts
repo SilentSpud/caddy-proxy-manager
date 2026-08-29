@@ -1,9 +1,6 @@
 /**
- * Unit tests for the pure environment-variable-reading functions
- * exported by src/lib/instance-sync.ts.
- *
- * These functions have no DB or network dependency — they only read
- * from process.env and do simple parsing/validation.
+ * The pure environment-variable readers exported by src/lib/instance-sync.ts — no DB or network,
+ * just process.env parsing and validation.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import {

@@ -1,14 +1,8 @@
 /**
- * Regression (SECURITY-AUDIT H3): an external OAuth identity provider must NOT
- * be able to set privileged user fields. better-auth's generic-OAuth signup
- * spreads the raw IdP profile claims into the new user record and bypasses the
- * `input:false` flags on `role`/`status`, so a permissive or attacker-controlled
- * IdP returning `role: "admin"` could self-provision an admin account.
- *
- * The fix forces role/status to safe defaults via a databaseHooks.user.create
- * .before hook (which fires on the OAuth createOAuthUser path). These tests lock
- * both the transform and the fact that the hook is actually wired into the
- * better-auth config.
+ * SECURITY-AUDIT H3: an OAuth IdP must not set privileged user fields. better-auth's generic-OAuth
+ * signup spreads raw profile claims into the new user and ignores `input:false` on `role`/`status`.
+ * The fix forces safe defaults in a databaseHooks.user.create.before hook; these lock both the
+ * transform and the fact that the hook is wired into the config.
  */
 import { describe, it, expect } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

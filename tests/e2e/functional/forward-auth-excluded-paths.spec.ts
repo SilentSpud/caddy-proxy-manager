@@ -1,15 +1,6 @@
 /**
- * Functional tests: CPM Forward Auth with excluded paths.
- *
- * Creates a proxy host with CPM forward auth enabled and excluded_paths set,
- * then verifies:
- * - Excluded paths bypass auth and reach the upstream directly
- * - Non-excluded paths still require authentication (redirect to portal)
- * - The callback route still works for completing auth on non-excluded paths
- *
- * This validates the fix for GitHub issue #108: the ability to exclude
- * specific paths from forward auth (e.g., /share/*, /rest/* for Navidrome).
- *
+ * Functional: CPM Forward Auth with excluded_paths (#108) — excluded paths reach the upstream
+ * directly, others still redirect to the portal, and the callback still completes auth.
  * Domain: func-fwd-auth-excl.test
  */
 import { test, expect } from '@playwright/test';

@@ -1,13 +1,7 @@
 /**
- * The Caddy module registry and custom-module validation.
- *
- * The registry is the contract between three things that cannot check each
- * other at runtime: the Dockerfile that compiles the binary, the config builder
- * that decides which handlers may appear, and the UI that decides which
- * settings are live. Most of what follows guards that agreement — a module in
- * the Dockerfile but not the registry is a plugin nobody can turn off, and one
- * in the registry but not the Dockerfile is a toggle that promises a plugin the
- * default image does not have.
+ * The Caddy module registry and custom-module validation. The registry is the contract between the
+ * Dockerfile that compiles the binary, the config builder that decides which handlers may appear,
+ * and the UI that decides which settings are live — none of which can check each other at runtime.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';

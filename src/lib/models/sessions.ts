@@ -3,9 +3,8 @@ import db from "../db";
 import { sessions } from "../db/schema";
 
 /**
- * Active management-UI session for a user, as shown in the profile's
- * "Active sessions" view. (Forward-auth `_cpm_fa` sessions are tracked
- * separately and are not management-UI sessions.)
+ * Active management-UI session for a user, as shown in the profile's "Active sessions" view.
+ * (Forward-auth `_cpm_fa` sessions are tracked separately.)
  */
 export interface UserSession {
   id: number;
@@ -40,8 +39,8 @@ export async function listUserSessions(userId: number): Promise<UserSession[]> {
 }
 
 /**
- * Revoke a single session, but only if it belongs to the given user.
- * Returns false if no such session exists for that user (so callers can 404).
+ * Revoke a single session, but only if it belongs to the given user. Returns false when no such
+ * session exists for that user, so callers can 404.
  */
 export async function revokeUserSession(userId: number, sessionId: number): Promise<boolean> {
   const [existing] = await db
@@ -54,8 +53,8 @@ export async function revokeUserSession(userId: number, sessionId: number): Prom
 }
 
 /**
- * Revoke all of a user's sessions except `exceptSessionId` (typically the
- * caller's current session). Returns the number of sessions revoked.
+ * Revoke all of a user's sessions except `exceptSessionId` (typically the caller's current one).
+ * Returns the number of sessions revoked.
  */
 export async function revokeOtherUserSessions(
   userId: number,

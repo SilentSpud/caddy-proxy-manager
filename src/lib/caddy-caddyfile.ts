@@ -1,18 +1,8 @@
 /**
- * Turning a per-host Caddyfile snippet into JSON handlers.
- *
- * Everything else in this app builds Caddy's JSON config directly, which is
- * precise but unwriteable by hand: `reverse_proxy` alone expands to a dozen
- * nested keys. Caddyfile syntax is what the upstream documentation, every blog
- * post, and every GitHub issue is written in, so a host-level escape hatch is
- * far more useful in that dialect than as another JSON blob.
- *
- * The translation is not reimplemented here. Caddy's own admin API exposes
- * `/adapt`, so the running binary — the same binary, with the same plugin set,
- * that will execute the result — does the parsing. That matters twice over: a
- * hand-rolled parser would drift from upstream syntax, and it would happily
- * accept directives for plugins that are not compiled in, producing a config
- * that fails to load.
+ * Turning a per-host Caddyfile snippet into JSON handlers. Everything else here builds Caddy's JSON
+ * directly, which is precise but unwriteable by hand. The translation is Caddy's own — `/adapt` on
+ * the admin API, so the running binary with its actual plugin set does the parsing; a hand-rolled
+ * parser would drift and would accept directives for plugins that are not compiled in.
  */
 
 import { caddyAdminRequest } from "./caddy-admin";
@@ -23,9 +13,8 @@ export type AdaptedCaddyfile = {
   /** Warnings Caddy reported while adapting, e.g. deprecated directives. */
   warnings: string[];
   /**
-   * Top-level app keys the snippet produced that this app cannot honour at
-   * host scope (`tls`, `layer4`, …). Surfaced rather than dropped silently:
-   * an operator who wrote a `tls` directive needs to know it did nothing.
+   * Top-level app keys the snippet produced that cannot be honoured at host scope (`tls`,
+   * `layer4`, …). Surfaced rather than dropped: an operator's `tls` directive did nothing.
    */
   ignoredApps: string[];
 };
@@ -38,10 +27,8 @@ export class CaddyfileAdaptError extends Error {
 }
 
 /**
- * Caddy's adapter needs a complete Caddyfile, so the snippet is wrapped in a
- * site block. `:80` is used as the address because it produces no host matcher
- * — the routes come back matching on whatever the snippet itself specified,
- * and this app supplies the host matching when it nests them under a host.
+ * Caddy's adapter needs a complete Caddyfile, so the snippet is wrapped in a `:80` site block —
+ * that address produces no host matcher, and this app supplies host matching when it nests them.
  */
 function wrapSnippet(snippet: string): string {
   return `:80 {\n${snippet}\n}\n`;
@@ -60,11 +47,8 @@ type AdaptResponse = {
 };
 
 /**
- * Adapt a Caddyfile snippet into HTTP routes.
- *
- * Throws CaddyfileAdaptError with Caddy's own message when the snippet does not
- * parse — that text names the line and the directive, which is far more useful
- * than anything this layer could synthesise.
+ * Adapt a Caddyfile snippet into HTTP routes. Throws CaddyfileAdaptError carrying Caddy's own
+ * message, which names the line and the directive.
  */
 export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCaddyfile> {
   const trimmed = snippet.trim();
@@ -75,8 +59,8 @@ export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCad
     method: "POST",
     body: wrapSnippet(trimmed),
     contentType: "text/caddyfile",
-    // Adaptation is pure parsing — if it has not answered in ten seconds
-    // something is wrong with the admin endpoint, not with the snippet.
+    // Adaptation is pure parsing — no answer in ten seconds means something is wrong with the
+    // admin endpoint, not with the snippet.
     timeoutMs: 10_000,
   });
 
@@ -116,13 +100,9 @@ export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCad
 }
 
 /**
- * The single handler entry that carries a snippet's routes into a host's
- * handler chain.
- *
- * A `subroute` is used rather than splicing the handlers in flat because the
- * adapted routes carry their own matchers and `terminal` flags. Flattening
- * would drop the matchers, applying a snippet's path-scoped directives to every
- * request the host serves — the exact opposite of what was written.
+ * The handler entry carrying a snippet's routes into a host's chain. A `subroute` rather than flat
+ * handlers: the adapted routes carry their own matchers, and flattening would apply a snippet's
+ * path-scoped directives to every request.
  */
 export function buildCaddyfileSubrouteHandler(
   routes: Record<string, unknown>[],
@@ -132,8 +112,8 @@ export function buildCaddyfileSubrouteHandler(
 }
 
 /**
- * Validate a snippet by adapting it, returning an error message or null.
- * Used on save so a snippet that cannot be adapted never reaches the database.
+ * Validate a snippet by adapting it, returning an error message or null. Used on save so a
+ * snippet that cannot be adapted never reaches the database.
  */
 export async function validateCaddyfileSnippet(snippet: string): Promise<string | null> {
   if (!snippet.trim()) return null;
@@ -145,8 +125,8 @@ export async function validateCaddyfileSnippet(snippet: string): Promise<string 
     return null;
   } catch (error) {
     if (error instanceof CaddyfileAdaptError) return error.message;
-    // A transport failure is not the operator's fault and must not be reported
-    // as a syntax error — let the save through and let the config build warn.
+    // A transport failure is not the operator's fault and must not read as a syntax error — let
+    // the save through and let the config build warn.
     console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
     return null;
   }

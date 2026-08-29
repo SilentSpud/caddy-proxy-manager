@@ -1,24 +1,9 @@
 /**
- * Functional tests: custom error pages (Caddy handle_errors).
- *
- * These exercise the real error path that the "Custom Reverse Proxy (JSON)" /
- * "Custom Pre-Handlers (JSON)" fields could NOT reach (issue #168): a server-level
- * error route that fires when a handler raises an error — most importantly a
- * reverse_proxy dial failure when the upstream is down (502).
- *
- * Hosts are pointed at `whoami-server:9999` — the whoami container resolves, but
- * nothing listens on :9999, so every request fails to dial and Caddy raises a 502,
- * which is what triggers the error route. A healthy host (whoami-server:80) is used
- * to prove error pages don't touch successful responses.
- *
- * Coverage:
- *   - Per-host page served on a down upstream, with the original status preserved.
- *   - Default and custom Content-Type.
- *   - Status matching: a [502] rule fires on a 502, a [404] rule does not.
- *   - Empty status list = catch-all (matches any error).
- *   - Healthy upstream is unaffected.
- *   - Global page as a fallback when a host defines none.
- *   - Per-host page takes precedence over the global one.
+ * Functional: custom error pages (Caddy handle_errors) — the real error path the custom-JSON
+ * fields could not reach (#168). Hosts point at `whoami-server:9999`, which resolves but never
+ * listens, so every request 502s and triggers the error route; a healthy host proves successful
+ * responses are untouched. Covers status matching, catch-all, Content-Type, and global-vs-per-host
+ * precedence.
  */
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';

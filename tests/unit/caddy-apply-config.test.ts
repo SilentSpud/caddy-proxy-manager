@@ -1,11 +1,7 @@
 /**
- * End-to-end coverage of the apply path against a spoofed Caddy instance.
- *
- * Nothing here is mocked except the admin-API socket: buildCaddyDocument runs
- * for real, applyCaddyConfig runs for real, and the fake Caddy records what it
- * was sent. Before the transport seam existed these tests were impossible —
- * applyCaddyConfig could only be replaced wholesale, so its status handling and
- * error mapping had no coverage at all.
+ * The apply path end to end against a spoofed Caddy. Nothing is mocked but the admin-API socket:
+ * buildCaddyDocument and applyCaddyConfig run for real and the fake records what it was sent.
+ * Before the transport seam, applyCaddyConfig could only be replaced wholesale and had no coverage.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -13,19 +13,15 @@ const MIN_SESSION_SECRET_LENGTH = 32;
 const DEFAULT_APP_NAME = "Caddy Proxy Manager";
 
 /**
- * Display name shown in the sidebar, on the login card, and as the suffix on
- * every page title. A page that should not carry the suffix opts out itself
- * with `title: { absolute: ... }` — see app/layout.tsx.
+ * Display name in the sidebar, on the login card, and as the page-title suffix. A page opts out of
+ * the suffix with `title: { absolute: ... }` — see app/layout.tsx.
  */
 const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
 
 /**
- * Gravatar fallback for users with no icon of their own.
- *
- * `null` means the operator has not expressed a preference, leaving the choice
- * to the Settings toggle. Setting AVATAR_GRAVATAR pins it and locks the toggle,
- * which is how an air-gapped or privacy-sensitive deployment guarantees no
- * browser ever reaches out to gravatar.com.
+ * Gravatar fallback for users with no icon. `null` leaves the choice to the Settings toggle;
+ * setting AVATAR_GRAVATAR pins it and locks the toggle, so an air-gapped deployment can guarantee
+ * no browser ever reaches gravatar.com.
  */
 function resolveLegacyPasswordChangeEnv(): boolean | null {
   const raw = process.env.AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH?.trim().toLowerCase();
@@ -40,9 +36,8 @@ function resolveGravatarEnv(): boolean | null {
 }
 
 /**
- * OIDC-only mode: CPM creates and authenticates no local accounts at all.
- * The bootstrap admin is neither created nor required, credential sign-in is
- * turned off, and every identity comes from an OAuth/OIDC provider.
+ * OIDC-only mode: no local accounts at all. No bootstrap admin, no credential sign-in; every
+ * identity comes from an OAuth/OIDC provider.
  */
 const LOCAL_USERS_DISABLED = process.env.AUTH_DISABLE_LOCAL_USERS === "true";
 
@@ -106,9 +101,8 @@ function resolveSessionSecret(): string {
 }
 
 function resolveAdminCredentials(): { username: string | null; password: string | null } {
-  // With local users disabled there is no bootstrap admin to seed, so the
-  // credentials are not just unused — demanding them would block startup for a
-  // deployment that has deliberately handed identity to its IdP.
+  // With local users disabled there is no bootstrap admin to seed, so demanding these
+  // credentials would block startup for a deployment that handed identity to its IdP.
   if (LOCAL_USERS_DISABLED) {
     return { username: null, password: null };
   }
@@ -197,25 +191,22 @@ export const config = {
     return getAdminCredentials().password;
   },
   auth: {
-    // OIDC-only mode. Disables credential sign-in, local account creation,
-    // password management, and the bootstrap admin seed.
+    // OIDC-only mode. Disables credential sign-in, local account creation, password management,
+    // and the bootstrap admin seed.
     disableLocalUsers: LOCAL_USERS_DISABLED,
     allowSelfRegistration:
       !LOCAL_USERS_DISABLED && process.env.AUTH_ALLOW_SELF_REGISTRATION === "true",
-    // Separate from credential self-registration: gates whether an OAuth
-    // sign-in may implicitly create a brand-new account. Defaults to closed —
-    // except in OIDC-only mode, where the IdP is the only way an account can
-    // ever come into existence, so it defaults open unless explicitly refused.
+    // Separate from credential self-registration: gates whether an OAuth sign-in may implicitly
+    // create a brand-new account. Defaults closed — except in OIDC-only mode, where the IdP is
+    // the only way an account can exist, so it defaults open unless explicitly refused.
     allowOauthRegistration: LOCAL_USERS_DISABLED
       ? process.env.AUTH_ALLOW_OAUTH_REGISTRATION !== "false"
       : process.env.AUTH_ALLOW_OAUTH_REGISTRATION === "true",
-    // When true, an OAuth IdP's profile claims may set a new user's role/status.
-    // Defaults to false: role/status are forced to safe defaults regardless of
-    // claims. Only enable if you control the IdP and want it to manage roles.
+    // When true, an OAuth IdP's profile claims may set a new user's role/status. Defaults to
+    // false, forcing safe defaults regardless of claims. Enable only if you control the IdP.
     allowOauthRoleFromClaims: process.env.AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS === "true",
-    // Force a password reset for anyone still on a pre-argon2id bcrypt hash.
-    // true/false when AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH pins it, null
-    // when the stored setting decides.
+    // Force a password reset for anyone still on a pre-argon2id bcrypt hash. true/false when
+    // AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH pins it, null when the stored setting decides.
     requirePasswordChangeOnLegacyHashFromEnv: resolveLegacyPasswordChangeEnv(),
   },
   oauth: {
@@ -228,8 +219,8 @@ export const config = {
     tokenUrl: process.env.OAUTH_TOKEN_URL ?? null,
     userinfoUrl: process.env.OAUTH_USERINFO_URL ?? null,
     allowAutoLinking: process.env.OAUTH_ALLOW_AUTO_LINKING === "true",
-    // Scopes for the env-configured provider. Group claims usually need an
-    // extra scope (e.g. "openid email profile groups").
+    // Scopes for the env-configured provider. Group claims usually need an extra scope (e.g.
+    // "openid email profile groups").
     scopes: process.env.OAUTH_SCOPES?.trim() || null,
     // ── Group-based roles (env-configured provider) ─────────────────────────
     groupsClaim: process.env.OAUTH_GROUPS_CLAIM?.trim() || null,
@@ -245,16 +236,14 @@ export const config = {
 };
 
 /**
- * Validates configuration at server startup in production.
- * Throws if production is running with insecure default values.
- * Safe to call during build - only validates when actually serving.
+ * Validates configuration at server startup in production, throwing if insecure default values
+ * are in use. Safe to call during build — only validates when actually serving.
  */
 export function validateProductionConfig() {
   if (isRuntimeProduction) {
-    // Force validation by accessing the config values
-    // This will throw if defaults are being used in production
+    // Access the config values to force validation; throws if defaults are used in production
     void config.sessionSecret;
-    // Admin credentials are only validated when local users exist at all —
+    // Admin credentials are validated only when local users exist at all —
     // resolveAdminCredentials() short-circuits in OIDC-only mode.
     void config.adminUsername;
     void config.adminPassword;

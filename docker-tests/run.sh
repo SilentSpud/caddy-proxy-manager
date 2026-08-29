@@ -4,14 +4,13 @@
 #   ./run.sh                     build if needed, bring the rig up, run everything, tear down
 #   ./run.sh mtls l4             run only the test files matching those patterns
 #   ./run.sh --sync              also start the second CPM instance and run the replication tests
-#   ./run.sh --keep              leave the rig running afterwards (for poking at it)
+#   ./run.sh --keep              leave the rig running afterwards
 #   ./run.sh --rebuild           force a rebuild of the web and caddy images
 #   ./run.sh --shell             drop into a shell in the client container
 #   ./run.sh --logs [service]    tail logs
 #   ./run.sh --down              tear the rig down, volumes and all
 #
-# Requires docker with the compose plugin. Nothing else is installed on the
-# host: every tool the suite uses lives in the client container.
+# Needs docker with the compose plugin; every other tool lives in the client container.
 set -uo pipefail
 
 # Git Bash on Windows rewrites arguments that look like absolute paths, which

@@ -1,13 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
 
-// docker/clickhouse/config.d/low-disk-write.xml is mounted into the ClickHouse
-// container by docker-compose.yml and turns these diagnostic system-log tables
-// off with remove="1". On stock ClickHouse they flush every few seconds even
-// when the proxy is idle, writing several GB/day; disabling them means the
-// tables are never created, so disk writes stay proportional to real traffic.
-// Keep this list in sync with low-disk-write.xml and DISABLED_SYSTEM_LOGS in
-// src/lib/clickhouse/client.ts.
+// low-disk-write.xml turns these diagnostic system-log tables off with remove="1"; on stock
+// ClickHouse they flush every few seconds even when idle, writing several GB/day. Keep in sync
+// with that file and DISABLED_SYSTEM_LOGS in src/lib/clickhouse/client.ts.
 const DISABLED_SYSTEM_LOGS = [
   'metric_log',
   'asynchronous_metric_log',

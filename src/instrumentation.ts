@@ -1,14 +1,13 @@
 /**
- * Next.js instrumentation hook - runs once when the server starts
+ * Next.js instrumentation hook — runs once when the server starts.
  * https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 export async function register() {
   // Only run on the server side
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    // Refuse to run under anything but Bun. This catches the paths where the app
-    // gets to execute at all; the standalone build dies earlier, while its module
-    // graph is still linking, so `bun run build` plants an equivalent check at the
-    // top of dist/standalone/server.js (scripts/inject-runtime-guard.mjs).
+    // Refuse to run under anything but Bun. This catches the paths where the app gets to execute
+    // at all; the standalone build dies earlier, while linking, so `bun run build` plants an
+    // equivalent check atop dist/standalone/server.js (scripts/inject-runtime-guard.mjs).
     const { assertBunRuntime } = await import("./lib/runtime-guard");
     assertBunRuntime();
 
@@ -30,13 +29,12 @@ export async function register() {
       console.log("Database initialization complete");
     } catch (error) {
       console.error("Failed to initialize database:", error);
-      // Don't throw - let the app start anyway, errors will surface when users try to use features
+      // Don't throw — let the app start; errors surface when users reach the features
     }
 
-    // With local users disabled, an OAuth provider is the only way in. Warn
-    // loudly rather than throwing: an operator locked out of the UI can only
-    // recover by configuring a provider through OAUTH_* environment variables,
-    // which needs the app to keep starting.
+    // With local users disabled, an OAuth provider is the only way in. Warn loudly rather than
+    // throwing: an operator locked out of the UI can only recover by configuring a provider via
+    // OAUTH_* environment variables, which needs the app to keep starting.
     const { config: appConfig } = await import("./lib/config");
     if (appConfig.auth.disableLocalUsers) {
       try {
@@ -65,8 +63,8 @@ export async function register() {
       console.log("Caddy configuration applied successfully");
     } catch (error) {
       console.error("Failed to apply Caddy configuration on startup:", error);
-      // Don't throw - Caddy might not be ready yet, or config might be applied later
-      // This ensures proxy hosts work after container restart
+      // Don't throw — Caddy may not be ready yet, or the config may be applied later; this keeps
+      // proxy hosts working after a container restart
     }
 
     // Start Caddy health monitoring to detect restarts and auto-reapply config

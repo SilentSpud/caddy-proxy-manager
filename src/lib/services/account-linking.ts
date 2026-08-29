@@ -12,10 +12,8 @@ import { accountIssuerFor } from "../account-issuer";
 const LINKING_TOKEN_EXPIRY = 5 * 60; // 5 minutes in seconds
 
 /**
- * The issuer to stamp on a linked OAuth account row. From better-auth 1.7 an
- * account is keyed by (issuer, accountId), so a link written here has to carry
- * the same issuer the provider will present at sign-in — otherwise the link
- * exists but never resolves.
+ * The issuer to stamp on a linked OAuth account row. From better-auth 1.7 accounts are keyed by
+ * (issuer, accountId), so a mismatch means the link exists but never resolves.
  */
 async function issuerForProvider(providerId: string): Promise<string> {
   const row = await db
@@ -40,9 +38,7 @@ export type LinkingTokenPayload = {
   exp: number;
 };
 
-/**
- * Determines how to handle an OAuth sign-in attempt
- */
+/** Determines how to handle an OAuth sign-in attempt. */
 export async function decideLinkingStrategy(
   provider: string,
   providerAccountId: string,
@@ -98,9 +94,7 @@ export async function decideLinkingStrategy(
   };
 }
 
-/**
- * Create a temporary linking token (5-minute expiry)
- */
+/** Create a temporary linking token (5-minute expiry). */
 export async function createLinkingToken(
   userId: number,
   provider: string,
@@ -123,9 +117,7 @@ export async function createLinkingToken(
   return token;
 }
 
-/**
- * Verify and decode linking token
- */
+/** Verify and decode a linking token. */
 export async function verifyLinkingToken(token: string): Promise<LinkingTokenPayload | null> {
   try {
     const secret = new TextEncoder().encode(config.sessionSecret);
@@ -145,8 +137,8 @@ export async function verifyLinkingToken(token: string): Promise<LinkingTokenPay
 }
 
 /**
- * Store a linking JWT in the DB and return an opaque 64-char hex ID.
- * Expired rows are purged on each insert to prevent unbounded table growth.
+ * Store a linking JWT in the DB and return an opaque 64-char hex ID. Expired rows are purged on
+ * each insert to prevent unbounded table growth.
  */
 export async function storeLinkingToken(token: string): Promise<string> {
   const id = randomBytes(32).toString("hex");
@@ -166,10 +158,8 @@ export async function storeLinkingToken(token: string): Promise<string> {
 }
 
 /**
- * Peek at a linking token by its opaque ID without consuming (deleting) it.
- * Used by the link-account page to decode display info (provider, email) while
- * keeping the token available for the subsequent API call.
- * Returns null if the ID is not found or the token is expired.
+ * Peek at a linking token by its opaque ID without consuming it, so the link-account page can show
+ * provider and email while leaving the token for the API call. Null if unknown or expired.
  */
 export async function peekLinkingToken(id: string): Promise<string | null> {
   const now = nowIso();
@@ -181,8 +171,8 @@ export async function peekLinkingToken(id: string): Promise<string | null> {
 }
 
 /**
- * Retrieve and delete a linking token by its opaque ID (one-time use).
- * Returns null if the ID is not found or the token is expired.
+ * Retrieve and delete a linking token by its opaque ID (one-time use). Returns null if the ID
+ * is unknown or the token is expired.
  */
 export async function retrieveLinkingToken(id: string): Promise<string | null> {
   const now = nowIso();
@@ -195,9 +185,7 @@ export async function retrieveLinkingToken(id: string): Promise<string | null> {
   return token;
 }
 
-/**
- * Verify password and link OAuth account to existing user
- */
+/** Verify the password and link an OAuth account to an existing user. */
 export async function verifyAndLinkOAuth(
   userId: number,
   password: string,
@@ -228,9 +216,7 @@ export async function verifyAndLinkOAuth(
   return true;
 }
 
-/**
- * Auto-link OAuth account (for users without passwords)
- */
+/** Auto-link an OAuth account, for users without passwords. */
 export async function autoLinkOAuth(
   userId: number,
   provider: string,
@@ -242,8 +228,7 @@ export async function autoLinkOAuth(
     return false;
   }
 
-  // Don't auto-link if user has a password (unless explicitly called for authenticated linking)
-  // This check is bypassed when called from the authenticated linking flow
+  // Don't auto-link if the user has a password; bypassed by the authenticated linking flow.
   if (user.passwordHash && !config.oauth.allowAutoLinking) {
     return false;
   }
@@ -267,8 +252,7 @@ export async function autoLinkOAuth(
 }
 
 /**
- * Link OAuth account for an already-authenticated user
- * This bypasses the password check since the user is already authenticated
+ * Link an OAuth account for an already-authenticated user, bypassing the password check.
  */
 export async function linkOAuthAuthenticated(
   userId: number,

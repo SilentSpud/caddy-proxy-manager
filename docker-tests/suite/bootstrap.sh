@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
-# Prepares the runner before any test file executes:
-#
-#   1. waits for the CPM API and for Pebble,
-#   2. signs in as the seeded admin and mints a bearer token for the suite,
-#   3. builds the CA bundle the client uses to verify Caddy's certificates,
-#   4. points CPM's ACME settings at Pebble, so every auto-managed proxy host
-#      in the suite gets a real, properly-validated certificate without the
-#      network ever leaving the rig.
-#
-# Sourced state lands in $STATE_DIR and is read by lib.sh.
+# Prepares the runner before any test file executes: waits for the CPM API and Pebble, signs in as
+# the seeded admin and mints a bearer token, builds the CA bundle the client verifies Caddy with,
+# and points CPM's ACME settings at Pebble so every auto-managed host gets a real, validated
+# certificate without the network leaving the rig. State lands in $STATE_DIR, read by lib.sh.
 set -uo pipefail
 
 SUITE_NAME=bootstrap

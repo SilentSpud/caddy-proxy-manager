@@ -28,8 +28,7 @@ export type StatCard = {
 };
 
 type RecentEvent = {
-  // The audit row's primary key, so the list keys on real identity rather than
-  // on its position in the page's snapshot.
+  // The audit row's primary key, so the list keys on real identity rather than page position.
   id: number;
   summary: string;
   createdAt: string;
@@ -40,18 +39,12 @@ type TrafficSummary = {
   blockedPercent: number;
 } | null;
 
-/**
- * Per-position card tints, so the stat cards stay visually distinguishable.
- * These are decorative only — nothing about a card's meaning is carried by its
- * colour, which is why the previous hand-rolled violet/emerald/amber classes
- * could be swapped for the theme's own non-semantic variants.
- */
+/** Per-position card tints. Decorative only, so they use the theme's non-semantic variants. */
 const CARD_VARIANTS = ["purple", "green", "orange"] as const;
 
 /**
- * The activity dot's colour used to be the only signal of what kind of change
- * an event was. StatusDot carries a label too, so the distinction is now
- * available to screen readers rather than being colour-only.
+ * The activity dot's colour used to be the only signal of what kind of change an event was.
+ * StatusDot carries a label too, so the distinction reaches screen readers as well.
  */
 function getEventStatus(summary: string): {
   variant: "success" | "error" | "accent";

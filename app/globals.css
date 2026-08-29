@@ -18,11 +18,8 @@
 
 @layer base {
   /**
-   * Colour and radius come from Astryx's Tailwind bridge above, which maps
-   * `--color-*` / `--radius-*` onto the theme's light-dark() tokens. There is
-   * no second palette here and no `.dark` block: light and dark are one set of
-   * tokens resolved by `color-scheme`, which Astryx's <Theme> drives off
-   * `<html data-theme>`. See src/lib/theme-mode.ts for how the mode is chosen.
+   * Colour and radius come from Astryx's Tailwind bridge above. One set of light-dark() tokens
+   * resolved by `color-scheme` — no second palette, no `.dark` block. See src/lib/theme-mode.ts.
    */
   * {
     @apply border-border;
@@ -34,13 +31,10 @@
 
 @layer components {
   /**
-   * Visual masking for a secret typed into a multi-line field.
-   *
-   * A private key must be entered in a <textarea>: <input type="password">
-   * strips newlines on paste, which corrupts PEM. Astryx's TextArea exposes no
-   * masking prop and no className, so the mask is applied from a wrapper.
-   * -webkit-text-security is supported in Chromium, WebKit and Firefox 118+;
-   * where it is not, the field degrades to plain text rather than breaking.
+   * Visual masking for a secret typed into a multi-line field. A private key needs a <textarea>:
+   * <input type="password"> strips newlines on paste and corrupts PEM. Astryx's TextArea exposes
+   * no masking prop, so this comes from a wrapper. Where -webkit-text-security is unsupported the
+   * field degrades to plain text.
    */
   [data-masked-input="true"] textarea {
     -webkit-text-security: disc;

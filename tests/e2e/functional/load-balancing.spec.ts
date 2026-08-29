@@ -1,11 +1,6 @@
 /**
- * Functional tests: round-robin load balancing across multiple upstreams.
- *
- * Creates a proxy host with two echo servers as upstreams. Each server
- * returns a distinct body so tests can verify that traffic is distributed
- * across both backends.
- *
- * Domain: func-lb.test
+ * Functional: round-robin load balancing. Two echo upstreams with distinct bodies, so traffic
+ * distribution is observable. Domain: func-lb.test
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

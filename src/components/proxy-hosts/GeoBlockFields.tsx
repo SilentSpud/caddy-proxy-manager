@@ -89,11 +89,8 @@ const CONTINENT_OPTIONS = CONTINENTS.map((c) => ({
 }));
 
 /**
- * The country and continent pickers were ~200 lines of hand-built chips,
- * sticky letter headers, inline SVG checkmarks and colour-coded accents.
- * MultiSelector provides the search, select-all, badge summary and keyboard
- * handling natively; the hidden input keeps the submitted comma-joined value
- * byte-identical so the server action is untouched.
+ * MultiSelector replaces ~200 lines of hand-built chips and headers. The hidden input keeps the
+ * submitted comma-joined value byte-identical, so the server action is untouched.
  */
 function CodeMultiSelect({
   name,
@@ -190,10 +187,9 @@ function TagInput({
           placeholder={placeholder}
           description={helperText}
           onEnter={() => commit(draft)}
-          // Enter here means "add this tag", not "submit the form". The design
-          // system fires onEnter without preventing the default, so without this
-          // the same keypress also triggers implicit form submission — saving
-          // the whole config, and re-applying Caddy, on every tag added.
+          // Enter here means "add this tag", not "submit the form". The design system fires onEnter
+          // without preventing the default, so without this the same keypress also saves the whole
+          // config and re-applies Caddy on every tag added.
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
           }}
@@ -372,9 +368,8 @@ const BLOCK_ALL_CIDR = "0.0.0.0/0";
 
 export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBlockFieldsProps) {
   const rawInitial = initialValues?.geoblock ?? null;
-  // Geoblocking is entirely the caddy-blocker plugin. With it switched off the
-  // rules would be recorded and then never emitted, so the switch is locked
-  // rather than left to look functional.
+  // Geoblocking is entirely the caddy-blocker plugin. With it off the rules would be recorded and
+  // then never emitted, so the switch is locked rather than left to look functional.
   const moduleDisabledReason = useDisabledReason("geoblock");
   const [enabled, setEnabled] = useState(rawInitial?.enabled ?? false);
   const [mode, setMode] = useState<GeoBlockMode>(initialValues?.geoblock_mode ?? "merge");

@@ -1,9 +1,7 @@
 /**
- * The guard is the app's first line of defence against being started with the
- * wrong interpreter, so it has to behave correctly in the case it exists for —
- * a runtime that is not Bun — which is not the runtime this suite runs on. The
- * Node case is reproduced by removing `process.versions.bun` for the duration
- * of a test rather than by mocking the module.
+ * The guard has to behave correctly in the case it exists for — a runtime that is not Bun — which
+ * is not the runtime this suite runs on. The Node case is reproduced by removing
+ * `process.versions.bun` for the duration of a test rather than by mocking the module.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

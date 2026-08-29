@@ -1,12 +1,6 @@
 /**
- * Functional tests: basic reverse-proxy routing.
- *
- * Creates a real proxy host pointing at the echo-server container,
- * then sends HTTP requests directly to Caddy and asserts the response
- * comes from the upstream.
- *
- * Domain: func-proxy.test  (no DNS resolution needed — requests go to
- * 127.0.0.1:80 with a custom Host header, which Caddy routes by hostname).
+ * Functional: basic reverse-proxy routing to the echo-server container. Domain: func-proxy.test —
+ * no DNS needed, requests go to 127.0.0.1:80 with a custom Host header.
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

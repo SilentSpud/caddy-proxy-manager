@@ -3,11 +3,8 @@ import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { applyCaddyBuild, getCaddyBuildDiff, getCaddyBuildStatus } from "@/src/lib/caddy-build";
 
 /**
- * GET /api/caddy-build — the module diff plus the sidecar's rebuild status.
- *
- * Polled by the Caddy Build settings panel while a rebuild is in flight.
- * Compiling Caddy from source takes minutes, which is far too long for a server
- * action to hold open, so the trigger and the progress are separate calls.
+ * GET /api/caddy-build — the module diff plus the sidecar's rebuild status. Polled by the settings
+ * panel: compiling Caddy takes minutes, far too long for a server action to hold open.
  */
 export async function GET(request: NextRequest) {
   try {

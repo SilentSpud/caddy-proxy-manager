@@ -7,11 +7,8 @@ import { CADDY_MODULES } from "@/src/lib/caddy-modules";
 import { getCaddyBuildSettings, saveCaddyBuildSettings } from "@/src/lib/settings";
 
 /**
- * GET /api/v1/caddy/modules — the module catalog, the current selection, and
- * how it differs from the image that is actually running.
- *
- * The catalog is included rather than left to be looked up because the module
- * ids are what PUT expects, and they are not derivable from the Go module path.
+ * GET /api/v1/caddy/modules — the module catalog, the current selection, and how it differs from
+ * the running image. The catalog ships along because module ids are what PUT expects.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -38,11 +35,8 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PUT /api/v1/caddy/modules — replace the selection.
- *
- * Saving does not rebuild: plugins are compiled into the binary, so the running
- * container keeps its current module set until POST /api/caddy-build triggers a
- * rebuild. The returned diff says what such a rebuild would change.
+ * PUT /api/v1/caddy/modules — replace the selection. Does not rebuild: the running container keeps
+ * its module set until POST /api/caddy-build. The returned diff says what a rebuild would change.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -53,10 +47,9 @@ export async function PUT(request: NextRequest) {
       customModules: body?.customModules,
     });
 
-    // The same refusal the Settings UI applies. Without it this endpoint is a
-    // way around the guard: disabling a module something still uses would be
-    // accepted here, and the config builder would then quietly stop emitting
-    // that feature's handlers.
+    // The same refusal the Settings UI applies. Without it this endpoint is a way around the
+    // guard: disabling a module something still uses would be accepted here, and the config
+    // builder would then quietly stop emitting that feature's handlers.
     const conflict = await describeModuleConflicts(settings);
     if (conflict) {
       return NextResponse.json({ error: conflict }, { status: 409 });
@@ -64,9 +57,9 @@ export async function PUT(request: NextRequest) {
 
     await saveCaddyBuildSettings(settings);
 
-    // Regenerate the config so it stops naming any module just switched off,
-    // matching what the Settings save does. Leaving a stale config in place
-    // would hand the next rebuild a config its new binary cannot load.
+    // Regenerate the config so it stops naming any module just switched off, matching what the
+    // Settings save does. A stale config would hand the next rebuild something its binary can't
+    // load.
     await applyCaddyConfig();
 
     return NextResponse.json({ selection: settings, diff: await getCaddyBuildDiff() });

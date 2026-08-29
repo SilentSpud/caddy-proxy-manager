@@ -1,18 +1,8 @@
 /**
- * Functional tests: L4 port manager sidecar (regression #117).
- *
- * Verifies that:
- * 1. Triggering "Apply Ports" successfully runs docker compose and reaches "applied"
- * 2. After restarting the l4-port-manager container the sidecar auto-applies the
- *    override file on startup without failing.
- *
- * The bug in #117: NETWORKS: 0 in the docker-socket-proxy blocked the
- * GET /networks/{id} call that docker compose makes when recreating the caddy
- * container. The compose command returned non-zero, the sidecar wrote "failed",
- * and the UI showed an error after every Docker restart.
- *
- * Must run after l4-proxy-routing.spec.ts (alphabetically "l4-sidecar" > "l4-proxy")
- * so that L4 proxy hosts exist and an override file is present on the shared volume.
+ * Functional: L4 port manager sidecar (#117). "Apply Ports" reaches "applied", and the sidecar
+ * re-applies the override on startup after a container restart. The bug: NETWORKS: 0 in the
+ * docker-socket-proxy blocked the GET /networks/{id} compose makes when recreating caddy. Must run
+ * after l4-proxy-routing.spec.ts, so L4 hosts and an override file already exist.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
@@ -48,12 +38,8 @@ async function fetchL4Status(page: Page): Promise<L4StatusResponse> {
 }
 
 /**
- * Poll /api/l4-ports until the state is "applied" or "failed".
- *
- * Pass `newerThan` (ISO timestamp string) when you need to confirm a *new*
- * apply completed — e.g. after a container restart where the previous status
- * file already shows "applied".  Uses lexicographic comparison which works
- * correctly for ISO-8601 timestamps.
+ * Poll /api/l4-ports until the state is "applied" or "failed". Pass `newerThan` (ISO timestamp) to
+ * confirm a *new* apply completed — lexicographic comparison is correct for ISO-8601.
  */
 async function waitForL4Terminal(
   page: Page,

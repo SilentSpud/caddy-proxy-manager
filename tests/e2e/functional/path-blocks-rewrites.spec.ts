@@ -1,24 +1,9 @@
 /**
- * Functional tests: structured Path Blocks and Path Rewrites.
- *
- * Creates a proxy host with:
- *   - a Path Block for /dns-query → 403 "Forbidden"
- *   - a Path Rewrite for /secretpath → /dns-query
- *   - default routing to whoami-server (which echoes the request line)
- *
- * Verifies that:
- *   - Blocked paths return the configured status + body (no proxying).
- *   - Rewrites change the URI seen by the upstream.
- *   - A rewrite to a path that is ALSO blocked does NOT re-match the block
- *     (subroute routes are evaluated sequentially), so the upstream still
- *     sees the rewritten path.
- *   - Unmatched paths are proxied normally.
- *
- * The pathBlocksJson / pathRewritesJson hidden fields are injected directly
- * (same pattern as redirects.spec.ts) so the test doesn't have to drive the
- * dynamic dialog rows.
- *
- * Domain: func-path-rules.test
+ * Functional: structured Path Blocks and Path Rewrites. A host blocks /dns-query → 403, rewrites
+ * /secretpath → /dns-query, and otherwise proxies to whoami-server (which echoes the request line).
+ * Blocked paths return the configured status and body; rewrites change the upstream URI; a rewrite
+ * onto a blocked path does NOT re-match the block, since subroute routes run sequentially. The
+ * pathBlocksJson / pathRewritesJson fields are injected directly. Domain: func-path-rules.test
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
@@ -78,12 +63,9 @@ test.describe
     });
 
     test('rewrite changes the URI seen by the upstream', async () => {
-      // The upstream is whoami-server, which echoes the request line. After the
-      // rewrite, the upstream should see /dns-query — not /secretpath. Crucially,
-      // even though /dns-query is in the block list, subroute routes are
-      // evaluated sequentially: the block route matched on the ORIGINAL URI
-      // (/secretpath, which is not blocked), then the rewrite route ran. The
-      // block route does NOT re-evaluate after the rewrite.
+      // whoami-server echoes the request line, so the upstream should see /dns-query. Even though
+      // that path is blocked, the block route matched the ORIGINAL URI (/secretpath) and does not
+      // re-evaluate after the rewrite.
       const res = await httpGet(DOMAIN, '/secretpath');
       expect(res.status).toBe(200);
       expect(res.body).toContain('/dns-query');

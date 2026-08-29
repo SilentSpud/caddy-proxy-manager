@@ -1,32 +1,19 @@
 #!/usr/bin/env bun
 /**
- * Enforces the suite's coverage ratchet against the lcov report that
- * `bun test --coverage` writes.
- *
- * Bun's own `coverageThreshold` is evaluated per file, so it can only express a
- * floor under the weakest module — not the floor under the suite as a whole
- * that this project ratchets on. The terminal reporter's "All files" row is no
- * substitute either: it averages the per-file percentages, so a hundred-line
- * module and a thousand-line one count the same. lcov carries the raw hit and
- * found counts, so the numbers below are weighted by size.
+ * Enforces the suite's coverage ratchet against the lcov report `bun test --coverage` writes.
+ * Bun's `coverageThreshold` is per file, and the reporter's "All files" row averages per-file
+ * percentages; lcov carries raw hit/found counts, so the numbers below are weighted by size.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * A ratchet, not an aspiration: these sit just under what the suite achieves
- * today, so a real drop fails the run while ordinary churn does not. Raise them
- * as coverage improves; do not lower them to make a build pass.
+ * A ratchet, not an aspiration: these sit just under what the suite achieves today. Raise them as
+ * coverage improves; never lower them to make a build pass.
  *
- * Rebaselined when the suite moved from Vitest to `bun test`. Bun reports only
- * the files a test actually loaded, and reports functions and lines (there is
- * no statement or branch metric), so these are not comparable to the istanbul
- * thresholds they replace.
- *
- * These assume the serial run that `bun run test:coverage` performs. Under
- * `--parallel` each worker only instruments the files it happened to load and
- * the merge loses some of that, so both the numerator and the denominator move
- * between runs — which is why the coverage script does not use it.
+ * Rebaselined for `bun test`, which reports only the files a test loaded and has no statement or
+ * branch metric — not comparable to the istanbul thresholds these replace. They assume the serial
+ * run `bun run test:coverage` performs; under `--parallel` both numerator and denominator move.
  */
 const THRESHOLDS = {
   lines: 58,

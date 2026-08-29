@@ -1,10 +1,7 @@
 /**
- * Regression: Coraza's SecAuditLog writes waf-audit.log directly with no
- * rotation of its own (unlike access.log/waf-rules.log, which go through
- * Caddy's file writer and roll automatically) — it grew to ~2GB in
- * production and was never cleaned up. parseNewWafLogEntries now truncates
- * the file in place once it has been fully ingested and crosses a size
- * threshold. These tests pin that behavior.
+ * Regression: Coraza's SecAuditLog writes waf-audit.log with no rotation of its own, and it grew to
+ * ~2GB in production. parseNewWafLogEntries now truncates it in place once fully ingested and past
+ * a size threshold; these pin that.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

@@ -1,21 +1,9 @@
 /**
- * Functional tests: WAF event ingestion (issue #233).
- *
- * waf-blocking.spec.ts proves Caddy/Coraza *blocks* attacks, but nothing
- * asserted that a block is ever *recorded*. That left the whole ingestion
- * pipeline — Coraza audit log → waf-log-parser → ClickHouse → /api/waf-events
- * → the WAF page — without any coverage, so it could break in production while
- * the entire suite stayed green. These tests close that gap.
- *
- * Scope note: the specific regression in #233 was that rule attribution came
- * from a join against waf-rules.log, which silently dropped an event whenever
- * the audit line and the rule line landed in different 30s parse ticks. Forcing
- * that race from the outside isn't practical, so it is pinned deterministically
- * in tests/unit/waf-log-parser.test.ts ("rule attribution from the audit entry
- * itself"). What these tests guarantee is the part unit tests cannot: that a
- * real Coraza audit log actually reaches the table with its rule populated.
- *
- * Domain: func-waf-ingest.test
+ * Functional: WAF event ingestion (#233). waf-blocking.spec.ts proves Coraza *blocks*; nothing
+ * asserted a block is *recorded*, leaving the whole pipeline (audit log → waf-log-parser →
+ * ClickHouse → /api/waf-events → the WAF page) uncovered. The tick-boundary race behind #233 is
+ * pinned in tests/unit/waf-log-parser.test.ts; these guarantee a real audit log reaches the table
+ * with its rule populated. Domain: func-waf-ingest.test
  */
 import { test, expect, type Page } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

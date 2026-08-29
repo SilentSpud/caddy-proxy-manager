@@ -32,9 +32,8 @@ export function encryptSecret(value: string): string {
 }
 
 /**
- * Legacy fallback is time-limited. After the migration grace period,
- * the legacy key is no longer tried, forcing re-encryption of old secrets.
- * Set LEGACY_KEY_CUTOFF_DATE env var to extend/disable (ISO 8601 date or "never").
+ * Legacy fallback is time-limited: after the grace period the legacy key is no longer tried,
+ * forcing re-encryption. LEGACY_KEY_CUTOFF_DATE extends or disables it (ISO 8601 or "never").
  */
 const LEGACY_KEY_CUTOFF_ENV = process.env.LEGACY_KEY_CUTOFF_DATE;
 const LEGACY_KEY_CUTOFF =

@@ -1,12 +1,6 @@
 /**
- * E2E tests: Disabled user enforcement.
- *
- * Verifies that disabling a user actually blocks them:
- *
- * 1. Disabled user's existing UI session is rejected (pages redirect to /login)
- * 2. Disabled user cannot log in with credentials
- * 3. Disabled user's API token returns 401
- * 4. Re-enabling the user restores access
+ * E2E: disabling a user blocks them — existing session redirects to /login, credential login
+ * fails, the API token returns 401 — and re-enabling restores access.
  */
 import { test, expect, type BrowserContext } from '@playwright/test';
 import * as seed from '../helpers/seed';

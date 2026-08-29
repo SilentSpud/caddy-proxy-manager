@@ -1,15 +1,9 @@
 /**
- * In-memory adapter for the Caddy admin seam (src/lib/caddy-admin.ts).
- *
- * Stands in for a real Caddy container: it accepts config loads, remembers the
- * last document it was given, and serves it back on GET /config/. That lets the
- * whole builder-and-apply path — buildCaddyDocument, applyCaddyConfig, the
- * health monitor's restart detection — run end to end in unit tests with no
- * server listening anywhere.
- *
- * Tests that only need the guard get one of these installed globally by
- * tests/setup.bun.ts. Tests that want to assert on what was sent, or to
- * simulate Caddy misbehaving, should create their own via `installFakeCaddy()`.
+ * In-memory adapter for the Caddy admin seam (src/lib/caddy-admin.ts). Accepts config loads,
+ * remembers the last document, and serves it back on GET /config/, so buildCaddyDocument,
+ * applyCaddyConfig and the health monitor run end to end with nothing listening.
+ * tests/setup.bun.ts installs one globally; tests that assert on what was sent make their own via
+ * installFakeCaddy().
  */
 import type {
   CaddyAdminRequest,

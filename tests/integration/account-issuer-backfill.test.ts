@@ -1,12 +1,7 @@
 /**
- * Migration 0024 adds better-auth 1.7's required `accounts.issuer` column and
- * backfills existing rows.
- *
- * The backfill is the risky half of that upgrade: if a row is given an issuer
- * that differs from the one better-auth computes for the same identity, nothing
- * errors — the account just stops matching at sign-in and the user is locked out
- * of an account they still nominally have. So the values are asserted against
- * better-auth's own helpers, not against literals copied from the SQL.
+ * Migration 0024 adds better-auth 1.7's required `accounts.issuer` column and backfills it. The
+ * backfill is the risky half: a wrong issuer errors nothing, the account just stops matching at
+ * sign-in. So values are asserted against better-auth's own helpers, not literals from the SQL.
  */
 import { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';

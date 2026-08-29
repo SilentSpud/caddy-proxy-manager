@@ -1,13 +1,8 @@
 /**
- * Applies an IdP's group claim to a CPM user: role assignment, and optionally
- * membership of CPM groups mirrored from the IdP.
- *
- * The claims are read during the OAuth callback (in the provider's
- * `mapProfileToUser`), but the user row may not exist yet at that moment and
- * the callback has no user id to hand us. So the mapping result is parked in a
- * short-lived registry keyed by provider + subject, and consumed once the
- * sign-in reaches session creation — by which point better-auth has created
- * both the user and the account row that ties the subject to the user id.
+ * Applies an IdP's group claim to a CPM user: role assignment, and optionally CPM group membership
+ * mirrored from the IdP. The claims are read in the OAuth callback's `mapProfileToUser`, which has
+ * no user id yet, so the result is parked in a short-lived registry keyed by provider + subject and
+ * consumed at session creation, once better-auth has written both the user and the account row.
  */
 
 import { and, eq } from "drizzle-orm";
@@ -148,8 +143,8 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
     added.push(group.name);
   }
 
-  // Only IdP-owned groups are reconciled: a group an operator created in the UI
-  // keeps whatever membership they gave it.
+  // Only IdP-owned groups are reconciled: a group an operator created in the UI keeps whatever
+  // membership they gave it.
   const removed: string[] = [];
   for (const membership of memberships) {
     const group = existingGroups.find((g) => g.id === membership.groupId);
@@ -180,9 +175,8 @@ export async function applyOidcSync(userId: number, entry: PendingOidcSync): Pro
 }
 
 /**
- * Called after better-auth creates a session. Finds the pending mapping that
- * belongs to this user by matching their linked accounts against the registry,
- * so concurrent sign-ins can never pick up each other's claims.
+ * Called after better-auth creates a session. Finds this user's pending mapping by matching their
+ * linked accounts against the registry, so concurrent sign-ins cannot pick up each other's claims.
  */
 export async function reconcileOidcUserAfterSignIn(userId: number): Promise<void> {
   if (pending.size === 0 || !Number.isFinite(userId)) return;

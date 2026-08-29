@@ -1,12 +1,7 @@
 /**
- * Whether user icons may fall back to Gravatar has two controls: the
- * AVATAR_GRAVATAR environment variable and a Settings toggle. The env variable
- * wins when set, so an operator can guarantee no browser reaches gravatar.com
- * regardless of what an admin clicks; otherwise the stored toggle decides, and
- * an untouched instance defaults to enabled.
- *
- * The toggle is a synced setting, so a slave inherits its master's choice
- * unless it has stored an override of its own.
+ * Gravatar fallback has two controls: AVATAR_GRAVATAR and a Settings toggle. The env var wins when
+ * set; otherwise the stored toggle decides, defaulting to enabled. The toggle is a synced setting,
+ * so a slave inherits its master's choice unless it stored an override.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -38,14 +33,9 @@ import { settings } from '../../src/lib/db/schema';
 import '../../src/lib/settings';
 
 /**
- * Applies the env stubs and re-points the config module at a freshly evaluated
- * copy of itself, so the stubs actually reach the code under test.
- *
- * isGravatarEnabled() reads its env-pinned value through a dynamic
- * import of ./config, and config snapshots process.env when it is first
- * evaluated. A query suffix gives a second, freshly evaluated copy, but it does
- * not propagate to importers — so the plain specifier is mocked to point at
- * that copy, which is what settings.ts resolves.
+ * Applies the env stubs and re-points the config module at a freshly evaluated copy, so the stubs
+ * reach the code under test. config snapshots process.env on first evaluation; a query suffix gives
+ * a fresh copy but does not propagate to importers, so the plain specifier is mocked to point at it.
  */
 async function load(env: Record<string, string | undefined> = {}) {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);

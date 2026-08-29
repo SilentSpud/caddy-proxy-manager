@@ -1,14 +1,8 @@
 /**
- * Regression: L4 geoblockMode (override / merge) must round-trip through
- * createL4ProxyHost and updateL4ProxyHost.
- *
- * Bug A: `parseL4GeoBlockConfig` returned `geoblock_mode` (snake_case),
- * but L4ProxyHostInput uses `geoblockMode`, so the spread silently dropped
- * the field.
- *
- * Bug B: `updateL4ProxyHost` gated its meta-update branch on
- * `input.meta / loadBalancer / dnsResolver / upstreamDnsResolution`,
- * omitting geoblock — so updates that only changed geoblock were no-ops.
+ * Regression: L4 geoblockMode must round-trip through createL4ProxyHost and updateL4ProxyHost.
+ * `parseL4GeoBlockConfig` returned `geoblock_mode` while L4ProxyHostInput uses `geoblockMode`, so
+ * the spread dropped it; and `updateL4ProxyHost` gated its meta-update branch on other fields only,
+ * so geoblock-only updates were no-ops.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

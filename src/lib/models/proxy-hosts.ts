@@ -8,15 +8,12 @@ import { type GeoBlockSettings, getDnsProviderSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 
 /**
- * Wildcard certificates (e.g. "*.example.com") can only be issued via the ACME
- * DNS-01 challenge — HTTP-01/TLS-ALPN-01 cannot satisfy a wildcard. When a host
- * carries a wildcard domain and relies on auto-managed TLS (no certificate
- * assigned), Caddy will silently fail to obtain a certificate unless a DNS
- * provider is configured. Block that misconfiguration up front with a clear error.
+ * Wildcard certificates can only be issued via ACME DNS-01, so a wildcard host on auto-managed TLS
+ * silently fails to get a certificate without a DNS provider. Block that up front.
  */
 export async function assertWildcardIssuable(domains: string[], certificateId: number | null) {
-  // An explicitly assigned certificate (imported, or managed with its own
-  // provider) is the admin's responsibility — only guard the auto-managed path.
+  // An explicitly assigned certificate (imported, or managed with its own provider) is the
+  // admin's responsibility — only guard the auto-managed path.
   if (certificateId != null) {
     return;
   }
@@ -36,9 +33,9 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
   }
 }
 
-// Security: Only the protocol scheme is validated (http/https). Host/IP targets are
-// not restricted — admins intentionally need to proxy to internal services.
-// The Caddy admin API (port 2019) is protected by origins checking, not network isolation.
+// Security: only the protocol scheme is validated (http/https). Host/IP targets are not
+// restricted — admins intentionally need to proxy to internal services, and the Caddy admin
+// API (port 2019) is protected by origins checking, not network isolation.
 function validateUpstreamProtocol(upstream: string): void {
   const trimmed = upstream.trim();
   if (!trimmed) return;
@@ -98,8 +95,8 @@ export type LocationRuleInput = {
   loadBalancer?: LoadBalancerInput | null;
 };
 
-// Stored (meta JSON) shape of a location rule. The load balancer is held in the
-// same snake_case meta shape used for the host-level load balancer.
+// Stored (meta JSON) shape of a location rule. The load balancer uses the same snake_case meta
+// shape as the host-level one.
 export type LocationRuleMeta = {
   path: string;
   upstreams: string[];
@@ -120,8 +117,8 @@ export type PathRewriteRule = {
   to: string; // internal target URI, e.g. "/dns-query"
 };
 
-// Suggested status codes for the error-page UI. Any 4xx/5xx code is accepted by
-// the sanitizer; this list only drives the picker.
+// Suggested status codes for the error-page UI. The sanitizer accepts any 4xx/5xx code; this
+// list only drives the picker.
 export const ERROR_PAGE_STATUS_CODES = [400, 401, 403, 404, 408, 429, 500, 502, 503, 504] as const;
 
 export type ErrorPageRule = {
@@ -384,10 +381,9 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
     }
   }
 
-  // Reject enabling mTLS with no trust material at all. Such a config would
-  // otherwise fail open (no client_authentication block is emitted for the
-  // host). Note this cannot catch a role that is later emptied via revocation —
-  // the config still references a valid role — which is why Caddy config
+  // Reject enabling mTLS with no trust material at all: such a config would fail open, since no
+  // client_authentication block is emitted for the host. This cannot catch a role later emptied
+  // by revocation — the config still references a valid role — which is why Caddy config
   // generation also fails closed for the zero-resolved-trust case.
   if (
     !normalized.trusted_client_cert_ids &&
@@ -424,10 +420,8 @@ type ProxyHostMeta = {
   custom_reverse_proxy_json?: string;
   custom_pre_handlers_json?: string;
   /**
-   * Raw Caddyfile directives for this host, adapted to JSON handlers at
-   * config-build time. Stored as written so the operator gets their own text
-   * back when they reopen the dialog — the adapted JSON is a build artefact,
-   * not the source of truth.
+   * Raw Caddyfile directives, adapted to JSON handlers at config-build time. Stored as written so
+   * the operator gets their own text back; the adapted JSON is a build artefact.
    */
   custom_caddyfile?: string;
   authentik?: ProxyHostAuthentikMeta;
@@ -1047,8 +1041,8 @@ export function sanitizeErrorPageRules(value: unknown): ErrorPageRule[] {
   return valid;
 }
 
-// Extract a validated { path, upstreams } pair from a raw location-rule item,
-// or null if it is malformed. Shared by the meta and input sanitizers below.
+// Extract a validated { path, upstreams } pair from a raw location-rule item, or null if it is
+// malformed. Shared by the meta and input sanitizers below.
 function parseLocationRuleBase(item: unknown): { path: string; upstreams: string[] } | null {
   if (
     item &&
@@ -1084,8 +1078,8 @@ function sanitizeLocationRuleMetas(value: unknown): LocationRuleMeta[] {
   return valid;
 }
 
-// Normalize location rules supplied as input (camelCase loadBalancer) into the
-// stored meta shape, reusing the host-level load-balancer input normalizer.
+// Normalize location rules supplied as input (camelCase loadBalancer) into the stored meta
+// shape, reusing the host-level load-balancer input normalizer.
 function normalizeLocationRulesInput(value: unknown): LocationRuleMeta[] {
   if (!Array.isArray(value)) return [];
   const valid: LocationRuleMeta[] = [];
@@ -1110,8 +1104,8 @@ function hydrateLocationRules(metaRules: LocationRuleMeta[] | undefined): Locati
   }));
 }
 
-// Convert hydrated location rules back to the stored meta shape. Used when
-// reconstructing existing meta during an update.
+// Convert hydrated location rules back to the stored meta shape, when reconstructing existing
+// meta during an update.
 function dehydrateLocationRules(rules: LocationRule[]): LocationRuleMeta[] {
   return rules.map((rule) => {
     const meta: LocationRuleMeta = { path: rule.path, upstreams: rule.upstreams };
@@ -2174,13 +2168,9 @@ export async function listProxyHostsPaginated(
 }
 
 /**
- * Reject a Caddyfile snippet the running Caddy cannot adapt.
- *
- * Enforced in the model rather than in the server action so the REST API is
- * held to the same rule. Storing a snippet that fails to adapt would not break
- * the host on its own — the config builder skips it with a warning — but it
- * would quietly stop doing whatever the operator wrote it to do, which is the
- * worst way for a proxy rule to fail.
+ * Reject a Caddyfile snippet the running Caddy cannot adapt. Enforced in the model, not the server
+ * action, so the REST API is held to the same rule: an unadaptable snippet would not break the
+ * host (the builder skips it with a warning) but would quietly stop doing what it was written for.
  */
 async function assertCaddyfileAdapts(snippet: string | null | undefined): Promise<void> {
   if (!snippet?.trim()) return;

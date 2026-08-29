@@ -1,14 +1,7 @@
 /**
- * PUT /api/v1/caddy/modules must be held to the same rules as the Settings UI.
- *
- * The REST API is a second write path into the module selection, and a guard
- * that only exists in a server action is not a guard — it is a suggestion. Two
- * things in particular have to hold here, because getting either wrong takes
- * the proxy down rather than merely misconfiguring it:
- *
- *   - a selection that disables a module something still uses is refused, and
- *   - a selection that is accepted regenerates the Caddy config, so the stored
- *     config stops naming a module that is on its way out of the binary.
+ * PUT /api/v1/caddy/modules is a second write path into the module selection, so it must be held to
+ * the Settings UI's rules: a selection disabling a module something still uses is refused, and an
+ * accepted one regenerates the Caddy config. Getting either wrong takes the proxy down.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

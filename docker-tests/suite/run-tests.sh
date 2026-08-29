@@ -4,9 +4,8 @@
 #   /suite/run-tests.sh              run everything
 #   /suite/run-tests.sh mtls l4      run only files whose name matches a pattern
 #
-# Each test file runs in its own bash process so a crash or a `set -e` abort
-# takes down only that file. Results are accumulated in a TSV and summarised at
-# the end; the exit status is non-zero if any assertion failed.
+# Each test file runs in its own bash process, so a crash takes down only that file. Results
+# accumulate in a TSV; the exit status is non-zero if any assertion failed.
 set -uo pipefail
 
 SUITE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

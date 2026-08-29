@@ -1,9 +1,6 @@
 /**
- * Integration tests for L4 Caddy config generation.
- *
- * Verifies that the data stored in l4_proxy_hosts can be used to produce
- * correct caddy-l4 JSON config structures. Tests the config shape that
- * buildL4Servers() would produce by reconstructing it from DB rows.
+ * Integration: L4 Caddy config generation — the data in l4_proxy_hosts produces the caddy-l4 JSON
+ * shape buildL4Servers() would, reconstructed here from DB rows.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';

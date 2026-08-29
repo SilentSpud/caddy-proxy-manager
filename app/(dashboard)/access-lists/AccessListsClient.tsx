@@ -409,9 +409,8 @@ function SettingsTab({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Switching to a different list that happens to share a name and description
-  // must still reset the form and clear the confirm field, so the effect keys on
-  // the id as well even though it does not read it.
+  // Switching to a different list that happens to share a name and description must still reset
+  // the form and clear the confirm field, so the effect keys on the id as well.
   // biome-ignore lint/correctness/useExhaustiveDependencies: list.id is deliberate
   useEffect(() => {
     setName(list.name);
@@ -987,9 +986,8 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
     [router],
   );
 
-  // Keyboard shortcuts: ⌘K focuses search, N creates. Both were previously
-  // wired to a raw input ref; the search box is a component now, so the
-  // shortcut focuses the input inside its wrapper.
+  // Keyboard shortcuts: ⌘K focuses search, N creates. Both were wired to a raw input ref; the
+  // search box is a component now, so the shortcut focuses the input inside its wrapper.
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {

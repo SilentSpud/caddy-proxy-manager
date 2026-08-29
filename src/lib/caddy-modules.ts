@@ -1,31 +1,18 @@
 /**
  * The catalog of Caddy modules this app knows how to drive.
  *
- * Caddy is a single static binary: a plugin either was compiled into the image
- * by xcaddy or it does not exist at runtime. That makes the module list a
- * *build* input, and it makes every feature built on top of a plugin
- * conditional on that build. This module is the one place that records the
- * relationship, so three otherwise-disconnected concerns stay in agreement:
- *
- *   1. `docker/caddy/Dockerfile` — what gets compiled in (via CADDY_MODULES).
- *   2. `src/lib/caddy.ts` — which handlers may appear in the generated config.
- *      Emitting a handler for a plugin that is not in the binary makes Caddy
- *      reject the *entire* config, taking every unrelated host down with it.
- *   3. The Settings UI — which controls are live, and which are greyed out
- *      with a note naming the module the operator has to turn back on.
- *
- * DNS provider modules are derived from DNS_PROVIDERS rather than restated,
- * because a provider's credentials form and its Go module path are the same
- * fact viewed from two sides.
+ * Caddy is one static binary: a plugin was either compiled in by xcaddy or does not exist. This is
+ * the one place recording that, so three concerns agree — `docker/caddy/Dockerfile` (what gets
+ * compiled), `src/lib/caddy.ts` (which handlers may be emitted; naming an absent module makes Caddy
+ * reject the *entire* config), and the Settings UI (which controls are live). DNS provider modules
+ * derive from DNS_PROVIDERS: the credentials form and the Go module path are the same fact.
  */
 
 import { DNS_PROVIDERS } from "./dns-providers";
 
 /**
- * A capability the rest of the app can ask about. Features are what UI and
- * config generation gate on; modules are what the operator toggles. The
- * indirection matters because a feature can outlive the module that first
- * provided it, and because one module can power several features.
+ * A capability the rest of the app can ask about. Features are what UI and config generation gate
+ * on, modules are what the operator toggles — one module can power several features.
  */
 export type CaddyFeatureId =
   | "l4"
@@ -49,8 +36,8 @@ export type CaddyModuleDefinition = {
   /** Features that stop working when this module is not compiled in. */
   features: CaddyFeatureId[];
   /**
-   * DNS provider name (DnsProviderDefinition.name) for provider modules, so
-   * the DNS Providers UI can find the module backing each entry.
+   * DNS provider name (DnsProviderDefinition.name) for provider modules, so the DNS Providers
+   * UI can find the module backing each entry.
    */
   dnsProvider?: string;
 };
@@ -121,11 +108,8 @@ export function modulesForFeature(feature: CaddyFeatureId): CaddyModuleDefinitio
 }
 
 /**
- * The module list the shipped image is built with when nothing is configured.
- *
- * Everything is on by default so an existing install keeps behaving exactly as
- * it did before this setting existed — an upgrade must not silently drop a
- * plugin someone's hosts depend on.
+ * The module list the shipped image is built with when nothing is configured. Everything is on by
+ * default, so an upgrade never silently drops a plugin someone's hosts need.
  */
 export const DEFAULT_ENABLED_MODULE_IDS: string[] = CADDY_MODULES.map((m) => m.id);
 
@@ -140,11 +124,9 @@ export type CaddyCustomModule = {
 };
 
 /**
- * Go module paths are pasted from README files, so they arrive with schemes,
- * trailing slashes, and stray whitespace. They also land verbatim in a shell
- * command inside the Dockerfile, so anything outside this character set is
- * rejected rather than escaped — an allowlist is the only version of this that
- * stays correct when the Dockerfile's quoting changes.
+ * Go module paths are pasted from READMEs, so they arrive with schemes, slashes and whitespace,
+ * and they land verbatim in a shell command in the Dockerfile. An allowlist is the only form of
+ * this that stays correct when the Dockerfile's quoting changes.
  */
 const MODULE_PATH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._~/-]*[a-zA-Z0-9]$/;
 const VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._+-]*$/;
@@ -157,8 +139,8 @@ export function normalizeModulePath(raw: string): string {
 }
 
 /**
- * Validate a custom module entry, returning an error message or null.
- * Exported so the server action and the REST API reject the same inputs.
+ * Validate a custom module entry, returning an error message or null. Exported so the server
+ * action and the REST API reject the same inputs.
  */
 export function validateCustomModule(entry: CaddyCustomModule): string | null {
   const path = normalizeModulePath(entry.modulePath);

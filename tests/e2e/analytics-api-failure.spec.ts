@@ -1,17 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Regression tests for analytics page resilience when the API misbehaves.
- *
- * The analytics endpoints answer failures with `{ error: "…" }` and a 5xx
- * status. The client used to call `response.json()` without checking
- * `response.ok`, so that error object landed in array-typed state and the first
- * `allHosts.some(...)` / `timeline.map(...)` threw during render. React
- * unmounted the entire page — the user saw a blank Analytics screen with no map
- * and no explanation. A single unreachable ClickHouse was enough to trigger it.
- *
- * Routes are stubbed here rather than stopping the ClickHouse container so the
- * failure modes are exact and the shared test stack stays untouched.
+ * Analytics page resilience when the API misbehaves. The endpoints answer failures with
+ * `{ error: "…" }` and a 5xx; calling `response.json()` without checking `response.ok` landed that
+ * object in array-typed state and the first `.map()` threw, blanking the page. Routes are stubbed
+ * rather than stopping ClickHouse, so the shared stack stays untouched.
  */
 
 const ANALYTICS_API = '**/api/analytics/**';

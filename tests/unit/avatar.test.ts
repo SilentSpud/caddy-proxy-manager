@@ -1,9 +1,7 @@
 /**
- * User icon resolution: a user's own icon, then their Gravatar, then their
- * initial. The interesting rule is which addresses get a Gravatar at all —
- * locally created accounts carry a synthetic `<username>@localhost` address, and
- * hashing one would leak the username to Gravatar for an avatar that cannot
- * exist.
+ * User icon resolution: own icon, then Gravatar, then initial. The interesting rule is which
+ * addresses get a Gravatar at all — a locally created `<username>@localhost` would leak the
+ * username for an avatar that cannot exist.
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'bun:test';

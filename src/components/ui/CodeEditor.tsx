@@ -1,26 +1,9 @@
 "use client";
 
 /**
- * A Monaco-backed replacement for TextArea on fields that hold code.
- *
- * Every configuration field in this app that people get wrong is a code field:
- * a JSON handler array with a trailing comma, a Caddyfile snippet with an
- * unbalanced brace, a SecLang directive split across lines. A textarea gives no
- * signal until the save fails; Monaco gives bracket matching, folding, and — for
- * JSON — inline parse errors as you type.
- *
- * Two properties of the surrounding code shaped this:
- *
- *   * Forms here submit through React 19 server actions, reading values out of
- *     the DOM by `name`. Monaco has no form-associated element, so the value is
- *     carried in a hidden input the same way FormBooleanControls does it. That
- *     also means the submitted value always matches React state, not whatever
- *     the DOM happens to hold after a form reset.
- *
- *   * Monaco loads lazily and can fail (no JS yet, an old browser, a chunk that
- *     404s behind a strict proxy). Until it is ready — or forever, if it never
- *     is — a real TextArea is rendered instead. The field stays editable in
- *     every case; only the highlighting is conditional.
+ * A Monaco-backed replacement for TextArea on code fields: bracket matching, folding and inline
+ * JSON errors. Monaco has no form-associated element, so the value rides in a hidden input (as
+ * FormBooleanControls does); a real TextArea renders until it loads, or forever if it never does.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -29,8 +12,8 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack, HStack } from "@astryxdesign/core/Stack";
 import { CADDYFILE_LANGUAGE_ID, type Monaco, loadMonaco } from "./monaco-setup";
-// Type-only, so it is erased at build time and pulls none of Monaco into
-// this chunk — see monaco-setup.ts for why that matters.
+// Type-only, so it is erased at build time and pulls none of Monaco into this chunk — see
+// monaco-setup.ts for why that matters.
 import type { editor } from "monaco-editor";
 
 export type CodeEditorLanguage = "json" | "caddyfile" | "dockerfile" | "html" | "ini" | "plaintext";
@@ -72,21 +55,19 @@ export function CodeEditor({
   const monacoRef = useRef<Monaco | null>(null);
   const [ready, setReady] = useState(false);
 
-  // The latest onChange without making it an effect dependency — a parent that
-  // passes an inline arrow (most of them do) would otherwise tear down and
-  // recreate the editor on every keystroke, losing cursor and undo history.
+  // The latest onChange without making it an effect dependency — a parent passing an inline
+  // arrow (most do) would otherwise tear down and recreate the editor on every keystroke,
+  // losing cursor and undo history.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // Same idea for the incoming value: the create-effect needs the current text
-  // once, at mount, without re-running whenever it changes.
+  // Same idea for the incoming value: the create-effect needs the current text once, at mount.
   const valueRef = useRef(value);
   valueRef.current = value;
 
-  // Monaco's theme is global to the module, so it is applied at creation and
-  // then again whenever the app theme changes. Read through a ref here so the
-  // create-effect does not re-run — and therefore rebuild the editor — every
-  // time someone flips light/dark.
+  // Monaco's theme is global to the module, so it is applied at creation and again whenever the
+  // app theme changes. Read through a ref so the create-effect does not re-run — and rebuild the
+  // editor — every time someone flips light/dark.
   const monacoTheme = mode === "dark" ? "vs-dark" : "vs";
   const monacoThemeRef = useRef(monacoTheme);
   monacoThemeRef.current = monacoTheme;
@@ -107,8 +88,8 @@ export function CodeEditor({
         language: language === "caddyfile" ? CADDYFILE_LANGUAGE_ID : language,
         automaticLayout: true,
         minimap: { enabled: false },
-        // Config snippets are short; a scrollbar that only appears when needed
-        // reads better than a permanently reserved gutter.
+        // Config snippets are short; a scrollbar that appears only when needed reads better than
+        // a permanently reserved gutter.
         scrollBeyondLastLine: false,
         lineNumbers: "on",
         renderLineHighlight: "none",
@@ -117,21 +98,19 @@ export function CodeEditor({
         wordWrap: "on",
         readOnly,
         theme: monacoThemeRef.current,
-        // Monaco renders its own hidden textarea, which a screen reader
-        // otherwise announces as the generic "Editor content". The visible
-        // label above is a styled Text node, not a <label>, so it cannot carry
-        // the association — this is the only thing naming the field once the
-        // TextArea fallback is gone.
+        // Monaco renders its own hidden textarea, which a screen reader otherwise announces as
+        // the generic "Editor content". The visible label above is a styled Text node, not a
+        // <label>, so this is the only thing naming the field once the TextArea fallback is gone.
         ariaLabel: label,
-        // Without this the editor keeps its own scroll position glued to the
-        // page scroll on long settings pages, which feels broken.
+        // Without this the editor glues its own scroll position to the page scroll on long
+        // settings pages, which feels broken.
         scrollbar: { alwaysConsumeMouseWheel: false },
       });
 
       created.onDidChangeModelContent(() => {
         const next = created?.getValue() ?? "";
-        // Guard against echoing back the value we were just handed — otherwise
-        // a controlled parent and the editor ping-pong on every render.
+        // Guard against echoing back the value we were just handed — otherwise a controlled
+        // parent and the editor ping-pong on every render.
         if (next === valueRef.current) return;
         valueRef.current = next;
         onChangeRef.current?.(next);
@@ -150,9 +129,9 @@ export function CodeEditor({
     };
   }, [language, readOnly, label]);
 
-  // External value changes (a form reset, loading a different record) have to
-  // reach the model, but only when they genuinely differ — setValue moves the
-  // cursor to the end, so doing it on every render would make typing unusable.
+  // External value changes (a form reset, loading a different record) must reach the model, but
+  // only when they genuinely differ — setValue moves the cursor to the end, so doing it on every
+  // render would make typing unusable.
   useEffect(() => {
     const instance = editorRef.current;
     if (!instance) return;

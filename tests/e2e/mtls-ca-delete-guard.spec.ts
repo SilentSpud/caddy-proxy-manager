@@ -60,12 +60,9 @@ function makeClientCert(ca: ReturnType<typeof makeCa>, commonName: string) {
 }
 
 /**
- * Regression: a CA must not be deletable while a proxy host trusts one of its
- * issued client certificates. The original guard in deleteCaCertificate only
- * checked the deprecated `mtls.ca_certificate_ids` field, so a CA referenced
- * via the current `trusted_client_cert_ids` model could be deleted out from
- * under a live mTLS host (silently breaking it). This e2e exercises the real
- * DELETE /api/v1/ca-certificates/:id path end-to-end.
+ * Regression: a CA must not be deletable while a proxy host trusts one of its issued certs. The
+ * original guard checked only the deprecated `mtls.ca_certificate_ids`, so a CA referenced via
+ * `trusted_client_cert_ids` could be deleted from under a live host. Exercises the real DELETE.
  */
 test.describe('mTLS — CA delete guard (in-use protection)', () => {
   // RSA keygen via node-forge is CPU-heavy; give the test room.

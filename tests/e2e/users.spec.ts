@@ -1,9 +1,4 @@
-/**
- * E2E tests: Users management page.
- *
- * Verifies user listing, search, edit, disable/enable, delete, and create functionality.
- * Runs as admin (testadmin) — the page requires admin role.
- */
+/** E2E: Users page — listing, search, edit, disable/enable, delete, create. Runs as admin. */
 import { test, expect } from '@playwright/test';
 import { getUserRecord } from '../helpers/seed';
 

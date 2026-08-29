@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
-# Mints the fixed PKI the rig needs before anything else can start.
-#
-#   pebble-ca.*    a CA whose only job is to sign Pebble's ACME endpoint. Caddy
-#                  is told to trust it via the acme.caRootPem setting, which is
-#                  what makes ACME-over-HTTPS work with no public trust anchor.
-#   pebble.*       Pebble's server certificate. Must be valid for the name Caddy
-#                  dials (pebble) — Pebble's own bundled cert is localhost-only.
-#   origin-tls.*   a self-signed cert for the HTTPS origin, issued for a name it
-#                  is deliberately NOT reachable under, so upstream hostname
-#                  verification fails unless a host opts out of it.
-#
+# Mints the fixed PKI the rig needs before anything else starts:
+#   pebble-ca.*    signs Pebble's ACME endpoint; Caddy trusts it via acme.caRootPem
+#   pebble.*       Pebble's server cert, valid for the name Caddy dials (its own is localhost-only)
+#   origin-tls.*   self-signed cert for the HTTPS origin, issued for a name it is NOT reachable
+#                  under, so upstream hostname verification fails unless a host opts out
 # Output lands in a named volume, so this is a no-op on repeat runs.
 set -euo pipefail
 

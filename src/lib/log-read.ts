@@ -1,17 +1,9 @@
 import { createReadStream } from "node:fs";
 
 /**
- * Read complete (newline-terminated) lines from `file` starting at `startOffset`.
- *
- * The returned offset only advances past the last newline, so a line still
- * being written when we read (the file ends mid-line) is left intact and
- * re-read on the next pass instead of being split into invalid fragments and
- * lost. Counting `byteLength(line) + 1` per emitted line instead would push the
- * offset past the partial record, and the remainder would then be re-read as a
- * fragment that fails to parse — silently dropping that event.
- *
- * A missing or unreadable file resolves to zero lines and an unchanged offset
- * so callers can treat it as "nothing new yet".
+ * Read complete (newline-terminated) lines from `file` starting at `startOffset`. The offset only
+ * advances past the last newline, so a line still being written is left intact and re-read next
+ * pass rather than split into a fragment that fails to parse. A missing file yields zero lines.
  */
 export async function readLines(
   startOffset: number,
@@ -33,8 +25,7 @@ export async function readLines(
       const buf = pending.length ? Buffer.concat([pending, chunk]) : chunk;
       let start = 0;
       let nl: number;
-      // Hoisting the search out of the condition would mean calling indexOf twice
-      // per iteration, once before the loop and once at the end of the body.
+      // Hoisting the search out of the condition would mean calling indexOf twice per iteration.
       // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic buffer walk
       while ((nl = buf.indexOf(0x0a, start)) !== -1) {
         const line = buf.subarray(start, nl).toString("utf8").trim();

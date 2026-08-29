@@ -5,12 +5,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * maplibre-gl v6 loads its tile worker from a separate ES module whose runtime
- * `import.meta.url` lookup does not survive bundling, so WorldMapInner imports
- * that worker with Vite's `?worker&url` and hands the emitted chunk to
- * setWorkerUrl(). These tests fail loudly if a maplibre-gl upgrade renames the
- * worker entry, or if the config that combination depends on drifts — either
- * would otherwise only surface as a blank map.
+ * WorldMapInner imports maplibre-gl's tile worker with Vite's `?worker&url` and hands the emitted
+ * chunk to setWorkerUrl(), because the worker's own `import.meta.url` lookup does not survive
+ * bundling. These fail loudly if an upgrade renames the worker entry — otherwise a blank map.
  */
 
 const require = createRequire(import.meta.url);

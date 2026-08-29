@@ -1,19 +1,9 @@
 "use client";
 
 /**
- * The module picker for the Caddy image.
- *
- * Two things happen on this panel and they are deliberately kept apart:
- *
- *   Save    — records which plugins the operator wants. Takes effect for config
- *             generation straight away (a module switched off stops producing
- *             handlers immediately) but does not touch the running container.
- *   Rebuild — recompiles Caddy with that selection and recreates the container.
- *             Minutes long, and the proxy restarts at the end of it.
- *
- * Collapsing them into one button would mean every stray toggle triggered a
- * multi-minute recompile and a restart of the live proxy, so the rebuild stays
- * an explicit, separately-confirmed act.
+ * The module picker for the Caddy image. Save records the selection (config generation honours it
+ * immediately); Rebuild recompiles Caddy and recreates the container, which takes minutes and
+ * restarts the proxy — hence two separate, separately-confirmed buttons.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -91,9 +81,8 @@ export function CaddyBuildFields({
     }
     return resolved;
   });
-  // Rows carry a client-only id because they have no server identity until
-  // they are saved, and reordering or deleting by array index makes React
-  // recycle inputs into the wrong row mid-edit.
+  // Rows carry a client-only id because they have no server identity until saved, and reordering
+  // or deleting by array index makes React recycle inputs into the wrong row mid-edit.
   const [customModules, setCustomModules] = useState<CustomModuleRow[]>(() =>
     initialCustomModules.map((entry) => ({ ...entry, uid: nextRowId() })),
   );
@@ -115,8 +104,8 @@ export function CaddyBuildFields({
     void fetchStatus();
   }, [fetchStatus]);
 
-  // Poll only while the sidecar is working. A build takes minutes, so a slower
-  // interval than the L4 banner's keeps the request count sane.
+  // Poll only while the sidecar is working. A build takes minutes, so a slower interval than the
+  // L4 banner's keeps the request count sane.
   const inFlight = build?.status.state === "pending" || build?.status.state === "building";
   useEffect(() => {
     if (!inFlight) return;
@@ -130,8 +119,8 @@ export function CaddyBuildFields({
     [modules, customModules],
   );
 
-  // Previewed from the same field list the server builds from, so what is shown
-  // is what the rebuild will actually pass to xcaddy.
+  // Previewed from the same field list the server builds from, so what is shown is what the
+  // rebuild will actually pass to xcaddy.
   const previewSpecs = useMemo(() => {
     const builtIn = CADDY_MODULES.filter((m) => modules[m.id]).map((m) => m.modulePath);
     const custom = customModules
@@ -160,11 +149,10 @@ export function CaddyBuildFields({
     try {
       const res = await fetch("/api/caddy-build", { method: "POST" });
       if (!res.ok) {
-        // Deliberately not left to the status poll. The failures that land here
-        // — an invalid custom module, Caddy unreachable, an expired session —
-        // all abort before the sidecar writes any status at all, and the poll
-        // only runs while the status says pending/building. Without this the
-        // spinner just stops and the button looks broken.
+        // Deliberately not left to the status poll. The failures that land here — an invalid
+        // custom module, Caddy unreachable, an expired session — all abort before the sidecar
+        // writes any status, and the poll only runs while the status says pending/building.
+        // Without this the spinner just stops and the button looks broken.
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setRebuildError(body?.error ?? `Rebuild could not be started (HTTP ${res.status}).`);
         return;

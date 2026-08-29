@@ -1,11 +1,6 @@
 /**
- * Functional tests: WAF (Web Application Firewall) blocking.
- *
- * Creates a proxy host with per-host WAF enabled (OWASP CRS, blocking mode)
- * and verifies Caddy/Coraza blocks known attack payloads while passing
- * legitimate traffic through to the echo server.
- *
- * Domain: func-waf.test
+ * Functional: per-host WAF (OWASP CRS, blocking mode) blocks known attack payloads while passing
+ * legitimate traffic to the echo server. Domain: func-waf.test
  */
 import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';

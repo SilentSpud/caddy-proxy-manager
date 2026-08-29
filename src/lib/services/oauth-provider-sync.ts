@@ -6,9 +6,8 @@ import {
 } from "../models/oauth-providers";
 
 /**
- * Sync OAUTH_* environment variables into the oauthProviders table.
- * Env-sourced providers are created with source="env" and are read-only in the UI.
- * Call this once at server startup.
+ * Sync OAUTH_* environment variables into the oauthProviders table. Env-sourced providers get
+ * source="env" and are read-only in the UI. Call once at server startup.
  */
 export async function syncEnvOAuthProviders(): Promise<void> {
   if (!config.oauth.enabled || !config.oauth.clientId || !config.oauth.clientSecret) {

@@ -1,9 +1,4 @@
-/**
- * E2E tests: API Docs page (OpenAPI / Swagger UI).
- *
- * Verifies the page loads and Swagger UI renders the OpenAPI spec.
- * The page requires admin role.
- */
+/** E2E: API Docs page — the page loads and Swagger UI renders the OpenAPI spec. Admin only. */
 import { test, expect } from '@playwright/test';
 
 test.describe('API Docs page', () => {

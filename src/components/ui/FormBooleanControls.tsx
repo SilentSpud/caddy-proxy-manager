@@ -1,26 +1,11 @@
 "use client";
 
 /**
- * Form-safe wrappers around the design system's boolean controls.
- *
- * React 19 automatically resets a `<form action={serverAction}>` once the
- * action completes. A reset restores every control to its *attribute* default,
- * and a Switch/CheckboxInput that the user toggled has a DOM `checked`
- * property that has diverged from that attribute — React only sets the
- * property. The control therefore silently snaps back to the server-rendered
- * value while React state still holds the user's choice, and the next submit
- * sends the stale value.
- *
- * Concretely: enable geoblocking, save, then save again without touching
- * anything, and geoblocking is written back as disabled.
- *
- * These wrappers take the value out of the checkbox's DOM state and carry it
- * in a hidden input rendered from React state instead, so what gets submitted
- * always matches what the user sees. `input[type="hidden"]` is `display: none`
- * per the UA stylesheet, so the extra node never affects layout.
- *
- * Import these instead of the design system's own Switch/CheckboxInput
- * anywhere the control participates in a form via `htmlName`.
+ * Form-safe wrappers around the design system's boolean controls. React 19 resets a
+ * `<form action={serverAction}>` after the action, restoring each control to its *attribute*
+ * default — so a toggled Switch snaps back while React state keeps the user's choice, and the next
+ * submit sends the stale value. These carry the value in a hidden input rendered from React state.
+ * Use them wherever a control participates in a form via `htmlName`.
  */
 
 import { CheckboxInput as BaseCheckboxInput } from "@astryxdesign/core/CheckboxInput";
@@ -34,9 +19,8 @@ function booleanFormValue(value: boolean | "indeterminate"): string {
 }
 
 export function Switch({ htmlName, ...props }: SwitchProps) {
-  // A disabled control must not submit — the base components enforce this with
-  // `name={isDisabled ? undefined : htmlName}`, so the hidden input has to
-  // honour it too, or a disabled toggle starts contributing its state.
+  // A disabled control must not submit — the base components enforce that with
+  // `name={isDisabled ? undefined : htmlName}`, so the hidden input has to honour it too.
   if (!htmlName || props.isDisabled) return <BaseSwitch {...props} />;
   return (
     <>

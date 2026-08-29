@@ -24,9 +24,8 @@ export type AvatarSettings = {
 
 export type PasswordPolicySettings = {
   /**
-   * Force a password reset at next sign-in for anyone whose stored hash is still
-   * bcrypt. Changing the password rehashes it with argon2id, so this is how a
-   * deployment finishes migrating off the old algorithm.
+   * Force a password reset at next sign-in for anyone still on a bcrypt hash. Changing the
+   * password rehashes with argon2id, which is how a deployment finishes migrating off it.
    */
   requireChangeOnLegacyHash: boolean;
 };
@@ -55,18 +54,18 @@ export type LoggingSettings = {
 };
 
 export type TrustedProxiesSettings = {
-  // Proxy ranges to trust for X-Forwarded-For / client IP resolution at the
-  // server level (Caddy `trusted_proxies`). Accepts CIDRs, bare IPs, and the
-  // "private_ranges" shorthand. Empty = feature disabled (current behaviour).
+  // Proxy ranges to trust for X-Forwarded-For / client IP resolution at the server level
+  // (Caddy `trusted_proxies`). Accepts CIDRs, bare IPs, and the "private_ranges" shorthand.
+  // Empty = disabled (current behaviour).
   ranges: string[];
-  // Headers Caddy reads the real client IP from (Caddy `client_ip_headers`).
-  // Empty = Caddy default of X-Forwarded-For. Useful for e.g. Cf-Connecting-Ip.
+  // Headers Caddy reads the real client IP from (Caddy `client_ip_headers`). Empty = Caddy's
+  // X-Forwarded-For default; useful for e.g. Cf-Connecting-Ip.
   client_ip_headers?: string[];
-  // Only trust client_ip_headers from the configured proxies, rejecting
-  // spoofed values from untrusted peers (Caddy `trusted_proxies_strict`).
+  // Only trust client_ip_headers from the configured proxies, rejecting spoofed values from
+  // untrusted peers (Caddy `trusted_proxies_strict`).
   strict?: boolean;
-  // When true, use `ranges` as the default trusted-proxy list for global
-  // geoblocking so the two settings can't silently disagree.
+  // When true, use `ranges` as the default trusted-proxy list for global geoblocking so the
+  // two settings can't silently disagree.
   default_geoblock?: boolean;
 };
 
@@ -110,8 +109,8 @@ export type GeoBlockSettings = {
 
   // Trusted proxies for X-Forwarded-For parsing
   trusted_proxies: string[];
-  // When true, block requests where the real client IP cannot be determined
-  // (e.g. connection from trusted proxy but no usable XFF entry). Default: false (fail-open)
+  // When true, block requests whose real client IP cannot be determined (e.g. from a trusted
+  // proxy with no usable XFF entry). Default: false (fail-open).
   fail_closed: boolean;
 
   // Block response customization
@@ -144,10 +143,10 @@ export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
 }
 
 async function getInstanceModeForSettings(): Promise<InstanceMode> {
-  // Environment variable takes precedence — mirrors getInstanceMode() in
-  // instance-sync.ts. An env-configured slave never writes the mode to the DB
-  // (setInstanceMode refuses when env-set), so reading the DB alone here would
-  // report "standalone" and getEffectiveSetting would never serve synced:* values.
+  // Environment variable takes precedence — mirrors getInstanceMode() in instance-sync.ts. An
+  // env-configured slave never writes the mode to the DB (setInstanceMode refuses when
+  // env-set), so reading the DB alone here would report "standalone" and getEffectiveSetting
+  // would never serve synced:* values.
   const envMode = process.env.INSTANCE_MODE;
   if (envMode === "master" || envMode === "slave" || envMode === "standalone") {
     return envMode;
@@ -219,8 +218,7 @@ export async function saveGeneralSettings(settings: GeneralSettings): Promise<vo
 }
 
 export async function getAvatarSettings(): Promise<AvatarSettings | null> {
-  // Effective, so a slave inherits its master's choice unless it has stored a
-  // local override of its own.
+  // Effective, so a slave inherits its master's choice unless it stored a local override.
   return await getEffectiveSetting<AvatarSettings>("avatars");
 }
 
@@ -229,9 +227,8 @@ export async function saveAvatarSettings(settings: AvatarSettings): Promise<void
 }
 
 /**
- * Whether user icons may fall back to Gravatar. AVATAR_GRAVATAR wins when set,
- * so an operator can guarantee the behaviour regardless of what an admin does
- * in the UI; otherwise the stored toggle decides, defaulting to enabled.
+ * Whether user icons may fall back to Gravatar. AVATAR_GRAVATAR wins when set; otherwise the
+ * stored toggle decides, defaulting to enabled.
  */
 export async function isGravatarEnabled(): Promise<boolean> {
   const { config } = await import("./config");
@@ -249,10 +246,8 @@ export async function savePasswordPolicySettings(settings: PasswordPolicySetting
 }
 
 /**
- * Whether a bcrypt-hashed user must change their password before continuing.
- * AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH wins when set; otherwise the
- * stored setting decides, defaulting to off so an upgrade never locks anyone out
- * of a running deployment unannounced.
+ * Whether a bcrypt-hashed user must change their password before continuing. Pinned by
+ * AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH; otherwise the stored setting decides, default off.
  */
 export async function isLegacyPasswordChangeRequired(): Promise<boolean> {
   const { config } = await import("./config");
@@ -315,8 +310,8 @@ export async function getDnsProviderSettings(): Promise<DnsProviderSettings | nu
   const raw = await getEffectiveSetting<Record<string, unknown>>("dns_provider");
   if (!raw) return null;
 
-  // Normalize old single-provider format { provider, credentials }
-  // to new multi-provider format { providers, default }
+  // Normalize the old single-provider { provider, credentials } shape into the multi-provider
+  // { providers, default } shape.
   if ("provider" in raw && "credentials" in raw && !("providers" in raw)) {
     const name = raw.provider as string;
     const creds = raw.credentials as Record<string, string>;
@@ -350,8 +345,8 @@ export async function saveGeoBlockSettings(settings: GeoBlockSettings): Promise<
 
 export type WafSettings = {
   enabled: boolean;
-  // Coraza's SecRuleEngine values. DetectionOnly is settable through the REST
-  // API (the UI only offers Off/On); buildWafHandler rejects anything else.
+  // Coraza's SecRuleEngine values. DetectionOnly is settable through the REST API (the UI only
+  // offers Off/On); buildWafHandler rejects anything else.
   mode: "Off" | "On" | "DetectionOnly";
   load_owasp_crs: boolean;
   custom_directives: string;
@@ -366,8 +361,8 @@ export async function saveWafSettings(s: WafSettings): Promise<void> {
   await setSetting("waf", s);
 }
 
-// Global error pages, applied as fallback error routes across every proxy host.
-// Per-host error pages take precedence over these.
+// Global error pages, applied as fallback error routes across every proxy host. Per-host error
+// pages take precedence over these.
 export type ErrorPagesSettings = {
   rules: ErrorPageRule[];
 };
@@ -383,13 +378,9 @@ export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<voi
 // ─── Caddy build ─────────────────────────────────────────────────────────────
 
 /**
- * Which Caddy plugins this instance's caddy image is built with.
- *
- * Deliberately read with getSetting rather than getEffectiveSetting: the module
- * list describes a binary that lives on *this* host and is rebuilt by this
- * host's sidecar. Inheriting a master's list would tell a slave its image
- * contains plugins it never compiled, and the config it generates would then be
- * rejected wholesale by its own Caddy.
+ * Which Caddy plugins this instance's image is built with. Read with getSetting, not
+ * getEffectiveSetting: the list describes a binary on *this* host, so inheriting a master's would
+ * tell a slave it has plugins it never compiled and its own Caddy would reject the config.
  */
 export type CaddyBuildSettings = {
   /** Built-in module id -> enabled. Absent ids fall back to enabled. */

@@ -59,10 +59,9 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression test for #119: Advanced Options (HSTS Subdomains, Skip HTTPS
-   * Validation) were not saved because the form field names used camelCase
-   * (hstsSubdomains, skipHttpsHostnameValidation) while the server action
-   * expected snake_case (hsts_subdomains, skip_https_hostname_validation).
+   * Regression test for #119: Advanced Options (HSTS Subdomains, Skip HTTPS Validation) were not
+   * saved because the form field names used camelCase (hstsSubdomains, skipHttpsHostnameValidation)
+   * while the server action expected snake_case.
    */
   test('advanced options are saved and persist after edit (#119)', async ({ page }) => {
     // Create a host (defaults: HSTS Subdomains ON, Skip HTTPS OFF)
@@ -171,10 +170,9 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression test for #120: Toggling a proxy host disabled then re-enabled
-   * via the row-level switch wiped custom configs (redirects, rewrite,
-   * location_rules) because they were not included in existingMeta when
-   * updateProxyHost was called with only { enabled }.
+   * Regression test for #120: toggling a proxy host disabled then re-enabled via the row-level
+   * switch wiped custom configs (redirects, rewrite, location_rules), because they were not in
+   * existingMeta when updateProxyHost was called with only { enabled }.
    */
   test('toggling enabled/disabled preserves redirects and rewrite config (#120)', async ({
     page,
@@ -316,11 +314,9 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression (#232): Authentik defaults reached the create dialog but not the
-   * edit dialog — `EditHostDialog` never accepted an `authentikDefaults` prop, so
-   * `AuthentikFields` fell back to empty strings. Enabling Authentik on an
-   * existing host left Outpost Domain / Upstream / Auth Endpoint blank and the
-   * save failed on the required fields, while new hosts worked fine.
+   * Regression (#232): Authentik defaults reached the create dialog but not the edit dialog, which
+   * never accepted an `authentikDefaults` prop — so enabling Authentik on an existing host left the
+   * required Outpost fields blank and the save failed.
    */
   test('edit host Authentik fields are prefilled from global defaults (#232)', async ({ page }) => {
     const origin = new URL(page.url()).origin;
@@ -395,9 +391,8 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * The other half of #232: defaults must only fill blanks. A host with its own
-   * Authentik config must keep it when the edit dialog opens, never be
-   * overwritten by the global defaults.
+   * The other half of #232: defaults must only fill blanks. A host with its own Authentik config
+   * must keep it when the edit dialog opens, never be overwritten by the global defaults.
    */
   test('edit host keeps its own Authentik values instead of global defaults (#232)', async ({
     page,
@@ -481,12 +476,9 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression: per-host geoblock "Override global" toggle was silently dropped.
-   *
-   * The form action's `parseGeoBlockConfig` returned `geoblock_mode` (snake_case)
-   * while ProxyHostInput uses `geoblockMode` (camelCase), so the spread into
-   * createProxyHost / updateProxyHost dropped the field and the host always
-   * stayed in merge mode regardless of UI state.
+   * Regression: the per-host geoblock "Override global" toggle was dropped — `parseGeoBlockConfig`
+   * returned `geoblock_mode` while ProxyHostInput uses `geoblockMode`, so the spread lost it and
+   * the host stayed in merge mode.
    */
   test('per-host geoblock override mode persists after save', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();
@@ -585,18 +577,16 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * The Features column renders a "Forward Auth" badge when a host has CPM
-   * forward auth enabled. This badge was previously missing even though the
-   * feature was fully supported by the data model and edit dialog.
+   * The Features column renders a "Forward Auth" badge when a host has CPM forward auth enabled.
+   * This badge was previously missing even though the feature was fully supported.
    */
   test('Forward Auth feature badge shows for hosts with CPM forward auth enabled', async ({
     page,
   }) => {
     const origin = new URL(page.url()).origin;
 
-    // Host WITH forward auth enabled. Note: names deliberately avoid the
-    // substring "Forward Auth" so the badge assertions match the badge text
-    // (asserted with exact:true) and never the host's name cell.
+    // Host WITH forward auth enabled. Names deliberately avoid the substring "Forward Auth" so the
+    // badge assertions (exact:true) match the badge text and never the host's name cell.
     const withResp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
       data: {
@@ -648,18 +638,11 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression test for the index-key row-identity bug.
-   *
-   * The add/remove field-array editors keyed their rows on the array index, so
-   * removing a row made React reconcile every later row onto its predecessor's
-   * DOM node — the deleted row's inputs stayed mounted and the *last* row's
-   * inputs were the ones torn down. Any state the input owned but had not yet
-   * pushed into React (an in-flight edit, the caret, an IME composition)
-   * therefore surfaced in a different row than the one it was typed into.
-   *
-   * Values alone cannot catch this: the inputs are controlled, so React repaints
-   * the correct text either way. The test stamps each input's DOM node with a
-   * JS expando React never touches, then checks which nodes survive the delete.
+   * Regression: the index-key row-identity bug. The field-array editors keyed rows on the array
+   * index, so removing one made React reconcile later rows onto their predecessors' DOM nodes —
+   * state the input had not yet pushed into React surfaced in a different row. Values alone cannot
+   * catch it (the inputs are controlled), so the test stamps each node with an expando React never
+   * touches and checks which survive the delete.
    */
   test('removing an upstream keeps every other row on its own DOM node', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();

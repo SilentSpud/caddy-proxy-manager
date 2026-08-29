@@ -1,23 +1,13 @@
 /**
- * Module gating must never remove a value from a form submission.
+ * Module gating must never remove a value from a form submission. The form actions read an absent
+ * field as "empty", not "unchanged" (`parseWafConfig` → `[]`, `updateWafSettingsAction` → `""`),
+ * while the `wafPresent` / `geoblockPresent` markers submit unconditionally — so the parser always
+ * runs and always writes.
  *
- * The form actions in this app read an absent field as "empty", not as
- * "unchanged" — `parseWafConfig` turns a missing `wafExcludedRuleIds` into `[]`,
- * `parseGeoBlockConfig` turns every missing rule input into `[]`, and
- * `updateWafSettingsAction` turns a missing `wafCustomDirectives` into `""`.
- * Meanwhile the `wafPresent` / `geoblockPresent` markers submit unconditionally,
- * so the parser always runs and always writes.
- *
- * That combination makes greying-out dangerous in a way greying-out normally is
- * not: unmounting a rule editor — or disabling a field, since disabled controls
- * submit nothing — silently erases the stored value the next time the operator
- * saves an unrelated field on the same form. Rules an operator spent real effort
- * tuning (WAF false-positive suppressions, geo allow-lists) disappear with no
- * diff, no warning, and no way back short of a database restore.
- *
- * So module gating locks the *enable* switch and explains itself, and leaves
- * every value-carrying input mounted and submitting. These tests inspect source
- * rather than rendering, matching the convention in l4-ports-apply-banner.test.ts.
+ * That makes greying-out dangerous: unmounting a rule editor, or disabling a field, silently erases
+ * tuned WAF suppressions and geo allow-lists the next time anything on the form is saved. So gating
+ * locks the *enable* switch and leaves every value-carrying input mounted. Inspects source rather
+ * than rendering.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';

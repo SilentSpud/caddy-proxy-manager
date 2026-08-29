@@ -1,9 +1,6 @@
 /**
- * E2E tests: Docker container health.
- *
- * Verifies that all containers in the test stack are running and healthy.
- * Catches issues like permission errors, missing dependencies, or
- * misconfigured Dockerfiles that cause sidecar containers to crash-loop.
+ * E2E: every container in the test stack is running and healthy — catches permission errors,
+ * missing dependencies, and Dockerfiles that make sidecars crash-loop.
  */
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';

@@ -20,12 +20,10 @@ const SYNC_RATE_MAX = Number(process.env.INSTANCE_SYNC_RATE_MAX ?? 60);
 const SYNC_RATE_WINDOW_MS = Number(process.env.INSTANCE_SYNC_RATE_WINDOW_MS ?? 60_000);
 const SYNC_RATE_LIMITS = new Map<string, { count: number; windowStart: number }>();
 
-/**
- * Timing-safe token comparison to prevent timing attacks
- */
+/** Timing-safe token comparison. */
 function secureTokenCompare(a: string, b: string): boolean {
-  // Always compare buffers of the expected length (b) to avoid leaking
-  // the expected token length via early-return timing when a.length !== b.length
+  // Always compare buffers of the expected length (b), so an early return on a.length !== b.length
+  // cannot leak the expected token length.
   const bufA = Buffer.from(a.padEnd(b.length, "\0").slice(0, b.length));
   const bufB = Buffer.from(b);
   const equal = timingSafeEqual(bufA, bufB);
@@ -208,8 +206,8 @@ function isL4ProxyHost(
 }
 
 /**
- * Validate semantic content of proxy host fields to prevent
- * config injection via compromised master or stolen sync token.
+ * Validate the semantic content of proxy host fields, to prevent config injection via a
+ * compromised master or a stolen sync token.
  */
 function validateProxyHostContent(host: Record<string, unknown>): string | null {
   // Validate domains are valid hostnames
@@ -258,9 +256,7 @@ function validateProxyHostContent(host: Record<string, unknown>): string | null 
   return null;
 }
 
-/**
- * Validates that the payload has the expected structure for syncing
- */
+/** Validates that the payload has the expected structure for syncing. */
 function isValidSyncPayload(payload: unknown): payload is SyncPayload {
   if (payload === null || typeof payload !== "object") {
     return false;

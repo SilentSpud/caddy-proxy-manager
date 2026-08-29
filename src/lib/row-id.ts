@@ -1,25 +1,16 @@
 /**
- * Client-side identity for the rows of an editable list.
- *
- * The add/remove field-array editors (upstreams, redirects, path rules and
- * friends) used to key their rows on the array index. React reconciles by key,
- * so deleting row 1 of 3 made row 2 inherit row 1's DOM node and component
- * state — uncommitted text in one input could resurface in a different row.
- * Each row instead carries an id minted where the row is created: appended
- * blank, or seeded from server data.
- *
- * The ids exist only for rendering. They are never part of the serialized form
- * payload, so every editor builds its hidden-input JSON from explicit fields
- * rather than stringifying row state wholesale.
+ * Client-side identity for the rows of an editable list. The field-array editors used to key rows
+ * on the array index, so deleting row 1 of 3 made row 2 inherit row 1's DOM node and any state it
+ * had not pushed into React. Each row now carries an id minted where it is created. The ids are
+ * render-only, so each editor builds its hidden-input JSON from explicit fields.
  */
 
 let fallbackCounter = 0;
 
 /** Mints an id unique within the page. */
 export function newRowId(): string {
-  // randomUUID is only exposed in a secure context, which a plain-HTTP LAN
-  // install is not. The counter covers that case: ids need to be unique among
-  // the rows rendered in one page, not globally.
+  // randomUUID is only exposed in a secure context, which a plain-HTTP LAN install is not. The
+  // counter covers that case: ids need to be unique among the rows on one page, not globally.
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }

@@ -27,12 +27,8 @@ test.describe('Dashboard home page', () => {
   });
 
   /**
-   * ClickableCard renders a visually-hidden 1px <a> that exists only to give
-   * the card an accessible name — the real click target is the card surface,
-   * which carries the navigation handler. Clicking the anchor itself is
-   * impossible for a mouse user (card content sits over it), so click the
-   * parent surface instead. Matching on the card's exact accessible name also
-   * keeps these tests off the sidebar links, which `.first()` used to select.
+   * ClickableCard's visually-hidden <a> exists only to name the card; the click target is the card
+   * surface. Click the parent, and match the exact accessible name to stay off the sidebar links.
    */
   async function clickCard(page: Page, name: string | RegExp) {
     await page.getByRole('link', { name }).locator('xpath=..').click();

@@ -45,12 +45,9 @@ function cidrInput(
 
 test.describe('Geo Blocking — form persistence', () => {
   /**
-   * Mutating v1 API calls are same-origin checked, so a request without an
-   * Origin header is rejected with 403. This reset silently did nothing for
-   * as long as it lacked one, which left every test in this file running
-   * against whatever the previous test — or the previous run, since the
-   * database lives in a persisted volume — happened to leave behind. Assert
-   * the status so it can never fail quietly again.
+   * Mutating v1 API calls are same-origin checked, so a request without an Origin header 403s. This
+   * reset silently did nothing while it lacked one, leaving every test here running against
+   * whatever the previous run left in the persisted volume. Assert the status.
    */
   async function resetGeoblock(page: any) {
     const res = await page.request.put(API_GEOBLOCK, {
@@ -74,11 +71,9 @@ test.describe('Geo Blocking — form persistence', () => {
   });
 
   /**
-   * Regression: Radix Tabs unmount inactive tab content, so only the
-   * currently-visible tab's hidden inputs were submitted. Saving while on the
-   * "Block Rules" tab would wipe all allow rules and vice-versa.
-   *
-   * Uses RFC 5737 test ranges to avoid blocking real traffic.
+   * Regression: Radix Tabs unmount inactive tab content, so only the currently-visible tab's hidden
+   * inputs were submitted. Saving while on the "Block Rules" tab would wipe all allow rules and
+   * vice-versa. Uses RFC 5737 test ranges to avoid blocking real traffic.
    */
   test('saving block rules does not wipe allow rules', async ({ page }) => {
     const geoSection = page.locator('form', {
@@ -137,10 +132,8 @@ test.describe('Geo Blocking — form persistence', () => {
   });
 
   /**
-   * Regression: the tag inputs call onEnter without preventing the keypress's
-   * default, so pressing Enter to add a CIDR also triggered implicit form
-   * submission — persisting a half-finished config and re-applying the whole
-   * Caddy configuration on every tag the user typed.
+   * Regression: the tag inputs call onEnter without preventing the keypress default, so adding a
+   * CIDR also submitted the form — persisting a half-finished config and re-applying Caddy.
    */
   test('adding a rule with Enter does not submit the form', async ({ page }) => {
     const geoSection = page.locator('form', {

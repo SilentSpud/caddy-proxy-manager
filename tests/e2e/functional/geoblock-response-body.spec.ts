@@ -1,8 +1,6 @@
 /**
- * Functional regression test for issue #123.
- *
- * Global geoblocking must keep its custom response body even when a host has a
- * disabled per-host geoblock config in merge mode.
+ * Issue #123: global geoblocking keeps its custom response body even when a host has a disabled
+ * per-host geoblock config in merge mode.
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';

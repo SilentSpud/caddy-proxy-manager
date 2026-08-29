@@ -1,33 +1,18 @@
 /**
- * Invariants of the compose-manager sidecar's entrypoint script.
+ * Invariants of the compose-manager sidecar's entrypoint script. It runs in its own container,
+ * driven by files on a shared volume, so these assertions read the shipped source directly —
+ * weaker than executing it, but the alternative is Docker-in-Docker for a 400-line shell script.
  *
- * The script runs in its own container, driven by files on a shared volume, so
- * nothing else in the test suite can reach it — these assertions read the
- * shipped source directly. That is a weaker check than executing it, and it is
- * chosen deliberately: the alternative is a Docker-in-Docker harness for a
- * 400-line shell script. What it does buy is a guard on the properties whose
- * violation is expensive and silent.
+ * Ports: applies the override on startup, touches only the caddy service (--no-deps
+ * --force-recreate), auto-detects the compose project from container labels, pre-loads LAST_TRIGGER
+ * so startup does not double-apply, supports COMPOSE_HOST_DIR, never pulls images.
  *
- * Port management:
- * - Applies the override on startup, not only on trigger change
- * - Only ever touches the caddy service, with --no-deps and --force-recreate
- * - Auto-detects the compose project from the caddy container's labels
- * - Pre-loads LAST_TRIGGER so startup does not double-apply
- * - Supports named-volume and bind-mount deployments (COMPOSE_HOST_DIR)
- * - Never pulls images, and never drags the test override into production
+ * Rebuilds: build and port overrides always passed together; the build is timeout-bounded; a failed
+ * build leaves the container alone; the applied-module record is written only once healthy, since
+ * earlier would let the app emit config for plugins the binary lacks; a stale "building" status is
+ * cleared on startup.
  *
- * Image rebuilds (module selection):
- * - Build and port overrides are always passed together, so neither undoes the other
- * - The build is bounded by a timeout and cannot wedge the sidecar
- * - A failed build leaves the running container alone
- * - The applied-module record is written only after the build is healthy —
- *   writing it earlier would let the app emit config for plugins the running
- *   binary does not have, which Caddy rejects wholesale
- * - A stale "building" status from a killed sidecar is cleared on startup
- *
- * Status reporting:
- * - Status files are valid JSON, with control characters stripped
- * - Exit codes are captured without `set -e` killing the failure branch
+ * Status: files are valid JSON with control characters stripped, and exit codes survive `set -e`.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -42,9 +27,8 @@ const lines = script.split('\n');
 
 describe('L4 port manager entrypoint.sh', () => {
   it('applies override on startup (not only on trigger change)', () => {
-    // The script must call do_apply before entering the while loop.
-    // This ensures L4 ports are bound after any restart, because the main
-    // compose stack starts caddy without the L4 ports override file.
+    // The script must call do_apply before entering the while loop, so L4 ports are bound after any
+    // restart — the main compose stack starts caddy without the L4 ports override file.
     const firstApply = lines.findIndex(
       (l) => l.trim().startsWith('do_apply') || l.includes('do_apply'),
     );
@@ -96,9 +80,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('specifies project name to target the correct compose stack', () => {
-    // Without -p, compose would infer the project from the mount directory name
-    // ("/compose") rather than the actual running stack name, causing it to
-    // create new containers instead of recreating the existing ones.
+    // Without -p, compose would infer the project from the mount directory name ("/compose") rather
+    // than the running stack, creating new containers instead of recreating the existing ones.
     expect(script).toMatch(/args="-p \$COMPOSE_PROJECT"/);
     // Every compose invocation must take its flags from the shared builder,
     // so the build path cannot drift away from the port-apply path.
@@ -165,9 +148,7 @@ describe('L4 port manager entrypoint.sh', () => {
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // Caddy image rebuild (module selection)
-  // ---------------------------------------------------------------------------
+  // ── Caddy image rebuild (module selection) ─────────────────────────────────
 
   it('watches a separate build trigger and only builds the caddy service', () => {
     expect(script).toContain('caddy-build.trigger');
@@ -178,9 +159,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('includes the build override in compose args so ports and modules coexist', () => {
-    // A rebuild that dropped the L4 port override would unbind every L4
-    // listener; a port apply that dropped the build override would rebuild
-    // with the default module set. Both files must always be passed together.
+    // A rebuild that dropped the L4 port override would unbind every L4 listener; a port apply that
+    // dropped the build override would rebuild with the default module set. Always pass both.
     expect(script).toContain('-f $BUILD_OVERRIDE_FILE');
     expect(script).toContain('-f $OVERRIDE_FILE');
   });
@@ -191,9 +171,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('leaves the running container alone when the build fails', () => {
-    // xcaddy compiles from source against upstream module repos, so a build
-    // failure is routine (a bad custom module path, an upstream tag pulled).
-    // The recreate must be gated on the build having succeeded.
+    // xcaddy compiles from source against upstream module repos, so a build failure is routine (a
+    // bad custom module path, an upstream tag pulled). Gate the recreate on the build succeeding.
     const buildIdx = lines.findIndex((l) => l.includes('docker compose') && l.includes(' build '));
     const returnIdx = lines.findIndex((l, i) => i > buildIdx && l.trim() === 'return');
     const upIdx = lines.findIndex(
@@ -205,9 +184,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('resolves the compose project in the caller, not inside the subshell', () => {
-    // build_compose_args is invoked as $(...), so an assignment inside it is
-    // discarded on subshell exit and the "Using compose project" log line would
-    // print an empty name.
+    // build_compose_args is invoked as $(...), so an assignment inside it is discarded on subshell
+    // exit and the "Using compose project" log line would print an empty name.
     expect(script).not.toMatch(/build_compose_args\(\) \{[\s\S]{0,200}COMPOSE_PROJECT=/);
     const callers = lines.filter((l) => l.includes('COMPOSE_ARGS="$(build_compose_args)"'));
     expect(callers.length).toBeGreaterThanOrEqual(2);
@@ -218,16 +196,14 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('strips control characters before embedding output in status JSON', () => {
-    // RFC 8259 forbids raw U+0000..U+001F inside a JSON string, and compose
-    // output carries CR/ESC routinely. One of them makes the status file
-    // unparseable, which the UI shows as no progress at all.
+    // RFC 8259 forbids raw U+0000..U+001F inside a JSON string, and compose output carries CR/ESC
+    // routinely. One of them makes the status file unparseable, which the UI shows as no progress.
     expect(script).toContain("tr -d '\\000-\\037'");
   });
 
   it('captures compose exit codes without tripping set -e', () => {
-    // The script runs under `set -e`, where a plain `VAR=$(failing-cmd)` exits
-    // immediately — so every failure branch that writes a "failed" status would
-    // be unreachable. Each capture must be an AND-OR list instead.
+    // The script runs under `set -e`, where a plain `VAR=$(failing-cmd)` exits immediately — so
+    // every failure branch that writes a "failed" status would be unreachable. Use an AND-OR list.
     const captures = lines.filter((l) => l.includes('docker compose') && l.includes('=$('));
     expect(captures.length).toBeGreaterThanOrEqual(3);
     for (const line of captures) {
@@ -236,9 +212,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('records the applied module set only after the build is healthy', () => {
-    // The web app treats this file as the authority on what the binary
-    // contains. Writing it any earlier — when the override is generated, say —
-    // would claim a module is available while the old binary is still serving.
+    // The web app treats this file as the authority on what the binary contains. Writing it any
+    // earlier would claim a module is available while the old binary is still serving.
     const writeIdx = lines.findIndex((l) => l.trim() === 'write_applied_modules');
     const healthyIdx = lines.findIndex(
       (l) => l.includes('HEALTH" = "healthy"') && l.includes('if'),
@@ -251,9 +226,8 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('clears a stale in-progress build status on startup', () => {
-    // A sidecar killed mid-build leaves state=building on disk, and the trigger
-    // is pre-loaded as already-handled — so nothing would ever move it on, and
-    // the UI would sit on a disabled Rebuild button forever.
+    // A sidecar killed mid-build leaves state=building on disk, and the trigger is pre-loaded as
+    // already-handled — so nothing would move it on, and the UI would sit on a disabled button.
     expect(script).toMatch(/grep -q .*building.*pending.*BUILD_STATUS_FILE/);
     expect(script).toContain('Startup: cleared a stale in-progress build status.');
   });
@@ -272,15 +246,12 @@ describe('L4 port manager entrypoint.sh', () => {
     expect(script).toMatch(/message="\$\(json_escape "\$3"\)"/);
   });
 
-  // ---------------------------------------------------------------------------
-  // Deployment scenario: COMPOSE_HOST_DIR (bind-mount / cloud override)
-  // ---------------------------------------------------------------------------
+  // ── Deployment: COMPOSE_HOST_DIR (bind-mount / cloud override) ─────────────
 
   it('uses --project-directory $COMPOSE_HOST_DIR when COMPOSE_HOST_DIR is set', () => {
-    // Bind-mount deployments (docker-compose.override.yml replaces named volumes
-    // with ./data bind mounts). Relative paths like ./geoip-data in the override
-    // file must resolve against the HOST project directory, not the sidecar's
-    // /compose mount. --project-directory tells the Docker daemon where to look.
+    // Bind-mount deployments (docker-compose.override.yml swaps named volumes for ./data binds).
+    // Relative paths like ./geoip-data in the override must resolve against the HOST project
+    // directory, not the sidecar's /compose mount — --project-directory tells the daemon where.
     expect(script).toContain('--project-directory $COMPOSE_HOST_DIR');
     // It must be conditional — only applied when COMPOSE_HOST_DIR is non-empty
     expect(script).toMatch(/if \[ -n "\$COMPOSE_HOST_DIR" \]/);
@@ -299,18 +270,17 @@ describe('L4 port manager entrypoint.sh', () => {
   });
 
   it('uses --env-file from $COMPOSE_DIR (container-accessible path), not $COMPOSE_HOST_DIR', () => {
-    // When --project-directory points to the host path, Docker Compose looks for
-    // .env at $COMPOSE_HOST_DIR/.env which is NOT mounted inside the container.
-    // We must explicitly pass --env-file $COMPOSE_DIR/.env (the container mount).
+    // With --project-directory pointing at the host path, Compose looks for .env at
+    // $COMPOSE_HOST_DIR/.env, which is NOT mounted inside the container — so pass
+    // --env-file $COMPOSE_DIR/.env explicitly.
     expect(script).toContain('--env-file $COMPOSE_DIR/.env');
     // Must NOT reference the host dir for the env file
     expect(script).not.toContain('--env-file $COMPOSE_HOST_DIR');
   });
 
   it('always reads compose files from $COMPOSE_DIR regardless of COMPOSE_HOST_DIR', () => {
-    // The sidecar mounts the project at /compose (COMPOSE_DIR). Whether or not
-    // COMPOSE_HOST_DIR is set, all -f flags must reference container-accessible
-    // paths under $COMPOSE_DIR, never the host path.
+    // The sidecar mounts the project at /compose (COMPOSE_DIR). Set or not, all -f flags must
+    // reference container-accessible paths under $COMPOSE_DIR, never the host path.
     const composeFileFlags = lines.filter((l) => l.includes('-f ') && l.includes('docker-compose'));
     expect(composeFileFlags.length).toBeGreaterThan(0);
     for (const line of composeFileFlags) {

@@ -1,12 +1,7 @@
 /**
- * Unit tests for the L4PortsApplyBanner refresh-signal contract.
- *
- * Verifies that the banner component re-fetches port status whenever
- * refreshSignal changes — so changes are reflected immediately after
- * create/edit/delete/toggle without a page reload.
- *
- * These tests inspect the component source rather than rendering it,
- * to avoid the cost of a jsdom environment.
+ * L4PortsApplyBanner's refresh-signal contract: it re-fetches port status whenever refreshSignal
+ * changes, so create/edit/delete/toggle shows immediately. Inspects source rather than rendering,
+ * to avoid a jsdom environment.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';

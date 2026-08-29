@@ -1,12 +1,7 @@
 /**
- * Bun is the only supported runtime for this application.
- *
- * The database layer imports `bun:sqlite`, a Bun built-in with no Node.js
- * equivalent, and the Docker image starts the server with `bun server.js`.
- * Under Node.js the process instead dies while linking the module graph, on an
- * unsupported `bun:` URL scheme deep inside an import chain — which reads as a
- * packaging bug rather than the wrong interpreter. Say so plainly instead, and
- * say what to run.
+ * Bun is the only supported runtime: the database layer imports `bun:sqlite`. Under Node the
+ * process dies while linking the module graph on an unsupported `bun:` URL, which reads as a
+ * packaging bug rather than the wrong interpreter — so say so plainly, and say what to run.
  */
 
 /** `{runtime}` is filled in by describeRuntime() at the point of failure. */
@@ -26,16 +21,9 @@ export function describeRuntime(): string {
 }
 
 /**
- * Aborts unless the process is running under Bun.
- *
- * This covers the paths where application code gets to run at all — `vinext
- * dev`, and any entry that reaches the instrumentation hook. The standalone
- * build fails earlier than this, while its module graph is still linking, so
- * scripts/inject-runtime-guard.mjs plants an equivalent check at the top of the
- * generated dist/standalone/server.js as part of `bun run build`.
- *
- * `exit` is injected so the check can be tested without killing the test
- * runner; production callers use the default.
+ * Aborts unless the process is running under Bun. Covers the paths where app code runs at all; the
+ * standalone build fails earlier, while linking, so scripts/inject-runtime-guard.mjs plants an
+ * equivalent check atop dist/standalone/server.js. `exit` is injected so this is testable.
  */
 export function assertBunRuntime(exit: (code: number) => never = process.exit): void {
   if (process.versions.bun) {

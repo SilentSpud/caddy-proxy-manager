@@ -1,41 +1,17 @@
 /**
  * Caddy image build management.
  *
- * Caddy plugins are compiled in, not loaded at runtime, so changing the module
- * list means rebuilding and recreating the caddy container. That is the same
- * shape of problem as L4 port changes, and it reuses the same machinery: the
- * web app writes a compose override plus a trigger file onto the shared data
- * volume, and the sidecar — which is the only component holding a Docker API
- * handle — does the build.
+ * Plugins are compiled in, so changing the module list means rebuilding and recreating the caddy
+ * container: the web app writes a compose override plus a trigger file to the shared data volume,
+ * and the sidecar builds, recreates, and writes caddy-build.status — plus caddy-build.applied.json
+ * on success only.
  *
- * Flow:
- *   1. Admin toggles modules in Settings → Caddy Build; the selection is stored.
- *   2. "Rebuild Caddy" writes docker-compose.caddy-build.yml (a CADDY_MODULES
- *      build arg) and caddy-build.trigger.
- *   3. Sidecar detects the trigger, runs `docker compose build caddy` then
- *      recreates the container, and writes caddy-build.status. On success — and
- *      only on success — it also writes caddy-build.applied.json.
- *   4. Web reads the status to report progress and the applied module list.
- *
- * Two module sets therefore exist at any moment, and the difference between
- * them is load-bearing rather than incidental:
- *
- *   - *desired* — what the admin selected. Drives which settings the UI offers.
- *     Lives in the compose override, which is the build's *input*.
- *   - *applied* — what the running binary was actually built with, read from the
- *     record the sidecar writes after a successful build. Config generation must
- *     never emit a handler that is not in this set, because Caddy rejects a
- *     config containing an unknown module in full, taking every unrelated host
- *     with it.
- *
- * Those are two separate files for a reason: the override is written before the
- * build, so treating it as the applied set would make applied equal desired
- * while the old binary is still running — and keep it wrong forever if the build
- * failed. See getAppliedModuleSpecs.
- *
- * So config generation uses the intersection: turning a module *off* takes
- * effect immediately (harmless — the handler simply stops being emitted), while
- * turning one *on* waits for the rebuild that actually puts it in the binary.
+ * Two module sets exist at once. *desired* is the admin's selection, held in the compose override
+ * and driving the UI; *applied* is what the running binary was built with, per the sidecar's
+ * record. Config generation must never emit a handler outside *applied*, since Caddy rejects a
+ * config naming an unknown module in full. Separate files because the override is written before
+ * the build — see getAppliedModuleSpecs. Generation uses the intersection: off applies at once, on
+ * waits for the rebuild.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -53,14 +29,14 @@ import {
 } from "./caddy-modules";
 import { type CaddyBuildSettings, getCaddyBuildSettings } from "./settings";
 
-// Shares the data volume with l4-ports.ts, and the same env override so tests
-// can point both at a scratch directory.
+// Shares the data volume and env override with l4-ports.ts, so tests can point both at a
+// scratch directory.
 const DATA_DIR = process.env.L4_PORTS_DIR || "/app/data";
 const OVERRIDE_FILE = "docker-compose.caddy-build.yml";
 const TRIGGER_FILE = "caddy-build.trigger";
 const STATUS_FILE = "caddy-build.status";
-// Written by the sidecar after a build succeeds and caddy is healthy again.
-// Kept separate from OVERRIDE_FILE on purpose — see getAppliedModuleSpecs.
+// Written by the sidecar after a build succeeds and caddy is healthy again. Separate from
+// OVERRIDE_FILE on purpose — see getAppliedModuleSpecs.
 const APPLIED_FILE = "caddy-build.applied.json";
 
 export type CaddyBuildState = "idle" | "pending" | "building" | "applied" | "failed";
@@ -89,12 +65,8 @@ export type CaddyBuildDiff = {
 // ─── Selection ───────────────────────────────────────────────────────────────
 
 /**
- * Resolve stored settings into a complete selection.
- *
- * A module id missing from the stored map counts as enabled. That is what makes
- * an upgrade safe: a module added to the catalog after an operator last saved
- * their selection appears on, matching the image they are already running,
- * rather than silently switching a working feature off.
+ * Resolve stored settings into a complete selection. A missing module id counts as enabled, so a
+ * module added to the catalog after the operator last saved appears on, matching their image.
  */
 export function resolveEnabledModuleIds(settings: CaddyBuildSettings | null): string[] {
   const overrides = settings?.modules ?? {};
@@ -108,8 +80,8 @@ export function resolveCustomModules(settings: CaddyBuildSettings | null): Caddy
 }
 
 /**
- * The full `--with` argument list for a selection, sorted so that an unchanged
- * selection always hashes to the same value regardless of toggle order.
+ * The full `--with` argument list for a selection, sorted so an unchanged selection always
+ * hashes to the same value regardless of toggle order.
  */
 export function resolveModuleSpecs(settings: CaddyBuildSettings | null): string[] {
   const builtIn = resolveEnabledModuleIds(settings).map(
@@ -119,7 +91,7 @@ export function resolveModuleSpecs(settings: CaddyBuildSettings | null): string[
   return Array.from(new Set([...builtIn, ...custom])).sort();
 }
 
-/** The specs the shipped image is built with — the baseline before any rebuild. */
+/** Specs the shipped image is built with — the baseline before any rebuild. */
 export function defaultModuleSpecs(): string[] {
   return CADDY_MODULES.map((m) => m.modulePath).sort();
 }
@@ -129,26 +101,14 @@ export function defaultModuleSpecs(): string[] {
 /**
  * The module specs actually compiled into the running binary.
  *
- * Read from a record the sidecar writes only *after* a build succeeds and the
- * container comes back healthy — deliberately not from the compose override,
- * even though that file also holds a module list.
+ * Read from the record the sidecar writes only after a build succeeds and the container is
+ * healthy — not from the compose override, which holds the *desired* list and is written before
+ * the build. Reading that would make applied equal desired the instant a rebuild is requested, so
+ * any config apply during the build would emit handlers the binary lacks, and a failed build would
+ * keep every later apply rejected.
  *
- * The override carries the *desired* list into the build, and it is written
- * before the build starts. Reading it here would make applied equal desired the
- * instant the rebuild is requested, which collapses the whole desired-vs-applied
- * distinction this module exists to maintain. Two concrete failures follow from
- * that, and both were reachable:
- *
- *   - During the minutes a build takes, any other config apply (a host edit, a
- *     cert renewal, an instance-sync push) would emit handlers for a module the
- *     running binary does not have yet, and Caddy would reject the document.
- *   - If the build then failed, the override would stay on disk, so the wrong
- *     answer would persist — every later apply rejected — until someone deleted
- *     the file by hand.
- *
- * No record means no successful rebuild has happened, so the container is still
- * the shipped image, which is built with the full catalog. Returning an empty
- * list here would drop every plugin-backed handler on a healthy default install.
+ * No record means no rebuild has happened, so the container is the shipped image with the full
+ * catalog — returning an empty list would drop every plugin handler on a healthy install.
  */
 export function getAppliedModuleSpecs(): string[] {
   const filePath = join(DATA_DIR, APPLIED_FILE);
@@ -221,9 +181,8 @@ export async function getCaddyModuleAvailability(): Promise<CaddyModuleAvailabil
       Boolean(p),
     ),
   );
-  // Custom modules are opaque — they carry no feature mapping, but they do
-  // belong in appliedPaths so a caller checking a specific path can find one
-  // an operator added by hand.
+  // Custom modules are opaque — no feature mapping, but they belong in appliedPaths so a
+  // caller checking a specific path can find one an operator added by hand.
   const appliedPaths = new Set(getAppliedModuleSpecs().map((spec) => stripVersion(spec)));
   return {
     desired: featuresForPaths(desiredPaths),
@@ -239,8 +198,8 @@ function stripVersion(spec: string): string {
 }
 
 /**
- * Whether config generation may emit handlers for a feature: the module must be
- * both selected and actually compiled into the running binary.
+ * Whether config generation may emit handlers for a feature: the module must be both
+ * selected and actually compiled into the running binary.
  */
 export function isFeatureUsable(
   availability: CaddyModuleAvailability,
@@ -250,9 +209,8 @@ export function isFeatureUsable(
 }
 
 /**
- * Whether a specific DNS provider can be used for an ACME DNS-01 challenge.
- * DNS-01 is per-provider, unlike the coarser feature check: having Cloudflare
- * compiled in says nothing about Route 53.
+ * Whether a DNS provider can be used for an ACME DNS-01 challenge. Per-provider, unlike the
+ * coarser feature check: Cloudflare compiled in says nothing about Route 53.
  */
 export function isDnsProviderUsable(
   availability: CaddyModuleAvailability,
@@ -273,12 +231,8 @@ export function featureModuleNames(feature: CaddyFeatureId): string {
 // ─── Dockerfile / compose generation ─────────────────────────────────────────
 
 /**
- * The Dockerfile the image is built from, rendered with the selected modules.
- *
- * Shown read-only in Settings so an operator can see exactly what the rebuild
- * will run, and copy it if they would rather build outside the sidecar. The
- * real file on disk stays generic — it takes CADDY_MODULES as a build arg — so
- * this only substitutes that one value.
+ * The Dockerfile the image is built from, rendered with the selected modules. Shown read-only in
+ * Settings; the real file stays generic, so this substitutes only CADDY_MODULES.
  */
 export function generateCaddyDockerfilePreview(specs: string[]): string {
   const withLines = specs.map((spec) => `#     --with ${spec}`).join("\n");
@@ -306,11 +260,8 @@ services:
 }
 
 /**
- * Persist the current selection as a compose override and signal the sidecar.
- *
- * Validation happens here as well as in the UI because this is also reachable
- * through the REST API, and a bad module path would otherwise surface as an
- * opaque build failure minutes later.
+ * Persist the current selection as a compose override and signal the sidecar. Validated here as
+ * well as in the UI, since the REST API reaches this too and a bad path would fail opaquely later.
  */
 export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
   const settings = await getCaddyBuildSettings();
@@ -321,18 +272,10 @@ export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
     if (error) throw new Error(error);
   }
 
-  // Re-apply the config before the rebuild, not after.
-  //
-  // Caddy runs with `--resume`, so when the sidecar recreates the container it
-  // reloads whatever config was last autosaved. If that config still names a
-  // module the new binary no longer contains, Caddy refuses to load it and the
-  // proxy stays down — every host, not just the ones using that module — and the
-  // app cannot push a correction because the admin API never comes up.
-  //
-  // Applying here rather than at the settings save covers every route in: the
-  // UI's Rebuild button, the REST endpoint, and a rebuild triggered after a
-  // selection change that arrived some other way. Imported lazily because
-  // caddy.ts imports this module for its feature gating.
+  // Re-apply the config before the rebuild, not after. Caddy runs with `--resume`, so a recreated
+  // container reloads the last autosaved config; if that names a module the new binary lacks,
+  // Caddy refuses to load and the proxy stays down with no admin API to correct it. Doing it here
+  // covers every entry point. Imported lazily — caddy.ts imports this module for feature gating.
   const { applyCaddyConfig } = await import("./caddy");
   await applyCaddyConfig();
 
@@ -367,8 +310,8 @@ export function getCaddyBuildStatus(): CaddyBuildStatus {
 }
 
 /**
- * Normalize a settings payload from a form or the REST API: unknown module ids
- * are dropped, and custom entries are cleaned up and validated.
+ * Normalize a settings payload from a form or the REST API: drop unknown module ids, clean
+ * up and validate custom entries.
  */
 export function sanitizeCaddyBuildSettings(input: {
   modules?: Record<string, boolean>;
@@ -387,8 +330,8 @@ export function sanitizeCaddyBuildSettings(input: {
     if (!modulePath) continue;
     const error = validateCustomModule({ ...entry, modulePath });
     if (error) throw new Error(error);
-    // A duplicate path would make xcaddy fail with a confusing "module already
-    // required" error long after the admin left the page.
+    // A duplicate path fails the build with a confusing "module already required" error,
+    // long after the admin left the page.
     if (seen.has(modulePath)) {
       throw new Error(`Duplicate custom module "${modulePath}"`);
     }
@@ -408,12 +351,9 @@ export function sanitizeCaddyBuildSettings(input: {
 const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "dns01"];
 
 /**
- * The serializable snapshot the dashboard hands to client components.
- *
- * Gates on *desired* rather than applied state: the toggles are what the admin
- * just set, so a control that follows the applied set would stay greyed out
- * after being switched on and read as broken. The pending-rebuild flag is what
- * tells them the change is not live yet.
+ * The serializable snapshot the dashboard hands to client components. Gates on *desired*, not
+ * applied: a control following applied would stay greyed out right after being switched on. The
+ * pending-rebuild flag is what says the change is not live yet.
  */
 export async function getModuleGateState(): Promise<{
   features: Record<CaddyFeatureId, boolean>;
@@ -436,9 +376,8 @@ export async function getModuleGateState(): Promise<{
   return {
     features,
     moduleNames,
-    // Per-module rather than per-feature, because DNS-01 is only meaningful one
-    // provider at a time: having Cloudflare compiled in says nothing about
-    // whether Route 53 is.
+    // Per-module rather than per-feature: DNS-01 is only meaningful one provider at a time,
+    // and having Cloudflare compiled in says nothing about whether Route 53 is.
     enabledModuleIds: Array.from(availability.desiredIds),
     pendingRebuild: diff.needsRebuild,
   };

@@ -9,20 +9,14 @@ const migrationsFolder = resolve(process.cwd(), 'drizzle');
 export type TestDb = ReturnType<typeof drizzle<typeof schema>>;
 
 /**
- * Creates a fresh in-memory SQLite database with all migrations applied.
- * Each call returns a completely isolated database instance.
+ * A fresh in-memory SQLite database with all migrations applied. Each call returns a completely
+ * isolated instance.
  */
 export function createTestDb(): TestDb {
   const sqlite = new Database(':memory:');
-  // better-sqlite3, which backed these tests before the suite moved to Bun,
-  // turns foreign keys on for every connection. bun:sqlite follows SQLite's own
-  // default and leaves them OFF, which would silently stop every `ON DELETE
-  // CASCADE` assertion below from testing anything. Set it explicitly so the
-  // behaviour under test does not depend on a driver default.
-  //
-  // Note this is deliberately a *test* setting: src/lib/db.ts does not set the
-  // pragma, so cascades do not fire in production either — models that need one
-  // do it by hand (see deleteCaCertificate in src/lib/models/ca-certificates.ts).
+  // bun:sqlite follows SQLite's default and leaves foreign keys OFF, where better-sqlite3 turned
+  // them on — without this every `ON DELETE CASCADE` assertion below would pass vacuously. A *test*
+  // setting only: src/lib/db.ts does not set it, so models cascade by hand (deleteCaCertificate).
   sqlite.exec('PRAGMA foreign_keys = ON');
   const db = drizzle(sqlite, { schema, casing: 'snake_case' });
   migrate(db, { migrationsFolder });
@@ -30,18 +24,11 @@ export function createTestDb(): TestDb {
 }
 
 /**
- * A stand-in for the `db` module's default export that always forwards to
- * whichever database the current test is using.
- *
- * Under Vitest a mock factory could return `get default() { return db }` and
- * the getter would re-run on every access, so a `db` reassigned in `beforeEach`
- * was picked up automatically. Bun evaluates the factory's getters once, when
- * the mocked module is linked, and stores the resulting values — so that
- * pattern captures whatever `db` held at import time, which is `undefined`.
- *
- * This returns a single object with a stable identity, safe to snapshot, whose
- * every property read is resolved against `current()` at call time. Methods are
- * bound to the real database so drizzle's internals still see the right `this`.
+ * A stand-in for the `db` module's default export, forwarding to whichever database the current
+ * test uses. Bun evaluates a mock factory's getters once at link time, so Vitest's
+ * `get default() { return db }` pattern would capture `undefined`. This is one object with a stable
+ * identity whose property reads resolve against `current()` at call time, with methods bound to the
+ * real database so drizzle's internals see the right `this`.
  */
 export function currentDb(current: () => TestDb): TestDb {
   return new Proxy({} as TestDb, {

@@ -137,9 +137,8 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     throw new Error("CA certificate not found");
   }
 
-  // Collect the issued client certificates belonging to this CA, plus any
-  // mTLS roles that include them — used both to detect references below and to
-  // cascade-delete afterwards.
+  // Issued client certificates belonging to this CA, plus any mTLS roles that include them — used
+  // both to detect references below and to cascade-delete afterwards.
   const issuedCerts = await db
     .select({ id: issuedClientCertificates.id })
     .from(issuedClientCertificates)
@@ -156,13 +155,9 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     for (const row of roleRows) affectedRoleIds.add(row.roleId);
   }
 
-  // Check if any proxy host's mTLS config references this CA. A host is "in
-  // use" if it directly trusts one of the CA's issued certs
-  // (trusted_client_cert_ids), trusts a role that contains one
-  // (trusted_role_ids), or uses the deprecated whole-CA trust list
-  // (ca_certificate_ids). The old guard only checked the deprecated field, so
-  // CAs trusted via the current per-cert/role model could be deleted out from
-  // under a live host.
+  // A host is "in use" if it trusts one of the CA's issued certs (trusted_client_cert_ids), a role
+  // containing one (trusted_role_ids), or the deprecated whole-CA list (ca_certificate_ids). The
+  // old guard checked only the deprecated field.
   const allHosts = await db
     .select({ meta: proxyHosts.meta, name: proxyHosts.name })
     .from(proxyHosts);
@@ -188,10 +183,9 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     throw new Error(`CA certificate is in use by proxy host(s): ${names}`);
   }
 
-  // Cascade-delete the CA's issued client certificates and their role
-  // mappings. The schema declares onDelete: "cascade" for these foreign keys,
-  // but bun:sqlite leaves PRAGMA foreign_keys OFF, so the cascade never
-  // fires automatically — without this, deleting a CA orphans its issued
+  // Cascade-delete the CA's issued client certificates and their role mappings. The schema
+  // declares onDelete: "cascade" for these foreign keys, but bun:sqlite leaves PRAGMA
+  // foreign_keys OFF, so the cascade never fires — without this, deleting a CA orphans its issued
   // certificates, which keep appearing as selectable in the mTLS picker.
   if (issuedCertIds.length > 0) {
     await db

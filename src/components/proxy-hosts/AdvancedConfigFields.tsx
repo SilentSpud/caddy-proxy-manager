@@ -1,12 +1,8 @@
 "use client";
 
 /**
- * The three raw-config escape hatches a proxy host offers, in one place so the
- * create and edit dialogs cannot drift apart.
- *
- * They sit at different points in the request path, which is the only thing
- * that makes choosing between them possible, so each label says where its
- * content lands rather than only what format it takes.
+ * The three raw-config escape hatches a proxy host offers, shared so create and edit cannot drift.
+ * Each label says where in the request path its content lands, not just the format.
  */
 
 import { useState } from "react";

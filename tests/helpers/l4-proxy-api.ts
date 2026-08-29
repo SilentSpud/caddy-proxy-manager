@@ -1,9 +1,6 @@
 /**
- * Higher-level helpers for creating L4 proxy hosts in E2E tests.
- *
- * All helpers accept a Playwright `Page` (pre-authenticated via the
- * global storageState) so they integrate cleanly with the standard
- * `page` test fixture.
+ * Helpers for creating L4 proxy hosts in E2E tests. Each takes a Playwright `Page`
+ * (pre-authenticated via the global storageState), so they fit the standard `page` fixture.
  */
 import { expect, type Page } from '@playwright/test';
 

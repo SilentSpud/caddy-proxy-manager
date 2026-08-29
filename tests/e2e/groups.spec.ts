@@ -1,9 +1,4 @@
-/**
- * E2E tests: Groups management page.
- *
- * Verifies group creation, member management, and deletion.
- * Runs as admin (testadmin) — the page requires admin role.
- */
+/** E2E: Groups page — creation, member management, deletion. Runs as admin. */
 import { test, expect } from '@playwright/test';
 
 test.describe('Groups page', () => {

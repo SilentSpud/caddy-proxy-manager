@@ -288,8 +288,8 @@ function MatchTags({ tags }: { tags: string[] }) {
 function AuditPanel({ rawData }: { rawData: string | null }) {
   const [innerTab, setInnerTab] = useState("overview");
 
-  // Parsed once per event instead of on every render. The matched rules get
-  // their row ids here, so switching the inner tab re-keys nothing.
+  // Parsed once per event instead of on every render. The matched rules get their row ids here, so
+  // switching the inner tab re-keys nothing.
   const { data, msgs } = useMemo(() => {
     let parsed: AuditData | null = null;
     if (rawData) {
@@ -566,8 +566,8 @@ function EventDetailPanel({
   }
 
   return (
-    // Was a hand-built fixed-position drawer with its own backdrop and Escape
-    // handler; Dialog brings focus trapping and dismissal with it.
+    // Was a hand-built fixed-position drawer with its own backdrop and Escape handler; Dialog
+    // brings focus trapping and dismissal with it.
     <AppDialog
       open
       onClose={onClose}
@@ -922,9 +922,8 @@ export default function WafEventsClient({
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
   );
-  // Coraza is a compiled-in plugin. With it off the settings below would be
-  // stored and then never reach Caddy, so the form says so up front rather than
-  // accepting a rule set that silently does nothing.
+  // Coraza is a compiled-in plugin. With it off the settings below would be stored and then never
+  // reach Caddy, so the form says so up front rather than accepting a rule set that does nothing.
   const wafModuleDisabledReason = useDisabledReason("waf");
 
   useEffect(() => {
@@ -1046,10 +1045,9 @@ export default function WafEventsClient({
       id: "ts",
       label: "Time",
       width: 150,
-      // The timestamp renders on the server in the container's locale/timezone
-      // and again in the browser's — the two never match, so this text opts out
-      // of hydration checks rather than letting React discard the whole tree
-      // (error #418).
+      // The timestamp renders on the server in the container's locale/timezone and again in the
+      // browser's — the two never match, so this text opts out of hydration checks rather than
+      // letting React discard the whole tree (error #418).
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
           <span suppressHydrationWarning>{new Date(r.ts * 1000).toLocaleString()}</span>
@@ -1292,9 +1290,9 @@ export default function WafEventsClient({
                 height="sm"
                 value={wafCustomDirectives}
                 onChange={setWafCustomDirectives}
-                // isReadOnly, not isDisabled: a disabled field submits nothing,
-                // and updateWafSettingsAction reads a missing value as an empty
-                // string — which would erase the stored directives.
+                // isReadOnly, not isDisabled: a disabled field submits nothing, and
+                // updateWafSettingsAction reads a missing value as an empty string, which would
+                // erase the stored directives.
                 isReadOnly={Boolean(wafModuleDisabledReason)}
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
                 description="ModSecurity SecLang syntax. Applied after OWASP CRS if enabled."

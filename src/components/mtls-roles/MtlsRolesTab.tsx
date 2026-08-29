@@ -19,11 +19,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { MtlsRole, MtlsRoleWithCertificates } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 
-/**
- * Per-position card tints. Decorative only: a role's colour says nothing about
- * it, so these map onto the theme's non-semantic variants rather than the
- * hand-written amber/cyan/violet/emerald/rose classes they replace.
- */
+/** Per-position card tints. Decorative only, so they use the theme's non-semantic variants. */
 const CARD_VARIANTS = ["orange", "cyan", "purple", "green", "red"] as const;
 
 type Props = {

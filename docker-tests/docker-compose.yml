@@ -1,14 +1,7 @@
-# Full-stack integration test rig for caddy-proxy-manager.
-#
-# Everything runs on one *internal* bridge network: containers can talk to each
-# other and to nothing else. No host ports are published, so the rig cannot be
-# reached from outside and cannot reach the internet — certificates come from a
-# Pebble ACME server inside the network, not Let's Encrypt.
-#
-# Static IPs are assigned because two components need to know an address before
-# the container exists: dnsmasq answers every *.cpm.test query with Caddy's
-# address, and Pebble is pointed at dnsmasq so its HTTP-01 validation resolves
-# test domains the same way the client does.
+# Full-stack integration test rig. One *internal* bridge network: containers reach each other and
+# nothing else, no host ports published, certificates from an in-network Pebble rather than Let's
+# Encrypt. Static IPs because dnsmasq must answer *.cpm.test with Caddy's address, and Pebble is
+# pointed at dnsmasq so HTTP-01 validation resolves test domains the same way the client does.
 name: cpm-docker-tests
 
 networks:

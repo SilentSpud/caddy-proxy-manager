@@ -1,10 +1,6 @@
 /**
- * Higher-level helpers for creating proxy hosts and access lists
- * in functional E2E tests.
- *
- * All helpers accept a Playwright `Page` (pre-authenticated via the
- * global storageState) so they integrate cleanly with the standard
- * `page` test fixture.
+ * Helpers for creating proxy hosts and access lists in functional E2E tests. Each takes a
+ * Playwright `Page` (pre-authenticated via the global storageState).
  */
 import { expect, type Download, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
@@ -54,17 +50,16 @@ async function expandCaRow(page: Page, caName: string): Promise<void> {
   const row = page.locator('tr').filter({ hasText: caName }).first();
   await expect(row).toBeVisible({ timeout: 10_000 });
   await row.locator('button').first().click();
-  // The phrase also appears as the title and empty-state copy of the "Manage"
-  // dialog, which is a native <dialog> and so stays in the DOM while closed.
-  // Exact + visible narrows this to the expanded row's own panel label.
+  // The phrase also appears as the title and empty-state copy of the "Manage" dialog, a native
+  // <dialog> that stays in the DOM while closed. Exact + visible narrows this to the row's panel.
   await expect(
     page.getByText('Issued Client Certificates', { exact: true }).filter({ visible: true }),
   ).toBeVisible({ timeout: 10_000 });
 }
 
 /**
- * Create a proxy host via the browser UI.
- * ssl_forced is always set to false so functional tests can use plain HTTP.
+ * Create a proxy host via the browser UI. ssl_forced is always false so functional tests can use
+ * plain HTTP.
  */
 export async function createProxyHost(page: Page, config: ProxyHostConfig): Promise<void> {
   await page.goto('/proxy-hosts');
@@ -110,8 +105,7 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
   }
 
   if (config.mtlsCaNames?.length) {
-    // Enable mTLS — the switch is near the "Mutual TLS (mTLS)" text
-    // Scroll to the mTLS section first, then click the switch in the containing card
+    // Enable mTLS: scroll to the section, then click the switch in the containing card
     const mtlsCard = page.locator('input[name="mtlsEnabled"]').locator('..');
     await mtlsCard.scrollIntoViewIfNeeded();
     await mtlsCard.getByRole('switch').click();
@@ -222,9 +216,8 @@ export async function issueClientCertificate(
   await openCertificatesTab(page, /^CA \/ mTLS/i);
   await expandCaRow(page, config.caName);
   await page.getByRole('button', { name: /^issue cert$/i }).click();
-  // Every CA row mounts its own issue dialog, and a closed native <dialog>
-  // stays in the DOM — so scope all field lookups to the open one. (getByRole
-  // skips hidden elements, but getByLabel and CSS locators do not.)
+  // Every CA row mounts its own issue dialog, and a closed native <dialog> stays in the DOM — so
+  // scope field lookups to the open one. (getByRole skips hidden elements; getByLabel does not.)
   const dialog = page.getByRole('dialog', { name: /issue client certificate/i });
   await expect(dialog).toBeVisible();
 
@@ -263,8 +256,8 @@ export async function revokeIssuedClientCertificate(
   const dialog = page.getByRole('dialog', { name: /issued client certificates/i });
   await expect(dialog).toBeVisible();
 
-  // Each issued cert renders as a design-system Card; the old
-  // '.rounded-lg.border' Tailwind classes are no longer emitted.
+  // Each issued cert renders as a design-system Card; the old '.rounded-lg.border' Tailwind
+  // classes are no longer emitted.
   const certCard = dialog.locator('.astryx-card').filter({ hasText: commonName });
   await expect(certCard).toBeVisible({ timeout: 10_000 });
   await certCard.getByRole('button', { name: /^revoke$/i }).click();
@@ -291,8 +284,8 @@ export interface AccessListUser {
 }
 
 /**
- * Create an access list with initial users via the browser UI.
- * Opens the "New" dialog, fills in name + seed members, and creates.
+ * Create an access list with initial users via the browser UI: opens the "New" dialog, fills in
+ * name + seed members, and creates.
  */
 export async function createAccessList(
   page: Page,

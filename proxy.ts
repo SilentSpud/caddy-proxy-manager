@@ -4,19 +4,15 @@ import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
 
 /**
- * Next.js Proxy for route protection.
- * Provides defense-in-depth by checking authentication at the edge
- * before requests reach page components.
- *
- * Note: Proxy always runs on Node.js runtime.
+ * Next.js Proxy for route protection: defense-in-depth auth checks at the edge, before requests
+ * reach page components. Always runs on the Node.js runtime.
  */
 
 const isDev = process.env.NODE_ENV === "development";
 
 /**
- * Build a nonce-based Content-Security-Policy per request.
- * Next.js reads the nonce from the CSP request header and applies it
- * to all inline scripts it generates.
+ * Build a nonce-based Content-Security-Policy per request. Next.js reads the nonce from the CSP
+ * request header and applies it to every inline script it generates.
  */
 function buildCsp(nonce: string): string {
   const directives = [
@@ -103,15 +99,9 @@ export default async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - maplibre (maplibre-gl's tile worker bundle, staged into public/ at
-     *   build time; it must load as a module script even if the session has
-     *   expired, otherwise the redirect to /login is parsed as JS and the
-     *   analytics map silently breaks)
-     * - public folder
+     * Everything except _next/static, _next/image, favicon.ico, the public folder, and maplibre
+     * (the tile worker bundle — it must load as a module script even with an expired session, or
+     * the redirect to /login is parsed as JS and the map breaks).
      */
     "/((?!_next/static|_next/image|favicon.ico|maplibre/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],

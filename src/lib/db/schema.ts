@@ -53,10 +53,9 @@ export const accounts = sqliteTable(
       .notNull(),
     accountId: text("accountId").notNull(),
     providerId: text("providerId").notNull(),
-    // better-auth 1.7 scopes account identity by issuer rather than by
-    // providerId: `local:credential` for password accounts, the provider's own
-    // issuer URL for OIDC providers that have one, and `local:oauth:<id>` for
-    // plain OAuth2 providers that don't. Set by better-auth on write; see
+    // better-auth 1.7 scopes account identity by issuer rather than providerId: `local:credential`
+    // for password accounts, the provider's own issuer URL for OIDC providers that have one, and
+    // `local:oauth:<id>` for plain OAuth2 providers that don't. Set by better-auth on write; see
     // migration 0024 for how existing rows were backfilled.
     issuer: text("issuer").notNull(),
     accessToken: text("accessToken"),
@@ -105,8 +104,8 @@ export const oauthProviders = sqliteTable(
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     source: text("source").notNull().default("ui"),
     // ── OIDC group mapping ────────────────────────────────────────────────
-    // Claim holding the user's groups. Dot-separated paths are supported for
-    // nested claims (e.g. "resource_access.cpm.roles").
+    // Claim holding the user's groups. Dot-separated paths address nested claims (e.g.
+    // "resource_access.cpm.roles").
     groupsClaim: text("groupsClaim").notNull().default("groups"),
     // Convention prefix: with "CPM_", membership of "CPM_Admin" grants admin.
     groupPrefix: text("groupPrefix"),
@@ -321,8 +320,7 @@ export const linkingTokens = sqliteTable("linking_tokens", {
   expiresAt: text("expiresAt").notNull(),
 });
 
-// traffic_events and waf_events have been migrated to ClickHouse.
-// See src/lib/clickhouse/client.ts for the ClickHouse schema.
+// traffic_events and waf_events now live in ClickHouse — see src/lib/clickhouse/client.ts.
 
 export const logParseState = sqliteTable("log_parse_state", {
   key: text("key").primaryKey(),
@@ -407,8 +405,8 @@ export const groups = sqliteTable(
     name: text("name").notNull(),
     description: text("description"),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
-    // "ui" for operator-managed groups, "oidc" for groups created by an IdP
-    // group sync. Only membership of "oidc" groups is reconciled on sign-in.
+    // "ui" for operator-managed groups, "oidc" for groups created by an IdP group sync. Only
+    // "oidc" group membership is reconciled on sign-in.
     source: text("source").notNull().default("ui"),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull(),

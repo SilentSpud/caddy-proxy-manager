@@ -67,8 +67,7 @@ const MIN_TOKEN_LENGTH = 32;
 const VALID_UPSTREAM_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
 /**
- * Validates that a sync token meets minimum security requirements.
- * Tokens must be at least 32 characters to provide adequate entropy.
+ * Validates a sync token: at least 32 characters, for adequate entropy.
  */
 function validateSyncToken(token: string): { valid: boolean; error?: string } {
   if (token.length < MIN_TOKEN_LENGTH) {
@@ -435,8 +434,7 @@ export async function updatePasswordPolicySettingsAction(
   try {
     await requireAdmin();
 
-    // The env var pins the behaviour; refuse rather than silently storing a
-    // preference the environment overrides.
+    // The env var pins the behaviour; refuse rather than silently storing an overridden preference.
     if (config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null) {
       return {
         success: false,
@@ -471,8 +469,8 @@ export async function updateAvatarSettingsAction(
   try {
     await requireAdmin();
 
-    // AVATAR_GRAVATAR pins the behaviour; refuse rather than silently storing a
-    // preference the environment overrides.
+    // AVATAR_GRAVATAR pins the behaviour; refuse rather than silently storing an overridden
+    // preference.
     if (config.avatars.gravatarFromEnv !== null) {
       return {
         success: false,
@@ -1460,13 +1458,9 @@ export async function updateWafSettingsAction(
 // ─── Caddy Build ─────────────────────────────────────────────────────────────
 
 /**
- * Save the module selection.
- *
- * Saving alone does not change the running Caddy — the plugins are compiled in,
- * so the image has to be rebuilt. It does immediately change what the config
- * builder is willing to emit, though: applyCaddyConfig runs here so that
- * switching a module off stops producing handlers for it right away, rather
- * than leaving a config that references a plugin about to disappear.
+ * Save the module selection. This does not rebuild — plugins are compiled in — but it does change
+ * what the config builder will emit, so applyCaddyConfig runs here: switching a module off stops
+ * producing its handlers at once, rather than leaving config naming a plugin about to vanish.
  */
 export async function updateCaddyBuildSettingsAction(
   _prevState: ActionResult | null,
@@ -1477,17 +1471,16 @@ export async function updateCaddyBuildSettingsAction(
 
     const modules: Record<string, boolean> = {};
     for (const module of CADDY_MODULES) {
-      // A checkbox that is off submits nothing, so every known module is read
-      // explicitly rather than inferred from which keys are present.
+      // A checkbox that is off submits nothing, so every known module is read explicitly rather
+      // than inferred from which keys are present.
       modules[module.id] = formData.get(`module:${module.id}`) === "on";
     }
 
     const customModules = parseCustomModules(formData.get("customModulesJson"));
     const settings = sanitizeCaddyBuildSettings({ modules, customModules });
 
-    // Refuse a selection that would strip a module something is actively using.
-    // The rebuild would otherwise succeed and the feature would just stop, with
-    // the settings still showing it as enabled.
+    // Refuse a selection that would strip a module something is actively using: the rebuild would
+    // otherwise succeed and the feature would just stop, with settings still showing it enabled.
     const conflict = await describeModuleConflicts(settings);
     if (conflict) {
       return { success: false, message: conflict };

@@ -1,21 +1,8 @@
 /**
- * Functional tests: Forward Auth with OAuth (Dex OIDC).
- *
- * Tests the full forward auth flow including:
- * - Proxy host creation with forward auth via REST API
- * - OAuth login through Dex OIDC provider
- * - Allowed vs disallowed user access enforcement
- * - Group-based access control
- * - Session cookie lifecycle
- *
- * Note: Test domains (e.g. func-fwd-oauth.test) are not DNS-resolvable.
- * Browser-based navigation uses localhost:3000 (the portal). The callback
- * step and upstream access are verified via httpGet (which sends to
- * 127.0.0.1:80 with a custom Host header, bypassing DNS).
- *
- * Requires Dex to be running in the test stack (port 5556).
- *
- * Domain: func-fwd-oauth.test
+ * Functional: Forward Auth with OAuth (Dex OIDC) — host creation, Dex login, allowed vs disallowed
+ * users, group-based access, session cookie lifecycle. Test domains are not DNS-resolvable, so
+ * browser navigation uses localhost:3000 and the callback goes through httpGet with a Host header.
+ * Requires Dex on port 5556. Domain: func-fwd-oauth.test
  */
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';

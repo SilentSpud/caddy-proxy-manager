@@ -36,20 +36,9 @@ import { useChartTheme } from "./chart-theme";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
-// `ssr: false` is deliberate, not a leftover ApexCharts v6 workaround. v7 does
-// render on the server, but through `react-apexcharts/server`, which is an async
-// Server Component — unreachable from this file, which is a client component
-// driven by user-adjustable filters.
-//
-// Server rendering would gain nothing here anyway: this page takes no props and
-// fetches every dataset from /api/analytics/* in an effect, so during the server
-// pass `timeline`, `protocols`, `userAgents` and `wafStats` are all still empty
-// and each chart's `length === 0` guard renders an EmptyState in place of the
-// chart. Dropping `ssr: false` would pull ApexCharts into the SSR graph without
-// server-rendering a single chart. (The theme tokens are not what blocks this —
-// Astryx's `useTheme` supplies a server snapshot and resolves fine without a
-// DOM.) Worth revisiting only if this page starts receiving initial data as
-// props, at which point the charts have something to draw before hydration.
+// `ssr: false` is deliberate. ApexCharts v7 renders on the server only through
+// `react-apexcharts/server`, an async Server Component this client file cannot reach — and there
+// is nothing to render anyway, since every dataset arrives from /api/analytics/* in an effect.
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 const WorldMap = dynamic(() => import("./WorldMapInner"), {
@@ -205,12 +194,8 @@ function formatTs(ts: number, rangeSeconds: number): string {
 // ── Local DateTimePicker ───────────────────────────────────────────────────────
 
 /**
- * A date and a time in one control.
- *
- * Was a Popover holding a Calendar plus a bare <input type="time">, which meant
- * two separate widgets and a hand-rolled string round-trip. DateTimeInput owns
- * both halves, so this only converts between its ISO string and the Dayjs value
- * the rest of the page works in.
+ * A date and a time in one control. DateTimeInput owns both halves, so this only converts between
+ * its ISO string and the Dayjs value the rest of the page uses.
  */
 function DateTimePicker({
   value,
@@ -237,16 +222,8 @@ function DateTimePicker({
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
-/**
- * The `color` prop stays a raw hex: these cards share the chart palette so a
- * red block-rate figure matches the red in the series beside it, and the chart
- * library is not theme-token aware.
- */
-/**
- * `tone` names the meaning rather than the colour: the value is read from an
- * Astryx token at paint time, so it follows the theme without this component
- * needing to know which mode is active.
- */
+/** Raw hex: these cards share the chart palette, and the chart library is not token-aware. */
+/** `tone` names the meaning; the value resolves from an Astryx token at paint time. */
 type StatTone = "error" | "warning";
 
 const STAT_TONE_VAR: Record<StatTone, string> = {
@@ -289,13 +266,8 @@ function StatCard({
 const INCLUDE_UNCONFIGURED_KEY = "analytics:includeUnconfiguredHosts";
 
 /**
- * Host filter.
- *
- * Was a Popover wrapping a Command list with hand-built "select all" / "clear"
- * buttons, a hand-built include-unconfigured toggle, and a hand-built badge
- * summary. MultiSelector provides search, select-all and the badge summary
- * natively; the unconfigured toggle is the one thing left to render, and it is
- * a real checkbox now rather than a button with a faded tick.
+ * Host filter. MultiSelector supplies search, select-all and the badge summary; only the
+ * include-unconfigured checkbox is rendered here.
  */
 function HostsCombobox({
   allHosts,
@@ -362,13 +334,9 @@ function HostsCombobox({
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
 /**
- * Fetch JSON, treating a non-2xx response as a failure.
- *
- * The analytics endpoints answer errors with `{ error: "…" }` and a 4xx/5xx
- * status. Parsing that body without checking `response.ok` yields an object
- * where the caller expects an array, and the first `.map()`/`.some()` on it
- * throws during render — which unmounts the whole analytics page, map included.
- * So a single unreachable ClickHouse used to blank the entire page.
+ * Fetch JSON, treating a non-2xx response as a failure. The analytics endpoints answer errors with
+ * `{ error: "…" }` and a 4xx/5xx, which parsed without checking `response.ok` lands an object in
+ * array-typed state — the first `.map()` then throws during render and blanks the whole page.
  */
 async function fetchJson(url: string): Promise<unknown> {
   const response = await fetch(url);
@@ -378,17 +346,16 @@ async function fetchJson(url: string): Promise<unknown> {
       body && typeof body === "object" && "error" in body
         ? String((body as { error: unknown }).error).trim()
         : "";
-    // Errors thrown by the ClickHouse client often carry an empty message, so
-    // always fall back to something renderable — an empty string is falsy and
-    // would leave the failure banner invisible.
+    // Errors thrown by the ClickHouse client often carry an empty message, so always fall back to
+    // something renderable — an empty string is falsy and would leave the banner invisible.
     throw new Error(reported || `${url.split("?")[0]} failed with status ${response.status}`);
   }
   return body;
 }
 
 /**
- * Defensive cast for list-shaped payloads. Renders empty rather than throwing if
- * an endpoint ever answers 200 with something unexpected.
+ * Defensive cast for list-shaped payloads. Renders empty rather than throwing if an endpoint ever
+ * answers 200 with something unexpected.
  */
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -573,9 +540,9 @@ export default function AnalyticsClient() {
 
   const INTERVALS: DisplayInterval[] = ["1h", "12h", "24h", "7d", "30d", "custom"];
 
-  // -- Table shapes ----------------------------------------------------------
-  // Astryx's Table wants rows carrying an index signature, so each dataset is
-  // widened at this one boundary rather than on the domain types themselves.
+  // ── Table shapes ──────────────────────────────────────────────────────────
+  // Astryx's Table wants rows carrying an index signature, so each dataset is widened at this one
+  // boundary rather than on the domain types themselves.
 
   const countryRows: CountryRow[] = countries.slice(0, 10).map((c) => ({
     countryCode: c.countryCode,
@@ -585,8 +552,8 @@ export default function AnalyticsClient() {
     allowed: Math.max(0, c.total - c.blocked),
   }));
 
-  // Replaces a hand-tinted row background, which signalled selection by colour
-  // alone and was invisible to assistive tech.
+  // Replaces a hand-tinted row background, which signalled selection by colour alone and was
+  // invisible to assistive tech.
   const countryStatus = useTableRowStatus<CountryRow>({
     getStatus: (row) =>
       row.countryCode === selectedCountry ? { color: "accent", label: "Selected" } : null,
@@ -597,8 +564,8 @@ export default function AnalyticsClient() {
       key: "countryCode",
       header: "Country",
       width: proportional(1),
-      // The whole row used to be the click target for filtering the map, which
-      // no keyboard user could reach. The country itself is the control now.
+      // The whole row used to be the click target for filtering the map, which no keyboard user
+      // could reach. The country itself is the control now.
       renderCell: (row) => (
         <Button
           variant="ghost"

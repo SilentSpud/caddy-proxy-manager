@@ -1,12 +1,6 @@
 /**
- * Functional tests: path prefix rewrite.
- *
- * Creates a proxy host with a path prefix rewrite (/api) pointing at the
- * whoami-server, which reflects the full request line in its response body.
- * This lets us assert that Caddy rewrote the path before forwarding, e.g.
- * a client request for /users arrives at the upstream as /api/users.
- *
- * Domain: func-rewrite.test
+ * Functional: path prefix rewrite. A host rewrites with prefix /api onto whoami-server, which
+ * reflects the request line, so /users must arrive as /api/users. Domain: func-rewrite.test
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';

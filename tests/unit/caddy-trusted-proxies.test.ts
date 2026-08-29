@@ -1,11 +1,7 @@
 /**
- * Server-level trusted_proxies / client_ip_headers support (issue #222).
- *
- * Caddy resolves {http.request.client_ip} in core, before any handler runs, so
- * the only place a global trusted-proxy list can correct client-IP attribution
- * (access logs, analytics, downstream handlers) is the HTTP server object
- * itself (servers.cpm). These tests cover the pure builder plus the emission
- * into the generated Caddy document.
+ * Server-level trusted_proxies / client_ip_headers (#222). Caddy resolves client_ip in core, before
+ * any handler, so servers.cpm is the only place a global list can fix attribution. Covers the pure
+ * builder plus its emission into the generated document.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

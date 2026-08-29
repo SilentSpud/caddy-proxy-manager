@@ -1,10 +1,6 @@
 /**
- * Integration tests for buildSyncPayload and applySyncPayload
- * in src/lib/instance-sync.ts.
- *
- * We mock src/lib/db.ts to inject a fresh migrated in-memory SQLite
- * database, giving full control over table content without affecting
- * any real db file.
+ * Integration: buildSyncPayload and applySyncPayload. src/lib/db.ts is mocked to inject a fresh
+ * migrated in-memory SQLite database, so table content is fully controlled.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

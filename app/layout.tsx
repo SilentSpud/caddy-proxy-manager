@@ -6,13 +6,9 @@ import Providers from "./providers";
 import { config } from "@/src/lib/config";
 import { THEME_COOKIE, parseThemeMode, themeAttr } from "@/src/lib/theme-mode";
 
-// Each page sets its own `title`; the template appends the app name so tabs read
-// "Proxy Hosts · Caddy Proxy Manager". APP_NAME renames it everywhere.
-//
-// A page opts out of the suffix with `title: { absolute: "..." }`, which Next
-// uses verbatim instead of filling the template. The forward auth portal does
-// this: it is served on someone else's domain, so it should not announce which
-// product is guarding the app behind it.
+// Each page sets its own `title`; the template appends APP_NAME. A page opts out with
+// `title: { absolute: "..." }` — the forward auth portal does, since it runs on someone else's
+// domain and should not name the product guarding the app.
 export const metadata: Metadata = {
   title: {
     default: config.appName,
@@ -25,13 +21,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const themeMode = parseThemeMode((await cookies()).get(THEME_COOKIE)?.value);
 
   return (
-    // data-theme is rendered here, from the cookie, so the very first paint is
-    // already in the right mode — Astryx's reset.css maps the attribute to
-    // color-scheme, and its tokens are light-dark() pairs that follow. Omitted
-    // for "system", which reset.css treats as `color-scheme: light dark`.
-    //
-    // suppressHydrationWarning stays: Astryx's Theme also writes data-theme and
-    // data-astryx-theme onto <html> once mounted.
+    // data-theme is rendered from the cookie so the first paint is already in the right mode;
+    // omitted for "system", which Astryx's reset.css reads as `color-scheme: light dark`.
+    // suppressHydrationWarning stays — Astryx's Theme writes data-theme itself once mounted.
     <html lang="en" data-theme={themeAttr(themeMode)} suppressHydrationWarning>
       <body>
         <Providers initialThemeMode={themeMode}>{children}</Providers>

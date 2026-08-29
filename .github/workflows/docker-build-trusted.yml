@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: caddy-proxman
+  IMAGE_NAME: ${{ github.repository }}
 
 # One build per ref. Pushing twice in quick succession supersedes the older run
 # rather than stacking another 3-image matrix beside it; tags get their own ref

@@ -1,12 +1,7 @@
 /**
- * The rule in src/lib/account-issuer.ts mirrors better-auth's own account
- * namespacing so the rows CPM writes directly match the ones better-auth writes
- * for the same identity.
- *
- * Drift here does not fail loudly: nothing throws, the account row simply stops
- * resolving at sign-in and the user is locked out. So the mirror is pinned
- * against better-auth's exported helpers rather than against copied literals —
- * if upstream changes the scheme, this test breaks instead of production.
+ * src/lib/account-issuer.ts mirrors better-auth's account namespacing, so rows CPM writes match the
+ * ones better-auth writes. Drift is silent — nothing throws, the account just stops resolving at
+ * sign-in — so the mirror is pinned against better-auth's exported helpers, not copied literals.
  */
 import { describe, it, expect } from 'bun:test';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';

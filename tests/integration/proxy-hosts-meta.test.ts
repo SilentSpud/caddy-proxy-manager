@@ -1,9 +1,6 @@
 /**
- * Integration tests: proxy host JSON field serialization.
- *
- * Verifies that complex nested meta objects (WAF, geo-block, authentik,
- * load balancer) survive a round-trip through the database — stored as JSON,
- * retrieved and deserialized correctly.
+ * Integration: complex nested meta objects (WAF, geo-block, authentik, load balancer) survive a
+ * round-trip through the database as JSON.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { createTestDb, type TestDb } from '../helpers/db';

@@ -1,8 +1,7 @@
 /**
- * In OIDC-only mode better-auth must not accept credentials at all — hiding the
- * login form is cosmetic, the email/password endpoints have to be off. The flag
- * is read from env when config is imported, so it is set in a hoisted block
- * before any import.
+ * In OIDC-only mode better-auth must not accept credentials at all — hiding the login form is
+ * cosmetic, the email/password endpoints have to be off. The flag is read from env at config
+ * import, so it is set in a hoisted block.
  */
 import { describe, it, expect, afterAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';

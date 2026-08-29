@@ -27,16 +27,10 @@ import {
 import atlasUrl from "world-atlas/countries-50m.json?url";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
-// maplibre-gl v6 loads its tile worker from a separate file resolved at runtime
-// from `import.meta.url`, and that lookup does not survive bundling — the worker
-// never starts and the map renders as an empty ocean. `?worker&url` has Vite
-// bundle the worker's whole module graph (it imports a sibling
-// `./maplibre-gl-shared.mjs`, which a plain `?url` copy would 404 on) into one
-// self-contained chunk and hand back its emitted path, which is pointed at
-// explicitly here. Requires `worker.format: "es"` in vite.config.ts, since
-// maplibre constructs it with `{ type: "module" }`, and `worker-src 'self'` in
-// the CSP (proxy.ts) — the worker is a same-origin URL now, not the blob: URL
-// v5 used.
+// maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling
+// — the worker never starts and the map renders as empty ocean. `?worker&url` bundles the worker's
+// whole module graph into one chunk and hands back its path. Needs `worker.format: "es"` in
+// vite.config.ts and `worker-src 'self'` in the CSP (proxy.ts).
 if (typeof window !== "undefined") {
   setWorkerUrl(maplibreWorkerUrl);
 }
@@ -443,9 +437,9 @@ function flag(code: string): string {
   );
 }
 
-// Unwrap polygon rings so consecutive vertices never jump more than 180° in longitude.
-// This prevents MapLibre from drawing giant artifacts for countries crossing ±180° (Russia, Fiji, etc.).
-// Coordinates outside [-180, 180] are intentional — MapLibre renders them via world-copy tiling.
+// Unwrap polygon rings so consecutive vertices never jump more than 180° in longitude, which stops
+// MapLibre drawing giant artifacts for countries crossing ±180° (Russia, Fiji). Coordinates
+// outside [-180, 180] are intentional — MapLibre renders them via world-copy tiling.
 function cutAntimeridian(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection {
   function unwrapRing(ring: GeoJSON.Position[]): GeoJSON.Position[] {
     if (ring.length === 0) return ring;
@@ -502,10 +496,9 @@ export default function WorldMapInner({
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
-  // `tokens` is memoized on theme + mode, so every layer spec below stays
-  // referentially stable until the mode actually flips — react-map-gl diffs
-  // these against the live style, and a new object each render would make it
-  // re-apply paint properties continuously.
+  // `tokens` is memoized on theme + mode, so every layer spec below stays referentially stable
+  // until the mode actually flips — react-map-gl diffs these against the live style, and a new
+  // object each render would make it re-apply paint properties continuously.
   const { mode, tokens } = useTheme();
   const palette = useMemo(
     () => mapPalette(mode, (name: string) => tokens[name] ?? ""),

@@ -6,15 +6,14 @@ import { users, accounts } from "./db/schema";
 import { and, eq } from "drizzle-orm";
 
 /**
- * Ensures the admin user from environment variables exists in the database.
- * This is called during application startup.
- * The password from environment variables is hashed and stored securely.
+ * Ensures the admin user from environment variables exists, hashing the password before storing
+ * it. Called during application startup.
  */
 
 //Todo: this could probably be handled better, especially for the adminid.
 export async function ensureAdminUser(): Promise<void> {
-  // OIDC-only mode: no local accounts exist, so there is no bootstrap admin to
-  // seed and no admin credentials to require. Roles come from the IdP's groups.
+  // OIDC-only mode: no local accounts, so no bootstrap admin to seed and no admin credentials to
+  // require. Roles come from the IdP's groups.
   if (config.auth.disableLocalUsers) {
     console.log(
       "Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true) — skipping admin user seed",
@@ -43,9 +42,8 @@ export async function ensureAdminUser(): Promise<void> {
   });
 
   if (existingUser) {
-    // Admin user exists, update credentials if needed
-    // Always update password hash to handle password changes in env vars
-    // Also ensure role is always "admin" for the primary admin user
+    // Admin user exists — always update the password hash so env-var changes take effect, and keep
+    // the role at "admin".
     const now = nowIso();
     await db
       .update(users)
@@ -90,8 +88,8 @@ export async function ensureAdminUser(): Promise<void> {
 }
 
 /**
- * Ensures a credential account row exists in the accounts table for Better Auth.
- * Better Auth requires an accounts row with providerId="credential" and the password hash.
+ * Ensures a credential account row exists for Better Auth, which requires one with
+ * providerId="credential" and the password hash.
  */
 async function ensureCredentialAccount(userId: number, passwordHash: string): Promise<void> {
   const now = nowIso();

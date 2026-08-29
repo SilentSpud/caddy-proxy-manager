@@ -1,24 +1,19 @@
 /**
- * mTLS helper functions for building Caddy TLS connection policies
- * and HTTP-layer RBAC route enforcement.
- *
+ * mTLS helpers for Caddy TLS connection policies and HTTP-layer RBAC route enforcement.
  * Extracted from caddy.ts so they can be unit-tested independently.
  */
 
 /**
- * Normalise a fingerprint to the format Caddy uses:
- * lowercase hex without colons.
- *
- * Node's X509Certificate.fingerprint256 returns "AB:CD:EF:..." (uppercase, colons).
- * Caddy's {http.request.tls.client.fingerprint} returns "abcdef..." (lowercase, no colons).
+ * Normalise a fingerprint to Caddy's format — lowercase hex, no colons. Node's
+ * X509Certificate.fingerprint256 gives "AB:CD:EF:…"; Caddy's placeholder gives "abcdef…".
  */
 export function normalizeFingerprint(fp: string): string {
   return fp.replace(/:/g, "").toLowerCase();
 }
 
 /**
- * Minimal type matching MtlsAccessRule from the models layer.
- * Defined here to avoid importing from models (which pulls in db.ts).
+ * Minimal type matching MtlsAccessRule from the models layer, redeclared here to avoid
+ * importing models (which pulls in db.ts).
  */
 export type MtlsAccessRuleLike = {
   pathPattern: string;
@@ -28,8 +23,8 @@ export type MtlsAccessRuleLike = {
 };
 
 /**
- * Converts a PEM certificate to base64-encoded DER format expected by Caddy's
- * `trusted_ca_certs` and `trusted_leaf_certs` fields.
+ * PEM certificate → base64-encoded DER, the form Caddy's `trusted_ca_certs` and
+ * `trusted_leaf_certs` fields expect.
  */
 export function pemToBase64Der(pem: string): string {
   return pem
@@ -39,20 +34,11 @@ export function pemToBase64Der(pem: string): string {
 }
 
 /**
- * Builds a Caddy `client_authentication` block for the given list of domains.
- *
- * All CA cert IDs referenced by those domains are unioned into one set, which is
- * intentional when every domain in the list shares the same CA configuration.
- * Callers must ensure that `domains` is pre-grouped so domains with different CA
- * sets are passed in separate calls — see `groupMtlsDomainsByCaSet`.
- *
- * Strategy per CA:
- *  - Unmanaged CA (no tracked issued certs): trust any cert signed by that CA.
- *  - Managed CA with active certs: CA in `trusted_ca_certs` + active leaf certs
- *    in `trusted_leaf_certs` (revocation enforcement).
- *  - Managed CA with ALL certs revoked: excluded entirely (chain validation fails).
- *
- * Returns null if there are no CA certs to trust (all excluded or none configured).
+ * Builds a Caddy `client_authentication` block for the given domains, unioning their CA cert IDs —
+ * so callers must pre-group domains sharing a CA config (see `groupMtlsDomainsByCaSet`). Per CA:
+ * unmanaged (no tracked certs) → trust anything it signed; managed with active certs → CA in
+ * `trusted_ca_certs` plus active leaves in `trusted_leaf_certs`; all revoked → excluded, so chain
+ * validation fails. Null when no CA certs are left to trust.
  */
 export function buildClientAuthentication(
   domains: string[],
@@ -93,8 +79,8 @@ export function buildClientAuthentication(
   const trustedLeafCerts: string[] = [];
 
   if (hasLeafOverride) {
-    // New cert-based model: CAs were derived from selected certs.
-    // Add CAs for chain validation, pin to only the explicitly selected leaf certs.
+    // New cert-based model: CAs derived from the selected certs. Add them for chain
+    // validation, pin to only the explicitly selected leaf certs.
     for (const id of caCertIds) {
       const ca = caCertMap.get(id);
       if (ca) trustedCaCerts.push(pemToBase64Der(ca.certificatePem));
@@ -112,12 +98,8 @@ export function buildClientAuthentication(
         const activeLeafCerts = issuedClientCertMap.get(id) ?? [];
         trustedCaCerts.push(pemToBase64Der(ca.certificatePem));
         if (activeLeafCerts.length === 0) {
-          // All certs revoked — pin to the CA cert itself as a leaf cert.
-          // No client cert can hash-match a CA cert, so this rejects all
-          // clients while keeping a valid client_authentication block
-          // (avoids relying on Caddy's experimental "drop" field).
-          // Note: presenting the CA cert as a client cert would require the
-          // CA's private key, which is already a full compromise scenario.
+          // All certs revoked — pin the CA cert itself as a leaf. No client cert can hash-match a
+          // CA cert, so this rejects everyone while keeping a valid client_authentication block.
           trustedLeafCerts.push(pemToBase64Der(ca.certificatePem));
         } else {
           for (const certPem of activeLeafCerts) {
@@ -145,17 +127,10 @@ export function buildValidClientCertCelExpression(): string {
 }
 
 /**
- * Groups mTLS domains by their sorted CA ID fingerprint so that each group can
- * get its own TLS connection policy with the correct, isolated set of trusted CAs.
- *
- * Domains with the same set of CA IDs (regardless of order) are placed in the
- * same group.  Domains with different CA sets end up in separate groups, ensuring
- * a client certificate from CA_B cannot authenticate against a host that only
- * configured CA_A.
- *
- * @param domains - List of domain names that have mTLS configured.
- * @param mTlsDomainMap - Map from lowercased domain to its list of CA cert IDs.
- * @returns Map from CA-set fingerprint string to the list of domains sharing it.
+ * Groups mTLS domains by sorted CA ID fingerprint, so each group gets its own TLS policy with an
+ * isolated trust set — a cert from CA_B cannot authenticate against a host that configured CA_A.
+ * @param mTlsDomainMap - Lowercased domain → its CA cert IDs.
+ * @returns CA-set fingerprint → the domains sharing it.
  */
 export function groupMtlsDomainsByCaSet(
   domains: string[],
@@ -175,9 +150,8 @@ export function groupMtlsDomainsByCaSet(
 // ── mTLS RBAC HTTP-layer route enforcement ───────────────────────────
 
 /**
- * For a single access rule, resolve the set of allowed fingerprints by unioning:
- *  - All active cert fingerprints from certs that hold any of the allowed roles
- *  - All active cert fingerprints from directly-allowed cert IDs
+ * Resolve one access rule's allowed fingerprints: the union of active cert fingerprints from
+ * certs holding any of the allowed roles and from directly-allowed cert IDs.
  */
 export function resolveAllowedFingerprints(
   rule: MtlsAccessRuleLike,
@@ -202,10 +176,8 @@ export function resolveAllowedFingerprints(
 }
 
 /**
- * Builds a CEL expression that checks whether the client certificate's
- * fingerprint is in the given set of allowed fingerprints.
- *
- * Uses Caddy's `{http.request.tls.client.fingerprint}` placeholder.
+ * A CEL expression checking whether the client certificate's fingerprint is in the allowed
+ * set, via Caddy's `{http.request.tls.client.fingerprint}` placeholder.
  */
 export function buildFingerprintCelExpression(fingerprints: Set<string>): string {
   const fps = Array.from(fingerprints).sort();
@@ -214,16 +186,9 @@ export function buildFingerprintCelExpression(fingerprints: Set<string>): string
 }
 
 /**
- * Given a proxy host's mTLS access rules, builds subroutes that enforce
- * path-based RBAC at the HTTP layer (after TLS handshake).
- *
- * Returns null if there are no access rules (caller should use normal routing).
- *
- * The returned subroutes:
- *  - For each rule (ordered by priority desc), emit a path+fingerprint match
- *    route (allow) followed by a path-only route (deny 403).
- *  - After all rules, a catch-all route allows any valid cert (preserving
- *    backwards-compatible behavior for paths without rules).
+ * Subroutes enforcing a host's path-based mTLS RBAC at the HTTP layer; null when there are no
+ * rules. Per rule (priority desc): a path+fingerprint allow route, then a path-only 403. A
+ * catch-all afterwards admits any valid cert, for paths without rules.
  */
 export function buildMtlsRbacSubroutes(
   accessRules: MtlsAccessRuleLike[],

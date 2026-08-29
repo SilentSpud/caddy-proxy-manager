@@ -241,12 +241,9 @@ trap cleanup_tracked EXIT
 
 # create_resource COLLECTION JSON
 #
-# Sets NEW_ID on success and registers the resource for teardown. Returns
-# non-zero on failure, leaving the server's reply in API_STATUS / API_BODY.
-#
-# Deliberately not written to echo the id: it has to run in the caller's shell
-# so that `track` mutates the caller's cleanup stack, which a $(...) subshell
-# would silently discard.
+# Sets NEW_ID on success and registers the resource for teardown; non-zero on failure, with the
+# reply in API_STATUS / API_BODY. Deliberately not written to echo the id — it must run in the
+# caller's shell so `track` mutates the caller's cleanup stack, which a $(...) subshell would lose.
 NEW_ID=
 
 create_resource() {

@@ -176,20 +176,11 @@ services:
       VOLUMES: 1
       IMAGES: 1
       SECRETS: 0
-      # Caddy plugins are compiled into the binary, so changing the module
-      # selection in Settings → Caddy Build means recompiling the image. That
-      # is POST /build, which this flag gates.
-      #
-      # Set BUILD: 0 to opt out. The rest of the app keeps working; only the
-      # "Rebuild Caddy" button stops, and the UI reports the failure. Do that
-      # if you would rather run `docker compose build caddy` yourself — the
-      # generated module list is written to the shared data volume either way,
-      # as docker-compose.caddy-build.yml.
-      #
-      # Note that a hand-run build does not produce caddy-build.applied.json
-      # (the sidecar writes that only after a build it performed came back
-      # healthy), so the app keeps assuming the shipped module set and will not
-      # emit config for anything you added that way.
+      # Caddy plugins are compiled in, so a module change means recompiling the image — that is
+      # POST /build, which this flag gates. Set BUILD: 0 to opt out: only the "Rebuild Caddy" button
+      # stops, and the module list is still written to the shared volume as
+      # docker-compose.caddy-build.yml. A hand-run build produces no caddy-build.applied.json, so
+      # the app keeps assuming the shipped module set.
       BUILD: 1
       # Deny everything else by default
       EXEC: 0
@@ -197,26 +188,18 @@ services:
       AUTH: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    # Security: keep the socket proxy off the shared app network. Only the
-    # l4-port-manager sidecar needs to reach its container-create API; exposing
-    # it to web/caddy/clickhouse would turn any container compromise into host
-    # root (POST + CONTAINERS = create a privileged container that mounts the
-    # host fs). This network is `internal: true` (no egress) and carries only
-    # the proxy + sidecar.
+    # Security: keep the socket proxy off the shared app network. Only the l4-port-manager sidecar
+    # needs its container-create API; exposing it to web/caddy/clickhouse would turn any container
+    # compromise into host root (POST + CONTAINERS = create a privileged container that mounts the
+    # host fs). This network is `internal: true` (no egress) and carries only the proxy + sidecar.
     networks:
       - socket-proxy
 
-  # Compose manager sidecar (service name kept for upgrade compatibility) —
-  # performs the two operations that need the caddy *container* recreated
-  # rather than its config reloaded over the admin API:
-  #   * L4 proxy host port changes (published ports are fixed at create time)
-  #   * Caddy module selection changes (plugins are compiled into the binary)
-  # Uses Docker socket proxy instead of direct Docker socket access.
-  #
-  # Note: rebuilding needs the build context readable from this container, which
-  # the `.:/compose:ro` mount below provides. Deployments that set
-  # COMPOSE_HOST_DIR to a host path outside that mount can still apply L4 ports
-  # but cannot rebuild; run `docker compose build caddy` on the host instead.
+  # Compose manager sidecar (name kept for upgrade compatibility) — performs the two operations
+  # needing the caddy *container* recreated rather than reloaded: L4 port changes and module
+  # selection changes. Uses the Docker socket proxy. Rebuilding needs the build context, which the
+  # `.:/compose:ro` mount provides; deployments setting COMPOSE_HOST_DIR outside that mount can
+  # apply ports but not rebuild.
   l4-port-manager:
     container_name: caddy-proxy-manager-l4-ports
     image: ghcr.io/fuomag9/caddy-proxy-manager-l4-port-manager:latest

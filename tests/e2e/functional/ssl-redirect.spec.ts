@@ -1,10 +1,5 @@
 /**
- * Functional tests: HTTP→HTTPS redirect when ssl_forced is enabled.
- *
- * Creates a proxy host with ssl_forced=true (the default when the form
- * field is present without the ssl_forced_present bypass) and verifies
- * that plain HTTP requests receive a 308 permanent redirect to HTTPS.
- *
+ * Functional: HTTP→HTTPS redirect with ssl_forced enabled — plain HTTP gets a 308.
  * Domain: func-ssl.test
  */
 import { test, expect } from '@playwright/test';

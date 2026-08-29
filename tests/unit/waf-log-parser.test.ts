@@ -33,13 +33,10 @@ vi.mock('node:fs', () => ({
 import { extractBracketField, parseLine, ruleInfoFromAuditEntry } from '@/src/lib/waf-log-parser';
 
 /**
- * Regression (issue #233): rule attribution must come from the audit entry's own
- * `messages` array (audit log part H), not from a join against waf-rules.log.
- *
- * The join only lands when Coraza's audit line and Caddy's rule line happen to be
- * written within the same 30s parse tick. When it misses, `parseLine` used to drop
- * the whole event unless it was blocked — so every detected-but-not-blocked event
- * disappeared. Each test here passes an EMPTY ruleMap to simulate that miss.
+ * Regression (#233): rule attribution must come from the audit entry's own `messages` array (part
+ * H), not a join against waf-rules.log — that only lands when both lines fall in the same 30s parse
+ * tick, and when it misses `parseLine` dropped the whole event unless blocked. Each test here
+ * passes an EMPTY ruleMap to simulate the miss.
  */
 describe('rule attribution from the audit entry itself', () => {
   const CRS_XSS =

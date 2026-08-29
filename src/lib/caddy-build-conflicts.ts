@@ -1,11 +1,7 @@
 /**
- * Refusing a module selection that something is still using.
- *
- * Kept out of caddy-build.ts on purpose: this reaches into the proxy-host and
- * settings models, and those import caddy.ts, which imports caddy-build.ts for
- * its feature gating. Putting the check there would close that loop into an
- * import cycle. Nothing in the config-building path needs this — only the two
- * write paths (the settings server action and the REST endpoint) do.
+ * Refusing a module selection that something is still using. Kept out of caddy-build.ts because it
+ * reaches into models that import caddy.ts, which imports caddy-build.ts — an import cycle. Only
+ * the two write paths (settings action, REST endpoint) need it.
  */
 
 import { resolveEnabledModuleIds } from "./caddy-build";
@@ -20,11 +16,8 @@ import {
 } from "./settings";
 
 /**
- * Describe, in the operator's terms, why a selection cannot be applied yet —
- * or null when it can.
- *
- * Naming the thing that uses a module ("3 enabled L4 proxy hosts") is the
- * difference between a rule someone can act on and one that just blocks them.
+ * Why a selection cannot be applied yet, in the operator's terms, or null when it can. Naming what
+ * uses the module ("3 enabled L4 proxy hosts") is what makes the refusal actionable.
  */
 export async function describeModuleConflicts(
   settings: CaddyBuildSettings,
@@ -58,12 +51,8 @@ export async function describeModuleConflicts(
     }
   }
 
-  // Per-host configuration counts just as much as the global switch. Both WAF
-  // and geoblocking can be enabled on an individual host with the global
-  // setting left off, and resolveEffectiveWaf/resolveEffectiveGeoBlock honour
-  // that. Checking only the globals let an operator disable a module a dozen
-  // hosts relied on; the config builder would then quietly stop emitting their
-  // handlers, and a security control would vanish without a word.
+  // Per-host config counts as much as the global switch: WAF and geoblocking can be on per host
+  // with the global off. Checking only globals let an operator disable a module a dozen hosts used.
   if (wafOff || blockerOff) {
     const hosts = await listProxyHosts();
     if (wafOff) {
@@ -84,9 +73,8 @@ export async function describeModuleConflicts(
     }
   }
 
-  // Every configured provider, not just the default: a certificate can pin its
-  // own provider through providerOptions.provider, so a non-default provider
-  // with credentials on file is very likely issuing something.
+  // Every configured provider, not just the default: a certificate can pin its own through
+  // providerOptions.provider, so a non-default provider with credentials on file is likely busy.
   const dnsProviders = await getDnsProviderSettings();
   const defaultProvider = dnsProviders?.default ?? null;
   for (const provider of Object.keys(dnsProviders?.providers ?? {})) {
@@ -103,19 +91,9 @@ export async function describeModuleConflicts(
 }
 
 /**
- * A non-blocking heads-up about per-host Caddyfile snippets, or null.
- *
- * Snippets are free-form Caddyfile text and can name a directive from any
- * compiled-in plugin — `waf { … }`, `geoblock { … }`, something from a custom
- * module. Nothing in the stored shape says which, and the only thing that could
- * tell us is Caddy's own adapter, which can only answer for the binary that is
- * running now, not the one a rebuild would produce. So this cannot be a refusal
- * the way the checks above are.
- *
- * It is still worth saying. Without it, a snippet referencing a removed plugin
- * simply stops adapting after the rebuild and is skipped with a console warning
- * nobody reads — the same silent-disappearance problem the refusals exist to
- * prevent, just one layer down.
+ * A non-blocking heads-up about per-host Caddyfile snippets, or null. Snippets are free-form text
+ * that can name any compiled-in plugin's directive, and only Caddy's adapter could say which — and
+ * only for the binary running now. So this warns rather than refuses.
  */
 export async function describeCaddyfileSnippetWarning(
   settings: CaddyBuildSettings,

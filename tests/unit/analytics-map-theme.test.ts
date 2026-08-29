@@ -13,10 +13,8 @@ import {
 } from '../../app/(dashboard)/analytics/map-theme';
 
 /**
- * Builds the palette the way the component does: Astryx tokens resolved for one
- * colour mode. Going through the real theme rather than a stub is the point —
- * the failure this guards against is a token being renamed or dropped upstream,
- * which a hand-written fixture would hide.
+ * Builds the palette the way the component does, through the real Astryx theme rather than a stub:
+ * the failure this guards is a token renamed or dropped upstream, which a fixture would hide.
  */
 function paletteFor(mode: 'light' | 'dark'): MapPalette {
   const tokens = resolveThemeTokens(neutralTheme, { mode });
