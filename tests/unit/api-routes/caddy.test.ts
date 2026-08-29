@@ -50,6 +50,7 @@ function createMockRequest(): any {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireApiAdmin.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
+  mockApplyCaddyConfig.mockResolvedValue({ ok: true });
 });
 
 describe('POST /api/v1/caddy/apply', () => {
