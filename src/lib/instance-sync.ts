@@ -11,7 +11,10 @@ import {
 import { getSetting, setSetting } from "./settings";
 import { recordInstanceSyncResult, updateInstance } from "./models/instances";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
+import { sanitizeStoredCertificateProviderOptions } from "./certificate-provider-options";
+import { sanitizeInstanceSyncError } from "./instance-sync-error";
 import { applyL4Ports, getL4PortsDiff } from "./l4-ports";
+import { assertValidInstanceSyncToken, isValidInstanceSyncToken } from "./instance-sync-token";
 
 export type InstanceMode = "standalone" | "master" | "slave";
 
@@ -30,6 +33,8 @@ export type SyncSettings = {
   error_pages: unknown | null;
   trusted_proxies: unknown | null;
   avatars: unknown | null;
+  /** Optional for backward compatibility with payloads from older masters. */
+  default_response?: unknown | null;
 };
 
 export type SyncPayload = {
@@ -88,11 +93,13 @@ export function getEnvSlaveInstances(): EnvSlaveInstance[] {
       if (typeof item !== "object" || item === null) return false;
       if (typeof item.name !== "string" || item.name.trim().length === 0) return false;
       if (typeof item.url !== "string" || item.url.trim().length === 0) return false;
-      if (typeof item.token !== "string" || item.token.trim().length === 0) return false;
+      if (!isValidInstanceSyncToken(item.token)) return false;
       return true;
     });
-  } catch (error) {
-    console.warn("Failed to parse INSTANCE_SLAVES environment variable:", error);
+  } catch {
+    // JSON.parse errors can include excerpts from the input, which contains
+    // bearer tokens. Never attach the exception or environment value here.
+    console.warn("Failed to parse INSTANCE_SLAVES environment variable");
     return [];
   }
 }
@@ -169,6 +176,7 @@ export async function getSlaveMasterToken(): Promise<string | null> {
   // Environment variable takes precedence
   const envToken = process.env[ENV_INSTANCE_SYNC_TOKEN];
   if (typeof envToken === "string" && envToken.length > 0) {
+    assertValidInstanceSyncToken(envToken, ENV_INSTANCE_SYNC_TOKEN);
     return envToken;
   }
 
@@ -178,6 +186,7 @@ export async function getSlaveMasterToken(): Promise<string | null> {
     return null;
   }
   if (!isEncryptedSecret(stored)) {
+    assertValidInstanceSyncToken(stored, "Stored instance sync token");
     try {
       await setSetting(MASTER_TOKEN_KEY, encryptSecret(stored));
     } catch (error) {
@@ -186,7 +195,9 @@ export async function getSlaveMasterToken(): Promise<string | null> {
     return stored;
   }
   try {
-    return decryptSecret(stored);
+    const token = decryptSecret(stored);
+    assertValidInstanceSyncToken(token, "Stored instance sync token");
+    return token;
   } catch (error) {
     console.error("Failed to decrypt stored master token:", error);
     return null;
@@ -201,6 +212,9 @@ export async function setSlaveMasterToken(token: string | null): Promise<void> {
     );
     return;
   }
+  if (token) {
+    assertValidInstanceSyncToken(token);
+  }
   const next = token ? encryptSecret(token) : "";
   await setSetting(MASTER_TOKEN_KEY, next);
 }
@@ -213,7 +227,7 @@ export async function getSlaveLastSync(): Promise<{ at: string | null; error: st
 
   return {
     at: at ?? null,
-    error: error && error.length > 0 ? error : null,
+    error: sanitizeInstanceSyncError(error),
   };
 }
 
@@ -221,7 +235,7 @@ export async function setSlaveLastSync(result: { ok: boolean; error?: string | n
   await setSetting(SLAVE_LAST_SYNC_AT_KEY, nowIso());
   await setSetting(
     SLAVE_LAST_SYNC_ERROR_KEY,
-    result.ok ? "" : (result.error ?? "Unknown sync error"),
+    result.ok ? "" : (sanitizeInstanceSyncError(result.error) ?? "Previous synchronization failed"),
   );
 }
 
@@ -271,6 +285,7 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
     error_pages: await getSetting("error_pages"),
     trusted_proxies: await getSetting("trusted_proxies"),
     avatars: await getSetting("avatars"),
+    default_response: await getSetting("default_response"),
   };
 
   const sanitizedAccessLists = accessListRows.map((row) => ({
@@ -280,6 +295,10 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
 
   const sanitizedCertificates = certRows.map((row) => ({
     ...row,
+    providerOptions: sanitizeStoredCertificateProviderOptions(row.providerOptions),
+    // Transport the operational value over the authenticated sync channel;
+    // the slave re-encrypts it with its own SESSION_SECRET before storage.
+    privateKeyPem: row.privateKeyPem ? decryptSecret(row.privateKeyPem) : null,
     createdBy: null,
   }));
 
@@ -358,12 +377,18 @@ export async function syncInstances(): Promise<{
       let token: string;
       try {
         token = decryptSecret(instance.apiToken);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+      } catch {
         await recordInstanceSyncResult(instance.id, {
           ok: false,
-          error: `Token decrypt failed: ${message}`,
+          error: "Stored token could not be decrypted",
         });
+        return { ok: false, skippedHttp: false };
+      }
+
+      if (!isValidInstanceSyncToken(token)) {
+        const message = "Stored instance sync token does not meet the current security policy";
+        console.warn(`Skipping sync to "${instance.name}": ${message}`);
+        await recordInstanceSyncResult(instance.id, { ok: false, error: message });
         return { ok: false, skippedHttp: false };
       }
 
@@ -376,6 +401,7 @@ export async function syncInstances(): Promise<{
         return { ok: false, skippedHttp: true };
       }
 
+      let failureMessage = "Sync request failed";
       try {
         const response = await fetch(`${instance.baseUrl.replace(/\/$/, "")}/api/instances/sync`, {
           method: "POST",
@@ -387,15 +413,14 @@ export async function syncInstances(): Promise<{
         });
 
         if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Sync failed: ${response.status} ${text}`);
+          failureMessage = `Sync failed with HTTP ${response.status}`;
+          throw new Error(failureMessage);
         }
 
         await recordInstanceSyncResult(instance.id, { ok: true });
         return { ok: true, skippedHttp: false };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await recordInstanceSyncResult(instance.id, { ok: false, error: message });
+      } catch {
+        await recordInstanceSyncResult(instance.id, { ok: false, error: failureMessage });
         return { ok: false, skippedHttp: false };
       }
     }),
@@ -412,6 +437,7 @@ export async function syncInstances(): Promise<{
         return { ok: false, skippedHttp: true };
       }
 
+      let failureStatus: number | null = null;
       try {
         const response = await fetch(`${instance.url.replace(/\/$/, "")}/api/instances/sync`, {
           method: "POST",
@@ -423,15 +449,17 @@ export async function syncInstances(): Promise<{
         });
 
         if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Sync failed: ${response.status} ${text}`);
+          failureStatus = response.status;
+          throw new Error("Sync request rejected");
         }
 
         console.log(`Sync to env-configured instance "${instance.name}" succeeded`);
         return { ok: true, skippedHttp: false };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`Sync to env-configured instance "${instance.name}" failed:`, message);
+      } catch {
+        console.error("Environment-configured instance sync failed", {
+          instanceName: instance.name,
+          ...(failureStatus === null ? {} : { status: failureStatus }),
+        });
         return { ok: false, skippedHttp: false };
       }
     }),
@@ -465,6 +493,7 @@ export async function applySyncPayload(payload: SyncPayload) {
   // ?? null so a master running an older build, whose payload omits the key,
   // clears the synced value instead of leaving a stale one behind.
   await setSyncedSetting("avatars", payload.settings.avatars ?? null);
+  await setSyncedSetting("default_response", payload.settings.default_response ?? null);
 
   // bun:sqlite is synchronous, so the transaction callback must be too
   db.transaction((tx) => {
@@ -477,7 +506,17 @@ export async function applySyncPayload(payload: SyncPayload) {
     tx.delete(caCertificates).run();
 
     if (payload.data.certificates.length > 0) {
-      tx.insert(certificates).values(payload.data.certificates).run();
+      tx.insert(certificates)
+        .values(
+          payload.data.certificates.map((certificate) => ({
+            ...certificate,
+            providerOptions: sanitizeStoredCertificateProviderOptions(certificate.providerOptions),
+            privateKeyPem: certificate.privateKeyPem
+              ? encryptSecret(certificate.privateKeyPem)
+              : null,
+          })),
+        )
+        .run();
     }
     if (payload.data.caCertificates && payload.data.caCertificates.length > 0) {
       tx.insert(caCertificates).values(payload.data.caCertificates).run();

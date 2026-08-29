@@ -17,7 +17,11 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AUTOFILL_NEW_PASSWORD } from "@/components/ui/native-input-attrs";
-import type { OAuthProvider } from "@/src/lib/models/oauth-providers";
+import {
+  oauthCallbackUrl,
+  withOAuthClientSecretRotation,
+  type OAuthProviderView,
+} from "@/src/lib/oauth-provider-view";
 import {
   createOAuthProviderAction,
   updateOAuthProviderAction,
@@ -25,7 +29,7 @@ import {
 } from "./actions";
 
 interface OAuthProvidersSectionProps {
-  initialProviders: OAuthProvider[];
+  initialProviders: OAuthProviderView[];
   baseUrl: string;
   /** True when AUTH_DISABLE_LOCAL_USERS=true — SSO is the only way in. */
   localUsersDisabled?: boolean;
@@ -93,31 +97,44 @@ export default function OAuthProvidersSection({
 }: OAuthProvidersSectionProps) {
   const [providers, setProviders] = useState(initialProviders);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<OAuthProvider | null>(null);
+  const [editingProvider, setEditingProvider] = useState<OAuthProviderView | null>(null);
+  const [rotateClientSecret, setRotateClientSecret] = useState(false);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<OAuthProvider | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<OAuthProviderView | null>(null);
 
   const callbackUrl = useCallback(
-    (providerId: string) => `${baseUrl}/api/auth/callback/${providerId}`,
+    (providerId: string) => oauthCallbackUrl(baseUrl, providerId),
     [baseUrl],
   );
 
+  function closeDialog() {
+    // Clear any newly-entered replacement secret from client memory as soon
+    // as the dialog closes.
+    setDialogOpen(false);
+    setEditingProvider(null);
+    setRotateClientSecret(false);
+    setForm(emptyForm);
+    setError(null);
+  }
+
   function openAddDialog() {
     setEditingProvider(null);
+    setRotateClientSecret(true);
     setForm(emptyForm);
     setError(null);
     setDialogOpen(true);
   }
 
-  function openEditDialog(provider: OAuthProvider) {
+  function openEditDialog(provider: OAuthProviderView) {
     setEditingProvider(provider);
+    setRotateClientSecret(false);
     setForm({
       name: provider.name,
       type: provider.type,
       clientId: provider.clientId,
-      clientSecret: provider.clientSecret,
+      clientSecret: "",
       issuer: provider.issuer ?? "",
       authorizationUrl: provider.authorizationUrl ?? "",
       tokenUrl: provider.tokenUrl ?? "",
@@ -138,7 +155,13 @@ export default function OAuthProvidersSection({
   }
 
   async function handleSave() {
-    if (!form.name.trim() || !form.clientId.trim() || !form.clientSecret.trim()) {
+    const secretRequired =
+      !editingProvider || rotateClientSecret || !editingProvider.hasClientSecret;
+    if (
+      !form.name.trim() ||
+      !form.clientId.trim() ||
+      (secretRequired && !form.clientSecret.trim())
+    ) {
       setError("Name, Client ID, and Client Secret are required.");
       return;
     }
@@ -148,26 +171,29 @@ export default function OAuthProvidersSection({
 
     try {
       if (editingProvider) {
-        const updated = await updateOAuthProviderAction(editingProvider.id, {
-          name: form.name.trim(),
-          type: form.type,
-          clientId: form.clientId.trim(),
-          clientSecret: form.clientSecret.trim(),
-          issuer: form.issuer.trim() || null,
-          authorizationUrl: form.authorizationUrl.trim() || null,
-          tokenUrl: form.tokenUrl.trim() || null,
-          userinfoUrl: form.userinfoUrl.trim() || null,
-          scopes: form.scopes.trim() || "openid email profile",
-          autoLink: form.autoLink,
-          groupsClaim: form.groupsClaim.trim() || "groups",
-          groupPrefix: form.groupPrefix.trim() || null,
-          roleMappingEnabled: form.roleMappingEnabled,
-          adminGroup: form.adminGroup.trim() || null,
-          userGroup: form.userGroup.trim() || null,
-          viewerGroup: form.viewerGroup.trim() || null,
-          defaultRole: form.defaultRole,
-          syncGroups: form.syncGroups,
-        });
+        const update = withOAuthClientSecretRotation(
+          {
+            name: form.name.trim(),
+            type: form.type,
+            clientId: form.clientId.trim(),
+            issuer: form.issuer.trim() || null,
+            authorizationUrl: form.authorizationUrl.trim() || null,
+            tokenUrl: form.tokenUrl.trim() || null,
+            userinfoUrl: form.userinfoUrl.trim() || null,
+            scopes: form.scopes.trim() || "openid email profile",
+            autoLink: form.autoLink,
+            groupsClaim: form.groupsClaim.trim() || "groups",
+            groupPrefix: form.groupPrefix.trim() || null,
+            roleMappingEnabled: form.roleMappingEnabled,
+            adminGroup: form.adminGroup.trim() || null,
+            userGroup: form.userGroup.trim() || null,
+            viewerGroup: form.viewerGroup.trim() || null,
+            defaultRole: form.defaultRole,
+            syncGroups: form.syncGroups,
+          },
+          secretRequired ? form.clientSecret : undefined,
+        );
+        const updated = await updateOAuthProviderAction(editingProvider.id, update);
         if (updated) {
           setProviders((prev) => prev.map((p) => (p.id === editingProvider.id ? updated : p)));
         }
@@ -194,7 +220,7 @@ export default function OAuthProvidersSection({
         });
         setProviders((prev) => [...prev, created]);
       }
-      setDialogOpen(false);
+      closeDialog();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -202,7 +228,7 @@ export default function OAuthProvidersSection({
     }
   }
 
-  async function handleToggleEnabled(provider: OAuthProvider) {
+  async function handleToggleEnabled(provider: OAuthProviderView) {
     try {
       const updated = await updateOAuthProviderAction(provider.id, {
         enabled: !provider.enabled,
@@ -375,15 +401,35 @@ export default function OAuthProvidersSection({
             onChange={(v) => updateField("clientId", v)}
           />
 
-          <TextInput
-            {...AUTOFILL_NEW_PASSWORD}
-            label="Client Secret"
-            isRequired
-            type="password"
-            size="sm"
-            value={form.clientSecret}
-            onChange={(v) => updateField("clientSecret", v)}
-          />
+          {editingProvider?.hasClientSecret && !rotateClientSecret ? (
+            <HStack justify="between" vAlign="center" gap={3}>
+              <VStack gap={1}>
+                <Text type="label" size="xsm">
+                  Client Secret
+                </Text>
+                <Text type="body" size="xsm" color="secondary">
+                  A secret is configured. Its existing value cannot be viewed.
+                </Text>
+              </VStack>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                label="Rotate Secret"
+                onClick={() => setRotateClientSecret(true)}
+              />
+            </HStack>
+          ) : (
+            <TextInput
+              {...AUTOFILL_NEW_PASSWORD}
+              label={editingProvider ? "New Client Secret" : "Client Secret"}
+              isRequired
+              type="password"
+              size="sm"
+              value={form.clientSecret}
+              onChange={(v) => updateField("clientSecret", v)}
+            />
+          )}
 
           <TextInput
             label="Issuer URL"

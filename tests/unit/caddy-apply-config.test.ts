@@ -79,7 +79,12 @@ describe('applyCaddyConfig against a spoofed Caddy', () => {
   it('throws when Caddy rejects the config', async () => {
     caddy.failWith(400, 'invalid handler');
 
-    await expect(applyCaddyConfig()).rejects.toThrow(/Caddy config load failed: 400/);
+    // The response body quotes the config Caddy choked on, so it is never echoed back —
+    // only an application-authored message and a code reach the caller.
+    await expect(applyCaddyConfig()).rejects.toMatchObject({
+      name: 'CaddyApplyError',
+      code: 'CADDY_REJECTED',
+    });
   });
 
   it('maps a refused connection to an actionable error', async () => {
@@ -91,7 +96,10 @@ describe('applyCaddyConfig against a spoofed Caddy', () => {
   it('surfaces the failure rather than swallowing it on a 5xx', async () => {
     caddy.failWith(500, 'boom');
 
-    await expect(applyCaddyConfig()).rejects.toThrow(/Caddy config load failed: 500 boom/);
+    await expect(applyCaddyConfig()).rejects.toMatchObject({
+      name: 'CaddyApplyError',
+      code: 'CADDY_REJECTED',
+    });
     expect(caddy.requests.some((r) => r.path === '/load')).toBe(true);
   });
 });

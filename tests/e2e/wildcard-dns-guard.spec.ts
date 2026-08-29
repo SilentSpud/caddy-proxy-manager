@@ -15,11 +15,6 @@ test.describe('Wildcard host DNS-provider guard', () => {
     const origin = new URL(page.url()).origin;
     const headers = { Origin: origin };
 
-    // Preserve whatever DNS-provider config the stack already has.
-    const originalResp = await page.request.get(API_DNS_PROVIDER);
-    expect(originalResp.ok()).toBeTruthy();
-    const original = await originalResp.json();
-
     const createdIds: number[] = [];
     try {
       // ── No DNS provider configured ──────────────────────────────────────
@@ -37,7 +32,7 @@ test.describe('Wildcard host DNS-provider guard', () => {
           upstreams: ['localhost:9999'],
         },
       });
-      expect(rejected.ok()).toBeFalsy();
+      expect(rejected.status()).toBe(400);
       expect((await rejected.json()).error).toMatch(/DNS provider/i);
 
       // Control: an exact-domain host is unaffected by the guard.
@@ -59,6 +54,15 @@ test.describe('Wildcard host DNS-provider guard', () => {
       });
       expect(setResp.ok()).toBeTruthy();
 
+      const statusResp = await page.request.get(API_DNS_PROVIDER);
+      expect(statusResp.ok()).toBeTruthy();
+      const statusBody = await statusResp.text();
+      expect(JSON.parse(statusBody)).toEqual({
+        providers: { duckdns: { configuredFields: ['api_token'] } },
+        default: 'duckdns',
+      });
+      expect(statusBody).not.toContain('e2e-fake-token');
+
       const allowed = await page.request.post(API_PROXY_HOSTS, {
         headers,
         data: {
@@ -73,10 +77,10 @@ test.describe('Wildcard host DNS-provider guard', () => {
       for (const id of createdIds) {
         await page.request.delete(`${API_PROXY_HOSTS}/${id}`, { headers });
       }
+      // GET redacts credential values, so the prior configuration cannot be restored — clear it.
       await page.request.put(API_DNS_PROVIDER, {
         headers,
-        data:
-          original && Object.keys(original).length ? original : { providers: {}, default: null },
+        data: { providers: {}, default: null },
       });
     }
   });

@@ -180,9 +180,45 @@ services:
       - caddy-network
 
   # ── Master/slave pair for the settings-sync functional test (issue #192) ──
-  # Both point CADDY_API_URL at an unreachable address so their startup
-  # applyCaddyConfig() fails harmlessly and they never touch the shared Caddy.
-  # The master pushes settings to the slave over plain HTTP on the compose network.
+  # Each instance has its own isolated Caddy admin API. This lets settings updates
+  # exercise the production apply/rollback path without replacing the main E2E
+  # Caddy configuration or racing the rest of the browser suite.
+  caddy-master:
+    container_name: caddy-proxy-manager-caddy-master
+    image: ghcr.io/fuomag9/caddy-proxy-manager-caddy:latest
+    environment:
+      PRIMARY_DOMAIN: master.caddyproxymanager.test
+    volumes:
+      - acme-ca-master:/acme-ca:ro
+    networks:
+      master-caddy-network:
+        aliases:
+          - caddy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  caddy-slave:
+    container_name: caddy-proxy-manager-caddy-slave
+    image: ghcr.io/fuomag9/caddy-proxy-manager-caddy:latest
+    environment:
+      PRIMARY_DOMAIN: slave.caddyproxymanager.test
+    volumes:
+      - acme-ca-slave:/acme-ca:ro
+    networks:
+      slave-caddy-network:
+        aliases:
+          - caddy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
   web-master:
     container_name: caddy-proxy-manager-web-master
     image: ghcr.io/fuomag9/caddy-proxy-manager-web:latest
@@ -197,7 +233,7 @@ services:
       NEXTAUTH_URL: http://localhost:3002
       DATABASE_PATH: /app/data/caddy-proxy-manager.db
       DATABASE_URL: file:/app/data/caddy-proxy-manager.db
-      CADDY_API_URL: http://127.0.0.1:2019
+      CADDY_API_URL: http://caddy:2019
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
       CLICKHOUSE_PASSWORD: ""
@@ -208,8 +244,15 @@ services:
       INSTANCE_SLAVES: '[{"name":"slave","url":"http://web-slave:3000","token":"e2e-sync-token-0123456789abcdef0123456789"}]'
     volumes:
       - web-master-data:/app/data
+      - acme-ca-master:/acme-ca
+    depends_on:
+      caddy-master:
+        condition: service_healthy
     networks:
-      - caddy-network
+      instance-sync-network:
+      master-caddy-network:
+        aliases:
+          - web
     healthcheck:
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
@@ -231,7 +274,7 @@ services:
       NEXTAUTH_URL: http://localhost:3003
       DATABASE_PATH: /app/data/caddy-proxy-manager.db
       DATABASE_URL: file:/app/data/caddy-proxy-manager.db
-      CADDY_API_URL: http://127.0.0.1:2019
+      CADDY_API_URL: http://caddy:2019
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
       CLICKHOUSE_PASSWORD: ""
@@ -240,14 +283,34 @@ services:
       INSTANCE_SYNC_ALLOW_HTTP: "true"
     volumes:
       - web-slave-data:/app/data
+      - acme-ca-slave:/acme-ca
+    depends_on:
+      caddy-slave:
+        condition: service_healthy
     networks:
-      - caddy-network
+      instance-sync-network:
+      slave-caddy-network:
+        aliases:
+          - web
     healthcheck:
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 20s
+
+networks:
+  # The two web instances communicate with each other here. Keep this bridge
+  # non-internal so Docker can publish their E2E ports to the host.
+  instance-sync-network:
+    driver: bridge
+  # Each Caddy admin API is reachable only by its corresponding web instance.
+  master-caddy-network:
+    driver: bridge
+    internal: true
+  slave-caddy-network:
+    driver: bridge
+    internal: true
 
 volumes:
   caddy-manager-data:
@@ -266,6 +329,10 @@ volumes:
     name: clickhouse-data-test
   acme-ca:
     name: acme-ca-test
+  acme-ca-master:
+    name: acme-ca-master-test
+  acme-ca-slave:
+    name: acme-ca-slave-test
   step-ca-data:
     name: step-ca-data-test
   web-master-data:

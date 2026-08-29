@@ -5,9 +5,9 @@ import LinkAccountClient from "@/src/components/auth/LinkAccountClient";
 import type { Metadata } from "next";
 
 interface LinkAccountPageProps {
-  searchParams: {
+  searchParams: Promise<{
     error?: string;
-  };
+  }>;
 }
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export default async function LinkAccountPage({ searchParams }: LinkAccountPageP
   }
 
   // Get linking ID from error parameter (NextAuth redirects with error param)
-  const errorParam = searchParams.error || "";
+  const errorParam = (await searchParams).error || "";
 
   if (!errorParam.startsWith("LINKING_REQUIRED:")) {
     redirect("/login?error=Invalid linking request");

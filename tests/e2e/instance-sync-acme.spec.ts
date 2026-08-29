@@ -1,7 +1,8 @@
 /**
  * Functional: master → slave settings sync for the ACME group (#192). A directory set on
- * web-master:3002 is pushed to web-slave:3003 and surfaces as the slave's effective setting. Guards
- * the regression where a new setting group is missing from the SyncSettings allowlist.
+ * web-master:3002 is pushed to web-slave:3003 and surfaces as the slave's effective setting. Both
+ * instances run isolated Caddy sidecars, so this exercises the production settings-apply path.
+ * Guards the regression where a new setting group is missing from the SyncSettings allowlist.
  */
 import { test, expect, type BrowserContext, type Browser } from '@playwright/test';
 
@@ -60,10 +61,9 @@ test.describe
         headers: { Origin: MASTER },
       });
       expect(sync.status()).toBe(200);
+      expect(await sync.json()).toMatchObject({ total: 1, success: 1, failed: 0 });
 
       // 3. The slave's effective ACME setting now reflects the master's value.
-      //    (The push itself reports the slave's Caddy-apply failure — the slave
-      //    points at an unreachable Caddy — but synced settings persist regardless.)
       await expect
         .poll(
           async () => {

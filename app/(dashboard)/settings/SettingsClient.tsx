@@ -18,6 +18,7 @@ import {
   Waypoints,
   UserCircle,
   Package,
+  Server,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -53,13 +54,13 @@ import type {
   MetricsSettings,
   LoggingSettings,
   DnsSettings,
-  DnsProviderSettings,
   UpstreamDnsResolutionSettings,
   GeoBlockSettings,
   ErrorPagesSettings,
   TrustedProxiesSettings,
+  DefaultResponseSettings,
 } from "@/lib/settings";
-import type { DnsProviderDefinition } from "@/src/lib/dns-providers";
+import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
 import type { CaddyBuildSettings } from "@/lib/settings";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
@@ -68,8 +69,8 @@ import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
 import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import OAuthProvidersSection from "./OAuthProvidersSection";
-import type { OAuthProvider } from "@/src/lib/models/oauth-providers";
 import { CheckboxInput } from "@/src/components/ui/FormBooleanControls";
+import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import {
   updateDnsProviderSettingsAction,
   updateGeneralSettingsAction,
@@ -91,6 +92,7 @@ import {
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
   updateCaddyBuildSettingsAction,
+  updateDefaultResponseSettingsAction,
 } from "./actions";
 
 // ─── Settings navigation catalog ─────────────────────────────────────────────
@@ -130,6 +132,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "ACME Server",
         desc: "Custom ACME directory URL for internal CAs",
         icon: ShieldCheck,
+      },
+      {
+        id: "default-response",
+        name: "Default Response",
+        desc: "Handle requests for unknown hosts and direct IP access",
+        icon: Server,
       },
       {
         id: "avatars",
@@ -470,7 +478,7 @@ function DetailHeader({ activeId }: { activeId: string }) {
 type Props = {
   general: GeneralSettings | null;
   acme: AcmeSettings | null;
-  dnsProvider: DnsProviderSettings | null;
+  dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
   authentik: AuthentikSettings | null;
   metrics: MetricsSettings | null;
@@ -478,9 +486,10 @@ type Props = {
   dns: DnsSettings | null;
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   trustedProxies: TrustedProxiesSettings | null;
+  defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
-  oauthProviders: OAuthProvider[];
+  oauthProviders: OAuthProviderView[];
   localUsersDisabled: boolean;
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
@@ -501,6 +510,7 @@ type Props = {
       upstreamDnsResolution: boolean;
       trustedProxies: boolean;
       avatars: boolean;
+      defaultResponse: boolean;
     };
     slave: {
       hasToken: boolean;
@@ -537,6 +547,7 @@ export default function SettingsClient({
   dns,
   upstreamDnsResolution,
   trustedProxies,
+  defaultResponse,
   globalGeoBlock,
   globalErrorPages,
   oauthProviders,
@@ -610,6 +621,10 @@ export default function SettingsClient({
     updateTrustedProxiesSettingsAction,
     null,
   );
+  const [defaultResponseState, defaultResponseFormAction] = useActionState(
+    updateDefaultResponseSettingsAction,
+    null,
+  );
 
   const isSlave = instanceSync.mode === "slave";
   const isMaster = instanceSync.mode === "master";
@@ -628,6 +643,9 @@ export default function SettingsClient({
   );
   const [trustedProxiesOverride, setTrustedProxiesOverride] = useState(
     instanceSync.overrides.trustedProxies,
+  );
+  const [defaultResponseOverride, setDefaultResponseOverride] = useState(
+    instanceSync.overrides.defaultResponse,
   );
 
   // The page has two navigations — the sidebar panel and the compact picker in the content column
@@ -697,6 +715,16 @@ export default function SettingsClient({
                     isSlave={isSlave}
                     acmeOverride={acmeOverride}
                     setAcmeOverride={setAcmeOverride}
+                  />
+                )}
+                {active === "default-response" && (
+                  <DefaultResponseSection
+                    defaultResponse={defaultResponse}
+                    defaultResponseState={defaultResponseState}
+                    defaultResponseFormAction={defaultResponseFormAction}
+                    isSlave={isSlave}
+                    defaultResponseOverride={defaultResponseOverride}
+                    setDefaultResponseOverride={setDefaultResponseOverride}
                   />
                 )}
                 {active === "dns-providers" && (
@@ -1163,6 +1191,176 @@ function GeneralSection({
   );
 }
 
+// ─── Section: Default Response ──────────────────────────────────────────────
+
+const DEFAULT_RESPONSE_MODES = [
+  { value: "caddy", label: "Caddy native behavior" },
+  { value: "respond", label: "Custom HTTP response" },
+  { value: "redirect", label: "Redirect" },
+  { value: "abort", label: "No response (abort connection)" },
+];
+
+const REDIRECT_STATUS_OPTIONS = [
+  { value: "301", label: "301 Permanent" },
+  { value: "302", label: "302 Temporary" },
+  { value: "303", label: "303 See Other" },
+  { value: "307", label: "307 Temporary" },
+  { value: "308", label: "308 Permanent" },
+];
+
+function DefaultResponseSection({
+  defaultResponse,
+  defaultResponseState,
+  defaultResponseFormAction,
+  isSlave,
+  defaultResponseOverride,
+  setDefaultResponseOverride,
+}: {
+  defaultResponse: DefaultResponseSettings | null;
+  defaultResponseState: { success: boolean; message?: string } | null;
+  defaultResponseFormAction: (payload: FormData) => void;
+  isSlave: boolean;
+  defaultResponseOverride: boolean;
+  setDefaultResponseOverride: (v: boolean) => void;
+}) {
+  const [mode, setMode] = useState<DefaultResponseSettings["mode"]>(
+    defaultResponse?.mode ?? "caddy",
+  );
+  const [status, setStatus] = useState<number | null>(
+    defaultResponse?.mode === "respond" ? (defaultResponse.status ?? 404) : 404,
+  );
+  const [redirectStatus, setRedirectStatus] = useState(
+    String(defaultResponse?.mode === "redirect" ? (defaultResponse.status ?? 302) : 302),
+  );
+  const [body, setBody] = useState(
+    defaultResponse?.mode === "respond" ? (defaultResponse.body ?? "") : "",
+  );
+  const [redirectUrl, setRedirectUrl] = useState(
+    defaultResponse?.mode === "redirect" ? (defaultResponse.redirectUrl ?? "") : "",
+  );
+  const storedHeaders = Object.entries(defaultResponse?.headers ?? {})
+    .map(([name, value]) => `${name}: ${value}`)
+    .join("\n");
+  // Headers only carry over when the stored mode is the one being edited; switching modes starts
+  // from that mode's sensible default rather than the other mode's headers.
+  const [headers, setHeaders] = useState(
+    defaultResponse?.mode === "respond" || defaultResponse?.mode === "redirect"
+      ? storedHeaders
+      : "Content-Type: text/plain; charset=utf-8",
+  );
+  const disabled = isSlave && !defaultResponseOverride;
+
+  return (
+    <VStack gap={4}>
+      <FormCard title="Unknown Host Handling">
+        <form action={defaultResponseFormAction}>
+          <VStack gap={3}>
+            {defaultResponseState?.message && (
+              <StatusAlert
+                message={defaultResponseState.message}
+                success={defaultResponseState.success}
+              />
+            )}
+            {isSlave && (
+              <OverrideToggle
+                value={defaultResponseOverride}
+                onChange={setDefaultResponseOverride}
+              />
+            )}
+            <Selector
+              label="Behavior"
+              description="Applied only when no configured proxy host matches the request."
+              htmlName="mode"
+              options={DEFAULT_RESPONSE_MODES}
+              value={mode}
+              onChange={(v) => setMode(v as DefaultResponseSettings["mode"])}
+              isDisabled={disabled}
+            />
+
+            {mode === "respond" && (
+              <>
+                <NumberInput
+                  label="Status code"
+                  description="Any final HTTP status from 200 through 599."
+                  htmlName="status"
+                  min={200}
+                  max={599}
+                  isIntegerOnly
+                  value={status}
+                  onChange={setStatus}
+                  isDisabled={disabled}
+                />
+                <TextArea
+                  label="Response body"
+                  isOptional
+                  description="Plain text, JSON, or custom HTML. Empty is allowed."
+                  htmlName="body"
+                  value={body}
+                  onChange={setBody}
+                  rows={8}
+                  placeholder="Not Found"
+                  isDisabled={disabled}
+                />
+              </>
+            )}
+
+            {mode === "redirect" && (
+              <>
+                <Selector
+                  label="Redirect status"
+                  description="307 and 308 preserve the original request method."
+                  htmlName="status"
+                  options={REDIRECT_STATUS_OPTIONS}
+                  value={redirectStatus}
+                  onChange={setRedirectStatus}
+                  isDisabled={disabled}
+                />
+                <TextInput
+                  label="Redirect URL"
+                  isRequired
+                  description="Absolute, relative, and Caddy placeholder-based targets are supported."
+                  htmlName="redirectUrl"
+                  value={redirectUrl}
+                  onChange={setRedirectUrl}
+                  placeholder="https://example.com{http.request.uri}"
+                  isDisabled={disabled}
+                />
+              </>
+            )}
+
+            {(mode === "respond" || mode === "redirect") && (
+              <TextArea
+                label="Response headers"
+                isOptional
+                description="Optional Name: value pairs, one per line. For custom HTML, set Content-Type: text/html; charset=utf-8."
+                htmlName="headers"
+                value={headers}
+                onChange={setHeaders}
+                rows={4}
+                placeholder={"Content-Type: text/html; charset=utf-8\nCache-Control: no-store"}
+                isDisabled={disabled}
+              />
+            )}
+
+            {mode === "abort" && (
+              <WarnAlert title="Unmatched connections are closed without a response">
+                Caddy writes no status line or body — the native equivalent of a &ldquo;444 / no
+                response&rdquo; policy.
+              </WarnAlert>
+            )}
+
+            <SaveButton label="Save default response" isDisabled={disabled} />
+          </VStack>
+        </form>
+      </FormCard>
+      <InfoAlert title="Configured hosts always run before this catch-all">
+        For HTTPS the response can only be sent once a TLS certificate completes the handshake, so
+        an unknown hostname or direct IP may fail earlier.
+      </InfoAlert>
+    </VStack>
+  );
+}
+
 // ─── Section: ACME Server ────────────────────────────────────────────────────
 
 function AcmeSection({
@@ -1272,7 +1470,7 @@ function DnsProvidersSection({
   dnsProviderOverride,
   setDnsProviderOverride,
 }: {
-  dnsProvider: DnsProviderSettings | null;
+  dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
   dnsProviderState: { success: boolean; message?: string } | null;
   dnsProviderFormAction: (payload: FormData) => void;
@@ -1854,7 +2052,7 @@ function OAuthSection({
   localUsersDisabled,
   baseUrl,
 }: {
-  oauthProviders: OAuthProvider[];
+  oauthProviders: OAuthProviderView[];
   localUsersDisabled: boolean;
   baseUrl: string;
 }) {

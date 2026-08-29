@@ -17,10 +17,22 @@ import {
 import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 import { hashPassword, verifyPassword } from "./password";
+import { accountIssuerFor } from "./account-issuer";
 
 // biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
 let cachedAuth: any = null;
 let cachedProviders: GenericOAuthConfig[] | null = null;
+let cachedTrustedProviderIds: string[] = [];
+
+/**
+ * OIDC spells the claim `email_verified`; some providers serialize it as a
+ * string. Better Auth's generic-OAuth profile reader only looks at a camelCase
+ * `emailVerified` field, so the claim has to be mapped explicitly.
+ */
+function profileEmailVerified(profile: Record<string, unknown>): boolean {
+  const claim = profile.email_verified ?? profile.emailVerified;
+  return claim === true || claim === "true";
+}
 
 export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
   const cfg: GenericOAuthConfig = {
@@ -32,14 +44,22 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     // Security: an OAuth sign-in must not implicitly create an account unless OAuth
     // self-registration is on. Only first-time auto-provisioning is gated; linking still works.
     disableImplicitSignUp: !config.auth.allowOauthRegistration,
+    // Better Auth 1.7 scopes external identities by (issuer, accountId).
+    // Pin the namespace to trusted application configuration so a provider
+    // cannot choose or change its account namespace through profile claims.
+    accountIssuer: accountIssuerFor(p.id, p.issuer),
+    // Ownership of an existing CPM account is asserted by the operator through
+    // the provider's auto-link switch, never by the IdP alone. Reporting the
+    // claim only for auto-link providers keeps a provider that merely returns
+    // `email_verified: true` from attaching itself to a local account.
+    mapProfileToUser: (profile) => ({
+      emailVerified: p.autoLink === true && profileEmailVerified(profile),
+    }),
   };
   if (p.authorizationUrl) cfg.authorizationUrl = p.authorizationUrl;
   if (p.tokenUrl) cfg.tokenUrl = p.tokenUrl;
   if (p.userinfoUrl) cfg.userInfoUrl = p.userinfoUrl;
   if (p.issuer) {
-    // better-auth 1.7 renamed `issuer` to `accountIssuer`. Discovery providers fall back to the
-    // discovery document's issuer; ones with explicit endpoints have none, so set it here.
-    cfg.accountIssuer = p.issuer;
     // Only use discovery when explicit URLs are not provided
     if (!p.authorizationUrl && !p.tokenUrl) {
       cfg.discoveryUrl = `${p.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
@@ -129,6 +149,7 @@ function loadProvidersSync(): GenericOAuthConfig[] {
       updatedAt: row.updatedAt,
     }));
     cachedProviders = providers.map(mapOAuthProvider);
+    cachedTrustedProviderIds = providers.filter((p) => p.autoLink).map((p) => p.id);
     providersLoadedSuccessfully = true;
   } catch (e) {
     // DB not ready yet — start with empty, will retry on next getAuth() call
@@ -153,6 +174,7 @@ export function enforceSafeUserDefaults<T extends object>(
 // biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above — the return type depends on a plugin list only known at runtime
 function createAuth(): any {
   const oauthConfigs = loadProvidersSync();
+  const trustedProviderIds = [...cachedTrustedProviderIds];
 
   return betterAuth({
     database: sqlite,
@@ -191,7 +213,19 @@ function createAuth(): any {
       expiresIn: 7 * 24 * 60 * 60,
       cookieCache: { enabled: false },
     },
-    account: { modelName: "accounts" },
+    account: {
+      modelName: "accounts",
+      accountLinking: {
+        enabled: true,
+        // A provider with "Auto-link accounts" enabled is trusted to prove that
+        // its identity owns the CPM account carrying the same email address.
+        trustedProviders: trustedProviderIds,
+        // CPM has no local email-verification flow, so a user row's
+        // emailVerified is never set and the default gate would refuse every
+        // link. The per-provider trust decision above is the ownership signal.
+        requireLocalEmailVerified: false,
+      },
+    },
     verification: { modelName: "verifications" },
     emailAndPassword: {
       // OIDC-only mode turns credential sign-in off entirely — there are no local accounts.
@@ -299,6 +333,7 @@ export function getAuth(): ReturnType<typeof betterAuth> {
 
 export function invalidateProviderCache(): void {
   cachedProviders = null;
+  cachedTrustedProviderIds = [];
   providersLoadedSuccessfully = false;
   cachedAuth = null;
 }

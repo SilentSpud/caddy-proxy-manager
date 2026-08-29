@@ -48,10 +48,33 @@ function unstubAllEnvs(): void {
   stubbedEnv.clear();
 }
 
+/**
+ * Polls `check` until it stops throwing (and stops returning a rejected promise), matching
+ * Vitest's `vi.waitFor`. Bun has no equivalent, and a fixed sleep would either be flaky or slow.
+ */
+async function waitFor<T>(
+  check: () => T | Promise<T>,
+  options: { timeout?: number; interval?: number } = {},
+): Promise<T> {
+  const { timeout = 1000, interval = 10 } = options;
+  const deadline = Date.now() + timeout;
+  let lastError: unknown;
+  for (;;) {
+    try {
+      return await check();
+    } catch (error) {
+      lastError = error;
+    }
+    if (Date.now() >= deadline) throw lastError;
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+}
+
 export const vi = {
   ...bunVi,
   mocked,
   hoisted,
   stubEnv,
   unstubAllEnvs,
+  waitFor,
 };

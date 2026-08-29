@@ -92,7 +92,7 @@ interface UserData {
 
 interface ProfileClientProps {
   user: UserData;
-  enabledProviders: Array<{ id: string; name: string }>;
+  enabledProviders: Array<{ id: string; name: string; autoLink: boolean }>;
   apiTokens: ApiToken[];
   sessions: ActiveSession[];
   /** False in OIDC-only mode: local passwords do not exist. */
@@ -243,22 +243,22 @@ export default function ProfileClient({
     setLoading(true);
 
     try {
-      // Set a cookie to indicate this is a linking attempt
-      const response = await fetch("/api/user/link-oauth-start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: providerId }),
+      // linkSocial (not signIn.social) binds the identity to the session user
+      // and requires the provider email to match, so an unrelated IdP account
+      // cannot silently swap the browser onto a different CPM user.
+      const { error: linkError } = await authClient.linkSocial({
+        provider: providerId,
+        callbackURL: "/profile",
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        setError(data.error || "Failed to start OAuth linking");
+      if (linkError) {
+        setError(
+          linkError.message ||
+            'Failed to start OAuth linking. Enable "Auto-link accounts" for this provider first.',
+        );
         setLoading(false);
-        return;
       }
-
-      // Now initiate OAuth flow
-      await authClient.signIn.social({ provider: providerId, callbackURL: "/profile" });
+      // On success the client follows the provider redirect.
     } catch {
       setError("An error occurred while linking OAuth");
       setLoading(false);

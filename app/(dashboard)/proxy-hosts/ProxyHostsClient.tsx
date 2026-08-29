@@ -26,7 +26,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AccessList } from "@/lib/models/access-lists";
-import type { Certificate } from "@/lib/models/certificates";
+import type { CertificatePickerOption } from "@/lib/certificate-api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { AuthentikSettings } from "@/lib/settings";
@@ -54,7 +54,7 @@ type ForwardAuthAccessMap = Record<number, { userIds: number[]; groupIds: number
 
 type Props = {
   hosts: ProxyHost[];
-  certificates: Certificate[];
+  certificates: CertificatePickerOption[];
   accessLists: AccessList[];
   caCertificates: CaCertificate[];
   authentikDefaults: AuthentikSettings | null;

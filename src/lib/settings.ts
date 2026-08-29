@@ -3,6 +3,12 @@ import { settings } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { sanitizeErrorPageRules, type ErrorPageRule } from "./models/proxy-hosts";
 import type { CaddyCustomModule } from "./caddy-modules";
+import {
+  normalizeDefaultResponseSettings,
+  type DefaultResponseSettings,
+} from "./caddy-default-response";
+
+export type { DefaultResponseSettings } from "./caddy-default-response";
 
 export type SettingValue<T> = T | null;
 
@@ -344,6 +350,14 @@ export type WafSettings = {
   load_owasp_crs: boolean;
   custom_directives: string;
   excluded_rule_ids?: number[];
+  // Request body limits, in bytes. Unset means Coraza's own default applies
+  // (12.5 MiB from @coraza.conf-recommended when load_owasp_crs is on, else
+  // 128 MiB). Coraza caps both at 1 GiB — see CORAZA_MAX_BODY_LIMIT.
+  request_body_limit?: number;
+  request_body_in_memory_limit?: number;
+  // ProcessPartial inspects the leading bytes and forwards the rest instead of
+  // rejecting oversized uploads outright.
+  request_body_limit_action?: "Reject" | "ProcessPartial";
 };
 
 export async function getWafSettings(): Promise<WafSettings | null> {
@@ -387,4 +401,22 @@ export async function getCaddyBuildSettings(): Promise<CaddyBuildSettings | null
 
 export async function saveCaddyBuildSettings(s: CaddyBuildSettings): Promise<void> {
   await setSetting("caddy_build", s);
+}
+
+// Response for requests that do not match any configured proxy host. A missing
+// setting (or mode "caddy") preserves Caddy's native routing/HTTPS behavior.
+export async function getDefaultResponseSettings(): Promise<DefaultResponseSettings | null> {
+  const value = await getEffectiveSetting<unknown>("default_response");
+  if (value === null) return null;
+
+  try {
+    return normalizeDefaultResponseSettings(value);
+  } catch (error) {
+    console.warn("Ignoring invalid default response settings", error);
+    return null;
+  }
+}
+
+export async function saveDefaultResponseSettings(value: DefaultResponseSettings): Promise<void> {
+  await setSetting("default_response", normalizeDefaultResponseSettings(value));
 }

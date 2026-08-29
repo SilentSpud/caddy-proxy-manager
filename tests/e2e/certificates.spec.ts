@@ -78,11 +78,10 @@ test.describe('Certificates', () => {
     const domain = `acme-wc-${Date.now()}.example`;
 
     // Auto-managed wildcard hosts require a DNS provider (ACME DNS-01 challenge).
-    // Configure one for this test and restore the original afterwards.
+    // Configure one for this isolated test stack and clear it afterwards.
+    // GET redacts credential values, so the prior configuration cannot be read back and
+    // restored — the teardown below clears the group instead.
     const dnsProviderUrl = `${API}/settings/dns-provider`;
-    const originalDns = await (
-      await page.request.get(dnsProviderUrl, { headers: { Origin: BASE_URL } })
-    ).json();
     const setDnsRes = await page.request.put(dnsProviderUrl, {
       data: { providers: { duckdns: { api_token: 'e2e-fake-token' } }, default: 'duckdns' },
       headers,
@@ -131,10 +130,7 @@ test.describe('Certificates', () => {
       if (subHostId) await page.request.delete(`${API}/proxy-hosts/${subHostId}`, { headers });
       if (wcHostId) await page.request.delete(`${API}/proxy-hosts/${wcHostId}`, { headers });
       await page.request.put(dnsProviderUrl, {
-        data:
-          originalDns && Object.keys(originalDns).length
-            ? originalDns
-            : { providers: {}, default: null },
+        data: { providers: {}, default: null },
         headers,
       });
     }
@@ -194,13 +190,18 @@ test.describe('Certificates', () => {
     }
   });
 
-  test('imports a certificate via the UI form preserving PEM newlines (#157)', async ({ page }) => {
+  test('imports a multiline private key without exposing it through the API (#157)', async ({
+    page,
+  }) => {
     const BASE_URL = 'http://localhost:3000';
     const API = `${BASE_URL}/api/v1`;
     const headers = { 'Content-Type': 'application/json', Origin: BASE_URL };
     const domain = `import-ui-${Date.now()}.example`;
     const certName = `UI Import ${domain}`;
     const { certificatePem, privateKeyPem } = createSelfSignedServerCertificate(domain, [domain]);
+    // HTML textareas normalize CRLF input to LF. Compare against the browser's
+    // canonical value while still checking that every PEM line survives.
+    const normalizedPrivateKeyPem = privateKeyPem.replace(/\r\n?/g, '\n');
 
     // Sanity-check the fixture: PEM blocks must be multi-line for this test
     // to meaningfully exercise newline preservation.
@@ -233,29 +234,30 @@ test.describe('Certificates', () => {
       const keyField = drawer.getByLabel(/private key pem/i);
       await keyField.click();
       await keyField.fill(privateKeyPem);
+      expect(await keyField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
+      expect(await keyField.inputValue()).toBe(normalizedPrivateKeyPem);
 
       await drawer.getByRole('button', { name: /import certificate|save changes/i }).click();
       await expect(drawer).not.toBeVisible({ timeout: 10_000 });
 
-      // Verify via the API that the persisted PEM still contains its original
-      // newlines — this is what would fail if the password-input regressed.
+      // The ordinary API confirms that a key is stored but must never return
+      // the key itself. The textarea assertions above guard newline handling.
       const listRes = await page.request.get(`${API}/certificates`, {
         headers: { Origin: BASE_URL },
       });
       expect(listRes.ok()).toBe(true);
-      const list = (await listRes.json()) as Array<{
+      const listBody = await listRes.text();
+      const list = JSON.parse(listBody) as Array<{
         id: number;
         name: string;
-        privateKeyPem: string | null;
+        hasPrivateKey: boolean;
       }>;
       const created = list.find((c) => c.name === certName);
       expect(created).toBeTruthy();
       createdId = created!.id;
-      expect(created!.privateKeyPem).toContain('-----BEGIN');
-      expect(created!.privateKeyPem).toContain('-----END');
-      expect(created!.privateKeyPem!.split('\n').length).toBeGreaterThan(3);
-      // The persisted key must round-trip byte-for-byte (ignoring trailing whitespace).
-      expect(created!.privateKeyPem!.trimEnd()).toBe(privateKeyPem.trimEnd());
+      expect(created!.hasPrivateKey).toBe(true);
+      expect(created).not.toHaveProperty('privateKeyPem');
+      expect(listBody).not.toContain(normalizedPrivateKeyPem.split('\n')[1]);
     } finally {
       if (createdId !== null) {
         await page.request

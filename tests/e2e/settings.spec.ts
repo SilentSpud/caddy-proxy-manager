@@ -53,13 +53,14 @@ test.describe('Settings — page load & layout', () => {
     await expect(sidebar.getByText('Observability')).toBeVisible();
   });
 
-  test('sidebar shows all 11 navigation items', async ({ page }) => {
+  test('sidebar shows settings navigation items', async ({ page }) => {
     await page.goto('/settings');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     const expectedItems = [
       'Instance Sync',
       'General',
       'ACME Server',
+      'Default Response',
       'DNS Providers',
       'DNS Resolvers',
       'Upstream DNS Pinning',
@@ -123,6 +124,7 @@ test.describe('Settings — sidebar navigation', () => {
     const sections = [
       'Instance Sync',
       'General',
+      'Default Response',
       'DNS Providers',
       'DNS Resolvers',
       'Upstream DNS Pinning',
@@ -179,6 +181,7 @@ test.describe('Settings — Cmd-K palette', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Instance Sync')).toBeVisible();
     await expect(dialog.getByText('General')).toBeVisible();
+    await expect(dialog.getByText('Default Response')).toBeVisible();
     await expect(dialog.getByText('DNS Providers')).toBeVisible();
     await expect(dialog.getByText('Metrics & Monitoring')).toBeVisible();
   });
@@ -289,6 +292,63 @@ test.describe('Settings — General', () => {
     const emailInput = page.locator('input[name="acmeEmail"]');
     await emailInput.fill('test@example.com');
     await expect(emailInput).toHaveValue('test@example.com');
+  });
+});
+
+// ─── Default Response section (unknown hosts — issue #241) ──────────────────
+
+test.describe('Settings — Default Response', () => {
+  test('shows all supported behaviors and conditional custom fields', async ({ page }) => {
+    await goToSection(page, 'Default Response');
+    const behavior = page.getByRole('combobox', { name: 'Default response behavior' });
+    await expect(behavior).toBeVisible();
+    await behavior.click();
+    await expect(page.getByRole('option', { name: 'Caddy native behavior' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Custom HTTP response' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Redirect' })).toBeVisible();
+    await expect(
+      page.getByRole('option', { name: 'No response (abort connection)' }),
+    ).toBeVisible();
+    await page.getByRole('option', { name: 'Custom HTTP response' }).click();
+
+    await expect(page.locator('input[name="status"]')).toHaveValue('404');
+    await expect(page.locator('textarea[name="body"]')).toBeVisible();
+    await expect(page.locator('textarea[name="headers"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: /save default response/i })).toBeVisible();
+  });
+
+  test('saves and reloads a custom response through the settings form', async ({ page }) => {
+    await goToSection(page, 'Default Response');
+    let behavior = page.getByRole('combobox', { name: 'Default response behavior' });
+    await behavior.click();
+    await page.getByRole('option', { name: 'Custom HTTP response' }).click();
+    await page.locator('input[name="status"]').fill('451');
+    await page.locator('textarea[name="body"]').fill('Unavailable for legal reasons');
+    await page
+      .locator('textarea[name="headers"]')
+      .fill('Content-Type: text/plain; charset=utf-8\nX-Cpm-Ui: saved');
+    await page.getByRole('button', { name: /save default response/i }).click();
+    await expect(page.getByText('Default response saved and applied successfully')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await goToSection(page, 'Default Response');
+    behavior = page.getByRole('combobox', { name: 'Default response behavior' });
+    await expect(behavior).toContainText('Custom HTTP response');
+    await expect(page.locator('input[name="status"]')).toHaveValue('451');
+    await expect(page.locator('textarea[name="body"]')).toHaveValue(
+      'Unavailable for legal reasons',
+    );
+    await expect(page.locator('textarea[name="headers"]')).toHaveValue(
+      'Content-Type: text/plain; charset=utf-8\nX-Cpm-Ui: saved',
+    );
+
+    await behavior.click();
+    await page.getByRole('option', { name: 'Caddy native behavior' }).click();
+    await page.getByRole('button', { name: /save default response/i }).click();
+    await expect(page.getByText('Default response saved and applied successfully')).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });
 
@@ -485,6 +545,74 @@ test.describe('Settings — OAuth Providers', () => {
     await expect(page.getByText('E2E Test Provider', { exact: true })).not.toBeVisible({
       timeout: 10_000,
     });
+  });
+
+  test('existing OAuth secrets never cross the API or React browser boundary', async ({ page }) => {
+    await page.goto('/settings');
+    const origin = new URL(page.url()).origin;
+    const secret = `oauth-browser-secret-${Date.now()}`;
+    const providerName = `Write-only OAuth ${Date.now()}`;
+    const createResponse = await page.request.post(`${origin}/api/v1/oauth-providers`, {
+      headers: { Origin: origin },
+      data: {
+        name: providerName,
+        type: 'oidc',
+        clientId: 'browser-boundary-client-id',
+        clientSecret: secret,
+        scopes: 'openid email profile',
+      },
+    });
+    const createBody = await createResponse.text();
+    const created = JSON.parse(createBody) as { id: string; hasClientSecret: boolean };
+
+    expect(createResponse.ok()).toBeTruthy();
+    expect(created.hasClientSecret).toBe(true);
+    expect(createBody).not.toContain(secret);
+    expect(createBody).not.toContain('clientSecret');
+
+    try {
+      const navigation = await page.goto('/settings');
+      const initialRscHtml = await navigation!.text();
+      expect(initialRscHtml).not.toContain(secret);
+      expect(initialRscHtml).not.toContain('clientSecret');
+      expect(await page.content()).not.toContain(secret);
+
+      const itemResponse = await page.request.get(`${origin}/api/v1/oauth-providers/${created.id}`);
+      const itemBody = await itemResponse.text();
+      expect(itemResponse.ok()).toBeTruthy();
+      expect(itemBody).not.toContain(secret);
+      expect(itemBody).not.toContain('clientSecret');
+
+      await page
+        .locator(SETTINGS_SIDEBAR)
+        .getByRole('button', { name: 'OAuth Providers', exact: true })
+        .click();
+      const providerCard = page.locator('div.rounded-md').filter({ hasText: providerName });
+      await providerCard.getByTitle('Edit provider').click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText(/existing value cannot be viewed/i)).toBeVisible();
+      await expect(dialog.getByLabel(/client secret/i)).toHaveCount(0);
+      await dialog.getByRole('button', { name: /rotate secret/i }).click();
+      await expect(dialog.getByLabel(/new client secret/i)).toHaveValue('');
+      await dialog.getByRole('button', { name: /keep existing/i }).click();
+
+      await dialog.getByLabel(/^name/i).fill(`${providerName} renamed`);
+      await dialog.getByRole('button', { name: /update provider/i }).click();
+      await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+
+      const preservedResponse = await page.request.get(
+        `${origin}/api/v1/oauth-providers/${created.id}`,
+      );
+      const preserved = (await preservedResponse.json()) as { hasClientSecret: boolean };
+      expect(preserved.hasClientSecret).toBe(true);
+    } finally {
+      await page.request
+        .delete(`${origin}/api/v1/oauth-providers/${created.id}`, {
+          headers: { Origin: origin },
+        })
+        .catch(() => undefined);
+    }
   });
 });
 

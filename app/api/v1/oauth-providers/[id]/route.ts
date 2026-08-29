@@ -5,16 +5,17 @@ import {
   updateOAuthProvider,
   deleteOAuthProvider,
 } from "@/src/lib/models/oauth-providers";
-import type { OAuthProvider } from "@/src/lib/models/oauth-providers";
+import { toOAuthProviderView, type OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { invalidateProviderCache } from "@/src/lib/auth-server";
 
-function redactSecrets(provider: OAuthProvider) {
+const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "no-store" };
+
+function redactClientId(provider: OAuthProviderView) {
   const clientId = provider.clientId;
   return {
     ...provider,
     clientId: clientId.length > 4 ? `••••${clientId.slice(-4)}` : "••••",
-    clientSecret: "••••••••",
   };
 }
 
@@ -26,7 +27,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!provider) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(redactSecrets(provider));
+    return NextResponse.json(redactClientId(toOAuthProviderView(provider)), {
+      headers: PRIVATE_RESPONSE_HEADERS,
+    });
   } catch (error) {
     return apiErrorResponse(error);
   }
@@ -72,7 +75,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data: JSON.stringify({ providerId: updated.id, fields: Object.keys(body) }),
     });
 
-    return NextResponse.json(redactSecrets(updated));
+    return NextResponse.json(redactClientId(toOAuthProviderView(updated)), {
+      headers: PRIVATE_RESPONSE_HEADERS,
+    });
   } catch (error) {
     return apiErrorResponse(error);
   }

@@ -7,6 +7,12 @@ import { asc, desc, eq, count, like, or } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
+import { ApiValidationError } from "../api-errors";
+import {
+  bodyLimitRangeMessage,
+  findInvalidBodyLimitDirective,
+  isValidBodyLimit,
+} from "../caddy-waf";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -27,7 +33,7 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
     dnsSettings?.default && dnsSettings.providers[dnsSettings.default],
   );
   if (!hasDnsProvider) {
-    throw new Error(
+    throw new ApiValidationError(
       `Wildcard domain "${wildcardDomains[0]}" requires a DNS provider for the ACME DNS-01 challenge. ` +
         `Configure a default DNS provider in settings, or assign a certificate to this host.`,
     );
@@ -141,6 +147,11 @@ export type WafHostConfig = {
   custom_directives?: string;
   excluded_rule_ids?: number[];
   waf_mode?: WafMode;
+  // Request body limits in bytes; unset inherits the global WAF setting.
+  // Coraza rejects anything above 1 GiB at config-load time.
+  request_body_limit?: number;
+  request_body_in_memory_limit?: number;
+  request_body_limit_action?: "Reject" | "ProcessPartial";
 };
 
 // Load Balancer Types
@@ -330,6 +341,42 @@ export type MtlsConfig = {
   ca_certificate_ids?: number[];
 };
 
+/**
+ * Rejects per-host WAF body limits Coraza would refuse. Coraza builds its WAF
+ * while Caddy loads the config, so one bad value here makes Caddy reject the
+ * whole document and *every* host stops being reconfigured — worth failing the
+ * write with a clear message instead.
+ */
+function validateWafMeta(waf: WafHostConfig): WafHostConfig {
+  for (const key of ["request_body_limit", "request_body_in_memory_limit"] as const) {
+    const value = waf[key];
+    if (value === undefined || value === null) continue;
+    if (!isValidBodyLimit(value)) throw new ApiValidationError(bodyLimitRangeMessage(`waf.${key}`));
+  }
+  const action = waf.request_body_limit_action;
+  if (action !== undefined && action !== "Reject" && action !== "ProcessPartial") {
+    throw new ApiValidationError("waf.request_body_limit_action must be Reject or ProcessPartial");
+  }
+  if (
+    typeof waf.request_body_limit === "number" &&
+    typeof waf.request_body_in_memory_limit === "number" &&
+    waf.request_body_in_memory_limit > waf.request_body_limit
+  ) {
+    throw new ApiValidationError(
+      "waf.request_body_in_memory_limit must not exceed waf.request_body_limit",
+    );
+  }
+  // Safe to echo: findInvalidBodyLimitDirective only ever returns a line that
+  // matched `<known directive name> <digits>`, never free-form user text.
+  const badDirective = findInvalidBodyLimitDirective(waf.custom_directives);
+  if (badDirective) {
+    throw new ApiValidationError(
+      `waf.custom_directives has an out-of-range body limit: "${badDirective}" — ${bodyLimitRangeMessage("the byte count")}`,
+    );
+  }
+  return waf;
+}
+
 function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined {
   if (!meta?.enabled) {
     return undefined;
@@ -390,7 +437,7 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
     !normalized.trusted_role_ids &&
     !normalized.ca_certificate_ids
   ) {
-    throw new Error(
+    throw new ApiValidationError(
       "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
     );
   }
@@ -860,7 +907,7 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
   }
 
   if (meta.waf) {
-    normalized.waf = meta.waf;
+    normalized.waf = validateWafMeta(meta.waf);
   }
 
   if (meta.mtls) {
@@ -1632,7 +1679,7 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
 
   if (input.waf !== undefined) {
     if (input.waf) {
-      next.waf = input.waf;
+      next.waf = validateWafMeta(input.waf);
     } else {
       delete next.waf;
     }

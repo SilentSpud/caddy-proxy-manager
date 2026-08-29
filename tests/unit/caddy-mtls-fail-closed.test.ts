@@ -31,6 +31,7 @@ vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { buildCaddyDocument } from '../../src/lib/caddy';
 import * as schema from '../../src/lib/db/schema';
+import { ApiValidationError } from '../../src/lib/api-errors';
 
 const EMPTY_ROLE_ID = 999; // a role with no active certs (simulates all-revoked / empty role)
 
@@ -130,17 +131,20 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
   });
 
   it('rejects enabling mTLS with no trusted certs, roles, or CAs (model guard)', async () => {
-    await expect(
-      createProxyHost(
-        {
-          name: 'mtls-no-trust',
-          domains: ['no-trust.example.com'],
-          upstreams: ['10.0.0.5:8080'],
-          mtls: { enabled: true },
-        },
-        1,
-      ),
-    ).rejects.toThrow(/no trusted client certificates, roles, or CA/i);
+    const failure = createProxyHost(
+      {
+        name: 'mtls-no-trust',
+        domains: ['no-trust.example.com'],
+        upstreams: ['10.0.0.5:8080'],
+        mtls: { enabled: true },
+      },
+      1,
+    );
+    await expect(failure).rejects.toBeInstanceOf(ApiValidationError);
+    await expect(failure).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/no trusted client certificates, roles, or CA/i),
+    });
   });
 
   it('does not emit a drop policy for a plain (non-mTLS) host', async () => {

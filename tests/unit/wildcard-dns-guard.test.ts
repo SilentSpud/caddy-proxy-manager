@@ -10,6 +10,7 @@ vi.mock('@/src/lib/settings', () => ({ ...actualSettings, getDnsProviderSettings
 
 import { assertWildcardIssuable } from '@/src/lib/models/proxy-hosts';
 import { getDnsProviderSettings } from '@/src/lib/settings';
+import { ApiValidationError } from '@/src/lib/api-errors';
 
 const mockGetDnsProviderSettings = vi.mocked(getDnsProviderSettings);
 
@@ -20,9 +21,12 @@ beforeEach(() => {
 describe('assertWildcardIssuable', () => {
   it('rejects an auto-managed wildcard host when no DNS provider is configured', async () => {
     mockGetDnsProviderSettings.mockResolvedValue(null);
-    await expect(assertWildcardIssuable(['*.example.com'], null)).rejects.toThrow(
-      /Wildcard domain "\*\.example\.com" requires a DNS provider/,
-    );
+    const failure = assertWildcardIssuable(['*.example.com'], null);
+    await expect(failure).rejects.toBeInstanceOf(ApiValidationError);
+    await expect(failure).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/Wildcard domain "\*\.example\.com" requires a DNS provider/),
+    });
   });
 
   it('rejects when a default is named but has no credentials', async () => {

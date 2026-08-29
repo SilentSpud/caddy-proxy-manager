@@ -12,6 +12,7 @@ import {
   getGeoBlockSettings,
   getErrorPagesSettings,
   getTrustedProxiesSettings,
+  getDefaultResponseSettings,
   getAvatarSettings,
   getPasswordPolicySettings,
   getCaddyBuildSettings,
@@ -24,11 +25,13 @@ import {
   isSyncTokenFromEnv,
   getEnvSlaveInstances,
 } from "@/src/lib/instance-sync";
+import { toEnvSlaveInstanceView } from "@/src/lib/instance-sync-view";
 import { listInstances } from "@/src/lib/models/instances";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
+import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -55,6 +58,7 @@ export default async function SettingsPage() {
     globalGeoBlock,
     globalErrorPages,
     trustedProxies,
+    defaultResponse,
     oauthProviders,
     avatarSettings,
     passwordPolicySettings,
@@ -72,6 +76,7 @@ export default async function SettingsPage() {
     getGeoBlockSettings(),
     getErrorPagesSettings(),
     getTrustedProxiesSettings(),
+    getDefaultResponseSettings(),
     listOAuthProviders(),
     getAvatarSettings(),
     getPasswordPolicySettings(),
@@ -88,6 +93,7 @@ export default async function SettingsPage() {
     overrideDns,
     overrideUpstreamDnsResolution,
     overrideTrustedProxies,
+    overrideDefaultResponse,
     overrideAvatars,
   ] =
     instanceMode === "slave"
@@ -101,9 +107,10 @@ export default async function SettingsPage() {
           getSetting("dns"),
           getSetting("upstream_dns_resolution"),
           getSetting("trusted_proxies"),
+          getSetting("default_response"),
           getSetting("avatars"),
         ])
-      : [null, null, null, null, null, null, null, null, null, null];
+      : [null, null, null, null, null, null, null, null, null, null, null];
 
   const [slaveToken, slaveLastSync] =
     instanceMode === "slave"
@@ -111,13 +118,14 @@ export default async function SettingsPage() {
       : [null, null];
 
   const instances = instanceMode === "master" ? await listInstances() : [];
-  const envInstances = instanceMode === "master" ? getEnvSlaveInstances() : [];
+  const envInstances =
+    instanceMode === "master" ? getEnvSlaveInstances().map(toEnvSlaveInstanceView) : [];
 
   return (
     <SettingsClient
       general={general}
       acme={acme}
-      dnsProvider={dnsProvider}
+      dnsProvider={dnsProvider ? redactDnsProviderSettingsForApi(dnsProvider) : null}
       dnsProviderDefinitions={DNS_PROVIDERS}
       authentik={authentik}
       metrics={metrics}
@@ -125,6 +133,7 @@ export default async function SettingsPage() {
       dns={dns}
       upstreamDnsResolution={upstreamDnsResolution}
       trustedProxies={trustedProxies}
+      defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
@@ -158,6 +167,7 @@ export default async function SettingsPage() {
           dns: overrideDns !== null,
           upstreamDnsResolution: overrideUpstreamDnsResolution !== null,
           trustedProxies: overrideTrustedProxies !== null,
+          defaultResponse: overrideDefaultResponse !== null,
           avatars: overrideAvatars !== null,
         },
         slave:

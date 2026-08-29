@@ -5,6 +5,9 @@ import {
   updateCertificate,
   deleteCertificate,
 } from "@/src/lib/models/certificates";
+import { toCertificateApiResponse } from "@/src/lib/certificate-api";
+
+const PRIVATE_RESPONSE_INIT = { headers: { "Cache-Control": "no-store" } };
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!cert) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(cert);
+    return NextResponse.json(toCertificateApiResponse(cert), PRIVATE_RESPONSE_INIT);
   } catch (error) {
     return apiErrorResponse(error);
   }
@@ -26,7 +29,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const body = await request.json();
     const cert = await updateCertificate(Number(id), body, userId);
-    return NextResponse.json(cert);
+    return NextResponse.json(toCertificateApiResponse(cert), PRIVATE_RESPONSE_INIT);
   } catch (error) {
     return apiErrorResponse(error);
   }

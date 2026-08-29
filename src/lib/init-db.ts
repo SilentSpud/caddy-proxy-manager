@@ -90,7 +90,13 @@ async function ensureCredentialAccount(userId: number, passwordHash: string): Pr
   const existing = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+    .where(
+      and(
+        eq(accounts.userId, userId),
+        eq(accounts.providerId, "credential"),
+        eq(accounts.issuer, CREDENTIAL_ISSUER),
+      ),
+    )
     .get();
 
   if (existing) {

@@ -36,6 +36,9 @@ jobs:
       - name: Lint and format check
         run: bun run lint
 
+      - name: Type-check clean dependency graph
+        run: bun run typecheck
+
       # Coverage is collected here rather than in a separate job so the
       # thresholds in scripts/coverage-ratchet.ts actually gate a pull request:
       # the step fails if coverage drops below the ratchet.
@@ -51,3 +54,13 @@ jobs:
           name: coverage
           path: coverage/
           retention-days: 14
+
+      - name: Build production application
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: "1"
+          DATABASE_PATH: /tmp/caddy-proxy-manager-build.db
+          DATABASE_URL: file:/tmp/caddy-proxy-manager-build.db
+          SESSION_SECRET: ci-build-session-secret-at-least-32-chars
+          ADMIN_PASSWORD: ci-build-admin-password
+        run: bun run build

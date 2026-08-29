@@ -1,3 +1,4 @@
+import { assertValidInstanceSyncToken } from "./instance-sync-token";
 import { passwordPolicyFailures } from "./password-policy";
 
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
@@ -244,5 +245,14 @@ export function validateProductionConfig() {
     // resolveAdminCredentials() short-circuits in OIDC-only mode.
     void config.adminUsername;
     void config.adminPassword;
+
+    // An environment-configured slave cannot safely fall back to a short or
+    // missing bearer credential. Validate this synchronously during startup.
+    if (process.env.INSTANCE_MODE === "slave") {
+      assertValidInstanceSyncToken(
+        process.env.INSTANCE_SYNC_TOKEN,
+        "INSTANCE_SYNC_TOKEN for slave mode",
+      );
+    }
   }
 }

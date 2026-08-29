@@ -52,6 +52,19 @@ export async function register() {
       }
     }
 
+    // Imported keys and provider options could contain plaintext secrets in
+    // older releases. Repair them before any request handler reads the rows.
+    const { migrateLegacyCertificateStorage } = await import("./lib/models/certificates");
+    try {
+      const migrated = await migrateLegacyCertificateStorage();
+      if (migrated > 0) {
+        console.log(`Hardened ${migrated} legacy certificate record(s)`);
+      }
+    } catch (error) {
+      console.error("Failed to harden legacy certificate storage");
+      if (process.env.NODE_ENV === "production") throw error;
+    }
+
     // Apply Caddy configuration from database on startup
     const { applyCaddyConfig } = await import("./lib/caddy");
     try {

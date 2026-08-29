@@ -2,32 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
+import { buildCsp } from "@/src/lib/csp";
 
 /** Next.js Proxy: defense-in-depth auth at the edge, before page components. Node runtime. */
-
-const isDev = process.env.NODE_ENV === "development";
-
-/** A nonce-based CSP per request; Next.js reads the nonce from the CSP request header. */
-function buildCsp(nonce: string): string {
-  const directives = [
-    "default-src 'self'",
-    isDev
-      ? `script-src 'self' 'nonce-${nonce}' 'unsafe-eval' https://cdn.jsdelivr.net`
-      : `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net`,
-    // style-src still needs 'unsafe-inline' for React JSX inline style props
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-    "font-src 'self' https://fonts.gstatic.com",
-    // gravatar.com is named explicitly rather than opening img-src to all https:, so a provider's
-    // `picture` claim stays blocked and the avatar steps down to Gravatar or the initial.
-    "img-src 'self' data: blob: https://www.gravatar.com https://secure.gravatar.com",
-    // 'self' is needed by maplibre-gl v6, which loads its tile worker from a
-    // bundled /_next/static asset instead of the blob: URL it used in v5.
-    "worker-src 'self' blob:",
-    "connect-src 'self'",
-    "frame-ancestors 'none'",
-  ];
-  return directives.join("; ");
-}
 
 export default async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;

@@ -7,6 +7,9 @@ import { describe, it, expect } from 'bun:test';
 import {
   buildWafHandler,
   buildWafHandlerEntry,
+  CORAZA_MAX_BODY_LIMIT,
+  findInvalidBodyLimitDirective,
+  parseBodyLimitMib,
   resolveEffectiveWaf,
 } from '../../src/lib/caddy-waf';
 
@@ -111,12 +114,37 @@ describe('buildWafHandler — without OWASP CRS', () => {
 
   it('allows request body limit directives from custom directives', () => {
     const directives = [
-      'SecRequestBodyLimit 10737418240',
-      'SecRequestBodyNoFilesLimit 10737418240',
+      'SecRequestBodyLimit 536870912',
+      'SecRequestBodyNoFilesLimit 536870912',
     ].join('\n');
     const handler = buildWafHandler({ ...baseWaf, custom_directives: directives });
-    expect(handler.directives).toContain('SecRequestBodyLimit 10737418240');
-    expect(handler.directives).toContain('SecRequestBodyNoFilesLimit 10737418240');
+    expect(handler.directives).toContain('SecRequestBodyLimit 536870912');
+    expect(handler.directives).toContain('SecRequestBodyNoFilesLimit 536870912');
+  });
+
+  // Coraza refuses to build a WAF above 1 GiB, and coraza-caddy builds it while
+  // Caddy loads the config — so an out-of-range value doesn't just fail this
+  // host, it makes Caddy reject the whole document.
+  it('drops body limits Coraza would refuse rather than breaking the config load', () => {
+    const handler = buildWafHandler({
+      ...baseWaf,
+      custom_directives: [
+        'SecRequestBodyLimit 10737418240',
+        'SecRequestBodyInMemoryLimit 0',
+        'SecRequestBodyLimit 536870912',
+      ].join('\n'),
+    });
+    expect(handler.directives).not.toContain('10737418240');
+    expect(handler.directives).not.toContain('SecRequestBodyInMemoryLimit 0');
+    expect(handler.directives).toContain('SecRequestBodyLimit 536870912');
+  });
+
+  it("accepts a body limit exactly at Coraza's 1 GiB ceiling", () => {
+    const handler = buildWafHandler({
+      ...baseWaf,
+      custom_directives: `SecRequestBodyLimit ${CORAZA_MAX_BODY_LIMIT}`,
+    });
+    expect(handler.directives).toContain(`SecRequestBodyLimit ${CORAZA_MAX_BODY_LIMIT}`);
   });
 
   it('allows related constrained request body limit directives', () => {
@@ -405,5 +433,158 @@ describe('buildWafHandlerEntry — WebSocket bypass', () => {
     );
     const directives = entry.routes[0].handle[0].directives as string;
     expect(directives).toContain('SecRule ARGS "@contains evil"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dedicated request body limit settings (#252)
+//
+// Coraza's WAF is built while Caddy loads the config, so every value emitted
+// here has to satisfy Coraza's validation up front: <= 1 GiB, and the
+// in-memory limit no larger than the request limit. A violation rejects the
+// whole config document, leaving every host unapplied.
+// ---------------------------------------------------------------------------
+
+describe('buildWafHandler — request body limit settings', () => {
+  it('emits the configured limits as SecLang directives', () => {
+    const handler = buildWafHandler({
+      ...baseWaf,
+      request_body_limit: 536870912,
+      request_body_in_memory_limit: 1048576,
+      request_body_limit_action: 'ProcessPartial',
+    });
+    const directives = handler.directives as string;
+    expect(directives).toContain('SecRequestBodyLimit 536870912');
+    expect(directives).toContain('SecRequestBodyInMemoryLimit 1048576');
+    expect(directives).toContain('SecRequestBodyLimitAction ProcessPartial');
+  });
+
+  it('emits nothing when the limits are unset', () => {
+    const directives = buildWafHandler(baseWaf).directives as string;
+    expect(directives).not.toContain('SecRequestBodyLimit');
+    expect(directives).not.toContain('SecRequestBodyLimitAction');
+  });
+
+  it('overrides the CRS default by ordering the limit after the include', () => {
+    const directives = buildWafHandler({
+      ...baseWaf,
+      load_owasp_crs: true,
+      request_body_limit: 536870912,
+    }).directives as string;
+    const includeAt = directives.indexOf('Include @coraza.conf-recommended');
+    const limitAt = directives.indexOf('SecRequestBodyLimit 536870912');
+    expect(includeAt).toBeGreaterThanOrEqual(0);
+    expect(limitAt).toBeGreaterThan(includeAt);
+  });
+
+  it('lets custom directives win over the settings fields', () => {
+    const directives = buildWafHandler({
+      ...baseWaf,
+      request_body_limit: 536870912,
+      custom_directives: 'SecRequestBodyLimit 268435456',
+    }).directives as string;
+    expect(directives.indexOf('SecRequestBodyLimit 268435456')).toBeGreaterThan(
+      directives.indexOf('SecRequestBodyLimit 536870912'),
+    );
+  });
+
+  it('ignores out-of-range and unknown values instead of emitting them', () => {
+    const directives = buildWafHandler({
+      ...baseWaf,
+      request_body_limit: 10737418240,
+      request_body_in_memory_limit: 0,
+      request_body_limit_action: 'Off' as never,
+    }).directives as string;
+    expect(directives).not.toContain('SecRequestBodyLimit');
+    expect(directives).not.toContain('SecRequestBodyLimitAction');
+  });
+
+  // Coraza validates the FINAL values, so the corrective line at the end wins.
+  it('clamps an in-memory limit that would exceed the request limit', () => {
+    const directives = buildWafHandler({
+      ...baseWaf,
+      load_owasp_crs: true,
+      custom_directives: 'SecRequestBodyInMemoryLimit 268435456',
+    }).directives as string;
+    // CRS caps the request body at 12.5 MiB, so 256 MiB in memory is invalid.
+    expect(directives.trimEnd().endsWith('SecRequestBodyInMemoryLimit 13107200')).toBe(true);
+  });
+
+  it('leaves a valid limit pair untouched', () => {
+    const directives = buildWafHandler({
+      ...baseWaf,
+      load_owasp_crs: true,
+      request_body_limit: 536870912,
+      request_body_in_memory_limit: 268435456,
+    }).directives as string;
+    expect(directives.match(/SecRequestBodyInMemoryLimit/g)).toHaveLength(1);
+  });
+});
+
+describe('resolveEffectiveWaf — body limits', () => {
+  const globalWaf = {
+    enabled: true,
+    mode: 'On' as const,
+    load_owasp_crs: true,
+    custom_directives: '',
+    request_body_limit: 134217728,
+    request_body_limit_action: 'Reject' as const,
+  };
+
+  it('lets a host override the global limit in merge mode', () => {
+    const effective = resolveEffectiveWaf(globalWaf, {
+      enabled: true,
+      request_body_limit: 536870912,
+    });
+    expect(effective?.request_body_limit).toBe(536870912);
+    expect(effective?.request_body_limit_action).toBe('Reject');
+  });
+
+  it('inherits the global limit when the host leaves it unset', () => {
+    const effective = resolveEffectiveWaf(globalWaf, { enabled: true });
+    expect(effective?.request_body_limit).toBe(134217728);
+  });
+
+  it('does not inherit the global limit in override mode', () => {
+    const effective = resolveEffectiveWaf(globalWaf, { enabled: true, waf_mode: 'override' });
+    expect(effective?.request_body_limit).toBeUndefined();
+  });
+});
+
+describe('findInvalidBodyLimitDirective', () => {
+  it('reports the offending line so the user gets a precise error', () => {
+    expect(findInvalidBodyLimitDirective('SecRequestBodyLimit 10737418240')).toBe(
+      'SecRequestBodyLimit 10737418240',
+    );
+  });
+
+  it('passes in-range limits, comments and unrelated directives', () => {
+    expect(
+      findInvalidBodyLimitDirective(
+        [
+          '# raise the upload ceiling',
+          'SecRequestBodyLimit 536870912',
+          'SecRule ARGS "@contains evil" "id:9001,deny"',
+        ].join('\n'),
+      ),
+    ).toBeNull();
+    expect(findInvalidBodyLimitDirective('')).toBeNull();
+    expect(findInvalidBodyLimitDirective(undefined)).toBeNull();
+  });
+});
+
+describe('parseBodyLimitMib', () => {
+  it('converts MiB to bytes and treats blank as unset', () => {
+    expect(parseBodyLimitMib('512', 'Limit')).toBe(536870912);
+    expect(parseBodyLimitMib('', 'Limit')).toBeUndefined();
+    expect(parseBodyLimitMib('  ', 'Limit')).toBeUndefined();
+    expect(parseBodyLimitMib(null, 'Limit')).toBeUndefined();
+  });
+
+  it('rejects values Coraza would refuse', () => {
+    expect(() => parseBodyLimitMib('1025', 'Limit')).toThrow(/between 1 and 1024/);
+    expect(() => parseBodyLimitMib('0', 'Limit')).toThrow();
+    expect(() => parseBodyLimitMib('1.5', 'Limit')).toThrow();
+    expect(() => parseBodyLimitMib('abc', 'Limit')).toThrow();
   });
 });

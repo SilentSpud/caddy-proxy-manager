@@ -44,11 +44,12 @@ export async function decideLinkingStrategy(
   providerAccountId: string,
   email: string,
 ): Promise<LinkingDecision> {
+  const issuer = await issuerForProvider(provider);
   // Check accounts table for existing OAuth connection
   const existingAccount = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.providerId, provider), eq(accounts.accountId, providerAccountId)))
+    .where(and(eq(accounts.issuer, issuer), eq(accounts.accountId, providerAccountId)))
     .limit(1);
 
   if (existingAccount.length > 0) {
@@ -198,11 +199,12 @@ export async function verifyAndLinkOAuth(
   }
 
   // Insert OAuth account link
+  const issuer = await issuerForProvider(provider);
   await db.insert(accounts).values({
     userId,
+    issuer,
     accountId: providerAccountId,
     providerId: provider,
-    issuer: await issuerForProvider(provider),
     createdAt: nowIso(),
     updatedAt: nowIso(),
   });
@@ -228,11 +230,12 @@ export async function autoLinkOAuth(
   }
 
   // Insert OAuth account link
+  const issuer = await issuerForProvider(provider);
   await db.insert(accounts).values({
     userId,
+    issuer,
     accountId: providerAccountId,
     providerId: provider,
-    issuer: await issuerForProvider(provider),
     createdAt: nowIso(),
     updatedAt: nowIso(),
   });
@@ -260,11 +263,12 @@ export async function linkOAuthAuthenticated(
   }
 
   // Insert OAuth account link
+  const issuer = await issuerForProvider(provider);
   await db.insert(accounts).values({
     userId,
+    issuer,
     accountId: providerAccountId,
     providerId: provider,
-    issuer: await issuerForProvider(provider),
     createdAt: nowIso(),
     updatedAt: nowIso(),
   });

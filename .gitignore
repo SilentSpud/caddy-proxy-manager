@@ -52,3 +52,7 @@ test-results/
 playwright-report/
 
 /geoip-data
+
+# Temp SQLite databases left behind by tests/integration/db-compat-accounts.test.ts on a
+# failure, before its cleanup runs.
+tmp-db-*/

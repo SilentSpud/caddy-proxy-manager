@@ -74,6 +74,7 @@ async function insertProxyHost(overrides: Partial<typeof proxyHosts.$inferInsert
 describe('forward auth sessions', () => {
   it('creates a session with hashed token', async () => {
     const user = await insertUser();
+    const host = await insertProxyHost();
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = hashToken(rawToken);
     const now = nowIso();
@@ -82,6 +83,8 @@ describe('forward auth sessions', () => {
       .insert(forwardAuthSessions)
       .values({
         userId: user.id,
+        proxyHostId: host.id,
+        audienceOrigin: 'https://app.example.com',
         tokenHash,
         expiresAt: futureIso(3600),
         createdAt: now,
@@ -94,11 +97,14 @@ describe('forward auth sessions', () => {
 
   it('enforces unique token hashes', async () => {
     const user = await insertUser();
+    const host = await insertProxyHost();
     const tokenHash = hashToken('same-token');
     const now = nowIso();
 
     await db.insert(forwardAuthSessions).values({
       userId: user.id,
+      proxyHostId: host.id,
+      audienceOrigin: 'https://app.example.com',
       tokenHash,
       expiresAt: futureIso(3600),
       createdAt: now,
@@ -110,6 +116,8 @@ describe('forward auth sessions', () => {
       Promise.resolve(
         db.insert(forwardAuthSessions).values({
           userId: user.id,
+          proxyHostId: host.id,
+          audienceOrigin: 'https://app.example.com',
           tokenHash,
           expiresAt: futureIso(3600),
           createdAt: now,
@@ -120,10 +128,13 @@ describe('forward auth sessions', () => {
 
   it('cascades user deletion to sessions', async () => {
     const user = await insertUser();
+    const host = await insertProxyHost();
     const now = nowIso();
 
     await db.insert(forwardAuthSessions).values({
       userId: user.id,
+      proxyHostId: host.id,
+      audienceOrigin: 'https://app.example.com',
       tokenHash: hashToken('token1'),
       expiresAt: futureIso(3600),
       createdAt: now,
@@ -139,12 +150,15 @@ describe('forward auth sessions', () => {
 describe('forward auth exchanges', () => {
   it('creates an exchange code linked to a session', async () => {
     const user = await insertUser();
+    const host = await insertProxyHost();
     const now = nowIso();
 
     const [session] = await db
       .insert(forwardAuthSessions)
       .values({
         userId: user.id,
+        proxyHostId: host.id,
+        audienceOrigin: 'https://app.example.com',
         tokenHash: hashToken('session-token'),
         expiresAt: futureIso(3600),
         createdAt: now,
@@ -156,6 +170,8 @@ describe('forward auth exchanges', () => {
       .insert(forwardAuthExchanges)
       .values({
         sessionId: session.id,
+        proxyHostId: host.id,
+        audienceOrigin: 'https://app.example.com',
         codeHash: hashToken(rawCode),
         sessionToken: 'raw-session-token',
         redirectUri: 'https://app.example.com/path',
@@ -172,12 +188,15 @@ describe('forward auth exchanges', () => {
 
   it('cascades session deletion to exchanges', async () => {
     const user = await insertUser();
+    const host = await insertProxyHost();
     const now = nowIso();
 
     const [session] = await db
       .insert(forwardAuthSessions)
       .values({
         userId: user.id,
+        proxyHostId: host.id,
+        audienceOrigin: 'https://app.example.com',
         tokenHash: hashToken('session2'),
         expiresAt: futureIso(3600),
         createdAt: now,
@@ -186,6 +205,8 @@ describe('forward auth exchanges', () => {
 
     await db.insert(forwardAuthExchanges).values({
       sessionId: session.id,
+      proxyHostId: host.id,
+      audienceOrigin: 'https://app.example.com',
       codeHash: hashToken('code1'),
       sessionToken: 'raw-token',
       redirectUri: 'https://app.example.com/',

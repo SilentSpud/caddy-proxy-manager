@@ -54,8 +54,9 @@ describe('maplibre worker wiring', () => {
   });
 
   it("CSP allows loading the worker from 'self'", () => {
-    const proxy = readFileSync(join(projectRoot, 'proxy.ts'), 'utf8');
-    const workerSrc = proxy.match(/"worker-src ([^"]+)"/);
+    // The policy moved out of proxy.ts into its own module when upstream extracted buildCsp().
+    const csp = readFileSync(join(projectRoot, 'src', 'lib', 'csp.ts'), 'utf8');
+    const workerSrc = csp.match(/"worker-src ([^"]+)"/);
     expect(workerSrc?.[1]).toContain("'self'");
   });
 });

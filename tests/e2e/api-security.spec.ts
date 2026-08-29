@@ -13,8 +13,8 @@ const ORIGIN = 'http://localhost:3000';
 type Endpoint = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   path: string;
-  /** 'admin' = requireApiAdmin, 'user' = requireApiUser */
-  auth: 'admin' | 'user';
+  /** 'admin'/'user' are bearer-accessible; 'session' requires interactive auth. */
+  auth: 'admin' | 'user' | 'session';
   /** Optional body for mutating requests (prevents 400 from missing body) */
   body?: Record<string, unknown>;
 };
@@ -189,7 +189,7 @@ const ENDPOINTS: Endpoint[] = [
 
   // tokens (user-level — any authenticated user can manage their own)
   { method: 'GET', path: '/tokens', auth: 'user' },
-  { method: 'POST', path: '/tokens', auth: 'user', body: { name: 'x' } },
+  { method: 'POST', path: '/tokens', auth: 'session', body: { name: 'x' } },
   { method: 'DELETE', path: '/tokens/999', auth: 'user' },
 ];
 
@@ -279,6 +279,7 @@ test.describe('Unauthenticated API access', () => {
 test.describe('User role API access', () => {
   const adminOnly = ENDPOINTS.filter((ep) => ep.auth === 'admin');
   const userAllowed = ENDPOINTS.filter((ep) => ep.auth === 'user');
+  const sessionOnly = ENDPOINTS.filter((ep) => ep.auth === 'session');
 
   for (const ep of adminOnly) {
     test(`${ep.method} ${ep.path} → 403`, async ({ request }) => {
@@ -292,6 +293,12 @@ test.describe('User role API access', () => {
       const status = await apiRequest(request, ep, userToken);
       expect(status).not.toBe(401);
       expect(status).not.toBe(403);
+    });
+  }
+
+  for (const ep of sessionOnly) {
+    test(`${ep.method} ${ep.path} → 403 for bearer credentials`, async ({ request }) => {
+      expect(await apiRequest(request, ep, userToken)).toBe(403);
     });
   }
 });
@@ -301,6 +308,7 @@ test.describe('User role API access', () => {
 test.describe('Viewer role API access', () => {
   const adminOnly = ENDPOINTS.filter((ep) => ep.auth === 'admin');
   const userAllowed = ENDPOINTS.filter((ep) => ep.auth === 'user');
+  const sessionOnly = ENDPOINTS.filter((ep) => ep.auth === 'session');
 
   for (const ep of adminOnly) {
     test(`${ep.method} ${ep.path} → 403`, async ({ request }) => {
@@ -316,16 +324,28 @@ test.describe('Viewer role API access', () => {
       expect(status).not.toBe(403);
     });
   }
+
+  for (const ep of sessionOnly) {
+    test(`${ep.method} ${ep.path} → 403 for bearer credentials`, async ({ request }) => {
+      expect(await apiRequest(request, ep, viewerToken)).toBe(403);
+    });
+  }
 });
 
 // ── Admin role ──────────────────────────────────────────────────────────
 
 test.describe('Admin role API access', () => {
-  for (const ep of ENDPOINTS) {
+  for (const ep of ENDPOINTS.filter((endpoint) => endpoint.auth !== 'session')) {
     test(`${ep.method} ${ep.path} → allowed (not 401/403)`, async ({ request }) => {
       const status = await apiRequest(request, ep, adminToken);
       expect(status).not.toBe(401);
       expect(status).not.toBe(403);
+    });
+  }
+
+  for (const ep of ENDPOINTS.filter((endpoint) => endpoint.auth === 'session')) {
+    test(`${ep.method} ${ep.path} → 403 for admin bearer credentials`, async ({ request }) => {
+      expect(await apiRequest(request, ep, adminToken)).toBe(403);
     });
   }
 });
@@ -395,7 +415,7 @@ test.describe('Cross-user isolation', () => {
     });
     // Bearer tokens go through our api-auth, not Better Auth session — use a different approach
     // Just verify they CAN'T access admin user, which we tested above.
-    // Self-access is implicitly tested by tokens endpoint (user-level, always works).
+    // Self-access is covered by the user-scoped GET/DELETE token endpoints.
   });
 
   test("admin CAN access other users' profiles", async ({ request }) => {

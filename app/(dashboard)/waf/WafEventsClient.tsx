@@ -41,7 +41,9 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
+import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/src/lib/caddy-waf";
 import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
 import { withRowIds } from "@/lib/row-id";
@@ -874,6 +876,18 @@ const RANGE_OPTIONS: { value: RangeOption; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
+/** Stored body limits are bytes; the form asks for whole MiB. Unset means "inherit the default". */
+function bodyLimitMib(bytes: number | undefined): number | null {
+  const mib = bytesToMib(bytes);
+  return mib ? Number(mib) : null;
+}
+
+const BODY_LIMIT_ACTIONS = [
+  { value: "", label: "Default" },
+  { value: "Reject", label: "Reject" },
+  { value: "ProcessPartial", label: "Partial" },
+];
+
 const WAF_TEMPLATES = [
   {
     label: "Allow IP",
@@ -921,6 +935,13 @@ export default function WafEventsClient({
   const [wafLoadOwaspCrs, setWafLoadOwaspCrs] = useState(globalWaf?.load_owasp_crs ?? true);
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
+  );
+  const [wafBodyLimitMb, setWafBodyLimitMb] = useState(bodyLimitMib(globalWaf?.request_body_limit));
+  const [wafInMemoryLimitMb, setWafInMemoryLimitMb] = useState(
+    bodyLimitMib(globalWaf?.request_body_in_memory_limit),
+  );
+  const [wafLimitAction, setWafLimitAction] = useState<string>(
+    globalWaf?.request_body_limit_action ?? "",
   );
   // Coraza is a compiled-in plugin. With it off the settings below would be stored and then never
   // reach Caddy, so the form says so up front rather than accepting a rule set that does nothing.
@@ -1283,6 +1304,48 @@ export default function WafEventsClient({
                 value={wafLoadOwaspCrs}
                 onChange={setWafLoadOwaspCrs}
               />
+              <HStack gap={3} vAlign="start" wrap="wrap">
+                <NumberInput
+                  label="Max body size (MiB)"
+                  htmlName="wafRequestBodyLimitMb"
+                  value={wafBodyLimitMb}
+                  onChange={setWafBodyLimitMb}
+                  min={MIN_BODY_LIMIT_MIB}
+                  max={MAX_BODY_LIMIT_MIB}
+                  step={1}
+                  isIntegerOnly
+                  hasClear
+                  placeholder="Coraza default"
+                  description="Largest request body the WAF will inspect."
+                />
+                <NumberInput
+                  label="Buffered in memory (MiB)"
+                  htmlName="wafRequestBodyInMemoryLimitMb"
+                  value={wafInMemoryLimitMb}
+                  onChange={setWafInMemoryLimitMb}
+                  min={MIN_BODY_LIMIT_MIB}
+                  max={MAX_BODY_LIMIT_MIB}
+                  step={1}
+                  isIntegerOnly
+                  hasClear
+                  placeholder="Coraza default"
+                  description="Must not exceed the request body limit."
+                />
+              </HStack>
+              <input type="hidden" name="wafRequestBodyLimitAction" value={wafLimitAction} />
+              <SegmentedControl
+                label="Over-limit action"
+                size="sm"
+                value={wafLimitAction}
+                onChange={setWafLimitAction}
+              >
+                {BODY_LIMIT_ACTIONS.map((o) => (
+                  <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+                ))}
+              </SegmentedControl>
+              <Text type="body" size="xsm" color="secondary">
+                Reject returns 413; Partial inspects what fits and forwards the rest.
+              </Text>
               <CodeEditor
                 label="Custom SecLang Directives"
                 language="ini"

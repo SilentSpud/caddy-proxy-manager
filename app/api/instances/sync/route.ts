@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import {
   applySyncPayload,
@@ -22,12 +22,12 @@ const SYNC_RATE_LIMITS = new Map<string, { count: number; windowStart: number }>
 
 /** Timing-safe token comparison. */
 function secureTokenCompare(a: string, b: string): boolean {
-  // Always compare buffers of the expected length (b), so an early return on a.length !== b.length
-  // cannot leak the expected token length.
-  const bufA = Buffer.from(a.padEnd(b.length, "\0").slice(0, b.length));
-  const bufB = Buffer.from(b);
-  const equal = timingSafeEqual(bufA, bufB);
-  return equal && a.length === b.length;
+  // Hash arbitrary UTF-8 input to fixed-size buffers before comparing. This
+  // avoids both length-dependent comparisons and timingSafeEqual throwing when
+  // a Unicode token's byte length differs from its JavaScript string length.
+  const digestA = createHash("sha256").update(a, "utf8").digest();
+  const digestB = createHash("sha256").update(b, "utf8").digest();
+  return timingSafeEqual(digestA, digestB);
 }
 
 function getClientIp(request: NextRequest): string {
@@ -363,9 +363,10 @@ export async function POST(request: NextRequest) {
     await applyCaddyConfig();
     await setSlaveLastSync({ ok: true });
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to apply sync payload";
-    await setSlaveLastSync({ ok: false, error: message }); // still store internally
+  } catch {
+    // This value is persisted and later serialized into the settings browser;
+    // keep it operationally useful but independent of exception internals.
+    await setSlaveLastSync({ ok: false, error: "Failed to apply synchronized configuration" });
     return NextResponse.json({ error: "Failed to apply sync payload" }, { status: 500 });
   }
 }

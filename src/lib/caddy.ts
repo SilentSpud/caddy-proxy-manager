@@ -37,6 +37,7 @@ import {
   getGeoBlockSettings,
   getWafSettings,
   getErrorPagesSettings,
+  getDefaultResponseSettings,
   getTrustedProxiesSettings,
   type AcmeSettings,
   type DnsProviderSettings,
@@ -47,6 +48,7 @@ import {
   type WafSettings,
   type TrustedProxiesSettings,
 } from "./settings";
+import { buildDefaultResponseRoute } from "./caddy-default-response";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { syncInstances } from "./instance-sync";
 import { caddyAdminRequest } from "./caddy-admin";
@@ -93,6 +95,9 @@ import {
   isDnsProviderUsable,
   isFeatureUsable,
 } from "./caddy-build";
+import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
+import { decryptSecret } from "./secret";
+import { CaddyApplyError, describeCaddyRejection, logCaddyApplyFailure } from "./caddy-apply-error";
 
 const CERTS_DIR = process.env.CERTS_DIRECTORY || join(process.cwd(), "data", "certs");
 mkdirSync(CERTS_DIR, { recursive: true, mode: 0o700 });
@@ -1673,6 +1678,7 @@ async function buildProxyRoutes(
       // Uses CPM itself as the auth provider (replaces Authentik)
       const cpmDialAddress = getCpmDialAddress();
       if (cpmDialAddress) {
+        const cpmProxyProof = getForwardAuthProxyProof();
         // Canonical (Go MIME) casing is required, not cosmetic: Caddy resolves
         // `{http.reverse_proxy.header.<name>}` by literal lookup in Go's canonicalised map, so
         // "X-CPM-User" resolves to nothing and every upstream sees an anonymous request.
@@ -1727,8 +1733,9 @@ async function buildProxyRoutes(
               set: {
                 "X-Forwarded-Method": ["{http.request.method}"],
                 "X-Forwarded-Uri": ["{http.request.uri}"],
-                "X-Forwarded-Host": ["{http.request.host}"],
+                "X-Forwarded-Host": ["{http.request.hostport}"],
                 "X-Forwarded-Proto": ["{http.request.scheme}"],
+                [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof],
               },
             },
           },
@@ -1747,7 +1754,7 @@ async function buildProxyRoutes(
                       status_code: 302,
                       headers: {
                         Location: [
-                          `${config.baseUrl}/portal?rd={http.request.scheme}://{http.request.host}{http.request.uri}`,
+                          `${config.baseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri}`,
                         ],
                       },
                     },
@@ -1779,8 +1786,9 @@ async function buildProxyRoutes(
               headers: {
                 request: {
                   set: {
-                    "X-Forwarded-Host": ["{http.request.host}"],
+                    "X-Forwarded-Host": ["{http.request.hostport}"],
                     "X-Forwarded-Proto": ["{http.request.scheme}"],
+                    [FORWARD_AUTH_PROXY_PROOF_HEADER]: [cpmProxyProof],
                   },
                 },
               },
@@ -2652,7 +2660,7 @@ export async function buildCaddyDocument() {
     type: c.type as "managed" | "imported",
     domainNames: c.domainNames,
     certificatePem: c.certificatePem,
-    privateKeyPem: c.privateKeyPem,
+    privateKeyPem: c.privateKeyPem ? decryptSecret(c.privateKeyPem) : null,
     autoRenew: c.autoRenew ? 1 : 0,
     providerOptions: c.providerOptions,
   }));
@@ -2786,6 +2794,7 @@ export async function buildCaddyDocument() {
     globalWaf,
     trustedProxiesSettings,
     moduleAvailability,
+    defaultResponseSettings,
   ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
@@ -2796,6 +2805,7 @@ export async function buildCaddyDocument() {
     getWafSettings(),
     getTrustedProxiesSettings(),
     getCaddyModuleAvailability(),
+    getDefaultResponseSettings(),
   ]);
 
   // Optionally seed the global geoblock trusted-proxy list from the server-level value so the
@@ -2854,6 +2864,12 @@ export async function buildCaddyDocument() {
   const { routes: httpRoutes, errorRoutes: hostErrorRoutes } =
     await buildProxyRoutes(caddyBuildContext);
 
+  // An administrator-configured matcher-less route replaces Caddy's native
+  // unmatched-request behavior and must remain last so it cannot shadow any
+  // managed proxy host.
+  const defaultResponseRoute = buildDefaultResponseRoute(defaultResponseSettings);
+  const mainRoutes = defaultResponseRoute ? [...httpRoutes, defaultResponseRoute] : httpRoutes;
+
   // Server-level error routes (Caddy handle_errors): per-host rules first so they
   // take precedence, then global rules act as a fallback for any unmatched host/status.
   const globalErrorPages = await getErrorPagesSettings();
@@ -2881,12 +2897,12 @@ export async function buildCaddyDocument() {
   const serverTrustedProxies = buildServerTrustedProxies(trustedProxiesSettings);
 
   // Main HTTP/HTTPS server for proxy hosts
-  if (httpRoutes.length > 0) {
+  if (mainRoutes.length > 0) {
     servers.cpm = {
       listen: hasTls ? [":80", ":443"] : [":80"],
-      routes: httpRoutes,
-      // Only disable automatic HTTPS when TLS automation policies exist, so Caddy can still
-      // handle HTTP-01 challenges for managed certificates
+      routes: mainRoutes,
+      // Only disable automatic HTTPS if we have TLS automation policies
+      // This allows Caddy to handle HTTP-01 challenges for managed certificates
       ...(tlsApp ? {} : { automatic_https: { disable: true } }),
       ...(hasTls ? { tls_connection_policies: tlsConnectionPolicies } : {}),
       // Custom error pages (handle_errors)
@@ -2986,25 +3002,38 @@ export async function applyCaddyConfig() {
   const document = await buildCaddyDocument();
   const payload = JSON.stringify(document);
 
+  let response: { status: number; text: string };
   try {
-    const response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Caddy config load failed: ${response.status} ${response.text}`);
+    response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
+  } catch (error) {
+    logCaddyApplyFailure("Caddy admin request failed", error);
+    if (isConnectionError(error)) {
+      throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
     }
+    throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
+  }
 
+  if (response.status < 200 || response.status >= 300) {
+    const reason = describeCaddyRejection(response.text);
+    logCaddyApplyFailure("Caddy rejected configuration", undefined, {
+      status: response.status,
+      responseBytes: Buffer.byteLength(response.text),
+      knownReason: reason !== null,
+    });
+    throw new CaddyApplyError(
+      reason ? `Caddy rejected configuration: ${reason}` : "Caddy rejected configuration",
+      "CADDY_REJECTED",
+    );
+  }
+
+  try {
     await syncInstances();
   } catch (error) {
-    console.error("Failed to apply Caddy config", error);
-
-    if (isConnectionError(error)) {
-      throw new Error(
-        `Unable to reach Caddy API at ${config.caddyApiUrl}. Ensure Caddy is running and accessible.`,
-        { cause: error },
-      );
-    }
-
-    throw error;
+    logCaddyApplyFailure("Instance synchronization failed after Caddy apply", error);
+    throw new CaddyApplyError(
+      "Caddy configuration applied but instance synchronization failed",
+      "INSTANCE_SYNC_FAILED",
+    );
   }
 }
 

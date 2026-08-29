@@ -8,17 +8,26 @@ import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Icon } from "@astryxdesign/core/Icon";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { WafHostConfig } from "@/lib/models/proxy-hosts";
+import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-waf";
 import { WafRuleExclusions } from "./WafRuleExclusions";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 
 type WafMode = "merge" | "override";
 type EngineMode = "Off" | "On" | "inherit";
+type LimitAction = "Reject" | "ProcessPartial" | "inherit";
+
+/** Stored body limits are bytes; the form asks for whole MiB. Null means "inherit". */
+function bodyLimitMib(bytes: number | undefined): number | null {
+  const mib = bytesToMib(bytes);
+  return mib ? Number(mib) : null;
+}
 
 const QUICK_TEMPLATES = [
   {
@@ -53,6 +62,13 @@ export function WafFields({ value, showModeSelector = true }: Props) {
   );
   const [loadCrs, setLoadCrs] = useState(value?.load_owasp_crs ?? true);
   const [customDirectives, setCustomDirectives] = useState(value?.custom_directives ?? "");
+  const [bodyLimitMb, setBodyLimitMb] = useState(bodyLimitMib(value?.request_body_limit));
+  const [inMemoryLimitMb, setInMemoryLimitMb] = useState(
+    bodyLimitMib(value?.request_body_in_memory_limit),
+  );
+  const [limitAction, setLimitAction] = useState<LimitAction>(
+    value?.request_body_limit_action ?? "inherit",
+  );
 
   return (
     <Card>
@@ -62,6 +78,13 @@ export function WafFields({ value, showModeSelector = true }: Props) {
       <input type="hidden" name="wafEngineMode" value={engineMode} />
       <input type="hidden" name="wafLoadOwaspCrs" value={loadCrs ? "on" : ""} />
       <input type="hidden" name="wafCustomDirectives" value={customDirectives} />
+      <input type="hidden" name="wafRequestBodyLimitMb" value={bodyLimitMb ?? ""} />
+      <input type="hidden" name="wafRequestBodyInMemoryLimitMb" value={inMemoryLimitMb ?? ""} />
+      <input
+        type="hidden"
+        name="wafRequestBodyLimitAction"
+        value={limitAction === "inherit" ? "" : limitAction}
+      />
 
       <VStack gap={4}>
         <HStack justify="between" vAlign="start" gap={2}>
@@ -137,6 +160,57 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               value={loadCrs}
               onChange={setLoadCrs}
             />
+
+            <Divider />
+
+            <VStack gap={2}>
+              <Text type="body" size="sm" weight="bold">
+                Request Body Limits
+              </Text>
+              <Text type="body" size="xsm" color="secondary">
+                Coraza buffers request bodies for inspection and rejects anything larger than its
+                limit — 12.5 MiB with the OWASP CRS loaded. Raise it for hosts that receive large
+                uploads. Leave blank to inherit.
+              </Text>
+              <HStack gap={3} vAlign="start" wrap="wrap">
+                <NumberInput
+                  label={`Max body size (MiB, up to ${MAX_BODY_LIMIT_MIB})`}
+                  value={bodyLimitMb}
+                  onChange={setBodyLimitMb}
+                  min={MIN_BODY_LIMIT_MIB}
+                  max={MAX_BODY_LIMIT_MIB}
+                  step={1}
+                  isIntegerOnly
+                  hasClear
+                  placeholder="Inherit"
+                />
+                <NumberInput
+                  label="Buffered in memory (MiB)"
+                  value={inMemoryLimitMb}
+                  onChange={setInMemoryLimitMb}
+                  min={MIN_BODY_LIMIT_MIB}
+                  max={MAX_BODY_LIMIT_MIB}
+                  step={1}
+                  isIntegerOnly
+                  hasClear
+                  placeholder="Inherit"
+                />
+              </HStack>
+              <SegmentedControl
+                label="Over-limit action"
+                value={limitAction}
+                onChange={(next) => setLimitAction(next as LimitAction)}
+              >
+                <SegmentedControlItem value="inherit" label="Inherit" />
+                <SegmentedControlItem value="Reject" label="Reject" />
+                <SegmentedControlItem value="ProcessPartial" label="Partial" />
+              </SegmentedControl>
+              <Text type="body" size="xsm" color="secondary">
+                Reject returns 413; Partial inspects what fits and forwards the rest.
+              </Text>
+            </VStack>
+
+            <Divider />
 
             <WafRuleExclusions value={value?.excluded_rule_ids} />
 

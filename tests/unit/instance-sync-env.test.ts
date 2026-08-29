@@ -3,12 +3,15 @@
  * just process.env parsing and validation.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
 import {
   getEnvSlaveInstances,
   getSyncIntervalMs,
   isHttpSyncAllowed,
   isInstanceModeFromEnv,
   isSyncTokenFromEnv,
+  getSlaveMasterToken,
+  setSlaveMasterToken,
 } from '../../src/lib/instance-sync';
 
 const KEYS = [
@@ -43,23 +46,31 @@ describe('getEnvSlaveInstances', () => {
 
   it('parses a valid single slave entry', () => {
     process.env.INSTANCE_SLAVES = JSON.stringify([
-      { name: 'slave1', url: 'https://slave.example.com', token: 'secret123' },
+      { name: 'slave1', url: 'https://slave.example.com', token: 'a'.repeat(32) },
     ]);
     const result = getEnvSlaveInstances();
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
       name: 'slave1',
       url: 'https://slave.example.com',
-      token: 'secret123',
+      token: 'a'.repeat(32),
     });
   });
 
   it('parses multiple slave entries', () => {
     process.env.INSTANCE_SLAVES = JSON.stringify([
-      { name: 'slave1', url: 'https://slave1.example.com', token: 'tok1' },
-      { name: 'slave2', url: 'https://slave2.example.com', token: 'tok2' },
+      { name: 'slave1', url: 'https://slave1.example.com', token: 'a'.repeat(32) },
+      { name: 'slave2', url: 'https://slave2.example.com', token: 'b'.repeat(32) },
     ]);
     expect(getEnvSlaveInstances()).toHaveLength(2);
+  });
+
+  it('filters out slave entries with weak sync tokens', () => {
+    process.env.INSTANCE_SLAVES = JSON.stringify([
+      { name: 'weak', url: 'https://weak.example.com', token: 'too-short' },
+      { name: 'strong', url: 'https://strong.example.com', token: 'a'.repeat(32) },
+    ]);
+    expect(getEnvSlaveInstances().map((instance) => instance.name)).toEqual(['strong']);
   });
 
   it('returns empty array for non-array JSON', () => {
@@ -68,13 +79,20 @@ describe('getEnvSlaveInstances', () => {
   });
 
   it('returns empty array for malformed JSON', () => {
-    process.env.INSTANCE_SLAVES = '{bad json';
+    const secret = 'malformed-env-token-secret-sentinel';
+    process.env.INSTANCE_SLAVES = `[{"token":"${secret}"}`;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
     expect(getEnvSlaveInstances()).toEqual([]);
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(secret);
+    expect(warnSpy).toHaveBeenCalledWith('Failed to parse INSTANCE_SLAVES environment variable');
+
+    warnSpy.mockRestore();
   });
 
   it('filters out entries missing required fields', () => {
     process.env.INSTANCE_SLAVES = JSON.stringify([
-      { name: 'slave1', url: 'https://slave1.example.com', token: 'tok1' }, // valid
+      { name: 'slave1', url: 'https://slave1.example.com', token: 'a'.repeat(32) }, // valid
       { name: 'slave2', url: 'https://slave2.example.com' }, // missing token
       { name: 'slave3', token: 'tok3' }, // missing url
       { url: 'https://slave4.example.com', token: 'tok4' }, // missing name
@@ -96,7 +114,7 @@ describe('getEnvSlaveInstances', () => {
       42,
       null,
       'string',
-      { name: 'ok', url: 'https://ok.com', token: 'tok' },
+      { name: 'ok', url: 'https://ok.com', token: 'a'.repeat(32) },
     ]);
     const result = getEnvSlaveInstances();
     expect(result).toHaveLength(1);
@@ -228,8 +246,8 @@ describe('isSyncTokenFromEnv', () => {
     expect(isSyncTokenFromEnv()).toBe(false);
   });
 
-  it('returns true when token is set to a non-empty string', () => {
-    process.env.INSTANCE_SYNC_TOKEN = 'my-secret-token';
+  it('returns true when token is configured in the environment', () => {
+    process.env.INSTANCE_SYNC_TOKEN = 'a'.repeat(32);
     expect(isSyncTokenFromEnv()).toBe(true);
   });
 
@@ -238,8 +256,19 @@ describe('isSyncTokenFromEnv', () => {
     expect(isSyncTokenFromEnv()).toBe(false);
   });
 
-  it('returns true for any non-empty value', () => {
-    process.env.INSTANCE_SYNC_TOKEN = '   '; // whitespace counts as non-empty
+  it('treats an invalid non-empty value as configured so it cannot silently fall back to the database', () => {
+    process.env.INSTANCE_SYNC_TOKEN = '   ';
     expect(isSyncTokenFromEnv()).toBe(true);
+  });
+});
+
+describe('sync token enforcement', () => {
+  it('does not accept a weak environment token for sync authentication', async () => {
+    process.env.INSTANCE_SYNC_TOKEN = 'weak-token';
+    await expect(getSlaveMasterToken()).rejects.toThrow(/INSTANCE_SYNC_TOKEN.*at least 32/);
+  });
+
+  it('rejects weak tokens at the persistence boundary', async () => {
+    await expect(setSlaveMasterToken('weak-token')).rejects.toThrow(/at least 32/);
   });
 });
