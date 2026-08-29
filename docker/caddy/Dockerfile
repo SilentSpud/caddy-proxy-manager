@@ -64,7 +64,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # stages on one distro means it stays that way even if a plugin pulls in cgo. Not caddy:<version>
 # itself — this stage overwrites /usr/bin/caddy, so the official binary would sit in a lower layer
 # as ~50MB of dead weight. wget is busybox's, which the compose healthcheck uses unchanged.
-FROM alpine:3.23
+FROM alpine:3.24
 
 # Accept build args for user/group IDs to support rootless operation
 # Using 10000 as default to avoid conflicts with system users
