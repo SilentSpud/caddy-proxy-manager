@@ -22,6 +22,7 @@ import { DNS_PROVIDERS } from '@/src/lib/dns-providers';
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const DOCKERFILE = readFileSync(resolve(moduleDir, '../../docker/caddy/Dockerfile'), 'utf-8');
 const GO_MOD = readFileSync(resolve(moduleDir, '../../docker/caddy/go.mod'), 'utf-8');
+const GO_TOOLS = readFileSync(resolve(moduleDir, '../../docker/caddy/tools.go'), 'utf-8');
 
 /** Module paths carrying a pinned version in the Caddy build's go.mod. */
 function pinnedModulePaths(): Set<string> {
@@ -84,6 +85,20 @@ describe('caddy module registry', () => {
   it('pins Caddy itself, so the Dockerfile needs no version of its own', () => {
     expect(pinnedModulePaths().has('github.com/caddyserver/caddy/v2')).toBe(true);
     expect(DOCKERFILE).not.toContain('CADDY_VERSION');
+  });
+
+  it('blank-imports every pin from tools.go, so `go mod tidy` keeps them', () => {
+    // The pins only survive tidy because tools.go imports them; a module added to go.mod but not
+    // there is silently dropped the next time Dependabot opens a PR, which is how the require
+    // block got emptied once already. cel-go has no package at its module root, so it is spelled
+    // as the subpackage the replace directive exists to hold in place.
+    const imported = new Set(
+      [...GO_TOOLS.matchAll(/^\s*_ "([^"]+)"$/gm)].map(([, path]) =>
+        path === 'github.com/google/cel-go/cel' ? 'github.com/google/cel-go' : path,
+      ),
+    );
+    const unimported = [...pinnedModulePaths()].filter((p) => !imported.has(p));
+    expect(unimported).toEqual([]);
   });
 
   it('records the resolved module list inside the image', () => {
