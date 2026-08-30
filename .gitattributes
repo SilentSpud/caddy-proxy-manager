@@ -1,0 +1,6 @@
+# docker/caddy/tools.go is the only Go file in the repo and it is never compiled: its blank
+# imports exist purely so `go mod tidy` keeps the version catalog in docker/caddy/go.mod. Left
+# detectable, it makes GitHub report the repo as containing Go, and CodeQL's default setup adds
+# a Go analysis whose autobuild then fails with "no source code seen" -- `go build ./...` finds
+# no packages, because the one file is behind the `tools` build tag.
+docker/caddy/tools.go -linguist-detectable
