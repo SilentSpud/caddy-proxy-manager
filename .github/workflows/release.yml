@@ -1,0 +1,177 @@
+name: Release
+
+# The version bump is the gate. docker-build-trusted only emits semver tags for a v* ref, so a bump
+# that never gets tagged ships as `latest` and nothing else.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+  # Already-released versions are a no-op, so running this by hand is always safe.
+  workflow_dispatch:
+
+# Queue rather than cancel: the loser would abandon a version bump with no release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag and release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      # Dispatching the image build — see the last step.
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Notes and the deploy-file diff are both computed against the previous release tag.
+          fetch-depth: 0
+
+      - name: Resolve the version to release
+        id: version
+        run: |
+          set -euo pipefail
+
+          version="$(jq -er .version package.json)"
+          tag="v${version}"
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} already exists — nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          case "$version" in
+            *-*) prerelease=true ;;
+            *)   prerelease=false ;;
+          esac
+
+          # Empty only on a repository with no v* tag yet.
+          previous="$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)"
+
+          {
+            echo "release=true"
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "prerelease=${prerelease}"
+            echo "previous=${previous}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Releasing ${tag} (prerelease=${prerelease}, previous=${previous:-none})"
+
+      - name: Compose release notes
+        if: steps.version.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # ghcr rejects an uppercase path; metadata-action lowercases the same way at build time.
+          image_base="ghcr.io/$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+
+          # What a deployment carries on disk. `docker compose pull` cannot deliver a change to any
+          # of these, which is what makes it worth calling out.
+          deploy_paths=(docker-compose.yml .env.example docker/clickhouse)
+
+          deploy_changed=""
+          if [ -n "$PREVIOUS" ]; then
+            deploy_changed="$(git diff --name-only "${PREVIOUS}..HEAD" -- "${deploy_paths[@]}")"
+          fi
+
+          {
+            echo "## Images"
+            echo
+            echo '```'
+            for service in web caddy l4-port-manager; do
+              echo "${image_base}-${service}:${VERSION}"
+            done
+            echo '```'
+            echo
+            echo "Published by the image build this release starts; give it a few minutes."
+            echo
+            echo "## Deployment files"
+            echo
+            if [ -n "$deploy_changed" ]; then
+              echo "> [!IMPORTANT]"
+              echo "> These live in your checkout, not in the images, so \`docker compose pull\` will"
+              echo "> not update them. Pull the repository (or take them from the assets below)"
+              echo "> before \`docker compose up -d\`:"
+              echo ">"
+              while IFS= read -r file; do
+                [ -n "$file" ] && echo "> - \`${file}\`"
+              done <<< "$deploy_changed"
+            elif [ -n "$PREVIOUS" ]; then
+              echo "Unchanged since ${PREVIOUS}. Pulling the images is enough."
+            else
+              echo "First tagged release — take \`docker-compose.yml\` and \`.env.example\` from the assets below."
+            fi
+            echo
+            echo "## Changes"
+            echo
+            if [ -n "$PREVIOUS" ]; then
+              # Capped; the compare link is the better view of a release that long.
+              git log --no-merges --pretty='- %s (%h)' "${PREVIOUS}..HEAD" | head -n 100
+              total="$(git rev-list --no-merges --count "${PREVIOUS}..HEAD")"
+              if [ "$total" -gt 100 ]; then
+                echo "- …and $((total - 100)) more"
+              fi
+              echo
+              echo "**Full diff:** https://github.com/${REPOSITORY}/compare/${PREVIOUS}...${TAG}"
+            else
+              echo "Initial release."
+            fi
+          } > release-notes.md
+
+          echo "--- release notes ---"
+          cat release-notes.md
+
+      - name: Create the tag and release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          args=(
+            "$TAG"
+            --title "$TAG"
+            --notes-file release-notes.md
+            # The checked-out commit, not wherever the branch moved while the run queued.
+            --target "$GITHUB_SHA"
+          )
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+
+          # `#label` renames the asset; low-disk-write.xml says nothing on its own in a file list.
+          args+=(
+            docker-compose.yml
+            .env.example
+            'docker/clickhouse/config.d/low-disk-write.xml#clickhouse-low-disk-write.xml'
+          )
+
+          gh release create "${args[@]}"
+
+      - name: Build and publish the images for this tag
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Dispatched, not left to the tag push: a tag created with GITHUB_TOKEN starts no
+          # workflow, and workflow_dispatch is the documented exception. --ref so metadata-action
+          # reads the version off the tag.
+          gh workflow run docker-build-trusted.yml --ref "$TAG"
+          echo "Dispatched docker-build-trusted at ${TAG}"

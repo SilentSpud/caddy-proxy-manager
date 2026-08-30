@@ -2,6 +2,13 @@
 
 Project-specific guidance for AI coding agents.
 
+## Comments
+
+Terse. One line is the median here and three is already long — match that, in every language,
+workflows and shell included. Explain *why*: a constraint, a gotcha, a decision that reads as a
+mistake without it. Never restate what the line does, and leave code that holds no surprise
+uncommented. Prefer tightening an existing comment to adding one beside it.
+
 <!-- ASTRYX:START -->
 Astryx v0.4.5 · 90+ components
 CLI: run every command as `bunx astryx <cmd>` (shown below as `astryx ...`).

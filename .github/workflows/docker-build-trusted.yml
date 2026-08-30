@@ -1,10 +1,8 @@
 name: Build and Push Docker Images (Trusted)
 
+# Released versions only. The Release workflow creates the v* tag and dispatches this run at it.
 on:
   push:
-    branches:
-      - main
-      - develop
     tags:
       - 'v*'
   workflow_dispatch:
@@ -74,7 +72,10 @@ jobs:
             type=semver,pattern={{major}}
             type=match,pattern=v(.*),group=1
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+            # is_default_branch can no longer be true, and docker-compose.yml pins :latest, so it
+            # follows the newest release instead. Prereleases move it; narrow to stable releases
+            # with `&& !contains(github.ref_name, '-')`.
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
       - name: Build and push Docker image
         id: build
