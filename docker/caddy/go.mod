@@ -40,8 +40,8 @@ require (
 	github.com/mholt/caddy-l4 v0.1.2
 )
 
-// caddy-blocker-plugin tracks Caddy master and currently requests cel-go
-// v0.29.0, whose InterpretableV2 API is incompatible with Caddy v2.11.4.
-// Keep the reviewed stable Caddy build on its own cel-go version; the image
-// build test must pass before Dependabot can merge an update to this pin.
+// caddy-blocker-plugin tracks Caddy master and wants cel-go v0.29.0, whose InterpretableV2 API
+// Caddy v2.11.4 does not compile against. update-compatibility-pins.sh derives this from the
+// pinned Caddy release, and Dependabot cannot move it without the image build passing.
+// The import path becomes cel.dev/cel-go at v0.32.0, so a bump past v0.31.0 changes both sides.
 replace github.com/google/cel-go => github.com/google/cel-go v0.28.1
