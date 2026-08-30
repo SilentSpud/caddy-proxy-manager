@@ -158,6 +158,35 @@ describe('REST settings runtime validation', () => {
     expect(validateSettingsGroup('acme', { caRootPem })).toEqual({ caRootPem });
   });
 
+  it('validates the shape of an ACME contact address', () => {
+    const withEmail = (acmeEmail: string) =>
+      validateSettingsGroup('general', { primaryDomain: 'example.com', acmeEmail });
+
+    for (const good of ['admin@example.com', 'admin@mail.example.co.uk']) {
+      expect(withEmail(good), good).toEqual({ primaryDomain: 'example.com', acmeEmail: good });
+    }
+
+    for (const bad of ['admin', 'admin@example', 'admin@.com', 'admin@example.', 'a b@x.com']) {
+      expect(() => withEmail(bad), bad).toThrow(/valid email address/);
+    }
+
+    // An empty label is not a domain. The earlier pattern let both sides of the dot swallow one,
+    // which is what made a non-matching address backtrack quadratically.
+    expect(() => withEmail('admin@example..com')).toThrow(/valid email address/);
+  });
+
+  it('caps the address length before the pattern ever runs', () => {
+    // '!@!.!.!.…' is the worst case for a pattern whose two sides can both eat the dot. The
+    // length cap, not the pattern, is what keeps a hostile payload short enough to be harmless,
+    // so it has to stay in front of the match rather than beside it.
+    expect(() =>
+      validateSettingsGroup('general', {
+        primaryDomain: 'example.com',
+        acmeEmail: `!@${'!.'.repeat(5000)}`,
+      }),
+    ).toThrow(/between 0 and 320 characters/);
+  });
+
   it('rejects non-line-break control characters in ACME root PEM values', () => {
     expect(() =>
       validateSettingsGroup('acme', {

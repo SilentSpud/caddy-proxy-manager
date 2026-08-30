@@ -19,6 +19,11 @@ const MAX_SHORT_STRING = 2048;
 const MAX_SECRET_LENGTH = 16 * 1024;
 const MAX_LIST_ITEMS = 1024;
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+// Domain labels are matched one at a time, each excluding the dot that separates them. The
+// obvious `[^\s@]+\.[^\s@]+` lets both sides consume dots, so the two alternatives overlap and a
+// non-matching address backtracks quadratically -- CodeQL js/polynomial-redos. The 320-character
+// cap below bounds the damage either way; this just removes the sharp edge.
+const EMAIL_ADDRESS = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 const CONTINENTS = new Set(["AF", "AN", "AS", "EU", "NA", "OC", "SA"]);
 
 function invalid(message: string): never {
@@ -176,7 +181,7 @@ function validateGeneral(value: Record<string, unknown>): void {
   });
   if (value.acmeEmail !== undefined) {
     const email = stringValue(value.acmeEmail, "general.acmeEmail", { max: 320 });
-    if (email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    if (email.length > 0 && !EMAIL_ADDRESS.test(email))
       invalid("general.acmeEmail must be a valid email address");
   }
 }
