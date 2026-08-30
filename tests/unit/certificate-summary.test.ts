@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   countExpiry,
   countHealthyAcmeHosts,
-} from '@/app/(dashboard)/certificates/certificate-summary';
+} from '@/src/app/(dashboard)/certificates/certificate-summary';
 
 describe('certificate summary helpers', () => {
   it('counts imported expiry buckets', () => {

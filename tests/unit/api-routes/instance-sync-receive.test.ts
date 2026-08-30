@@ -16,7 +16,7 @@ vi.mock('@/src/lib/instance-sync', () => ({
   setSlaveLastSync: vi.fn(),
 }));
 
-import { POST } from '@/app/api/instances/sync/route';
+import { POST } from '@/src/app/api/instances/sync/route';
 import { applyCaddyConfig } from '@/src/lib/caddy';
 import { applySyncPayload, setSlaveLastSync } from '@/src/lib/instance-sync';
 

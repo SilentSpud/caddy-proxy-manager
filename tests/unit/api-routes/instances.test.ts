@@ -37,9 +37,9 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET, POST } from '@/app/api/v1/instances/route';
-import { DELETE } from '@/app/api/v1/instances/[id]/route';
-import { POST as syncPOST } from '@/app/api/v1/instances/sync/route';
+import { GET, POST } from '@/src/app/api/v1/instances/route';
+import { DELETE } from '@/src/app/api/v1/instances/[id]/route';
+import { POST as syncPOST } from '@/src/app/api/v1/instances/sync/route';
 import { listInstances, createInstance, deleteInstance } from '@/src/lib/models/instances';
 import { syncInstances } from '@/src/lib/instance-sync';
 import { requireApiAdmin } from '@/src/lib/api-auth';

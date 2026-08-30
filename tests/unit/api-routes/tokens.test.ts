@@ -34,8 +34,8 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET, POST } from '@/app/api/v1/tokens/route';
-import { DELETE } from '@/app/api/v1/tokens/[id]/route';
+import { GET, POST } from '@/src/app/api/v1/tokens/route';
+import { DELETE } from '@/src/app/api/v1/tokens/[id]/route';
 import {
   createApiToken,
   listApiTokens,

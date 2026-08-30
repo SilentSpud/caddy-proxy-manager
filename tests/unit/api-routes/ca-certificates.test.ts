@@ -35,8 +35,8 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET as listGET, POST } from '@/app/api/v1/ca-certificates/route';
-import { GET as getGET, PUT, DELETE } from '@/app/api/v1/ca-certificates/[id]/route';
+import { GET as listGET, POST } from '@/src/app/api/v1/ca-certificates/route';
+import { GET as getGET, PUT, DELETE } from '@/src/app/api/v1/ca-certificates/[id]/route';
 import {
   listCaCertificates,
   createCaCertificate,

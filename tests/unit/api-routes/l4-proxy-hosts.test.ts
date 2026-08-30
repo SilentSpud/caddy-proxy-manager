@@ -35,8 +35,8 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET as listGET, POST } from '@/app/api/v1/l4-proxy-hosts/route';
-import { GET as getGET, PUT, DELETE } from '@/app/api/v1/l4-proxy-hosts/[id]/route';
+import { GET as listGET, POST } from '@/src/app/api/v1/l4-proxy-hosts/route';
+import { GET as getGET, PUT, DELETE } from '@/src/app/api/v1/l4-proxy-hosts/[id]/route';
 import {
   listL4ProxyHosts,
   createL4ProxyHost,

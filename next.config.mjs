@@ -11,8 +11,8 @@ const nextConfig = {
   },
   output: "standalone",
   poweredByHeader: false,
-  // Security headers (CSP, etc.) are set per-request in proxy.ts middleware
-  // with a unique nonce, so they are NOT defined here as static headers.
+  // Security headers (CSP, etc.) are set per-request in src/proxy.ts with a
+  // unique nonce, so they are NOT defined here as static headers.
 };
 
 export default nextConfig;

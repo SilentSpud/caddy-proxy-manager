@@ -11,7 +11,7 @@ import {
   createProxyHostAction,
   deleteProxyHostAction,
   updateProxyHostAction,
-} from "@/app/(dashboard)/proxy-hosts/actions";
+} from "@/src/app/(dashboard)/proxy-hosts/actions";
 import { INITIAL_ACTION_STATE } from "@/lib/actions";
 import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificate-api";

@@ -53,7 +53,7 @@ import {
   resolveForwardAuthAudience,
   validateForwardAuthSession,
 } from '../../src/lib/models/forward-auth';
-import { GET as forwardAuthCallback } from '../../app/api/forward-auth/callback/route';
+import { GET as forwardAuthCallback } from '../../src/app/api/forward-auth/callback/route';
 import {
   FORWARD_AUTH_PROXY_PROOF_HEADER,
   getForwardAuthProxyProof,

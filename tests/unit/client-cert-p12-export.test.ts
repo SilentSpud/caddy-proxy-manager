@@ -24,7 +24,7 @@ vi.mock('@/src/lib/models/issued-client-certificates', () => ({
 import {
   generateCaCertificateAction,
   issueClientCertificateAction,
-} from '@/app/(dashboard)/certificates/ca-actions';
+} from '@/src/app/(dashboard)/certificates/ca-actions';
 import {
   createCaCertificate,
   getCaCertificate,

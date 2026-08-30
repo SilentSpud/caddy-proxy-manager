@@ -10,7 +10,7 @@ import {
   outlineLayerFor,
   selectedLayerFor,
   type MapPalette,
-} from '../../app/(dashboard)/analytics/map-theme';
+} from '../../src/app/(dashboard)/analytics/map-theme';
 
 /**
  * Builds the palette the way the component does, through the real Astryx theme rather than a stub:

@@ -36,8 +36,8 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET as listGET } from '@/app/api/v1/users/route';
-import { GET as getGET, PUT } from '@/app/api/v1/users/[id]/route';
+import { GET as listGET } from '@/src/app/api/v1/users/route';
+import { GET as getGET, PUT } from '@/src/app/api/v1/users/[id]/route';
 import { listUsers, getUserById, updateUserProfile } from '@/src/lib/models/user';
 import { requireApiAdmin, requireApiUser } from '@/src/lib/api-auth';
 

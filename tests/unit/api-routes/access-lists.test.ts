@@ -37,10 +37,10 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET as listGET, POST as listPOST } from '@/app/api/v1/access-lists/route';
-import { GET as getGET, PUT, DELETE } from '@/app/api/v1/access-lists/[id]/route';
-import { POST as entriesPOST } from '@/app/api/v1/access-lists/[id]/entries/route';
-import { DELETE as entryDELETE } from '@/app/api/v1/access-lists/[id]/entries/[entryId]/route';
+import { GET as listGET, POST as listPOST } from '@/src/app/api/v1/access-lists/route';
+import { GET as getGET, PUT, DELETE } from '@/src/app/api/v1/access-lists/[id]/route';
+import { POST as entriesPOST } from '@/src/app/api/v1/access-lists/[id]/entries/route';
+import { DELETE as entryDELETE } from '@/src/app/api/v1/access-lists/[id]/entries/[entryId]/route';
 import {
   listAccessLists,
   createAccessList,

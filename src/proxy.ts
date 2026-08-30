@@ -6,7 +6,7 @@ import { buildCsp } from "@/src/lib/csp";
 
 /** Next.js Proxy: defense-in-depth auth at the edge, before page components. Node runtime. */
 
-export default async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
   // Allow public routes

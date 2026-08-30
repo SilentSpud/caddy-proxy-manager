@@ -32,8 +32,8 @@ vi.mock('@/src/lib/auth-server', () => ({
   invalidateProviderCache: vi.fn(),
 }));
 
-import { GET as listGET, POST } from '@/app/api/v1/oauth-providers/route';
-import { GET as itemGET, PUT } from '@/app/api/v1/oauth-providers/[id]/route';
+import { GET as listGET, POST } from '@/src/app/api/v1/oauth-providers/route';
+import { GET as itemGET, PUT } from '@/src/app/api/v1/oauth-providers/[id]/route';
 import {
   createOAuthProvider,
   getOAuthProvider,

@@ -31,7 +31,7 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET } from '@/app/api/waf-events/route';
+import { GET } from '@/src/app/api/waf-events/route';
 import { countWafEvents, listWafEvents } from '@/src/lib/models/waf-events';
 
 const mockListWafEvents = vi.mocked(listWafEvents);

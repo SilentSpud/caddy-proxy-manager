@@ -91,7 +91,7 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-const { GET, PUT } = await import('@/app/api/v1/settings/[group]/route');
+const { GET, PUT } = await import('@/src/app/api/v1/settings/[group]/route');
 import {
   getGeneralSettings,
   saveGeneralSettings,
@@ -131,7 +131,7 @@ import {
 import { applyCaddyConfig } from '@/src/lib/caddy';
 import { requireApiAdmin } from '@/src/lib/api-auth';
 import { DefaultResponseValidationError } from '@/src/lib/caddy-default-response';
-import { updateGeneralSettingsAction } from '@/app/(dashboard)/settings/actions';
+import { updateGeneralSettingsAction } from '@/src/app/(dashboard)/settings/actions';
 
 const mockGetGeneral = vi.mocked(getGeneralSettings);
 const mockSaveGeneral = vi.mocked(saveGeneralSettings);

@@ -31,7 +31,7 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { POST } from '@/app/api/v1/caddy/apply/route';
+import { POST } from '@/src/app/api/v1/caddy/apply/route';
 import { applyCaddyConfig } from '@/src/lib/caddy';
 import { requireApiAdmin } from '@/src/lib/api-auth';
 

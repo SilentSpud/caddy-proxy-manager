@@ -64,7 +64,7 @@ vi.mock('@/src/lib/dns-providers', () => ({
   DNS_PROVIDERS: [],
 }));
 
-import { suppressWafRuleForHostAction } from '@/app/(dashboard)/settings/actions';
+import { suppressWafRuleForHostAction } from '@/src/app/(dashboard)/settings/actions';
 
 beforeEach(() => {
   updateProxyHostMock.mockClear();

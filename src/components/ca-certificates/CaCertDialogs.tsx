@@ -21,7 +21,7 @@ import {
   deleteCaCertificateAction,
   issueClientCertificateAction,
   revokeIssuedClientCertificateAction,
-} from "@/app/(dashboard)/certificates/ca-actions";
+} from "@/src/app/(dashboard)/certificates/ca-actions";
 
 function downloadFile(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);

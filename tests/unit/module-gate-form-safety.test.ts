@@ -15,9 +15,9 @@ const read = (relative: string) => readFileSync(resolve(moduleDir, '../..', rela
 
 const geoBlockFields = read('src/components/proxy-hosts/GeoBlockFields.tsx');
 const wafFields = read('src/components/proxy-hosts/WafFields.tsx');
-const wafEventsClient = read('app/(dashboard)/waf/WafEventsClient.tsx');
-const proxyHostActions = read('app/(dashboard)/proxy-hosts/actions.ts');
-const settingsActions = read('app/(dashboard)/settings/actions.ts');
+const wafEventsClient = read('src/app/(dashboard)/waf/WafEventsClient.tsx');
+const proxyHostActions = read('src/app/(dashboard)/proxy-hosts/actions.ts');
+const settingsActions = read('src/app/(dashboard)/settings/actions.ts');
 
 describe('the parsers these components feed', () => {
   it('always runs once the presence marker is submitted', () => {

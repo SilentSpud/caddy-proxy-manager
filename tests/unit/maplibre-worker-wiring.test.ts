@@ -17,7 +17,7 @@ const projectRoot = resolve(moduleDir, '../..');
 const WORKER_SPECIFIER = 'maplibre-gl/dist/maplibre-gl-worker.mjs';
 
 const worldMapInner = readFileSync(
-  join(projectRoot, 'app', '(dashboard)', 'analytics', 'WorldMapInner.tsx'),
+  join(projectRoot, 'src', 'app', '(dashboard)', 'analytics', 'WorldMapInner.tsx'),
   'utf8',
 );
 

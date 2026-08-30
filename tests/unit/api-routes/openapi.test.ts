@@ -27,7 +27,7 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET } from '@/app/api/v1/openapi.json/route';
+import { GET } from '@/src/app/api/v1/openapi.json/route';
 
 function makeRequest() {
   return new NextRequest('http://localhost/api/v1/openapi.json', {

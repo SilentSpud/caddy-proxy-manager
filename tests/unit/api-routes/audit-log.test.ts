@@ -32,7 +32,7 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET } from '@/app/api/v1/audit-log/route';
+import { GET } from '@/src/app/api/v1/audit-log/route';
 import { listAuditEvents, countAuditEvents } from '@/src/lib/models/audit';
 import { requireApiAdmin } from '@/src/lib/api-auth';
 

@@ -51,7 +51,7 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { PUT } from '@/app/api/v1/caddy/modules/route';
+import { PUT } from '@/src/app/api/v1/caddy/modules/route';
 import { describeModuleConflicts } from '@/src/lib/caddy-build-conflicts';
 import { saveCaddyBuildSettings } from '@/src/lib/settings';
 import { applyCaddyConfig } from '@/src/lib/caddy';

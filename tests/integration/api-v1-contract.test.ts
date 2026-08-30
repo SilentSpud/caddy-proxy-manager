@@ -39,11 +39,11 @@ vi.mock('../../src/lib/api-auth', () => {
   };
 });
 
-import { POST as createProxyHost } from '../../app/api/v1/proxy-hosts/route';
-import { POST as createL4ProxyHost } from '../../app/api/v1/l4-proxy-hosts/route';
-import { POST as createCertificate } from '../../app/api/v1/certificates/route';
-import { POST as createCaCertificate } from '../../app/api/v1/ca-certificates/route';
-import { GET as getOpenApi } from '../../app/api/v1/openapi.json/route';
+import { POST as createProxyHost } from '../../src/app/api/v1/proxy-hosts/route';
+import { POST as createL4ProxyHost } from '../../src/app/api/v1/l4-proxy-hosts/route';
+import { POST as createCertificate } from '../../src/app/api/v1/certificates/route';
+import { POST as createCaCertificate } from '../../src/app/api/v1/ca-certificates/route';
+import { GET as getOpenApi } from '../../src/app/api/v1/openapi.json/route';
 import * as schema from '../../src/lib/db/schema';
 import { getCertificate, migrateLegacyCertificateStorage } from '../../src/lib/models/certificates';
 import { decryptSecret, isEncryptedSecret } from '../../src/lib/secret';
