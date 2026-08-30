@@ -8,7 +8,7 @@ on:
       - main
     paths:
       - package.json
-  # Already-released versions are a no-op, so running this by hand is always safe.
+  # Skips the version-change check; an already-released version is still a no-op.
   workflow_dispatch:
 
 # Queue rather than cancel: the loser would abandon a version bump with no release.
@@ -35,11 +35,25 @@ jobs:
 
       - name: Resolve the version to release
         id: version
+        env:
+          # Empty on workflow_dispatch, and all-zero for a new branch; both skip the check below.
+          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
           version="$(jq -er .version package.json)"
           tag="v${version}"
+
+          # A dependency bump touches package.json too, so the release turns on the version having
+          # changed across the push — not merely on the file having been written.
+          if [ -n "${BEFORE:-}" ] && git rev-parse -q --verify "${BEFORE}^{commit}" >/dev/null; then
+            before_version="$(git show "${BEFORE}:package.json" 2>/dev/null | jq -er .version 2>/dev/null || true)"
+            if [ "$version" = "$before_version" ]; then
+              echo "Version unchanged at ${version} — nothing to release."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
 
           if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
             echo "${tag} already exists — nothing to release."
