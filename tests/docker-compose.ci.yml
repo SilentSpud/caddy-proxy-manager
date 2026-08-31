@@ -1,0 +1,33 @@
+# Layer-cache wiring for the end-to-end images, applied only on CI.
+#
+# `type=gha` talks to the Actions cache service and needs the credentials the runner injects, so
+# this file must not reach a developer's machine -- tests/helpers/compose.ts adds it only when
+# E2E_COMPOSE_EXTRA_FILE names it, which .github/workflows/e2e.yml is the only thing that does.
+#
+# Separate scopes per image: one shared scope would have three builds evicting each other's layers
+# on every run, which is slower than no cache at all.
+#
+# mode=max exports intermediate stages too, not just the final layer. The web and caddy images are
+# multi-stage -- the expensive work (bun build, xcaddy compile) happens in a builder stage whose
+# layers mode=min would throw away, leaving nothing worth restoring.
+services:
+  web:
+    build:
+      cache_from:
+        - type=gha,scope=e2e-web
+      cache_to:
+        - type=gha,mode=max,scope=e2e-web
+
+  caddy:
+    build:
+      cache_from:
+        - type=gha,scope=e2e-caddy
+      cache_to:
+        - type=gha,mode=max,scope=e2e-caddy
+
+  l4-port-manager:
+    build:
+      cache_from:
+        - type=gha,scope=e2e-l4
+      cache_to:
+        - type=gha,mode=max,scope=e2e-l4

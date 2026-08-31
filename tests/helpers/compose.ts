@@ -10,7 +10,7 @@
  * variables docker-compose.yml refuses to interpolate without; the values services actually run
  * with come from tests/docker-compose.test.yml.
  */
-export const COMPOSE_ARGS = [
+const BASE_ARGS = [
   'compose',
   '--env-file',
   'tests/e2e.env',
@@ -19,3 +19,13 @@ export const COMPOSE_ARGS = [
   '-f',
   'tests/docker-compose.test.yml',
 ];
+
+/**
+ * One more `-f` when E2E_COMPOSE_EXTRA_FILE names it. CI points this at
+ * tests/docker-compose.ci.yml to attach the GitHub Actions layer cache, which cannot simply live
+ * in the test override: `type=gha` needs credentials only a runner has, so a developer running the
+ * suite would fail on it. Unset everywhere else, which leaves the stack exactly as it was.
+ */
+const EXTRA_FILE = process.env.E2E_COMPOSE_EXTRA_FILE;
+
+export const COMPOSE_ARGS = EXTRA_FILE ? [...BASE_ARGS, '-f', EXTRA_FILE] : BASE_ARGS;
