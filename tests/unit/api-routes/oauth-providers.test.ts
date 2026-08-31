@@ -98,6 +98,7 @@ describe("OAuth provider secret response boundaries", () => {
     expect(data[0].clientSecret).toBeUndefined();
     expect(bodyText).not.toContain(SECRET_SENTINEL);
     expect(bodyText).not.toContain("clientSecret");
+    expect(data[0].callbackUrl).toMatch(/\/api\/auth\/callback\/provider-id$/);
   });
 
   it("keeps create responses secret-free while accepting a new secret", async () => {
@@ -123,7 +124,8 @@ describe("OAuth provider secret response boundaries", () => {
       params: Promise.resolve({ id: rawProvider.id }),
     });
 
-    await expectSecretFree(response);
+    const data = await expectSecretFree(response);
+    expect(data.callbackUrl).toMatch(/\/api\/auth\/callback\/provider-id$/);
   });
 
   it("keeps update responses secret-free when rotating a secret", async () => {
