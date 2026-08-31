@@ -170,7 +170,10 @@ test.describe('Certificates', () => {
       await dialog.getByRole('button', { name: /delete certificate/i }).click();
 
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText(certName)).not.toBeVisible({ timeout: 10_000 });
+      // toHaveCount(0), not not.toBeVisible(): the row is rendered twice
+      // (hidden mobile card + desktop row) and a strict visibility assertion
+      // fails transiently while the post-delete revalidation is in flight.
+      await expect(page.getByText(certName)).toHaveCount(0, { timeout: 10_000 });
 
       const getRes = await page.request.get(`${API}/certificates/${cert.id}`, { headers: { Origin: BASE_URL } });
       expect(getRes.status()).toBe(404);
