@@ -1,0 +1,66 @@
+name: End-to-end tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+# One run per ref. A force-push supersedes the in-flight run rather than leaving
+# a 30-minute Docker job grinding against a commit nobody is looking at.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # tests/global-setup.ts allows 180s for the stack to come up and the suite
+    # itself runs single-worker against a live Caddy, so this is slow by nature.
+    # Healthy runs land around 15-20 minutes; past 45 something is wedged.
+    timeout-minutes: 45
+    # The suite builds images and drives a local stack. No package pushes, no
+    # repo writes, and no secrets: references, so nothing is injected here.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # chromium for the desktop project, webkit for mobile-iphone: devices
+      # ['iPhone 15'] carries defaultBrowserType "webkit", so omitting it fails
+      # only the mobile project, and only once it reaches a test.
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium webkit
+
+      # tests/global-setup.ts drives `docker compose up -d --build` over
+      # docker-compose.yml + tests/docker-compose.test.yml, seeds fixtures, logs
+      # in, and saves the storage state the projects reuse. Teardown removes the
+      # stack. Nothing to set up here beyond Docker, which ubuntu-latest ships.
+      - name: Run Playwright end-to-end suite
+        run: bun run test:e2e
+
+      - name: Upload failure artifacts
+        # Only on failure: traces and the per-test error-context.md snapshots are
+        # what make a red run diagnosable without reproducing it locally, and a
+        # green run's copies are noise.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: ignore

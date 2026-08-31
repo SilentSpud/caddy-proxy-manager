@@ -420,15 +420,33 @@ export default function OAuthProvidersSection({
               />
             </HStack>
           ) : (
-            <TextInput
-              {...AUTOFILL_NEW_PASSWORD}
-              label={editingProvider ? "New Client Secret" : "Client Secret"}
-              isRequired
-              type="password"
-              size="sm"
-              value={form.clientSecret}
-              onChange={(v) => updateField("clientSecret", v)}
-            />
+            <VStack gap={2}>
+              <TextInput
+                {...AUTOFILL_NEW_PASSWORD}
+                label={editingProvider ? "New Client Secret" : "Client Secret"}
+                isRequired
+                type="password"
+                size="sm"
+                value={form.clientSecret}
+                onChange={(v) => updateField("clientSecret", v)}
+              />
+              {editingProvider?.hasClientSecret && rotateClientSecret && (
+                // Rotating is otherwise a one-way door: isClientSecretRequired turns on with it,
+                // so a misclick forces either inventing a new secret or losing the whole dialog.
+                <HStack justify="end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    label="Keep Existing"
+                    onClick={() => {
+                      setRotateClientSecret(false);
+                      updateField("clientSecret", "");
+                    }}
+                  />
+                </HStack>
+              )}
+            </VStack>
           )}
 
           <TextInput

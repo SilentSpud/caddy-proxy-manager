@@ -300,7 +300,7 @@ test.describe('Settings — General', () => {
 test.describe('Settings — Default Response', () => {
   test('shows all supported behaviors and conditional custom fields', async ({ page }) => {
     await goToSection(page, 'Default Response');
-    const behavior = page.getByRole('combobox', { name: 'Default response behavior' });
+    const behavior = page.getByRole('combobox', { name: 'Behavior' });
     await expect(behavior).toBeVisible();
     await behavior.click();
     await expect(page.getByRole('option', { name: 'Caddy native behavior' })).toBeVisible();
@@ -319,7 +319,7 @@ test.describe('Settings — Default Response', () => {
 
   test('saves and reloads a custom response through the settings form', async ({ page }) => {
     await goToSection(page, 'Default Response');
-    let behavior = page.getByRole('combobox', { name: 'Default response behavior' });
+    let behavior = page.getByRole('combobox', { name: 'Behavior' });
     await behavior.click();
     await page.getByRole('option', { name: 'Custom HTTP response' }).click();
     await page.locator('input[name="status"]').fill('451');
@@ -333,7 +333,7 @@ test.describe('Settings — Default Response', () => {
     });
 
     await goToSection(page, 'Default Response');
-    behavior = page.getByRole('combobox', { name: 'Default response behavior' });
+    behavior = page.getByRole('combobox', { name: 'Behavior' });
     await expect(behavior).toContainText('Custom HTTP response');
     await expect(page.locator('input[name="status"]')).toHaveValue('451');
     await expect(page.locator('textarea[name="body"]')).toHaveValue(
@@ -587,8 +587,9 @@ test.describe('Settings — OAuth Providers', () => {
         .locator(SETTINGS_SIDEBAR)
         .getByRole('button', { name: 'OAuth Providers', exact: true })
         .click();
-      const providerCard = page.locator('div.rounded-md').filter({ hasText: providerName });
-      await providerCard.getByTitle('Edit provider').click();
+      // Scoping to the card meant guessing at its classes; the button's own accessible name
+      // already carries the provider name, which the timestamp makes unique.
+      await page.getByRole('button', { name: `Edit ${providerName}` }).click();
 
       const dialog = page.getByRole('dialog');
       await expect(dialog.getByText(/existing value cannot be viewed/i)).toBeVisible();
