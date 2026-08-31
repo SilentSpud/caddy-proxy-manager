@@ -1,0 +1,21 @@
+/**
+ * The single definition of how the end-to-end stack is addressed on the docker CLI.
+ *
+ * This lived as six copies — two global setups, two teardowns, container-health.spec.ts and
+ * seed.ts — and they drifted the moment one of them changed: adding `--env-file` to four left the
+ * other two still reading whatever .env the developer happened to have.
+ *
+ * `--env-file` REPLACES the repo-root .env rather than layering onto it, so the suite behaves the
+ * same with or without one, and the same on CI, which has none. tests/e2e.env carries the two
+ * variables docker-compose.yml refuses to interpolate without; the values services actually run
+ * with come from tests/docker-compose.test.yml.
+ */
+export const COMPOSE_ARGS = [
+  'compose',
+  '--env-file',
+  'tests/e2e.env',
+  '-f',
+  'docker-compose.yml',
+  '-f',
+  'tests/docker-compose.test.yml',
+];

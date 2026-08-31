@@ -3,16 +3,18 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COMPOSE_ARGS } from './helpers/compose';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 const HEALTH_URL = 'http://localhost:3000/api/health';
 export const AUTH_DIR = resolve(moduleDir, '.auth');
 export const AUTH_FILE = resolve(AUTH_DIR, 'admin.json');
 const MAX_WAIT_MS = 180_000;
 const POLL_INTERVAL_MS = 3_000;
-// No CLICKHOUSE_PASSWORD — analytics should be disabled
+// No COMPOSE_PROFILES — the clickhouse container never starts, which is what disables
+// analytics. The password in tests/e2e.env only satisfies interpolation; web's own value
+// comes from tests/docker-compose.test.yml either way.
 const ENV = { ...process.env };
 
 async function waitForHealth(): Promise<void> {

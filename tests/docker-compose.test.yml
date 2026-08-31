@@ -97,6 +97,13 @@ services:
     environment:
       COMPOSE_SKIP_OVERRIDE: "1"
       COMPOSE_EXTRA_FILE: /compose/tests/docker-compose.test.yml
+      # The sidecar shells out to `docker compose` against the repo mounted at /compose. Its
+      # entrypoint adds --env-file only when /compose/.env exists, and the e2e stack deliberately
+      # runs without one, so the variables docker-compose.yml refuses to interpolate without have
+      # to arrive as real environment variables instead. Values are irrelevant -- the services it
+      # recreates take theirs from this file -- but absence aborts the whole compose invocation.
+      SESSION_SECRET: "test-l4-sidecar-interpolation-32chars"
+      CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
   # Dex OIDC provider for OAuth E2E tests
   dex:
     image: dexidp/dex:v2.41.1

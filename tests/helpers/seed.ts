@@ -4,8 +4,7 @@
  * `db-seed` container, which mounts the same volume and opens the same SQLite file.
  */
 import { execFileSync } from 'node:child_process';
-
-const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
+import { COMPOSE_ARGS } from './compose';
 
 /** Database path as seen from inside db-seed, whose working_dir is /app. */
 const DB = './data/caddy-proxy-manager.db';

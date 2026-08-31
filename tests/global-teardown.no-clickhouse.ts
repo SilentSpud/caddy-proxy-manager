@@ -2,10 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { rmSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COMPOSE_ARGS } from './helpers/compose';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
-
-const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
 
 export default async function globalTeardown() {
   console.log('[global-teardown-no-ch] Stopping Docker Compose test stack (no ClickHouse)...');

@@ -4,8 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-
-const COMPOSE_ARGS = ['compose', '-f', 'docker-compose.yml', '-f', 'tests/docker-compose.test.yml'];
+import { COMPOSE_ARGS } from '../helpers/compose';
 
 type ContainerInfo = {
   name: string;
