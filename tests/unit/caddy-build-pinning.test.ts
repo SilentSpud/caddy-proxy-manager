@@ -6,6 +6,7 @@ const root = process.cwd();
 const dockerfile = readFileSync(join(root, "docker/caddy/Dockerfile"), "utf8");
 const goMod = readFileSync(join(root, "docker/caddy/go.mod"), "utf8");
 const buildScript = readFileSync(join(root, "docker/caddy/build.sh"), "utf8");
+const toolsFile = readFileSync(join(root, "docker/caddy/tools.go"), "utf8");
 const compatibilityUpdater = readFileSync(
   join(root, "docker/caddy/update-compatibility-pins.sh"),
   "utf8"
@@ -42,7 +43,12 @@ describe("reproducible Caddy build", () => {
       .filter((line) => line.startsWith("github.com/") && !line.includes("caddyserver/caddy"));
 
     expect(plugins.length).toBeGreaterThan(0);
-    for (const plugin of plugins) expect(requiredModules.has(plugin)).toBe(true);
+    // Every build module must also be blank-imported in tools.go, otherwise
+    // `go mod tidy` (run by Dependabot) prunes the require from go.mod.
+    for (const plugin of plugins) {
+      expect(requiredModules.has(plugin)).toBe(true);
+      expect(toolsFile).toContain(`_ "${plugin}"`);
+    }
     expect(buildScript).toContain('module_version "$module"');
     expect(buildScript).toContain('--replace "github.com/google/cel-go=github.com/google/cel-go@$cel_go_version"');
     expect(dockerfile).toContain("RUN sh ./update-compatibility-pins.sh");
