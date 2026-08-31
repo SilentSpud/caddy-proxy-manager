@@ -1,4 +1,21 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+/**
+ * Click "Create Host" and wait for its dialog, retrying the click itself.
+ *
+ * The button is in the server-rendered HTML before React attaches its handler, so a click that
+ * lands during hydration is swallowed and no dialog ever opens. This page carries every host the
+ * earlier functional specs left behind, which makes hydration slow enough on a CI runner for that
+ * window to be hit -- it never reproduced on a developer machine. Retrying the click rides out the
+ * race without inflating a timeout and calling it fixed.
+ */
+async function openCreateHostDialog(page: Page) {
+  await expect(async () => {
+    await page.getByRole('button', { name: /create host/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+}
 
 // Force a mobile viewport even under the desktop Chromium project so these
 // checks validate responsive behavior instead of self-skipping.
@@ -77,9 +94,8 @@ test.describe('Mobile layout', () => {
 
   test('create host dialog is usable at mobile width', async ({ page }) => {
     await page.goto('/proxy-hosts');
-    await page.getByRole('button', { name: /create host/i }).click();
+    await openCreateHostDialog(page);
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
     // Dialog should not overflow — check it fits in viewport
     const dialogBox = await dialog.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 393;
@@ -92,8 +108,7 @@ test.describe('Mobile layout', () => {
   test('card edit and delete actions reachable without scrolling', async ({ page }) => {
     await page.goto('/proxy-hosts');
     // Create a host so there is at least one card to inspect
-    await page.getByRole('button', { name: /create host/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await openCreateHostDialog(page);
     await page.getByLabel('Name').fill('Mobile Test Host');
     await page.getByLabel(/^domains/i).fill('mobile-test.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9999');
