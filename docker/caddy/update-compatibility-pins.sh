@@ -46,4 +46,8 @@ else
   echo "Pinned${replaced} to ${caddy_cel_path}@${cel_go_version}"
 fi
 
-go mod download all
+# tidy, not `go mod download all`: with tools.go pinning the graph, download all records
+# checksums for the whole transitive closure -- 1282 go.sum lines against tidy's 725 -- so the
+# scheduled run reported a diff every week and opened a PR of pure churn. `download all` was
+# only ever here because tidy used to empty this module; tools.go is what makes tidy correct.
+go mod tidy

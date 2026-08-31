@@ -35,6 +35,13 @@ jobs:
 
       - name: Verify updated Caddy image
         if: steps.changes.outputs.changed == 'true'
+        # Compose interpolates the whole file before it builds anything, and
+        # docker-compose.yml declares these two with `:?`. A runner has no .env, so without
+        # them this aborts before the caddy build it is meant to verify. Values are never
+        # used -- nothing here starts a container.
+        env:
+          SESSION_SECRET: pin-verify-interpolation-placeholder
+          CLICKHOUSE_PASSWORD: pin-verify-interpolation-placeholder
         run: docker compose build caddy
 
       - name: Open compatibility-pin pull request
