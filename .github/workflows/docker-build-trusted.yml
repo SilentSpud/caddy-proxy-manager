@@ -41,9 +41,9 @@ jobs:
             service: caddy
             dockerfile: docker/caddy/Dockerfile
             context: .
-          - name: Layer 4 Port Manager
-            service: l4-port-manager
-            dockerfile: docker/l4-port-manager/Dockerfile
+          - name: Builder Sidecar
+            service: sidecar
+            dockerfile: docker/sidecar/Dockerfile
             context: .
 
     steps:
@@ -64,7 +64,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}

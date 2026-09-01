@@ -144,7 +144,7 @@ ${portLines}
 
   return {
     state: "pending",
-    message: `Trigger written. Waiting for port manager sidecar to apply ${requiredPorts.length} port(s).`,
+    message: `Trigger written. Waiting for the sidecar to apply ${requiredPorts.length} port(s).`,
     triggeredAt,
   };
 }

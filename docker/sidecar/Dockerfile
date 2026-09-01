@@ -3,7 +3,7 @@ FROM docker:cli
 # Only need docker compose CLI and basic shell tools
 RUN apk add --no-cache bash
 
-COPY docker/l4-port-manager/entrypoint.sh /entrypoint.sh
+COPY docker/sidecar/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Runs as root intentionally: this sidecar executes `docker compose` to

@@ -1,5 +1,5 @@
 /**
- * Functional: L4 port manager sidecar (#117). "Apply Ports" reaches "applied", and the sidecar
+ * Functional: Caddy rebuilder sidecar (#117). "Apply Ports" reaches "applied", and the sidecar
  * re-applies the override on startup after a restart. The bug: NETWORKS: 0 in the socket proxy
  * blocked the GET /networks/{id} compose makes. Must run after l4-proxy-routing.spec.ts.
  */
@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { waitForTcpEcho, tcpSend } from '../../helpers/tcp';
 
 // Container name as defined in docker-compose.yml
-const L4_CONTAINER = 'caddy-proxy-manager-l4-ports';
+const SIDECAR_CONTAINER = 'caddy-proxy-manager-sidecar';
 
 // Port created by l4-proxy-routing.spec.ts — must match that file
 const TCP_PORT = 15432;
@@ -57,11 +57,11 @@ async function waitForL4Terminal(
     if (isTerminal && isFresh) return state;
     await page.waitForTimeout(2_000);
   }
-  throw new Error(`l4-port-manager did not reach a terminal state within ${timeoutMs}ms`);
+  throw new Error(`sidecar did not reach a terminal state within ${timeoutMs}ms`);
 }
 
 test.describe
-  .serial('L4 Port Manager Sidecar', () => {
+  .serial('Sidecar', () => {
     test('apply ports reaches "applied" state', async ({ page }) => {
       // waitForL4Terminal polls for up to 90 s; the global 60 s timeout would
       // fire first without this override.
@@ -75,7 +75,7 @@ test.describe
       const state = await waitForL4Terminal(page, 90_000);
       expect(
         state,
-        'Expected "applied" but got "failed". Run: docker logs caddy-proxy-manager-l4-ports',
+        'Expected "applied" but got "failed". Run: docker logs caddy-proxy-manager-sidecar',
       ).toBe('applied');
     });
 
@@ -101,7 +101,7 @@ test.describe
       // Restarting the sidecar makes it find the override file and run `docker compose up
       // --force-recreate caddy`. With NETWORKS: 0 that always failed, since compose needs
       // GET /networks/{id} to inspect caddy-network before reconnecting.
-      execFileSync('docker', ['restart', L4_CONTAINER], {
+      execFileSync('docker', ['restart', SIDECAR_CONTAINER], {
         stdio: 'inherit',
         cwd: process.cwd(),
         env: ENV,
@@ -114,7 +114,7 @@ test.describe
         state,
         'Sidecar returned "failed" after restart. ' +
           'Likely cause: docker-socket-proxy is missing NETWORKS: 1. ' +
-          'Run: docker logs caddy-proxy-manager-l4-ports',
+          'Run: docker logs caddy-proxy-manager-sidecar',
       ).toBe('applied');
     });
 

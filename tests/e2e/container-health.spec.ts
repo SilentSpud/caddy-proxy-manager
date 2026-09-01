@@ -71,21 +71,19 @@ test.describe('Container health', () => {
     expect(ch!.health, `clickhouse container health: ${ch!.health}`).toBe('healthy');
   });
 
-  test('l4-port-manager container is running (not crash-looping)', () => {
-    const l4 = containers.find(
-      (c) => c.name.includes('l4-ports') || c.name.includes('l4-port-manager'),
-    );
-    expect(l4, 'l4-port-manager container not found').toBeTruthy();
-    expect(l4!.state, `l4-port-manager state: ${l4!.state}`).toBe('running');
+  test('sidecar container is running (not crash-looping)', () => {
+    const sidecar = containers.find((c) => c.name.includes('sidecar'));
+    expect(sidecar, 'sidecar container not found').toBeTruthy();
+    expect(sidecar!.state, `sidecar state: ${sidecar!.state}`).toBe('running');
 
     // Verify it hasn't restarted (restart count > 0 means crash-loop)
-    const inspect = execFileSync('docker', ['inspect', '--format', '{{.RestartCount}}', l4!.name], {
+    const inspect = execFileSync('docker', ['inspect', '--format', '{{.RestartCount}}', sidecar!.name], {
       encoding: 'utf-8',
     }).trim();
     const restartCount = Number(inspect);
     expect(
       restartCount,
-      `l4-port-manager has restarted ${restartCount} time(s) — likely crash-looping`,
+      `sidecar has restarted ${restartCount} time(s) — likely crash-looping`,
     ).toBe(0);
   });
 });

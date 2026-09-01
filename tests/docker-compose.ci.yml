@@ -25,9 +25,9 @@ services:
       cache_to:
         - type=gha,mode=max,scope=e2e-caddy
 
-  l4-port-manager:
+  sidecar:
     build:
       cache_from:
-        - type=gha,scope=e2e-l4
+        - type=gha,scope=e2e-sidecar
       cache_to:
-        - type=gha,mode=max,scope=e2e-l4
+        - type=gha,mode=max,scope=e2e-sidecar

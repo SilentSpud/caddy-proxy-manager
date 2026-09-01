@@ -58,7 +58,7 @@ async function waitForHealth(): Promise<void> {
 }
 
 /**
- * Wait for Caddy to be healthy per Docker. The l4-port-manager force-recreates caddy at startup
+ * Wait for Caddy to be healthy per Docker. The sidecar force-recreates caddy at startup
  * when an override file exists, and `docker compose up --wait` can return before that finishes.
  */
 async function waitForCaddyHealthy(): Promise<void> {

@@ -105,8 +105,8 @@ jobs:
             echo "## Images"
             echo
             echo '```'
-            for service in web caddy l4-port-manager; do
-              echo "${image_base}-${service}:${VERSION}"
+            for service in web caddy sidecar; do
+              echo "${image_base}/${service}:${VERSION}"
             done
             echo '```'
             echo

@@ -1,7 +1,7 @@
 services:
   web:
     container_name: caddy-proxy-manager-web
-    image: ghcr.io/fuomag9/caddy-proxy-manager-web:latest
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
     build:
       context: .
       dockerfile: docker/web/Dockerfile
@@ -104,7 +104,7 @@ services:
 
   caddy:
     container_name: caddy-proxy-manager-caddy
-    image: ghcr.io/fuomag9/caddy-proxy-manager-caddy:latest
+    image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
     build:
       context: .
       dockerfile: docker/caddy/Dockerfile
@@ -139,7 +139,7 @@ services:
       retries: 3
       start_period: 10s
 
-  # Restricts the Docker API surface reachable by the l4-port-manager sidecar.
+  # Restricts the Docker API surface reachable by the sidecar.
   docker-socket-proxy:
     container_name: caddy-proxy-manager-docker-proxy
     image: tecnativa/docker-socket-proxy:latest
@@ -165,17 +165,17 @@ services:
 
   # Recreates the caddy container for the two changes a reload cannot apply:
   # L4 port changes and Caddy module selection.
-  l4-port-manager:
-    container_name: caddy-proxy-manager-l4-ports
-    image: ghcr.io/fuomag9/caddy-proxy-manager-l4-port-manager:latest
+  sidecar:
+    container_name: caddy-proxy-manager-sidecar
+    image: ghcr.io/silentspud/caddy-proxy-manager/sidecar:latest
     build:
       context: .
-      dockerfile: docker/l4-port-manager/Dockerfile
+      dockerfile: docker/sidecar/Dockerfile
     restart: unless-stopped
     environment:
       DATA_DIR: /data
       COMPOSE_DIR: /compose
-      POLL_INTERVAL: "${L4_PORT_MANAGER_POLL_INTERVAL:-2}"
+      POLL_INTERVAL: "${SIDECAR_POLL_INTERVAL:-2}"
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375

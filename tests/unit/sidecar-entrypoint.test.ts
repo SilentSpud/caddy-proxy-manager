@@ -16,11 +16,11 @@ import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-const SCRIPT_PATH = resolve(moduleDir, '../../docker/l4-port-manager/entrypoint.sh');
+const SCRIPT_PATH = resolve(moduleDir, '../../docker/sidecar/entrypoint.sh');
 const script = readFileSync(SCRIPT_PATH, 'utf-8');
 const lines = script.split('\n');
 
-describe('L4 port manager entrypoint.sh', () => {
+describe('sidecar entrypoint.sh', () => {
   it('applies override on startup (not only on trigger change)', () => {
     // The script must call do_apply before entering the while loop, so L4 ports are bound after any
     // restart — the main compose stack starts caddy without the L4 ports override file.
@@ -135,8 +135,8 @@ describe('L4 port manager entrypoint.sh', () => {
     const dangerousPatterns = [
       /up.*\bweb\b/,
       /restart.*\bweb\b/,
-      /up.*\bl4-port-manager\b/,
-      /restart.*\bl4-port-manager\b/,
+      /up.*\bsidecar\b/,
+      /restart.*\bsidecar\b/,
     ];
     for (const pattern of dangerousPatterns) {
       expect(script).not.toMatch(pattern);

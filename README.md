@@ -365,7 +365,7 @@ replacement moves.
 You can see exactly what an image was built with, without rebuilding it:
 
 ```bash
-docker run --rm ghcr.io/fuomag9/caddy-proxy-manager-caddy:latest cat /etc/caddy/caddy-modules.resolved.txt
+docker run --rm ghcr.io/silentspud/caddy-proxy-manager/caddy:latest cat /etc/caddy/caddy-modules.resolved.txt
 ```
 
 ### Custom modules

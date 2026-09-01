@@ -364,7 +364,7 @@ describe('getL4PortsStatus', () => {
 
   it('returns idle when no status file exists even if trigger file is present', () => {
     // Trigger files are deleted by the sidecar after processing.
-    // A leftover trigger file must NEVER cause "Waiting for port manager sidecar..."
+    // A leftover trigger file must NEVER cause "Waiting for the sidecar..."
     // because that message gets permanently stuck if the sidecar is slow or restarting.
     writeFileSync(
       join(ctx.tmpDir, 'l4-ports.trigger'),

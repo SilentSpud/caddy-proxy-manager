@@ -40,7 +40,7 @@ services:
 
   web-registration-enabled:
     container_name: caddy-proxy-manager-web-registration-enabled
-    image: ghcr.io/fuomag9/caddy-proxy-manager-web:latest
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
     ports:
       - "3001:3000"
     environment:
@@ -93,7 +93,7 @@ services:
       - "15353:15353/udp"
   # Skip any local docker-compose.override.yml and use this file instead,
   # so the sidecar recreates caddy with the correct "-test" volume names.
-  l4-port-manager:
+  sidecar:
     environment:
       COMPOSE_SKIP_OVERRIDE: "1"
       COMPOSE_EXTRA_FILE: /compose/tests/docker-compose.test.yml
@@ -192,7 +192,7 @@ services:
   # Caddy configuration or racing the rest of the browser suite.
   caddy-master:
     container_name: caddy-proxy-manager-caddy-master
-    image: ghcr.io/fuomag9/caddy-proxy-manager-caddy:latest
+    image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
     environment:
       PRIMARY_DOMAIN: master.caddyproxymanager.test
     volumes:
@@ -210,7 +210,7 @@ services:
 
   caddy-slave:
     container_name: caddy-proxy-manager-caddy-slave
-    image: ghcr.io/fuomag9/caddy-proxy-manager-caddy:latest
+    image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
     environment:
       PRIMARY_DOMAIN: slave.caddyproxymanager.test
     volumes:
@@ -228,7 +228,7 @@ services:
 
   web-master:
     container_name: caddy-proxy-manager-web-master
-    image: ghcr.io/fuomag9/caddy-proxy-manager-web:latest
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
     ports:
       - "3002:3000"
     environment:
@@ -269,7 +269,7 @@ services:
 
   web-slave:
     container_name: caddy-proxy-manager-web-slave
-    image: ghcr.io/fuomag9/caddy-proxy-manager-web:latest
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
     ports:
       - "3003:3000"
     environment:

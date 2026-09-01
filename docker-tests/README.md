@@ -170,9 +170,10 @@ a change to either is deliberate:
   auth, which shares the same route-building code, is covered end to end.
 - **Analytics** (ClickHouse) is not started. `55-waf` checks that the WAF event
   endpoint answers, not that a specific event was ingested.
-- The **L4 port manager** sidecar is not run. It only exists to republish host
-  ports when L4 hosts change, and the client is on the same network as Caddy, so
-  it reaches stream listeners directly.
+- The **sidecar** is not run. It only exists to recreate the Caddy container —
+  republishing host ports when L4 hosts change, and rebuilding the binary when
+  the module selection changes — and neither is exercised here. The client is on
+  the same network as Caddy, so it reaches stream listeners directly.
 
 ## How a test file is written
 
