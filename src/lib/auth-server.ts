@@ -202,6 +202,16 @@ async function createAuth(): Promise<any> {
     advanced: {
       database: {
         generateId: "serial",
+        // Fetch a session and its user in one statement instead of two. getSession runs on
+        // essentially every authenticated request (see requireSession in ./auth.ts), so this is
+        // the hottest query path in the app.
+        //
+        // Requires the relations declared in ./db/schema.sqlite.ts: Better Auth's drizzle adapter
+        // resolves the join key from drizzle's relational schema, and with none declared it
+        // silently falls back to separate queries. The fallback being silent is why
+        // tests/integration/auth-joins.test.ts counts statements rather than just asserting that
+        // sign-in still works.
+        joins: true,
       },
     } as Record<string, unknown>,
     rateLimit: {
