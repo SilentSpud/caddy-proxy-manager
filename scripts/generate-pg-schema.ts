@@ -57,18 +57,11 @@ export function toPostgresSchema(source: string): string {
     "uniqueIndex",
     "varchar",
   ];
-  // Scanned past the import block rather than past the first line: dialect-neutral imports
-  // (drizzle-orm's own `relations`) sit alongside the sqlite-core one, so "the first line" is not
-  // reliably the import being replaced.
-  const body = out.replace(/^import [^\n]*\n/gm, "");
+  const body = out.slice(out.indexOf("\n"));
   const used = candidates.filter((name) => new RegExp(`\\b${name}\\b`).test(body));
   const importLine = `import { ${used.join(", ")} } from "drizzle-orm/pg-core";`;
 
-  const sqliteCoreImport = /^import \{[^}]*\} from "drizzle-orm\/sqlite-core";\n/m;
-  if (!sqliteCoreImport.test(out)) {
-    throw new Error("schema.sqlite.ts has no drizzle-orm/sqlite-core import to rewrite");
-  }
-  out = out.replace(sqliteCoreImport, `${importLine}\n`);
+  out = out.replace(/^import \{[^}]*\} from "drizzle-orm\/sqlite-core";\n/, `${importLine}\n`);
 
   return HEADER + out;
 }
