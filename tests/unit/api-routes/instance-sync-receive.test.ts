@@ -11,24 +11,24 @@ vi.mock('@/src/lib/caddy', () => ({
 
 vi.mock('@/src/lib/instance-sync', () => ({
   applySyncPayload: vi.fn(),
-  getInstanceMode: vi.fn().mockResolvedValue('slave'),
-  getSlaveMasterToken: vi.fn().mockResolvedValue('sync-token'),
-  setSlaveLastSync: vi.fn(),
+  getInstanceMode: vi.fn().mockResolvedValue('agent'),
+  getAgentControllerToken: vi.fn().mockResolvedValue('sync-token'),
+  setAgentLastSync: vi.fn(),
 }));
 
 import { POST } from '@/src/app/api/instances/sync/route';
 import { applyCaddyConfig } from '@/src/lib/caddy';
-import { applySyncPayload, setSlaveLastSync } from '@/src/lib/instance-sync';
+import { applySyncPayload, setAgentLastSync } from '@/src/lib/instance-sync';
 
 const mockApplySyncPayload = vi.mocked(applySyncPayload);
 const mockApplyCaddyConfig = vi.mocked(applyCaddyConfig);
-const mockSetSlaveLastSync = vi.mocked(setSlaveLastSync);
+const mockSetAgentLastSync = vi.mocked(setAgentLastSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockApplySyncPayload.mockResolvedValue(undefined);
   mockApplyCaddyConfig.mockResolvedValue(undefined);
-  mockSetSlaveLastSync.mockResolvedValue(undefined);
+  mockSetAgentLastSync.mockResolvedValue(undefined);
 });
 
 function makePayload() {
@@ -121,10 +121,10 @@ describe('POST /api/instances/sync', () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(data)).not.toContain(sensitiveDetail);
-    expect(mockSetSlaveLastSync).toHaveBeenCalledWith({
+    expect(mockSetAgentLastSync).toHaveBeenCalledWith({
       ok: false,
       error: 'Failed to apply synchronized configuration',
     });
-    expect(JSON.stringify(mockSetSlaveLastSync.mock.calls)).not.toContain(sensitiveDetail);
+    expect(JSON.stringify(mockSetAgentLastSync.mock.calls)).not.toContain(sensitiveDetail);
   });
 });

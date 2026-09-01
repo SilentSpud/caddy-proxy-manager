@@ -6,13 +6,11 @@ vi.mock('@/src/lib/db', () => ({
   default: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }),
+        where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
       }),
     }),
     insert: vi.fn().mockReturnValue({
-      values: vi
-        .fn()
-        .mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) }),
+      values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) }),
     }),
     delete: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ run: vi.fn() }) }),
     run: vi.fn(),

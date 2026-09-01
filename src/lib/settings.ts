@@ -1,4 +1,5 @@
 import db, { nowIso } from "./db";
+import { INSTANCE_MODE_KEY, normalizeInstanceMode, type InstanceMode } from "./instance-mode";
 import { settings } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { sanitizeErrorPageRules, type ErrorPageRule } from "./models/proxy-hosts";
@@ -123,9 +124,6 @@ export type GeoBlockSettings = {
   redirect_url: string; // if set, 302 redirect instead of status/body
 };
 
-type InstanceMode = "standalone" | "master" | "slave";
-
-const INSTANCE_MODE_KEY = "instance_mode";
 const SYNCED_PREFIX = "synced:";
 
 export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
@@ -146,19 +144,15 @@ export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
 }
 
 async function getInstanceModeForSettings(): Promise<InstanceMode> {
-  // Env takes precedence — mirrors getInstanceMode(). An env-configured slave never writes the
+  // Env takes precedence — mirrors getInstanceMode(). An env-configured agent never writes the
   // mode to the DB, so reading the DB alone would report "standalone" and getEffectiveSetting
   // would never serve synced:* values.
-  const envMode = process.env.INSTANCE_MODE;
-  if (envMode === "master" || envMode === "slave" || envMode === "standalone") {
+  const envMode = normalizeInstanceMode(process.env.INSTANCE_MODE);
+  if (envMode) {
     return envMode;
   }
 
-  const stored = await getSetting<string>(INSTANCE_MODE_KEY);
-  if (stored === "master" || stored === "slave" || stored === "standalone") {
-    return stored;
-  }
-  return "standalone";
+  return normalizeInstanceMode(await getSetting<string>(INSTANCE_MODE_KEY)) ?? "standalone";
 }
 
 async function getSyncedSetting<T>(key: string): Promise<SettingValue<T>> {
@@ -167,7 +161,7 @@ async function getSyncedSetting<T>(key: string): Promise<SettingValue<T>> {
 
 export async function getEffectiveSetting<T>(key: string): Promise<SettingValue<T>> {
   const mode = await getInstanceModeForSettings();
-  if (mode !== "slave") {
+  if (mode !== "agent") {
     return await getSetting<T>(key);
   }
 
@@ -220,7 +214,7 @@ export async function saveGeneralSettings(settings: GeneralSettings): Promise<vo
 }
 
 export async function getAvatarSettings(): Promise<AvatarSettings | null> {
-  // Effective, so a slave inherits its master's choice unless it stored a local override.
+  // Effective, so an agent inherits its controller's choice unless it stored a local override.
   return await getEffectiveSetting<AvatarSettings>("avatars");
 }
 
@@ -386,7 +380,7 @@ export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<voi
 
 /**
  * Which Caddy plugins this instance's image is built with. getSetting, not getEffectiveSetting:
- * the list describes a binary on *this* host, so inheriting a master's would tell a slave it has
+ * the list describes a binary on *this* host, so inheriting a controller's would tell an agent it has
  * plugins it never compiled.
  */
 export type CaddyBuildSettings = {

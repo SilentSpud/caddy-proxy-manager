@@ -21,11 +21,11 @@ volumes:
   caddy-logs:    # shared: access log + coraza audit log (web parses these)
   acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
   test-certs:    # certgen output: pebble server cert, https-origin cert
-  cpm-data-slave:
-  caddy-data-slave:
-  caddy-config-slave:
-  caddy-logs-slave:
-  acme-ca-slave:
+  cpm-data-agent:
+  caddy-data-agent:
+  caddy-config-agent:
+  caddy-logs-agent:
+  acme-ca-agent:
 
 services:
   # ── Test PKI ────────────────────────────────────────────────────────────
@@ -142,8 +142,8 @@ services:
       AUTH_ALLOW_OAUTH_REGISTRATION: "false"
       AUTH_DISABLE_LOCAL_USERS: "false"
       OAUTH_ENABLED: "false"
-      # Master → slave replication normally refuses plaintext targets. The rig
-      # has no public CA to issue a certificate for web-slave and the network
+      # Controller → agent replication normally refuses plaintext targets. The rig
+      # has no public CA to issue a certificate for web-agent and the network
       # is isolated, so the guard is lifted here and nowhere else.
       INSTANCE_SYNC_ALLOW_HTTP: "true"
       # No ClickHouse in the rig — an empty password disables analytics.
@@ -253,29 +253,29 @@ services:
       cpm-test:
         ipv4_address: 172.28.0.24
 
-  # ── Second CPM instance, for master → slave replication ─────────────────
+  # ── Second CPM instance, for controller → agent replication ─────────────────
   # The generated Caddy config pins the admin API's accepted Host headers, and only one container
-  # can answer to "caddy". The slave pair therefore shares a network namespace, so web-slave reaches
+  # can answer to "caddy". The agent pair therefore shares a network namespace, so web-agent reaches
   # its own Caddy on localhost:2019 — an accepted origin.
-  web-slave:
+  web-agent:
     image: cpm-test/web:latest
-    container_name: cpm-test-web-slave
+    container_name: cpm-test-web-agent
     profiles: [sync]
     environment:
       NODE_ENV: production
       SESSION_SECRET: test-session-secret-not-for-production-use-9876543210
       CADDY_API_URL: http://localhost:2019
-      BASE_URL: http://web-slave:3000
-      NEXTAUTH_URL: http://web-slave:3000
+      BASE_URL: http://web-agent:3000
+      NEXTAUTH_URL: http://web-agent:3000
       DATABASE_PATH: /app/data/cpm.db
       DATABASE_URL: file:/app/data/cpm.db
       ADMIN_USERNAME: cpmadmin
       ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
       CLICKHOUSE_PASSWORD: ""
     volumes:
-      - cpm-data-slave:/app/data
-      - caddy-logs-slave:/logs
-      - acme-ca-slave:/acme-ca
+      - cpm-data-agent:/app/data
+      - caddy-logs-agent:/logs
+      - acme-ca-agent:/acme-ca
     networks:
       cpm-test:
         ipv4_address: 172.28.0.13
@@ -290,21 +290,21 @@ services:
       retries: 30
       start_period: 10s
 
-  caddy-slave:
+  caddy-agent:
     image: cpm-test/caddy:latest
-    container_name: cpm-test-caddy-slave
+    container_name: cpm-test-caddy-agent
     profiles: [sync]
-    # Shares web-slave's network namespace; see the note above.
-    network_mode: "service:web-slave"
+    # Shares web-agent's network namespace; see the note above.
+    network_mode: "service:web-agent"
     environment:
-      PRIMARY_DOMAIN: slave.cpm.test
+      PRIMARY_DOMAIN: agent.cpm.test
     volumes:
-      - caddy-data-slave:/data
-      - caddy-config-slave:/config
-      - caddy-logs-slave:/logs
-      - acme-ca-slave:/acme-ca:ro
+      - caddy-data-agent:/data
+      - caddy-config-agent:/config
+      - caddy-logs-agent:/logs
+      - acme-ca-agent:/acme-ca:ro
     depends_on:
-      web-slave:
+      web-agent:
         condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
@@ -325,7 +325,7 @@ services:
       CPM_API: http://web:3000
       CPM_ADMIN_USER: cpmadmin
       CPM_ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
-      CPM_SLAVE_API: http://web-slave:3000
+      CPM_AGENT_API: http://web-agent:3000
       TEST_DOMAIN: cpm.test
       CADDY_IP: 172.28.0.10
       CLIENT_IP: 172.28.0.40

@@ -26,7 +26,7 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
   // biome-ignore lint/suspicious/noExplicitAny: shape comes from better-auth's runtime-configured instance and is narrowed by the checks below
   let betterAuthSession: any;
   try {
-    betterAuthSession = await getAuth().api.getSession({
+    betterAuthSession = await (await getAuth()).api.getSession({
       headers: resolvedHeaders,
     });
   } catch {
@@ -81,7 +81,7 @@ export async function getCurrentSessionId(req?: NextRequest): Promise<number | n
   const hdrs = req ? req.headers : (await import("next/headers")).headers();
   const resolvedHeaders = hdrs instanceof Promise ? await hdrs : hdrs;
   try {
-    const result = await getAuth().api.getSession({ headers: resolvedHeaders });
+    const result = await (await getAuth()).api.getSession({ headers: resolvedHeaders });
     const id = result?.session?.id;
     return id != null ? Number(id) : null;
   } catch {

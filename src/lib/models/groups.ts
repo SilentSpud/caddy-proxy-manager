@@ -124,7 +124,7 @@ export async function createGroup(input: GroupInput, actorUserId: number): Promi
 
   if (!row) throw new Error("Failed to create group");
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "group",
@@ -154,7 +154,7 @@ export async function updateGroup(
     })
     .where(eq(groups.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "group",
@@ -173,7 +173,7 @@ export async function deleteGroup(id: number, actorUserId: number): Promise<void
 
   await db.delete(groups).where(eq(groups.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "group",
@@ -198,7 +198,7 @@ export async function addGroupMember(
     createdAt: nowIso(),
   });
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "group_member",
@@ -227,7 +227,7 @@ export async function removeGroupMember(
 
   await db.delete(groupMembers).where(eq(groupMembers.id, member.id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "group_member",

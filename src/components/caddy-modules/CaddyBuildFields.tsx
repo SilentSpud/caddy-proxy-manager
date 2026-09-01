@@ -135,7 +135,7 @@ export function CaddyBuildFields({
         "# Copy this into your own build if you would rather not use the sidecar:",
         '#   docker compose build --build-arg CADDY_MODULES="..." caddy',
         "",
-        "xcaddy build master \\",
+        "xcaddy build controller \\",
         ...previewSpecs.map((spec) => `  --with ${spec} \\`),
         "  --output /usr/bin/caddy",
       ].join("\n"),

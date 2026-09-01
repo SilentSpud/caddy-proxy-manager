@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     if (user?.status !== "active" || !user.passwordHash) {
       registerFailedAttempt(ip);
-      logAuditEvent({
+      await logAuditEvent({
         userId: null,
         action: "forward_auth_login_failed",
         entityType: "user",
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
       registerFailedAttempt(ip);
-      logAuditEvent({
+      await logAuditEvent({
         userId: user.id,
         action: "forward_auth_login_failed",
         entityType: "user",
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // to silently change the authorization target mid-flow.
     const hasAccess = await checkHostAccess(user.id, intent.audience.proxyHostId);
     if (!hasAccess) {
-      logAuditEvent({
+      await logAuditEvent({
         userId: user.id,
         action: "forward_auth_access_denied",
         entityType: "proxy_host",
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     const { session } = await createForwardAuthSession(user.id, intent.audience);
     const { rawCode } = await createExchangeCode(session.id, intent.redirectUri, intent.audience);
 
-    logAuditEvent({
+    await logAuditEvent({
       userId: user.id,
       action: "forward_auth_login",
       entityType: "user",

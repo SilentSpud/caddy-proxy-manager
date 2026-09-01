@@ -53,8 +53,8 @@ import { ensureAdminUser } from '../../src/lib/init-db';
 import { users } from '../../src/lib/db/schema';
 
 describe('AUTH_DISABLE_LOCAL_USERS=true', () => {
-  it('turns off better-auth email/password sign-in', () => {
-    const auth = getAuth() as any;
+  it('turns off better-auth email/password sign-in', async () => {
+    const auth = (await getAuth()) as any;
     expect(auth.options.emailAndPassword.enabled).toBe(false);
   });
 

@@ -88,7 +88,7 @@ export async function createIssuedClientCertificate(
     throw new Error("Failed to store issued client certificate");
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "issued_client_certificate",
@@ -124,7 +124,7 @@ export async function revokeIssuedClientCertificate(
     })
     .where(eq(issuedClientCertificates.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "revoke",
     entityType: "issued_client_certificate",

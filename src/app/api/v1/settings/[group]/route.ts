@@ -36,8 +36,8 @@ import {
 import {
   getInstanceMode,
   setInstanceMode,
-  getSlaveMasterToken,
-  setSlaveMasterToken,
+  getAgentControllerToken,
+  setAgentControllerToken,
 } from "@/src/lib/instance-sync";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { DefaultResponseValidationError } from "@/src/lib/caddy-default-response";
@@ -167,7 +167,7 @@ export async function GET(
     }
 
     if (group === "sync-token") {
-      const token = await getSlaveMasterToken();
+      const token = await getAgentControllerToken();
       return NextResponse.json({ has_token: token !== null });
     }
 
@@ -229,7 +229,7 @@ export async function PUT(
           { status: 400 },
         );
       }
-      const validModes = ["standalone", "master", "slave"];
+      const validModes = ["standalone", "controller", "agent"];
       if (!validModes.includes(input.mode as string)) {
         return NextResponse.json(
           { error: `Invalid mode. Must be one of: ${validModes.join(", ")}` },
@@ -237,7 +237,7 @@ export async function PUT(
         );
       }
       return await withSettingsUpdateLock(async () => {
-        await setInstanceMode(input.mode as "standalone" | "master" | "slave");
+        await setInstanceMode(input.mode as "standalone" | "controller" | "agent");
         return NextResponse.json({ ok: true });
       });
     }
@@ -260,7 +260,7 @@ export async function PUT(
       }
       // instanceSyncTokenValidationError rejects every non-string value above.
       return await withSettingsUpdateLock(async () => {
-        await setSlaveMasterToken(token as string | null);
+        await setAgentControllerToken(token as string | null);
         return NextResponse.json({ ok: true });
       });
     }

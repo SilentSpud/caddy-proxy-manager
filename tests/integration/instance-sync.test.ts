@@ -29,6 +29,19 @@ vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
   return {
     default: ctx.db,
+    db: ctx.db,
+    client: undefined,
+    dialect: 'sqlite' as const,
+    // Mirrors connection.ts's SQLite branch: run the statement list synchronously inside
+    // bun:sqlite's transaction. Keeping the same shape here means applySyncPayload's real
+    // build-then-execute path is what the tests exercise.
+    runInTransaction: async (build: (tx: any) => Array<{ run?: () => unknown }>): Promise<void> => {
+      (ctx.db as any).transaction((tx: any) => {
+        for (const statement of build(tx)) {
+          statement.run?.();
+        }
+      });
+    },
     schema: schemaModule,
     nowIso: () => new Date().toISOString(),
     toIso: (value: string | Date | null | undefined): string | null => {
@@ -49,7 +62,7 @@ vi.mock('../../src/lib/l4-ports', () => ({ ...freshL4Ports }));
 import {
   buildSyncPayload,
   applySyncPayload,
-  getSlaveLastSync,
+  getAgentLastSync,
   syncInstances,
   type SyncPayload,
 } from '../../src/lib/instance-sync';
@@ -133,7 +146,7 @@ function makeL4Host(overrides: Partial<typeof schema.l4ProxyHosts.$inferInsert> 
 
 beforeEach(async () => {
   delete process.env.INSTANCE_MODE;
-  delete process.env.INSTANCE_SLAVES;
+  delete process.env.INSTANCE_AGENTS;
   delete process.env.INSTANCE_SYNC_ALLOW_HTTP;
   await clearTables();
   cleanTmpDir();
@@ -371,12 +384,12 @@ describe('buildSyncPayload', () => {
 
 describe('syncInstances token policy', () => {
   it('never sends legacy weak plaintext or encrypted target tokens', async () => {
-    process.env.INSTANCE_MODE = 'master';
+    process.env.INSTANCE_MODE = 'controller';
     const now = nowIso();
     await ctx.db.insert(schema.instances).values([
       {
         name: 'Legacy plaintext',
-        baseUrl: 'https://plain-slave.example.com',
+        baseUrl: 'https://plain-agent.example.com',
         apiToken: 'weak-plaintext',
         enabled: true,
         createdAt: now,
@@ -384,7 +397,7 @@ describe('syncInstances token policy', () => {
       },
       {
         name: 'Legacy encrypted',
-        baseUrl: 'https://encrypted-slave.example.com',
+        baseUrl: 'https://encrypted-agent.example.com',
         apiToken: encryptSecret('weak-encrypted'),
         enabled: true,
         createdAt: now,
@@ -417,11 +430,11 @@ describe('syncInstances token policy', () => {
     await setSetting('instance_last_sync_error', `Caddy rejected: ${legacySecret}`);
 
     const instances = await listInstances();
-    const slaveStatus = await getSlaveLastSync();
+    const agentStatus = await getAgentLastSync();
 
     expect(instances[0].lastSyncError).toBe('Previous synchronization failed');
-    expect(slaveStatus.error).toBe('Previous synchronization failed');
-    expect(JSON.stringify({ instances, slaveStatus })).not.toContain(legacySecret);
+    expect(agentStatus.error).toBe('Previous synchronization failed');
+    expect(JSON.stringify({ instances, agentStatus })).not.toContain(legacySecret);
   });
 });
 
@@ -802,13 +815,13 @@ describe('applySyncPayload', () => {
     expect(rows[0].listenAddress).toBe(':5432');
   });
 
-  it('works with payload missing l4ProxyHosts (backward compat with old master)', async () => {
-    // Old master instances don't include l4ProxyHosts in their payload.
-    // The slave should still sync successfully and not crash.
+  it('works with payload missing l4ProxyHosts (backward compat with old controller)', async () => {
+    // Old controller instances don't include l4ProxyHosts in their payload.
+    // The agent should still sync successfully and not crash.
     await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ name: 'Existing L4' }));
 
     const payload = emptyPayload();
-    // Explicitly remove l4ProxyHosts to simulate old master payload
+    // Explicitly remove l4ProxyHosts to simulate old controller payload
     delete (payload.data as Record<string, unknown>).l4ProxyHosts;
 
     await expect(applySyncPayload(payload)).resolves.toBeUndefined();

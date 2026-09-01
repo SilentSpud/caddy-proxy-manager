@@ -2260,7 +2260,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     throw new Error("Failed to create proxy host");
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "proxy_host",
@@ -2373,7 +2373,7 @@ export async function updateProxyHost(
     })
     .where(eq(proxyHosts.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "proxy_host",
@@ -2393,7 +2393,7 @@ export async function deleteProxyHost(id: number, actorUserId: number) {
   }
 
   await db.delete(proxyHosts).where(eq(proxyHosts.id, id));
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "proxy_host",

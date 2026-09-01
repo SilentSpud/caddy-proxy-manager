@@ -87,7 +87,7 @@ export async function createCaCertificate(
     throw new Error("Failed to create CA certificate");
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "ca_certificate",
@@ -121,7 +121,7 @@ export async function updateCaCertificate(
     })
     .where(eq(caCertificates.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "ca_certificate",
@@ -196,7 +196,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
   }
 
   await db.delete(caCertificates).where(eq(caCertificates.id, id));
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "ca_certificate",

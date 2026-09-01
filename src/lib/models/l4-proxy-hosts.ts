@@ -571,7 +571,7 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     throw new Error("Failed to create L4 proxy host");
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "l4_proxy_host",
@@ -721,7 +721,7 @@ export async function updateL4ProxyHost(
     })
     .where(eq(l4ProxyHosts.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "l4_proxy_host",
@@ -741,7 +741,7 @@ export async function deleteL4ProxyHost(id: number, actorUserId: number) {
   }
 
   await db.delete(l4ProxyHosts).where(eq(l4ProxyHosts.id, id));
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "l4_proxy_host",

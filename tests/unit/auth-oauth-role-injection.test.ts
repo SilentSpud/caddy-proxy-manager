@@ -79,14 +79,14 @@ describe('enforceSafeUserDefaults', () => {
 });
 
 describe('better-auth user.create.before hook (wired into the real config)', () => {
-  it('is configured as a function', () => {
-    const auth = getAuth() as any;
+  it('is configured as a function', async () => {
+    const auth = (await getAuth()) as any;
     const hook = auth.options?.databaseHooks?.user?.create?.before;
     expect(typeof hook).toBe('function');
   });
 
   it('forces role/status to safe defaults on a malicious OAuth-style user create', async () => {
-    const auth = getAuth() as any;
+    const auth = (await getAuth()) as any;
     const hook = auth.options.databaseHooks.user.create.before;
 
     const result = await hook({

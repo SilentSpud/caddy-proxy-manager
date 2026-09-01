@@ -163,7 +163,7 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
     await db.insert(accessListEntries).values(entryRows);
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "access_list",
@@ -195,7 +195,7 @@ export async function updateAccessList(
     })
     .where(eq(accessLists.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "access_list",
@@ -229,7 +229,7 @@ export async function addAccessListEntry(
     updatedAt: now,
   });
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "access_list_entry",
@@ -254,7 +254,7 @@ export async function removeAccessListEntry(
 
   await db.delete(accessListEntries).where(eq(accessListEntries.id, entryId));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "access_list_entry",
@@ -275,7 +275,7 @@ export async function deleteAccessList(id: number, actorUserId: number) {
 
   await db.delete(accessLists).where(eq(accessLists.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "access_list",

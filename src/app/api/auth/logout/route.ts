@@ -10,6 +10,6 @@ export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
   if (originCheck) return originCheck;
 
-  await getAuth().api.signOut({ headers: await headers() });
+  await (await getAuth()).api.signOut({ headers: await headers() });
   return NextResponse.redirect(new URL("/login", config.baseUrl));
 }

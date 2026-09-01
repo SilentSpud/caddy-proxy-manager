@@ -38,8 +38,8 @@ vi.mock('@/src/lib/settings', () => ({
 vi.mock('@/src/lib/instance-sync', () => ({
   getInstanceMode: vi.fn(),
   setInstanceMode: vi.fn(),
-  getSlaveMasterToken: vi.fn(),
-  setSlaveMasterToken: vi.fn(),
+  getAgentControllerToken: vi.fn(),
+  setAgentControllerToken: vi.fn(),
   syncInstances: vi.fn().mockResolvedValue({ total: 0, success: 0, failed: 0, skippedHttp: 0 }),
 }));
 
@@ -125,8 +125,8 @@ import {
 import {
   getInstanceMode,
   setInstanceMode,
-  getSlaveMasterToken,
-  setSlaveMasterToken,
+  getAgentControllerToken,
+  setAgentControllerToken,
 } from '@/src/lib/instance-sync';
 import { applyCaddyConfig } from '@/src/lib/caddy';
 import { requireApiAdmin } from '@/src/lib/api-auth';
@@ -163,8 +163,8 @@ const mockSetSetting = vi.mocked(setSetting);
 const mockClearSetting = vi.mocked(clearSetting);
 const mockGetInstanceMode = vi.mocked(getInstanceMode);
 const mockSetInstanceMode = vi.mocked(setInstanceMode);
-const mockGetSlaveMasterToken = vi.mocked(getSlaveMasterToken);
-const mockSetSlaveMasterToken = vi.mocked(setSlaveMasterToken);
+const mockGetAgentControllerToken = vi.mocked(getAgentControllerToken);
+const mockSetAgentControllerToken = vi.mocked(setAgentControllerToken);
 const mockApplyCaddyConfig = vi.mocked(applyCaddyConfig);
 const mockRequireApiAdmin = vi.mocked(requireApiAdmin);
 
@@ -314,7 +314,7 @@ describe('GET /api/v1/settings/[group]', () => {
   });
 
   it('returns sync-token status', async () => {
-    mockGetSlaveMasterToken.mockResolvedValue('some-token' as any);
+    mockGetAgentControllerToken.mockResolvedValue('some-token' as any);
 
     const response = await GET(createMockRequest(), {
       params: Promise.resolve({ group: 'sync-token' }),
@@ -326,7 +326,7 @@ describe('GET /api/v1/settings/[group]', () => {
   });
 
   it('returns has_token false when no token', async () => {
-    mockGetSlaveMasterToken.mockResolvedValue(null as any);
+    mockGetAgentControllerToken.mockResolvedValue(null as any);
 
     const response = await GET(createMockRequest(), {
       params: Promise.resolve({ group: 'sync-token' }),
@@ -428,7 +428,7 @@ describe('PUT /api/v1/settings/[group]', () => {
   it('sets instance mode', async () => {
     mockSetInstanceMode.mockResolvedValue(undefined as any);
 
-    const body = { mode: 'master' };
+    const body = { mode: 'controller' };
     const response = await PUT(createMockRequest({ method: 'PUT', body }), {
       params: Promise.resolve({ group: 'instance-mode' }),
     });
@@ -436,11 +436,11 @@ describe('PUT /api/v1/settings/[group]', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ ok: true });
-    expect(mockSetInstanceMode).toHaveBeenCalledWith('master');
+    expect(mockSetInstanceMode).toHaveBeenCalledWith('controller');
   });
 
   it('sets sync token', async () => {
-    mockSetSlaveMasterToken.mockResolvedValue(undefined as any);
+    mockSetAgentControllerToken.mockResolvedValue(undefined as any);
 
     const validToken = 'a]b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6';
     const body = { token: validToken };
@@ -451,14 +451,14 @@ describe('PUT /api/v1/settings/[group]', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ ok: true });
-    expect(mockSetSlaveMasterToken).toHaveBeenCalledWith(validToken);
+    expect(mockSetAgentControllerToken).toHaveBeenCalledWith(validToken);
   });
 
   it('rejects unknown fields for special settings groups', async () => {
     const modeResponse = await PUT(
       createMockRequest({
         method: 'PUT',
-        body: { mode: 'master', injected: true },
+        body: { mode: 'controller', injected: true },
       }),
       { params: Promise.resolve({ group: 'instance-mode' }) },
     );
@@ -473,7 +473,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     expect(modeResponse.status).toBe(400);
     expect(tokenResponse.status).toBe(400);
     expect(mockSetInstanceMode).not.toHaveBeenCalled();
-    expect(mockSetSlaveMasterToken).not.toHaveBeenCalled();
+    expect(mockSetAgentControllerToken).not.toHaveBeenCalled();
   });
 
   it('rejects oversized special-group credentials before persistence', async () => {
@@ -489,11 +489,11 @@ describe('PUT /api/v1/settings/[group]', () => {
     expect(await response.json()).toEqual({
       error: 'Sync token must be at most 512 characters; token must otherwise be null',
     });
-    expect(mockSetSlaveMasterToken).not.toHaveBeenCalled();
+    expect(mockSetAgentControllerToken).not.toHaveBeenCalled();
   });
 
   it('clears sync token when null', async () => {
-    mockSetSlaveMasterToken.mockResolvedValue(undefined as any);
+    mockSetAgentControllerToken.mockResolvedValue(undefined as any);
 
     const body = {};
     const response = await PUT(createMockRequest({ method: 'PUT', body }), {
@@ -502,7 +502,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     await response.json();
 
     expect(response.status).toBe(200);
-    expect(mockSetSlaveMasterToken).toHaveBeenCalledWith(null);
+    expect(mockSetAgentControllerToken).toHaveBeenCalledWith(null);
   });
 
   it('returns 404 for unknown settings group', async () => {

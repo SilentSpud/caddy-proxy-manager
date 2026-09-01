@@ -6,9 +6,9 @@ import { applyCaddyConfig } from "@/src/lib/caddy";
 import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import {
   getInstanceMode,
-  getSlaveMasterToken,
+  getAgentControllerToken,
   setInstanceMode,
-  setSlaveMasterToken,
+  setAgentControllerToken,
   syncInstances,
 } from "@/src/lib/instance-sync";
 import { createInstance, deleteInstance, updateInstance } from "@/src/lib/models/instances";
@@ -102,11 +102,11 @@ async function updateGeneralSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("general");
       await syncInstances();
       revalidatePath("/settings");
-      return { success: true, message: "General settings reset to master defaults" };
+      return { success: true, message: "General settings reset to controller defaults" };
     }
     await saveGeneralSettings({
       primaryDomain: String(formData.get("primaryDomain") ?? ""),
@@ -132,12 +132,12 @@ async function updateAcmeSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("acme");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "ACME settings reset to master defaults" };
+        return { success: true, message: "ACME settings reset to controller defaults" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -201,12 +201,12 @@ async function updateCloudflareSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("cloudflare");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "Cloudflare settings reset to master defaults" };
+        return { success: true, message: "Cloudflare settings reset to controller defaults" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -267,12 +267,12 @@ async function updateDnsProviderSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("dns_provider");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "DNS provider settings reset to master defaults" };
+        return { success: true, message: "DNS provider settings reset to controller defaults" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -408,11 +408,11 @@ async function updateAuthentikSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("authentik");
       await syncInstances();
       revalidatePath("/settings");
-      return { success: true, message: "Authentik defaults reset to master values" };
+      return { success: true, message: "Authentik defaults reset to controller values" };
     }
     const outpostDomain = String(formData.get("outpostDomain") ?? "").trim();
     const outpostUpstream = String(formData.get("outpostUpstream") ?? "").trim();
@@ -496,12 +496,12 @@ async function updateAvatarSettingsActionUnlocked(
 
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("avatars");
       revalidatePath("/settings");
       revalidatePath("/users");
       revalidatePath("/profile");
-      return { success: true, message: "Avatar settings reset to master defaults" };
+      return { success: true, message: "Avatar settings reset to controller defaults" };
     }
 
     const gravatarEnabled = formData.get("gravatarEnabled") === "on";
@@ -534,12 +534,12 @@ async function updateMetricsSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("metrics");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "Metrics settings reset to master defaults" };
+        return { success: true, message: "Metrics settings reset to controller defaults" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -592,12 +592,12 @@ async function updateLoggingSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("logging");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "Logging settings reset to master defaults" };
+        return { success: true, message: "Logging settings reset to controller defaults" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -662,12 +662,12 @@ async function updateTrustedProxiesSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("trusted_proxies");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "Trusted proxies settings reset to master defaults" };
+        return { success: true, message: "Trusted proxies settings reset to controller defaults" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -727,12 +727,12 @@ async function updateDnsSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("dns");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "DNS settings reset to master defaults" };
+        return { success: true, message: "DNS settings reset to controller defaults" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -795,14 +795,14 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("upstream_dns_resolution");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
         return {
           success: true,
-          message: "Upstream DNS resolution settings reset to master defaults",
+          message: "Upstream DNS resolution settings reset to controller defaults",
         };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
@@ -864,8 +864,8 @@ async function updateInstanceModeActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = String(formData.get("mode") ?? "").trim() as "standalone" | "master" | "slave";
-    if (mode !== "standalone" && mode !== "master" && mode !== "slave") {
+    const mode = String(formData.get("mode") ?? "").trim() as "standalone" | "controller" | "agent";
+    if (mode !== "standalone" && mode !== "controller" && mode !== "agent") {
       return { success: false, message: "Invalid instance mode" };
     }
     await setInstanceMode(mode);
@@ -880,20 +880,22 @@ async function updateInstanceModeActionUnlocked(
   }
 }
 
-async function updateSlaveMasterTokenActionUnlocked(
+async function updateAgentControllerTokenActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
     const clearToken = formData.get("clearToken") === "on";
-    const rawToken = formData.get("masterToken") ? String(formData.get("masterToken")).trim() : "";
+    const rawToken = formData.get("controllerToken")
+      ? String(formData.get("controllerToken")).trim()
+      : "";
 
     // If clearing, allow empty token
     if (clearToken) {
-      await setSlaveMasterToken("");
+      await setAgentControllerToken("");
       revalidatePath("/settings");
-      return { success: true, message: "Master sync token removed" };
+      return { success: true, message: "Controller sync token removed" };
     }
 
     // If a new token is provided, validate it
@@ -902,35 +904,35 @@ async function updateSlaveMasterTokenActionUnlocked(
       if (!validation.valid) {
         return { success: false, message: validation.error };
       }
-      await setSlaveMasterToken(rawToken);
+      await setAgentControllerToken(rawToken);
       revalidatePath("/settings");
-      return { success: true, message: "Master sync token updated" };
+      return { success: true, message: "Controller sync token updated" };
     }
 
     // No change - keep existing token
-    const current = await getSlaveMasterToken();
+    const current = await getAgentControllerToken();
     if (!current) {
       return { success: false, message: "No token provided. Please enter a sync token." };
     }
-    return { success: true, message: "Master sync token unchanged" };
+    return { success: true, message: "Controller sync token unchanged" };
   } catch (error) {
-    console.error("Failed to update master token:", error);
+    console.error("Failed to update controller token:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to update master token",
+      message: error instanceof Error ? error.message : "Failed to update controller token",
     };
   }
 }
 
-export async function createSlaveInstanceAction(
+export async function createAgentInstanceAction(
   _prevState: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
-    if (mode !== "master") {
-      return { success: false, message: "Instance mode must be set to master to add slaves" };
+    if (mode !== "controller") {
+      return { success: false, message: "Instance mode must be set to controller to add agents" };
     }
     const name = String(formData.get("name") ?? "").trim();
     const baseUrl = String(formData.get("baseUrl") ?? "")
@@ -949,20 +951,20 @@ export async function createSlaveInstanceAction(
 
     await createInstance({ name, baseUrl, apiToken, enabled: true });
     revalidatePath("/settings");
-    return { success: true, message: "Slave instance added" };
+    return { success: true, message: "Agent instance added" };
   } catch (error) {
-    console.error("Failed to create slave instance:", error);
+    console.error("Failed to create agent instance:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to create slave instance",
+      message: error instanceof Error ? error.message : "Failed to create agent instance",
     };
   }
 }
 
-export async function deleteSlaveInstanceAction(formData: FormData): Promise<void> {
+export async function deleteAgentInstanceAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const mode = await getInstanceMode();
-  if (mode !== "master") {
+  if (mode !== "controller") {
     return;
   }
   const id = Number(formData.get("instanceId"));
@@ -973,10 +975,10 @@ export async function deleteSlaveInstanceAction(formData: FormData): Promise<voi
   revalidatePath("/settings");
 }
 
-export async function toggleSlaveInstanceAction(formData: FormData): Promise<void> {
+export async function toggleAgentInstanceAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const mode = await getInstanceMode();
-  if (mode !== "master") {
+  if (mode !== "controller") {
     return;
   }
   const id = Number(formData.get("instanceId"));
@@ -1172,12 +1174,12 @@ async function updateDefaultResponseSettingsActionUnlocked(
     await requireAdmin();
     const mode = await getInstanceMode();
     const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "slave" && !overrideEnabled) {
+    if (mode === "agent" && !overrideEnabled) {
       await clearSetting("default_response");
       try {
         await applyCaddyConfig();
         revalidatePath("/settings");
-        return { success: true, message: "Default response reset to master settings" };
+        return { success: true, message: "Default response reset to controller settings" };
       } catch (error) {
         console.error("Failed to apply Caddy config:", error);
         revalidatePath("/settings");
@@ -1237,7 +1239,7 @@ async function updateDefaultResponseSettingsActionUnlocked(
   }
 }
 
-export async function syncSlaveInstancesAction(
+export async function syncAgentInstancesAction(
   _prevState: ActionResult | null,
   _formData: FormData,
 ): Promise<ActionResult> {
@@ -1246,8 +1248,8 @@ export async function syncSlaveInstancesAction(
   try {
     await requireAdmin();
     const mode = await getInstanceMode();
-    if (mode !== "master") {
-      return { success: false, message: "Instance mode must be set to master to sync slaves" };
+    if (mode !== "controller") {
+      return { success: false, message: "Instance mode must be set to controller to sync agents" };
     }
     const result = await syncInstances();
     revalidatePath("/settings");
@@ -1274,10 +1276,10 @@ export async function syncSlaveInstancesAction(
       message: `Sync completed (${result.success}/${result.total} succeeded)`,
     };
   } catch (error) {
-    console.error("Failed to sync slave instances:", error);
+    console.error("Failed to sync agent instances:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to sync slave instances",
+      message: error instanceof Error ? error.message : "Failed to sync agent instances",
     };
   }
 }
@@ -1701,8 +1703,8 @@ export const updateUpstreamDnsResolutionSettingsAction = serializedSettingsActio
   updateUpstreamDnsResolutionSettingsActionUnlocked,
 );
 export const updateInstanceModeAction = serializedSettingsAction(updateInstanceModeActionUnlocked);
-export const updateSlaveMasterTokenAction = serializedSettingsAction(
-  updateSlaveMasterTokenActionUnlocked,
+export const updateAgentControllerTokenAction = serializedSettingsAction(
+  updateAgentControllerTokenActionUnlocked,
 );
 export const updateGeoBlockSettingsAction = serializedSettingsAction(
   updateGeoBlockSettingsActionUnlocked,

@@ -10,7 +10,7 @@
  * directions: auto-link providers are trusted, and providers without it stay
  * unable to claim an existing account.
  */
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
 
@@ -25,9 +25,11 @@ vi.mock('../../src/lib/db', () => {
   ctx.db = createTestDb();
 
   const now = '2026-01-01T00:00:00.000Z';
-  ctx.db
-    .insert(schemaModule.oauthProviders)
-    .values([
+  // Bun evaluates a vi.mock factory synchronously, so this seed cannot be awaited. `.run()` is
+  // SQLite's synchronous execution and is not on the shared (PostgreSQL) type — the cast reaches
+  // the real bun:sqlite builder underneath. Test-only: app code must stay awaitable.
+  (
+    ctx.db.insert(schemaModule.oauthProviders).values([
       {
         id: 'autolink-idp',
         name: 'Auto-link IdP',
@@ -70,12 +72,14 @@ vi.mock('../../src/lib/db', () => {
         createdAt: now,
         updatedAt: now,
       },
-    ])
-    .run();
+    ]) as unknown as { run: () => void }
+  ).run();
 
   return {
     default: ctx.db,
-    sqlite: undefined,
+    db: ctx.db,
+    client: undefined,
+    dialect: 'sqlite' as const,
     schema: schemaModule,
     nowIso: () => new Date().toISOString(),
     toIso: (value: string | Date | null | undefined): string | null => {
@@ -174,7 +178,12 @@ describe('mapOAuthProvider — email_verified claim mapping', () => {
 });
 
 describe('better-auth account.accountLinking (wired into the real config)', () => {
-  const options = (getAuth() as any).options;
+  // getAuth() builds the config asynchronously now that provider rows can come from PostgreSQL,
+  // so the options object is resolved once in beforeAll rather than at describe-body time.
+  let options: any;
+  beforeAll(async () => {
+    options = ((await getAuth()) as any).options;
+  });
 
   it('enables account linking', () => {
     expect(options.account.accountLinking.enabled).toBe(true);

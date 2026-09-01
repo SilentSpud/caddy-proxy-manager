@@ -34,7 +34,7 @@ else.
 | `dns`        | `172.28.0.5`  | dnsmasq — `*.cpm.test` → Caddy, everything else → Docker DNS |
 | `caddy`      | `172.28.0.10` | **system under test** — the project's Caddy image            |
 | `web`        | `172.28.0.11` | **system under test** — the project's CPM image              |
-| `web-slave`  | `172.28.0.13` | second CPM instance (`--sync` only), Caddy in the same netns |
+| `web-agent`  | `172.28.0.13` | second CPM instance (`--sync` only), Caddy in the same netns |
 | `origin-a`   | `172.28.0.20` | L7 HTTP origin                                               |
 | `origin-b`   | `172.28.0.21` | L7 HTTP origin, second identity for load-balancing tests     |
 | `origin-tls` | `172.28.0.22` | L7 HTTPS origin with a deliberately mismatched certificate   |
@@ -123,7 +123,7 @@ Test files are ordinary bash. Editing one on the host takes effect immediately �
 | `55-waf`                   | Coraza rules, DetectionOnly, global/host merge, directive allowlist, WebSocket carve-out |
 | `60-forward-auth`          | portal bounce, full login round-trip, identity headers, header spoofing, revocation    |
 | `65-settings-and-admin`    | every settings group, metrics listener, groups, sessions, audit log, OpenAPI           |
-| `90-instance-sync`         | master → slave replication, receiving-end auth, target removal (`--sync` only)         |
+| `90-instance-sync`         | controller → agent replication, receiving-end auth, target removal (`--sync` only)         |
 
 ### What the rig has caught
 

@@ -22,20 +22,20 @@ let stopped = false;
 
 // ── state helpers ─────────────────────────────────────────────────────────────
 
-function getState(key: string): string | null {
-  const row = db
+async function getState(key: string): Promise<string | null> {
+  const [row] = await db
     .select({ value: wafLogParseState.value })
     .from(wafLogParseState)
     .where(eq(wafLogParseState.key, key))
-    .get();
+    .limit(1);
   return row?.value ?? null;
 }
 
-function setState(key: string, value: string): void {
-  db.insert(wafLogParseState)
+async function setState(key: string, value: string): Promise<void> {
+  await db
+    .insert(wafLogParseState)
     .values({ key, value })
-    .onConflictDoUpdate({ target: wafLogParseState.key, set: { value } })
-    .run();
+    .onConflictDoUpdate({ target: wafLogParseState.key, set: { value } });
 }
 
 // ── GeoIP ─────────────────────────────────────────────────────────────────────
@@ -226,10 +226,10 @@ async function readAuditLog(startOffset: number): Promise<{ lines: string[]; new
  * file is gone or replaced: an offset from a different inode would park the parser past EOF, since
  * the rotation guard only fires when the file is *smaller* than last recorded.
  */
-function resetAuditLogState(): void {
-  setState("waf_audit_log_offset", "0");
-  setState("waf_audit_log_size", "0");
-  setState("waf_audit_log_inode", "0");
+async function resetAuditLogState(): Promise<void> {
+  await setState("waf_audit_log_offset", "0");
+  await setState("waf_audit_log_size", "0");
+  await setState("waf_audit_log_inode", "0");
 }
 
 // Warn once per episode so a deleted audit log — or one we are never allowed to truncate —
@@ -263,7 +263,7 @@ export async function parseNewWafLogEntries(): Promise<void> {
         `[waf-log-parser] ${AUDIT_LOG} is missing — WAF events cannot be ingested until Caddy recreates it (restart the caddy container).`,
       );
       warnedAuditLogMissing = true;
-      resetAuditLogState();
+      await resetAuditLogState();
     }
     return;
   }
@@ -271,8 +271,8 @@ export async function parseNewWafLogEntries(): Promise<void> {
 
   try {
     // ── 1. Parse WAF rules log to build unique_id → rule info map ────────────
-    const rulesOffset = parseInt(getState("waf_rules_log_offset") ?? "0", 10);
-    const rulesSize = parseInt(getState("waf_rules_log_size") ?? "0", 10);
+    const rulesOffset = parseInt((await getState("waf_rules_log_offset")) ?? "0", 10);
+    const rulesSize = parseInt((await getState("waf_rules_log_size")) ?? "0", 10);
 
     let currentRulesSize = 0;
     if (existsSync(RULES_LOG)) {
@@ -285,13 +285,13 @@ export async function parseNewWafLogEntries(): Promise<void> {
     const rulesStartOffset = currentRulesSize < rulesSize ? 0 : rulesOffset;
     const { ruleMap, newOffset: newRulesOffset } = await readRulesLog(rulesStartOffset);
 
-    setState("waf_rules_log_offset", String(newRulesOffset));
-    setState("waf_rules_log_size", String(currentRulesSize));
+    await setState("waf_rules_log_offset", String(newRulesOffset));
+    await setState("waf_rules_log_size", String(currentRulesSize));
 
     // ── 2. Parse audit log, enriching events with rule info from map ─────────
-    const storedOffset = parseInt(getState("waf_audit_log_offset") ?? "0", 10);
-    const storedSize = parseInt(getState("waf_audit_log_size") ?? "0", 10);
-    const storedInode = parseInt(getState("waf_audit_log_inode") ?? "0", 10);
+    const storedOffset = parseInt((await getState("waf_audit_log_offset")) ?? "0", 10);
+    const storedSize = parseInt((await getState("waf_audit_log_size")) ?? "0", 10);
+    const storedInode = parseInt((await getState("waf_audit_log_inode")) ?? "0", 10);
 
     let currentSize: number;
     let currentInode: number;
@@ -329,9 +329,9 @@ export async function parseNewWafLogEntries(): Promise<void> {
     // Persist progress BEFORE truncating. Truncation is a best-effort disk guard that fails with
     // EACCES when web and caddy run as different UIDs, and doing it first froze these offsets — so
     // every later pass re-read and re-inserted the same tail forever.
-    setState("waf_audit_log_offset", String(newOffset));
-    setState("waf_audit_log_size", String(currentSize));
-    setState("waf_audit_log_inode", String(currentInode));
+    await setState("waf_audit_log_offset", String(newOffset));
+    await setState("waf_audit_log_size", String(currentSize));
+    await setState("waf_audit_log_inode", String(currentInode));
 
     // Having read through to the current end of file, truncation is safe: Coraza appends via
     // O_APPEND, so writes after truncation land at the new (empty) end of file.
@@ -339,8 +339,8 @@ export async function parseNewWafLogEntries(): Promise<void> {
       try {
         truncateSync(AUDIT_LOG, 0);
         // Same inode, now empty — keep tracking it, just rewind.
-        setState("waf_audit_log_offset", "0");
-        setState("waf_audit_log_size", "0");
+        await setState("waf_audit_log_offset", "0");
+        await setState("waf_audit_log_size", "0");
         warnedTruncateFailed = false;
         console.log(
           `[waf-log-parser] truncated waf-audit.log after ingesting ${currentSize} bytes`,

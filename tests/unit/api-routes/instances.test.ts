@@ -61,8 +61,8 @@ function createMockRequest(options: { method?: string; body?: unknown } = {}): a
 
 const sampleInstance = {
   id: 1,
-  name: 'Slave 1',
-  url: 'https://slave1.example.com:3000',
+  name: 'Agent 1',
+  url: 'https://agent1.example.com:3000',
   token: 'sync-token-abc',
   created_at: '2026-01-01',
 };
@@ -95,8 +95,8 @@ describe('GET /api/v1/instances', () => {
 describe('POST /api/v1/instances', () => {
   it('creates an instance and returns 201', async () => {
     const body = {
-      name: 'Slave 2',
-      baseUrl: 'https://slave2.example.com:3000',
+      name: 'Agent 2',
+      baseUrl: 'https://agent2.example.com:3000',
       apiToken: 'a'.repeat(32),
     };
     mockCreate.mockResolvedValue({ id: 2, ...body } as any);
@@ -111,7 +111,7 @@ describe('POST /api/v1/instances', () => {
 
   it('rejects a weak sync token before creating an instance', async () => {
     const body = {
-      name: 'Weak slave',
+      name: 'Weak agent',
       baseUrl: 'https://weak.example.com:3000',
       apiToken: 'short',
     };

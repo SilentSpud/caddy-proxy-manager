@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import { toCertificateApiResponse, toCertificatePickerOption } from '@/src/lib/certificate-api';
-import { toEnvSlaveInstanceView } from '@/src/lib/instance-sync-view';
+import { toEnvAgentInstanceView } from '@/src/lib/instance-sync-view';
 
 const certificate = {
   id: 7,
@@ -58,14 +58,14 @@ describe('browser secret boundaries', () => {
     expect(proxyHostsPage).not.toMatch(/certificates=\{certificates\}/);
   });
 
-  it('allowlists environment slave metadata before client-component props', () => {
+  it('allowlists environment agent metadata before client-component props', () => {
     const view = JSON.stringify(
-      toEnvSlaveInstanceView({
+      toEnvAgentInstanceView({
         name: 'Edge node',
         url: 'https://edge.example.com',
         token: 'instance-sync-token-secret-sentinel',
         futureSecret: 'future-instance-secret-sentinel',
-      } as Parameters<typeof toEnvSlaveInstanceView>[0]),
+      } as Parameters<typeof toEnvAgentInstanceView>[0]),
     );
 
     expect(view).toBe('{"name":"Edge node","url":"https://edge.example.com"}');
@@ -76,6 +76,6 @@ describe('browser secret boundaries', () => {
       join(process.cwd(), 'src/app/(dashboard)/settings/page.tsx'),
       'utf8',
     );
-    expect(settingsPage).toMatch(/getEnvSlaveInstances\(\)\.map\(toEnvSlaveInstanceView\)/);
+    expect(settingsPage).toMatch(/getEnvAgentInstances\(\)\.map\(toEnvAgentInstanceView\)/);
   });
 });

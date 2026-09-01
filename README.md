@@ -81,7 +81,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
 - **REST API** - Full REST API under `/api/v1/` with Bearer token authentication, covering all resources. Interactive OpenAPI 3.1.0 docs at `/api-docs`
 - **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
-- **Instance Sync** - Master/slave configuration sync for multi-instance deployments. The master pushes proxy hosts, certificates, access lists, and settings to slaves on every change
+- **Instance Sync** - Controller/agent configuration sync for multi-instance deployments. The controller pushes proxy hosts, certificates, access lists, and settings to agents on every change
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, Spaceship, deSEC, Dynu, and acme-dns. Credentials encrypted at rest. Per-certificate provider override supported
@@ -105,9 +105,9 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `ADMIN_PASSWORD` | Admin password (see requirements below) | `admin` (dev only) | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
 | `BASE_URL` | Public URL where users access the dashboard.<br/>**Required for OAuth** - must match redirect URI | `http://localhost:3000` | **Yes** (if using OAuth) |
 | `APP_NAME` | Display name in the sidebar, on the login card, and as the suffix on every page title | `Caddy Proxy Manager` | No |
-| `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides (and syncs from master to slaves) | Unset (toggle decides) | No |
+| `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides (and syncs from controller to agents) | Unset (toggle decides) | No |
 | `CADDY_API_URL` | Caddy Admin API endpoint | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
-| `DATABASE_URL` | SQLite database URL | `file:/app/data/caddy-proxy-manager.db` | No |
+| `DATABASE_URL` | Database connection. A path or `file:` URL selects SQLite; a `postgres://` URL selects PostgreSQL. See [Database Backends](#database-backends) | `file:/app/data/caddy-proxy-manager.db` | No |
 | `CERTS_DIRECTORY` | Certificate storage directory | `./data/certs` | No |
 | `LOGIN_MAX_ATTEMPTS` | Max login attempts before rate limit | `5` | No |
 | `LOGIN_WINDOW_MS` | Rate limit window in milliseconds | `300000` (5 min) | No |
@@ -137,9 +137,9 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `AUTH_RATE_LIMIT_ENABLED` | Enable Better Auth rate limiting | `true` | No |
 | `AUTH_RATE_LIMIT_WINDOW` | Rate limit window in seconds | `60` | No |
 | `AUTH_RATE_LIMIT_MAX` | Max requests per window | `5` | No |
-| `INSTANCE_MODE` | Instance role: `standalone`, `master`, or `slave` | `standalone` | No |
-| `INSTANCE_SYNC_TOKEN` | Bearer token slaves use to authenticate sync requests (32+ characters) | None | No (required if `slave`) |
-| `INSTANCE_SLAVES` | JSON array of slave instances for the master to push to (tokens must be 32+ characters) | None | No |
+| `INSTANCE_MODE` | Instance role: `standalone`, `controller`, or `agent` | `standalone` | No |
+| `INSTANCE_SYNC_TOKEN` | Bearer token agents use to authenticate sync requests (32+ characters) | None | No (required if `agent`) |
+| `INSTANCE_AGENTS` | JSON array of agent instances for the controller to push to (tokens must be 32+ characters) | None | No |
 | `INSTANCE_SYNC_INTERVAL` | Periodic sync interval in seconds (`0` = disabled) | `0` | No |
 | `INSTANCE_SYNC_ALLOW_HTTP` | Allow sync over HTTP (for internal Docker networks) | `false` | No |
 | `CLICKHOUSE_URL` | ClickHouse HTTP endpoint for analytics | `http://clickhouse:8123` | No |
@@ -153,6 +153,59 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - `ADMIN_PASSWORD`: 12+ chars with uppercase, lowercase, numbers, and special characters — not required when `AUTH_DISABLE_LOCAL_USERS=true`
 
 Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credentials.
+
+---
+
+## Database Backends
+
+`DATABASE_URL` selects the backend. SQLite is the default and needs no configuration.
+
+| Backend | `DATABASE_URL` | Driver |
+| ------- | -------------- | ------ |
+| SQLite (default) | `file:/app/data/caddy-proxy-manager.db`, a bare path, or `:memory:` | `bun:sqlite` |
+| PostgreSQL | `postgres://user:password@host:5432/dbname` | `Bun.SQL` |
+
+Anything without a recognized URL scheme is read as a SQLite path, so every pre-existing `.env`
+keeps working untouched. MySQL and MariaDB are rejected with a clear error rather than being
+mistaken for a filename: Bun can talk to them, but Drizzle's Bun driver only builds PostgreSQL, and
+several write paths here depend on `RETURNING`, which MySQL does not implement.
+
+### Using PostgreSQL
+
+Point `DATABASE_URL` at the server and start normally — migrations run on boot, the same as with
+SQLite:
+
+```bash
+DATABASE_URL=postgres://cpm:secret@postgres:5432/cpm docker compose up -d
+```
+
+The database must already exist; the app creates its own tables but not the database itself.
+
+### Switching an existing deployment
+
+There is no migration path between backends. Pointing an existing SQLite deployment at an empty
+PostgreSQL server gives you a working but **empty** install — proxy hosts, certificates, users and
+settings all stay behind in the SQLite file. Export what you need first, or treat the switch as a
+fresh install.
+
+### Working on the schema
+
+`src/lib/db/schema.sqlite.ts` is the source of truth. `schema.pg.ts` is generated from it, and each
+backend keeps its own migration folder because the generated DDL is not portable:
+
+```bash
+bun run db:schema:pg                                              # after editing the SQLite schema
+bun run db:generate                                            # SQLite migrations -> drizzle/
+DATABASE_URL=postgres://... bun run db:generate                # PostgreSQL       -> drizzle/postgres/
+```
+
+`tests/unit/db-schema-parity.test.ts` fails if the two schemas drift or the generator was not
+re-run. `tests/integration/db-backend.test.ts` runs the same behavioural checks against both
+backends; it covers SQLite always, and PostgreSQL when `TEST_POSTGRES_URL` is set:
+
+```bash
+TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:55433/cpm bun test tests/integration/db-backend.test.ts
+```
 
 ---
 
@@ -449,18 +502,18 @@ other hosts down with it.
 
 ## Instance Sync
 
-Run a master instance that pushes configuration to one or more slaves on every change.
+Run a controller instance that pushes configuration to one or more agents on every change.
 
 ```bash
 # Generate once, then configure the same 64-character value on both sides.
 openssl rand -hex 32
 
-# Master
-INSTANCE_MODE=master
-INSTANCE_SLAVES='[{"name":"replica","url":"https://replica.example.com","token":"<64-hex-character-token>"}]'
+# Controller
+INSTANCE_MODE=controller
+INSTANCE_AGENTS='[{"name":"replica","url":"https://replica.example.com","token":"<64-hex-character-token>"}]'
 
-# Slave
-INSTANCE_MODE=slave
+# Agent
+INSTANCE_MODE=agent
 INSTANCE_SYNC_TOKEN=<64-hex-character-token>
 ```
 
@@ -468,7 +521,33 @@ Sync tokens shorter than 32 characters, longer than 512 characters, or padded wi
 
 Synced data: proxy hosts, certificates, access lists, and settings. User accounts are **not** synced.
 
-Use HTTPS slave URLs in production. Set `INSTANCE_SYNC_ALLOW_HTTP=true` only for internal Docker networks.
+### Upgrading from `master`/`slave`
+
+These roles were previously called `master`/`slave`. Those names are gone — nothing translates them
+any more.
+
+**Stored settings migrate themselves.** On first start, a stored `instance_mode` of `master` or
+`slave` is rewritten to `controller`/`agent`, and the `instance_master_token` setting moves to
+`instance_controller_token`. Nothing to do.
+
+**Environment variables must be renamed by hand**, because this process cannot rewrite your `.env`:
+
+| Before | After |
+| ------ | ----- |
+| `INSTANCE_MODE=master` | `INSTANCE_MODE=controller` |
+| `INSTANCE_MODE=slave` | `INSTANCE_MODE=agent` |
+| `INSTANCE_SLAVES=[...]` | `INSTANCE_AGENTS=[...]` |
+
+Startup **fails** with a message naming the variable and its replacement if an old value is still
+set. That is deliberate: an unrecognized `INSTANCE_MODE` falls back to `standalone`, which would
+turn an agent into an instance serving its own configuration instead of the controller's, and leave
+a controller pushing to nobody — silently, in both cases.
+
+Controllers and agents can be upgraded independently. A role is local configuration and never
+appears in the sync payload, so a mixed-build pair keeps syncing as long as each instance's own
+`INSTANCE_MODE` is valid for the build it is running.
+
+Use HTTPS agent URLs in production. Set `INSTANCE_SYNC_ALLOW_HTTP=true` only for internal Docker networks.
 
 See the [Environment Variables Reference](https://github.com/fuomag9/caddy-proxy-manager/wiki/Environment-Variables-Reference) for all `INSTANCE_*` options.
 

@@ -19,13 +19,13 @@ import {
 } from "@/src/lib/settings";
 import {
   getInstanceMode,
-  getSlaveLastSync,
-  getSlaveMasterToken,
+  getAgentLastSync,
+  getAgentControllerToken,
   isInstanceModeFromEnv,
   isSyncTokenFromEnv,
-  getEnvSlaveInstances,
+  getEnvAgentInstances,
 } from "@/src/lib/instance-sync";
-import { toEnvSlaveInstanceView } from "@/src/lib/instance-sync-view";
+import { toEnvAgentInstanceView } from "@/src/lib/instance-sync-view";
 import { listInstances } from "@/src/lib/models/instances";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
@@ -96,7 +96,7 @@ export default async function SettingsPage() {
     overrideDefaultResponse,
     overrideAvatars,
   ] =
-    instanceMode === "slave"
+    instanceMode === "agent"
       ? await Promise.all([
           getSetting("general"),
           getSetting("acme"),
@@ -112,14 +112,14 @@ export default async function SettingsPage() {
         ])
       : [null, null, null, null, null, null, null, null, null, null, null];
 
-  const [slaveToken, slaveLastSync] =
-    instanceMode === "slave"
-      ? await Promise.all([getSlaveMasterToken(), getSlaveLastSync()])
+  const [agentToken, agentLastSync] =
+    instanceMode === "agent"
+      ? await Promise.all([getAgentControllerToken(), getAgentLastSync()])
       : [null, null];
 
-  const instances = instanceMode === "master" ? await listInstances() : [];
+  const instances = instanceMode === "controller" ? await listInstances() : [];
   const envInstances =
-    instanceMode === "master" ? getEnvSlaveInstances().map(toEnvSlaveInstanceView) : [];
+    instanceMode === "controller" ? getEnvAgentInstances().map(toEnvAgentInstanceView) : [];
 
   return (
     <SettingsClient
@@ -170,15 +170,15 @@ export default async function SettingsPage() {
           defaultResponse: overrideDefaultResponse !== null,
           avatars: overrideAvatars !== null,
         },
-        slave:
-          instanceMode === "slave"
+        agent:
+          instanceMode === "agent"
             ? {
-                hasToken: Boolean(slaveToken),
-                lastSyncAt: slaveLastSync?.at ?? null,
-                lastSyncError: slaveLastSync?.error ?? null,
+                hasToken: Boolean(agentToken),
+                lastSyncAt: agentLastSync?.at ?? null,
+                lastSyncError: agentLastSync?.error ?? null,
               }
             : null,
-        master: instanceMode === "master" ? { instances, envInstances } : null,
+        controller: instanceMode === "controller" ? { instances, envInstances } : null,
       }}
     />
   );

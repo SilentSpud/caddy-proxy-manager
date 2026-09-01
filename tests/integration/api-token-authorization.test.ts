@@ -1,13 +1,13 @@
+import type { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
-import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 function resetDbModuleState() {
   delete (globalThis as typeof globalThis & { __DRIZZLE_DB__?: unknown }).__DRIZZLE_DB__;
-  delete (globalThis as typeof globalThis & { __SQLITE_CLIENT__?: unknown }).__SQLITE_CLIENT__;
+  delete (globalThis as typeof globalThis & { __DB_CLIENT__?: unknown }).__DB_CLIENT__;
   delete (globalThis as typeof globalThis & { __MIGRATIONS_RAN__?: boolean }).__MIGRATIONS_RAN__;
 }
 
@@ -29,8 +29,7 @@ describe('API token deletion authorization', () => {
       // against this temp file; pointing the plain specifier at it rewrites the live bindings
       // every consumer already reads through.
       // The template-literal specifier loses the module's type, so restore it explicitly.
-      const freshDb = (await import(`@/src/lib/db${fresh()}`)) as typeof import('@/src/lib/db');
-      vi.mock('@/src/lib/db', () => ({ ...freshDb }));
+      const { dbModule: freshDb } = await reloadDbModule();
       const { default: db, nowIso } = freshDb;
       const [{ apiTokens, users }, { deleteApiToken }] = await Promise.all([
         import('@/src/lib/db/schema'),
@@ -103,7 +102,9 @@ describe('API token deletion authorization', () => {
         }),
       ).toBeUndefined();
 
-      db.$client.close();
+      // $client is the raw driver handle, `unknown` on the shared type because it differs per
+      // backend. This test only ever runs against SQLite.
+      (db.$client as Database).close();
     } finally {
       // bun:sqlite releases the file only once drizzle's prepared statements are finalized,
       // which happens on collection — Windows refuses the removal until then.

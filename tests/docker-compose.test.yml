@@ -186,19 +186,19 @@ services:
     networks:
       - caddy-network
 
-  # ── Master/slave pair for the settings-sync functional test (issue #192) ──
+  # ── Controller/agent pair for the settings-sync functional test (issue #192) ──
   # Each instance has its own isolated Caddy admin API. This lets settings updates
   # exercise the production apply/rollback path without replacing the main E2E
   # Caddy configuration or racing the rest of the browser suite.
-  caddy-master:
-    container_name: caddy-proxy-manager-caddy-master
+  caddy-controller:
+    container_name: caddy-proxy-manager-caddy-controller
     image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
     environment:
-      PRIMARY_DOMAIN: master.caddyproxymanager.test
+      PRIMARY_DOMAIN: controller.caddyproxymanager.test
     volumes:
-      - acme-ca-master:/acme-ca:ro
+      - acme-ca-controller:/acme-ca:ro
     networks:
-      master-caddy-network:
+      controller-caddy-network:
         aliases:
           - caddy
     healthcheck:
@@ -208,15 +208,15 @@ services:
       retries: 12
       start_period: 10s
 
-  caddy-slave:
-    container_name: caddy-proxy-manager-caddy-slave
+  caddy-agent:
+    container_name: caddy-proxy-manager-caddy-agent
     image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
     environment:
-      PRIMARY_DOMAIN: slave.caddyproxymanager.test
+      PRIMARY_DOMAIN: agent.caddyproxymanager.test
     volumes:
-      - acme-ca-slave:/acme-ca:ro
+      - acme-ca-agent:/acme-ca:ro
     networks:
-      slave-caddy-network:
+      agent-caddy-network:
         aliases:
           - caddy
     healthcheck:
@@ -226,14 +226,14 @@ services:
       retries: 12
       start_period: 10s
 
-  web-master:
-    container_name: caddy-proxy-manager-web-master
+  web-controller:
+    container_name: caddy-proxy-manager-web-controller
     image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
     ports:
       - "3002:3000"
     environment:
       NODE_ENV: production
-      SESSION_SECRET: "test-master-session-secret-32chars!xxY"
+      SESSION_SECRET: "test-controller-session-secret-32chars!xxY"
       ADMIN_USERNAME: testadmin
       ADMIN_PASSWORD: "TestPassword2026!"
       BASE_URL: http://localhost:3002
@@ -244,20 +244,20 @@ services:
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
       CLICKHOUSE_PASSWORD: ""
-      INSTANCE_MODE: master
+      INSTANCE_MODE: controller
       INSTANCE_SYNC_TOKEN: "e2e-sync-token-0123456789abcdef0123456789"
       INSTANCE_SYNC_ALLOW_HTTP: "true"
       INSTANCE_SYNC_INTERVAL: "0"
-      INSTANCE_SLAVES: '[{"name":"slave","url":"http://web-slave:3000","token":"e2e-sync-token-0123456789abcdef0123456789"}]'
+      INSTANCE_AGENTS: '[{"name":"agent","url":"http://web-agent:3000","token":"e2e-sync-token-0123456789abcdef0123456789"}]'
     volumes:
-      - web-master-data:/app/data
-      - acme-ca-master:/acme-ca
+      - web-controller-data:/app/data
+      - acme-ca-controller:/acme-ca
     depends_on:
-      caddy-master:
+      caddy-controller:
         condition: service_healthy
     networks:
       instance-sync-network:
-      master-caddy-network:
+      controller-caddy-network:
         aliases:
           - web
     healthcheck:
@@ -267,14 +267,14 @@ services:
       retries: 12
       start_period: 20s
 
-  web-slave:
-    container_name: caddy-proxy-manager-web-slave
+  web-agent:
+    container_name: caddy-proxy-manager-web-agent
     image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
     ports:
       - "3003:3000"
     environment:
       NODE_ENV: production
-      SESSION_SECRET: "test-slave-session-secret-32chars!xxY"
+      SESSION_SECRET: "test-agent-session-secret-32chars!xxY"
       ADMIN_USERNAME: testadmin
       ADMIN_PASSWORD: "TestPassword2026!"
       BASE_URL: http://localhost:3003
@@ -285,18 +285,18 @@ services:
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
       CLICKHOUSE_PASSWORD: ""
-      INSTANCE_MODE: slave
+      INSTANCE_MODE: agent
       INSTANCE_SYNC_TOKEN: "e2e-sync-token-0123456789abcdef0123456789"
       INSTANCE_SYNC_ALLOW_HTTP: "true"
     volumes:
-      - web-slave-data:/app/data
-      - acme-ca-slave:/acme-ca
+      - web-agent-data:/app/data
+      - acme-ca-agent:/acme-ca
     depends_on:
-      caddy-slave:
+      caddy-agent:
         condition: service_healthy
     networks:
       instance-sync-network:
-      slave-caddy-network:
+      agent-caddy-network:
         aliases:
           - web
     healthcheck:
@@ -312,10 +312,10 @@ networks:
   instance-sync-network:
     driver: bridge
   # Each Caddy admin API is reachable only by its corresponding web instance.
-  master-caddy-network:
+  controller-caddy-network:
     driver: bridge
     internal: true
-  slave-caddy-network:
+  agent-caddy-network:
     driver: bridge
     internal: true
 
@@ -336,13 +336,13 @@ volumes:
     name: clickhouse-data-test
   acme-ca:
     name: acme-ca-test
-  acme-ca-master:
-    name: acme-ca-master-test
-  acme-ca-slave:
-    name: acme-ca-slave-test
+  acme-ca-controller:
+    name: acme-ca-controller-test
+  acme-ca-agent:
+    name: acme-ca-agent-test
   step-ca-data:
     name: step-ca-data-test
-  web-master-data:
-    name: web-master-data-test
-  web-slave-data:
-    name: web-slave-data-test
+  web-controller-data:
+    name: web-controller-data-test
+  web-agent-data:
+    name: web-agent-data-test

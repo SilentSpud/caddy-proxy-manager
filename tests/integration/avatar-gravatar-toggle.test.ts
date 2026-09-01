@@ -1,6 +1,6 @@
 /**
  * Gravatar fallback has two controls: AVATAR_GRAVATAR and a Settings toggle. The env var wins;
- * otherwise the toggle decides, default on. It is a synced setting, so a slave inherits its master.
+ * otherwise the toggle decides, default on. It is a synced setting, so an agent inherits its controller.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -126,46 +126,46 @@ describe('resolveAvatar honours the decision', () => {
 });
 
 describe('instance sync', () => {
-  /** What a master pushes and a slave stores under the synced: prefix. */
+  /** What a controller pushes and an agent stores under the synced: prefix. */
   async function storeSynced(value: unknown) {
     const { setSetting } = await import('../../src/lib/settings');
     await setSetting('synced:avatars', value);
   }
 
-  it('lets a slave inherit the master value', async () => {
-    await load({ INSTANCE_MODE: 'slave' });
+  it('lets an agent inherit the controller value', async () => {
+    await load({ INSTANCE_MODE: 'agent' });
     await storeSynced({ gravatarEnabled: false });
 
-    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'slave' });
+    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'agent' });
     expect(await isGravatarEnabled()).toBe(false);
   });
 
-  it('lets a slave override the master value locally', async () => {
-    await load({ INSTANCE_MODE: 'slave' });
+  it('lets an agent override the controller value locally', async () => {
+    await load({ INSTANCE_MODE: 'agent' });
     await storeSynced({ gravatarEnabled: false });
 
-    const { saveAvatarSettings } = await load({ INSTANCE_MODE: 'slave' });
+    const { saveAvatarSettings } = await load({ INSTANCE_MODE: 'agent' });
     await saveAvatarSettings({ gravatarEnabled: true });
 
-    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'slave' });
+    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'agent' });
     expect(await isGravatarEnabled()).toBe(true);
   });
 
-  it('falls back to the master value when the slave clears its override', async () => {
-    await load({ INSTANCE_MODE: 'slave' });
+  it('falls back to the controller value when the agent clears its override', async () => {
+    await load({ INSTANCE_MODE: 'agent' });
     await storeSynced({ gravatarEnabled: false });
 
-    const { saveAvatarSettings } = await load({ INSTANCE_MODE: 'slave' });
+    const { saveAvatarSettings } = await load({ INSTANCE_MODE: 'agent' });
     await saveAvatarSettings({ gravatarEnabled: true });
 
     const { clearSetting } = await import('../../src/lib/settings');
     await clearSetting('avatars');
 
-    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'slave' });
+    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'agent' });
     expect(await isGravatarEnabled()).toBe(false);
   });
 
-  it('ignores a synced value when not a slave', async () => {
+  it('ignores a synced value when not an agent', async () => {
     await load();
     await storeSynced({ gravatarEnabled: false });
 
@@ -174,10 +174,10 @@ describe('instance sync', () => {
   });
 
   it('still lets AVATAR_GRAVATAR override an inherited value', async () => {
-    await load({ INSTANCE_MODE: 'slave' });
+    await load({ INSTANCE_MODE: 'agent' });
     await storeSynced({ gravatarEnabled: false });
 
-    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'slave', AVATAR_GRAVATAR: 'true' });
+    const { isGravatarEnabled } = await load({ INSTANCE_MODE: 'agent', AVATAR_GRAVATAR: 'true' });
     expect(await isGravatarEnabled()).toBe(true);
   });
 });

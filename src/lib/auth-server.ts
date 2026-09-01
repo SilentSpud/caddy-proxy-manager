@@ -1,6 +1,7 @@
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { genericOAuth, username } from "better-auth/plugins";
-import db, { sqlite } from "./db";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import db, { dialect } from "./db";
 import * as schema from "./db/schema";
 import { eq } from "drizzle-orm";
 import { config } from "./config";
@@ -111,17 +112,16 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
 /** Whether provider load succeeded at least once */
 let providersLoadedSuccessfully = false;
 
-function loadProvidersSync(): GenericOAuthConfig[] {
+async function loadProviders(): Promise<GenericOAuthConfig[]> {
   // If we have a successful cache, use it
   if (cachedProviders !== null && providersLoadedSuccessfully) return cachedProviders;
 
   // A cache left empty by a failed attempt is retried on every call until it succeeds
   try {
-    const rows = db
+    const rows = await db
       .select()
       .from(schema.oauthProviders)
-      .where(eq(schema.oauthProviders.enabled, true))
-      .all();
+      .where(eq(schema.oauthProviders.enabled, true));
     const providers: OAuthProvider[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -172,12 +172,25 @@ export function enforceSafeUserDefaults<T extends object>(
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above — the return type depends on a plugin list only known at runtime
-function createAuth(): any {
-  const oauthConfigs = loadProvidersSync();
+async function createAuth(): Promise<any> {
+  const oauthConfigs = await loadProviders();
   const trustedProviderIds = [...cachedTrustedProviderIds];
 
   return betterAuth({
-    database: sqlite,
+    // One adapter for both backends. Better Auth also accepts a raw bun:sqlite handle and drives
+    // it through its own Kysely adapter, which is how SQLite deployments' rows were originally
+    // written — but PostgreSQL has no equivalent handle, and keeping both meant two query builders
+    // reaching the same tables, where a bug could appear on one backend only and the unit tests
+    // (which stub betterAuth) would catch neither.
+    //
+    // `schema` is the whole module: the adapter resolves each model by the `modelName` configured
+    // below, and those names already match the exported table bindings. Rows written by the
+    // previous Kysely path stay readable — tests/integration/auth-adapter-compat.test.ts signs in
+    // as a user created that way.
+    database: drizzleAdapter(db, {
+      provider: dialect === "postgres" ? "pg" : "sqlite",
+      schema,
+    }),
     secret: config.sessionSecret,
     baseURL: config.baseUrl,
     basePath: "/api/auth",
@@ -319,16 +332,18 @@ function createAuth(): any {
   });
 }
 
-export function getAuth(): ReturnType<typeof betterAuth> {
+export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
   // Rebuild if providers failed to load initially and are now available
   if (cachedAuth && !providersLoadedSuccessfully) {
     cachedProviders = null;
     cachedAuth = null;
   }
   if (!cachedAuth) {
+    // Cache the promise, not the resolved instance: concurrent first requests would otherwise each
+    // build their own Better Auth instance and the last one to finish would win.
     cachedAuth = createAuth();
   }
-  return cachedAuth;
+  return await cachedAuth;
 }
 
 export function invalidateProviderCache(): void {

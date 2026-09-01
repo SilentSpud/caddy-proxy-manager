@@ -16,11 +16,11 @@ const LINKING_TOKEN_EXPIRY = 5 * 60; // 5 minutes in seconds
  * (issuer, accountId), so a mismatch means the link exists but never resolves.
  */
 async function issuerForProvider(providerId: string): Promise<string> {
-  const row = await db
+  const [row] = await db
     .select({ issuer: oauthProviders.issuer })
     .from(oauthProviders)
     .where(eq(oauthProviders.id, providerId))
-    .get();
+    .limit(1);
   return accountIssuerFor(providerId, row?.issuer);
 }
 

@@ -118,8 +118,8 @@ export async function getAnalyticsHosts(): Promise<AnalyticsHost[]> {
   const chHosts = await queryDistinctHosts();
   for (const h of chHosts) if (h) hostSet.add(h);
 
-  // All domains configured on proxy hosts (SQLite)
-  const proxyRows = db.select({ domains: proxyHosts.domains }).from(proxyHosts).all();
+  // All domains configured on proxy hosts
+  const proxyRows = await db.select({ domains: proxyHosts.domains }).from(proxyHosts);
   for (const r of proxyRows) {
     try {
       const domains = JSON.parse(r.domains) as string[];

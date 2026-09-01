@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     // Authorize the concrete proxy host captured by the one-time intent.
     const hasAccess = await checkHostAccess(userId, intent.audience.proxyHostId);
     if (!hasAccess) {
-      logAuditEvent({
+      await logAuditEvent({
         userId,
         action: "forward_auth_access_denied",
         entityType: "proxy_host",
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const { session: faSession } = await createForwardAuthSession(userId, intent.audience);
     const { rawCode } = await createExchangeCode(faSession.id, intent.redirectUri, intent.audience);
 
-    logAuditEvent({
+    await logAuditEvent({
       userId,
       action: "forward_auth_login",
       entityType: "user",

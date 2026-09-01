@@ -2897,7 +2897,7 @@ const spec = {
         properties: {
           id: { type: "integer" },
           name: { type: "string" },
-          baseUrl: { type: "string", example: "https://slave.example.com:3000" },
+          baseUrl: { type: "string", example: "https://agent.example.com:3000" },
           enabled: { type: "boolean" },
           hasToken: { type: "boolean" },
           lastSyncAt: { type: ["string", "null"], format: "date-time" },
@@ -2910,14 +2910,14 @@ const spec = {
       InstanceInput: {
         type: "object",
         properties: {
-          name: { type: "string", example: "Slave 1" },
-          baseUrl: { type: "string", example: "https://slave.example.com:3000" },
+          name: { type: "string", example: "Agent 1" },
+          baseUrl: { type: "string", example: "https://agent.example.com:3000" },
           apiToken: {
             type: "string",
             minLength: 32,
             maxLength: 512,
             description:
-              "Random sync token for the slave instance (generate with: openssl rand -hex 32)",
+              "Random sync token for the agent instance (generate with: openssl rand -hex 32)",
           },
           enabled: { type: "boolean" },
         },

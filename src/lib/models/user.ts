@@ -52,11 +52,11 @@ export async function findUserByProviderSubject(
   provider: string,
   subject: string,
 ): Promise<User | null> {
-  const configuredProvider = await db
+  const [configuredProvider] = await db
     .select({ issuer: oauthProviders.issuer })
     .from(oauthProviders)
     .where(eq(oauthProviders.id, provider))
-    .get();
+    .limit(1);
   const issuer = accountIssuerFor(provider, configuredProvider?.issuer);
   const account = await db
     .select()

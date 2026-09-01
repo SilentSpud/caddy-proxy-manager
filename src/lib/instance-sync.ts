@@ -1,4 +1,4 @@
-import db, { nowIso } from "./db";
+import db, { nowIso, runInTransaction } from "./db";
 import {
   accessListEntries,
   accessLists,
@@ -15,8 +15,14 @@ import { sanitizeStoredCertificateProviderOptions } from "./certificate-provider
 import { sanitizeInstanceSyncError } from "./instance-sync-error";
 import { applyL4Ports, getL4PortsDiff } from "./l4-ports";
 import { assertValidInstanceSyncToken, isValidInstanceSyncToken } from "./instance-sync-token";
+import {
+  CONTROLLER_TOKEN_KEY,
+  INSTANCE_MODE_KEY,
+  normalizeInstanceMode,
+  type InstanceMode,
+} from "./instance-mode";
 
-export type InstanceMode = "standalone" | "master" | "slave";
+export type { InstanceMode } from "./instance-mode";
 
 export type SyncSettings = {
   general: unknown | null;
@@ -33,7 +39,7 @@ export type SyncSettings = {
   error_pages: unknown | null;
   trusted_proxies: unknown | null;
   avatars: unknown | null;
-  /** Optional for backward compatibility with payloads from older masters. */
+  /** Optional for backward compatibility with payloads from older controllers. */
   default_response?: unknown | null;
 };
 
@@ -47,37 +53,35 @@ export type SyncPayload = {
     accessLists: Array<typeof accessLists.$inferSelect>;
     accessListEntries: Array<typeof accessListEntries.$inferSelect>;
     proxyHosts: Array<typeof proxyHosts.$inferSelect>;
-    /** Optional — not present in payloads from older master instances */
+    /** Optional — not present in payloads from older controller instances */
     l4ProxyHosts?: Array<typeof l4ProxyHosts.$inferSelect>;
   };
 };
 
-const INSTANCE_MODE_KEY = "instance_mode";
-const MASTER_TOKEN_KEY = "instance_master_token";
 const SYNCED_PREFIX = "synced:";
-const SLAVE_LAST_SYNC_AT_KEY = "instance_last_sync_at";
-const SLAVE_LAST_SYNC_ERROR_KEY = "instance_last_sync_error";
+const AGENT_LAST_SYNC_AT_KEY = "instance_last_sync_at";
+const AGENT_LAST_SYNC_ERROR_KEY = "instance_last_sync_error";
 
 /** Environment variable names for instance sync config; these beat database settings. */
 const ENV_INSTANCE_MODE = "INSTANCE_MODE";
 const ENV_INSTANCE_SYNC_TOKEN = "INSTANCE_SYNC_TOKEN";
-const ENV_INSTANCE_SLAVES = "INSTANCE_SLAVES";
+const ENV_INSTANCE_AGENTS = "INSTANCE_AGENTS";
 const ENV_SYNC_INTERVAL = "INSTANCE_SYNC_INTERVAL";
 const ENV_SYNC_ALLOW_HTTP = "INSTANCE_SYNC_ALLOW_HTTP";
 
-/** A slave instance configured via environment variable. */
-export type EnvSlaveInstance = {
+/** An agent instance configured via environment variable. */
+export type EnvAgentInstance = {
   name: string;
   url: string;
   token: string;
 };
 
 /**
- * Parses INSTANCE_SLAVES: a JSON array of {name, url, token} objects, e.g.
- * [{"name":"slave1","url":"http://slave:3000","token":"secret"}]
+ * Parses INSTANCE_AGENTS: a JSON array of {name, url, token} objects, e.g.
+ * [{"name":"agent1","url":"http://agent:3000","token":"secret"}]
  */
-export function getEnvSlaveInstances(): EnvSlaveInstance[] {
-  const envValue = process.env[ENV_INSTANCE_SLAVES];
+export function getEnvAgentInstances(): EnvAgentInstance[] {
+  const envValue = process.env[ENV_INSTANCE_AGENTS];
   if (!envValue || envValue.trim().length === 0) {
     return [];
   }
@@ -85,11 +89,11 @@ export function getEnvSlaveInstances(): EnvSlaveInstance[] {
   try {
     const parsed = JSON.parse(envValue);
     if (!Array.isArray(parsed)) {
-      console.warn("INSTANCE_SLAVES must be a JSON array");
+      console.warn("INSTANCE_AGENTS must be a JSON array");
       return [];
     }
 
-    return parsed.filter((item): item is EnvSlaveInstance => {
+    return parsed.filter((item): item is EnvAgentInstance => {
       if (typeof item !== "object" || item === null) return false;
       if (typeof item.name !== "string" || item.name.trim().length === 0) return false;
       if (typeof item.url !== "string" || item.url.trim().length === 0) return false;
@@ -99,7 +103,7 @@ export function getEnvSlaveInstances(): EnvSlaveInstance[] {
   } catch {
     // JSON.parse errors can include excerpts from the input, which contains
     // bearer tokens. Never attach the exception or environment value here.
-    console.warn("Failed to parse INSTANCE_SLAVES environment variable");
+    console.warn("Failed to parse INSTANCE_AGENTS environment variable");
     return [];
   }
 }
@@ -136,8 +140,7 @@ function isHttpUrl(url: string): boolean {
 
 /** Whether instance mode is configured via environment variable, which beats DB settings. */
 export function isInstanceModeFromEnv(): boolean {
-  const envMode = process.env[ENV_INSTANCE_MODE];
-  return envMode === "master" || envMode === "slave" || envMode === "standalone";
+  return normalizeInstanceMode(process.env[ENV_INSTANCE_MODE]) !== null;
 }
 
 /** Whether the sync token is configured via environment variable. */
@@ -148,17 +151,13 @@ export function isSyncTokenFromEnv(): boolean {
 
 export async function getInstanceMode(): Promise<InstanceMode> {
   // Environment variable takes precedence
-  const envMode = process.env[ENV_INSTANCE_MODE];
-  if (envMode === "master" || envMode === "slave" || envMode === "standalone") {
+  const envMode = normalizeInstanceMode(process.env[ENV_INSTANCE_MODE]);
+  if (envMode) {
     return envMode;
   }
 
   // Fall back to database setting
-  const stored = await getSetting<string>(INSTANCE_MODE_KEY);
-  if (stored === "master" || stored === "slave" || stored === "standalone") {
-    return stored;
-  }
-  return "standalone";
+  return normalizeInstanceMode(await getSetting<string>(INSTANCE_MODE_KEY)) ?? "standalone";
 }
 
 export async function setInstanceMode(mode: InstanceMode): Promise<void> {
@@ -172,7 +171,7 @@ export async function setInstanceMode(mode: InstanceMode): Promise<void> {
   await setSetting(INSTANCE_MODE_KEY, mode);
 }
 
-export async function getSlaveMasterToken(): Promise<string | null> {
+export async function getAgentControllerToken(): Promise<string | null> {
   // Environment variable takes precedence
   const envToken = process.env[ENV_INSTANCE_SYNC_TOKEN];
   if (typeof envToken === "string" && envToken.length > 0) {
@@ -181,16 +180,16 @@ export async function getSlaveMasterToken(): Promise<string | null> {
   }
 
   // Fall back to database setting
-  const stored = await getSetting<string>(MASTER_TOKEN_KEY);
+  const stored = await getSetting<string>(CONTROLLER_TOKEN_KEY);
   if (!stored) {
     return null;
   }
   if (!isEncryptedSecret(stored)) {
     assertValidInstanceSyncToken(stored, "Stored instance sync token");
     try {
-      await setSetting(MASTER_TOKEN_KEY, encryptSecret(stored));
+      await setSetting(CONTROLLER_TOKEN_KEY, encryptSecret(stored));
     } catch (error) {
-      console.warn("Failed to encrypt stored master token:", error);
+      console.warn("Failed to encrypt stored controller token:", error);
     }
     return stored;
   }
@@ -199,12 +198,12 @@ export async function getSlaveMasterToken(): Promise<string | null> {
     assertValidInstanceSyncToken(token, "Stored instance sync token");
     return token;
   } catch (error) {
-    console.error("Failed to decrypt stored master token:", error);
+    console.error("Failed to decrypt stored controller token:", error);
     return null;
   }
 }
 
-export async function setSlaveMasterToken(token: string | null): Promise<void> {
+export async function setAgentControllerToken(token: string | null): Promise<void> {
   // If token is set via environment, don't allow changing it
   if (isSyncTokenFromEnv()) {
     console.warn(
@@ -216,13 +215,13 @@ export async function setSlaveMasterToken(token: string | null): Promise<void> {
     assertValidInstanceSyncToken(token);
   }
   const next = token ? encryptSecret(token) : "";
-  await setSetting(MASTER_TOKEN_KEY, next);
+  await setSetting(CONTROLLER_TOKEN_KEY, next);
 }
 
-export async function getSlaveLastSync(): Promise<{ at: string | null; error: string | null }> {
+export async function getAgentLastSync(): Promise<{ at: string | null; error: string | null }> {
   const [at, error] = await Promise.all([
-    getSetting<string>(SLAVE_LAST_SYNC_AT_KEY),
-    getSetting<string>(SLAVE_LAST_SYNC_ERROR_KEY),
+    getSetting<string>(AGENT_LAST_SYNC_AT_KEY),
+    getSetting<string>(AGENT_LAST_SYNC_ERROR_KEY),
   ]);
 
   return {
@@ -231,10 +230,10 @@ export async function getSlaveLastSync(): Promise<{ at: string | null; error: st
   };
 }
 
-export async function setSlaveLastSync(result: { ok: boolean; error?: string | null }) {
-  await setSetting(SLAVE_LAST_SYNC_AT_KEY, nowIso());
+export async function setAgentLastSync(result: { ok: boolean; error?: string | null }) {
+  await setSetting(AGENT_LAST_SYNC_AT_KEY, nowIso());
   await setSetting(
-    SLAVE_LAST_SYNC_ERROR_KEY,
+    AGENT_LAST_SYNC_ERROR_KEY,
     result.ok ? "" : (sanitizeInstanceSyncError(result.error) ?? "Previous synchronization failed"),
   );
 }
@@ -297,7 +296,7 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
     ...row,
     providerOptions: sanitizeStoredCertificateProviderOptions(row.providerOptions),
     // Transport the operational value over the authenticated sync channel;
-    // the slave re-encrypts it with its own SESSION_SECRET before storage.
+    // the agent re-encrypts it with its own SESSION_SECRET before storage.
     privateKeyPem: row.privateKeyPem ? decryptSecret(row.privateKeyPem) : null,
     createdBy: null,
   }));
@@ -344,7 +343,7 @@ export async function syncInstances(): Promise<{
   skippedHttp: number;
 }> {
   const mode = await getInstanceMode();
-  if (mode !== "master") {
+  if (mode !== "controller") {
     return { total: 0, success: 0, failed: 0, skippedHttp: 0 };
   }
 
@@ -354,7 +353,7 @@ export async function syncInstances(): Promise<{
   });
 
   // Get environment-configured instances
-  const envTargets = getEnvSlaveInstances();
+  const envTargets = getEnvAgentInstances();
 
   if (dbTargets.length === 0 && envTargets.length === 0) {
     return { total: 0, success: 0, failed: 0, skippedHttp: 0 };
@@ -490,24 +489,29 @@ export async function applySyncPayload(payload: SyncPayload) {
   await setSyncedSetting("geoblock", payload.settings.geoblock ?? null);
   await setSyncedSetting("error_pages", payload.settings.error_pages ?? null);
   await setSyncedSetting("trusted_proxies", payload.settings.trusted_proxies ?? null);
-  // ?? null so a master running an older build, whose payload omits the key,
+  // ?? null so a controller running an older build, whose payload omits the key,
   // clears the synced value instead of leaving a stale one behind.
   await setSyncedSetting("avatars", payload.settings.avatars ?? null);
   await setSyncedSetting("default_response", payload.settings.default_response ?? null);
 
-  // bun:sqlite is synchronous, so the transaction callback must be too
-  db.transaction((tx) => {
-    tx.delete(l4ProxyHosts).run();
-    tx.delete(proxyHosts).run();
-    tx.delete(accessListEntries).run();
-    tx.delete(accessLists).run();
-    tx.delete(issuedClientCertificates).run();
-    tx.delete(certificates).run();
-    tx.delete(caCertificates).run();
+  // Statements are built and returned rather than executed here: bun:sqlite's transaction callback
+  // is synchronous and would commit before the first `await` resolved, while Bun.SQL's must be
+  // async. runInTransaction executes this list the right way for whichever backend is connected.
+  // Order is significant — every delete must precede the inserts that repopulate the table.
+  await runInTransaction((tx) => {
+    const statements = [
+      tx.delete(l4ProxyHosts),
+      tx.delete(proxyHosts),
+      tx.delete(accessListEntries),
+      tx.delete(accessLists),
+      tx.delete(issuedClientCertificates),
+      tx.delete(certificates),
+      tx.delete(caCertificates),
+    ];
 
     if (payload.data.certificates.length > 0) {
-      tx.insert(certificates)
-        .values(
+      statements.push(
+        tx.insert(certificates).values(
           payload.data.certificates.map((certificate) => ({
             ...certificate,
             providerOptions: sanitizeStoredCertificateProviderOptions(certificate.providerOptions),
@@ -515,27 +519,31 @@ export async function applySyncPayload(payload: SyncPayload) {
               ? encryptSecret(certificate.privateKeyPem)
               : null,
           })),
-        )
-        .run();
+        ),
+      );
     }
     if (payload.data.caCertificates && payload.data.caCertificates.length > 0) {
-      tx.insert(caCertificates).values(payload.data.caCertificates).run();
+      statements.push(tx.insert(caCertificates).values(payload.data.caCertificates));
     }
     if (payload.data.issuedClientCertificates && payload.data.issuedClientCertificates.length > 0) {
-      tx.insert(issuedClientCertificates).values(payload.data.issuedClientCertificates).run();
+      statements.push(
+        tx.insert(issuedClientCertificates).values(payload.data.issuedClientCertificates),
+      );
     }
     if (payload.data.accessLists.length > 0) {
-      tx.insert(accessLists).values(payload.data.accessLists).run();
+      statements.push(tx.insert(accessLists).values(payload.data.accessLists));
     }
     if (payload.data.accessListEntries.length > 0) {
-      tx.insert(accessListEntries).values(payload.data.accessListEntries).run();
+      statements.push(tx.insert(accessListEntries).values(payload.data.accessListEntries));
     }
     if (payload.data.proxyHosts.length > 0) {
-      tx.insert(proxyHosts).values(payload.data.proxyHosts).run();
+      statements.push(tx.insert(proxyHosts).values(payload.data.proxyHosts));
     }
     if (payload.data.l4ProxyHosts && payload.data.l4ProxyHosts.length > 0) {
-      tx.insert(l4ProxyHosts).values(payload.data.l4ProxyHosts).run();
+      statements.push(tx.insert(l4ProxyHosts).values(payload.data.l4ProxyHosts));
     }
+
+    return statements;
   });
 
   // When the synced L4 proxy hosts need different ports than currently applied, write the

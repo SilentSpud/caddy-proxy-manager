@@ -228,7 +228,7 @@ export function generateCaddyDockerfilePreview(specs: string[]): string {
   return `# Generated preview — the real build uses docker/caddy/Dockerfile with
 # CADDY_MODULES set to the value below.
 #
-# xcaddy build master \\
+# xcaddy build controller \\
 ${withLines || "#     (no plugins — plain Caddy)"}
 #     --output /usr/bin/caddy
 

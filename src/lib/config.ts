@@ -1,4 +1,5 @@
 import { assertValidInstanceSyncToken } from "./instance-sync-token";
+import { assertNoLegacyInstanceRoleEnv, normalizeInstanceMode } from "./instance-mode";
 import { passwordPolicyFailures } from "./password-policy";
 
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
@@ -238,6 +239,11 @@ export const config = {
 
 /** Validates config at production startup, throwing on insecure defaults. Safe during build. */
 export function validateProductionConfig() {
+  // Not gated on production: a stale INSTANCE_MODE=master/slave misroutes a development instance
+  // exactly as badly as a deployed one, and the whole point of rejecting it is that the failure
+  // would otherwise be silent.
+  assertNoLegacyInstanceRoleEnv();
+
   if (isRuntimeProduction) {
     // Access the config values to force validation; throws if defaults are used in production
     void config.sessionSecret;
@@ -246,12 +252,12 @@ export function validateProductionConfig() {
     void config.adminUsername;
     void config.adminPassword;
 
-    // An environment-configured slave cannot safely fall back to a short or
+    // An environment-configured agent cannot safely fall back to a short or
     // missing bearer credential. Validate this synchronously during startup.
-    if (process.env.INSTANCE_MODE === "slave") {
+    if (normalizeInstanceMode(process.env.INSTANCE_MODE) === "agent") {
       assertValidInstanceSyncToken(
         process.env.INSTANCE_SYNC_TOKEN,
-        "INSTANCE_SYNC_TOKEN for slave mode",
+        "INSTANCE_SYNC_TOKEN for agent mode",
       );
     }
   }

@@ -232,7 +232,7 @@ test.describe('Settings — Cmd-K palette', () => {
 // ─── Instance Sync section ───────────────────────────────────────────────────
 
 test.describe('Settings — Instance Sync', () => {
-  test('shows mode selector with Standalone/Master/Slave options', async ({ page }) => {
+  test('shows mode selector with Standalone/Controller/Agent options', async ({ page }) => {
     await page.goto('/settings');
     await expect(page.getByRole('heading', { name: 'Instance Sync' })).toBeVisible();
     // The mode select trigger should be present
@@ -244,8 +244,8 @@ test.describe('Settings — Instance Sync', () => {
     await page.goto('/settings');
     await page.getByRole('combobox', { name: 'Instance mode' }).click();
     await expect(page.getByRole('option', { name: 'Standalone' })).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Master' })).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Slave' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Controller' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Agent' })).toBeVisible();
   });
 });
 

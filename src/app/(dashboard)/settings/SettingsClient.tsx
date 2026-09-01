@@ -83,11 +83,11 @@ import {
   updateDnsSettingsAction,
   updateUpstreamDnsResolutionSettingsAction,
   updateInstanceModeAction,
-  updateSlaveMasterTokenAction,
-  createSlaveInstanceAction,
-  deleteSlaveInstanceAction,
-  toggleSlaveInstanceAction,
-  syncSlaveInstancesAction,
+  updateAgentControllerTokenAction,
+  createAgentInstanceAction,
+  deleteAgentInstanceAction,
+  toggleAgentInstanceAction,
+  syncAgentInstancesAction,
   updateGeoBlockSettingsAction,
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
@@ -118,7 +118,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
       {
         id: "sync",
         name: "Instance Sync",
-        desc: "Standalone, master, or slave coordination",
+        desc: "Standalone, controller, or agent coordination",
         icon: Network,
       },
       {
@@ -292,7 +292,7 @@ function FormCard({
   );
 }
 
-/** The "Override master settings" toggle a slave shows above each form. */
+/** The "Override controller settings" toggle an agent shows above each form. */
 function OverrideToggle({
   value,
   onChange,
@@ -304,7 +304,7 @@ function OverrideToggle({
 }) {
   return (
     <CheckboxInput
-      label="Override master settings"
+      label="Override controller settings"
       htmlName="overrideEnabled"
       value={value}
       onChange={onChange}
@@ -496,7 +496,7 @@ type Props = {
   caddyBuild: CaddyBuildSettings | null;
   baseUrl: string;
   instanceSync: {
-    mode: "standalone" | "master" | "slave";
+    mode: "standalone" | "controller" | "agent";
     modeFromEnv: boolean;
     tokenFromEnv: boolean;
     overrides: {
@@ -512,12 +512,12 @@ type Props = {
       avatars: boolean;
       defaultResponse: boolean;
     };
-    slave: {
+    agent: {
       hasToken: boolean;
       lastSyncAt: string | null;
       lastSyncError: string | null;
     } | null;
-    master: {
+    controller: {
       instances: Array<{
         id: number;
         name: string;
@@ -603,15 +603,15 @@ export default function SettingsClient({
     updateInstanceModeAction,
     null,
   );
-  const [slaveTokenState, slaveTokenFormAction] = useActionState(
-    updateSlaveMasterTokenAction,
+  const [agentTokenState, agentTokenFormAction] = useActionState(
+    updateAgentControllerTokenAction,
     null,
   );
-  const [slaveInstanceState, slaveInstanceFormAction] = useActionState(
-    createSlaveInstanceAction,
+  const [agentInstanceState, agentInstanceFormAction] = useActionState(
+    createAgentInstanceAction,
     null,
   );
-  const [syncState, syncFormAction] = useActionState(syncSlaveInstancesAction, null);
+  const [syncState, syncFormAction] = useActionState(syncAgentInstancesAction, null);
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
   const [errorPagesState, errorPagesFormAction] = useActionState(
     updateErrorPagesSettingsAction,
@@ -626,8 +626,8 @@ export default function SettingsClient({
     null,
   );
 
-  const isSlave = instanceSync.mode === "slave";
-  const isMaster = instanceSync.mode === "master";
+  const isAgent = instanceSync.mode === "agent";
+  const isController = instanceSync.mode === "controller";
   const [generalOverride, setGeneralOverride] = useState(instanceSync.overrides.general);
   const [acmeOverride, setAcmeOverride] = useState(instanceSync.overrides.acme);
   const [dnsProviderOverride, setDnsProviderOverride] = useState(
@@ -687,14 +687,14 @@ export default function SettingsClient({
                     instanceSync={instanceSync}
                     instanceModeState={instanceModeState}
                     instanceModeFormAction={instanceModeFormAction}
-                    slaveTokenState={slaveTokenState}
-                    slaveTokenFormAction={slaveTokenFormAction}
-                    slaveInstanceState={slaveInstanceState}
-                    slaveInstanceFormAction={slaveInstanceFormAction}
+                    agentTokenState={agentTokenState}
+                    agentTokenFormAction={agentTokenFormAction}
+                    agentInstanceState={agentInstanceState}
+                    agentInstanceFormAction={agentInstanceFormAction}
                     syncState={syncState}
                     syncFormAction={syncFormAction}
-                    isSlave={isSlave}
-                    isMaster={isMaster}
+                    isAgent={isAgent}
+                    isController={isController}
                   />
                 )}
                 {active === "general" && (
@@ -702,7 +702,7 @@ export default function SettingsClient({
                     general={general}
                     generalState={generalState}
                     generalFormAction={generalFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     generalOverride={generalOverride}
                     setGeneralOverride={setGeneralOverride}
                   />
@@ -712,7 +712,7 @@ export default function SettingsClient({
                     acme={acme}
                     acmeState={acmeState}
                     acmeFormAction={acmeFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     acmeOverride={acmeOverride}
                     setAcmeOverride={setAcmeOverride}
                   />
@@ -722,7 +722,7 @@ export default function SettingsClient({
                     defaultResponse={defaultResponse}
                     defaultResponseState={defaultResponseState}
                     defaultResponseFormAction={defaultResponseFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     defaultResponseOverride={defaultResponseOverride}
                     setDefaultResponseOverride={setDefaultResponseOverride}
                   />
@@ -736,7 +736,7 @@ export default function SettingsClient({
                     selectedProvider={selectedProvider}
                     setSelectedProvider={setSelectedProvider}
                     configuredProviders={configuredProviders}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     dnsProviderOverride={dnsProviderOverride}
                     setDnsProviderOverride={setDnsProviderOverride}
                   />
@@ -746,7 +746,7 @@ export default function SettingsClient({
                     dns={dns}
                     dnsState={dnsState}
                     dnsFormAction={dnsFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     dnsOverride={dnsOverride}
                     setDnsOverride={setDnsOverride}
                   />
@@ -756,7 +756,7 @@ export default function SettingsClient({
                     upstreamDnsResolution={upstreamDnsResolution}
                     upstreamDnsResolutionState={upstreamDnsResolutionState}
                     upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     upstreamDnsResolutionOverride={upstreamDnsResolutionOverride}
                     setUpstreamDnsResolutionOverride={setUpstreamDnsResolutionOverride}
                   />
@@ -766,7 +766,7 @@ export default function SettingsClient({
                     trustedProxies={trustedProxies}
                     trustedProxiesState={trustedProxiesState}
                     trustedProxiesFormAction={trustedProxiesFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     trustedProxiesOverride={trustedProxiesOverride}
                     setTrustedProxiesOverride={setTrustedProxiesOverride}
                   />
@@ -790,7 +790,7 @@ export default function SettingsClient({
                     authentik={authentik}
                     authentikState={authentikState}
                     authentikFormAction={authentikFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     authentikOverride={authentikOverride}
                     setAuthentikOverride={setAuthentikOverride}
                   />
@@ -814,7 +814,7 @@ export default function SettingsClient({
                     avatars={avatars}
                     avatarsState={avatarsState}
                     avatarsFormAction={avatarsFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     avatarsOverride={avatarsOverride}
                     setAvatarsOverride={setAvatarsOverride}
                   />
@@ -831,7 +831,7 @@ export default function SettingsClient({
                     metrics={metrics}
                     metricsState={metricsState}
                     metricsFormAction={metricsFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     metricsOverride={metricsOverride}
                     setMetricsOverride={setMetricsOverride}
                   />
@@ -841,7 +841,7 @@ export default function SettingsClient({
                     logging={logging}
                     loggingState={loggingState}
                     loggingFormAction={loggingFormAction}
-                    isSlave={isSlave}
+                    isAgent={isAgent}
                     loggingOverride={loggingOverride}
                     setLoggingOverride={setLoggingOverride}
                   />
@@ -861,37 +861,37 @@ export default function SettingsClient({
 
 const MODE_OPTIONS = [
   { value: "standalone", label: "Standalone" },
-  { value: "master", label: "Master" },
-  { value: "slave", label: "Slave" },
+  { value: "controller", label: "Controller" },
+  { value: "agent", label: "Agent" },
 ];
 
 function SyncSection({
   instanceSync,
   instanceModeState,
   instanceModeFormAction,
-  slaveTokenState,
-  slaveTokenFormAction,
-  slaveInstanceState,
-  slaveInstanceFormAction,
+  agentTokenState,
+  agentTokenFormAction,
+  agentInstanceState,
+  agentInstanceFormAction,
   syncState,
   syncFormAction,
-  isSlave,
-  isMaster,
+  isAgent,
+  isController,
 }: {
   instanceSync: Props["instanceSync"];
   instanceModeState: { success: boolean; message?: string } | null;
   instanceModeFormAction: (payload: FormData) => void;
-  slaveTokenState: { success: boolean; message?: string } | null;
-  slaveTokenFormAction: (payload: FormData) => void;
-  slaveInstanceState: { success: boolean; message?: string } | null;
-  slaveInstanceFormAction: (payload: FormData) => void;
+  agentTokenState: { success: boolean; message?: string } | null;
+  agentTokenFormAction: (payload: FormData) => void;
+  agentInstanceState: { success: boolean; message?: string } | null;
+  agentInstanceFormAction: (payload: FormData) => void;
   syncState: { success: boolean; message?: string } | null;
   syncFormAction: (payload: FormData) => void;
-  isSlave: boolean;
-  isMaster: boolean;
+  isAgent: boolean;
+  isController: boolean;
 }) {
   const [mode, setMode] = useState<string>(instanceSync.mode);
-  const [masterToken, setMasterToken] = useState("");
+  const [controllerToken, setControllerToken] = useState("");
   const [clearToken, setClearToken] = useState(false);
   const [instName, setInstName] = useState("");
   const [instBaseUrl, setInstBaseUrl] = useState("");
@@ -915,7 +915,7 @@ function SyncSection({
             )}
             <Selector
               label="Instance mode"
-              description="Standalone runs alone. Master pushes config to slaves. Slave pulls from a master."
+              description="Standalone runs alone. Controller pushes config to agents. Agent pulls from a controller."
               htmlName="mode"
               options={MODE_OPTIONS}
               value={mode}
@@ -927,35 +927,35 @@ function SyncSection({
         </form>
       </FormCard>
 
-      {isSlave && (
-        <FormCard title="Master Connection">
+      {isAgent && (
+        <FormCard title="Controller Connection">
           <VStack gap={3}>
-            <form action={slaveTokenFormAction}>
+            <form action={agentTokenFormAction}>
               <VStack gap={3}>
                 {instanceSync.tokenFromEnv && (
                   <InfoAlert title="Sync token is set by the INSTANCE_SYNC_TOKEN environment variable">
                     It cannot be changed at runtime.
                   </InfoAlert>
                 )}
-                {slaveTokenState?.message && (
+                {agentTokenState?.message && (
                   <StatusAlert
-                    message={slaveTokenState.message}
-                    success={slaveTokenState.success}
+                    message={agentTokenState.message}
+                    success={agentTokenState.success}
                   />
                 )}
-                {instanceSync.slave?.hasToken && !instanceSync.tokenFromEnv && (
-                  <InfoAlert title="A master sync token is configured">
+                {instanceSync.agent?.hasToken && !instanceSync.tokenFromEnv && (
+                  <InfoAlert title="A controller sync token is configured">
                     Leave the token field blank to keep it, or select &ldquo;Remove existing
                     token&rdquo; to delete it.
                   </InfoAlert>
                 )}
                 <TextInput
                   {...AUTOFILL_NEW_PASSWORD}
-                  label="Master sync token"
+                  label="Controller sync token"
                   type="password"
-                  htmlName="masterToken"
-                  value={masterToken}
-                  onChange={setMasterToken}
+                  htmlName="controllerToken"
+                  value={controllerToken}
+                  onChange={setControllerToken}
                   placeholder="Enter new token"
                   isDisabled={instanceSync.tokenFromEnv}
                 />
@@ -964,26 +964,26 @@ function SyncSection({
                   htmlName="clearToken"
                   value={clearToken}
                   onChange={setClearToken}
-                  isDisabled={!instanceSync.slave?.hasToken || instanceSync.tokenFromEnv}
+                  isDisabled={!instanceSync.agent?.hasToken || instanceSync.tokenFromEnv}
                 />
-                <SaveButton label="Save master token" isDisabled={instanceSync.tokenFromEnv} />
+                <SaveButton label="Save controller token" isDisabled={instanceSync.tokenFromEnv} />
               </VStack>
             </form>
-            {instanceSync.slave?.lastSyncError ? (
+            {instanceSync.agent?.lastSyncError ? (
               <WarnAlert
                 title={
-                  instanceSync.slave?.lastSyncAt
-                    ? `Last sync: ${instanceSync.slave.lastSyncAt}`
+                  instanceSync.agent?.lastSyncAt
+                    ? `Last sync: ${instanceSync.agent.lastSyncAt}`
                     : "No sync payload has been received yet."
                 }
               >
-                {instanceSync.slave?.lastSyncError}
+                {instanceSync.agent?.lastSyncError}
               </WarnAlert>
             ) : (
               <InfoAlert
                 title={
-                  instanceSync.slave?.lastSyncAt
-                    ? `Last sync: ${instanceSync.slave.lastSyncAt}`
+                  instanceSync.agent?.lastSyncAt
+                    ? `Last sync: ${instanceSync.agent.lastSyncAt}`
                     : "No sync payload has been received yet."
                 }
               />
@@ -992,17 +992,17 @@ function SyncSection({
         </FormCard>
       )}
 
-      {isMaster && (
+      {isController && (
         <FormCard
-          title={`Slave Instances (${(instanceSync.master?.instances.length ?? 0) + (instanceSync.master?.envInstances.length ?? 0)})`}
+          title={`Agent Instances (${(instanceSync.controller?.instances.length ?? 0) + (instanceSync.controller?.envInstances.length ?? 0)})`}
         >
           <VStack gap={3}>
-            <form action={slaveInstanceFormAction}>
+            <form action={agentInstanceFormAction}>
               <VStack gap={3}>
-                {slaveInstanceState?.message && (
+                {agentInstanceState?.message && (
                   <StatusAlert
-                    message={slaveInstanceState.message}
-                    success={slaveInstanceState.success}
+                    message={agentInstanceState.message}
+                    success={agentInstanceState.success}
                   />
                 )}
                 <Grid columns={{ minWidth: 220, max: 2 }} gap={3}>
@@ -1018,19 +1018,19 @@ function SyncSection({
                     htmlName="baseUrl"
                     value={instBaseUrl}
                     onChange={setInstBaseUrl}
-                    placeholder="https://slave-1.example.com"
+                    placeholder="https://agent-1.example.com"
                   />
                 </Grid>
                 <TextInput
                   {...AUTOFILL_NEW_PASSWORD}
-                  label="Slave API token"
+                  label="Agent API token"
                   type="password"
                   htmlName="apiToken"
                   value={instApiToken}
                   onChange={setInstApiToken}
                 />
                 <HStack justify="end">
-                  <Button type="submit" size="sm" label="Add slave instance" />
+                  <Button type="submit" size="sm" label="Add agent instance" />
                 </HStack>
               </VStack>
             </form>
@@ -1048,40 +1048,41 @@ function SyncSection({
               </VStack>
             </form>
 
-            {instanceSync.master?.instances.length === 0 &&
-              instanceSync.master?.envInstances.length === 0 && (
-                <InfoAlert title="No slave instances configured yet." />
+            {instanceSync.controller?.instances.length === 0 &&
+              instanceSync.controller?.envInstances.length === 0 && (
+                <InfoAlert title="No agent instances configured yet." />
               )}
 
-            {instanceSync.master?.envInstances && instanceSync.master.envInstances.length > 0 && (
-              <VStack gap={2}>
-                <Text type="label" size="xsm" weight="semibold" color="secondary">
-                  Environment-configured (INSTANCE_SLAVES)
-                </Text>
-                {instanceSync.master.envInstances.map((instance) => (
-                  <Card key={instance.url} variant="muted" padding={3}>
-                    <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
-                      <VStack gap={0}>
-                        <Text type="body" size="sm" weight="semibold">
-                          {instance.name}
-                        </Text>
-                        <Text type="code" size="xsm" color="secondary">
-                          {instance.url}
-                        </Text>
-                      </VStack>
-                      <StatusChip status="active" label="ENV" />
-                    </HStack>
-                  </Card>
-                ))}
-              </VStack>
-            )}
+            {instanceSync.controller?.envInstances &&
+              instanceSync.controller.envInstances.length > 0 && (
+                <VStack gap={2}>
+                  <Text type="label" size="xsm" weight="semibold" color="secondary">
+                    Environment-configured (INSTANCE_AGENTS)
+                  </Text>
+                  {instanceSync.controller.envInstances.map((instance) => (
+                    <Card key={instance.url} variant="muted" padding={3}>
+                      <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
+                        <VStack gap={0}>
+                          <Text type="body" size="sm" weight="semibold">
+                            {instance.name}
+                          </Text>
+                          <Text type="code" size="xsm" color="secondary">
+                            {instance.url}
+                          </Text>
+                        </VStack>
+                        <StatusChip status="active" label="ENV" />
+                      </HStack>
+                    </Card>
+                  ))}
+                </VStack>
+              )}
 
-            {instanceSync.master?.instances && instanceSync.master.instances.length > 0 && (
+            {instanceSync.controller?.instances && instanceSync.controller.instances.length > 0 && (
               <VStack gap={2}>
                 <Text type="label" size="xsm" weight="semibold" color="secondary">
                   UI-configured instances
                 </Text>
-                {instanceSync.master.instances.map((instance) => (
+                {instanceSync.controller.instances.map((instance) => (
                   <Card key={instance.id} padding={3}>
                     <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
                       <VStack gap={0}>
@@ -1103,7 +1104,7 @@ function SyncSection({
                         )}
                       </VStack>
                       <HStack gap={2}>
-                        <form action={toggleSlaveInstanceAction}>
+                        <form action={toggleAgentInstanceAction}>
                           <input type="hidden" name="instanceId" value={instance.id} />
                           <input
                             type="hidden"
@@ -1117,7 +1118,7 @@ function SyncSection({
                             label={instance.enabled ? "Disable" : "Enable"}
                           />
                         </form>
-                        <form action={deleteSlaveInstanceAction}>
+                        <form action={deleteAgentInstanceAction}>
                           <input type="hidden" name="instanceId" value={instance.id} />
                           <Button type="submit" variant="destructive" size="sm" label="Remove" />
                         </form>
@@ -1140,14 +1141,14 @@ function GeneralSection({
   general,
   generalState,
   generalFormAction,
-  isSlave,
+  isAgent,
   generalOverride,
   setGeneralOverride,
 }: {
   general: GeneralSettings | null;
   generalState: { success: boolean; message?: string } | null;
   generalFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   generalOverride: boolean;
   setGeneralOverride: (v: boolean) => void;
 }) {
@@ -1155,7 +1156,7 @@ function GeneralSection({
     general?.primaryDomain ?? "caddyproxymanager.com",
   );
   const [acmeEmail, setAcmeEmail] = useState(general?.acmeEmail ?? "");
-  const disabled = isSlave && !generalOverride;
+  const disabled = isAgent && !generalOverride;
 
   return (
     <FormCard title="Defaults">
@@ -1164,7 +1165,7 @@ function GeneralSection({
           {generalState?.message && (
             <StatusAlert message={generalState.message} success={generalState.success} />
           )}
-          {isSlave && <OverrideToggle value={generalOverride} onChange={setGeneralOverride} />}
+          {isAgent && <OverrideToggle value={generalOverride} onChange={setGeneralOverride} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label="Primary domain"
@@ -1212,14 +1213,14 @@ function DefaultResponseSection({
   defaultResponse,
   defaultResponseState,
   defaultResponseFormAction,
-  isSlave,
+  isAgent,
   defaultResponseOverride,
   setDefaultResponseOverride,
 }: {
   defaultResponse: DefaultResponseSettings | null;
   defaultResponseState: { success: boolean; message?: string } | null;
   defaultResponseFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   defaultResponseOverride: boolean;
   setDefaultResponseOverride: (v: boolean) => void;
 }) {
@@ -1248,7 +1249,7 @@ function DefaultResponseSection({
       ? storedHeaders
       : "Content-Type: text/plain; charset=utf-8",
   );
-  const disabled = isSlave && !defaultResponseOverride;
+  const disabled = isAgent && !defaultResponseOverride;
 
   return (
     <VStack gap={4}>
@@ -1261,7 +1262,7 @@ function DefaultResponseSection({
                 success={defaultResponseState.success}
               />
             )}
-            {isSlave && (
+            {isAgent && (
               <OverrideToggle
                 value={defaultResponseOverride}
                 onChange={setDefaultResponseOverride}
@@ -1367,20 +1368,20 @@ function AcmeSection({
   acme,
   acmeState,
   acmeFormAction,
-  isSlave,
+  isAgent,
   acmeOverride,
   setAcmeOverride,
 }: {
   acme: AcmeSettings | null;
   acmeState: { success: boolean; message?: string } | null;
   acmeFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   acmeOverride: boolean;
   setAcmeOverride: (v: boolean) => void;
 }) {
   const [caUrl, setCaUrl] = useState(acme?.caUrl ?? "");
   const [caRootPem, setCaRootPem] = useState(acme?.caRootPem ?? "");
-  const disabled = isSlave && !acmeOverride;
+  const disabled = isAgent && !acmeOverride;
 
   return (
     <FormCard title="Custom ACME Directory">
@@ -1389,7 +1390,7 @@ function AcmeSection({
           {acmeState?.message && (
             <StatusAlert message={acmeState.message} success={acmeState.success} />
           )}
-          {isSlave && <OverrideToggle value={acmeOverride} onChange={setAcmeOverride} />}
+          {isAgent && <OverrideToggle value={acmeOverride} onChange={setAcmeOverride} />}
           <TextInput
             label="ACME directory URL"
             isOptional
@@ -1466,7 +1467,7 @@ function DnsProvidersSection({
   selectedProvider,
   setSelectedProvider,
   configuredProviders,
-  isSlave,
+  isAgent,
   dnsProviderOverride,
   setDnsProviderOverride,
 }: {
@@ -1477,7 +1478,7 @@ function DnsProvidersSection({
   selectedProvider: string;
   setSelectedProvider: (v: string) => void;
   configuredProviders: string[];
-  isSlave: boolean;
+  isAgent: boolean;
   dnsProviderOverride: boolean;
   setDnsProviderOverride: (v: boolean) => void;
 }) {
@@ -1492,7 +1493,7 @@ function DnsProvidersSection({
   const isUpdate = configuredProviders.includes(selectedProvider);
   const hasProvider = Boolean(selectedProvider) && selectedProvider !== "none";
   const selectedUnavailable = hasProvider && !isProviderAvailable(selectedProvider);
-  const disabled = isSlave && !dnsProviderOverride;
+  const disabled = isAgent && !dnsProviderOverride;
 
   const unavailableCount = dnsProviderDefinitions.filter(
     (p) => !isProviderAvailable(p.name),
@@ -1517,11 +1518,11 @@ function DnsProvidersSection({
       {dnsProviderState?.message && (
         <StatusAlert message={dnsProviderState.message} success={dnsProviderState.success} />
       )}
-      {isSlave && (
+      {isAgent && (
         /* Lives outside the form it belongs to, so its value is carried by the
            hidden field inside dnsp-add-form rather than by the control itself. */
         <CheckboxInput
-          label="Override master settings"
+          label="Override controller settings"
           value={dnsProviderOverride}
           onChange={setDnsProviderOverride}
         />
@@ -1547,7 +1548,7 @@ function DnsProvidersSection({
                         <form action={dnsProviderFormAction}>
                           <input type="hidden" name="action" value="set-default" />
                           <input type="hidden" name="provider" value={name} />
-                          {isSlave && (
+                          {isAgent && (
                             <input
                               type="hidden"
                               name="overrideEnabled"
@@ -1560,7 +1561,7 @@ function DnsProvidersSection({
                       <form action={dnsProviderFormAction}>
                         <input type="hidden" name="action" value="remove" />
                         <input type="hidden" name="provider" value={name} />
-                        {isSlave && (
+                        {isAgent && (
                           <input
                             type="hidden"
                             name="overrideEnabled"
@@ -1578,7 +1579,7 @@ function DnsProvidersSection({
               <form action={dnsProviderFormAction}>
                 <input type="hidden" name="action" value="set-default" />
                 <input type="hidden" name="provider" value="none" />
-                {isSlave && (
+                {isAgent && (
                   <input
                     type="hidden"
                     name="overrideEnabled"
@@ -1601,7 +1602,7 @@ function DnsProvidersSection({
         title={configuredProviders.length > 0 ? "Add or update provider" : "Add a provider"}
         footer={
           <>
-            {isSlave && (
+            {isAgent && (
               <input
                 type="hidden"
                 name="overrideEnabled"
@@ -1664,7 +1665,7 @@ function DnsProvidersSection({
                 )}
               </>
             )}
-            {isSlave && (
+            {isAgent && (
               <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />
             )}
           </VStack>
@@ -1680,14 +1681,14 @@ function DnsResolversSection({
   dns,
   dnsState,
   dnsFormAction,
-  isSlave,
+  isAgent,
   dnsOverride,
   setDnsOverride,
 }: {
   dns: DnsSettings | null;
   dnsState: { success: boolean; message?: string } | null;
   dnsFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   dnsOverride: boolean;
   setDnsOverride: (v: boolean) => void;
 }) {
@@ -1695,7 +1696,7 @@ function DnsResolversSection({
   const [resolvers, setResolvers] = useState(dns?.resolvers?.join("\n") ?? "");
   const [fallbacks, setFallbacks] = useState(dns?.fallbacks?.join("\n") ?? "");
   const [timeout, setTimeoutValue] = useState(dns?.timeout ?? "");
-  const disabled = isSlave && !dnsOverride;
+  const disabled = isAgent && !dnsOverride;
 
   return (
     <>
@@ -1705,7 +1706,7 @@ function DnsResolversSection({
             {dnsState?.message && (
               <StatusAlert message={dnsState.message} success={dnsState.success} />
             )}
-            {isSlave && <OverrideToggle value={dnsOverride} onChange={setDnsOverride} />}
+            {isAgent && <OverrideToggle value={dnsOverride} onChange={setDnsOverride} />}
             <CheckboxInput
               label="Enable custom DNS resolvers"
               htmlName="enabled"
@@ -1768,20 +1769,20 @@ function UpstreamDnsSection({
   upstreamDnsResolution,
   upstreamDnsResolutionState,
   upstreamDnsResolutionFormAction,
-  isSlave,
+  isAgent,
   upstreamDnsResolutionOverride,
   setUpstreamDnsResolutionOverride,
 }: {
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   upstreamDnsResolutionState: { success: boolean; message?: string } | null;
   upstreamDnsResolutionFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   upstreamDnsResolutionOverride: boolean;
   setUpstreamDnsResolutionOverride: (v: boolean) => void;
 }) {
   const [enabled, setEnabled] = useState(upstreamDnsResolution?.enabled ?? false);
   const [family, setFamily] = useState<string>(upstreamDnsResolution?.family ?? "both");
-  const disabled = isSlave && !upstreamDnsResolutionOverride;
+  const disabled = isAgent && !upstreamDnsResolutionOverride;
 
   return (
     <>
@@ -1794,7 +1795,7 @@ function UpstreamDnsSection({
                 success={upstreamDnsResolutionState.success}
               />
             )}
-            {isSlave && (
+            {isAgent && (
               <OverrideToggle
                 value={upstreamDnsResolutionOverride}
                 onChange={setUpstreamDnsResolutionOverride}
@@ -1837,14 +1838,14 @@ function TrustedProxiesSection({
   trustedProxies,
   trustedProxiesState,
   trustedProxiesFormAction,
-  isSlave,
+  isAgent,
   trustedProxiesOverride,
   setTrustedProxiesOverride,
 }: {
   trustedProxies: TrustedProxiesSettings | null;
   trustedProxiesState: { success: boolean; message?: string } | null;
   trustedProxiesFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   trustedProxiesOverride: boolean;
   setTrustedProxiesOverride: (v: boolean) => void;
 }) {
@@ -1854,7 +1855,7 @@ function TrustedProxiesSection({
   );
   const [strict, setStrict] = useState(trustedProxies?.strict ?? false);
   const [defaultGeoblock, setDefaultGeoblock] = useState(trustedProxies?.default_geoblock ?? false);
-  const disabled = isSlave && !trustedProxiesOverride;
+  const disabled = isAgent && !trustedProxiesOverride;
 
   return (
     <>
@@ -1867,7 +1868,7 @@ function TrustedProxiesSection({
                 success={trustedProxiesState.success}
               />
             )}
-            {isSlave && (
+            {isAgent && (
               <OverrideToggle value={trustedProxiesOverride} onChange={setTrustedProxiesOverride} />
             )}
             <TextArea
@@ -1985,21 +1986,21 @@ function AuthentikSection({
   authentik,
   authentikState,
   authentikFormAction,
-  isSlave,
+  isAgent,
   authentikOverride,
   setAuthentikOverride,
 }: {
   authentik: AuthentikSettings | null;
   authentikState: { success: boolean; message?: string } | null;
   authentikFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   authentikOverride: boolean;
   setAuthentikOverride: (v: boolean) => void;
 }) {
   const [outpostDomain, setOutpostDomain] = useState(authentik?.outpostDomain ?? "");
   const [outpostUpstream, setOutpostUpstream] = useState(authentik?.outpostUpstream ?? "");
   const [authEndpoint, setAuthEndpoint] = useState(authentik?.authEndpoint ?? "");
-  const disabled = isSlave && !authentikOverride;
+  const disabled = isAgent && !authentikOverride;
 
   return (
     <FormCard>
@@ -2008,7 +2009,7 @@ function AuthentikSection({
           {authentikState?.message && (
             <StatusAlert message={authentikState.message} success={authentikState.success} />
           )}
-          {isSlave && <OverrideToggle value={authentikOverride} onChange={setAuthentikOverride} />}
+          {isAgent && <OverrideToggle value={authentikOverride} onChange={setAuthentikOverride} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label="Outpost domain"
@@ -2070,7 +2071,7 @@ function OAuthSection({
 // ─── Section: Password Policy ────────────────────────────────────────────────
 
 /**
- * Not offered as a slave override: forcing a password reset is a local security decision, and
+ * Not offered as an agent override: forcing a password reset is a local security decision, and
  * inheriting it would let one instance lock another's users out.
  */
 function PasswordPolicySection({
@@ -2120,14 +2121,14 @@ function AvatarsSection({
   avatars,
   avatarsState,
   avatarsFormAction,
-  isSlave,
+  isAgent,
   avatarsOverride,
   setAvatarsOverride,
 }: {
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   avatarsState: { success: boolean; message?: string } | null;
   avatarsFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   avatarsOverride: boolean;
   setAvatarsOverride: (v: boolean) => void;
 }) {
@@ -2145,7 +2146,7 @@ function AvatarsSection({
           {avatarsState?.message && (
             <StatusAlert message={avatarsState.message} success={avatarsState.success} />
           )}
-          {isSlave && !avatars.fromEnv && (
+          {isAgent && !avatars.fromEnv && (
             <OverrideToggle value={avatarsOverride} onChange={setAvatarsOverride} />
           )}
           <CheckboxInput
@@ -2154,7 +2155,7 @@ function AvatarsSection({
             htmlName="gravatarEnabled"
             value={gravatarEnabled}
             onChange={setGravatarEnabled}
-            isDisabled={avatars.fromEnv || (isSlave && !avatarsOverride)}
+            isDisabled={avatars.fromEnv || (isAgent && !avatarsOverride)}
           />
           <SaveButton label="Save avatar settings" isDisabled={avatars.fromEnv} />
         </VStack>
@@ -2166,8 +2167,8 @@ function AvatarsSection({
 // ─── Section: Caddy Build ────────────────────────────────────────────────────
 
 /**
- * Not offered as a slave override: the module list describes a binary built on this host, so
- * inheriting a master's would tell a slave its Caddy has plugins it never compiled.
+ * Not offered as an agent override: the module list describes a binary built on this host, so
+ * inheriting a controller's would tell an agent its Caddy has plugins it never compiled.
  */
 function CaddyBuildSection({
   caddyBuild,
@@ -2203,20 +2204,20 @@ function MetricsSection({
   metrics,
   metricsState,
   metricsFormAction,
-  isSlave,
+  isAgent,
   metricsOverride,
   setMetricsOverride,
 }: {
   metrics: MetricsSettings | null;
   metricsState: { success: boolean; message?: string } | null;
   metricsFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   metricsOverride: boolean;
   setMetricsOverride: (v: boolean) => void;
 }) {
   const [enabled, setEnabled] = useState(metrics?.enabled ?? false);
   const [port, setPort] = useState(metrics?.port ?? 9090);
-  const disabled = isSlave && !metricsOverride;
+  const disabled = isAgent && !metricsOverride;
 
   return (
     <>
@@ -2226,7 +2227,7 @@ function MetricsSection({
             {metricsState?.message && (
               <StatusAlert message={metricsState.message} success={metricsState.success} />
             )}
-            {isSlave && <OverrideToggle value={metricsOverride} onChange={setMetricsOverride} />}
+            {isAgent && <OverrideToggle value={metricsOverride} onChange={setMetricsOverride} />}
             <CheckboxInput
               label="Enable metrics endpoint"
               description="Prometheus-compatible scrape endpoint, exposed on a dedicated port."
@@ -2269,20 +2270,20 @@ function LoggingSection({
   logging,
   loggingState,
   loggingFormAction,
-  isSlave,
+  isAgent,
   loggingOverride,
   setLoggingOverride,
 }: {
   logging: LoggingSettings | null;
   loggingState: { success: boolean; message?: string } | null;
   loggingFormAction: (payload: FormData) => void;
-  isSlave: boolean;
+  isAgent: boolean;
   loggingOverride: boolean;
   setLoggingOverride: (v: boolean) => void;
 }) {
   const [enabled, setEnabled] = useState(logging?.enabled ?? false);
   const [format, setFormat] = useState<string>(logging?.format ?? "json");
-  const disabled = isSlave && !loggingOverride;
+  const disabled = isAgent && !loggingOverride;
 
   return (
     <>
@@ -2292,7 +2293,7 @@ function LoggingSection({
             {loggingState?.message && (
               <StatusAlert message={loggingState.message} success={loggingState.success} />
             )}
-            {isSlave && <OverrideToggle value={loggingOverride} onChange={setLoggingOverride} />}
+            {isAgent && <OverrideToggle value={loggingOverride} onChange={setLoggingOverride} />}
             <CheckboxInput
               label="Enable access logging"
               htmlName="enabled"

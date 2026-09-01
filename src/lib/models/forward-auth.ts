@@ -450,7 +450,7 @@ export async function setForwardAuthAccess(
     await db.insert(forwardAuthAccess).values(values);
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "forward_auth_access",

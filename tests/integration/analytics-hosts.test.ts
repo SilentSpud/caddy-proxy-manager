@@ -8,9 +8,11 @@ const { allMock, queryDistinctHostsMock } = vi.hoisted(() => ({
   allMock: vi.fn(),
   queryDistinctHostsMock: vi.fn(),
 }));
+// `.from()` resolves rather than exposing `.all()`: the query is awaited now that the data layer
+// has to work against PostgreSQL too. allMock stays the control point for each test's rows.
 vi.mock('@/src/lib/db', () => ({
   default: {
-    select: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ all: allMock }) }),
+    select: vi.fn().mockReturnValue({ from: vi.fn(() => Promise.resolve(allMock())) }),
   },
 }));
 vi.mock('@/src/lib/clickhouse/client', () => ({

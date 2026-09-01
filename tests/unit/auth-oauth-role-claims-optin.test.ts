@@ -52,7 +52,7 @@ import { getAuth } from '../../src/lib/auth-server';
 
 describe('OAuth role-from-claims opt-in (AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true)', () => {
   it('leaves IdP-provided role/status intact instead of forcing defaults', async () => {
-    const auth = getAuth() as any;
+    const auth = (await getAuth()) as any;
     const hook = auth.options.databaseHooks.user.create.before;
 
     const result = await hook({

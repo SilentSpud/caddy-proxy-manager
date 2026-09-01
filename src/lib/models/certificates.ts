@@ -101,7 +101,7 @@ export async function createCertificate(input: CertificateInput, actorUserId: nu
     throw new Error("Failed to create certificate");
   }
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "certificate",
@@ -150,7 +150,7 @@ export async function updateCertificate(
     })
     .where(eq(certificates.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "certificate",
@@ -168,7 +168,7 @@ export async function deleteCertificate(id: number, actorUserId: number) {
   }
 
   await db.delete(certificates).where(eq(certificates.id, id));
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "certificate",

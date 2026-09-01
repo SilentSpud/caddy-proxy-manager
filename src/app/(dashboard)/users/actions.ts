@@ -47,7 +47,7 @@ export async function createUserAction(formData: FormData) {
     passwordHash,
   });
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorId,
     action: "create",
     entityType: "user",
@@ -68,7 +68,7 @@ export async function updateUserRoleAction(userId: number, role: User["role"]) {
 
   await updateUserRole(userId, role);
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorId,
     action: "update",
     entityType: "user",
@@ -89,7 +89,7 @@ export async function updateUserStatusAction(userId: number, status: string) {
 
   await updateUserStatus(userId, status);
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorId,
     action: "update",
     entityType: "user",
@@ -109,7 +109,7 @@ export async function updateUserInfoAction(userId: number, formData: FormData) {
 
   await updateUserProfile(userId, { name, email });
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorId,
     action: "update",
     entityType: "user",
@@ -130,7 +130,7 @@ export async function deleteUserAction(userId: number) {
 
   await deleteUser(userId);
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorId,
     action: "delete",
     entityType: "user",

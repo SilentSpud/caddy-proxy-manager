@@ -83,7 +83,7 @@ async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> 
     console.warn(
       `[oidc-group-sync] Skipping demotion of user ${userId} to "${entry.role}": they are the last active admin.`,
     );
-    logAuditEvent({
+    await logAuditEvent({
       userId,
       action: "oidc_role_sync_skipped",
       entityType: "user",
@@ -95,7 +95,7 @@ async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> 
 
   await db.update(users).set({ role: entry.role, updatedAt: nowIso() }).where(eq(users.id, userId));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId,
     action: "oidc_role_sync",
     entityType: "user",
@@ -159,7 +159,7 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
   const parts: string[] = [];
   if (added.length) parts.push(`added to ${added.join(", ")}`);
   if (removed.length) parts.push(`removed from ${removed.join(", ")}`);
-  logAuditEvent({
+  await logAuditEvent({
     userId,
     action: "oidc_group_sync",
     entityType: "user",

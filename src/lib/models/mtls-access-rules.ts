@@ -100,7 +100,7 @@ export async function createMtlsAccessRule(
 
   if (!record) throw new Error("Failed to create mTLS access rule");
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "mtls_access_rule",
@@ -136,7 +136,7 @@ export async function updateMtlsAccessRule(
 
   await db.update(mtlsAccessRules).set(updates).where(eq(mtlsAccessRules.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "mtls_access_rule",
@@ -156,7 +156,7 @@ export async function deleteMtlsAccessRule(id: number, actorUserId: number): Pro
 
   await db.delete(mtlsAccessRules).where(eq(mtlsAccessRules.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "mtls_access_rule",

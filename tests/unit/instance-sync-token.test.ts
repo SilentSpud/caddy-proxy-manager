@@ -27,14 +27,14 @@ describe('instance sync token policy', () => {
     );
   });
 
-  it('fails production startup when an environment-configured slave has a weak token', async () => {
+  it('fails production startup when an environment-configured agent has a weak token', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_RUNTIME', 'nodejs');
     vi.stubEnv('NEXT_PHASE', 'runtime');
     vi.stubEnv('SESSION_SECRET', 's'.repeat(32));
     vi.stubEnv('ADMIN_USERNAME', 'admin');
     vi.stubEnv('ADMIN_PASSWORD', 'Strong-Admin-Passw0rd!');
-    vi.stubEnv('INSTANCE_MODE', 'slave');
+    vi.stubEnv('INSTANCE_MODE', 'agent');
     vi.stubEnv('INSTANCE_SYNC_TOKEN', 'weak');
 
     // config snapshots process.env at import time, and bun cannot drop a module from its
@@ -44,14 +44,14 @@ describe('instance sync token policy', () => {
     expect(() => validateProductionConfig()).toThrow(/INSTANCE_SYNC_TOKEN.*at least 32/);
   });
 
-  it('accepts a sufficiently long token for an environment-configured production slave', async () => {
+  it('accepts a sufficiently long token for an environment-configured production agent', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_RUNTIME', 'nodejs');
     vi.stubEnv('NEXT_PHASE', 'runtime');
     vi.stubEnv('SESSION_SECRET', 's'.repeat(32));
     vi.stubEnv('ADMIN_USERNAME', 'admin');
     vi.stubEnv('ADMIN_PASSWORD', 'Strong-Admin-Passw0rd!');
-    vi.stubEnv('INSTANCE_MODE', 'slave');
+    vi.stubEnv('INSTANCE_MODE', 'agent');
     vi.stubEnv('INSTANCE_SYNC_TOKEN', 'a'.repeat(32));
 
     // config snapshots process.env at import time, and bun cannot drop a module from its

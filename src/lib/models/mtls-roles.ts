@@ -102,7 +102,7 @@ export async function createMtlsRole(input: MtlsRoleInput, actorUserId: number):
 
   if (!record) throw new Error("Failed to create mTLS role");
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "create",
     entityType: "mtls_role",
@@ -134,7 +134,7 @@ export async function updateMtlsRole(
     })
     .where(eq(mtlsRoles.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "update",
     entityType: "mtls_role",
@@ -158,7 +158,7 @@ export async function deleteMtlsRole(id: number, actorUserId: number): Promise<v
 
   await db.delete(mtlsRoles).where(eq(mtlsRoles.id, id));
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "delete",
     entityType: "mtls_role",
@@ -193,7 +193,7 @@ export async function assignRoleToCertificate(
     createdAt: now,
   });
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "assign",
     entityType: "mtls_certificate_role",
@@ -224,7 +224,7 @@ export async function removeRoleFromCertificate(
       ),
     );
 
-  logAuditEvent({
+  await logAuditEvent({
     userId: actorUserId,
     action: "unassign",
     entityType: "mtls_certificate_role",

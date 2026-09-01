@@ -100,9 +100,9 @@ fi
 
 if [ "${CPM_TEST_SYNC:-0}" = "1" ]; then
   echo "==> starting the second CPM instance"
-  compose up -d --wait --wait-timeout 300 web-slave caddy-slave || {
-    echo "the slave instance did not come up healthy" >&2
-    compose logs --tail 60 web-slave caddy-slave
+  compose up -d --wait --wait-timeout 300 web-agent caddy-agent || {
+    echo "the agent instance did not come up healthy" >&2
+    compose logs --tail 60 web-agent caddy-agent
   }
 fi
 

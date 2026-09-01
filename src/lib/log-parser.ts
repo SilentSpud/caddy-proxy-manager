@@ -18,20 +18,20 @@ let stopped = false;
 
 // ── state helpers ────────────────────────────────────────────────────────────
 
-function getState(key: string): string | null {
-  const row = db
+async function getState(key: string): Promise<string | null> {
+  const [row] = await db
     .select({ value: logParseState.value })
     .from(logParseState)
     .where(eq(logParseState.key, key))
-    .get();
+    .limit(1);
   return row?.value ?? null;
 }
 
-function setState(key: string, value: string): void {
-  db.insert(logParseState)
+async function setState(key: string, value: string): Promise<void> {
+  await db
+    .insert(logParseState)
     .values({ key, value })
-    .onConflictDoUpdate({ target: logParseState.key, set: { value } })
-    .run();
+    .onConflictDoUpdate({ target: logParseState.key, set: { value } });
 }
 
 // ── GeoIP ────────────────────────────────────────────────────────────────────
@@ -214,8 +214,8 @@ export async function parseNewLogEntries(): Promise<void> {
   if (!existsSync(LOG_FILE)) return;
 
   try {
-    const storedOffset = parseInt(getState("access_log_offset") ?? "0", 10);
-    const storedSize = parseInt(getState("access_log_size") ?? "0", 10);
+    const storedOffset = parseInt((await getState("access_log_offset")) ?? "0", 10);
+    const storedSize = parseInt((await getState("access_log_size")) ?? "0", 10);
 
     let currentSize: number;
     try {
@@ -245,8 +245,8 @@ export async function parseNewLogEntries(): Promise<void> {
       console.log(`[log-parser] inserted ${rows.length} traffic events (${blockedRows} blocked)`);
     }
 
-    setState("access_log_offset", String(newOffset));
-    setState("access_log_size", String(currentSize));
+    await setState("access_log_offset", String(newOffset));
+    await setState("access_log_size", String(currentSize));
   } catch (err) {
     console.error("[log-parser] error during parse:", err);
   }

@@ -2,8 +2,7 @@ import { Database } from 'bun:sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
-import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
+import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -17,8 +16,8 @@ const migrationsFolder = resolve(process.cwd(), 'drizzle');
  * first pass.
  */
 function removeTempDir(dir: string) {
-  const client = (globalThis as typeof globalThis & { __SQLITE_CLIENT__?: { close: () => void } })
-    .__SQLITE_CLIENT__;
+  const client = (globalThis as typeof globalThis & { __DB_CLIENT__?: { close: () => void } })
+    .__DB_CLIENT__;
   try {
     client?.close();
   } catch {
@@ -38,7 +37,7 @@ function removeTempDir(dir: string) {
 
 function resetDbModuleState() {
   delete (globalThis as typeof globalThis & { __DRIZZLE_DB__?: unknown }).__DRIZZLE_DB__;
-  delete (globalThis as typeof globalThis & { __SQLITE_CLIENT__?: unknown }).__SQLITE_CLIENT__;
+  delete (globalThis as typeof globalThis & { __DB_CLIENT__?: unknown }).__DB_CLIENT__;
   delete (globalThis as typeof globalThis & { __MIGRATIONS_RAN__?: boolean }).__MIGRATIONS_RAN__;
 }
 
@@ -223,9 +222,8 @@ describe('database compatibility for accounts schema', () => {
       // Re-evaluate the db module so it opens the broken database and repairs on import. A query
       // suffix makes a distinct module but does not propagate, so point the plain specifier at the
       // fresh one too — that rewrites the live bindings every consumer already reads through.
-      const freshDb = await import(`@/src/lib/db${fresh()}`);
-      vi.mock('@/src/lib/db', () => ({ ...freshDb }));
-      appSqlite = freshDb.sqlite;
+      const { dbModule: freshDb } = await reloadDbModule();
+      appSqlite = freshDb.client as { close: () => void };
       const { createUser } = await import('@/src/lib/models/user');
       await createUser({
         email: 'compat-user@example.com',
@@ -317,7 +315,7 @@ describe('database compatibility for accounts schema', () => {
 
       process.env.DATABASE_URL = `file:${dbPath}`;
       resetDbModuleState();
-      await import(`@/src/lib/db${fresh()}`);
+      await reloadDbModule();
 
       const sqlite = new Database(dbPath, { readonly: true });
       // Only the rows this test seeded: createBrokenAccountsDatabase leaves legacy rows of its
@@ -368,7 +366,7 @@ describe('database compatibility for accounts schema', () => {
       process.env.DATABASE_URL = `file:${dbPath}`;
       resetDbModuleState();
 
-      await expect(import(`@/src/lib/db${fresh()}`)).rejects.toThrow(/account identity collision/);
+      await expect(reloadDbModule()).rejects.toThrow(/account identity collision/);
     } finally {
       removeTempDir(tempDir);
     }

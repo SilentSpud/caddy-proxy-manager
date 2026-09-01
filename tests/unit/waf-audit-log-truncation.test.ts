@@ -27,12 +27,16 @@ vi.mock('drizzle-orm', () => ({
   eq: (_column: unknown, value: string) => ({ __key: value }),
 }));
 
+// Shaped like the awaited data layer: a select resolves to a row array via `.limit()`, and an
+// upsert resolves rather than exposing SQLite's synchronous `.run()`.
 vi.mock('@/src/lib/db', () => ({
   default: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn((cond: { __key: string }) => ({
-          get: vi.fn(() => (store.has(cond.__key) ? { value: store.get(cond.__key) } : null)),
+          limit: vi.fn(() =>
+            Promise.resolve(store.has(cond.__key) ? [{ value: store.get(cond.__key) }] : []),
+          ),
         })),
       })),
     })),
@@ -40,7 +44,7 @@ vi.mock('@/src/lib/db', () => ({
       values: vi.fn((v: { key: string; value: string }) => {
         state.inserted.push(v);
         store.set(v.key, v.value);
-        return { onConflictDoUpdate: vi.fn().mockReturnValue({ run: vi.fn() }) };
+        return { onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) };
       }),
     })),
   },

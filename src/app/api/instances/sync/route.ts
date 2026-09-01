@@ -4,8 +4,8 @@ import { applyCaddyConfig } from "@/src/lib/caddy";
 import {
   applySyncPayload,
   getInstanceMode,
-  getSlaveMasterToken,
-  setSlaveLastSync,
+  getAgentControllerToken,
+  setAgentLastSync,
   type SyncPayload,
 } from "@/src/lib/instance-sync";
 import { lastHeaderValue } from "@/src/lib/request-headers";
@@ -283,7 +283,7 @@ function isValidSyncPayload(payload: unknown): payload is SyncPayload {
 
   const d = data as Record<string, unknown>;
 
-  // l4ProxyHosts is optional for backward compatibility with older master instances
+  // l4ProxyHosts is optional for backward compatibility with older controller instances
   if (d.l4ProxyHosts !== undefined && !validateArray(d.l4ProxyHosts, isL4ProxyHost)) {
     return false;
   }
@@ -300,8 +300,8 @@ function isValidSyncPayload(payload: unknown): payload is SyncPayload {
 
 export async function POST(request: NextRequest) {
   const mode = await getInstanceMode();
-  if (mode !== "slave") {
-    return NextResponse.json({ error: "Instance is not configured as a slave" }, { status: 403 });
+  if (mode !== "agent") {
+    return NextResponse.json({ error: "Instance is not configured as an agent" }, { status: 403 });
   }
 
   const rateLimit = checkSyncRateLimit(getClientIp(request));
@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
 
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  const expected = await getSlaveMasterToken();
+  const expected = await getAgentControllerToken();
 
   if (!expected || !secureTokenCompare(token, expected)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -351,7 +351,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Backfill l4ProxyHosts for payloads from older master instances that don't include it
+    // Backfill l4ProxyHosts for payloads from older controller instances that don't include it
     const normalizedPayload: SyncPayload = {
       ...payload,
       data: {
@@ -361,12 +361,12 @@ export async function POST(request: NextRequest) {
     };
     await applySyncPayload(normalizedPayload);
     await applyCaddyConfig();
-    await setSlaveLastSync({ ok: true });
+    await setAgentLastSync({ ok: true });
     return NextResponse.json({ ok: true });
   } catch {
     // This value is persisted and later serialized into the settings browser;
     // keep it operationally useful but independent of exception internals.
-    await setSlaveLastSync({ ok: false, error: "Failed to apply synchronized configuration" });
+    await setAgentLastSync({ ok: false, error: "Failed to apply synchronized configuration" });
     return NextResponse.json({ error: "Failed to apply sync payload" }, { status: 500 });
   }
 }

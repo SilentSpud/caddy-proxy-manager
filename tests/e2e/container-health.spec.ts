@@ -77,9 +77,13 @@ test.describe('Container health', () => {
     expect(sidecar!.state, `sidecar state: ${sidecar!.state}`).toBe('running');
 
     // Verify it hasn't restarted (restart count > 0 means crash-loop)
-    const inspect = execFileSync('docker', ['inspect', '--format', '{{.RestartCount}}', sidecar!.name], {
-      encoding: 'utf-8',
-    }).trim();
+    const inspect = execFileSync(
+      'docker',
+      ['inspect', '--format', '{{.RestartCount}}', sidecar!.name],
+      {
+        encoding: 'utf-8',
+      },
+    ).trim();
     const restartCount = Number(inspect);
     expect(
       restartCount,

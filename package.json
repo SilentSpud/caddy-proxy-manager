@@ -36,6 +36,7 @@
     "typecheck": "tsc --noEmit",
     "test:all": "./scripts/test-all.sh",
     "db:generate": "drizzle-kit generate",
+    "db:schema:pg": "bun scripts/generate-pg-schema.ts",
     "db:migrate": "drizzle-kit migrate",
     "test": "bun test --parallel tests/unit tests/integration",
     "test:watch": "bun test --watch tests/unit tests/integration",

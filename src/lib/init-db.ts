@@ -87,7 +87,7 @@ export async function ensureAdminUser(): Promise<void> {
 /** Ensures the `credential` account row Better Auth needs, with the password hash. */
 async function ensureCredentialAccount(userId: number, passwordHash: string): Promise<void> {
   const now = nowIso();
-  const existing = await db
+  const [existing] = await db
     .select()
     .from(accounts)
     .where(
@@ -97,7 +97,7 @@ async function ensureCredentialAccount(userId: number, passwordHash: string): Pr
         eq(accounts.issuer, CREDENTIAL_ISSUER),
       ),
     )
-    .get();
+    .limit(1);
 
   if (existing) {
     // Update password hash if changed

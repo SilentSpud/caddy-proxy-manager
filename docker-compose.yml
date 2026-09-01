@@ -26,7 +26,10 @@ services:
       BASE_URL: ${BASE_URL:-http://localhost:3000}
 
       DATABASE_PATH: /app/data/caddy-proxy-manager.db
-      DATABASE_URL: file:/app/data/caddy-proxy-manager.db
+      # SQLite by default. Set DATABASE_URL to postgres://user:pass@host:5432/db to use
+      # PostgreSQL instead — the database must already exist, and there is no migration
+      # path from an existing SQLite file. See "Database Backends" in the README.
+      DATABASE_URL: ${DATABASE_URL:-file:/app/data/caddy-proxy-manager.db}
 
       NEXTAUTH_URL: ${BASE_URL:-http://localhost:3000}
 
