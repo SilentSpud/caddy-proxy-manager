@@ -5,9 +5,14 @@ import {
   updateOAuthProvider,
   deleteOAuthProvider,
 } from "@/src/lib/models/oauth-providers";
-import { toOAuthProviderView, type OAuthProviderView } from "@/src/lib/oauth-provider-view";
+import {
+  oauthCallbackUrl,
+  toOAuthProviderView,
+  type OAuthProviderView,
+} from "@/src/lib/oauth-provider-view";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { invalidateProviderCache } from "@/src/lib/auth-server";
+import { config } from "@/src/lib/config";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "no-store" };
 
@@ -16,6 +21,8 @@ function redactClientId(provider: OAuthProviderView) {
   return {
     ...provider,
     clientId: clientId.length > 4 ? `••••${clientId.slice(-4)}` : "••••",
+    // What the operator must register as the redirect URI at the IdP.
+    callbackUrl: oauthCallbackUrl(config.baseUrl, provider.id),
   };
 }
 

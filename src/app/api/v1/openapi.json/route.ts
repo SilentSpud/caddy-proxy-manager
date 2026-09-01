@@ -29,6 +29,7 @@ const spec = {
     { name: "Audit Log", description: "Audit log" },
     { name: "Caddy", description: "Caddy server operations" },
     { name: "Sessions", description: "Your active management-UI sessions" },
+    { name: "OAuth Providers", description: "External OIDC/OAuth2 identity providers for SSO" },
   ],
   paths: {
     // ── Tokens ──────────────────────────────────────────────────────
@@ -1572,6 +1573,116 @@ const spec = {
         },
       },
     },
+
+    // ── OAuth Providers ─────────────────────────────────────────────
+    "/api/v1/oauth-providers": {
+      get: {
+        tags: ["OAuth Providers"],
+        summary: "List OAuth providers",
+        operationId: "listOauthProviders",
+        responses: {
+          "200": {
+            description: "List of OAuth providers",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/OauthProvider" },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      post: {
+        tags: ["OAuth Providers"],
+        summary: "Create an OAuth provider",
+        operationId: "createOauthProvider",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OauthProviderInput" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "OAuth provider created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/OauthProvider" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/v1/oauth-providers/{id}": {
+      get: {
+        tags: ["OAuth Providers"],
+        summary: "Get an OAuth provider",
+        operationId: "getOauthProvider",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": {
+            description: "OAuth provider",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/OauthProvider" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["OAuth Providers"],
+        summary: "Update an OAuth provider",
+        description:
+          "Environment-sourced providers only allow toggling `enabled`. A blank or omitted clientSecret preserves the stored secret.",
+        operationId: "updateOauthProvider",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OauthProviderUpdate" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "OAuth provider updated",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/OauthProvider" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      delete: {
+        tags: ["OAuth Providers"],
+        summary: "Delete an OAuth provider",
+        description: "Environment-sourced providers cannot be deleted.",
+        operationId: "deleteOauthProvider",
+        parameters: [{ $ref: "#/components/parameters/IdPath" }],
+        responses: {
+          "200": { $ref: "#/components/responses/Ok" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/api/v1/caddy/modules": {
       get: {
         tags: ["Caddy"],
@@ -2821,6 +2932,82 @@ const spec = {
           skippedHttp: { type: "integer" },
         },
         required: ["total", "success", "failed", "skippedHttp"],
+      },
+      OauthProvider: {
+        type: "object",
+        description:
+          "OAuth/OIDC provider. clientId is masked; the clientSecret is never exposed. callbackUrl is the exact redirect URI to register at the identity provider.",
+        properties: {
+          id: { type: "string", example: "authino" },
+          name: { type: "string", example: "Authino" },
+          type: { type: "string", enum: ["oidc", "oauth2"] },
+          clientId: { type: "string", readOnly: true, example: "••••41ee" },
+          hasClientSecret: { type: "boolean", readOnly: true },
+          issuer: { type: ["string", "null"] },
+          authorizationUrl: { type: ["string", "null"] },
+          tokenUrl: { type: ["string", "null"] },
+          userinfoUrl: { type: ["string", "null"] },
+          scopes: { type: "string", example: "openid email profile" },
+          autoLink: { type: "boolean" },
+          enabled: { type: "boolean" },
+          source: { type: "string", enum: ["env", "ui"], readOnly: true },
+          callbackUrl: {
+            type: "string",
+            readOnly: true,
+            example: "https://cpm.example.com/api/auth/callback/authino",
+            description: "Register this URI as the redirect URI in the identity provider",
+          },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: [
+          "id",
+          "name",
+          "type",
+          "clientId",
+          "hasClientSecret",
+          "scopes",
+          "autoLink",
+          "enabled",
+          "source",
+          "callbackUrl",
+          "createdAt",
+          "updatedAt",
+        ],
+      },
+      OauthProviderInput: {
+        type: "object",
+        properties: {
+          name: { type: "string", example: "Keycloak" },
+          type: { type: "string", enum: ["oidc", "oauth2"], default: "oidc" },
+          clientId: { type: "string" },
+          clientSecret: { type: "string" },
+          issuer: { type: "string", example: "https://sso.example.com/realms/main" },
+          authorizationUrl: { type: "string" },
+          tokenUrl: { type: "string" },
+          userinfoUrl: { type: "string" },
+          scopes: { type: "string", default: "openid email profile" },
+          autoLink: { type: "boolean", default: false },
+          enabled: { type: "boolean", default: true },
+        },
+        required: ["name", "clientId", "clientSecret"],
+      },
+      OauthProviderUpdate: {
+        type: "object",
+        description: "All fields optional. Omitting clientSecret preserves the stored secret.",
+        properties: {
+          name: { type: "string" },
+          type: { type: "string", enum: ["oidc", "oauth2"] },
+          clientId: { type: "string" },
+          clientSecret: { type: "string" },
+          issuer: { type: ["string", "null"] },
+          authorizationUrl: { type: ["string", "null"] },
+          tokenUrl: { type: ["string", "null"] },
+          userinfoUrl: { type: ["string", "null"] },
+          scopes: { type: "string" },
+          autoLink: { type: "boolean" },
+          enabled: { type: "boolean" },
+        },
       },
       User: {
         type: "object",

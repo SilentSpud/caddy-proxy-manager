@@ -1,16 +1,15 @@
-//go:build tools
-
-// The version catalog in go.mod only survives `go mod tidy` because these blank imports exist:
-// tidy drops every requirement no package imports, and without this file that is all of them.
-// Dependabot runs tidy as part of preparing an update, so a bump would otherwise arrive as a PR
-// that empties go.mod and go.sum instead of moving one line.
+// This module is a version-pinning manifest for the Caddy build; nothing here
+// ships — xcaddy builds the real binary from these pins in its own module.
+// The blank imports must stay untagged and in sync with build.sh: they keep
+// `go mod tidy` (run by Dependabot on every update) from treating the
+// requirements as unused and stripping the require block from go.mod, and
+// they give CodeQL a buildable package to analyze (this is the repo's only
+// Go module). xcaddy is pinned via the `tool` directive in go.mod because it
+// only ships a main package, which cannot be imported.
 //
-// The `tools` build tag is never enabled for a real build, so nothing here is ever compiled --
-// xcaddy generates its own main package from build.sh's --with flags. Tidy, however, reads files
-// under every build tag, which is exactly the asymmetry this relies on.
-//
-// One import per module in the catalog. Adding a module to src/lib/caddy-modules.ts means adding
-// it in go.mod and here; tests/unit/caddy-modules.test.ts catches the go.mod half.
+// github.com/google/cel-go is intentionally absent: it has no root package
+// and is already pulled in transitively by Caddy. Its compatibility version
+// is managed through the replace directive in go.mod.
 
 package tools
 
@@ -37,8 +36,4 @@ import (
 	_ "github.com/corazawaf/coraza-caddy/v2"
 	_ "github.com/fuomag9/caddy-blocker-plugin"
 	_ "github.com/mholt/caddy-l4"
-
-	// cel-go has no package at its module root; the replace directive in go.mod is what this
-	// import is here to keep alive.
-	_ "github.com/google/cel-go/cel"
 )

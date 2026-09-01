@@ -90,13 +90,9 @@ describe('caddy module registry', () => {
   it('blank-imports every pin from tools.go, so `go mod tidy` keeps them', () => {
     // The pins only survive tidy because tools.go imports them; a module added to go.mod but not
     // there is silently dropped the next time Dependabot opens a PR, which is how the require
-    // block got emptied once already. cel-go has no package at its module root, so it is spelled
-    // as the subpackage the replace directive exists to hold in place.
-    const imported = new Set(
-      [...GO_TOOLS.matchAll(/^\s*_ "([^"]+)"$/gm)].map(([, path]) =>
-        path === 'github.com/google/cel-go/cel' ? 'github.com/google/cel-go' : path,
-      ),
-    );
+    // block got emptied once already. cel-go is deliberately absent from both: it has no package
+    // at its module root and reaches the build transitively, pinned by the replace directive.
+    const imported = new Set([...GO_TOOLS.matchAll(/^\s*_ "([^"]+)"$/gm)].map(([, path]) => path));
     const unimported = [...pinnedModulePaths()].filter((p) => !imported.has(p));
     expect(unimported).toEqual([]);
   });

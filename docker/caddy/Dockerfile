@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
+
 # Builder on the host arch (BUILDPLATFORM) with xcaddy cross-compiling via GOOS/GOARCH — avoids QEMU
 # when building linux/arm64 on an x86 runner. caddy:<version>-builder rather than golang:: it ships
 # xcaddy and the Go toolchain that release was built with, so cold builds skip the xcaddy compile

@@ -5,9 +5,10 @@
 // CADDY_MODULES (Settings -> Caddy Build). Every module in src/lib/caddy-modules.ts must appear
 // here — tests/unit/caddy-modules.test.ts asserts that.
 //
-// tools.go is what makes this survive `go mod tidy`: nothing here is compiled, so without its
-// blank imports tidy considers every requirement unused and empties the block. Dependabot runs
-// tidy, so deleting that file turns each dependency PR into a go.mod wipe.
+// tools.go is what makes this survive `go mod tidy`: nothing here ships, so without its blank
+// imports tidy considers every requirement unused and empties the block. Dependabot runs tidy, so
+// deleting that file turns each dependency PR into a go.mod wipe. Its imports are deliberately
+// untagged, which also gives CodeQL a buildable package to analyse.
 //
 // xcaddy itself is deliberately absent — it comes from the caddy:<version>-builder image the
 // Dockerfile pins, not from here, so there is only one place its version lives.
@@ -38,7 +39,6 @@ require (
 	github.com/caddyserver/caddy/v2 v2.11.4
 	github.com/corazawaf/coraza-caddy/v2 v2.6.0
 	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20260728192246-a1ff7050deb7
-	github.com/google/cel-go v0.29.0
 	github.com/mholt/caddy-l4 v0.1.2
 )
 
@@ -105,6 +105,7 @@ require (
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
+	github.com/google/cel-go v0.29.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect

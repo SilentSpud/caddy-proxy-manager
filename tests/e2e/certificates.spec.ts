@@ -15,7 +15,7 @@ test.describe('Certificates', () => {
     await expect(page.locator('body')).toBeVisible();
     // Look for tabs or buttons
     const hasAddButton = (await page.getByRole('button', { name: /add|new|create/i }).count()) > 0;
-    const hasTab = (await page.getByRole('button').count()) > 0;
+    const hasTab = (await page.getByRole('tab').count()) > 0;
     expect(hasAddButton || hasTab).toBe(true);
   });
 
@@ -58,11 +58,11 @@ test.describe('Certificates', () => {
     try {
       // 3. Visit certificates page — the subdomain host should NOT appear in the ACME tab
       await page.goto('/certificates');
-      await expect(page.getByRole('button', { name: /acme/i })).toBeVisible();
-      await page.getByRole('button', { name: /acme/i }).click();
+      await expect(page.getByRole('tab', { name: /acme/i })).toBeVisible();
+      await page.getByRole('tab', { name: /acme/i }).click();
 
       // The subdomain should not be listed as a separate ACME entry
-      const acmeTab = page.getByRole('main');
+      const acmeTab = page.locator('[role="tabpanel"]');
       await expect(acmeTab.getByText(`sub.${domain}`)).not.toBeVisible({ timeout: 5_000 });
     } finally {
       // Cleanup: delete the proxy host and certificate
@@ -79,8 +79,6 @@ test.describe('Certificates', () => {
 
     // Auto-managed wildcard hosts require a DNS provider (ACME DNS-01 challenge).
     // Configure one for this isolated test stack and clear it afterwards.
-    // GET redacts credential values, so the prior configuration cannot be read back and
-    // restored — the teardown below clears the group instead.
     const dnsProviderUrl = `${API}/settings/dns-provider`;
     const setDnsRes = await page.request.put(dnsProviderUrl, {
       data: { providers: { duckdns: { api_token: 'e2e-fake-token' } }, default: 'duckdns' },
@@ -117,10 +115,10 @@ test.describe('Certificates', () => {
 
       // 3. Visit certificates page — subdomain should be collapsed under the wildcard
       await page.goto('/certificates');
-      await expect(page.getByRole('button', { name: /acme/i })).toBeVisible();
-      await page.getByRole('button', { name: /acme/i }).click();
+      await expect(page.getByRole('tab', { name: /acme/i })).toBeVisible();
+      await page.getByRole('tab', { name: /acme/i }).click();
 
-      const acmeTab = page.getByRole('main');
+      const acmeTab = page.locator('[role="tabpanel"]');
       // DataTable renders both a hidden mobile card and a visible desktop table row.
       // Mobile card is first in the DOM (block md:hidden) — use .last() to get the visible desktop row.
       await expect(acmeTab.getByText(`*.${domain}`).last()).toBeVisible({ timeout: 5_000 });
@@ -160,11 +158,9 @@ test.describe('Certificates', () => {
 
     try {
       await page.goto('/certificates');
-      await page.getByRole('button', { name: /imported/i }).click();
+      await page.getByRole('tab', { name: /imported/i }).click();
 
-      await expect(page.getByText(certName, { exact: true }).last()).toBeVisible({
-        timeout: 10_000,
-      });
+      await expect(page.getByText(certName).last()).toBeVisible({ timeout: 10_000 });
 
       await page
         .getByRole('button', { name: `Actions for certificate ${certName}` })
@@ -172,12 +168,15 @@ test.describe('Certificates', () => {
         .click();
       await page.getByRole('menuitem', { name: /^delete$/i }).click();
 
-      const dialog = page.getByRole('alertdialog', { name: /delete imported certificate/i });
+      const dialog = page.getByRole('dialog', { name: /delete imported certificate/i });
       await expect(dialog).toBeVisible();
       await dialog.getByRole('button', { name: /delete certificate/i }).click();
 
       await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText(certName, { exact: true })).not.toBeVisible({ timeout: 10_000 });
+      // toHaveCount(0), not not.toBeVisible(): the row is rendered twice
+      // (hidden mobile card + desktop row) and a strict visibility assertion
+      // fails transiently while the post-delete revalidation is in flight.
+      await expect(page.getByText(certName)).toHaveCount(0, { timeout: 10_000 });
 
       const getRes = await page.request.get(`${API}/certificates/${cert.id}`, {
         headers: { Origin: BASE_URL },
@@ -210,7 +209,7 @@ test.describe('Certificates', () => {
     let createdId: number | null = null;
     try {
       await page.goto('/certificates');
-      await page.getByRole('button', { name: /imported/i }).click();
+      await page.getByRole('tab', { name: /imported/i }).click();
 
       // Open the Import drawer. The "Add"/"Import" trigger varies by viewport,
       // so match any button that opens the import flow.
@@ -222,8 +221,8 @@ test.describe('Certificates', () => {
       const drawer = page.getByRole('dialog');
       await expect(drawer).toBeVisible();
 
-      await drawer.getByLabel(/^name/i).fill(certName);
-      await drawer.getByLabel(/^domains/i).fill(domain);
+      await drawer.getByLabel(/^name$/i).fill(certName);
+      await drawer.getByLabel(/domains/i).fill(domain);
 
       // Certificate PEM goes into a textarea — newlines preserved trivially.
       await drawer.getByLabel(/certificate pem/i).fill(certificatePem);
