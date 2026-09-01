@@ -22,6 +22,7 @@ import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import * as sqliteSchema from '@/src/lib/db/schema.sqlite';
+import { fresh } from '@/tests/helpers/fresh';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { hashPassword } from '@/src/lib/password';
 import { CREDENTIAL_ISSUER } from '@/src/lib/account-issuer';
@@ -107,7 +108,8 @@ async function bootAuth(databasePath: string) {
   const { dbModule, schema } = await reloadDbModule();
   cleanups.push(() => (dbModule.client as { close?: () => void })?.close?.());
 
-  const authServer = await import(`@/src/lib/auth-server?adapter-compat=${Date.now()}`);
+  // fresh() and not Date.now(): same-millisecond boots would reuse a stale cached auth instance.
+  const authServer = await import(`@/src/lib/auth-server${fresh()}`);
   const auth = (await authServer.getAuth()) as any;
   return { auth, db: dbModule.default, schema };
 }
