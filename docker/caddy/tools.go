@@ -1,10 +1,11 @@
-//go:build tools
-
-// This module is a version-pinning manifest for the Caddy build; it contains
-// no compiled code. Without at least one Go file and these blank imports,
-// `go mod tidy` (run by Dependabot on every update) treats every requirement
-// as unused and strips the entire require block from go.mod. Keep every
-// module listed in build.sh imported here so tidy preserves the pins.
+// This module is a version-pinning manifest for the Caddy build; nothing here
+// ships — xcaddy builds the real binary from these pins in its own module.
+// The blank imports must stay untagged and in sync with build.sh: they keep
+// `go mod tidy` (run by Dependabot on every update) from treating the
+// requirements as unused and stripping the require block from go.mod, and
+// they give CodeQL a buildable package to analyze (this is the repo's only
+// Go module). xcaddy is pinned via the `tool` directive in go.mod because it
+// only ships a main package, which cannot be imported.
 //
 // github.com/google/cel-go is intentionally absent: it has no root package
 // and is already pulled in transitively by Caddy. Its compatibility version
@@ -32,7 +33,6 @@ import (
 	_ "github.com/caddy-dns/spaceship"
 	_ "github.com/caddy-dns/vultr"
 	_ "github.com/caddyserver/caddy/v2"
-	_ "github.com/caddyserver/xcaddy/cmd/xcaddy"
 	_ "github.com/corazawaf/coraza-caddy/v2"
 	_ "github.com/fuomag9/caddy-blocker-plugin"
 	_ "github.com/mholt/caddy-l4"

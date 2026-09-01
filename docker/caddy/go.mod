@@ -22,7 +22,6 @@ require (
 	github.com/caddy-dns/spaceship v1.0.0
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
 	github.com/caddyserver/caddy/v2 v2.11.4
-	github.com/caddyserver/xcaddy v0.4.7
 	github.com/corazawaf/coraza-caddy/v2 v2.6.0
 	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20260728192246-a1ff7050deb7
 	github.com/mholt/caddy-l4 v0.1.2
@@ -61,6 +60,7 @@ require (
 	github.com/aws/smithy-go v1.25.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/caddyserver/certmagic v0.25.3 // indirect
+	github.com/caddyserver/xcaddy v0.4.7 // indirect
 	github.com/caddyserver/zerossl v0.1.5 // indirect
 	github.com/ccoveille/go-safecast/v2 v2.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -245,3 +245,5 @@ require (
 // Keep the reviewed stable Caddy build on its own cel-go version; the image
 // build test must pass before Dependabot can merge an update to this pin.
 replace github.com/google/cel-go => github.com/google/cel-go v0.28.1
+
+tool github.com/caddyserver/xcaddy/cmd/xcaddy
