@@ -7,7 +7,7 @@ We release patches for security vulnerabilities for the following versions:
 | Version | Supported          |
 | ------- | ------------------ |
 | latest  | :white_check_mark: |
-| < 1.0   | :x:                |
+| < 3.0   | :x:                |
 
 ## Reporting a Vulnerability
 

@@ -7,58 +7,49 @@ services:
       dockerfile: docker/web/Dockerfile
       args:
         # User and group IDs for rootless operation
-        # Set these to match your host user to avoid permission issues
-        # Find your UID/GID with: id -u / id -g
+        # Match your host user to avoid permission issues: id -u / id -g
         PUID: ${PUID:-10001}
         PGID: ${PGID:-10001}
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      # Node environment
+      # production enforces password security
       NODE_ENV: production
 
-      # REQUIRED: Session secret for encrypting cookies and sessions
-      # Generate with: openssl rand -base64 32
-      # SECURITY: You MUST set this to a unique value in production!
+      # Required, and unique per instance. Generate with: openssl rand -base64 32
       SESSION_SECRET: ${SESSION_SECRET:?ERROR - SESSION_SECRET is required}
 
-      # Caddy API endpoint (internal communication)
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
 
-      # Public base URL for the application
+      # Public URL this instance is reached at.
       BASE_URL: ${BASE_URL:-http://localhost:3000}
 
-      # Database configuration
       DATABASE_PATH: /app/data/caddy-proxy-manager.db
       DATABASE_URL: file:/app/data/caddy-proxy-manager.db
 
-      # NextAuth configuration
       NEXTAUTH_URL: ${BASE_URL:-http://localhost:3000}
 
-      # Branding. Renames the app in the sidebar, on the login card, and as the
-      # suffix on every page title ("Users · <APP_NAME>").
+      # Renames the app in the sidebar, login card, and page titles.
       APP_NAME: ${APP_NAME:-}
 
-      # User icons fall back to Gravatar when a user has no icon and a routable email; their browser
-      # contacts gravatar.com directly. Set false to pin it off and lock the Settings toggle, which
-      # is synced master → slave, so pin it on any instance that must not reach the network.
-      AVATAR_GRAVATAR:
+      # Users without an icon fall back to Gravatar, which their browser fetches directly.
+      # Set false to disable it and lock the Settings toggle.
+      AVATAR_GRAVATAR: ${AVATAR_GRAVATAR:-true}
 
-      # REQUIRED unless AUTH_DISABLE_LOCAL_USERS=true. Must be 12+ chars with upper, lower, digit
-      # and special — the app refuses to start in production if these are missing or weak.
+      # Required unless AUTH_DISABLE_LOCAL_USERS=true. Must be 12+ chars with upper,
+      # lower, digit and special, or the app refuses to start.
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
 
-      # Self-registration is disabled unless explicitly enabled
+      # Let new users sign themselves up.
       AUTH_ALLOW_SELF_REGISTRATION: ${AUTH_ALLOW_SELF_REGISTRATION:-false}
       AUTH_ALLOW_OAUTH_REGISTRATION: ${AUTH_ALLOW_OAUTH_REGISTRATION:-false}
 
-      # OIDC-only mode: no local accounts, no credential sign-in, no bootstrap admin.
-      # Only enable this once an OAuth provider below is configured and working.
+      # OIDC-only: no local accounts and no bootstrap admin. Enable only once OAuth works.
       AUTH_DISABLE_LOCAL_USERS: ${AUTH_DISABLE_LOCAL_USERS:-false}
 
-      # OAuth2/OIDC Authentication (Optional - works with Authentik, Authelia, Keycloak, etc.)
+      # Optional OAuth2/OIDC — Authentik, Authelia, Keycloak, and similar.
       OAUTH_ENABLED: ${OAUTH_ENABLED:-false}
       OAUTH_PROVIDER_NAME: ${OAUTH_PROVIDER_NAME:-OAuth2}
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-}
@@ -70,9 +61,8 @@ services:
       OAUTH_ALLOW_AUTO_LINKING: ${OAUTH_ALLOW_AUTO_LINKING:-false}
       OAUTH_SCOPES: ${OAUTH_SCOPES:-}
 
-      # Group-based roles. Either name each role's group(s) below (comma-separated,
-      # any one grants the role), or set a prefix and let CPM derive <prefix>Admin,
-      # <prefix>User and <prefix>Viewer. A role left unset falls back to the prefix.
+      # Group-based roles. Either name each role's groups below (comma-separated, any one
+      # grants it), or set a prefix to derive <prefix>Admin, <prefix>User and <prefix>Viewer.
       OAUTH_ROLE_MAPPING: ${OAUTH_ROLE_MAPPING:-false}
       OAUTH_GROUPS_CLAIM: ${OAUTH_GROUPS_CLAIM:-}
       OAUTH_GROUP_PREFIX: ${OAUTH_GROUP_PREFIX:-}
@@ -82,22 +72,20 @@ services:
       OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
       OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
 
-      # ClickHouse analytics database (optional — omit CLICKHOUSE_PASSWORD to disable analytics)
+      # Optional analytics. Omit CLICKHOUSE_PASSWORD to disable; to enable, also start the
+      # clickhouse service with: docker compose --profile clickhouse up -d
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-cpm}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
-      # Days of analytics data to keep before TTL deletes it (default 30)
+      # Days of analytics kept before deletion.
       CLICKHOUSE_RETENTION_DAYS: ${CLICKHOUSE_RETENTION_DAYS:-30}
     group_add:
-      - "${CADDY_GID:-10000}"  # caddy's GID — lets the web user read/write /logs
+      - "${CADDY_GID:-10000}"  # caddy's GID, so web can write /logs
     volumes:
       - caddy-manager-data:/app/data
       - geoip-data:/usr/share/GeoIP:ro,z
-      # Read-write: waf-log-parser truncates waf-audit.log after ingesting it,
-      # since Coraza's SecAuditLog has no built-in rotation of its own.
       - caddy-logs:/logs
-      # Custom ACME CA root PEM written here by web, read by caddy (issue #192)
       - acme-ca:/acme-ca
     depends_on:
       caddy:
@@ -121,9 +109,7 @@ services:
       context: .
       dockerfile: docker/caddy/Dockerfile
       args:
-        # User and group IDs for rootless operation
-        # Set these to match your host user to avoid permission issues
-        # Find your UID/GID with: id -u / id -g
+        # Match your host user to avoid permission issues: id -u / id -g
         PUID: ${PUID:-10000}
         PGID: ${PGID:-10000}
     restart: unless-stopped
@@ -132,20 +118,17 @@ services:
       - "80:80/udp"
       - "443:443"
       - "443:443/udp"
-      # - "2019:2019"     # Admin API
-      # Admin API (port 2019) is only exposed on internal network for security, enable at your risk
-      # Web UI accesses via http://caddy:2019 internally
-      # Uncomment the line below to expose metrics externally for Grafana/Prometheus
-      # - "9090:9090"  # Metrics available at http://localhost:9090/metrics (configure in Settings first)
+      # Admin API. Internal-only by default; publish it at your own risk.
+      # - "2019:2019"
+      # Metrics for Prometheus/Grafana, once enabled in Settings.
+      # - "9090:9090"
     environment:
-      # Primary domain for Caddy configuration
       PRIMARY_DOMAIN: ${PRIMARY_DOMAIN:-caddyproxymanager.com}
     volumes:
       - caddy-data:/data
       - caddy-config:/config
       - caddy-logs:/logs
       - geoip-data:/usr/share/GeoIP:ro,z
-      # Custom ACME CA root PEM written by web, read here for trusted_roots_pem_files (issue #192)
       - acme-ca:/acme-ca:ro
     networks:
       - caddy-network
@@ -156,10 +139,7 @@ services:
       retries: 3
       start_period: 10s
 
-  # Docker socket proxy — restricts API surface exposed to l4-port-manager.
-  # Allows container management and network inspection (needed by docker compose up
-  # to inspect caddy-network when recreating the caddy container for L4 port changes),
-  # plus image builds (needed to recompile Caddy when the module selection changes).
+  # Restricts the Docker API surface reachable by the l4-port-manager sidecar.
   docker-socket-proxy:
     container_name: caddy-proxy-manager-docker-proxy
     image: tecnativa/docker-socket-proxy:latest
@@ -171,11 +151,8 @@ services:
       VOLUMES: 1
       IMAGES: 1
       SECRETS: 0
-      # Caddy plugins are compiled in, so a module change means recompiling the image — that is
-      # POST /build, which this flag gates. Set BUILD: 0 to opt out: only the "Rebuild Caddy" button
-      # stops, and the module list is still written to the shared volume as
-      # docker-compose.caddy-build.yml. A hand-run build produces no caddy-build.applied.json, so
-      # the app keeps assuming the shipped module set.
+      # Allows recompiling Caddy when the module selection changes. Set 0 to disable the
+      # "Rebuild Caddy" button; everything else keeps working.
       BUILD: 1
       # Deny everything else by default
       EXEC: 0
@@ -183,18 +160,11 @@ services:
       AUTH: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    # Security: keep the socket proxy off the shared app network. Only the l4-port-manager sidecar
-    # needs its container-create API; exposing it to web/caddy/clickhouse would turn any container
-    # compromise into host root (POST + CONTAINERS = create a privileged container that mounts the
-    # host fs). This network is `internal: true` (no egress) and carries only the proxy + sidecar.
     networks:
       - socket-proxy
 
-  # Compose manager sidecar (name kept for upgrade compatibility) — performs the two operations
-  # needing the caddy *container* recreated rather than reloaded: L4 port changes and module
-  # selection changes. Uses the Docker socket proxy. Rebuilding needs the build context, which the
-  # `.:/compose:ro` mount provides; deployments setting COMPOSE_HOST_DIR outside that mount can
-  # apply ports but not rebuild.
+  # Recreates the caddy container for the two changes a reload cannot apply:
+  # L4 port changes and Caddy module selection.
   l4-port-manager:
     container_name: caddy-proxy-manager-l4-ports
     image: ghcr.io/fuomag9/caddy-proxy-manager-l4-port-manager:latest
@@ -206,7 +176,7 @@ services:
       DATA_DIR: /data
       COMPOSE_DIR: /compose
       POLL_INTERVAL: "${L4_PORT_MANAGER_POLL_INTERVAL:-2}"
-      # Compiling Caddy from source is slow; give up rather than hang forever.
+      # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
     volumes:
@@ -217,9 +187,6 @@ services:
         condition: service_healthy
       docker-socket-proxy:
         condition: service_started
-    # Reaches Docker only via the socket proxy (over the isolated socket-proxy
-    # network) and recreates caddy through the mounted compose dir — it does not
-    # need the shared app network.
     networks:
       - socket-proxy
 
@@ -235,10 +202,6 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
-      # Mount only our single override file, not the whole config.d directory.
-      # Bind-mounting the directory would shadow the image's docker_related_config.xml
-      # (which sets listen_host to ::/0.0.0.0), leaving ClickHouse bound to loopback
-      # only so the web container could no longer reach it.
       - ./docker/clickhouse/config.d/low-disk-write.xml:/etc/clickhouse-server/config.d/low-disk-write.xml:ro
     networks:
       - caddy-network
@@ -271,9 +234,7 @@ services:
 networks:
   caddy-network:
     driver: bridge
-  # Isolated network for the Docker socket proxy and the l4-port-manager sidecar
-  # only. `internal: true` prevents external connectivity; no other service is
-  # attached, so a compromise of web/caddy/etc. cannot reach the socket proxy.
+  # Socket proxy and sidecar only; internal, with no external connectivity.
   socket-proxy:
     driver: bridge
     internal: true

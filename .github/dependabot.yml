@@ -10,7 +10,6 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-      - "security"
     commit-message:
       prefix: "ci"
       include: "scope"
@@ -77,7 +76,6 @@ updates:
     labels:
       - "dependencies"
       - "docker"
-      - "security"
     commit-message:
       prefix: "docker"
 
@@ -90,6 +88,5 @@ updates:
     labels:
       - "dependencies"
       - "docker"
-      - "security"
     commit-message:
       prefix: "docker"
