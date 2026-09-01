@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-      - develop
   pull_request:
     branches:
       - main
-      - develop
 
 # One run per ref. A force-push supersedes the in-flight run rather than leaving
 # a 30-minute Docker job grinding against a commit nobody is looking at.

@@ -4,7 +4,6 @@ on:
   pull_request:
     branches:
       - main
-      - develop
 
 # Both scopes are for enabling auto-merge. There is deliberately no approval step: GITHUB_TOKEN
 # cannot approve a pull request under any permissions ("GitHub Actions is not permitted to approve
