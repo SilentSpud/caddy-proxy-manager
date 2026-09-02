@@ -3,7 +3,7 @@
  * "/C:/data/app.db" and resolves against the drive root. Windows-only — on POSIX it is a real path.
  */
 import { describe, expect, it } from 'bun:test';
-import { stripLeadingSlashBeforeDriveLetter } from '../../src/lib/db';
+import { stripLeadingSlashBeforeDriveLetter } from '../../src/lib/db/legacy-sqlite';
 
 describe('stripLeadingSlashBeforeDriveLetter', () => {
   describe('on Windows', () => {

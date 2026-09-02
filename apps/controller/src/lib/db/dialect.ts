@@ -1,28 +1,23 @@
 /**
- * Which database backend a DATABASE_URL selects, and how to reach it.
+ * How DATABASE_URL is read.
  *
  * Kept in its own leaf module (no drizzle, no driver imports) so drizzle.config.ts, the runtime
- * connection in db.ts and the tests can all agree on how a URL is read without pulling in either
- * driver. Only the backends Bun ships a native driver for that drizzle can also target are
- * supported: bun:sqlite and Bun.SQL's PostgreSQL adapter.
+ * connection in db.ts and the tests can all agree on it without pulling in the driver.
+ *
+ * PostgreSQL only. SQLite was supported through 3.0 and is now reached exclusively by the
+ * migration flow, which opens the old file read-only through ./legacy-sqlite.ts — never as the
+ * application's own database.
  */
-import { isAbsolute, resolve as resolvePath } from "node:path";
 
-export type DatabaseDialect = "sqlite" | "postgres";
-
-export type DatabaseTarget =
-  /** `path` is an absolute filesystem path, or the literal ":memory:". */
-  | { dialect: "sqlite"; path: string }
-  /** `url` is a libpq-style connection string handed straight to Bun.SQL. */
-  | { dialect: "postgres"; url: string };
-
-export const DEFAULT_DATABASE_URL = "file:./data/caddy-proxy-manager.db";
+export type DatabaseTarget = {
+  /** A libpq-style connection string, handed straight to Bun.SQL. */
+  url: string;
+};
 
 /**
- * Bun.SQL also speaks MySQL and MariaDB, but drizzle-orm's Bun driver (`drizzle-orm/bun-sql`)
- * only builds PostgreSQL, and MySQL has no RETURNING for the insert paths this app relies on.
- * Named here so an operator pointing at MySQL gets a straight answer instead of a filesystem
- * error from the SQLite branch treating "mysql://..." as a relative filename.
+ * Named so an operator pointing at one of these gets a straight answer. `file:`/`sqlite:` is
+ * called out separately because every pre-3.1 deployment has one in its .env, and the useful
+ * response is "the app migrates it for you", not "unsupported scheme".
  */
 const UNSUPPORTED_SCHEMES = new Map<string, string>([
   ["mysql", "MySQL"],
@@ -32,60 +27,7 @@ const UNSUPPORTED_SCHEMES = new Map<string, string>([
   ["mongodb", "MongoDB"],
 ]);
 
-/**
- * A `file:` URL exposes its path with a leading slash, so a Windows absolute path arrives as
- * "/C:/data/app.db" and resolves against the drive root — drop the slash when a drive letter
- * follows. Not `fileURLToPath`, which rejects POSIX-style file URLs on Windows. Windows-only; on
- * POSIX "/C:/x" is a real path. `platform` is a parameter so tests can cover both.
- */
-export function stripLeadingSlashBeforeDriveLetter(
-  pathname: string,
-  platform: NodeJS.Platform = process.platform,
-): string {
-  if (platform !== "win32") return pathname;
-  return /^\/[A-Za-z]:[/\\]/.test(pathname) ? pathname.slice(1) : pathname;
-}
-
-export function resolveSqlitePath(rawUrl: string): string {
-  if (!rawUrl) {
-    return ":memory:";
-  }
-  if (rawUrl === ":memory:" || rawUrl === "file::memory:" || rawUrl === "sqlite::memory:") {
-    return ":memory:";
-  }
-
-  // `sqlite:` is an explicit opt-in to the SQLite branch; past that point it reads like `file:`.
-  const url = rawUrl.startsWith("sqlite://")
-    ? `file:${rawUrl.slice("sqlite://".length)}`
-    : rawUrl.startsWith("sqlite:")
-      ? `file:${rawUrl.slice("sqlite:".length)}`
-      : rawUrl;
-
-  if (url.startsWith("file:./") || url.startsWith("file:../")) {
-    const relative = url.slice("file:".length);
-    return resolvePath(/* turbopackIgnore: true */ process.cwd(), relative);
-  }
-
-  if (url.startsWith("file:")) {
-    try {
-      const fileUrl = new URL(url);
-      if (fileUrl.host && fileUrl.host !== "localhost") {
-        throw new Error("Remote SQLite hosts are not supported.");
-      }
-      return stripLeadingSlashBeforeDriveLetter(decodeURIComponent(fileUrl.pathname));
-    } catch {
-      const remainder = url.slice("file:".length);
-      if (!remainder) {
-        return ":memory:";
-      }
-      return isAbsolute(remainder)
-        ? remainder
-        : resolvePath(/* turbopackIgnore: true */ process.cwd(), remainder);
-    }
-  }
-
-  return isAbsolute(url) ? url : resolvePath(/* turbopackIgnore: true */ process.cwd(), url);
-}
+const SQLITE_SCHEMES = new Set(["file", "sqlite"]);
 
 /** The scheme of a URL-shaped string, lowercased. Null for bare filesystem paths. */
 function schemeOf(rawUrl: string): string | null {
@@ -96,30 +38,33 @@ function schemeOf(rawUrl: string): string | null {
   return scheme.length === 1 ? null : scheme;
 }
 
-/**
- * Read DATABASE_URL into the backend it names. Anything without a recognized scheme is a SQLite
- * path, which is what every pre-PostgreSQL deployment has in its .env.
- */
+const SQLITE_MESSAGE =
+  "DATABASE_URL points at a SQLite file, which is no longer supported as the application " +
+  "database. Point it at PostgreSQL (postgres://user:pass@host:5432/db) and start the app: it " +
+  "detects the old file and offers to migrate it. See docs/overhaul-plan.md.";
+
 export function resolveDatabaseTarget(rawUrl: string | undefined): DatabaseTarget {
-  const url = (rawUrl ?? DEFAULT_DATABASE_URL).trim();
+  const url = rawUrl?.trim();
+  if (!url) {
+    throw new Error("DATABASE_URL is required. PostgreSQL only: postgres://user:pass@host:5432/db");
+  }
+
   const scheme = schemeOf(url);
-
   if (scheme === "postgres" || scheme === "postgresql") {
-    return { dialect: "postgres", url };
+    return { url };
   }
 
-  const unsupported = scheme ? UNSUPPORTED_SCHEMES.get(scheme) : undefined;
-  if (unsupported) {
-    throw new Error(
-      `DATABASE_URL names ${unsupported}, which is not supported. Use a SQLite path ` +
-        `(file:./data/caddy-proxy-manager.db) or a PostgreSQL URL (postgres://user:pass@host/db).`,
-    );
+  // A bare path is what a pre-3.1 .env carries when it names the file directly.
+  if (scheme === null || SQLITE_SCHEMES.has(scheme)) {
+    throw new Error(SQLITE_MESSAGE);
   }
 
-  return { dialect: "sqlite", path: resolveSqlitePath(url) };
-}
-
-/** The dialect alone, for callers that only need to branch. */
-export function resolveDatabaseDialect(rawUrl: string | undefined): DatabaseDialect {
-  return resolveDatabaseTarget(rawUrl).dialect;
+  const unsupported = UNSUPPORTED_SCHEMES.get(scheme);
+  throw new Error(
+    unsupported
+      ? `DATABASE_URL names ${unsupported}, which is not supported. Use PostgreSQL ` +
+          "(postgres://user:pass@host:5432/db)."
+      : `DATABASE_URL has an unrecognized scheme "${scheme}". Use PostgreSQL ` +
+          "(postgres://user:pass@host:5432/db).",
+  );
 }

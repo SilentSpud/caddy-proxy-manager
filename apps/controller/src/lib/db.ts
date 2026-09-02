@@ -1,14 +1,11 @@
 /**
  * The application's database handle, plus the one-time data migrations that run on startup.
  *
- * The backend comes from DATABASE_URL: a path or `file:` URL selects SQLite (the default, and what
- * every existing deployment runs), a `postgres://` URL selects PostgreSQL. Both use Bun's own
- * drivers — `bun:sqlite` and `Bun.SQL` — through drizzle. Driver selection lives in
- * ./db/connection.ts; nothing below this line may branch on the dialect.
+ * PostgreSQL only, reached through Bun.SQL and drizzle; the connection itself lives in
+ * ./db/connection.ts.
  *
- * This module top-level-awaits its startup work. PostgreSQL migrations are asynchronous, and an
- * async ESM module makes the import graph wait for them, so no route handler can observe a
- * half-migrated database.
+ * This module top-level-awaits its startup work, so the import graph waits for the migrations and
+ * no route handler can observe a half-migrated database.
  */
 import { eq, ne, and, isNull } from "drizzle-orm";
 import * as schema from "./db/schema";
@@ -24,8 +21,7 @@ import { db, isEphemeral, runSchemaMigrations } from "./db/connection";
 /** Idempotency flag for runInstanceRoleRename(). */
 const INSTANCE_ROLES_RENAMED_KEY = "instance_roles_renamed";
 
-export { stripLeadingSlashBeforeDriveLetter } from "./db/dialect";
-export { db, dialect, client, runInTransaction } from "./db/connection";
+export { db, client, runInTransaction } from "./db/connection";
 export type { Db } from "./db/connection";
 
 try {

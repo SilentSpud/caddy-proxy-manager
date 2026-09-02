@@ -5,8 +5,8 @@ import { desc, eq, like } from 'drizzle-orm';
 
 let db: TestDb;
 
-beforeEach(() => {
-  db = createTestDb();
+beforeEach(async () => {
+  db = await createTestDb();
 });
 
 function nowIso(offsetMs = 0) {

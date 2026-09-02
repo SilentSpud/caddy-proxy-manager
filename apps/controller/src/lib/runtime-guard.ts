@@ -1,5 +1,5 @@
 /**
- * Bun is the only supported runtime: the database layer imports `bun:sqlite`. Under Node the
+ * Bun is the only supported runtime: the database layer uses `Bun.SQL`. Under Node the
  * process dies while linking on an unsupported `bun:` URL, which reads as a packaging bug — so say
  * so plainly, and say what to run.
  */

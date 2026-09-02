@@ -21,65 +21,63 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
+// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
+// synchronous — an async one never resolves and the file hangs.
+ctx.db = await createTestDb();
+
+const now = '2026-01-01T00:00:00.000Z';
+// Seeded at module scope rather than inside the factory below, which Bun evaluates
+// synchronously and so cannot await.
+await ctx.db.insert(schemaModule.oauthProviders).values([
+  {
+    id: 'autolink-idp',
+    name: 'Auto-link IdP',
+    type: 'oidc',
+    clientId: 'cid-a',
+    clientSecret: 'secret-a',
+    issuer: 'https://autolink.example',
+    scopes: 'openid email profile',
+    autoLink: true,
+    enabled: true,
+    source: 'ui',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'manual-idp',
+    name: 'Manual IdP',
+    type: 'oidc',
+    clientId: 'cid-b',
+    clientSecret: 'secret-b',
+    issuer: 'https://manual.example',
+    scopes: 'openid email profile',
+    autoLink: false,
+    enabled: true,
+    source: 'ui',
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'disabled-idp',
+    name: 'Disabled IdP',
+    type: 'oidc',
+    clientId: 'cid-c',
+    clientSecret: 'secret-c',
+    issuer: 'https://disabled.example',
+    scopes: 'openid email profile',
+    autoLink: true,
+    enabled: false,
+    source: 'ui',
+    createdAt: now,
+    updatedAt: now,
+  },
+]);
+
 vi.mock('../../src/lib/db', () => {
-  ctx.db = createTestDb();
-
-  const now = '2026-01-01T00:00:00.000Z';
-  // Bun evaluates a vi.mock factory synchronously, so this seed cannot be awaited. `.run()` is
-  // SQLite's synchronous execution and is not on the shared (PostgreSQL) type — the cast reaches
-  // the real bun:sqlite builder underneath. Test-only: app code must stay awaitable.
-  (
-    ctx.db.insert(schemaModule.oauthProviders).values([
-      {
-        id: 'autolink-idp',
-        name: 'Auto-link IdP',
-        type: 'oidc',
-        clientId: 'cid-a',
-        clientSecret: 'secret-a',
-        issuer: 'https://autolink.example',
-        scopes: 'openid email profile',
-        autoLink: true,
-        enabled: true,
-        source: 'ui',
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'manual-idp',
-        name: 'Manual IdP',
-        type: 'oidc',
-        clientId: 'cid-b',
-        clientSecret: 'secret-b',
-        issuer: 'https://manual.example',
-        scopes: 'openid email profile',
-        autoLink: false,
-        enabled: true,
-        source: 'ui',
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'disabled-idp',
-        name: 'Disabled IdP',
-        type: 'oidc',
-        clientId: 'cid-c',
-        clientSecret: 'secret-c',
-        issuer: 'https://disabled.example',
-        scopes: 'openid email profile',
-        autoLink: true,
-        enabled: false,
-        source: 'ui',
-        createdAt: now,
-        updatedAt: now,
-      },
-    ]) as unknown as { run: () => void }
-  ).run();
-
   return {
     default: ctx.db,
     db: ctx.db,
     client: undefined,
-    dialect: 'sqlite' as const,
     schema: schemaModule,
     nowIso: () => new Date().toISOString(),
     toIso: (value: string | Date | null | undefined): string | null => {

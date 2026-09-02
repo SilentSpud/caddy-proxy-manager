@@ -23,7 +23,7 @@ vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 let userId: number;
 
 beforeEach(async () => {
-  db = createTestDb();
+  db = await createTestDb();
   vi.clearAllMocks();
   // Seed a user to satisfy FK constraints on createdBy
   const now = new Date().toISOString();

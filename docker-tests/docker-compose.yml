@@ -15,7 +15,8 @@ networks:
           gateway: 172.28.0.1
 
 volumes:
-  cpm-data:      # web: sqlite database
+  postgres-data: # postgres: the controller's database
+  cpm-data:      # web: certificates and shared state
   caddy-data:    # caddy: certificate storage
   caddy-config:  # caddy: autosave.json
   caddy-logs:    # shared: access log + coraza audit log (web parses these)
@@ -97,6 +98,23 @@ services:
         ipv4_address: 172.28.0.30
 
   # ── System under test ───────────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cpm
+      POSTGRES_PASSWORD: docker-tests
+      POSTGRES_DB: cpm
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./config/postgres-init.sql:/docker-entrypoint-initdb.d/10-agent.sql:ro
+    networks:
+      - cpm-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cpm -d cpm"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   caddy:
     build:
       context: ..
@@ -132,8 +150,7 @@ services:
       CADDY_API_URL: http://caddy:2019
       BASE_URL: http://web:3000
       NEXTAUTH_URL: http://web:3000
-      DATABASE_PATH: /app/data/cpm.db
-      DATABASE_URL: file:/app/data/cpm.db
+      DATABASE_URL: postgres://cpm:docker-tests@postgres:5432/cpm
       APP_NAME: CPM Docker Test
       AVATAR_GRAVATAR: "false"
       ADMIN_USERNAME: cpmadmin
@@ -153,6 +170,8 @@ services:
       - caddy-logs:/logs
       - acme-ca:/acme-ca
     depends_on:
+      postgres:
+        condition: service_healthy
       caddy:
         condition: service_healthy
     networks:
@@ -267,8 +286,7 @@ services:
       CADDY_API_URL: http://localhost:2019
       BASE_URL: http://web-agent:3000
       NEXTAUTH_URL: http://web-agent:3000
-      DATABASE_PATH: /app/data/cpm.db
-      DATABASE_URL: file:/app/data/cpm.db
+      DATABASE_URL: postgres://cpm:docker-tests@postgres:5432/cpm_agent
       ADMIN_USERNAME: cpmadmin
       ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
       CLICKHOUSE_PASSWORD: ""
@@ -276,6 +294,9 @@ services:
       - cpm-data-agent:/app/data
       - caddy-logs-agent:/logs
       - acme-ca-agent:/acme-ca
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       cpm-test:
         ipv4_address: 172.28.0.13

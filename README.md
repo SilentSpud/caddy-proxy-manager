@@ -32,9 +32,9 @@ Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, c
 
 ### Runtime
 
-[Bun](https://bun.sh) is the only supported runtime. The app uses `bun:sqlite`, a Bun
-built-in with no Node.js equivalent, so it refuses to start under Node.js and tells you
-what to run instead.
+[Bun](https://bun.sh) is the only supported runtime. The app reaches PostgreSQL through
+`Bun.SQL`, a Bun built-in with no Node.js equivalent, so it refuses to start under Node.js
+and tells you what to run instead.
 
 For local work:
 
@@ -107,7 +107,9 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `APP_NAME` | Display name in the sidebar, on the login card, and as the suffix on every page title | `Caddy Proxy Manager` | No |
 | `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides (and syncs from controller to agents) | Unset (toggle decides) | No |
 | `CADDY_API_URL` | Caddy Admin API endpoint | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
-| `DATABASE_URL` | Database connection. A path or `file:` URL selects SQLite; a `postgres://` URL selects PostgreSQL. See [Database Backends](#database-backends) | `file:/app/data/caddy-proxy-manager.db` | No |
+| `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values below when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
+| `POSTGRES_PASSWORD` | Password for the bundled `postgres` service. Interpolated by Compose on the host, not read by the app | None | **Yes** |
+| `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates. Compose-only, as above | `cpm` / `cpm` | No |
 | `CERTS_DIRECTORY` | Certificate storage directory | `./data/certs` | No |
 | `LOGIN_MAX_ATTEMPTS` | Max login attempts before rate limit | `5` | No |
 | `LOGIN_WINDOW_MS` | Rate limit window in milliseconds | `300000` (5 min) | No |
@@ -178,55 +180,60 @@ Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credent
 
 ---
 
-## Database Backends
+## The Database
 
-`DATABASE_URL` selects the backend. SQLite is the default and needs no configuration.
-
-| Backend | `DATABASE_URL` | Driver |
-| ------- | -------------- | ------ |
-| SQLite (default) | `file:/app/data/caddy-proxy-manager.db`, a bare path, or `:memory:` | `bun:sqlite` |
-| PostgreSQL | `postgres://user:password@host:5432/dbname` | `Bun.SQL` |
-
-Anything without a recognized URL scheme is read as a SQLite path, so every pre-existing `.env`
-keeps working untouched. MySQL and MariaDB are rejected with a clear error rather than being
-mistaken for a filename: Bun can talk to them, but Drizzle's Bun driver only builds PostgreSQL, and
-several write paths here depend on `RETURNING`, which MySQL does not implement.
-
-### Using PostgreSQL
-
-Point `DATABASE_URL` at the server and start normally — migrations run on boot, the same as with
-SQLite:
+PostgreSQL only. `docker compose up -d` starts a `postgres` service alongside the app and points
+`DATABASE_URL` at it, so a default install needs nothing but a password:
 
 ```bash
-DATABASE_URL=postgres://cpm:secret@postgres:5432/cpm docker compose up -d
+POSTGRES_PASSWORD=$(openssl rand -base64 32)
+```
+
+To use a server you already run, set `DATABASE_URL` yourself and the bundled service is ignored:
+
+```bash
+DATABASE_URL=postgres://cpm:secret@db.internal:5432/cpm docker compose up -d
 ```
 
 The database must already exist; the app creates its own tables but not the database itself.
+Migrations run on boot.
 
-### Switching an existing deployment
+MySQL, MariaDB and the rest are rejected by name at startup rather than half-working: Bun can talk
+to some of them, but Drizzle's Bun driver only builds PostgreSQL, and several write paths here
+depend on `RETURNING`.
 
-There is no migration path between backends. Pointing an existing SQLite deployment at an empty
-PostgreSQL server gives you a working but **empty** install — proxy hosts, certificates, users and
-settings all stay behind in the SQLite file. Export what you need first, or treat the switch as a
-fresh install.
+### Upgrading from 3.0, which used SQLite
+
+Leave the old `.env` alone and stand up PostgreSQL first, then point `DATABASE_URL` at it. On the
+next start the app finds the old SQLite file, checks it against the schema it expects, and offers
+to migrate it — proxy hosts, certificates, users and settings included. If several candidate files
+are found, it asks which one.
+
+Starting with a SQLite `DATABASE_URL` still set fails immediately, with a message saying so. That
+is deliberate: silently starting against an empty database would look like total data loss.
 
 ### Working on the schema
 
-`apps/controller/src/lib/db/schema.sqlite.ts` is the source of truth. `schema.pg.ts` is generated from it, and each
-backend keeps its own migration folder because the generated DDL is not portable:
+`apps/controller/src/lib/db/schema.pg.ts` is the source of truth — hand-edited, since the SQLite
+schema it used to be generated from is gone. After changing it:
 
 ```bash
-bun run db:schema:pg                                              # after editing the SQLite schema
-bun run db:generate                                            # SQLite migrations -> drizzle/
-DATABASE_URL=postgres://... bun run db:generate                # PostgreSQL       -> drizzle/postgres/
+DATABASE_URL=postgres://... bun run db:generate         # emits drizzle/postgres/
 ```
 
-`apps/controller/tests/unit/db-schema-parity.test.ts` fails if the two schemas drift or the generator was not
-re-run. `tests/integration/db-backend.test.ts` runs the same behavioural checks against both
-backends; it covers SQLite always, and PostgreSQL when `TEST_POSTGRES_URL` is set:
+`apps/controller/drizzle/legacy-sqlite/` holds the migrations every pre-3.1 deployment ran. Nothing
+generates into it; it stays so the migration flow's tests can build a realistic old database.
+
+### Running the tests
+
+`bun run test` starts a throwaway PostgreSQL container, runs the suite against it, and removes it.
+Docker is the only prerequisite. Each test gets its own schema, so nothing leaks between them.
+
+To use a server of your own instead, set `TEST_POSTGRES_URL` — the suite will use it and start no
+container. Anything in it may be dropped, so do not point it at something you care about.
 
 ```bash
-TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:55433/cpm bun test tests/integration/db-backend.test.ts
+TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:5432/cpm_test bun run test
 ```
 
 ---

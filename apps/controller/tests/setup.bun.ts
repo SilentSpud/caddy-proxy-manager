@@ -1,5 +1,6 @@
-import { beforeEach } from 'bun:test';
+import { afterEach, beforeEach } from 'bun:test';
 import { installFakeCaddy } from './helpers/caddy-admin';
+import { cleanupTestDbs, markTestBoundary } from './helpers/db';
 import { clearDotEnv } from './helpers/env';
 import { vi } from './helpers/vi';
 
@@ -33,6 +34,17 @@ if (!process.env.TEST_LOG) {
 installFakeCaddy();
 beforeEach(() => {
   installFakeCaddy();
+  // Registered from the preload, so it runs before any hook the test file declares — which is what
+  // makes a database created in the file's own beforeEach count as belonging to the test.
+  markTestBoundary();
+});
+
+/**
+ * Every schema createTestDb() opened during the test, dropped along with its connection. Without
+ * it a file's tests accumulate one connection each and the suite exhausts max_connections.
+ */
+afterEach(async () => {
+  await cleanupTestDbs();
 });
 
 /**

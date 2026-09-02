@@ -1,9 +1,8 @@
-import type { Database } from 'bun:sqlite';
+import type { SQL } from 'bun';
 import { afterEach, describe, expect, it } from 'bun:test';
+import { createTestDatabase } from '@/tests/helpers/db';
+import { TEST_ENV } from '@/tests/helpers/env';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
 function resetDbModuleState() {
   delete (globalThis as typeof globalThis & { __DRIZZLE_DB__?: unknown }).__DRIZZLE_DB__;
@@ -12,17 +11,19 @@ function resetDbModuleState() {
 }
 
 afterEach(() => {
-  process.env.DATABASE_URL = ':memory:';
+  // Back to the suite-wide database, not deleted: connection.ts throws at import without one.
+  process.env.DATABASE_URL = TEST_ENV.DATABASE_URL;
   resetDbModuleState();
 });
 
 describe('API token deletion authorization', () => {
   it("makes another user's token indistinguishable from a nonexistent ID", async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'cpm-api-token-auth-'));
-    const databasePath = join(directory, 'tokens.db');
+    // A database of its own rather than one of the per-test schemas: this boots the real db
+    // module, which reads DATABASE_URL and opens its own connection.
+    const database = await createTestDatabase();
 
     try {
-      process.env.DATABASE_URL = `file:${databasePath}`;
+      process.env.DATABASE_URL = database.url;
       resetDbModuleState();
 
       // Bun cannot drop a module from its registry, so a unique specifier re-evaluates db
@@ -102,14 +103,10 @@ describe('API token deletion authorization', () => {
         }),
       ).toBeUndefined();
 
-      // $client is the raw driver handle, `unknown` on the shared type because it differs per
-      // backend. This test only ever runs against SQLite.
-      (db.$client as Database).close();
+      // $client is the raw driver handle, `unknown` on the shared type.
+      await (db.$client as SQL).close();
     } finally {
-      // bun:sqlite releases the file only once drizzle's prepared statements are finalized,
-      // which happens on collection — Windows refuses the removal until then.
-      Bun.gc(true);
-      rmSync(directory, { recursive: true, force: true });
+      await database.drop();
     }
   });
 });

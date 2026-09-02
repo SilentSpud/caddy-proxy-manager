@@ -25,20 +25,21 @@ const ctx = vi.hoisted(() => {
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
+// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
+// synchronous — an async one never resolves and the file hangs.
+ctx.db = await createTestDb();
+
 vi.mock('../../src/lib/db', () => {
-  ctx.db = createTestDb();
   return {
     default: ctx.db,
     db: ctx.db,
     client: undefined,
-    dialect: 'sqlite' as const,
-    // Mirrors connection.ts's SQLite branch: run the statement list synchronously inside
-    // bun:sqlite's transaction. Keeping the same shape here means applySyncPayload's real
-    // build-then-execute path is what the tests exercise.
-    runInTransaction: async (build: (tx: any) => Array<{ run?: () => unknown }>): Promise<void> => {
-      (ctx.db as any).transaction((tx: any) => {
+    // Mirrors connection.ts: await each statement inside the transaction. Keeping the same shape
+    // here means applySyncPayload's real build-then-execute path is what the tests exercise.
+    runInTransaction: async (build: (tx: any) => Array<PromiseLike<unknown>>): Promise<void> => {
+      await (ctx.db as any).transaction(async (tx: any) => {
         for (const statement of build(tx)) {
-          statement.run?.();
+          await statement;
         }
       });
     },

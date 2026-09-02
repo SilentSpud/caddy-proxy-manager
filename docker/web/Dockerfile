@@ -21,16 +21,17 @@ COPY apps/controller/package.json ./apps/controller/
 COPY apps/agent/package.json ./apps/agent/
 COPY apps/site/package.json ./apps/site/
 COPY packages/shared/package.json ./packages/shared/
-# --ignore-scripts skips native addon build steps; nothing here needs one, since
-# SQLite comes from bun's built-in bun:sqlite rather than a compiled addon.
+# --ignore-scripts skips native addon build steps; nothing here needs one, since the PostgreSQL
+# driver is Bun's built-in Bun.SQL rather than a compiled addon.
 RUN bun install --frozen-lockfile --ignore-scripts
 
 FROM base AS builder
 ARG TARGETARCH
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_PATH=/tmp/build.db
-ENV DATABASE_URL=file:/tmp/build.db
+# Never connected to: the bundler does not execute the app's startup path, and src/lib/db/dialect.ts
+# rejects anything that is not a PostgreSQL URL at import. This satisfies that check and nothing else.
+ENV DATABASE_URL=postgres://build:build@127.0.0.1:5/unused
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # `build` emits dist/standalone; `build:binary` compiles scripts/standalone-entry.ts and the vinext
@@ -42,7 +43,7 @@ RUN case "$TARGETARCH" in \
       arm64) export BUN_COMPILE_TARGET=bun-linux-arm64 ;; \
       *) echo "docker/web/Dockerfile: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
     esac && \
-    bun run build && bun run build:binary && rm -f /tmp/build.db
+    bun run build && bun run build:binary
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package manager

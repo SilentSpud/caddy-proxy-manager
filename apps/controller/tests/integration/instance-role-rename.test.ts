@@ -7,17 +7,18 @@
  * line, just a silently diverged instance. The token key move matters for the same reason: an
  * orphaned instance_master_token row means the agent authenticates with nothing.
  *
- * Runs against a real database file rather than mocks: the migration is raw drizzle against the
- * settings table, so a mock would only be testing itself.
+ * Runs against a real database rather than mocks: the migration is raw drizzle against the
+ * settings table, so a mock would only be testing itself. A database of its own, not one of the
+ * per-test schemas — the db module reads DATABASE_URL and opens its own connection.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { Database } from 'bun:sqlite';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
-import * as sqliteSchema from '@/src/lib/db/schema.sqlite';
+import { resolve } from 'node:path';
+import { SQL } from 'bun';
+import { drizzle } from 'drizzle-orm/bun-sql';
+import { migrate } from 'drizzle-orm/bun-sql/migrator';
+import * as pgSchema from '@/src/lib/db/schema.pg';
+import { createTestDatabase } from '@/tests/helpers/db';
+import { TEST_ENV } from '@/tests/helpers/env';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 
 function resetDbModuleState() {
@@ -27,7 +28,9 @@ function resetDbModuleState() {
 }
 
 afterEach(() => {
-  process.env.DATABASE_URL = ':memory:';
+  // Back to the suite-wide database, not deleted: connection.ts throws at import without one.
+  process.env.DATABASE_URL = TEST_ENV.DATABASE_URL;
+  process.env.CPM_EPHEMERAL_DB = TEST_ENV.CPM_EPHEMERAL_DB;
   resetDbModuleState();
 });
 
@@ -38,25 +41,26 @@ afterEach(() => {
  */
 async function migrateWithSettings(
   rows: Array<{ key: string; value: string }>,
-): Promise<{ settings: Map<string, string>; cleanup: () => void }> {
-  const directory = mkdtempSync(join(tmpdir(), 'cpm-role-rename-'));
-  const databasePath = join(directory, 'roles.db');
+): Promise<{ settings: Map<string, string>; cleanup: () => Promise<void> }> {
+  const database = await createTestDatabase();
 
   // Apply the real schema migrations first, then seed — the same order an upgrading deployment
-  // sees. Creating the settings table by hand instead would collide with migration 0000.
-  const seed = new Database(databasePath);
-  migrate(drizzle(seed, { schema: sqliteSchema }), {
-    migrationsFolder: resolve(process.cwd(), 'drizzle'),
+  // sees. Through drizzle's migrator rather than raw DDL, so the journal is written and the db
+  // module's own startup migration finds nothing left to do.
+  const seed = new SQL({ url: database.url, max: 1 });
+  await migrate(drizzle(seed, { schema: pgSchema }) as never, {
+    migrationsFolder: resolve(process.cwd(), 'drizzle', 'postgres'),
   });
-  const insert = seed.prepare(
-    'INSERT INTO "settings" ("key", "value", "updatedAt") VALUES (?, ?, ?)',
-  );
   for (const row of rows) {
-    insert.run(row.key, row.value, '2026-01-01T00:00:00.000Z');
+    await seed`INSERT INTO "settings" ("key", "value", "updatedAt")
+               VALUES (${row.key}, ${row.value}, '2026-01-01T00:00:00.000Z')`;
   }
-  seed.close();
+  await seed.close();
 
-  process.env.DATABASE_URL = `file:${databasePath}`;
+  process.env.DATABASE_URL = database.url;
+  // The suite marks its databases ephemeral so the one-time data migrations are skipped. This one
+  // is the migration under test, so it has to look like a real deployment's database.
+  delete process.env.CPM_EPHEMERAL_DB;
   resetDbModuleState();
   const { dbModule, schema } = await reloadDbModule();
 
@@ -65,10 +69,9 @@ async function migrateWithSettings(
 
   return {
     settings,
-    cleanup: () => {
-      (dbModule.client as { close?: () => void })?.close?.();
-      Bun.gc(true);
-      rmSync(directory, { recursive: true, force: true });
+    cleanup: async () => {
+      await (dbModule.client as { close?: () => Promise<void> })?.close?.();
+      await database.drop();
     },
   };
 }
@@ -81,7 +84,7 @@ describe('runInstanceRoleRename', () => {
     try {
       expect(settings.get('instance_mode')).toBe(JSON.stringify('agent'));
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -92,7 +95,7 @@ describe('runInstanceRoleRename', () => {
     try {
       expect(settings.get('instance_mode')).toBe(JSON.stringify('controller'));
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -105,7 +108,7 @@ describe('runInstanceRoleRename', () => {
       expect(settings.get('instance_controller_token')).toBe(token);
       expect(settings.has('instance_master_token')).toBe(false);
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -120,7 +123,7 @@ describe('runInstanceRoleRename', () => {
       expect(settings.get('instance_controller_token')).toBe(JSON.stringify('current'));
       expect(settings.has('instance_master_token')).toBe(false);
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -133,7 +136,7 @@ describe('runInstanceRoleRename', () => {
       expect(settings.get('instance_mode')).toBe(JSON.stringify('agent'));
       expect(settings.get('instance_controller_token')).toBe(JSON.stringify('already-correct'));
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -144,7 +147,7 @@ describe('runInstanceRoleRename', () => {
     try {
       expect(settings.get('instance_mode')).toBe(JSON.stringify('standalone'));
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -155,7 +158,7 @@ describe('runInstanceRoleRename', () => {
     try {
       expect(settings.get('instance_roles_renamed')).toBe('true');
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -170,7 +173,7 @@ describe('runInstanceRoleRename', () => {
     try {
       expect(settings.get('instance_mode')).toBe(JSON.stringify('master'));
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 
@@ -180,7 +183,7 @@ describe('runInstanceRoleRename', () => {
       expect(settings.get('instance_roles_renamed')).toBe('true');
       expect(settings.has('instance_mode')).toBe(false);
     } finally {
-      cleanup();
+      await cleanup();
     }
   });
 });

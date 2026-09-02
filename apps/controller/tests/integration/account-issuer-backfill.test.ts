@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { createLocalAccountIssuer, createOAuthAccountIssuer } from '@better-auth/core/db';
 
 const migrationSql = readFileSync(
-  resolve(process.cwd(), 'drizzle', '0024_account_issuer.sql'),
+  resolve(process.cwd(), 'drizzle', 'legacy-sqlite', '0024_account_issuer.sql'),
   'utf8',
 );
 

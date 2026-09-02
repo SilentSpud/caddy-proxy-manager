@@ -1,7 +1,7 @@
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { genericOAuth, username } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import db, { dialect } from "./db";
+import db from "./db";
 import * as schema from "./db/schema";
 import { eq } from "drizzle-orm";
 import { config } from "./config";
@@ -177,18 +177,12 @@ async function createAuth(): Promise<any> {
   const trustedProviderIds = [...cachedTrustedProviderIds];
 
   return betterAuth({
-    // One adapter for both backends. Better Auth also accepts a raw bun:sqlite handle and drives
-    // it through its own Kysely adapter, which is how SQLite deployments' rows were originally
-    // written — but PostgreSQL has no equivalent handle, and keeping both meant two query builders
-    // reaching the same tables, where a bug could appear on one backend only and the unit tests
-    // (which stub betterAuth) would catch neither.
-    //
     // `schema` is the whole module: the adapter resolves each model by the `modelName` configured
     // below, and those names already match the exported table bindings. Rows written by the
     // previous Kysely path stay readable — tests/integration/auth-adapter-compat.test.ts signs in
     // as a user created that way.
     database: drizzleAdapter(db, {
-      provider: dialect === "postgres" ? "pg" : "sqlite",
+      provider: "pg",
       schema,
     }),
     secret: config.sessionSecret,

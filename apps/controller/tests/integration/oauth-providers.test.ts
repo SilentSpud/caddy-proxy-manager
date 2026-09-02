@@ -7,8 +7,8 @@ import { encryptSecret, decryptSecret } from '@/src/lib/secret';
 
 let db: TestDb;
 
-beforeEach(() => {
-  db = createTestDb();
+beforeEach(async () => {
+  db = await createTestDb();
 });
 
 function nowIso() {

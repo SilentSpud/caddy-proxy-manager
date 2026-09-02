@@ -104,12 +104,27 @@ Each phase ends green — tests, typecheck, lint, build — and lands on `main` 
 | # | Phase | Status |
 | --- | --- | --- |
 | 0 | Monorepo restructure | Done — `4463b947` |
-| 1 | PostgreSQL only | |
+| 1 | PostgreSQL only | Done |
 | 2 | Settings service: typed registry, DB-backed config with an env-override layer | |
 | 3 | First-run setup and login-verify flow | |
 | 4 | Migration flow | |
 | 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | |
 | 6 | IPv6 | |
+
+### Owed to phase 4
+
+Three test files were deleted in phase 1 because they tested a path that no longer exists — running
+the application *on* a legacy SQLite database. What they covered is still worth covering, but as
+migration tests, reading an old database rather than booting on one:
+
+- `auth-adapter-compat.test.ts` — Better Auth reading rows written by the old Kysely/SQLite path.
+- `db-compat-accounts.test.ts` — repairing a legacy `accounts.id` schema, and the issuer backfill's
+  refusal to merge colliding identities.
+- `db-backend.test.ts` — serial ids, boolean round trips, upserts and transactions. Now covered
+  incidentally by the whole suite running on PostgreSQL, so this one needs no successor.
+
+`src/lib/db/legacy-sqlite.ts` is unreferenced for the same reason and kept for the same one: it
+encodes which release wrote which column names, which is not recoverable from the current schema.
 
 Phases 1 and 5 carry the risk. Phase 1 rebuilds the test suite's database layer across 132 test
 files; Phase 5 moves the eight places the controller touches the Caddy host's filesystem behind an

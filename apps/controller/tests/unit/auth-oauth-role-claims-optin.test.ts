@@ -12,15 +12,18 @@ const ctx = vi.hoisted(() => {
   return { db: null as unknown as TestDb };
 });
 
-afterAll(() => {
+afterAll(async () => {
   delete process.env.AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS;
 });
 
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
+// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
+// synchronous — an async one never resolves and the file hangs.
+ctx.db = await createTestDb();
+
 vi.mock('../../src/lib/db', () => {
-  ctx.db = createTestDb();
   return {
     default: ctx.db,
     get sqlite() {

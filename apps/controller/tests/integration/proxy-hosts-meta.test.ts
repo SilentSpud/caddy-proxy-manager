@@ -8,8 +8,8 @@ import { proxyHosts } from '@/src/lib/db/schema';
 
 let db: TestDb;
 
-beforeEach(() => {
-  db = createTestDb();
+beforeEach(async () => {
+  db = await createTestDb();
 });
 
 function nowIso() {

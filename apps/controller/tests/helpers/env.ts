@@ -2,14 +2,21 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// apps/controller — the dotenv files Bun reads sit at the repo root, two levels further up.
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
 /**
  * The environment every test run must see. Applied by clearDotEnv() below,
  * which the preload calls before any test file is imported.
  */
 export const TEST_ENV: Record<string, string> = {
-  DATABASE_URL: ':memory:',
+  // src/lib/db/connection.ts resolves this at module load and throws on anything but PostgreSQL,
+  // so it has to be set before the first import — not in a beforeEach. scripts/with-test-db.ts
+  // provides the server.
+  DATABASE_URL: process.env.TEST_POSTGRES_URL ?? '',
+  // What `:memory:` used to signal: a database with no deployment history, so the one-time data
+  // migrations in src/lib/db.ts have nothing to migrate.
+  CPM_EPHEMERAL_DB: 'true',
   // Read by the backstop in src/lib/caddy-admin.ts, which refuses to open a real socket when it is
   // set. `bun test` sets no marker of its own beyond NODE_ENV=test, so the suite declares one.
   CPM_TEST: '1',

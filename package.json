@@ -40,7 +40,6 @@
     "typecheck": "bun run --filter @cpm/shared typecheck && bun run --filter @cpm/controller typecheck",
     "test:all": "./scripts/test-all.sh",
     "db:generate": "bun run --filter @cpm/controller db:generate",
-    "db:schema:pg": "bun run --filter @cpm/controller db:schema:pg",
     "db:migrate": "bun run --filter @cpm/controller db:migrate",
     "test": "bun run --filter @cpm/controller test",
     "test:watch": "bun run --filter @cpm/controller test:watch",

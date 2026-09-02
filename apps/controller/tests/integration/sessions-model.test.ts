@@ -63,7 +63,7 @@ async function seedSession(opts: {
 }
 
 beforeEach(async () => {
-  db = createTestDb();
+  db = await createTestDb();
   await seedUser(1, 'alice@example.com');
   await seedUser(2, 'bob@example.com');
 });

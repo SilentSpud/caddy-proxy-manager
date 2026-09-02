@@ -28,7 +28,7 @@ vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 let userId: number;
 
 beforeEach(async () => {
-  db = createTestDb();
+  db = await createTestDb();
   vi.clearAllMocks();
   const now = new Date().toISOString();
   const [user] = await db

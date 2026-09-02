@@ -12,10 +12,13 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
+// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
+// synchronous — an async one never resolves and the file hangs. Creating it once here also
+// subsumes the memoisation the factory used to do, so a re-run never discards the setting saved a
+// moment earlier — the env-overrides-toggle cases depend on it surviving.
+ctx.db = await createTestDb();
+
 vi.mock('../../src/lib/db', () => {
-  // Memoised so a re-run of this factory never discards the setting saved a
-  // moment earlier — the env-overrides-toggle cases depend on it surviving.
-  ctx.db ??= createTestDb();
   return {
     default: ctx.db,
     sqlite: undefined,

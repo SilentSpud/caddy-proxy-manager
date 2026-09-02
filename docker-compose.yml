@@ -28,11 +28,10 @@ services:
       # Public URL this instance is reached at.
       BASE_URL: ${BASE_URL:-http://localhost:3000}
 
-      DATABASE_PATH: /app/data/caddy-proxy-manager.db
-      # SQLite by default. Set DATABASE_URL to postgres://user:pass@host:5432/db to use
-      # PostgreSQL instead — the database must already exist, and there is no migration
-      # path from an existing SQLite file. See "Database Backends" in the README.
-      DATABASE_URL: ${DATABASE_URL:-file:/app/data/caddy-proxy-manager.db}
+      # PostgreSQL only. Points at the postgres service below unless you override it with your
+      # own server; the database must already exist. An existing SQLite file is migrated through
+      # the in-app migration flow, not by pointing this at it.
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-cpm}:${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-cpm}}
 
       NEXTAUTH_URL: ${BASE_URL:-http://localhost:3000}
 
@@ -127,6 +126,8 @@ services:
       - caddy-logs:/logs
       - acme-ca:/acme-ca
     depends_on:
+      postgres:
+        condition: service_healthy
       caddy:
         condition: service_healthy
       clickhouse:
@@ -229,6 +230,28 @@ services:
     networks:
       - socket-proxy
 
+  # The controller's database. No profile: unlike clickhouse and geoipupdate this is not optional,
+  # since SQLite support was removed. Unpublished on purpose — nothing outside the compose network
+  # needs it, and publishing 5432 is how a database ends up on the internet.
+  postgres:
+    container_name: caddy-proxy-manager-postgres
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cpm}
+      POSTGRES_USER: ${POSTGRES_USER:-cpm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - caddy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cpm} -d ${POSTGRES_DB:-cpm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
     image: clickhouse/clickhouse-server:latest-alpine
@@ -285,4 +308,5 @@ volumes:
   caddy-logs:
   geoip-data:
   clickhouse-data:
+  postgres-data:
   acme-ca:

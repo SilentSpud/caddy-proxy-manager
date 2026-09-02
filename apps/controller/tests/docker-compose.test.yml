@@ -1,4 +1,17 @@
 services:
+  # Creates the extra databases the additional web instances below need. The base compose file's
+  # postgres service makes only one.
+  postgres:
+    volumes:
+      - ./apps/controller/tests/postgres-init.sql:/docker-entrypoint-initdb.d/10-e2e.sql:ro
+    # web-controller and web-agent sit on their own networks and would otherwise have no route to
+    # the database.
+    networks:
+      - caddy-network
+      - instance-sync-network
+      - controller-caddy-network
+      - agent-caddy-network
+
   # Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI or shell
   # runtime — deliberately, so the tests run the image that ships — so seeding happens in this
   # throwaway container, which mounts the same data volume and opens the same SQLite file.
@@ -8,8 +21,8 @@ services:
     profiles: ["tools"]
     working_dir: /app
     entrypoint: ["bun"]
-    volumes:
-      - caddy-manager-data:/app/data
+    # No data volume any more: seeding talks to the postgres service over the network, not to a
+    # file on the shared volume.
     networks:
       - caddy-network
 
@@ -50,8 +63,7 @@ services:
       ADMIN_PASSWORD: "TestPassword2026!"
       BASE_URL: http://localhost:3001
       NEXTAUTH_URL: http://localhost:3001
-      DATABASE_PATH: /app/data/caddy-proxy-manager.db
-      DATABASE_URL: file:/app/data/caddy-proxy-manager.db
+      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_registration
       CADDY_API_URL: http://caddy:2019
       AUTH_ALLOW_SELF_REGISTRATION: "true"
       AUTH_RATE_LIMIT_ENABLED: "false"
@@ -60,6 +72,8 @@ services:
     volumes:
       - caddy-manager-registration-data:/app/data
     depends_on:
+      postgres:
+        condition: service_healthy
       caddy:
         condition: service_healthy
     networks:
@@ -238,8 +252,7 @@ services:
       ADMIN_PASSWORD: "TestPassword2026!"
       BASE_URL: http://localhost:3002
       NEXTAUTH_URL: http://localhost:3002
-      DATABASE_PATH: /app/data/caddy-proxy-manager.db
-      DATABASE_URL: file:/app/data/caddy-proxy-manager.db
+      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_controller
       CADDY_API_URL: http://caddy:2019
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
@@ -253,6 +266,8 @@ services:
       - web-controller-data:/app/data
       - acme-ca-controller:/acme-ca
     depends_on:
+      postgres:
+        condition: service_healthy
       caddy-controller:
         condition: service_healthy
     networks:
@@ -279,8 +294,7 @@ services:
       ADMIN_PASSWORD: "TestPassword2026!"
       BASE_URL: http://localhost:3003
       NEXTAUTH_URL: http://localhost:3003
-      DATABASE_PATH: /app/data/caddy-proxy-manager.db
-      DATABASE_URL: file:/app/data/caddy-proxy-manager.db
+      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_agent
       CADDY_API_URL: http://caddy:2019
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
@@ -292,6 +306,8 @@ services:
       - web-agent-data:/app/data
       - acme-ca-agent:/acme-ca
     depends_on:
+      postgres:
+        condition: service_healthy
       caddy-agent:
         condition: service_healthy
     networks:

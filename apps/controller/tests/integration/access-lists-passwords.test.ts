@@ -10,8 +10,8 @@ import bcrypt from 'bcryptjs';
 
 let db: TestDb;
 
-beforeEach(() => {
-  db = createTestDb();
+beforeEach(async () => {
+  db = await createTestDb();
 });
 
 // ---------------------------------------------------------------------------

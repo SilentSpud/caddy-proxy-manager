@@ -17,24 +17,11 @@ jobs:
     # runner, reachable only from this job.
     permissions: {}
 
-    # PostgreSQL is a supported backend, so it gets exercised rather than assumed.
-    # tests/integration/db-backend.test.ts runs its checks against this server when
-    # TEST_POSTGRES_URL is set, and silently covers SQLite only when it is not.
+    # No postgres service container: the suite starts its own through
+    # apps/controller/scripts/with-test-db.ts, which needs to pass `-c max_connections=1000` and a
+    # tmpfs data directory. A service container takes neither, and running the same code path here
+    # as locally is worth more than reusing the runner's.
     services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: cpm
-          POSTGRES_PASSWORD: cpm-ci
-          POSTGRES_DB: cpm_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U cpm -d cpm_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
       # A real OIDC provider for tests/integration/oauth-flow.test.ts. OAuth is the one auth path
       # the fast suite cannot otherwise reach — the unit tests stub betterAuth outright — and a
       # broken callback previously only surfaced in the end-to-end suite, after the push.
@@ -86,7 +73,6 @@ jobs:
 
       - name: Run unit and integration tests with coverage
         env:
-          TEST_POSTGRES_URL: postgres://cpm:cpm-ci@127.0.0.1:5432/cpm_test
           TEST_OIDC_URL: http://localhost:5599
         run: bun run test:coverage
 
@@ -104,8 +90,7 @@ jobs:
         env:
           NODE_ENV: production
           NEXT_TELEMETRY_DISABLED: "1"
-          DATABASE_PATH: /tmp/caddy-proxy-manager-build.db
-          DATABASE_URL: file:/tmp/caddy-proxy-manager-build.db
+          DATABASE_URL: postgres://cpm:build@127.0.0.1:5/unused
           SESSION_SECRET: ci-build-session-secret-at-least-32-chars
           ADMIN_PASSWORD: ci-build-admin-password
         run: bun run build
