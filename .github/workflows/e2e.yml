@@ -26,6 +26,16 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      # Single source of truth for the browser set: the install step and the cache
+      # key both read it, so adding a browser here misses the cache and downloads
+      # it rather than restoring a bundle that is missing it.
+      #
+      # chromium for the desktop project, webkit for mobile-iphone: devices
+      # ['iPhone 15'] carries defaultBrowserType "webkit", so omitting it fails
+      # only the mobile project, and only once it reaches a test.
+      PLAYWRIGHT_BROWSERS: chromium webkit
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -38,11 +48,32 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # chromium for the desktop project, webkit for mobile-iphone: devices
-      # ['iPhone 15'] carries defaultBrowserType "webkit", so omitting it fails
-      # only the mobile project, and only once it reaches a test.
+      # Browser builds are pinned to the Playwright release, so the version is the
+      # whole cache key beyond the browser set. No restore-keys prefix: a partial
+      # hit would leave browsers from another release in place and the install step
+      # below would skip over them.
+      - name: Resolve the Playwright browser cache key
+        id: playwright
+        run: |
+          echo "version=$(bunx playwright --version | awk '{ print $2 }')" >> "$GITHUB_OUTPUT"
+          echo "browsers=$(echo "$PLAYWRIGHT_BROWSERS" | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.browsers }}
+
       - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium webkit
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install $PLAYWRIGHT_BROWSERS
+
+      # The shared libraries --with-deps pulls in are apt packages outside
+      # ~/.cache/ms-playwright, so the cache cannot carry them and this runs on a
+      # hit too. It is a no-op once they are present.
+      - name: Install Playwright system dependencies
+        run: bunx playwright install-deps $PLAYWRIGHT_BROWSERS
 
       # The default docker driver cannot export build cache, so type=gha in
       # tests/docker-compose.ci.yml needs a real buildx builder to exist first.
