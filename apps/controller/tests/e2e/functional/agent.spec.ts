@@ -1,17 +1,24 @@
 /**
  * Functional: Caddy rebuilder agent (#117). "Apply Ports" reaches "applied", and the agent
  * re-applies the override on startup after a restart. The bug: NETWORKS: 0 in the socket proxy
- * blocked the GET /networks/{id} compose makes. Must run after l4-proxy-routing.spec.ts.
+ * blocked the GET /networks/{id} compose makes.
+ *
+ * This used to say "must run after l4-proxy-routing.spec.ts", which was true and enforced by
+ * nothing but the alphabet — the file was called sidecar.spec.ts and sorted after it. Renaming it
+ * to agent.spec.ts moved it in front, so the port under test had not been created yet, the apply
+ * succeeded against an empty override, and only the TCP assertion noticed. It now creates the host
+ * itself when it is missing.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { waitForTcpEcho, tcpSend } from '../../helpers/tcp';
 import { COMPOSE_CWD } from '../../helpers/compose';
+import { createL4ProxyHost } from '../../helpers/l4-proxy-api';
 
 // Container name as defined in docker-compose.yml
 const AGENT_CONTAINER = 'caddy-proxy-manager-agent';
 
-// Port created by l4-proxy-routing.spec.ts — must match that file
+// Shared with l4-proxy-routing.spec.ts, which creates the same host when it runs first.
 const TCP_PORT = 15432;
 
 const BASE_URL = 'http://localhost:3000';
@@ -63,6 +70,23 @@ async function waitForL4Terminal(
 
 test.describe
   .serial('Agent', () => {
+    test('setup: an enabled L4 host is listening on the TCP port', async ({ page }) => {
+      // Idempotent: whichever of this file and l4-proxy-routing.spec.ts runs first creates it.
+      const existing = await page.request.get('/api/v1/l4-proxy-hosts');
+      expect(existing.ok(), `GET /api/v1/l4-proxy-hosts failed: ${await existing.text()}`).toBe(
+        true,
+      );
+      const hosts = (await existing.json()) as Array<{ listenAddress: string }>;
+      if (hosts.some((host) => host.listenAddress === `:${TCP_PORT}`)) return;
+
+      await createL4ProxyHost(page, {
+        name: 'L4 TCP Echo Test',
+        protocol: 'tcp',
+        listenAddress: `:${TCP_PORT}`,
+        upstream: 'tcp-echo:9000',
+      });
+    });
+
     test('apply ports reaches "applied" state', async ({ page }) => {
       // waitForL4Terminal polls for up to 90 s; the global 60 s timeout would
       // fire first without this override.

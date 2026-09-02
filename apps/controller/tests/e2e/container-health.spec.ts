@@ -8,6 +8,13 @@ import { COMPOSE_ARGS, COMPOSE_CWD } from '../helpers/compose';
 
 type ContainerInfo = {
   name: string;
+  /**
+   * The compose service, which is how every lookup below identifies a container. Matching on the
+   * name cannot work: the project is called caddy-proxy-manager, so `name.includes('caddy')` is
+   * true of every container in the stack, and which one `find` returned depended on the
+   * alphabetical position of the other services.
+   */
+  service: string;
   state: string;
   health?: string;
 };
@@ -28,6 +35,7 @@ function getContainers(): ContainerInfo[] {
       const c = JSON.parse(line);
       return {
         name: c.Name ?? c.Service,
+        service: c.Service ?? '',
         state: (c.State ?? '').toLowerCase(),
         health: (c.Health ?? '').toLowerCase() || undefined,
       };
@@ -49,21 +57,19 @@ test.describe('Container health', () => {
   });
 
   test('web container is healthy', () => {
-    const web = containers.find((c) => c.name.includes('web'));
+    const web = containers.find((c) => c.service === 'web');
     expect(web, 'web container not found').toBeTruthy();
     expect(web!.health, `web container health: ${web!.health}`).toBe('healthy');
   });
 
   test('caddy container is healthy', () => {
-    const caddy = containers.find(
-      (c) => c.name.includes('caddy') && !c.name.includes('proxy-manager-web'),
-    );
+    const caddy = containers.find((c) => c.service === 'caddy');
     expect(caddy, 'caddy container not found').toBeTruthy();
     expect(caddy!.health, `caddy container health: ${caddy!.health}`).toBe('healthy');
   });
 
   test('clickhouse container is healthy', () => {
-    const ch = containers.find((c) => c.name.includes('clickhouse'));
+    const ch = containers.find((c) => c.service === 'clickhouse');
     test.skip(
       !ch,
       'ClickHouse container not started (profile not active — analytics disabled run)',
@@ -72,7 +78,7 @@ test.describe('Container health', () => {
   });
 
   test('agent container is running (not crash-looping)', () => {
-    const agent = containers.find((c) => c.name.includes('agent'));
+    const agent = containers.find((c) => c.service === 'agent');
     expect(agent, 'agent container not found').toBeTruthy();
     expect(agent!.state, `agent state: ${agent!.state}`).toBe('running');
 
