@@ -25,9 +25,8 @@
  * Needs the mock IdP running (see tests/helpers/mock-idp.ts); skips with a note when it is not.
  */
 import { afterEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { createTestDatabase } from '@/tests/helpers/db';
+import { TEST_ENV } from '@/tests/helpers/env';
 import { vi } from '@/tests/helpers/vi';
 import { fresh } from '@/tests/helpers/fresh';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
@@ -47,7 +46,7 @@ if (!IDP_AVAILABLE) {
 }
 
 const PROVIDER_ID = 'mock';
-const cleanups: Array<() => void> = [];
+const cleanups: Array<() => void | Promise<void>> = [];
 
 function resetDbModuleState() {
   delete (globalThis as typeof globalThis & { __DRIZZLE_DB__?: unknown }).__DRIZZLE_DB__;
@@ -55,21 +54,24 @@ function resetDbModuleState() {
   delete (globalThis as typeof globalThis & { __MIGRATIONS_RAN__?: boolean }).__MIGRATIONS_RAN__;
 }
 
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
-  process.env.DATABASE_URL = ':memory:';
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
+  // Back to the suite-wide database, not deleted: connection.ts throws at import without one.
+  process.env.DATABASE_URL = TEST_ENV.DATABASE_URL;
+  process.env.CPM_EPHEMERAL_DB = TEST_ENV.CPM_EPHEMERAL_DB;
   resetDbModuleState();
 });
 
 /** Boot the app against a fresh database with the mock IdP registered as an env provider. */
 async function bootWithMockProvider() {
-  const directory = mkdtempSync(join(tmpdir(), 'cpm-oauth-flow-'));
-  cleanups.push(() => {
-    Bun.gc(true);
-    rmSync(directory, { recursive: true, force: true });
-  });
+  // A database of its own, not one of the per-test schemas: this boots the real db module, which
+  // reads DATABASE_URL and opens its own connection.
+  const database = await createTestDatabase();
+  cleanups.push(() => database.drop());
 
-  process.env.DATABASE_URL = `file:${join(directory, 'oauth.db')}`;
+  process.env.DATABASE_URL = database.url;
+  // runEnvProviderSync() below is one of the startup migrations the suite otherwise suppresses.
+  delete process.env.CPM_EPHEMERAL_DB;
   // runEnvProviderSync() turns these into the oauth_providers row on db load. The slugified
   // provider name becomes the provider id.
   process.env.OAUTH_ENABLED = 'true';
@@ -90,7 +92,7 @@ async function bootWithMockProvider() {
   vi.mock('@/src/lib/config', () => ({ ...config }));
 
   const { dbModule, schema } = await reloadDbModule();
-  cleanups.push(() => (dbModule.client as { close?: () => void })?.close?.());
+  cleanups.push(() => (dbModule.client as { close?: () => Promise<void> })?.close?.());
 
   // fresh() and not Date.now(): two boots inside the same millisecond would resolve to the same
   // specifier, so auth-server would not be re-evaluated and getAuth() would hand back an instance
