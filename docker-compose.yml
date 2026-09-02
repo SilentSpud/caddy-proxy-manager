@@ -22,6 +22,9 @@ services:
 
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
 
+      # Where generated certificates are written. Defaults to <workdir>/data/certs.
+      CERTS_DIRECTORY: ${CERTS_DIRECTORY:-}
+
       # Public URL this instance is reached at.
       BASE_URL: ${BASE_URL:-http://localhost:3000}
 
@@ -49,8 +52,27 @@ services:
       AUTH_ALLOW_SELF_REGISTRATION: ${AUTH_ALLOW_SELF_REGISTRATION:-false}
       AUTH_ALLOW_OAUTH_REGISTRATION: ${AUTH_ALLOW_OAUTH_REGISTRATION:-false}
 
+      # Let the IdP's claims set a new user's role/status. When false, OAuth-created
+      # accounts are forced to user/active no matter what the IdP sends.
+      AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS: ${AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS:-false}
+
       # OIDC-only: no local accounts and no bootstrap admin. Enable only once OAuth works.
       AUTH_DISABLE_LOCAL_USERS: ${AUTH_DISABLE_LOCAL_USERS:-false}
+
+      # Only behind a proxy that rewrites Host, and only when BASE_URL cannot cover it.
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-false}
+
+      # Force a reset for users still on a pre-argon2id bcrypt hash. Leave empty to let
+      # the Settings -> Security toggle decide; setting it here locks that toggle.
+      AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH: ${AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH:-}
+
+      # Better Auth request rate limiting, and the separate login throttle.
+      AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
+      AUTH_RATE_LIMIT_WINDOW: ${AUTH_RATE_LIMIT_WINDOW:-60}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-5}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+      LOGIN_WINDOW_MS: ${LOGIN_WINDOW_MS:-300000}
+      LOGIN_BLOCK_MS: ${LOGIN_BLOCK_MS:-900000}
 
       # Optional OAuth2/OIDC — Authentik, Authelia, Keycloak, and similar.
       OAUTH_ENABLED: ${OAUTH_ENABLED:-false}
@@ -74,6 +96,20 @@ services:
       OAUTH_VIEWER_GROUP: ${OAUTH_VIEWER_GROUP:-}
       OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
       OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
+
+      # Optional instance sync. A controller pushes proxy hosts, certificates, access
+      # lists and settings to its agents; user accounts are not synced. Generate the
+      # shared token with: openssl rand -hex 32
+      INSTANCE_MODE: ${INSTANCE_MODE:-standalone}
+      INSTANCE_SYNC_TOKEN: ${INSTANCE_SYNC_TOKEN:-}
+      INSTANCE_AGENTS: ${INSTANCE_AGENTS:-}
+      INSTANCE_SYNC_INTERVAL: ${INSTANCE_SYNC_INTERVAL:-0}
+      # Sync sends tokens in plaintext over HTTP — trusted internal networks only.
+      INSTANCE_SYNC_ALLOW_HTTP: ${INSTANCE_SYNC_ALLOW_HTTP:-false}
+      # Agent-side limits on inbound sync requests. Empty size means the 10 MB default.
+      INSTANCE_SYNC_MAX_BYTES: ${INSTANCE_SYNC_MAX_BYTES:-}
+      INSTANCE_SYNC_RATE_MAX: ${INSTANCE_SYNC_RATE_MAX:-60}
+      INSTANCE_SYNC_RATE_WINDOW_MS: ${INSTANCE_SYNC_RATE_WINDOW_MS:-60000}
 
       # Optional analytics. Omit CLICKHOUSE_PASSWORD to disable; to enable, also start the
       # clickhouse service with: docker compose --profile clickhouse up -d

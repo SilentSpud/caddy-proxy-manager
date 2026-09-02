@@ -112,6 +112,15 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `LOGIN_MAX_ATTEMPTS` | Max login attempts before rate limit | `5` | No |
 | `LOGIN_WINDOW_MS` | Rate limit window in milliseconds | `300000` (5 min) | No |
 | `LOGIN_BLOCK_MS` | Rate limit block duration in milliseconds | `900000` (15 min) | No |
+| `PUID` / `PGID` | Build args setting the UID/GID the containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
+| `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
+| `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
+| `CADDY_BUILD_TIMEOUT` | Seconds the sidecar waits for an xcaddy rebuild triggered from **Settings → Caddy Build** before giving up | `1800` | No |
+| `SIDECAR_POLL_INTERVAL` | Seconds between the sidecar's checks of the apply/rebuild trigger files (reaches the container as `POLL_INTERVAL`) | `2` | No |
+| `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Interpolated by Compose on the host, not read by the app. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
+| `COMPOSE_PROFILES` | Comma-separated Compose profiles to activate: `clickhouse`, `geoipupdate` | `clickhouse` | No |
+| `GEOIPUPDATE_ACCOUNT_ID` | MaxMind account ID for GeoLite2 updates. Needed for geo blocking | None | No (required if `geoipupdate`) |
+| `GEOIPUPDATE_LICENSE_KEY` | MaxMind license key for GeoLite2 updates | None | No (required if `geoipupdate`) |
 | `OAUTH_ENABLED` | Enable OAuth2/OIDC authentication | `false` | No |
 | `OAUTH_PROVIDER_NAME` | Display name for OAuth provider | `OAuth2` | No |
 | `OAUTH_CLIENT_ID` | OAuth2 client ID | None | No |
@@ -133,7 +142,9 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `AUTH_TRUST_HOST` | Trust the Host header for URL construction (only behind proxies that rewrite Host) | `false` | No |
 | `AUTH_ALLOW_SELF_REGISTRATION` | Allow public email/password account registration | `false` | No |
 | `AUTH_ALLOW_OAUTH_REGISTRATION` | Allow first-time OAuth/OIDC identities to create user accounts | `false` (`true` when `AUTH_DISABLE_LOCAL_USERS=true`) | No |
+| `AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS` | Trust the IdP's profile claims to set a new user's role and status. When `false`, OAuth-created accounts are forced to `user`/`active` regardless of claims. Enable only if you control the IdP | `false` | No |
 | `AUTH_DISABLE_LOCAL_USERS` | OIDC-only mode: no local accounts, no credential sign-in, no bootstrap admin | `false` | No |
+| `AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH` | Force a password reset for users still on a pre-argon2id bcrypt hash. Setting it pins the policy and locks the **Settings → Security** toggle; when unset, that toggle decides | Unset (toggle decides) | No |
 | `AUTH_RATE_LIMIT_ENABLED` | Enable Better Auth rate limiting | `true` | No |
 | `AUTH_RATE_LIMIT_WINDOW` | Rate limit window in seconds | `60` | No |
 | `AUTH_RATE_LIMIT_MAX` | Max requests per window | `5` | No |
@@ -142,10 +153,21 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `INSTANCE_AGENTS` | JSON array of agent instances for the controller to push to (tokens must be 32+ characters) | None | No |
 | `INSTANCE_SYNC_INTERVAL` | Periodic sync interval in seconds (`0` = disabled) | `0` | No |
 | `INSTANCE_SYNC_ALLOW_HTTP` | Allow sync over HTTP (for internal Docker networks) | `false` | No |
+| `INSTANCE_SYNC_MAX_BYTES` | Agent-side cap on the size of an inbound sync payload | Unset (no cap) | No |
+| `INSTANCE_SYNC_RATE_MAX` | Agent-side max inbound sync requests per window | `60` | No |
+| `INSTANCE_SYNC_RATE_WINDOW_MS` | Agent-side sync rate-limit window in milliseconds | `60000` (1 min) | No |
 | `CLICKHOUSE_URL` | ClickHouse HTTP endpoint for analytics | `http://clickhouse:8123` | No |
 | `CLICKHOUSE_USER` | ClickHouse username | `cpm` | No |
 | `CLICKHOUSE_PASSWORD` | ClickHouse password (`openssl rand -base64 32`). Required when the `clickhouse` profile is active. | None | No (required if analytics enabled) |
 | `CLICKHOUSE_DB` | ClickHouse database name | `analytics` | No |
+| `CLICKHOUSE_RETENTION_DAYS` | Days of analytics kept before ClickHouse's TTL deletes them. Changing it migrates the existing tables' TTL on the next startup | `30` | No |
+| `FORWARD_AUTH_INTERNAL_URL` | Dial address Caddy uses to reach this app for `forward_auth`. Override only if the derived container address does not work | Derived from the container network | No |
+| `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` to disable | Built-in cutoff date | No |
+| `ACME_CA_ROOT_DIR` | Directory holding the custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
+| `L4_PORTS_DIR` | Directory holding the layer-4 port state file. For non-Docker deployments | `/app/data` | No |
+| `PORT` / `HOST` | Listen address for the `cpm-server` binary when run directly instead of in the container | `3000` / `0.0.0.0` | No |
+| `CPM_APP_ROOT` | Application root for the `cpm-server` binary | Directory of the executable | No |
+| `CPM_HEALTHCHECK_URL` | Target for `cpm-server --healthcheck` | `http://127.0.0.1:${PORT}/api/health` | No |
 
 **Production Requirements:**
 

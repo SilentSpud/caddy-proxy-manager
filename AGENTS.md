@@ -9,6 +9,19 @@ workflows and shell included. Explain *why*: a constraint, a gotcha, a decision 
 mistake without it. Never restate what the line does, and leave code that holds no surprise
 uncommented. Prefer tightening an existing comment to adding one beside it.
 
+## Environment variables
+
+Adding, removing, or renaming one is never a one-file change. Update `.env.example` and the
+README's Environment Variables table in the same commit as the code, and delete the entries when
+the variable goes away — a stale row is worse than a missing one, because it reads as supported.
+
+A variable the app reads must also be listed under `web.environment` in `docker-compose.yml`.
+Compose forwards nothing implicitly and there is no `env_file`, so an undeclared one is simply
+unset in the container: documented, honored in development, silently ignored in production.
+
+Give Compose the real default, not `${VAR:-}`, for anything parsed as `Number(process.env.X ?? d)`
+— `??` does not catch the empty string that form produces, so the fallback lands as 0.
+
 <!-- ASTRYX:START -->
 Astryx v0.4.5 · 90+ components
 CLI: run every command as `bunx astryx <cmd>` (shown below as `astryx ...`).
