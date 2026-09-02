@@ -33,6 +33,10 @@ services:
       # the in-app migration flow, not by pointing this at it.
       DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-cpm}:${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-cpm}}
 
+      # Connections the database pool may open. The real default, not `${VAR:-}`: it is read as
+      # Number(), which turns the empty string that form produces into 0.
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+
       NEXTAUTH_URL: ${BASE_URL:-http://localhost:3000}
 
       # Renames the app in the sidebar, login card, and page titles.

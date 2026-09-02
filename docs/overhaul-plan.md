@@ -86,6 +86,7 @@ Everything not listed here moves to the database.
 | Variable | Why it cannot move |
 | --- | --- |
 | `DATABASE_URL` | Needed to reach the database. |
+| `DATABASE_POOL_MAX` | Sizes the pool that reads the database, so it cannot be read from it. |
 | `SESSION_SECRET` | HKDF root for `encryptSecret`, so it encrypts the database's own secrets. It cannot live inside what it encrypts, and rotating it makes every stored secret unreadable. |
 | `NODE_ENV` | Read at module load, before any query. |
 | `PORT`, `HOST` | The socket binds before the app can read anything. |

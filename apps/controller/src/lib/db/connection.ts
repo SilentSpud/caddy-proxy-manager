@@ -24,11 +24,24 @@ const globalForDrizzle = globalThis as GlobalForDrizzle;
 
 export const target = resolveDatabaseTarget(process.env.DATABASE_URL);
 
+/**
+ * Connections the pool may open. Bun.SQL defaults to 10 and says so nowhere; measured, 30
+ * concurrent queries against a default client run in three batches. SQLite had no such ceiling —
+ * it was in-process — so this limit arrived with PostgreSQL rather than being chosen, and an
+ * instance serving more concurrent work than this queues behind it.
+ *
+ * Stays an environment variable rather than a stored setting: the pool has to exist before
+ * anything can be read from the database.
+ */
+const DEFAULT_POOL_MAX = 10;
+const poolMax = Number(process.env.DATABASE_POOL_MAX) || DEFAULT_POOL_MAX;
+
 /** The tables handed to the driver. ./schema.ts re-exports these rather than importing separately. */
 export const activeSchema = pgSchema;
 
 /** The raw driver handle. Only the migration path should need it. */
-export const client: SQL = globalForDrizzle.__DB_CLIENT__ ?? new SQL(target.url);
+export const client: SQL =
+  globalForDrizzle.__DB_CLIENT__ ?? new SQL({ url: target.url, max: poolMax });
 
 export const db: Db =
   globalForDrizzle.__DRIZZLE_DB__ ?? (drizzle(client, { schema: pgSchema }) as unknown as Db);

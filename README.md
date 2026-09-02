@@ -108,6 +108,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides (and syncs from controller to agents) | Unset (toggle decides) | No |
 | `CADDY_API_URL` | Caddy Admin API endpoint | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
 | `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values below when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
+| `DATABASE_POOL_MAX` | Connections the database pool may open. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance pointing at it | `10` | No |
 | `POSTGRES_PASSWORD` | Password for the bundled `postgres` service. Interpolated by Compose on the host, not read by the app | None | **Yes** |
 | `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates. Compose-only, as above | `cpm` / `cpm` | No |
 | `CERTS_DIRECTORY` | Certificate storage directory | `./data/certs` | No |

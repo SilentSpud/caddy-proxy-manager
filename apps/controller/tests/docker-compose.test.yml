@@ -2,6 +2,20 @@ services:
   # Creates the extra databases the additional web instances below need. The base compose file's
   # postgres service makes only one.
   postgres:
+    # Durability buys nothing for a database `down -v` deletes, and fsync is the dominant cost of
+    # every write the suite makes. Mirrors scripts/with-test-db.ts, which does the same for the
+    # unit suite. Four web containers share this server, so the default of 100 connections is
+    # tighter here than it looks.
+    command:
+      - postgres
+      - -c
+      - fsync=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - synchronous_commit=off
+      - -c
+      - max_connections=300
     volumes:
       - ./apps/controller/tests/postgres-init.sql:/docker-entrypoint-initdb.d/10-e2e.sql:ro
     # web-controller and web-agent sit on their own networks and would otherwise have no route to
