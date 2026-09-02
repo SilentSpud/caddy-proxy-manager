@@ -24,7 +24,7 @@
  * build alike, under both Node and Bun, with no extra lifecycle script wiring.
  */
 import { createRequire } from 'node:module';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
@@ -72,11 +72,15 @@ export function copyMaplibreWorker(projectRoot) {
       );
     }
 
-    // maplibre's dist files are immutable per version; size is enough to detect
-    // a version bump without re-reading ~500 KB on every config load.
+    // Compare content, not size: maplibre-gl 6.4.1 and 6.6.0 ship worker files
+    // of identical size but different content, so a size-based check kept a
+    // stale 6.4.1 worker next to a freshly upgraded 6.6.0 shared chunk. The
+    // mismatched pair crashes the worker with "Class constructor ... cannot be
+    // invoked without 'new'" and renders the map as empty ocean.
+    const source = readFileSync(from);
     let upToDate;
     try {
-      upToDate = statSync(to).size === statSync(from).size;
+      upToDate = source.equals(readFileSync(to));
     } catch {
       upToDate = false; // not staged yet
     }
@@ -85,7 +89,7 @@ export function copyMaplibreWorker(projectRoot) {
       copied.push(name);
     }
 
-    for (const specifier of relativeImports(readFileSync(from, 'utf8'))) {
+    for (const specifier of relativeImports(source.toString('utf8'))) {
       const dep = specifier.replace(/^\.\//, '');
       if (dep.includes('/')) {
         throw new Error(

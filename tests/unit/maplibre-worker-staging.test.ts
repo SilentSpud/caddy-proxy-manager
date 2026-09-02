@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRequire } from 'node:module';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import {
   copyMaplibreWorker,
@@ -54,6 +54,23 @@ describe('maplibre worker staging', () => {
 
   it('is idempotent — a second run copies nothing', () => {
     expect(copyMaplibreWorker(projectRoot)).toEqual([]);
+  });
+
+  it('overwrites a staged file whose content differs but size matches', () => {
+    // Regression: maplibre-gl 6.4.1 and 6.6.0 ship worker files of identical
+    // byte size with different content. A size-based freshness check kept the
+    // stale 6.4.1 worker next to a freshly staged 6.6.0 shared chunk — the
+    // mismatched pair crashed the worker at runtime ("Class constructor ...
+    // cannot be invoked without 'new'") and the map rendered as empty ocean.
+    const stagedWorker = join(stagedDir, 'maplibre-gl-worker.mjs');
+    const distWorker = readFileSync(join(distDir, 'maplibre-gl-worker.mjs'));
+    const tampered = Buffer.from(distWorker);
+    tampered[tampered.length >> 1] ^= 0xff; // flip one byte, keep the size
+    expect(tampered.length).toBe(distWorker.length);
+    writeFileSync(stagedWorker, tampered);
+
+    expect(copyMaplibreWorker(projectRoot)).toContain('maplibre-gl-worker.mjs');
+    expect(readFileSync(stagedWorker)).toEqual(distWorker);
   });
 
   it('WorldMapInner points maplibre at the staged worker', () => {

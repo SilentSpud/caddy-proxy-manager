@@ -49,3 +49,9 @@ caddy-config/
 # Docker files
 docker-compose.yml
 docker-compose.*.yml
+
+# The maplibre worker is staged from the container's own node_modules by
+# scripts/copy-maplibre-worker.mjs during the build. A stale copy staged on the
+# host by next dev/build (potentially from a different maplibre-gl version) must
+# not leak into the image via COPY . .
+public/maplibre
