@@ -3,7 +3,7 @@
  * containers. Ports TCP 15432/15433, UDP 15353; upstreams tcp-echo:9000, udp-echo:9001.
  */
 import { test, expect } from '@playwright/test';
-import { createL4ProxyHost } from '../../helpers/l4-proxy-api';
+import { createL4ProxyHost, ensureL4ProxyHost } from '../../helpers/l4-proxy-api';
 import { tcpSend, waitForTcpEcho, tcpConnect, udpSend, waitForUdpRoute } from '../../helpers/tcp';
 
 const TCP_PORT = 15432;
@@ -17,7 +17,8 @@ const UDP_PORT = 15353;
 test.describe
   .serial('L4 TCP Proxy Routing', () => {
     test('setup: create TCP proxy host pointing at tcp-echo', async ({ page }) => {
-      await createL4ProxyHost(page, {
+      // Shared with agent.spec.ts, which needs this port and may run first.
+      await ensureL4ProxyHost(page, {
         name: 'L4 TCP Echo Test',
         protocol: 'tcp',
         listenAddress: `:${TCP_PORT}`,

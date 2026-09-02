@@ -13,7 +13,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { waitForTcpEcho, tcpSend } from '../../helpers/tcp';
 import { COMPOSE_CWD } from '../../helpers/compose';
-import { createL4ProxyHost } from '../../helpers/l4-proxy-api';
+import { ensureL4ProxyHost } from '../../helpers/l4-proxy-api';
 
 // Container name as defined in docker-compose.yml
 const AGENT_CONTAINER = 'caddy-proxy-manager-agent';
@@ -72,14 +72,7 @@ test.describe
   .serial('Agent', () => {
     test('setup: an enabled L4 host is listening on the TCP port', async ({ page }) => {
       // Idempotent: whichever of this file and l4-proxy-routing.spec.ts runs first creates it.
-      const existing = await page.request.get('/api/v1/l4-proxy-hosts');
-      expect(existing.ok(), `GET /api/v1/l4-proxy-hosts failed: ${await existing.text()}`).toBe(
-        true,
-      );
-      const hosts = (await existing.json()) as Array<{ listenAddress: string }>;
-      if (hosts.some((host) => host.listenAddress === `:${TCP_PORT}`)) return;
-
-      await createL4ProxyHost(page, {
+      await ensureL4ProxyHost(page, {
         name: 'L4 TCP Echo Test',
         protocol: 'tcp',
         listenAddress: `:${TCP_PORT}`,
