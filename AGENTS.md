@@ -2,6 +2,29 @@
 
 Project-specific guidance for AI coding agents.
 
+## Repository layout
+
+A Bun workspace. Nothing but config, docs and the Compose stack lives at the root.
+
+| Path | What it is |
+| --- | --- |
+| `apps/controller` | `@cpm/controller` — the web UI, REST API, schema, migrations and the whole test suite |
+| `apps/agent` | `@cpm/agent` — manages the Caddy container on its host. Was `docker/sidecar` |
+| `apps/site` | `@cpm/site` — the project website, static, no build step |
+| `packages/shared` | `@cpm/shared` — contracts both the controller and the agent hard-code |
+| `docker/` | Dockerfiles and image config. Build contexts are the repo root |
+
+Root `package.json` scripts delegate with `bun run --filter`, so `bun run test`, `bun run build` and
+`bun run typecheck` still work from the root and CI needed no new working directories. Anything
+reading a path off `process.cwd()` inside the controller now resolves against `apps/controller` —
+the e2e suite is the exception and pins `COMPOSE_CWD` to the repo root, because Compose anchors
+every relative path in every `-f` file to the first one's directory.
+
+`bunfig.toml` pins the **hoisted** installer. Bun 1.4 defaults workspaces to the isolated linker,
+under which four direct imports (`jose`, `@better-auth/core/db`, `topojson-specification`,
+`@maplibre/maplibre-gl-style-spec`) stop resolving because they arrive transitively. Declare those
+before changing it.
+
 ## Comments
 
 Terse. One line is the median here and three is already long — match that, in every language,

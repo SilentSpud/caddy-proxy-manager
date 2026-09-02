@@ -9,7 +9,7 @@
 #     compatibility replacement. Updated by Dependabot and update-compatibility-pins.sh.
 #
 # Resolving versions here rather than in CADDY_MODULES keeps the app's desired/applied diff
-# comparing like with like: the sidecar records the requested list, and a pin moving is a reviewed
+# comparing like with like: the agent records the requested list, and a pin moving is a reviewed
 # code change rather than something that makes the UI claim a rebuild is pending.
 set -eu
 

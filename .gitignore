@@ -5,18 +5,19 @@
 /.pnp
 .pnp.js
 
-# testing
-/coverage
+# testing. Unanchored: build and report output now lands inside each workspace
+# package, not only at the repo root.
+coverage/
 
 # next.js
-/.next/
-/.vinext/
-/dist/
-/out/
-/.vite/
+.next/
+.vinext/
+dist/
+out/
+.vite/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
@@ -45,9 +46,10 @@ next-env.d.ts
 /caddy-data
 /caddy-config
 /data
+/apps/controller/data
 
 # Playwright auth state
-tests/.auth/
+apps/controller/tests/.auth/
 test-results/
 playwright-report/
 

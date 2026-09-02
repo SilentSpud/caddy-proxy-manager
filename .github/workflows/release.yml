@@ -105,7 +105,7 @@ jobs:
             echo "## Images"
             echo
             echo '```'
-            for service in web caddy sidecar; do
+            for service in web caddy agent; do
               echo "${image_base}/${service}:${VERSION}"
             done
             echo '```'

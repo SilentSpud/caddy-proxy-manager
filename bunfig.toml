@@ -2,43 +2,12 @@
 # equivalent to `bun --bun` for all `bun run` commands
 bun = true
 
-[test]
-# Runs once per test file, before the file is imported. See tests/setup.bun.ts.
-preload = ["./tests/setup.bun.ts"]
-
-# `bun test` treats *.spec.ts as a test file, which would sweep the Playwright
-# suite (tests/e2e) into the unit run. Those are driven by `bun run test:e2e`.
-pathIgnorePatterns = ["tests/e2e/**", "docker-tests/**"]
-
-coverageReporter = ["text", "lcov"]
-coverageDir = "coverage"
-coverageSkipTestFiles = true
-randomize = true
-
-# Scoped to the code this suite is responsible for: the server-side library and
-# the API route handlers. The dashboard UI is deliberately out of scope — it is
-# exercised by Playwright (`bun run test:e2e`) and by the docker suite, and
-# folding hundreds of untested component lines in here would turn the number
-# into noise rather than a signal.
-#
-# Vitest expressed this as a coverage `include` allowlist. Bun only offers the
-# inverse, and only reports files a test actually loaded, so this is a denylist
-# of everything the suite pulls in that is not library or route code.
-coveragePathIgnorePatterns = [
-  "tests/**",
-  "src/components/**",
-  "src/hooks/**",
-  "src/styles/**",
-  "app/**/page.tsx",
-  "app/**/layout.tsx",
-  "**/*.d.ts",
-  # Type-only and generated modules have no executable statements to cover;
-  # leaving them in only drags the denominator around.
-  "src/lib/db/schema.ts",
-  "app/api/v1/openapi.json/**",
-]
-
-# No coverageThreshold here on purpose. Bun evaluates it against each file
-# individually, which cannot express the repository's ratchet — a floor under
-# the whole suite. scripts/coverage-ratchet.ts enforces that instead, from the
-# lcov report this run writes.
+[install]
+# Bun 1.4 defaults workspaces to the isolated linker, which hides transitive
+# dependencies a package does not declare. Several direct imports here resolve
+# that way today — `jose` and `@better-auth/core/db` through better-auth,
+# `topojson-specification` through @types/topojson-client — and under isolation
+# they stop type-checking. Hoisted keeps the flat pre-monorepo layout, so the
+# workspace split changes no module resolution. Tightening this means declaring
+# those four as direct dependencies first.
+linker = "hoisted"

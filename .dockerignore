@@ -1,22 +1,24 @@
-# Dependencies
-node_modules
+# Dependencies. `**/` throughout: these directories now exist per workspace
+# package, and a bare name only matches at the context root.
+**/node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
 
 # Build outputs
-.next
-.turbo
-out
-dist
-build
+**/.next
+**/.vinext
+**/.turbo
+**/out
+**/dist
+**/build
 
 # Environment files
 .env*
 
 # Testing
-coverage
+**/coverage
 
 # Misc
 .DS_Store
@@ -37,7 +39,7 @@ README.md
 .idea
 
 # Data directories - MUST exclude to prevent database lock errors
-data/
+**/data/
 *.db
 *.db-shm
 *.db-wal

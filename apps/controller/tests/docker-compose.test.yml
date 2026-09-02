@@ -1,0 +1,348 @@
+services:
+  # Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI or shell
+  # runtime — deliberately, so the tests run the image that ships — so seeding happens in this
+  # throwaway container, which mounts the same data volume and opens the same SQLite file.
+  # `profiles` keeps it out of `docker compose up`; see tests/helpers/seed.ts.
+  db-seed:
+    image: oven/bun:1-slim
+    profiles: ["tools"]
+    working_dir: /app
+    entrypoint: ["bun"]
+    volumes:
+      - caddy-manager-data:/app/data
+    networks:
+      - caddy-network
+
+  web:
+    environment:
+      SESSION_SECRET: "test-session-secret-32chars!xxxY"
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: "TestPassword2026!"
+      CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
+      BASE_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      # OAuth via Dex OIDC provider
+      OAUTH_ENABLED: "true"
+      OAUTH_PROVIDER_NAME: "Dex"
+      OAUTH_CLIENT_ID: cpm-test-client
+      OAUTH_CLIENT_SECRET: cpm-test-secret
+      OAUTH_ISSUER: http://localhost:5556/dex
+      OAUTH_AUTHORIZATION_URL: http://localhost:5556/dex/auth
+      OAUTH_TOKEN_URL: http://dex:5556/dex/token
+      OAUTH_USERINFO_URL: http://dex:5556/dex/userinfo
+      OAUTH_ALLOW_AUTO_LINKING: "true"
+      # Allow OAuth sign-in to create new accounts — the OAuth e2e tests
+      # (forward-auth-oauth, oauth-role-injection) exercise federated signup.
+      # Closed by default in production (see config.auth.allowOauthRegistration).
+      AUTH_ALLOW_OAUTH_REGISTRATION: "true"
+      # Disable Better Auth rate limiting for E2E tests (many rapid auth requests)
+      AUTH_RATE_LIMIT_ENABLED: "false"
+
+  web-registration-enabled:
+    container_name: caddy-proxy-manager-web-registration-enabled
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "test-registration-session-secret-32chars!xxxY"
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: "TestPassword2026!"
+      BASE_URL: http://localhost:3001
+      NEXTAUTH_URL: http://localhost:3001
+      DATABASE_PATH: /app/data/caddy-proxy-manager.db
+      DATABASE_URL: file:/app/data/caddy-proxy-manager.db
+      CADDY_API_URL: http://caddy:2019
+      AUTH_ALLOW_SELF_REGISTRATION: "true"
+      AUTH_RATE_LIMIT_ENABLED: "false"
+      OAUTH_ENABLED: "false"
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - caddy-manager-registration-data:/app/data
+    depends_on:
+      caddy:
+        condition: service_healthy
+    networks:
+      - caddy-network
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+  clickhouse:
+    environment:
+      CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
+    # Expose the HTTP interface so retention/TTL e2e tests can query directly.
+    ports:
+      - "8123:8123"
+  caddy:
+    # Alias so the Step-CA container can resolve the ACME test domain to Caddy
+    # for HTTP-01 / TLS-ALPN-01 challenge validation (functional/acme-custom-ca.spec.ts).
+    networks:
+      caddy-network:
+        aliases:
+          - acme-e2e.test
+    ports:
+      - "80:80"
+      - "443:443"
+      # L4 test ports (TCP)
+      - "15432:15432"
+      - "15433:15433"
+      # L4 test ports (UDP)
+      - "15353:15353/udp"
+  # Skip any local docker-compose.override.yml and use this file instead,
+  # so the agent recreates caddy with the correct "-test" volume names.
+  agent:
+    environment:
+      COMPOSE_SKIP_OVERRIDE: "1"
+      COMPOSE_EXTRA_FILE: /compose/tests/docker-compose.test.yml
+      # The agent shells out to `docker compose` against the repo mounted at /compose. Its
+      # entrypoint adds --env-file only when /compose/.env exists, and the e2e stack deliberately
+      # runs without one, so the variables docker-compose.yml refuses to interpolate without have
+      # to arrive as real environment variables instead. Values are irrelevant -- the services it
+      # recreates take theirs from this file -- but absence aborts the whole compose invocation.
+      SESSION_SECRET: "test-l4-agent-interpolation-32chars"
+      CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
+  # Dex OIDC provider for OAuth E2E tests
+  dex:
+    image: dexidp/dex:v2.41.1
+    command: ["dex", "serve", "/etc/dex/config.yml"]
+    volumes:
+      - ./apps/controller/tests/dex/config.yml:/etc/dex/config.yml:ro
+    ports:
+      - "5556:5556"
+    networks:
+      - caddy-network
+  # Hostile mock OIDC provider for the OAuth role-injection (H3) test.
+  # Dex cannot emit custom claims, so this mock injects a `role: admin` claim
+  # into every issued token to verify the app never lets an IdP set privileged
+  # fields. Browser reaches it at localhost:5557; the web container reaches it at
+  # mock-oidc:8080 (which is also the token `iss`, matching the provider issuer).
+  mock-oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    environment:
+      JSON_CONFIG_PATH: /config.json
+    volumes:
+      - ./apps/controller/tests/mock-oidc/config.json:/config.json:ro
+    ports:
+      - "5557:8080"
+    networks:
+      - caddy-network
+  # Lightweight echo server reachable by Caddy as "echo-server:8080".
+  # Returns a fixed body so tests can assert the proxy routed the request.
+  echo-server:
+    image: hashicorp/http-echo
+    command: ["-text=echo-ok", "-listen=:8080"]
+    networks:
+      - caddy-network
+  # Second echo server for load-balancing tests.
+  # Returns a different body so tests can distinguish which upstream served the request.
+  echo-server-2:
+    image: hashicorp/http-echo
+    command: ["-text=echo-server-2", "-listen=:8080"]
+    networks:
+      - caddy-network
+  # Request-echo server: reflects the full HTTP request (method + path + headers) in the response body.
+  # Used by path-prefix-rewrite tests to assert that Caddy rewrote the path before forwarding.
+  whoami-server:
+    image: traefik/whoami
+    networks:
+      - caddy-network
+  # TCP echo server for L4 proxy tests.
+  # Listens on port 9000 and echoes back anything sent to it with a prefix.
+  tcp-echo:
+    image: cjimti/go-echo
+    platform: linux/amd64
+    environment:
+      TCP_PORT: "9000"
+      NODE_NAME: "tcp-echo-ok"
+    networks:
+      - caddy-network
+  # UDP echo server for L4 proxy tests.
+  # Simple socat-based UDP echo: reflects any datagram back to sender.
+  udp-echo:
+    image: alpine/socat
+    command: ["UDP4-RECVFROM:9001,fork", "EXEC:cat"]
+    networks:
+      - caddy-network
+
+  # Internal ACME CA (Step-CA) for the custom-ACME functional test (issue #192).
+  # Auto-initializes a root CA + ACME provisioner named "acme" on first boot,
+  # serving its directory at https://step-ca:9000/acme/acme/directory.
+  # Caddy reaches the test domain via the "acme-e2e.test" alias on the caddy
+  # service for HTTP-01 / TLS-ALPN-01 challenge validation.
+  step-ca:
+    container_name: caddy-proxy-manager-step-ca
+    image: smallstep/step-ca:0.27.4
+    environment:
+      DOCKER_STEPCA_INIT_NAME: "CPM E2E Step-CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
+      DOCKER_STEPCA_INIT_ACME: "true"
+      DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT: "false"
+      DOCKER_STEPCA_INIT_PASSWORD: "e2e-step-ca-password"
+    volumes:
+      - step-ca-data:/home/step
+    networks:
+      - caddy-network
+
+  # ── Controller/agent pair for the settings-sync functional test (issue #192) ──
+  # Each instance has its own isolated Caddy admin API. This lets settings updates
+  # exercise the production apply/rollback path without replacing the main E2E
+  # Caddy configuration or racing the rest of the browser suite.
+  caddy-controller:
+    container_name: caddy-proxy-manager-caddy-controller
+    image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
+    environment:
+      PRIMARY_DOMAIN: controller.caddyproxymanager.test
+    volumes:
+      - acme-ca-controller:/acme-ca:ro
+    networks:
+      controller-caddy-network:
+        aliases:
+          - caddy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  caddy-agent:
+    container_name: caddy-proxy-manager-caddy-agent
+    image: ghcr.io/silentspud/caddy-proxy-manager/caddy:latest
+    environment:
+      PRIMARY_DOMAIN: agent.caddyproxymanager.test
+    volumes:
+      - acme-ca-agent:/acme-ca:ro
+    networks:
+      agent-caddy-network:
+        aliases:
+          - caddy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  web-controller:
+    container_name: caddy-proxy-manager-web-controller
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    ports:
+      - "3002:3000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "test-controller-session-secret-32chars!xxY"
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: "TestPassword2026!"
+      BASE_URL: http://localhost:3002
+      NEXTAUTH_URL: http://localhost:3002
+      DATABASE_PATH: /app/data/caddy-proxy-manager.db
+      DATABASE_URL: file:/app/data/caddy-proxy-manager.db
+      CADDY_API_URL: http://caddy:2019
+      OAUTH_ENABLED: "false"
+      AUTH_RATE_LIMIT_ENABLED: "false"
+      CLICKHOUSE_PASSWORD: ""
+      INSTANCE_MODE: controller
+      INSTANCE_SYNC_TOKEN: "e2e-sync-token-0123456789abcdef0123456789"
+      INSTANCE_SYNC_ALLOW_HTTP: "true"
+      INSTANCE_SYNC_INTERVAL: "0"
+      INSTANCE_AGENTS: '[{"name":"agent","url":"http://web-agent:3000","token":"e2e-sync-token-0123456789abcdef0123456789"}]'
+    volumes:
+      - web-controller-data:/app/data
+      - acme-ca-controller:/acme-ca
+    depends_on:
+      caddy-controller:
+        condition: service_healthy
+    networks:
+      instance-sync-network:
+      controller-caddy-network:
+        aliases:
+          - web
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web-agent:
+    container_name: caddy-proxy-manager-web-agent
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    ports:
+      - "3003:3000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "test-agent-session-secret-32chars!xxY"
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: "TestPassword2026!"
+      BASE_URL: http://localhost:3003
+      NEXTAUTH_URL: http://localhost:3003
+      DATABASE_PATH: /app/data/caddy-proxy-manager.db
+      DATABASE_URL: file:/app/data/caddy-proxy-manager.db
+      CADDY_API_URL: http://caddy:2019
+      OAUTH_ENABLED: "false"
+      AUTH_RATE_LIMIT_ENABLED: "false"
+      CLICKHOUSE_PASSWORD: ""
+      INSTANCE_MODE: agent
+      INSTANCE_SYNC_TOKEN: "e2e-sync-token-0123456789abcdef0123456789"
+      INSTANCE_SYNC_ALLOW_HTTP: "true"
+    volumes:
+      - web-agent-data:/app/data
+      - acme-ca-agent:/acme-ca
+    depends_on:
+      caddy-agent:
+        condition: service_healthy
+    networks:
+      instance-sync-network:
+      agent-caddy-network:
+        aliases:
+          - web
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+networks:
+  # The two web instances communicate with each other here. Keep this bridge
+  # non-internal so Docker can publish their E2E ports to the host.
+  instance-sync-network:
+    driver: bridge
+  # Each Caddy admin API is reachable only by its corresponding web instance.
+  controller-caddy-network:
+    driver: bridge
+    internal: true
+  agent-caddy-network:
+    driver: bridge
+    internal: true
+
+volumes:
+  caddy-manager-data:
+    name: caddy-manager-data-test
+  caddy-manager-registration-data:
+    name: caddy-manager-registration-data-test
+  caddy-data:
+    name: caddy-data-test
+  caddy-config:
+    name: caddy-config-test
+  caddy-logs:
+    name: caddy-logs-test
+  geoip-data:
+    name: geoip-data-test
+  clickhouse-data:
+    name: clickhouse-data-test
+  acme-ca:
+    name: acme-ca-test
+  acme-ca-controller:
+    name: acme-ca-controller-test
+  acme-ca-agent:
+    name: acme-ca-agent-test
+  step-ca-data:
+    name: step-ca-data-test
+  web-controller-data:
+    name: web-controller-data-test
+  web-agent-data:
+    name: web-agent-data-test

@@ -41,9 +41,9 @@ jobs:
             service: caddy
             dockerfile: docker/caddy/Dockerfile
             context: .
-          - name: Builder Sidecar
-            service: sidecar
-            dockerfile: docker/sidecar/Dockerfile
+          - name: Builder Agent
+            service: agent
+            dockerfile: docker/agent/Dockerfile
             context: .
 
     steps:

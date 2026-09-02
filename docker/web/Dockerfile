@@ -13,7 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-COPY package.json bun.lock ./
+# Every workspace manifest, not just the root one: `bun install` resolves the whole workspace graph
+# up front and fails on a member it cannot read. bunfig.toml comes along because it pins the
+# hoisted linker, without which transitive types stop resolving.
+COPY package.json bun.lock bunfig.toml ./
+COPY apps/controller/package.json ./apps/controller/
+COPY apps/agent/package.json ./apps/agent/
+COPY apps/site/package.json ./apps/site/
+COPY packages/shared/package.json ./packages/shared/
 # --ignore-scripts skips native addon build steps; nothing here needs one, since
 # SQLite comes from bun's built-in bun:sqlite rather than a compiled addon.
 RUN bun install --frozen-lockfile --ignore-scripts
@@ -67,10 +74,10 @@ RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || t
 # (node_modules/), and the package.json whose "type": "module" says how to load dist/*.js. The
 # bundle stays on disk because vinext loads it with a runtime import() of a real path, which Bun's
 # embedded-asset filesystem does not support.
-COPY --from=builder --chown=cpm:cpm /app/dist/standalone ./
+COPY --from=builder --chown=cpm:cpm /app/apps/controller/dist/standalone ./
 
 # Migrations are read at startup and live outside the bundle.
-COPY --from=builder --chown=cpm:cpm /app/drizzle ./drizzle
+COPY --from=builder --chown=cpm:cpm /app/apps/controller/drizzle ./drizzle
 
 RUN mkdir -p /app/data && chown -R cpm:cpm /app/data
 

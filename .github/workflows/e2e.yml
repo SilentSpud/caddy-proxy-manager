@@ -89,7 +89,7 @@ jobs:
         env:
           # Layers the GHA cache config onto the stack. tests/helpers/compose.ts adds it as one
           # more -f; nothing outside CI sets this, so a local run is unchanged.
-          E2E_COMPOSE_EXTRA_FILE: tests/docker-compose.ci.yml
+          E2E_COMPOSE_EXTRA_FILE: apps/controller/tests/docker-compose.ci.yml
           # Compose only honours build.cache_to when it delegates the build to bake.
           COMPOSE_BAKE: "true"
 

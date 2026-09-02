@@ -178,7 +178,7 @@ services:
       retries: 3
       start_period: 10s
 
-  # Restricts the Docker API surface reachable by the sidecar.
+  # Restricts the Docker API surface reachable by the agent.
   docker-socket-proxy:
     container_name: caddy-proxy-manager-docker-proxy
     image: tecnativa/docker-socket-proxy:latest
@@ -204,17 +204,17 @@ services:
 
   # Recreates the caddy container for the two changes a reload cannot apply:
   # L4 port changes and Caddy module selection.
-  sidecar:
-    container_name: caddy-proxy-manager-sidecar
-    image: ghcr.io/silentspud/caddy-proxy-manager/sidecar:latest
+  agent:
+    container_name: caddy-proxy-manager-agent
+    image: ghcr.io/silentspud/caddy-proxy-manager/agent:latest
     build:
       context: .
-      dockerfile: docker/sidecar/Dockerfile
+      dockerfile: docker/agent/Dockerfile
     restart: unless-stopped
     environment:
       DATA_DIR: /data
       COMPOSE_DIR: /compose
-      POLL_INTERVAL: "${SIDECAR_POLL_INTERVAL:-2}"
+      POLL_INTERVAL: "${AGENT_POLL_INTERVAL:-2}"
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
@@ -273,7 +273,7 @@ services:
 networks:
   caddy-network:
     driver: bridge
-  # Socket proxy and sidecar only; internal, with no external connectivity.
+  # Socket proxy and agent only; internal, with no external connectivity.
   socket-proxy:
     driver: bridge
     internal: true

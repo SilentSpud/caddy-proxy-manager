@@ -15,10 +15,10 @@
       "!coverage",
       "!out",
       "!build",
-      "!next-env.d.ts",
+      "!apps/controller/next-env.d.ts",
       "!.claude",
       "!public",
-      "!drizzle/meta",
+      "!apps/controller/drizzle/meta",
       "!skills-lock.json",
       "!bun.lock",
       "!.vscode"
@@ -88,7 +88,7 @@
     {
       // The test tree writes single-quoted and leans on `any` for fixtures and
       // on require() for module-mocking; both were already exempt under eslint.
-      "includes": ["tests/**"],
+      "includes": ["apps/controller/tests/**"],
       "javascript": { "formatter": { "quoteStyle": "single" } },
       "linter": {
         "domains": { "test": "recommended", "playwright": "recommended" },

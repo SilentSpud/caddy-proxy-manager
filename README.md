@@ -63,7 +63,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 ## Features
 
 - **Proxy Hosts** - Reverse proxies with custom headers, multiple upstreams, load balancing (8 policies), active/passive health checks, retries, and enable/disable toggle
-- **L4 Proxy Hosts** - TCP/UDP stream proxying with TLS SNI matching, proxy protocol (v1/v2), load balancing, health checks, and per-host geo blocking. Automatic Docker Compose port management via sidecar
+- **L4 Proxy Hosts** - TCP/UDP stream proxying with TLS SNI matching, proxy protocol (v1/v2), load balancing, health checks, and per-host geo blocking. Automatic Docker Compose port management via agent
 - **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another)
 - **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308) and path prefix rewriting
 - **Forward Auth Portal** - Built-in identity provider for protecting proxy hosts without an external IdP. Credential and OAuth login portal, user groups with membership management, per-host access control by user or group, and excluded paths that bypass authentication
@@ -115,8 +115,8 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `PUID` / `PGID` | Build args setting the UID/GID the containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
 | `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
-| `CADDY_BUILD_TIMEOUT` | Seconds the sidecar waits for an xcaddy rebuild triggered from **Settings → Caddy Build** before giving up | `1800` | No |
-| `SIDECAR_POLL_INTERVAL` | Seconds between the sidecar's checks of the apply/rebuild trigger files (reaches the container as `POLL_INTERVAL`) | `2` | No |
+| `CADDY_BUILD_TIMEOUT` | Seconds the agent waits for an xcaddy rebuild triggered from **Settings → Caddy Build** before giving up | `1800` | No |
+| `AGENT_POLL_INTERVAL` | Seconds between the agent's checks of the apply/rebuild trigger files (reaches the container as `POLL_INTERVAL`) | `2` | No |
 | `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Interpolated by Compose on the host, not read by the app. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 | `COMPOSE_PROFILES` | Comma-separated Compose profiles to activate: `clickhouse`, `geoipupdate` | `clickhouse` | No |
 | `GEOIPUPDATE_ACCOUNT_ID` | MaxMind account ID for GeoLite2 updates. Needed for geo blocking | None | No (required if `geoipupdate`) |
@@ -212,7 +212,7 @@ fresh install.
 
 ### Working on the schema
 
-`src/lib/db/schema.sqlite.ts` is the source of truth. `schema.pg.ts` is generated from it, and each
+`apps/controller/src/lib/db/schema.sqlite.ts` is the source of truth. `schema.pg.ts` is generated from it, and each
 backend keeps its own migration folder because the generated DDL is not portable:
 
 ```bash
@@ -221,7 +221,7 @@ bun run db:generate                                            # SQLite migratio
 DATABASE_URL=postgres://... bun run db:generate                # PostgreSQL       -> drizzle/postgres/
 ```
 
-`tests/unit/db-schema-parity.test.ts` fails if the two schemas drift or the generator was not
+`apps/controller/tests/unit/db-schema-parity.test.ts` fails if the two schemas drift or the generator was not
 re-run. `tests/integration/db-backend.test.ts` runs the same behavioural checks against both
 backends; it covers SQLite always, and PostgreSQL when `TEST_POSTGRES_URL` is set:
 
@@ -457,7 +457,7 @@ Add only modules you trust, from sources you would trust with the proxy itself.
 
 Saving records the selection; it does not change the running container. **Rebuild
 Caddy** writes a Compose override onto the shared data volume and signals the
-sidecar, which runs `docker compose build caddy` and then recreates the
+agent, which runs `docker compose build caddy` and then recreates the
 container. Compiling Caddy takes several minutes; the proxy keeps serving on the
 current binary until the new one is ready, then restarts.
 
@@ -471,11 +471,11 @@ split is what makes a failed build harmless:
 | File | Written by | Holds |
 | --- | --- | --- |
 | `docker-compose.caddy-build.yml` | web, when you click Rebuild | the *desired* module list — the build's input |
-| `caddy-build.applied.json` | sidecar, only after the build succeeds and Caddy is healthy | what the running binary *actually* contains |
+| `caddy-build.applied.json` | agent, only after the build succeeds and Caddy is healthy | what the running binary *actually* contains |
 
 If a build fails, the applied record is left alone, so the app keeps generating
 config the current binary can load. Nothing needs cleaning up by hand — fix the
-selection and click Rebuild again. If the sidecar is restarted mid-build (a host
+selection and click Rebuild again. If the agent is restarted mid-build (a host
 reboot, say), it clears the stale "building" state on startup and the button
 becomes available again.
 
@@ -484,7 +484,7 @@ Rebuilding needs `BUILD: 1` on the `docker-socket-proxy` service (the default in
 and you can run `docker compose build caddy` yourself — the generated module list
 is written to the data volume as `docker-compose.caddy-build.yml` either way.
 Note that a hand-run build does not write the applied record, so the app will
-keep assuming the shipped module set until a sidecar rebuild happens.
+keep assuming the shipped module set until a agent rebuild happens.
 
 Every image records what it was compiled with, so you can check a container
 directly rather than inferring it:

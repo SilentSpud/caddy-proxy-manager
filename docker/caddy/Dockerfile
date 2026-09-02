@@ -50,10 +50,10 @@ github.com/corazawaf/coraza-caddy/v2"
 # the build arg stays a plain list the app can generate and diff without knowing xcaddy's syntax or
 # carrying versions; word splitting separates the entries, and paths are allowlisted upstream
 # (validateCustomModule). The cache mounts matter for the rebuild-from-the-UI flow — without them
-# every module change recompiles from scratch. BuildKit keeps them on the same daemon the sidecar
+# every module change recompiles from scratch. BuildKit keeps them on the same daemon the agent
 # talks to.
 #
-# What lands in /caddy-modules.txt is the requested list, not build.sh's resolved one: the sidecar
+# What lands in /caddy-modules.txt is the requested list, not build.sh's resolved one: the agent
 # records that same unresolved list as "applied", and the two must match or the UI reports a rebuild
 # that already happened. The exact versions go to /caddy-modules.resolved.txt instead.
 RUN --mount=type=cache,target=/go/pkg/mod \

@@ -56,9 +56,9 @@ with, and add their own. Two consequences are worth stating plainly:
   malicious repository is still malicious.
 
 - **Rebuilding widens the Docker API surface.** The `docker-socket-proxy`
-  service ships with `BUILD: 1` so the sidecar can run `docker compose build
+  service ships with `BUILD: 1` so the agent can run `docker compose build
   caddy`. The socket proxy still denies `EXEC`, `SWARM`, `AUTH`, and `SECRETS`,
-  and only the sidecar is attached to that isolated network — but image builds
+  and only the agent is attached to that isolated network — but image builds
   are a meaningful capability. Set `BUILD: 0` to opt out; the rest of the
   application is unaffected and images can be built by hand instead.
 
