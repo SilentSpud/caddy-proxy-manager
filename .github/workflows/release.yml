@@ -117,7 +117,7 @@ jobs:
             if [ -n "$deploy_changed" ]; then
               echo "> [!IMPORTANT]"
               echo "> These live in your checkout, not in the images, so \`docker compose pull\` will"
-              echo "> not update them. Pull the repository (or take them from the assets below)"
+              echo "> not update them. Pull the repository (or take them from the archive below)"
               echo "> before \`docker compose up -d\`:"
               echo ">"
               while IFS= read -r file; do
@@ -126,8 +126,16 @@ jobs:
             elif [ -n "$PREVIOUS" ]; then
               echo "Unchanged since ${PREVIOUS}. Pulling the images is enough."
             else
-              echo "First tagged release — take \`docker-compose.yml\` and \`.env.example\` from the assets below."
+              echo "First tagged release — take \`docker-compose.yml\` and \`.env.example\` from the archive below."
             fi
+            echo
+            # The archive is flat and self-contained; say so, and flag the one difference from the
+            # repository so nobody diffs the two and files a bug.
+            echo "The archive holds every file at its top level and deploys as it unpacks —"
+            echo "extract it into one directory and \`docker compose up -d\` needs nothing moved."
+            echo "Its \`docker-compose.yml\` therefore mounts the ClickHouse override from beside"
+            echo "itself rather than from \`./docker/clickhouse/\`, which is the only way it"
+            echo "differs from the copy in the repository."
             echo
             echo "## Changes"
             echo
@@ -148,12 +156,89 @@ jobs:
           echo "--- release notes ---"
           cat release-notes.md
 
+      - name: Package the deployment files
+        id: archive
+        if: steps.version.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # One archive rather than three loose assets. These files are only useful together, and
+          # an archive also carries `.env.example` under its real name -- GitHub refuses a leading
+          # dot on an asset and was publishing it as `default.env.example`.
+          #
+          # tar.gz rather than zip: every target platform can open it without extra tooling, since
+          # Windows has shipped bsdtar as `tar.exe` in System32 since 1803.
+          #
+          # Everything sits flat at the archive root, staged here rather than tarred from the
+          # checkout. `low-disk-write.yml` says nothing on its own once it is out of the tree, so
+          # it carries its directory as a `clickhouse-` prefix instead -- the same rename the
+          # `#label` on the old loose asset was doing. Whole directory, not the one file, so a
+          # second override added under docker/clickhouse ships without touching this step.
+          #
+          # A flat archive would leave docker-compose.yml binding a path that is not there, so the
+          # staged copy is rewritten to mount the override from beside itself. Only the staged
+          # copy: the checkout keeps ./docker/clickhouse/, which is the layout the repo and the
+          # e2e stack run from. The result is an archive that deploys as it unpacks -- extract the
+          # three files into one directory and `docker compose up -d` needs nothing moved.
+          staging="$(mktemp -d)"
+          entries=(docker-compose.yml .env.example)
+          cp docker-compose.yml .env.example "$staging/"
+          for f in docker/clickhouse/*; do
+            entry="clickhouse-$(basename "$f")"
+            cp "$f" "${staging}/${entry}"
+            entries+=("$entry")
+          done
+
+          # Host side only. The container side stays /etc/clickhouse-server/config.d/..., which is
+          # where ClickHouse actually reads the override from.
+          sed -i 's#\./docker/clickhouse/#./clickhouse-#g' "$staging/docker-compose.yml"
+
+          # A sed that matched nothing is the failure worth catching here: it would ship a compose
+          # file pointing at a directory the archive does not contain, and nothing downstream
+          # would notice until a deploy failed.
+          if grep -q 'docker/clickhouse/' "$staging/docker-compose.yml"; then
+            echo "::error::staged docker-compose.yml still references docker/clickhouse/"
+            grep -n 'docker/clickhouse/' "$staging/docker-compose.yml"
+            exit 1
+          fi
+          for entry in "${entries[@]}"; do
+            case "$entry" in
+              clickhouse-*)
+                if ! grep -q "\./${entry}:" "$staging/docker-compose.yml"; then
+                  echo "::error::staged docker-compose.yml does not mount ${entry}"
+                  exit 1
+                fi
+                ;;
+            esac
+          done
+
+          name="caddy-proxy-manager-${TAG}-deploy.tar.gz"
+          tar -czf "$name" -C "$staging" "${entries[@]}"
+
+          # The dotfile is half the reason this is an archive, so it is worth asserting rather
+          # than trusting: tar stores the name it was given, but a release that quietly shipped
+          # `.env.example` under some other name would look fine until someone tried to deploy.
+          for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml; do
+            if ! tar -tzf "$name" | grep -qxF "$want"; then
+              echo "::error::${name} is missing ${want}"
+              tar -tzf "$name"
+              exit 1
+            fi
+          done
+
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "--- archive contents ---"
+          tar -tzvf "$name"
+
       - name: Create the tag and release
         if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          ARCHIVE: ${{ steps.archive.outputs.name }}
         run: |
           set -euo pipefail
 
@@ -168,12 +253,7 @@ jobs:
             args+=(--prerelease)
           fi
 
-          # `#label` renames the asset; low-disk-write.yml says nothing on its own in a file list.
-          args+=(
-            docker-compose.yml
-            .env.example
-            'docker/clickhouse/low-disk-write.yml#clickhouse-low-disk-write.yml'
-          )
+          args+=( "$ARCHIVE" )
 
           gh release create "${args[@]}"
 
