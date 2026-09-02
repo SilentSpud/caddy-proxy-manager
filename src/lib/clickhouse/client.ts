@@ -165,7 +165,7 @@ async function ensureRetentionTtl(
   });
 }
 
-// Diagnostic system-log tables that low-disk-write.xml turns off. On stock ClickHouse they flush
+// Diagnostic system-log tables that low-disk-write.yml turns off. On stock ClickHouse they flush
 // every few seconds regardless of traffic; disabling stops new writes, and dropping them reclaims
 // what a deployment accumulated before the override.
 const DISABLED_SYSTEM_LOGS = [

@@ -1,7 +1,3 @@
-[toml-schema]
-location = "https://www.schemastore.org/bunfig.json"
-version = "1.0.0" # optional expected schema-language version
-
 [run]
 # equivalent to `bun --bun` for all `bun run` commands
 bun = true

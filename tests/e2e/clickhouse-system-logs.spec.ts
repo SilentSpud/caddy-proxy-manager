@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
 
-// low-disk-write.xml turns these diagnostic system-log tables off with remove="1"; on stock
+// low-disk-write.yml turns these diagnostic system-log tables off with `"@remove"`; on stock
 // ClickHouse they flush every few seconds even when idle, writing several GB/day. Keep in sync
 // with that file and DISABLED_SYSTEM_LOGS in src/lib/clickhouse/client.ts.
 const DISABLED_SYSTEM_LOGS = [

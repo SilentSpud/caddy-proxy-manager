@@ -168,11 +168,11 @@ jobs:
             args+=(--prerelease)
           fi
 
-          # `#label` renames the asset; low-disk-write.xml says nothing on its own in a file list.
+          # `#label` renames the asset; low-disk-write.yml says nothing on its own in a file list.
           args+=(
             docker-compose.yml
             .env.example
-            'docker/clickhouse/low-disk-write.xml#clickhouse-low-disk-write.xml'
+            'docker/clickhouse/low-disk-write.yml#clickhouse-low-disk-write.yml'
           )
 
           gh release create "${args[@]}"
