@@ -99,7 +99,10 @@ services:
       # Optional instance sync. A controller pushes proxy hosts, certificates, access
       # lists and settings to its agents; user accounts are not synced. Generate the
       # shared token with: openssl rand -hex 32
-      INSTANCE_MODE: ${INSTANCE_MODE:-standalone}
+      # No `:-standalone` default. isInstanceModeFromEnv() treats any valid value as the
+      # environment pinning the mode, which locks the Settings selector — so defaulting it here
+      # would make the mode permanently unchangeable on every deployment that never set it.
+      INSTANCE_MODE: ${INSTANCE_MODE:-}
       INSTANCE_SYNC_TOKEN: ${INSTANCE_SYNC_TOKEN:-}
       INSTANCE_AGENTS: ${INSTANCE_AGENTS:-}
       INSTANCE_SYNC_INTERVAL: ${INSTANCE_SYNC_INTERVAL:-0}

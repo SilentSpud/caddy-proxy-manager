@@ -3,7 +3,7 @@ import db, { nowIso } from "./db";
 import { CREDENTIAL_ISSUER } from "./account-issuer";
 import { config } from "./config";
 import { users, accounts } from "./db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 /** Ensures the env-configured admin user exists, hashing the password. Called at startup. */
 
@@ -78,10 +78,29 @@ export async function ensureAdminUser(): Promise<void> {
     updatedAt: now,
   });
 
+  await syncUserIdSequence();
+
   console.log(`Created admin user: ${adminUsername}`);
 
   // Ensure credential account row exists for Better Auth
   await ensureCredentialAccount(adminId, passwordHash);
+}
+
+/**
+ * Move the `users.id` sequence past the row above.
+ *
+ * The admin is inserted with an explicit id because auth.ts hard-codes 1, and PostgreSQL does not
+ * advance a `serial`'s sequence for an explicit value — so the next insert is handed 1 as well and
+ * fails on the primary key. Better Auth reports that as a bare 422, which is what the first
+ * self-registration on a fresh deployment used to get.
+ */
+async function syncUserIdSequence(): Promise<void> {
+  await db.execute(
+    sql`SELECT setval(
+          pg_get_serial_sequence('users', 'id'),
+          GREATEST((SELECT COALESCE(MAX(id), 1) FROM users), 1)
+        )`,
+  );
 }
 
 /** Ensures the `credential` account row Better Auth needs, with the password hash. */

@@ -110,7 +110,7 @@ services:
   agent:
     environment:
       COMPOSE_SKIP_OVERRIDE: "1"
-      COMPOSE_EXTRA_FILE: /compose/tests/docker-compose.test.yml
+      COMPOSE_EXTRA_FILE: /compose/apps/controller/tests/docker-compose.test.yml
       # The agent shells out to `docker compose` against the repo mounted at /compose. Its
       # entrypoint adds --env-file only when /compose/.env exists, and the e2e stack deliberately
       # runs without one, so the variables docker-compose.yml refuses to interpolate without have
@@ -118,6 +118,7 @@ services:
       # recreates take theirs from this file -- but absence aborts the whole compose invocation.
       SESSION_SECRET: "test-l4-agent-interpolation-32chars"
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
+      POSTGRES_PASSWORD: "e2e-postgres-password"
   # Dex OIDC provider for OAuth E2E tests
   dex:
     image: dexidp/dex:v2.41.1
