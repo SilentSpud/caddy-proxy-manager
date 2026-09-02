@@ -26,6 +26,7 @@ import (
 	_ "github.com/caddy-dns/ionos"
 	_ "github.com/caddy-dns/linode"
 	_ "github.com/caddy-dns/namecheap"
+	_ "github.com/caddy-dns/netcup"
 	_ "github.com/caddy-dns/njalla"
 	_ "github.com/caddy-dns/ovh"
 	_ "github.com/caddy-dns/porkbun"

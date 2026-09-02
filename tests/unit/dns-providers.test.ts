@@ -278,4 +278,47 @@ describe("DNS provider registry", () => {
       resolvers: ["1.1.1.1"],
     });
   });
+
+  it("registers netcup with the Caddy module path and customer/key/password fields", () => {
+    const provider = getProviderDefinition("netcup");
+
+    expect(provider).toMatchObject({
+      name: "netcup",
+      displayName: "netcup",
+      docsUrl: "https://github.com/caddy-dns/netcup",
+      modulePath: "github.com/caddy-dns/netcup",
+    });
+    expect(provider?.fields).toEqual([
+      { key: "customer_number", label: "Customer Number", type: "string", required: true },
+      { key: "api_key", label: "API Key", type: "password", required: true },
+      { key: "api_password", label: "API Password", type: "password", required: true },
+    ]);
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("netcup");
+  });
+
+  it("encrypts, decrypts, and emits netcup credentials for Caddy DNS challenges", () => {
+    const encrypted = encryptProviderCredentials("netcup", {
+      customer_number: "123456",
+      api_key: "netcup-key",
+      api_password: "netcup-password",
+    });
+
+    expect(isEncryptedSecret(encrypted.api_key)).toBe(true);
+    expect(isEncryptedSecret(encrypted.api_password)).toBe(true);
+    expect(isEncryptedSecret(encrypted.customer_number)).toBe(false);
+    expect(decryptProviderCredentials("netcup", encrypted)).toEqual({
+      customer_number: "123456",
+      api_key: "netcup-key",
+      api_password: "netcup-password",
+    });
+    expect(buildDnsChallengeConfig("netcup", encrypted, ["1.1.1.1"])).toEqual({
+      provider: {
+        name: "netcup",
+        customer_number: "123456",
+        api_key: "netcup-key",
+        api_password: "netcup-password",
+      },
+      resolvers: ["1.1.1.1"],
+    });
+  });
 });

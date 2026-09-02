@@ -107,6 +107,8 @@ github.com/caddy-dns/linode v0.8.0 h1:e6lzkrYu1A5X4RuAFT0och0DOYwSYbPIgLhjteTkrK
 github.com/caddy-dns/linode v0.8.0/go.mod h1:5/wmqXWT7Sccz+MlE7ozXJi9PxebrUOHMOWDBhqA4xI=
 github.com/caddy-dns/namecheap v1.0.0 h1:CwMvdB7H/UP6wR7Z0PyCMhm8ZFwQ8UVV7yW+7NFUW98=
 github.com/caddy-dns/namecheap v1.0.0/go.mod h1:4/9/AcsTd+5SDVgJsC2nIjNb1olHiAewjx7GR83OzzY=
+github.com/caddy-dns/netcup v1.0.0 h1:ywpWcOOaMEyL37toW57l3PaP+zrl2up6e1Rfyj+fzng=
+github.com/caddy-dns/netcup v1.0.0/go.mod h1:YeSUf3I3Fq+LSg5MhzDhJHi7VNx1aefPg/Gz0aszU/c=
 github.com/caddy-dns/njalla v1.0.0 h1:y2dMER2lAlKs8CBuIH8ZGvp5H96nEyepmyIf3PrvGeQ=
 github.com/caddy-dns/njalla v1.0.0/go.mod h1:CMit3Nj4qRAwJUqECPNsrODacO5sssxs7Q8TzU9uEyY=
 github.com/caddy-dns/ovh v1.1.0 h1:CiqT4b3y/lK4j7FQTsUggdru4GqsY6yU8W0zStS54MI=
@@ -342,6 +344,8 @@ github.com/libdns/linode v0.5.0 h1:BYWhIfK+M7Qh/naDzL2FX2oTWBv6VbRRPiypIFe9yT8=
 github.com/libdns/linode v0.5.0/go.mod h1:s6utuPHV0ZtERlsDPvAZbo2X86xq2AJQ+dsIQTFyxls=
 github.com/libdns/namecheap v1.0.0 h1:cZK8w4Y1AJQCtL5bjqnFpYBnI1k/mzJhljcKAP5vPd8=
 github.com/libdns/namecheap v1.0.0/go.mod h1:v57RUzOgOGVnI9wY3uqPEanSrKx2I1YgR24uep/ys9Y=
+github.com/libdns/netcup v1.0.0 h1:+hXRhnCWPTBhsuZX+laBrWt+ijDINoq7zVbaA2UHFuY=
+github.com/libdns/netcup v1.0.0/go.mod h1:yfRQIwtgK9T3o2MZjMrPJhtJgH2uHNWJQfZ1n28J/3I=
 github.com/libdns/njalla v1.0.0 h1:a7TzBfE+/6o9KVt9INP4r31dMAXGvYJRbhI4BoZGSNY=
 github.com/libdns/njalla v1.0.0/go.mod h1:WQhNNMELDBuU/ZeXcHyd6jZsbbRSErd7ds2kdlxVg/A=
 github.com/libdns/ovh v1.1.0 h1:J909NRjU2IwRxvwwuvrHRomQ7lyetZdUISkqEhgmNYA=

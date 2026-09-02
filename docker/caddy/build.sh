@@ -30,6 +30,7 @@ github.com/caddy-dns/ovh
 github.com/caddy-dns/ionos
 github.com/caddy-dns/linode
 github.com/caddy-dns/njalla
+github.com/caddy-dns/netcup
 github.com/caddy-dns/spaceship
 github.com/caddy-dns/desec
 github.com/caddy-dns/dynu

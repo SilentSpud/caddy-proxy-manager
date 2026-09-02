@@ -276,6 +276,18 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
       { key: "api_token", label: "API Token", type: "password", required: true },
     ],
   },
+  {
+    name: "netcup",
+    displayName: "netcup",
+    description: "netcup CCP DNS API",
+    docsUrl: "https://github.com/caddy-dns/netcup",
+    modulePath: "github.com/caddy-dns/netcup",
+    fields: [
+      { key: "customer_number", label: "Customer Number", type: "string", required: true },
+      { key: "api_key", label: "API Key", type: "password", required: true },
+      { key: "api_password", label: "API Password", type: "password", required: true },
+    ],
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

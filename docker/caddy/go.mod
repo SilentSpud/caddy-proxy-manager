@@ -15,6 +15,7 @@ require (
 	github.com/caddy-dns/ionos v1.2.0
 	github.com/caddy-dns/linode v0.8.0
 	github.com/caddy-dns/namecheap v1.0.0
+	github.com/caddy-dns/netcup v1.0.0
 	github.com/caddy-dns/njalla v1.0.0
 	github.com/caddy-dns/ovh v1.1.0
 	github.com/caddy-dns/porkbun v0.3.1
@@ -129,6 +130,7 @@ require (
 	github.com/libdns/libdns v1.1.1 // indirect
 	github.com/libdns/linode v0.5.0 // indirect
 	github.com/libdns/namecheap v1.0.0 // indirect
+	github.com/libdns/netcup v1.0.0 // indirect
 	github.com/libdns/njalla v1.0.0 // indirect
 	github.com/libdns/ovh v1.1.0 // indirect
 	github.com/libdns/porkbun v1.0.1 // indirect
