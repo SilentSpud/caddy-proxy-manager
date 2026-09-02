@@ -106,11 +106,23 @@ Each phase ends green — tests, typecheck, lint, build — and lands on `main` 
 | --- | --- | --- |
 | 0 | Monorepo restructure | Done — `4463b947` |
 | 1 | PostgreSQL only | Done |
-| 2 | Settings service: typed registry, DB-backed config with an env-override layer | |
+| 2 | Settings service: typed registry, DB-backed config with an env-override layer | Done |
 | 3 | First-run setup and login-verify flow | |
 | 4 | Migration flow | |
 | 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | |
 | 6 | IPv6 | |
+
+### Consumers still reading the environment directly
+
+Phase 2 built the service and moved the Caddy admin URL and the login throttle onto it. The rest
+are deliberately still on `process.env`, for reasons that are worth keeping straight:
+
+| Setting | Why it has not moved |
+| --- | --- |
+| `AVATAR_GRAVATAR`, `AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH` | Both already have a stored value too — a JSON blob the Settings page writes — and the environment variable only pins it. Reading the registry alone would silently discard whatever the operator chose in the UI. They move in phase 4, where the migration can carry the blob's value across. |
+| `CLICKHOUSE_*` | Read into module-scope constants that are interpolated into the table DDL, so making them async means restructuring how the schema is built. Worth doing on its own, not as a rider. |
+| `APP_NAME` | Reached from `app/layout.tsx`'s static `metadata` export, which has to become `generateMetadata()` first. |
+| `AUTH_*`, `BASE_URL` | Phase 3 rewrites the paths that read them, so converting now would be work done twice. |
 
 ### Owed to phase 4
 

@@ -10,11 +10,29 @@ type RateLimitOutcome = {
 };
 
 const ATTEMPTS = new Map<string, RateLimitEntry>();
-const MAX_ATTEMPTS = Number(process.env.LOGIN_MAX_ATTEMPTS ?? 5);
-const WINDOW_MS = Number(process.env.LOGIN_WINDOW_MS ?? 5 * 60 * 1000);
-const BLOCK_DURATION_MS = Number(process.env.LOGIN_BLOCK_MS ?? 15 * 60 * 1000);
 
-function getEntry(key: string, now: number): RateLimitEntry | undefined {
+/**
+ * Read per call rather than at module load: the three values are settings now, so an operator can
+ * change the throttle without a restart. The settings module caches, so this is a map lookup after
+ * the first read.
+ *
+ * Imported lazily for the same reason the config module always was — a static import would read
+ * process.env before a test's hoisted block could set it.
+ */
+async function limits(): Promise<{ maxAttempts: number; windowMs: number; blockMs: number }> {
+  const [registry, { getSetting }] = await Promise.all([
+    import("./settings/registry"),
+    import("./settings/resolve"),
+  ]);
+  const [maxAttempts, windowMs, blockMs] = await Promise.all([
+    getSetting(registry.loginMaxAttempts),
+    getSetting(registry.loginWindowMs),
+    getSetting(registry.loginBlockMs),
+  ]);
+  return { maxAttempts, windowMs, blockMs };
+}
+
+function getEntry(key: string, now: number, windowMs: number): RateLimitEntry | undefined {
   const entry = ATTEMPTS.get(key);
   if (!entry) {
     return undefined;
@@ -27,7 +45,7 @@ function getEntry(key: string, now: number): RateLimitEntry | undefined {
   }
 
   // Reset the window once the observation window expires.
-  if (!entry.blockedUntil && entry.firstAttemptTimestamp + WINDOW_MS <= now) {
+  if (!entry.blockedUntil && entry.firstAttemptTimestamp + windowMs <= now) {
     ATTEMPTS.delete(key);
     return undefined;
   }
@@ -35,9 +53,10 @@ function getEntry(key: string, now: number): RateLimitEntry | undefined {
   return entry;
 }
 
-export function isRateLimited(key: string): RateLimitOutcome {
+export async function isRateLimited(key: string): Promise<RateLimitOutcome> {
   const now = Date.now();
-  const entry = getEntry(key, now);
+  const { windowMs } = await limits();
+  const entry = getEntry(key, now, windowMs);
   if (!entry) {
     return { blocked: false };
   }
@@ -49,9 +68,10 @@ export function isRateLimited(key: string): RateLimitOutcome {
   return { blocked: false };
 }
 
-export function registerFailedAttempt(key: string): RateLimitOutcome {
+export async function registerFailedAttempt(key: string): Promise<RateLimitOutcome> {
   const now = Date.now();
-  const existing = getEntry(key, now);
+  const { maxAttempts, windowMs, blockMs } = await limits();
+  const existing = getEntry(key, now, windowMs);
 
   if (!existing) {
     ATTEMPTS.set(key, {
@@ -67,11 +87,11 @@ export function registerFailedAttempt(key: string): RateLimitOutcome {
 
   existing.attempts += 1;
 
-  if (existing.attempts >= MAX_ATTEMPTS) {
+  if (existing.attempts >= maxAttempts) {
     existing.attempts = 0;
     existing.firstAttemptTimestamp = now;
-    existing.blockedUntil = now + BLOCK_DURATION_MS;
-    return { blocked: true, retryAfterMs: BLOCK_DURATION_MS };
+    existing.blockedUntil = now + blockMs;
+    return { blocked: true, retryAfterMs: blockMs };
   }
 
   return { blocked: false };

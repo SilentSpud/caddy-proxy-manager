@@ -21,59 +21,59 @@ afterEach(() => {
 describe('rate-limit', () => {
   const KEY = 'test-ip-1';
 
-  it('first attempt is not blocked', () => {
-    const result = registerFailedAttempt(KEY);
+  it('first attempt is not blocked', async () => {
+    const result = await registerFailedAttempt(KEY);
     expect(result.blocked).toBe(false);
   });
 
-  it('4 failed attempts are not blocked (below threshold of 5)', () => {
+  it('4 failed attempts are not blocked (below threshold of 5)', async () => {
     for (let i = 0; i < 4; i++) {
-      const result = registerFailedAttempt(KEY);
+      const result = await registerFailedAttempt(KEY);
       expect(result.blocked).toBe(false);
     }
   });
 
-  it('5th failed attempt triggers block', () => {
+  it('5th failed attempt triggers block', async () => {
     for (let i = 0; i < 4; i++) {
-      registerFailedAttempt(KEY);
+      await registerFailedAttempt(KEY);
     }
-    const result = registerFailedAttempt(KEY);
+    const result = await registerFailedAttempt(KEY);
     expect(result.blocked).toBe(true);
     expect(result.retryAfterMs).toBeGreaterThan(0);
   });
 
-  it('isRateLimited returns blocked after 5 failures', () => {
+  it('isRateLimited returns blocked after 5 failures', async () => {
     for (let i = 0; i < 5; i++) {
-      registerFailedAttempt(KEY);
+      await registerFailedAttempt(KEY);
     }
-    const result = isRateLimited(KEY);
+    const result = await isRateLimited(KEY);
     expect(result.blocked).toBe(true);
     expect(result.retryAfterMs).toBeGreaterThan(0);
   });
 
-  it('isRateLimited returns not blocked for unknown key', () => {
-    const result = isRateLimited('unknown-key-xyz');
+  it('isRateLimited returns not blocked for unknown key', async () => {
+    const result = await isRateLimited('unknown-key-xyz');
     expect(result.blocked).toBe(false);
   });
 
-  it('blocked entry unblocks after blockedUntil passes', () => {
+  it('blocked entry unblocks after blockedUntil passes', async () => {
     // Trigger block
     for (let i = 0; i < 5; i++) {
-      registerFailedAttempt(KEY);
+      await registerFailedAttempt(KEY);
     }
 
     // Mock Date.now to be far in the future (past block window)
     const future = Date.now() + 16 * 60 * 1000; // 16 minutes
     vi.spyOn(Date, 'now').mockReturnValue(future);
 
-    const result = isRateLimited(KEY);
+    const result = await isRateLimited(KEY);
     expect(result.blocked).toBe(false);
   });
 
-  it('window expires without max attempts resets attempts', () => {
+  it('window expires without max attempts resets attempts', async () => {
     // Make a few attempts
     for (let i = 0; i < 3; i++) {
-      registerFailedAttempt(KEY);
+      await registerFailedAttempt(KEY);
     }
 
     // Jump past the window (default 5 minutes)
@@ -81,29 +81,29 @@ describe('rate-limit', () => {
     vi.spyOn(Date, 'now').mockReturnValue(future);
 
     // Now should be treated as first attempt
-    const result = registerFailedAttempt(KEY);
+    const result = await registerFailedAttempt(KEY);
     expect(result.blocked).toBe(false);
   });
 
-  it('resetAttempts immediately unblocks a key', () => {
+  it('resetAttempts immediately unblocks a key', async () => {
     for (let i = 0; i < 5; i++) {
-      registerFailedAttempt(KEY);
+      await registerFailedAttempt(KEY);
     }
-    expect(isRateLimited(KEY).blocked).toBe(true);
+    expect((await isRateLimited(KEY)).blocked).toBe(true);
 
     resetAttempts(KEY);
-    expect(isRateLimited(KEY).blocked).toBe(false);
+    expect((await isRateLimited(KEY)).blocked).toBe(false);
   });
 
-  it('different keys do not interfere', () => {
+  it('different keys do not interfere', async () => {
     const KEY_A = 'ip-a';
     const KEY_B = 'ip-b';
 
     for (let i = 0; i < 5; i++) {
-      registerFailedAttempt(KEY_A);
+      await registerFailedAttempt(KEY_A);
     }
 
-    expect(isRateLimited(KEY_A).blocked).toBe(true);
-    expect(isRateLimited(KEY_B).blocked).toBe(false);
+    expect((await isRateLimited(KEY_A)).blocked).toBe(true);
+    expect((await isRateLimited(KEY_B)).blocked).toBe(false);
   });
 });

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting: check before attempting password verification
     const rateLimitKey = `oauth-link-verify:${tokenPayload.userId}`;
-    const rateLimitCheck = isRateLimited(rateLimitKey);
+    const rateLimitCheck = await isRateLimited(rateLimitKey);
     if (rateLimitCheck.blocked) {
       await createAuditEvent({
         userId: tokenPayload.userId,
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     if (!success) {
       // Count this failure against the rate limit
-      registerFailedAttempt(rateLimitKey);
+      await registerFailedAttempt(rateLimitKey);
 
       await createAuditEvent({
         userId: tokenPayload.userId,

@@ -26,12 +26,16 @@ export type CaddyAdminResponse = {
 export type CaddyAdminTransport = (request: CaddyAdminRequest) => Promise<CaddyAdminResponse>;
 
 /**
- * Absolute URL for an admin path. `./config` is imported lazily: it snapshots process.env on first
- * load, and a static import would freeze env before a test's hoisted block could set it.
+ * Absolute URL for an admin path. The settings module is imported lazily for the same reason the
+ * config module was: it reads process.env on first load, and a static import would freeze that
+ * before a test's hoisted block could set it.
  */
 async function caddyAdminUrl(path: string): Promise<string> {
-  const { config } = await import("./config");
-  const root = config.caddyApiUrl.replace(/\/+$/, "");
+  const [{ caddyApiUrl }, { getSetting }] = await Promise.all([
+    import("./settings/registry"),
+    import("./settings/resolve"),
+  ]);
+  const root = (await getSetting(caddyApiUrl)).replace(/\/+$/, "");
   return `${root}${path.startsWith("/") ? path : `/${path}`}`;
 }
 

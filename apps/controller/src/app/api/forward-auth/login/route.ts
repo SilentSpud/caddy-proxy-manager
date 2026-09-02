@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       lastHeaderValue(request.headers.get("x-real-ip")) ||
       lastHeaderValue(request.headers.get("x-forwarded-for")) ||
       "unknown";
-    const rateLimitResult = isRateLimited(ip);
+    const rateLimitResult = await isRateLimited(ip);
     if (rateLimitResult.blocked) {
       return NextResponse.json(
         { error: "Too many login attempts. Please try again later." },
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (user?.status !== "active" || !user.passwordHash) {
-      registerFailedAttempt(ip);
+      await registerFailedAttempt(ip);
       await logAuditEvent({
         userId: null,
         action: "forward_auth_login_failed",
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
-      registerFailedAttempt(ip);
+      await registerFailedAttempt(ip);
       await logAuditEvent({
         userId: user.id,
         action: "forward_auth_login_failed",

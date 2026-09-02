@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting: prevent OAuth linking spam
     const rateLimitKey = `oauth-link:${userId}`;
-    const rateLimitResult = registerFailedAttempt(rateLimitKey);
+    const rateLimitResult = await registerFailedAttempt(rateLimitKey);
     if (rateLimitResult.blocked) {
       return NextResponse.json(
         { error: "Too many OAuth linking attempts. Please try again later." },
