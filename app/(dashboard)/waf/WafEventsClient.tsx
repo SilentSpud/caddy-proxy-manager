@@ -9,6 +9,7 @@ import { Search, X, ShieldOff, Trash2, Copy, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-waf";
+import { formatDateTimeUtc } from "@/src/lib/date-format";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -49,20 +50,25 @@ type Props = {
 
 type RangeOption = Props['initialRange'];
 
-function formatDateTimeLocal(unixTs: number | null): string {
+// UTC-based counterparts of the datetime-local input helpers below, so the
+// custom-range fields match the UTC timestamps shown in the event list and
+// render identically on the server and in the browser.
+function formatDateTimeLocalUtc(unixTs: number | null): string {
   if (!unixTs) return '';
   const d = new Date(unixTs * 1000);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const min = String(d.getUTCMinutes()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
-function parseDateTimeLocal(value: string): number | null {
+function parseDateTimeLocalUtc(value: string): number | null {
   if (!value) return null;
-  const ts = Math.floor(new Date(value).getTime() / 1000);
+  // "YYYY-MM-DDTHH:mm" is parsed as local time per spec; the trailing "Z"
+  // pins it to UTC so it matches the displayed timestamps.
+  const ts = Math.floor(new Date(`${value}Z`).getTime() / 1000);
   return Number.isFinite(ts) ? ts : null;
 }
 
@@ -499,8 +505,8 @@ function EventDetailPanel({
 
           {/* Metadata grid */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border bg-muted/30 p-4">
-            <DetailRow label="Time">
-              <p className="text-sm" suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</p>
+            <DetailRow label="Time (UTC)">
+              <p className="text-sm">{formatDateTimeUtc(event.ts * 1000)}</p>
             </DetailRow>
             <DetailRow label="Host">
               <p className="font-mono text-sm break-all">{event.host || "—"}</p>
@@ -738,8 +744,8 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
   const [tab, setTab]                             = useState("events");
   const [searchTerm, setSearchTerm]               = useState(initialSearch);
   const [range, setRange]                         = useState<RangeOption>(initialRange);
-  const [customFrom, setCustomFrom]               = useState(formatDateTimeLocal(initialFrom));
-  const [customTo, setCustomTo]                   = useState(formatDateTimeLocal(initialTo));
+  const [customFrom, setCustomFrom]               = useState(formatDateTimeLocalUtc(initialFrom));
+  const [customTo, setCustomTo]                   = useState(formatDateTimeLocalUtc(initialTo));
   const [selected, setSelected]                   = useState<WafEvent | null>(null);
   const [localGlobalExcluded, setLocalGlobalExcluded]     = useState(globalExcluded);
   const [localGlobalMessages, setLocalGlobalMessages]     = useState(globalExcludedMessages);
@@ -756,8 +762,8 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
   useEffect(() => { setSearchTerm(initialSearch); }, [initialSearch]);
   useEffect(() => {
     setRange(initialRange);
-    setCustomFrom(formatDateTimeLocal(initialFrom));
-    setCustomTo(formatDateTimeLocal(initialTo));
+    setCustomFrom(formatDateTimeLocalUtc(initialFrom));
+    setCustomTo(formatDateTimeLocalUtc(initialTo));
   }, [initialRange, initialFrom, initialTo]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -790,8 +796,8 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
 
     params.set('range', nextRange);
     if (nextRange === 'custom') {
-      const fromTs = parseDateTimeLocal(nextFrom ?? '');
-      const toTs = parseDateTimeLocal(nextTo ?? '');
+      const fromTs = parseDateTimeLocalUtc(nextFrom ?? '');
+      const toTs = parseDateTimeLocalUtc(nextTo ?? '');
       if (fromTs == null || toTs == null || fromTs >= toTs) {
         toast.error('Choose a valid custom time range');
         return;
@@ -816,8 +822,8 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
     if (!customFrom || !customTo) {
       const now = new Date();
       const dayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-      setCustomFrom(formatDateTimeLocal(Math.floor(dayAgo.getTime() / 1000)));
-      setCustomTo(formatDateTimeLocal(Math.floor(now.getTime() / 1000)));
+      setCustomFrom(formatDateTimeLocalUtc(Math.floor(dayAgo.getTime() / 1000)));
+      setCustomTo(formatDateTimeLocalUtc(Math.floor(now.getTime() / 1000)));
     }
   }, [customFrom, customTo]);
 
@@ -837,7 +843,7 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
             <BlockedChip blocked={event.blocked} />
             <SeverityChip severity={event.severity} />
           </div>
-          <span className="text-xs text-muted-foreground" suppressHydrationWarning>{new Date(event.ts * 1000).toLocaleString()}</span>
+          <span className="text-xs text-muted-foreground">{formatDateTimeUtc(event.ts * 1000)}</span>
         </div>
         <p className="text-xs font-mono text-muted-foreground break-all">{event.host || "—"}</p>
         {event.ruleId && <span className="text-xs text-muted-foreground">Rule #{event.ruleId}</span>}
@@ -847,14 +853,13 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
 
   const columns = [
     {
-      id: "ts", label: "Time", width: 150,
-      // The timestamp renders on the server in the container's locale/timezone
-      // and again in the browser's — the two never match, so this text opts out
-      // of hydration checks rather than letting React discard the whole tree
-      // (error #418).
+      id: "ts", label: "Time (UTC)", width: 150,
+      // formatDateTimeUtc pins locale and timezone, so the server-rendered and
+      // client-rendered text are identical (no hydration mismatch, no locale-
+      // dependent dots vs slashes — issue #233).
       render: (r: WafEvent) => (
-        <span className="text-muted-foreground text-[0.78rem] whitespace-nowrap font-mono" suppressHydrationWarning>
-          {new Date(r.ts * 1000).toLocaleString()}
+        <span className="text-muted-foreground text-[0.78rem] whitespace-nowrap font-mono">
+          {formatDateTimeUtc(r.ts * 1000)}
         </span>
       ),
     },
@@ -947,8 +952,8 @@ export default function WafEventsClient({ events, stats, pagination, initialSear
                 </div>
                 {range === 'custom' && (
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <Input type="datetime-local" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-[220px]" />
-                    <Input type="datetime-local" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-[220px]" />
+                    <Input type="datetime-local" aria-label="From (UTC)" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-[220px]" />
+                    <Input type="datetime-local" aria-label="To (UTC)" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-[220px]" />
                     <Button size="sm" onClick={() => pushRange('custom', customFrom, customTo)}>Apply range</Button>
                   </div>
                 )}

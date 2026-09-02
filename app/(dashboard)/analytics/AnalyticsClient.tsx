@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { formatDateTimeUtc } from '@/src/lib/date-format';
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
@@ -753,7 +754,7 @@ export default function AnalyticsClient() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {['Time', 'IP', 'Country', 'Host', 'Method', 'URI', 'Status'].map(h => (
+                        {['Time (UTC)', 'IP', 'Country', 'Host', 'Method', 'URI', 'Status'].map(h => (
                           <TableHead key={h} className="text-muted-foreground whitespace-nowrap">{h}</TableHead>
                         ))}
                       </TableRow>
@@ -762,7 +763,7 @@ export default function AnalyticsClient() {
                       {blocked.events.map(ev => (
                         <TableRow key={ev.id}>
                           <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                            {new Date(ev.ts * 1000).toLocaleString()}
+                            {formatDateTimeUtc(ev.ts * 1000)}
                           </TableCell>
                           <TableCell className="font-mono text-sm">{ev.clientIp}</TableCell>
                           <TableCell className="text-sm">
