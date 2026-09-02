@@ -205,7 +205,7 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
-      - ./docker/clickhouse/config.d/low-disk-write.xml:/etc/clickhouse-server/config.d/low-disk-write.xml:ro
+      - ./docker/clickhouse/low-disk-write.xml:/etc/clickhouse-server/config.d/low-disk-write.xml:ro
     networks:
       - caddy-network
     healthcheck:

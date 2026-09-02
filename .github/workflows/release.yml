@@ -172,7 +172,7 @@ jobs:
           args+=(
             docker-compose.yml
             .env.example
-            'docker/clickhouse/config.d/low-disk-write.xml#clickhouse-low-disk-write.xml'
+            'docker/clickhouse/low-disk-write.xml#clickhouse-low-disk-write.xml'
           )
 
           gh release create "${args[@]}"
