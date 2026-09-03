@@ -107,7 +107,7 @@ Each phase ends green — tests, typecheck, lint, build — and lands on `main` 
 | 0 | Monorepo restructure | Done — `4463b947` |
 | 1 | PostgreSQL only | Done |
 | 2 | Settings service: typed registry, DB-backed config with an env-override layer | Done |
-| 3 | First-run setup and login-verify flow | |
+| 3 | First-run setup and login-verify flow | Done |
 | 4 | Migration flow | |
 | 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | |
 | 6 | IPv6 | |

@@ -1,0 +1,74 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { auth } from "@/src/lib/auth";
+import { SETTING_DEFINITIONS, SettingValidationError } from "@/src/lib/settings/registry";
+import { resolveAllSettings, saveSettings } from "@/src/lib/settings/resolve";
+import { isSetupCompleted, markSetupCompleted } from "@/src/lib/setup";
+
+export type SetupSettingsState = { error: string | null };
+
+/**
+ * Save the configuration collected by the last setup step, then mark setup finished.
+ *
+ * Requires an admin session: this step runs after the sign-in that setup insists on, so there is a
+ * real user by now and the endpoint should be protected like any other administrative write.
+ */
+export async function saveSetupSettings(
+  _previous: SetupSettingsState,
+  formData: FormData,
+): Promise<SetupSettingsState> {
+  const session = await auth();
+  if (session?.user?.role !== "admin") {
+    return { error: "You need to be signed in as an administrator to finish setup." };
+  }
+  if (await isSetupCompleted()) {
+    redirect("/");
+  }
+
+  // Read from the registry rather than iterating the form, so a setting the form did not post is
+  // still considered. Booleans compare against "on": the Switch wrapper in
+  // components/ui/FormBooleanControls always submits a hidden input, empty when off, so a
+  // presence check would read every toggle as true.
+  const resolved = await resolveAllSettings();
+  const values: Record<string, unknown> = {};
+
+  for (const definition of SETTING_DEFINITIONS) {
+    const raw = formData.get(definition.key);
+
+    if (typeof definition.default === "boolean") {
+      values[definition.key] = raw === "on";
+      continue;
+    }
+
+    if (raw === null) continue;
+    const text = String(raw);
+
+    // A secret is never sent to the browser, so a blank one means "leave it alone" rather than
+    // "clear it". Carry the resolved value across instead: the point of this step is that the
+    // operator can delete the variable from their .env afterwards, which only holds if the value
+    // actually lands in the database.
+    if (definition.secret && text === "") {
+      const current = resolved.get(definition.key)?.value;
+      if (typeof current === "string" && current !== "") {
+        values[definition.key] = current;
+      }
+      continue;
+    }
+
+    values[definition.key] = text;
+  }
+
+  try {
+    await saveSettings(values);
+  } catch (error) {
+    if (error instanceof SettingValidationError) {
+      return { error: error.message };
+    }
+    console.error("Setup: failed to save settings", error);
+    return { error: "Could not save the configuration. Try again." };
+  }
+
+  await markSetupCompleted();
+  redirect("/");
+}

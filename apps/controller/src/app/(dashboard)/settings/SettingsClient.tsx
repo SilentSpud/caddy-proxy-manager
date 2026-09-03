@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState, useEffect, type ReactNode } from "react";
+import { useState, useActionState, useEffect } from "react";
 import {
   Cloud,
   Globe,
@@ -22,12 +22,10 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
-import { Banner } from "@astryxdesign/core/Banner";
 import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
-import { Divider } from "@astryxdesign/core/Divider";
 import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Kbd } from "@astryxdesign/core/Kbd";
@@ -35,6 +33,13 @@ import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
+import {
+  FormCard,
+  InfoAlert,
+  SaveButton,
+  StatusAlert,
+  WarnAlert,
+} from "@/src/components/ui/FormLayout";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -242,55 +247,7 @@ function findItem(id: string) {
   return ALL_ITEMS.find((i) => i.id === id);
 }
 
-// ─── Alert helpers ───────────────────────────────────────────────────────────
-
-function StatusAlert({ message, success }: { message: string; success: boolean }) {
-  return <Banner status={success ? "success" : "error"} title={message} />;
-}
-
-function InfoAlert({ title, children }: { title: string; children?: ReactNode }) {
-  return <Banner status="info" title={title} description={children} />;
-}
-
-function WarnAlert({ title, children }: { title: string; children?: ReactNode }) {
-  return <Banner status="warning" title={title} description={children} />;
-}
-
 // ─── Layout primitives ───────────────────────────────────────────────────────
-
-function FormCard({
-  title,
-  children,
-  footer,
-}: {
-  title?: string;
-  children: ReactNode;
-  footer?: ReactNode;
-}) {
-  return (
-    <Card padding={4}>
-      <VStack gap={4}>
-        {title && (
-          <>
-            <Text type="label" size="xsm" weight="semibold" color="secondary">
-              {title}
-            </Text>
-            <Divider />
-          </>
-        )}
-        {children}
-        {footer && (
-          <>
-            <Divider />
-            <HStack justify="end" gap={2}>
-              {footer}
-            </HStack>
-          </>
-        )}
-      </VStack>
-    </Card>
-  );
-}
 
 /** The "Override controller settings" toggle an agent shows above each form. */
 function OverrideToggle({
@@ -310,15 +267,6 @@ function OverrideToggle({
       onChange={onChange}
       isDisabled={isDisabled}
     />
-  );
-}
-
-/** Right-aligned submit button, the footer every settings form ends with. */
-function SaveButton({ label, isDisabled }: { label: string; isDisabled?: boolean }) {
-  return (
-    <HStack justify="end">
-      <Button type="submit" size="sm" label={label} isDisabled={isDisabled} />
-    </HStack>
   );
 }
 
