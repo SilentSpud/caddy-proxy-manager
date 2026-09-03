@@ -222,12 +222,24 @@ export async function saveAvatarSettings(settings: AvatarSettings): Promise<void
   await setSetting("avatars", settings);
 }
 
-/** Whether icons may fall back to Gravatar. AVATAR_GRAVATAR wins; else the toggle, default on. */
+/**
+ * Whether icons may fall back to Gravatar.
+ *
+ * Resolution is the registry first — a stored value, then AVATAR_GRAVATAR — and only then the
+ * older JSON blob the Settings page used to write. The blob stays in the chain for deployments
+ * that have not been through the migration, which is what lifts it into the registry key; without
+ * that fallback, upgrading would silently reset the toggle.
+ */
 export async function isGravatarEnabled(): Promise<boolean> {
-  const { config } = await import("./config");
-  if (config.avatars.gravatarFromEnv !== null) return config.avatars.gravatarFromEnv;
+  const [{ gravatarEnabled }, { resolveSetting }] = await Promise.all([
+    import("./settings/registry"),
+    import("./settings/resolve"),
+  ]);
+  const resolved = await resolveSetting(gravatarEnabled);
+  if (resolved.source !== "default") return resolved.value;
+
   const stored = await getAvatarSettings();
-  return stored?.gravatarEnabled ?? true;
+  return stored?.gravatarEnabled ?? gravatarEnabled.default;
 }
 
 export async function getPasswordPolicySettings(): Promise<PasswordPolicySettings | null> {
@@ -239,14 +251,20 @@ export async function savePasswordPolicySettings(settings: PasswordPolicySetting
 }
 
 /**
- * Whether a bcrypt-hashed user must change their password. Pinned by
- * AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH; otherwise the stored setting, default off.
+ * Whether a bcrypt-hashed user must change their password.
+ *
+ * Same order as isGravatarEnabled: the registry (stored, then the environment variable), then the
+ * older JSON blob for deployments that have not migrated yet. This one is tri-state — null means
+ * "no opinion", which is why an unset registry value has to fall through rather than read as false.
  */
 export async function isLegacyPasswordChangeRequired(): Promise<boolean> {
-  const { config } = await import("./config");
-  if (config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null) {
-    return config.auth.requirePasswordChangeOnLegacyHashFromEnv;
-  }
+  const [{ requirePasswordChangeOnLegacyHash }, { resolveSetting }] = await Promise.all([
+    import("./settings/registry"),
+    import("./settings/resolve"),
+  ]);
+  const resolved = await resolveSetting(requirePasswordChangeOnLegacyHash);
+  if (resolved.value !== null) return resolved.value;
+
   const stored = await getPasswordPolicySettings();
   return stored?.requireChangeOnLegacyHash ?? false;
 }

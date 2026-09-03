@@ -6,6 +6,12 @@
  * that had no setup flow, and a restart in the middle of either.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { Database } from 'bun:sqlite';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { vi } from '@/tests/helpers/vi';
 import { createTestDb, currentDb, type TestDb } from '@/tests/helpers/db';
 
@@ -29,13 +35,14 @@ vi.mock('@/src/lib/db', () => ({
 
 const {
   backfillSetupCompletion,
+  declineMigration,
   getSetupState,
   hasAnySignIn,
   isSetupCompleted,
   markSetupCompleted,
 } = await import('@/src/lib/setup');
 
-const TOUCHED_ENV = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'OAUTH_ENABLED'];
+const TOUCHED_ENV = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'OAUTH_ENABLED', 'LEGACY_SQLITE_PATH'];
 
 async function addUser(email: string) {
   const now = new Date().toISOString();
@@ -189,5 +196,69 @@ describe('backfill for installations that predate setup', () => {
     await backfillSetupCompletion();
     await backfillSetupCompletion();
     expect(await isSetupCompleted()).toBe(true);
+  });
+});
+
+describe('the migration offer', () => {
+  // LEGACY_SQLITE_PATH pins the scan to one file, so these do not depend on what happens to be
+  // lying around the working directory.
+  function pointAtLegacyDatabase(): string {
+    const directory = mkdtempSync(join(tmpdir(), 'cpm-setup-legacy-'));
+    const path = join(directory, 'old.db');
+    const raw = new Database(path);
+    migrate(drizzle(raw), { migrationsFolder: resolve(process.cwd(), 'drizzle', 'legacy-sqlite') });
+    raw.close();
+    process.env.LEGACY_SQLITE_PATH = path;
+    return directory;
+  }
+
+  /**
+   * bun:sqlite releases the file only once its statements are finalized, which happens on
+   * collection — Windows refuses the removal until then, and a leftover temp directory is not
+   * worth failing a test over.
+   */
+  function discard(directory: string): void {
+    Bun.gc(true);
+    try {
+      rmSync(directory, { recursive: true, force: true });
+    } catch {
+      // Left for the operating system to clean up.
+    }
+  }
+
+  it('offers migration before account creation when an old database is present', async () => {
+    const directory = pointAtLegacyDatabase();
+    try {
+      expect((await getSetupState(false)).stage).toBe('migrate');
+    } finally {
+      discard(directory);
+    }
+  });
+
+  it('falls through to account creation once the offer is declined', async () => {
+    const directory = pointAtLegacyDatabase();
+    try {
+      await declineMigration();
+      expect((await getSetupState(false)).stage).toBe('account');
+    } finally {
+      discard(directory);
+    }
+  });
+
+  it('does not offer migration once the old database has been imported', async () => {
+    // Users exist after an import, which moves the flow to proving the sign-in works. Offering
+    // migration again here would invite a second import on top of the first.
+    const directory = pointAtLegacyDatabase();
+    try {
+      await addUser('migrated@localhost');
+      expect((await getSetupState(false)).stage).toBe('verify');
+    } finally {
+      discard(directory);
+    }
+  });
+
+  it('goes straight to account creation when there is nothing to migrate', async () => {
+    process.env.LEGACY_SQLITE_PATH = join(tmpdir(), 'definitely-not-here.db');
+    expect((await getSetupState(false)).stage).toBe('account');
   });
 });

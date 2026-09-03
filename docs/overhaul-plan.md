@@ -108,7 +108,7 @@ Each phase ends green — tests, typecheck, lint, build — and lands on `main` 
 | 1 | PostgreSQL only | Done |
 | 2 | Settings service: typed registry, DB-backed config with an env-override layer | Done |
 | 3 | First-run setup and login-verify flow | Done |
-| 4 | Migration flow | |
+| 4 | Migration flow | Done |
 | 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | |
 | 6 | IPv6 | |
 
@@ -124,6 +124,13 @@ are deliberately still on `process.env`, for reasons that are worth keeping stra
 | `APP_NAME` | Reached from `app/layout.tsx`'s static `metadata` export, which has to become `generateMetadata()` first. |
 | `AUTH_*`, `BASE_URL` | Phase 3 rewrites the paths that read them, so converting now would be work done twice. |
 
+### Settled in phase 4
+
+`AVATAR_GRAVATAR` and `AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH` now resolve through the
+registry first and fall back to their old JSON blob only for deployments that have not migrated.
+The migration lifts the blob's value into the registry key, which is what makes that fallback
+safe to remove later.
+
 ### Owed to phase 4
 
 Three test files were deleted in phase 1 because they tested a path that no longer exists — running
@@ -131,8 +138,11 @@ the application *on* a legacy SQLite database. What they covered is still worth 
 migration tests, reading an old database rather than booting on one:
 
 - `auth-adapter-compat.test.ts` — Better Auth reading rows written by the old Kysely/SQLite path.
+  **Done:** `legacy-migration.test.ts` asserts the credential account row arrives intact, which is
+  the only way one can reach a PostgreSQL deployment now.
 - `db-compat-accounts.test.ts` — repairing a legacy `accounts.id` schema, and the issuer backfill's
-  refusal to merge colliding identities.
+  refusal to merge colliding identities. **Partly done:** the import is covered, but the issuer
+  backfill's collision refusal is not yet exercised against a migrated database.
 - `db-backend.test.ts` — serial ids, boolean round trips, upserts and transactions. Now covered
   incidentally by the whole suite running on PostgreSQL, so this one needs no successor.
 

@@ -39,6 +39,9 @@ vi.mock('@/src/lib/db', () => ({
 }));
 
 const { importLegacyDatabase } = await import('@/src/lib/migration/import');
+const { carryOverBlobSettings } = await import('@/src/lib/migration/settings-carryover');
+const registry = await import('@/src/lib/settings/registry');
+const { getSetting, invalidateSettingsCache } = await import('@/src/lib/settings/resolve');
 const { inspectLegacyDatabase, scanForLegacyDatabases } = await import(
   '@/src/lib/migration/legacy-database'
 );
@@ -94,6 +97,7 @@ function buildLegacyDatabase(): string {
 }
 
 beforeEach(async () => {
+  invalidateSettingsCache();
   directory = mkdtempSync(join(tmpdir(), 'cpm-legacy-'));
   for (const table of [
     schemaModule.accounts,
@@ -261,5 +265,48 @@ describe('import', () => {
           LEFT JOIN users u ON u.id = a."userId" WHERE u.id IS NULL`,
     );
     expect(orphans).toBe(0);
+  });
+});
+
+describe('carrying the old JSON settings into the registry', () => {
+  it('lifts the gravatar toggle out of its blob, so an upgrade does not reset it', async () => {
+    // The fixture has avatars.gravatarEnabled = false. Phase 2 deliberately left this consumer
+    // reading the blob, because migrating it needed this step to exist first.
+    await importLegacyDatabase(buildLegacyDatabase());
+    invalidateSettingsCache();
+
+    const applied = await carryOverBlobSettings();
+    expect(applied).toContainEqual({ settingKey: registry.gravatarEnabled.key, value: false });
+
+    invalidateSettingsCache();
+    expect(await getSetting(registry.gravatarEnabled)).toBe(false);
+  });
+
+  it('writes nothing for a deployment that never touched the toggle', async () => {
+    // No blob at all: storing a value here would pin a default that was free to change.
+    const applied = await carryOverBlobSettings();
+    expect(applied).toEqual([]);
+  });
+
+  it('ignores a blob it cannot parse rather than failing the migration', async () => {
+    await ctx.db.insert(schemaModule.settings).values({
+      key: 'avatars',
+      value: 'not json at all',
+      updatedAt: NOW,
+    });
+
+    const applied = await carryOverBlobSettings();
+    expect(applied).toEqual([]);
+  });
+
+  it('ignores a field of the wrong type', async () => {
+    await ctx.db.insert(schemaModule.settings).values({
+      key: 'avatars',
+      value: JSON.stringify({ gravatarEnabled: 'yes please' }),
+      updatedAt: NOW,
+    });
+
+    const applied = await carryOverBlobSettings();
+    expect(applied).toEqual([]);
   });
 });

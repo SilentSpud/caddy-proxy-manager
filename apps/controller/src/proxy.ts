@@ -11,7 +11,8 @@ export default async function proxy(req: NextRequest) {
 
   // Everything the setup flow needs before there is an account to authenticate with. The settings
   // step is deliberately absent: it runs after sign-in and is protected like any other page.
-  const isSetupEntry = pathname === "/setup" || pathname === "/api/setup";
+  const isSetupEntry =
+    pathname === "/setup" || pathname === "/setup/migrate" || pathname === "/api/setup";
 
   // Allow public routes
   if (
@@ -53,8 +54,9 @@ export default async function proxy(req: NextRequest) {
     if (required && pathname !== destination) {
       return NextResponse.redirect(new URL(destination, req.url));
     }
-    // Setup is done; nothing should linger on its pages.
-    if (!required && pathname.startsWith("/setup")) {
+    // Setup is done; nothing should linger on its pages. /setup/done is the exception — it is the
+    // summary a migrated deployment is shown *after* completion, and it guards itself.
+    if (!required && pathname.startsWith("/setup") && pathname !== "/setup/done") {
       return NextResponse.redirect(new URL("/", req.url));
     }
   }

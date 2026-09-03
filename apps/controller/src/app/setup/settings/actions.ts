@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
 import { SETTING_DEFINITIONS, SettingValidationError } from "@/src/lib/settings/registry";
 import { resolveAllSettings, saveSettings } from "@/src/lib/settings/resolve";
-import { isSetupCompleted, markSetupCompleted } from "@/src/lib/setup";
+import { getMigrationSource, isSetupCompleted, markSetupCompleted } from "@/src/lib/setup";
 
 export type SetupSettingsState = { error: string | null };
 
@@ -70,5 +70,8 @@ export async function saveSetupSettings(
   }
 
   await markSetupCompleted();
-  redirect("/");
+
+  // A deployment that migrated has one more thing owed to it: its old database back, and a .env it
+  // can safely replace. Everyone else is finished here.
+  redirect((await getMigrationSource()) ? "/setup/done" : "/");
 }
