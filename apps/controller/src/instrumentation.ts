@@ -29,6 +29,15 @@ export async function register() {
       // Don't throw — let the app start; errors surface when users reach the features
     }
 
+    // After the seed, so an environment-configured deployment is recognised by the account it has
+    // just created rather than being sent through a setup flow it does not need.
+    const { backfillSetupCompletion } = await import("./lib/setup");
+    try {
+      await backfillSetupCompletion();
+    } catch (error) {
+      console.error("Failed to check first-run setup state:", error);
+    }
+
     // With local users disabled, an OAuth provider is the only way in. Warn loudly rather than
     // throwing: an operator locked out of the UI can only recover by configuring a provider via
     // OAUTH_* environment variables, which needs the app to keep starting.

@@ -9,10 +9,15 @@ import { buildCsp } from "@/src/lib/csp";
 export default async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
+  // Everything the setup flow needs before there is an account to authenticate with. The settings
+  // step is deliberately absent: it runs after sign-in and is protected like any other page.
+  const isSetupEntry = pathname === "/setup" || pathname === "/api/setup";
+
   // Allow public routes
   if (
     pathname === "/login" ||
     pathname === "/portal" ||
+    isSetupEntry ||
     pathname.startsWith("/api/auth") ||
     pathname === "/api/health" ||
     pathname === "/api/instances/sync" ||
@@ -36,6 +41,22 @@ export default async function proxy(req: NextRequest) {
   if (!isAuthenticated && !pathname.startsWith("/login")) {
     const loginUrl = new URL("/login", req.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // An unconfigured deployment serves nothing but the setup flow. Checked after authentication so
+  // the stage can tell "has an account but has not signed in" from "signed in, still configuring",
+  // and only for page requests — an API call gets its own answer rather than a redirect to HTML.
+  if (!pathname.startsWith("/api/")) {
+    const { getSetupState, SETUP_PATHS } = await import("@/src/lib/setup");
+    const { stage, required } = await getSetupState(isAuthenticated);
+    const destination = SETUP_PATHS[stage];
+    if (required && pathname !== destination) {
+      return NextResponse.redirect(new URL(destination, req.url));
+    }
+    // Setup is done; nothing should linger on its pages.
+    if (!required && pathname.startsWith("/setup")) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
   }
 
   // Generate per-request nonce for CSP

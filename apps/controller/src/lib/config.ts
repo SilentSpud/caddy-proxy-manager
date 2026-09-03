@@ -3,7 +3,6 @@ import { assertNoLegacyInstanceRoleEnv, normalizeInstanceMode } from "./instance
 import { passwordPolicyFailures } from "./password-policy";
 
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
-const DEFAULT_ADMIN_USERNAME = "admin";
 const DEFAULT_ADMIN_PASSWORD = "admin";
 const DISALLOWED_SESSION_SECRETS = new Set([
   "change-me-in-production",
@@ -102,56 +101,54 @@ function resolveSessionSecret(): string {
   return finalSecret;
 }
 
+/**
+ * The bootstrap admin, when the environment still names one.
+ *
+ * Absent credentials are no longer a startup failure. They mean the deployment has not been
+ * configured yet, and the app answers that by running first-run setup (./setup.ts) rather than
+ * refusing to start — which is the whole reason for having a setup flow. There is no development
+ * default either: admin/admin was a way to get a usable instance without configuring one, and
+ * setup is now the better answer to that in every environment.
+ *
+ * Credentials that *are* present still have to be good ones. A weak ADMIN_PASSWORD is a worse
+ * outcome than no seed at all, since it silently produces a reachable account.
+ */
 function resolveAdminCredentials(): { username: string | null; password: string | null } {
-  // With local users disabled there is no bootstrap admin to seed, so demanding these
-  // credentials would block startup for a deployment that handed identity to its IdP.
+  // With local users disabled there is no bootstrap admin to seed at all.
   if (LOCAL_USERS_DISABLED) {
     return { username: null, password: null };
   }
 
-  const rawUsername = process.env.ADMIN_USERNAME ?? null;
-  const rawPassword = process.env.ADMIN_PASSWORD ?? null;
-  const username = rawUsername?.trim() || DEFAULT_ADMIN_USERNAME;
-  const password = rawPassword?.trim() || DEFAULT_ADMIN_PASSWORD;
+  const username = process.env.ADMIN_USERNAME?.trim() || null;
+  const password = process.env.ADMIN_PASSWORD?.trim() || null;
 
-  // In development, allow defaults
-  if (isDevelopment) {
-    if (username === DEFAULT_ADMIN_USERNAME || password === DEFAULT_ADMIN_PASSWORD) {
-      console.log("Using default admin credentials for development (admin/admin)");
-    }
-    return { username, password };
+  // Neither set: nothing to seed, and setup asks for an account instead.
+  if (!username && !password) {
+    return { username: null, password: null };
   }
 
-  // In production build phase, allow defaults temporarily
-  if (isProduction && !isNodeRuntime) {
-    return { username, password };
-  }
-
-  // Strict validation in production runtime
-  if (isRuntimeProduction) {
-    const errors: string[] = [];
-
-    // Username validation - just ensure it's set
-    if (!rawUsername || !username) {
-      errors.push("ADMIN_USERNAME must be set");
-    }
-
-    // Password validation - strict requirements
-    if (!rawPassword || password === DEFAULT_ADMIN_PASSWORD) {
-      errors.push("ADMIN_PASSWORD must be set to a custom value in production (not 'admin')");
+  const errors: string[] = [];
+  if (!username) errors.push("ADMIN_USERNAME must be set alongside ADMIN_PASSWORD");
+  if (!password) {
+    errors.push("ADMIN_PASSWORD must be set alongside ADMIN_USERNAME");
+  } else if (isRuntimeProduction) {
+    // Runtime only: the production build imports this module with whatever the image carries, and
+    // a placeholder there must not fail the build.
+    if (password === DEFAULT_ADMIN_PASSWORD) {
+      errors.push("ADMIN_PASSWORD must not be 'admin'");
     } else {
       for (const failure of passwordPolicyFailures(password)) {
         errors.push(`ADMIN_PASSWORD ${failure}`);
       }
     }
+  }
 
-    if (errors.length > 0) {
-      throw new Error(
-        "Admin credentials validation failed:\n" +
-          errors.map((e) => `  - ${e}`).join("\n") +
-          "\n\nSet secure credentials using ADMIN_USERNAME and ADMIN_PASSWORD environment variables.",
-      );
-    }
+  if (errors.length > 0) {
+    throw new Error(
+      "Admin credentials validation failed:\n" +
+        errors.map((e) => `  - ${e}`).join("\n") +
+        "\n\nLeave both unset to create the first account through the setup flow instead.",
+    );
   }
 
   return { username, password };
