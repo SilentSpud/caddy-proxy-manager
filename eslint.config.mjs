@@ -22,6 +22,16 @@ export default [
     },
   },
   {
+    // Node config/build scripts (.mjs/.cjs) run outside Next's TS pipeline,
+    // so declare the Node globals ESLint's no-undef cannot infer.
+    files: ['**/*.{mjs,cjs}'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+      },
+    },
+  },
+  {
     files: ['tests/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

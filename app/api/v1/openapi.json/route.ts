@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { APP_VERSION } from "@/src/lib/app-version";
 
 const spec = {
   openapi: "3.1.0",
   info: {
     title: "Caddy Proxy Manager API",
-    version: "1.0.0",
+    version: APP_VERSION,
     description:
       "REST API for managing Caddy reverse proxy configurations, certificates, access lists, and more.",
   },
