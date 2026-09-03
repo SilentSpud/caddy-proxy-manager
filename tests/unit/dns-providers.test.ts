@@ -321,4 +321,77 @@ describe("DNS provider registry", () => {
       resolvers: ["1.1.1.1"],
     });
   });
+
+  it("registers ClouDNS with the Caddy module path and auth-id/sub-user/password fields", () => {
+    const provider = getProviderDefinition("cloudns");
+
+    expect(provider).toMatchObject({
+      name: "cloudns",
+      displayName: "ClouDNS",
+      docsUrl: "https://github.com/caddy-dns/cloudns",
+      modulePath: "github.com/caddy-dns/cloudns",
+    });
+    expect(provider?.fields).toEqual([
+      {
+        key: "auth_id",
+        label: "Auth ID",
+        type: "string",
+        required: false,
+        placeholder: "1234",
+        description: "API user ID (created under API & Resellers). Required unless a sub-user ID is provided.",
+      },
+      {
+        key: "sub_auth_id",
+        label: "Sub-user ID",
+        type: "string",
+        required: false,
+        description: "API sub-user ID. Required unless an API user ID is provided.",
+      },
+      {
+        key: "auth_password",
+        label: "API Password",
+        type: "password",
+        required: true,
+        description: "Password of the API user or sub-user.",
+      },
+    ]);
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("cloudns");
+  });
+
+  it("encrypts, decrypts, and emits ClouDNS credentials for Caddy DNS challenges", () => {
+    const encrypted = encryptProviderCredentials("cloudns", {
+      auth_id: "1234",
+      auth_password: "cloudns-password",
+    });
+
+    expect(isEncryptedSecret(encrypted.auth_password)).toBe(true);
+    expect(isEncryptedSecret(encrypted.auth_id)).toBe(false);
+    expect(decryptProviderCredentials("cloudns", encrypted)).toEqual({
+      auth_id: "1234",
+      auth_password: "cloudns-password",
+    });
+    expect(buildDnsChallengeConfig("cloudns", encrypted, ["1.1.1.1"])).toEqual({
+      provider: {
+        name: "cloudns",
+        auth_id: "1234",
+        auth_password: "cloudns-password",
+      },
+      resolvers: ["1.1.1.1"],
+    });
+  });
+
+  it("emits ClouDNS sub-user credentials when no API user ID is configured", () => {
+    const encrypted = encryptProviderCredentials("cloudns", {
+      sub_auth_id: "5678",
+      auth_password: "cloudns-password",
+    });
+
+    expect(buildDnsChallengeConfig("cloudns", encrypted, [])).toEqual({
+      provider: {
+        name: "cloudns",
+        sub_auth_id: "5678",
+        auth_password: "cloudns-password",
+      },
+    });
+  });
 });

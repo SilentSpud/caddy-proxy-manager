@@ -288,6 +288,37 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
       { key: "api_password", label: "API Password", type: "password", required: true },
     ],
   },
+  {
+    name: "cloudns",
+    displayName: "ClouDNS",
+    description: "ClouDNS DNS API",
+    docsUrl: "https://github.com/caddy-dns/cloudns",
+    modulePath: "github.com/caddy-dns/cloudns",
+    fields: [
+      {
+        key: "auth_id",
+        label: "Auth ID",
+        type: "string",
+        required: false,
+        placeholder: "1234",
+        description: "API user ID (created under API & Resellers). Required unless a sub-user ID is provided.",
+      },
+      {
+        key: "sub_auth_id",
+        label: "Sub-user ID",
+        type: "string",
+        required: false,
+        description: "API sub-user ID. Required unless an API user ID is provided.",
+      },
+      {
+        key: "auth_password",
+        label: "API Password",
+        type: "password",
+        required: true,
+        description: "Password of the API user or sub-user.",
+      },
+    ],
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
