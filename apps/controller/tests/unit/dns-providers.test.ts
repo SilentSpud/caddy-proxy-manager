@@ -2,13 +2,17 @@ import { describe, expect, it } from 'bun:test';
 import {
   DNS_PROVIDERS,
   buildDnsChallengeConfig,
+  challengeOptionFields,
   decryptProviderCredentials,
   encryptProviderCredentials,
   getProviderDefinition,
+  isValidDnsDuration,
   redactDnsProviderSettingsForApi,
   redactLegacyCloudflareSettingsForApi,
 } from '@/src/lib/dns-providers';
 import { isEncryptedSecret } from '@/src/lib/secret';
+
+const NETCUP_CHALLENGE_DEFAULTS = { propagation_delay: '600s', propagation_timeout: '900s' };
 
 describe('DNS provider registry', () => {
   it('redacts every credential value from API status metadata', () => {
@@ -69,6 +73,7 @@ describe('DNS provider registry', () => {
         type: 'password',
         required: true,
       },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('njalla');
   });
@@ -103,6 +108,7 @@ describe('DNS provider registry', () => {
     expect(provider?.fields).toEqual([
       { key: 'api_key', label: 'API Key', type: 'password', required: true },
       { key: 'api_secret', label: 'API Secret', type: 'password', required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('spaceship');
   });
@@ -140,6 +146,7 @@ describe('DNS provider registry', () => {
     });
     expect(provider?.fields).toEqual([
       { key: 'token', label: 'API Token', type: 'password', required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('desec');
   });
@@ -173,6 +180,7 @@ describe('DNS provider registry', () => {
     });
     expect(provider?.fields).toEqual([
       { key: 'api_token', label: 'API Token', type: 'password', required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('dynu');
   });
@@ -215,6 +223,7 @@ describe('DNS provider registry', () => {
         required: true,
         placeholder: 'https://auth.acme-dns.io',
       },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('acmedns');
   });
@@ -257,6 +266,7 @@ describe('DNS provider registry', () => {
     });
     expect(provider?.fields).toEqual([
       { key: 'api_token', label: 'API Token', type: 'password', required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain('infomaniak');
   });
@@ -277,5 +287,188 @@ describe('DNS provider registry', () => {
       },
       resolvers: ['1.1.1.1'],
     });
+  });
+
+  it('registers netcup with the Caddy module path, customer/key/password fields, and slow-propagation defaults', () => {
+    const provider = getProviderDefinition('netcup');
+
+    expect(provider).toMatchObject({
+      name: 'netcup',
+      displayName: 'netcup',
+      docsUrl: 'https://github.com/caddy-dns/netcup',
+      modulePath: 'github.com/caddy-dns/netcup',
+    });
+    expect(provider?.fields).toEqual([
+      { key: 'customer_number', label: 'Customer Number', type: 'string', required: true },
+      { key: 'api_key', label: 'API Key', type: 'password', required: true },
+      { key: 'api_password', label: 'API Password', type: 'password', required: true },
+      ...challengeOptionFields(NETCUP_CHALLENGE_DEFAULTS),
+    ]);
+    expect(provider?.challengeDefaults).toEqual(NETCUP_CHALLENGE_DEFAULTS);
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('netcup');
+  });
+
+  it('encrypts, decrypts, and emits netcup credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('netcup', {
+      customer_number: '123456',
+      api_key: 'netcup-key',
+      api_password: 'netcup-password',
+    });
+
+    expect(isEncryptedSecret(encrypted.api_key)).toBe(true);
+    expect(isEncryptedSecret(encrypted.api_password)).toBe(true);
+    expect(isEncryptedSecret(encrypted.customer_number)).toBe(false);
+    expect(decryptProviderCredentials('netcup', encrypted)).toEqual({
+      customer_number: '123456',
+      api_key: 'netcup-key',
+      api_password: 'netcup-password',
+    });
+    expect(buildDnsChallengeConfig('netcup', encrypted, ['1.1.1.1'])).toEqual({
+      provider: {
+        name: 'netcup',
+        customer_number: '123456',
+        api_key: 'netcup-key',
+        api_password: 'netcup-password',
+      },
+      resolvers: ['1.1.1.1'],
+      propagation_delay: '600s',
+      propagation_timeout: '900s',
+    });
+  });
+
+  it('registers ClouDNS with the Caddy module path and auth-id/sub-user/password fields', () => {
+    const provider = getProviderDefinition('cloudns');
+
+    expect(provider).toMatchObject({
+      name: 'cloudns',
+      displayName: 'ClouDNS',
+      docsUrl: 'https://github.com/caddy-dns/cloudns',
+      modulePath: 'github.com/caddy-dns/cloudns',
+    });
+    expect(provider?.fields).toEqual([
+      {
+        key: 'auth_id',
+        label: 'Auth ID',
+        type: 'string',
+        required: false,
+        placeholder: '1234',
+        description:
+          'API user ID (created under API & Resellers). Required unless a sub-user ID is provided.',
+      },
+      {
+        key: 'sub_auth_id',
+        label: 'Sub-user ID',
+        type: 'string',
+        required: false,
+        description: 'API sub-user ID. Required unless an API user ID is provided.',
+      },
+      {
+        key: 'auth_password',
+        label: 'API Password',
+        type: 'password',
+        required: true,
+        description: 'Password of the API user or sub-user.',
+      },
+      ...challengeOptionFields(),
+    ]);
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain('cloudns');
+  });
+
+  it('encrypts, decrypts, and emits ClouDNS credentials for Caddy DNS challenges', () => {
+    const encrypted = encryptProviderCredentials('cloudns', {
+      auth_id: '1234',
+      auth_password: 'cloudns-password',
+    });
+
+    expect(isEncryptedSecret(encrypted.auth_password)).toBe(true);
+    expect(isEncryptedSecret(encrypted.auth_id)).toBe(false);
+    expect(decryptProviderCredentials('cloudns', encrypted)).toEqual({
+      auth_id: '1234',
+      auth_password: 'cloudns-password',
+    });
+    expect(buildDnsChallengeConfig('cloudns', encrypted, ['1.1.1.1'])).toEqual({
+      provider: {
+        name: 'cloudns',
+        auth_id: '1234',
+        auth_password: 'cloudns-password',
+      },
+      resolvers: ['1.1.1.1'],
+    });
+  });
+
+  it('emits ClouDNS sub-user credentials when no API user ID is configured', () => {
+    const encrypted = encryptProviderCredentials('cloudns', {
+      sub_auth_id: '5678',
+      auth_password: 'cloudns-password',
+    });
+
+    expect(buildDnsChallengeConfig('cloudns', encrypted, [])).toEqual({
+      provider: {
+        name: 'cloudns',
+        sub_auth_id: '5678',
+        auth_password: 'cloudns-password',
+      },
+    });
+  });
+
+  it('applies netcup propagation defaults and keeps them out of the provider module config', () => {
+    const challenge = buildDnsChallengeConfig(
+      'netcup',
+      { customer_number: '123456', api_key: 'netcup-key', api_password: 'netcup-password' },
+      [],
+    );
+
+    expect(challenge).toEqual({
+      provider: {
+        name: 'netcup',
+        customer_number: '123456',
+        api_key: 'netcup-key',
+        api_password: 'netcup-password',
+      },
+      propagation_delay: '600s',
+      propagation_timeout: '900s',
+    });
+  });
+
+  it('lets stored propagation settings override the provider defaults', () => {
+    const challenge = buildDnsChallengeConfig(
+      'netcup',
+      { propagation_delay: '300s', propagation_timeout: '-1' },
+      [],
+    );
+
+    expect(challenge).toMatchObject({
+      propagation_delay: '300s',
+      // "-1" (disable propagation checks) is emitted as a Caddy duration number
+      propagation_timeout: -1,
+    });
+  });
+
+  it('emits propagation settings for providers without registered defaults', () => {
+    const challenge = buildDnsChallengeConfig(
+      'njalla',
+      { api_token: 'njalla-token', propagation_delay: '120s', propagation_timeout: '15m' },
+      ['1.1.1.1'],
+    );
+
+    expect(challenge).toEqual({
+      provider: { name: 'njalla', api_token: 'njalla-token' },
+      resolvers: ['1.1.1.1'],
+      propagation_delay: '120s',
+      propagation_timeout: '15m',
+    });
+  });
+
+  it('validates Caddy duration strings for the challenge option fields', () => {
+    expect(isValidDnsDuration('600s')).toBe(true);
+    expect(isValidDnsDuration('2m')).toBe(true);
+    expect(isValidDnsDuration('1h30m')).toBe(true);
+    expect(isValidDnsDuration('1.5h')).toBe(true);
+    expect(isValidDnsDuration('2d')).toBe(true);
+    expect(isValidDnsDuration('-1')).toBe(true);
+    expect(isValidDnsDuration('')).toBe(false);
+    expect(isValidDnsDuration('600')).toBe(false);
+    expect(isValidDnsDuration('900 sec')).toBe(false);
+    expect(isValidDnsDuration('soon')).toBe(false);
   });
 });

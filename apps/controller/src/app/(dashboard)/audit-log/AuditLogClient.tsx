@@ -9,6 +9,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { formatDateTimeUtc } from "@/src/lib/date-format";
 
 type EventRow = {
   id: number;
@@ -59,11 +60,11 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
   const columns: Column<EventRow>[] = [
     {
       id: "created_at",
-      label: "Time",
+      label: "Time (UTC)",
       width: 180,
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
-          {new Date(r.createdAt).toLocaleString()}
+          {formatDateTimeUtc(r.createdAt)}
         </Text>
       ),
     },
@@ -90,7 +91,7 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
         <HStack justify="between" vAlign="center" gap={2}>
           <Badge label={r.user} />
           <Text type="body" size="xsm" color="secondary">
-            {new Date(r.createdAt).toLocaleString()}
+            {formatDateTimeUtc(r.createdAt)}
           </Text>
         </HStack>
         <Text type="body" size="sm">

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useActionState, useEffect, useState } from "react";
+import { type ReactNode, useActionState, useEffect, useRef, useState } from "react";
 import {
   createL4ProxyHostAction,
   deleteL4ProxyHostAction,
@@ -24,6 +24,22 @@ import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+
+/**
+ * Schedule onClose after a successful action exactly once. Without the ref guard the effect
+ * re-arms on every parent render — onClose is a new function identity each time — while status
+ * stays "success", so a stray onClose closes a dialog the user has just reopened (#241).
+ */
+function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
+  const scheduledRef = useRef(false);
+  useEffect(() => {
+    if (state.status === "success" && !scheduledRef.current) {
+      scheduledRef.current = true;
+      const timer = setTimeout(onClose, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.status, onClose]);
+}
 
 const PROTOCOL_OPTIONS = [
   { value: "tcp", label: "TCP" },
@@ -652,11 +668,7 @@ export function CreateL4HostDialog({
 }) {
   const [state, formAction] = useActionState(createL4ProxyHostAction, INITIAL_ACTION_STATE);
 
-  useEffect(() => {
-    if (state.status === "success") {
-      setTimeout(onClose, 1000);
-    }
-  }, [state.status, onClose]);
+  useCloseOnSuccess(state, onClose);
 
   return (
     <AppDialog
@@ -693,11 +705,7 @@ export function EditL4HostDialog({
     INITIAL_ACTION_STATE,
   );
 
-  useEffect(() => {
-    if (state.status === "success") {
-      setTimeout(onClose, 1000);
-    }
-  }, [state.status, onClose]);
+  useCloseOnSuccess(state, onClose);
 
   return (
     <AppDialog
@@ -734,11 +742,7 @@ export function DeleteL4HostDialog({
     INITIAL_ACTION_STATE,
   );
 
-  useEffect(() => {
-    if (state.status === "success") {
-      setTimeout(onClose, 1000);
-    }
-  }, [state.status, onClose]);
+  useCloseOnSuccess(state, onClose);
 
   return (
     <AppDialog

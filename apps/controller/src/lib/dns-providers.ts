@@ -2,14 +2,14 @@ import { encryptSecret, decryptSecret, isEncryptedSecret } from "./secret";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type DnsProviderFieldType = "string" | "password";
+export type DnsProviderFieldType = "string" | "password" | "duration";
 
 export type DnsProviderField = {
   /** Key sent to Caddy config (e.g. "api_token") */
   key: string;
   /** Human-readable label */
   label: string;
-  /** "password" fields are encrypted at rest */
+  /** "password" fields are encrypted at rest; "duration" fields are validated as Caddy durations */
   type: DnsProviderFieldType;
   /** Placeholder text for the input */
   placeholder?: string;
@@ -32,6 +32,21 @@ export type DnsProviderDefinition = {
   fields: DnsProviderField[];
   /** caddy-dns Go module path (for Dockerfile reference) */
   modulePath: string;
+  /**
+   * Sensible DNS-challenge tuning defaults for this provider, applied when
+   * the corresponding option field is left empty. Values are Caddy durations
+   * (e.g. "600s", "10m").
+   */
+  challengeDefaults?: DnsProviderChallengeDefaults;
+};
+
+/**
+ * DNS-challenge tuning defaults for slow-propagation providers. Keys map to
+ * the Caddy `challenges.dns` JSON fields of the same name.
+ */
+export type DnsProviderChallengeDefaults = {
+  propagation_delay?: string;
+  propagation_timeout?: string;
 };
 
 export type DnsProviderCredentials = {
@@ -57,7 +72,45 @@ export type LegacyCloudflareApiStatus = {
 
 // ─── Registry ────────────────────────────────────────────────────────────────
 
-export const DNS_PROVIDERS: DnsProviderDefinition[] = [
+/** Keys that tune the DNS challenge itself rather than the provider module. */
+const CHALLENGE_OPTION_KEYS = ["propagation_delay", "propagation_timeout"] as const;
+
+/**
+ * Optional DNS-challenge tuning fields appended to every provider so that
+ * slow-propagation DNS services can be worked around without editing the
+ * Caddy config by hand. `defaults` pre-selects sensible values and is
+ * reflected in the placeholder/help text shown in the settings UI.
+ */
+export function challengeOptionFields(defaults?: DnsProviderChallengeDefaults): DnsProviderField[] {
+  return [
+    {
+      key: "propagation_delay",
+      label: "Propagation Delay",
+      type: "duration",
+      required: false,
+      placeholder: defaults?.propagation_delay ?? "e.g. 60s",
+      description:
+        "How long to wait before starting the DNS propagation checks, e.g. 60s or 5m." +
+        (defaults?.propagation_delay
+          ? ` Defaults to ${defaults.propagation_delay} for this provider.`
+          : ""),
+    },
+    {
+      key: "propagation_timeout",
+      label: "Propagation Timeout",
+      type: "duration",
+      required: false,
+      placeholder: defaults?.propagation_timeout ?? "e.g. 2m",
+      description:
+        "Maximum time to wait for the challenge TXT record to propagate, e.g. 2m or 15m. Use -1 to disable the propagation check." +
+        (defaults?.propagation_timeout
+          ? ` Defaults to ${defaults.propagation_timeout} for this provider.`
+          : ""),
+    },
+  ];
+}
+
+const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
   {
     name: "cloudflare",
     displayName: "Cloudflare",
@@ -276,9 +329,83 @@ export const DNS_PROVIDERS: DnsProviderDefinition[] = [
     modulePath: "github.com/caddy-dns/infomaniak",
     fields: [{ key: "api_token", label: "API Token", type: "password", required: true }],
   },
+  {
+    name: "netcup",
+    displayName: "netcup",
+    description: "netcup CCP DNS API",
+    docsUrl: "https://github.com/caddy-dns/netcup",
+    modulePath: "github.com/caddy-dns/netcup",
+    fields: [
+      { key: "customer_number", label: "Customer Number", type: "string", required: true },
+      { key: "api_key", label: "API Key", type: "password", required: true },
+      { key: "api_password", label: "API Password", type: "password", required: true },
+    ],
+    // netcup's DNS propagation is notoriously slow (see
+    // https://github.com/caddy-dns/netcup#attention-slow-netcup-propagation-time),
+    // so default to generous challenge timings. Users can override both.
+    challengeDefaults: { propagation_delay: "600s", propagation_timeout: "900s" },
+  },
+  {
+    name: "cloudns",
+    displayName: "ClouDNS",
+    description: "ClouDNS DNS API",
+    docsUrl: "https://github.com/caddy-dns/cloudns",
+    modulePath: "github.com/caddy-dns/cloudns",
+    fields: [
+      {
+        key: "auth_id",
+        label: "Auth ID",
+        type: "string",
+        required: false,
+        placeholder: "1234",
+        description:
+          "API user ID (created under API & Resellers). Required unless a sub-user ID is provided.",
+      },
+      {
+        key: "sub_auth_id",
+        label: "Sub-user ID",
+        type: "string",
+        required: false,
+        description: "API sub-user ID. Required unless an API user ID is provided.",
+      },
+      {
+        key: "auth_password",
+        label: "API Password",
+        type: "password",
+        required: true,
+        description: "Password of the API user or sub-user.",
+      },
+    ],
+  },
 ];
 
+/**
+ * Full provider registry. The challenge option fields (propagation delay and
+ * timeout) are appended to every provider so slow-DNS workarounds are always
+ * available, with per-provider defaults where they are known to help.
+ */
+export const DNS_PROVIDERS: DnsProviderDefinition[] = BASE_DNS_PROVIDERS.map((provider) => ({
+  ...provider,
+  fields: [...provider.fields, ...challengeOptionFields(provider.challengeDefaults)],
+}));
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Caddy durations follow Go duration syntax (ns/us/µs/ms/s/m/h compounds,
+// plus "d" for days, handled by caddy.ParseDuration). Validation stays
+// permissive about unit ordering; Caddy reports anything exotic at load time.
+const DURATION_SEGMENT = String.raw`(?:\d+(?:\.\d+)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h|d)`;
+const DURATION_PATTERN = new RegExp(`^-1$|^[+-]?(?:${DURATION_SEGMENT})+$`);
+
+/**
+ * Validate a Caddy duration string as accepted by the DNS challenge settings
+ * ("600s", "2m", "1h30m", ...). The special value "-1" (disable propagation
+ * checks) is also accepted. Unit-less numbers are rejected because Caddy
+ * would silently interpret them as nanoseconds.
+ */
+export function isValidDnsDuration(value: string): boolean {
+  return DURATION_PATTERN.test(value);
+}
 
 export function getProviderDefinition(name: string): DnsProviderDefinition | undefined {
   return DNS_PROVIDERS.find((p) => p.name === name);
@@ -351,13 +478,21 @@ export function decryptProviderCredentials(
   const result = { ...credentials };
   for (const field of def.fields) {
     if (field.type === "password" && result[field.key] && isEncryptedSecret(result[field.key])) {
-      result[field.key] = decryptSecret(result[field.key]);
+      result[field.key] = decryptSecret(
+        result[field.key],
+        `DNS provider "${providerName}" credential "${field.key}"`,
+      );
     }
   }
   return result;
 }
 
-/** The Caddy DNS challenge config for `issuer.challenges.dns`, from a provider + credentials. */
+/**
+ * The Caddy DNS challenge config for `issuer.challenges.dns`, from a provider + credentials.
+ * The challenge options (propagation_delay / propagation_timeout) are hoisted out of the
+ * credential map to the challenge level, falling back to the provider's own defaults;
+ * `resolvers` comes from the global DNS resolver settings and is passed in separately.
+ */
 export function buildDnsChallengeConfig(
   providerName: string,
   credentials: Record<string, string>,
@@ -368,10 +503,12 @@ export function buildDnsChallengeConfig(
 
   const decrypted = decryptProviderCredentials(providerName, credentials);
 
-  // Build provider config: { name: "cloudflare", api_token: "..." }
+  // Build provider config: { name: "cloudflare", api_token: "..." }.
+  // Challenge option keys configure the DNS challenge itself, not the
+  // provider module, so they are emitted at the challenge level below.
   const providerConfig: Record<string, string> = { name: providerName };
   for (const [key, value] of Object.entries(decrypted)) {
-    if (value) {
+    if (value && !(CHALLENGE_OPTION_KEYS as readonly string[]).includes(key)) {
       providerConfig[key] = value;
     }
   }
@@ -379,6 +516,16 @@ export function buildDnsChallengeConfig(
   const dnsChallenge: Record<string, unknown> = { provider: providerConfig };
   if (dnsResolvers.length > 0) {
     dnsChallenge.resolvers = dnsResolvers;
+  }
+
+  // Challenge tuning: a stored option value wins over the provider default.
+  // The "-1" disable value is emitted as a number because Caddy parses
+  // duration strings with time.ParseDuration, which rejects a bare "-1".
+  for (const key of CHALLENGE_OPTION_KEYS) {
+    const value = decrypted[key] || def.challengeDefaults?.[key];
+    if (value) {
+      dnsChallenge[key] = value === "-1" ? -1 : value;
+    }
   }
 
   return dnsChallenge;

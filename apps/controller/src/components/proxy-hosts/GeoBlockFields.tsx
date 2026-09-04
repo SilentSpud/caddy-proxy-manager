@@ -384,6 +384,21 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
   const [redirectUrl, setRedirectUrl] = useState(rawInitial?.redirect_url ?? "");
   const [failClosed, setFailClosed] = useState(rawInitial?.fail_closed ?? false);
 
+  // Re-seed from fresh server props after a save. revalidatePath re-renders this component with
+  // new initialValues, but useState seeds are read once, so without this the form kept showing
+  // the pre-save values until a hard refresh (#241). Bumping resetKey remounts the tag inputs,
+  // which hold their own copies of the lists.
+  useEffect(() => {
+    setEnabled(rawInitial?.enabled ?? false);
+    setMode(initialValues?.geoblock_mode ?? "merge");
+    setInitial(rawInitial);
+    setResponseStatus(rawInitial?.response_status ?? 403);
+    setResponseBody(rawInitial?.response_body ?? "Forbidden");
+    setRedirectUrl(rawInitial?.redirect_url ?? "");
+    setFailClosed(rawInitial?.fail_closed ?? false);
+    setResetKey((k) => k + 1);
+  }, [rawInitial, initialValues?.geoblock_mode]);
+
   const headers = useMemo(() => initial?.response_headers ?? {}, [initial]);
 
   function applyLanOnlyPreset() {

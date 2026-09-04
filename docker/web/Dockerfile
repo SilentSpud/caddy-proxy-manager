@@ -32,6 +32,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Never connected to: the bundler does not execute the app's startup path, and src/lib/db/dialect.ts
 # rejects anything that is not a PostgreSQL URL at import. This satisfies that check and nothing else.
 ENV DATABASE_URL=postgres://build:build@127.0.0.1:5/unused
+# Application version baked into the UI and the OpenAPI spec at build time.
+# Set by CI to the git tag (without the leading v) for release builds; when
+# unset, vite.config.ts falls back to the package.json version.
+ARG APP_VERSION
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # `build` emits dist/standalone; `build:binary` compiles scripts/standalone-entry.ts and the vinext

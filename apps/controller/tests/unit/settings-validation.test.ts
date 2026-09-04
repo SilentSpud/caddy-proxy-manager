@@ -140,6 +140,36 @@ describe('REST settings runtime validation', () => {
     ).toThrow(/unknown field/);
   });
 
+  it('validates DNS challenge duration option fields', () => {
+    const settings = (propagation: Record<string, unknown>) => ({
+      providers: {
+        netcup: {
+          customer_number: '123456',
+          api_key: 'secret',
+          api_password: 'secret',
+          ...propagation,
+        },
+      },
+      default: 'netcup',
+    });
+
+    expect(() =>
+      validateSettingsGroup(
+        'dns-provider',
+        settings({ propagation_delay: '600s', propagation_timeout: '900s' }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateSettingsGroup('dns-provider', settings({ propagation_timeout: '-1' })),
+    ).not.toThrow();
+    expect(() =>
+      validateSettingsGroup('dns-provider', settings({ propagation_delay: '600' })),
+    ).toThrow(/propagation_delay must be a duration/);
+    expect(() =>
+      validateSettingsGroup('dns-provider', settings({ propagation_timeout: 'soon' })),
+    ).toThrow(/propagation_timeout must be a duration/);
+  });
+
   it('caps total payload size', () => {
     expect(() => validateSettingsGroup('acme', { caRootPem: 'x'.repeat(1024 * 1024 + 1) })).toThrow(
       /must not exceed/,

@@ -30,6 +30,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
+import { formatAppVersion } from "@/src/lib/app-version";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 
 type User = {
@@ -143,6 +144,7 @@ export default function DashboardLayoutClient({
             <SideNavHeading
               heading={appName}
               headingHref="/"
+              subheading={formatAppVersion()}
               icon={
                 <NavIcon
                   icon={

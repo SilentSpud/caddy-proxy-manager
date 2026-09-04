@@ -17,6 +17,7 @@ import {
   AUTOFILL_USERNAME,
 } from "@/src/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
+import { formatAppVersion } from "@/src/lib/app-version";
 
 interface LoginClientProps {
   enabledProviders: Array<{ id: string; name: string }>;
@@ -181,6 +182,12 @@ export default function LoginClient({
               </VStack>
             </form>
           )}
+
+          <VStack hAlign="center">
+            <Text type="body" size="xsm" color="secondary">
+              {formatAppVersion()}
+            </Text>
+          </VStack>
         </VStack>
       </Card>
     </Center>

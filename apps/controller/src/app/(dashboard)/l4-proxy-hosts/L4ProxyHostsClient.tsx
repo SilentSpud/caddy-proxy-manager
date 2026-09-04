@@ -104,6 +104,9 @@ export default function L4ProxyHostsClient({
   const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<L4ProxyHost | null>(null);
   const [deleteHost, setDeleteHost] = useState<L4ProxyHost | null>(null);
+  // Bumped on every open so CreateL4HostDialog remounts and its useActionState starts clean —
+  // otherwise the previous save's "success" state closes the freshly reopened dialog (#241).
+  const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [bannerRefresh, setBannerRefresh] = useState(0);
   // The whole layer4 app comes from caddy-l4; with it off, nothing on this page
@@ -139,11 +142,18 @@ export default function L4ProxyHostsClient({
   const handleToggleEnabled = async (id: number, enabled: boolean) => {
     await toggleL4ProxyHostAction(id, enabled);
     signalBannerRefresh();
+    // revalidatePath alone leaves this client tree on its old props (#241).
+    router.refresh();
   };
+
+  function openCreate() {
+    setDialogKey((k) => k + 1);
+    setCreateOpen(true);
+  }
 
   function openDuplicate(host: L4ProxyHost) {
     setDuplicateHost(host);
-    setCreateOpen(true);
+    openCreate();
   }
 
   const actionsFor = (host: L4ProxyHost) => (
@@ -260,7 +270,7 @@ export default function L4ProxyHostsClient({
         description="Define TCP/UDP stream proxies powered by caddy-l4. Port mappings are applied automatically."
         action={{
           label: "Create L4 Host",
-          onClick: () => setCreateOpen(true),
+          onClick: openCreate,
           isDisabled: Boolean(l4DisabledReason),
         }}
       />
@@ -285,11 +295,13 @@ export default function L4ProxyHostsClient({
       />
 
       <CreateL4HostDialog
+        key={dialogKey}
         open={createOpen}
         onClose={() => {
           setCreateOpen(false);
           setTimeout(() => setDuplicateHost(null), 200);
           signalBannerRefresh();
+          router.refresh();
         }}
         initialData={duplicateHost}
       />
@@ -301,6 +313,7 @@ export default function L4ProxyHostsClient({
           onClose={() => {
             setEditHost(null);
             signalBannerRefresh();
+            router.refresh();
           }}
         />
       )}
@@ -312,6 +325,7 @@ export default function L4ProxyHostsClient({
           onClose={() => {
             setDeleteHost(null);
             signalBannerRefresh();
+            router.refresh();
           }}
         />
       )}

@@ -48,6 +48,11 @@ export async function POST(request: NextRequest) {
       .delete(accounts)
       .where(and(eq(accounts.userId, userId), ne(accounts.providerId, "credential")));
 
+    // Re-derive users.provider/subject from the (now OAuth-free) accounts rows
+    // so the Profile page stops reporting the account as linked (#261).
+    const { syncUserOAuthIdentity } = await import("@/src/lib/models/user");
+    await syncUserOAuthIdentity(userId);
+
     // Audit log
     await createAuditEvent({
       userId,

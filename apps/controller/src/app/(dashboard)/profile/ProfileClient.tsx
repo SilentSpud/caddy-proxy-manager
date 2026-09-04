@@ -92,6 +92,8 @@ interface UserData {
 
 interface ProfileClientProps {
   user: UserData;
+  /** Linked OAuth identities, read from the authoritative accounts table (#261). */
+  linkedProviders: Array<{ providerId: string; accountId: string }>;
   enabledProviders: Array<{ id: string; name: string; autoLink: boolean }>;
   apiTokens: ApiToken[];
   sessions: ActiveSession[];
@@ -132,6 +134,7 @@ function ProfileSection({
 
 export default function ProfileClient({
   user,
+  linkedProviders,
   enabledProviders,
   apiTokens,
   sessions,
@@ -151,8 +154,22 @@ export default function ProfileClient({
   const [tokenName, setTokenName] = useState("");
   const [tokenExpiresAt, setTokenExpiresAt] = useState<ISODateTimeString | undefined>(undefined);
 
+  const getProviderName = (provider: string) => {
+    if (provider === "credentials") return "Username/Password";
+    if (provider === "oauth2") return "OAuth2";
+    if (provider === "authentik") return "Authentik";
+    return provider;
+  };
+
   const hasPassword = !!user.passwordHash;
-  const hasOAuth = !!user.provider && user.provider !== "credentials";
+  // Connection state comes from the accounts rows, not the users.provider projection, so a stale
+  // projection cannot make a linked account look unlinked or vice versa (#261).
+  const linkedNames = linkedProviders.map(
+    (link) =>
+      enabledProviders.find((p) => p.id === link.providerId)?.name ??
+      getProviderName(link.providerId),
+  );
+  const hasOAuth = linkedNames.length > 0;
 
   const handlePasswordChange = async () => {
     setError(null);
@@ -378,13 +395,6 @@ export default function ProfileClient({
     return new Date(expiresAt) <= new Date();
   };
 
-  const getProviderName = (provider: string) => {
-    if (provider === "credentials") return "Username/Password";
-    if (provider === "oauth2") return "OAuth2";
-    if (provider === "authentik") return "Authentik";
-    return provider;
-  };
-
   return (
     <VStack gap={6}>
       <Heading level={1}>Profile &amp; Account Settings</Heading>
@@ -567,7 +577,9 @@ export default function ProfileClient({
             {hasOAuth ? (
               <VStack gap={2}>
                 <Text type="body" size="sm" color="secondary">
-                  Your account is linked to {getProviderName(user.provider ?? "")}
+                  {linkedNames.length === 1
+                    ? `Your account is linked to ${linkedNames[0]}`
+                    : `Your account is linked to: ${linkedNames.join(", ")}`}
                 </Text>
 
                 {!localPasswordsEnabled ? (
@@ -768,8 +780,8 @@ export default function ProfileClient({
         isSubmitting={loading}
       >
         <Text type="body" size="sm" color="secondary">
-          Are you sure you want to unlink your {getProviderName(user.provider ?? "")} account? You
-          will only be able to sign in with your username and password after this.
+          Are you sure you want to unlink your {linkedNames.join(", ")} account? You will only be
+          able to sign in with your username and password after this.
         </Text>
       </AppDialog>
     </VStack>

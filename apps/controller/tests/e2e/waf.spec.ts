@@ -6,8 +6,10 @@ test.describe('WAF', () => {
   }) => {
     const customFrom = '2026-05-01T09:00';
     const customTo = '2026-05-02T09:30';
-    const expectedFrom = Math.floor(new Date(customFrom).getTime() / 1000);
-    const expectedTo = Math.floor(new Date(customTo).getTime() / 1000);
+    // The WAF page pins datetime-local values to UTC (see parseDateTimeLocalUtc),
+    // so compute the expected epochs in UTC rather than the runner's timezone.
+    const expectedFrom = Math.floor(new Date(`${customFrom}Z`).getTime() / 1000);
+    const expectedTo = Math.floor(new Date(`${customTo}Z`).getTime() / 1000);
 
     await page.goto('/waf');
 
@@ -28,10 +30,10 @@ test.describe('WAF', () => {
     // DateTimeInput is no longer a native datetime-local control: it renders a
     // date combobox (accepting unambiguous ISO input) plus a separate time
     // field, each committing its pending text on blur.
-    const fromDate = page.getByRole('combobox', { name: 'From', exact: true });
-    const fromTime = page.getByLabel('From time', { exact: true });
-    const toDate = page.getByRole('combobox', { name: 'To', exact: true });
-    const toTime = page.getByLabel('To time', { exact: true });
+    const fromDate = page.getByRole('combobox', { name: 'From (UTC)', exact: true });
+    const fromTime = page.getByLabel('From (UTC) time', { exact: true });
+    const toDate = page.getByRole('combobox', { name: 'To (UTC)', exact: true });
+    const toTime = page.getByLabel('To (UTC) time', { exact: true });
     await expect(fromDate).toBeVisible();
 
     const [fromDay, fromClock] = customFrom.split('T');

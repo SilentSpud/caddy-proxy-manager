@@ -49,7 +49,11 @@ import type {
   GeoBlockSettings,
   WafSettings,
 } from "@/src/lib/settings";
-import { getProviderDefinition, encryptProviderCredentials } from "@/src/lib/dns-providers";
+import {
+  getProviderDefinition,
+  encryptProviderCredentials,
+  isValidDnsDuration,
+} from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
@@ -268,6 +272,20 @@ async function updateDnsProviderSettingsActionUnlocked(
     for (const field of def.fields) {
       if (field.required && !credentials[field.key]) {
         return { success: false, message: `${field.label} is required for ${def.displayName}` };
+      }
+    }
+
+    // Validate duration-typed option fields (e.g. propagation delay/timeout)
+    for (const field of def.fields) {
+      if (
+        field.type === "duration" &&
+        credentials[field.key] &&
+        !isValidDnsDuration(credentials[field.key])
+      ) {
+        return {
+          success: false,
+          message: `${field.label} must be a duration like "600s" or "10m" (or -1 to disable)`,
+        };
       }
     }
 

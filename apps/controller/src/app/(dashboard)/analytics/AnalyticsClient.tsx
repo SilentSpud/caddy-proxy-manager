@@ -31,6 +31,7 @@ import {
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { formatDateTimeUtc } from "@/src/lib/date-format";
 
 import { useChartTheme } from "./chart-theme";
 
@@ -672,11 +673,11 @@ export default function AnalyticsClient() {
   const blockedColumns: TableColumn<BlockedRow>[] = [
     {
       key: "ts",
-      header: "Time",
+      header: "Time (UTC)",
       width: pixel(170),
       renderCell: (row) => (
         <Text type="body" size="sm" color="secondary">
-          <span suppressHydrationWarning>{new Date(row.ts * 1000).toLocaleString()}</span>
+          {formatDateTimeUtc(row.ts * 1000)}
         </Text>
       ),
     },

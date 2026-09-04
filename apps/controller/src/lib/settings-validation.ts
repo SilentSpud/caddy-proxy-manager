@@ -5,7 +5,7 @@ import {
   isValidBodyLimit,
 } from "./caddy-waf";
 import { normalizeDefaultResponseSettings } from "./caddy-default-response";
-import { getProviderDefinition } from "./dns-providers";
+import { getProviderDefinition, isValidDnsDuration } from "./dns-providers";
 
 export class SettingsValidationError extends Error {
   constructor(message: string) {
@@ -288,9 +288,16 @@ function validateDnsProvider(value: Record<string, unknown>): void {
           { min: 1, max: MAX_SECRET_LENGTH },
         );
       } else if (credentials[field.key] !== undefined) {
-        stringValue(credentials[field.key], `dns-provider.providers.${providerName}.${field.key}`, {
-          max: MAX_SECRET_LENGTH,
-        });
+        const stored = stringValue(
+          credentials[field.key],
+          `dns-provider.providers.${providerName}.${field.key}`,
+          { max: MAX_SECRET_LENGTH },
+        );
+        if (field.type === "duration" && !isValidDnsDuration(stored)) {
+          invalid(
+            `dns-provider.providers.${providerName}.${field.key} must be a duration like "600s" or "10m" (or -1 to disable)`,
+          );
+        }
       }
     }
   }

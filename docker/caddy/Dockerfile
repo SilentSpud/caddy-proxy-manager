@@ -33,6 +33,7 @@ github.com/caddy-dns/vultr \
 github.com/caddy-dns/porkbun \
 github.com/caddy-dns/godaddy \
 github.com/caddy-dns/namecheap \
+github.com/caddy-dns/netcup \
 github.com/caddy-dns/ovh \
 github.com/caddy-dns/ionos \
 github.com/caddy-dns/linode \
@@ -42,6 +43,7 @@ github.com/caddy-dns/desec \
 github.com/caddy-dns/dynu \
 github.com/caddy-dns/acmedns \
 github.com/caddy-dns/infomaniak \
+github.com/caddy-dns/cloudns \
 github.com/mholt/caddy-l4 \
 github.com/fuomag9/caddy-blocker-plugin \
 github.com/corazawaf/coraza-caddy/v2"

@@ -126,8 +126,8 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       id: row.id,
       name: row.name,
       type: row.type,
-      clientId: decryptSecret(row.clientId),
-      clientSecret: decryptSecret(row.clientSecret),
+      clientId: decryptSecret(row.clientId, `OAuth provider "${row.name}"`),
+      clientSecret: decryptSecret(row.clientSecret, `OAuth provider "${row.name}"`),
       issuer: row.issuer,
       authorizationUrl: row.authorizationUrl,
       tokenUrl: row.tokenUrl,
@@ -270,6 +270,23 @@ async function createAuth(): Promise<any> {
             if (data.idToken) data.idToken = encryptSecret(data.idToken);
             return { data };
           },
+          after: async (account) => {
+            // Better Auth writes federated identities to the `accounts` table
+            // only. Re-derive the informational users.provider/subject columns
+            // from it so auto-linking, profile linking, and federated sign-up
+            // are all reflected in the CPM user state (#261).
+            try {
+              const { syncUserOAuthIdentity } = await import("./models/user");
+              const userId =
+                typeof account.userId === "string" ? Number(account.userId) : account.userId;
+              if (Number.isFinite(userId)) {
+                await syncUserOAuthIdentity(userId);
+              }
+            } catch (e) {
+              // Informational columns only — never break authentication over them.
+              console.warn("[auth-server] Failed to sync users.provider/subject from accounts:", e);
+            }
+          },
         },
         update: {
           before: async (account) => {
@@ -281,6 +298,20 @@ async function createAuth(): Promise<any> {
             if (data.idToken && !isEncryptedSecret(data.idToken))
               data.idToken = encryptSecret(data.idToken);
             return { data };
+          },
+          after: async (account) => {
+            // Repeat OAuth sign-ins update the existing account row rather than
+            // creating one; keep the projection fresh in that path too.
+            try {
+              const { syncUserOAuthIdentity } = await import("./models/user");
+              const userId =
+                typeof account.userId === "string" ? Number(account.userId) : account.userId;
+              if (Number.isFinite(userId)) {
+                await syncUserOAuthIdentity(userId);
+              }
+            } catch (e) {
+              console.warn("[auth-server] Failed to sync users.provider/subject from accounts:", e);
+            }
           },
         },
       },

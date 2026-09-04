@@ -2659,7 +2659,9 @@ export async function buildCaddyDocument() {
     type: c.type as "managed" | "imported",
     domainNames: c.domainNames,
     certificatePem: c.certificatePem,
-    privateKeyPem: c.privateKeyPem ? decryptSecret(c.privateKeyPem) : null,
+    privateKeyPem: c.privateKeyPem
+      ? decryptSecret(c.privateKeyPem, `certificate "${c.name}"`)
+      : null,
     autoRenew: c.autoRenew ? 1 : 0,
     providerOptions: c.providerOptions,
   }));

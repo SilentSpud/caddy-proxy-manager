@@ -7,7 +7,7 @@
  * This module top-level-awaits its startup work, so the import graph waits for the migrations and
  * no route handler can observe a half-migrated database.
  */
-import { eq, ne, and, isNull } from "drizzle-orm";
+import { eq, ne, and, isNull, desc } from "drizzle-orm";
 import * as schema from "./db/schema";
 import { CREDENTIAL_ISSUER, accountIssuerFor } from "./account-issuer";
 import { db, isEphemeral, runSchemaMigrations } from "./db/connection";
@@ -305,10 +305,74 @@ async function runCloudflareToProviderMigration() {
     .values({ key: "dns_provider_migrated", value: "true", updatedAt: now });
 }
 
+/**
+ * One-time repair (#261): re-derive `users.provider` / `users.subject` from the authoritative
+ * `accounts` table. Deployments that linked or unlinked OAuth identities before the sync hook in
+ * auth-server existed carry stale values, which made the Profile page report the wrong connection
+ * state. The logic mirrors syncUserOAuthIdentity() in models/user, spelled out here because that
+ * module imports this one.
+ */
+async function runOAuthIdentityRepair() {
+  if (isEphemeral) return;
+
+  const { settings, users, accounts } = schema;
+
+  const [flag] = await db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, "oauth_identity_sync_repaired"))
+    .limit(1);
+  if (flag) return;
+
+  const allUsers = await db.select({ id: users.id, passwordHash: users.passwordHash }).from(users);
+  for (const user of allUsers) {
+    const now = new Date().toISOString();
+
+    const [oauthAccount] = await db
+      .select({ providerId: accounts.providerId, accountId: accounts.accountId })
+      .from(accounts)
+      .where(and(eq(accounts.userId, user.id), ne(accounts.providerId, "credential")))
+      .orderBy(desc(accounts.id))
+      .limit(1);
+
+    if (oauthAccount) {
+      await db
+        .update(users)
+        .set({
+          provider: oauthAccount.providerId,
+          subject: oauthAccount.accountId,
+          updatedAt: now,
+        })
+        .where(eq(users.id, user.id));
+      continue;
+    }
+
+    const [credentialAccount] = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.userId, user.id), eq(accounts.providerId, "credential")))
+      .limit(1);
+    const hasCredential = !!credentialAccount || !!user.passwordHash;
+
+    await db
+      .update(users)
+      .set({ provider: hasCredential ? "credentials" : null, subject: null, updatedAt: now })
+      .where(eq(users.id, user.id));
+  }
+
+  await db.insert(settings).values({
+    key: "oauth_identity_sync_repaired",
+    value: "true",
+    updatedAt: new Date().toISOString(),
+  });
+  console.log("OAuth identity repair complete: users.provider/subject re-derived from accounts");
+}
+
 try {
   await runBetterAuthDataMigration();
   await runEnvProviderSync();
   await runCloudflareToProviderMigration();
+  await runOAuthIdentityRepair();
 } catch (error) {
   console.warn("Better Auth data migration warning:", error);
 }
