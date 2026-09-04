@@ -25,6 +25,8 @@ export const AGENT_ROUTES = {
   l4Ports: "/v1/l4-ports",
   /** GET the applied module list; POST a new one to rebuild with. */
   caddyBuild: "/v1/caddy-build",
+  /** Proxy a request to this agent's own Caddy admin API. */
+  caddyAdmin: "/v1/caddy-admin",
 } as const;
 
 // ─── Authentication ──────────────────────────────────────────────────────────
@@ -141,6 +143,39 @@ export type ApplyResponse<TStatus> = {
   accepted: boolean;
   status: TStatus;
 };
+
+// ─── Caddy admin proxy ───────────────────────────────────────────────────────
+
+/**
+ * A request for the agent to make against its own Caddy.
+ *
+ * The agent is the only thing that knows where its Caddy is, so every admin call goes through it
+ * rather than the controller dialling an address of its own. Without this a paired remote agent
+ * would recreate the *remote* container while the controller kept configuring a *local* Caddy.
+ */
+export type CaddyAdminProxyRequest = {
+  /** Path under the admin API root, e.g. "/load" or "/config/". Must be absolute. */
+  path: string;
+  method: string;
+  body?: string;
+  /** Defaults to application/json; /adapt needs text/caddyfile. */
+  contentType?: string;
+};
+
+/** Caddy's own answer, passed back unchanged. A non-2xx status is data here, not an error. */
+export type CaddyAdminProxyResponse = {
+  status: number;
+  text: string;
+  headers: Record<string, string>;
+};
+
+/**
+ * Largest Caddy config the proxy route accepts.
+ *
+ * A generated document grows with the number of proxy hosts, and a deployment with hundreds of
+ * them produces megabytes. Well above anything realistic, and still bounded.
+ */
+export const MAX_CADDY_CONFIG_BYTES = 8 * 1024 * 1024;
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 

@@ -40,6 +40,8 @@ export type FakeAgent = {
     appliedModules: string[] | null;
     l4Status: L4PortsStatus;
     buildStatus: CaddyBuildStatus;
+    /** What this agent's Caddy answers a /v1/caddy-admin request with. */
+    caddyAdmin: { status: number; text: string };
   };
   /** Finish the port apply the controller last asked for, as the real agent does once Caddy is up. */
   completeL4Ports: () => void;
@@ -71,6 +73,7 @@ export async function startFakeAgent(
     appliedModules: null,
     l4Status: { state: 'idle' },
     buildStatus: { state: 'idle' },
+    caddyAdmin: { status: 200, text: '{}' },
     ...overrides,
   };
 
@@ -158,6 +161,10 @@ export async function startFakeAgent(
           triggeredAt: new Date().toISOString(),
         };
         return Response.json({ accepted: true, status: state.l4Status }, { status: 202 });
+      }
+
+      if (url.pathname === AGENT_ROUTES.caddyAdmin && request.method === 'POST') {
+        return Response.json({ ...state.caddyAdmin, headers: {} });
       }
 
       if (url.pathname === AGENT_ROUTES.caddyBuild && request.method === 'POST') {

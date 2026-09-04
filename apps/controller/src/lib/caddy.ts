@@ -2997,32 +2997,77 @@ export async function buildCaddyDocument() {
   };
 }
 
+/**
+ * Turn one Caddy's answer into an outcome, or throw.
+ *
+ * `who` names the agent when there is more than one: with a fleet, "Caddy rejected configuration"
+ * leaves the operator with no idea which host is now out of step with the others.
+ */
+function assertCaddyAccepted(response: { status: number; text: string }, who: string): void {
+  if (response.status >= 200 && response.status < 300) return;
+
+  const reason = describeCaddyRejection(response.text);
+  logCaddyApplyFailure("Caddy rejected configuration", undefined, {
+    status: response.status,
+    responseBytes: Buffer.byteLength(response.text),
+    knownReason: reason !== null,
+  });
+  const where = who ? ` on ${who}` : "";
+  throw new CaddyApplyError(
+    reason
+      ? `Caddy rejected configuration${where}: ${reason}`
+      : `Caddy rejected configuration${where}`,
+    "CADDY_REJECTED",
+  );
+}
+
+/**
+ * Build the configuration and load it onto every agent's Caddy.
+ *
+ * One document, every host: the controller's database is the single source of truth for the whole
+ * fleet, and an agent that ends up with a different config is a proxy quietly serving something
+ * nobody asked for. A rejection anywhere fails the whole apply and says which host rejected it —
+ * a partial apply is a state to report, not to succeed at.
+ */
 export async function applyCaddyConfig() {
   const document = await buildCaddyDocument();
   const payload = JSON.stringify(document);
 
-  let response: { status: number; text: string };
-  try {
-    response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
-  } catch (error) {
-    logCaddyApplyFailure("Caddy admin request failed", error);
-    if (isConnectionError(error)) {
-      throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
+  const { broadcastCaddyAdmin, listAgentTargets } = await import("./agent/client");
+
+  // One agent, or none, goes through the single transport seam: its production adapter already
+  // routes to that one agent, and broadcasting to it would be the same call with extra steps.
+  // Keeping the common case on one seam is also what lets a test install one in-memory Caddy.
+  if ((await listAgentTargets()).length <= 1) {
+    let response: { status: number; text: string };
+    try {
+      response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
+    } catch (requestError) {
+      logCaddyApplyFailure("Caddy admin request failed", requestError);
+      if (isConnectionError(requestError)) {
+        throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
+      }
+      throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
     }
-    throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
+    assertCaddyAccepted(response, "");
+    return;
   }
 
-  if (response.status < 200 || response.status >= 300) {
-    const reason = describeCaddyRejection(response.text);
-    logCaddyApplyFailure("Caddy rejected configuration", undefined, {
-      status: response.status,
-      responseBytes: Buffer.byteLength(response.text),
-      knownReason: reason !== null,
+  const results = await broadcastCaddyAdmin({ path: "/load", method: "POST", body: payload });
+  const unreachable = results.filter((result) => !result.ok);
+  if (unreachable.length > 0) {
+    logCaddyApplyFailure("Caddy admin request failed", undefined, {
+      unreachableAgents: unreachable.length,
     });
     throw new CaddyApplyError(
-      reason ? `Caddy rejected configuration: ${reason}` : "Caddy rejected configuration",
-      "CADDY_REJECTED",
+      `Unable to reach Caddy API on ${unreachable.map((r) => r.agent).join(", ")}`,
+      "CADDY_UNREACHABLE",
     );
+  }
+
+  for (const result of results) {
+    if (!result.ok) continue;
+    assertCaddyAccepted(result.value, result.agent);
   }
 }
 

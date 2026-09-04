@@ -186,7 +186,9 @@ export const caddyApiUrl = stringSetting({
   env: "CADDY_API_URL",
   group: "application",
   label: "Caddy admin API",
-  description: "Where Caddy's admin API is reachable. Rarely needs changing.",
+  description:
+    "Where Caddy's admin API is reachable, for a deployment running Caddy with no agent. " +
+    "With an agent, every admin call is proxied through it and this is not used.",
   default: "http://caddy:2019",
   pattern: URL_PATTERN,
   patternHint: "must start with http:// or https://",

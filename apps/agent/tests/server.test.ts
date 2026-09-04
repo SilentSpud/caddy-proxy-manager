@@ -354,3 +354,113 @@ describe("unknown routes", () => {
     expect((await send("/v1/nope")).status).toBe(404);
   });
 });
+
+describe("the Caddy admin proxy", () => {
+  it("forwards an allowed path and passes Caddy's answer back unchanged", async () => {
+    const caddy = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: async (request) =>
+        new Response(JSON.stringify({ seen: new URL(request.url).pathname }), { status: 200 }),
+    });
+    try {
+      config = { ...config, caddyApiUrl: `http://127.0.0.1:${caddy.port}` };
+      build();
+
+      const response = await send(AGENT_ROUTES.caddyAdmin, {
+        method: "POST",
+        body: { path: "/load", method: "POST", body: "{}" },
+      });
+      expect(response.status).toBe(200);
+      const proxied = (await response.json()) as { status: number; text: string };
+      expect(proxied.status).toBe(200);
+      expect(JSON.parse(proxied.text)).toEqual({ seen: "/load" });
+    } finally {
+      await caddy.stop(true);
+    }
+  });
+
+  it("passes a rejection back as data rather than as an error", async () => {
+    // A config Caddy refuses is something the controller has to show the operator, not something
+    // for this layer to reinterpret.
+    const caddy = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: () => new Response("bad module", { status: 400 }),
+    });
+    try {
+      config = { ...config, caddyApiUrl: `http://127.0.0.1:${caddy.port}` };
+      build();
+
+      const response = await send(AGENT_ROUTES.caddyAdmin, {
+        method: "POST",
+        body: { path: "/load", method: "POST", body: "{}" },
+      });
+      expect(response.status).toBe(200);
+      expect((await response.json()) as { status: number; text: string }).toMatchObject({
+        status: 400,
+        text: "bad module",
+      });
+    } finally {
+      await caddy.stop(true);
+    }
+  });
+
+  it("refuses a path outside the allowlist", async () => {
+    // Caddy's admin API can also stop the server outright. The controller needs four paths from
+    // it, and anything else is a sign the request did not come from this application.
+    for (const path of ["/stop", "/config/apps/http/servers/x", "/../stop", "load"]) {
+      const response = await send(AGENT_ROUTES.caddyAdmin, {
+        method: "POST",
+        body: { path, method: "POST" },
+      });
+      expect(response.status).toBe(400);
+    }
+  });
+
+  it("refuses an unsigned request, like every other write", async () => {
+    const response = await send(AGENT_ROUTES.caddyAdmin, {
+      method: "POST",
+      body: { path: "/load", method: "POST", body: "{}" },
+      signed: false,
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it("reports an unreachable Caddy rather than hanging", async () => {
+    // Port 1 on loopback: nothing is listening, so the connection is refused immediately.
+    config = { ...config, caddyApiUrl: "http://127.0.0.1:1" };
+    build();
+
+    const response = await send(AGENT_ROUTES.caddyAdmin, {
+      method: "POST",
+      body: { path: "/config/", method: "GET" },
+    });
+    expect(response.status).toBe(502);
+  });
+
+  it("accepts a config far larger than the other routes allow", async () => {
+    // A generated document grows with the number of proxy hosts; the 64 KB cap the short JSON
+    // routes use would reject a realistic fleet's config outright.
+    const caddy = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: async (request) =>
+        new Response(String((await request.text()).length), { status: 200 }),
+    });
+    try {
+      config = { ...config, caddyApiUrl: `http://127.0.0.1:${caddy.port}` };
+      build();
+
+      const big = "x".repeat(200_000);
+      const response = await send(AGENT_ROUTES.caddyAdmin, {
+        method: "POST",
+        body: { path: "/load", method: "POST", body: big },
+      });
+      expect(response.status).toBe(200);
+      expect((await response.json()) as { text: string }).toMatchObject({ text: "200000" });
+    } finally {
+      await caddy.stop(true);
+    }
+  });
+});

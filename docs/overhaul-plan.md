@@ -212,14 +212,47 @@ five minutes: an address with a path or a non-HTTP scheme (a sign something else
 code that is not six letters, a reply whose secret is too short to be an agent's, and a code the
 agent has already burned. Each failure says which of those happened rather than "pairing failed".
 
-**Still one agent at a time.** The table holds several rows so a deployment can keep a disabled one
-it is about to switch back to, but exactly one enabled agent is used. Fanning out to several is a
-larger decision than it looks: two agents means two Caddy instances, which means deciding whether
-proxy hosts belong to a host or to the fleet — which is the question the deleted instance-sync
-answered badly. That decision is open, not deferred by oversight.
-
 **Also not done:** there is no `/api/v1/agents` REST surface. The old `/api/v1/instances*` routes
 went with instance-sync and nothing has replaced them; pairing is UI-only for now.
+
+### Phase 5, step 4: more than one agent
+
+The open question from step 3 — do proxy hosts belong to a host or to the fleet? — is answered:
+**to the fleet.** The controller's database is the single source of truth, and every agent's Caddy
+is loaded with the identical document.
+
+That is what instance-sync tried to do and got wrong. It replicated the *database* to a second CPM
+instance, which gave every replica its own writable copy, its own drift, and a `synced:` override
+layer to paper over the difference. Replicating only the *rendered configuration* has no divergence
+surface at all: there is one writer, and the agents hold no state the controller does not.
+
+**This also fixed a live bug rather than only adding a feature.** Until now the controller reached
+Caddy at its own `CADDY_API_URL` while the agent recreated a container on its own host. With a
+paired remote agent that is a split brain: ports and rebuilds landed on the remote host, config on
+the local one. Every admin call now goes through an agent, because the agent is the only thing that
+knows where its Caddy is. `CADDY_API_URL` is the agent's setting; the controller keeps it only for
+a deployment running Caddy with no agent.
+
+**Writes fan out, reads do not.** Config loads, port publishes and rebuilds go to every agent and
+report per agent; a rejection or an unreachable host fails the whole apply and names the agent,
+because half a fleet configured is a state to report, never one to succeed at. Reads go to the
+first agent, since every Caddy carries the same document and a second answer would be the same
+answer. With one agent nothing fans out at all — it goes through the ordinary transport seam, which
+already routes to that agent, and which is what keeps the seam testable.
+
+**Module availability is the intersection.** A handler is emitted only if every agent's binary has
+the module behind it: one document goes to all of them, and Caddy rejects a document naming an
+unknown module wholesale. An unreachable agent contributes nothing rather than emptying the set —
+it cannot be configured either, and stripping every plugin-backed handler from the hosts that *are*
+reachable would turn one unreachable agent into a fleet-wide outage.
+
+**The agent's Caddy proxy is an allowlist, not a sanitiser.** `/load`, `/config/`, `/adapt` and
+`/reverse_proxy/upstreams` are the four paths the controller needs. Caddy's admin API can also stop
+the server outright, and a request for anything else is a sign it did not come from this
+application, whatever signed it.
+
+The compose file puts the agent on `caddy-network` for this. It already controls that container
+through the Docker API, so reaching its admin port grants it nothing it did not have.
 
 ### Consumers still reading the environment directly
 

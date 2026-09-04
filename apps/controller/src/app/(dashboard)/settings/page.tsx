@@ -18,7 +18,7 @@ import {
 } from "@/src/lib/settings";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { listAgents } from "@/src/lib/models/agents";
-import { tryGetAgentStatus } from "@/src/lib/agent/client";
+import { getAllAgentStatuses } from "@/src/lib/agent/client";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
@@ -68,10 +68,10 @@ export default async function SettingsPage() {
     getCaddyBuildSettings(),
   ]);
 
-  // Two round trips rather than one: the status comes from the agent over the network, so a slow
-  // or absent one must not hold up the rest of the page. tryGetAgentStatus returns null instead of
-  // throwing for exactly that reason.
-  const [pairedAgents, agentStatus] = await Promise.all([listAgents(), tryGetAgentStatus()]);
+  // Separate from the settings reads above: these go out over the network to each agent, so a slow
+  // or absent one must not hold up the rest of the page. getAllAgentStatuses reports per agent and
+  // never throws, for exactly that reason.
+  const [pairedAgents, agentStatuses] = await Promise.all([listAgents(), getAllAgentStatuses()]);
 
   return (
     <SettingsClient
@@ -105,7 +105,7 @@ export default async function SettingsPage() {
       }}
       caddyBuild={caddyBuild}
       baseUrl={config.baseUrl}
-      agents={{ paired: pairedAgents, status: agentStatus }}
+      agents={{ paired: pairedAgents, statuses: agentStatuses }}
     />
   );
 }

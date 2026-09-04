@@ -105,7 +105,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `BASE_URL` | Public URL where users access the dashboard.<br/>**Required for OAuth** - must match redirect URI | `http://localhost:3000` | **Yes** (if using OAuth) |
 | `APP_NAME` | Display name in the sidebar, on the login card, and as the suffix on every page title | `Caddy Proxy Manager` | No |
 | `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides | Unset (toggle decides) | No |
-| `CADDY_API_URL` | Caddy Admin API endpoint | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
+| `CADDY_API_URL` | Caddy Admin API endpoint. Read by the **agent**, which proxies every admin call; the controller uses it only when running Caddy with no agent at all | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
 | `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values below when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
 | `DATABASE_POOL_MAX` | Connections the database pool may open. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance pointing at it | `10` | No |
 | `POSTGRES_PASSWORD` | Password for the bundled `postgres` service. Interpolated by Compose on the host, not read by the app | None | **Yes** |
@@ -401,6 +401,23 @@ second container does that work and the two talk over a small REST API.
 Every request is signed with a shared secret using HMAC-SHA256 over the method, path, timestamp and
 body. The secret never travels with a request, and the signature covers the path, so a captured
 read cannot be replayed as a write.
+
+### One controller, one configuration
+
+Everything a proxy serves — hosts, certificates, access lists, published ports, compiled-in
+plugins — belongs to this controller's database, not to any host. Every agent's Caddy is loaded
+with the identical document. A change is applied to all of them or to none: if one agent rejects
+the config or cannot be reached, the whole apply fails and names that agent, rather than leaving
+one proxy serving the new configuration and another serving the old.
+
+Two consequences worth knowing:
+
+- **Plugins are the intersection.** A handler is only emitted if *every* agent's Caddy was built
+  with the module behind it, because one document goes to all of them and Caddy rejects a document
+  naming a module it lacks — wholesale, taking every host on that instance down with it. Rebuild
+  the fleet before a newly enabled module takes effect.
+- **Ports are published everywhere.** A layer-4 host's port is opened on every agent, since any of
+  them may be the one a client reaches.
 
 ### Same host — nothing to configure
 

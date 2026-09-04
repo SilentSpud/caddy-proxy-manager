@@ -13,9 +13,12 @@ import {
   type AgentStatus,
   type ApplyCaddyBuildRequest,
   type ApplyL4PortsRequest,
+  type CaddyAdminProxyRequest,
+  MAX_CADDY_CONFIG_BYTES,
   type PairRequest,
   type PairResponse,
 } from "@cpm/shared";
+import { CaddyAdminUnreachable, forwardToCaddy, isAllowedAdminPath } from "./caddy-admin";
 import { generateSecret, verifyRequest, type PairingCodeIssuer } from "./auth";
 import type { AgentConfig } from "./config";
 import type { AgentStore } from "./db";
@@ -24,7 +27,12 @@ import { OperationBusyError, type Operations } from "./operations";
 
 export const AGENT_VERSION = "3.1.0";
 
-/** Largest body any endpoint accepts. Every one of them is a short JSON object. */
+/**
+ * Largest body most endpoints accept. Every one of them is a short JSON object.
+ *
+ * The Caddy admin proxy is the exception: it carries a whole generated config, which grows with
+ * the number of proxy hosts.
+ */
 const MAX_BODY_BYTES = 64 * 1024;
 
 function error(status: number, code: AgentErrorCode, message: string): Response {
@@ -83,12 +91,14 @@ export function createHandler(services: AgentServices) {
       return Response.json({ ok: true, version: AGENT_VERSION });
     }
 
+    const limit =
+      url.pathname === AGENT_ROUTES.caddyAdmin ? MAX_CADDY_CONFIG_BYTES : MAX_BODY_BYTES;
     const contentLength = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
-    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    if (Number.isFinite(contentLength) && contentLength > limit) {
       return error(413, "BAD_REQUEST", "The request body is too large.");
     }
     const body = await request.arrayBuffer();
-    if (body.byteLength > MAX_BODY_BYTES) {
+    if (body.byteLength > limit) {
       return error(413, "BAD_REQUEST", "The request body is too large.");
     }
 
@@ -117,6 +127,10 @@ export function createHandler(services: AgentServices) {
               applied: store.appliedCaddyModules(),
               status: store.caddyBuildStatus(),
             });
+      case AGENT_ROUTES.caddyAdmin:
+        return request.method === "POST"
+          ? handleCaddyAdmin(body)
+          : error(405, "BAD_REQUEST", "Use POST to reach the Caddy admin API.");
       default:
         return error(404, "BAD_REQUEST", "No such endpoint.");
     }
@@ -207,6 +221,39 @@ export function createHandler(services: AgentServices) {
       throw busy;
     }
     return Response.json({ accepted: true, status: store.caddyBuildStatus() }, { status: 202 });
+  }
+
+  /**
+   * Forward one admin request to this host's Caddy.
+   *
+   * Caddy's own answer is passed back unchanged, non-2xx included: a rejected config is something
+   * the controller has to read and show the operator, not an error for this layer to reinterpret.
+   */
+  async function handleCaddyAdmin(body: ArrayBuffer): Promise<Response> {
+    const parsed = parseJson(body) as CaddyAdminProxyRequest | null;
+    if (!parsed || typeof parsed !== "object") {
+      return error(400, "BAD_REQUEST", "The request is not valid JSON.");
+    }
+    if (typeof parsed.path !== "string" || typeof parsed.method !== "string") {
+      return error(400, "BAD_REQUEST", "A Caddy admin request needs a path and a method.");
+    }
+    if (!isAllowedAdminPath(parsed.path)) {
+      // The admin API can also stop the server outright. The controller needs four paths from it,
+      // and anything else is a sign the request did not come from this application.
+      return error(400, "BAD_REQUEST", `The Caddy admin path "${parsed.path}" is not allowed.`);
+    }
+    if (parsed.body !== undefined && typeof parsed.body !== "string") {
+      return error(400, "BAD_REQUEST", "A Caddy admin body must be a string.");
+    }
+
+    try {
+      return Response.json(await forwardToCaddy(config.caddyApiUrl, parsed));
+    } catch (caddyError) {
+      if (caddyError instanceof CaddyAdminUnreachable) {
+        return error(502, "INTERNAL", caddyError.message);
+      }
+      throw caddyError;
+    }
   }
 
   async function buildStatus(): Promise<AgentStatus> {

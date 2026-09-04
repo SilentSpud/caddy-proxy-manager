@@ -26,7 +26,7 @@ import {
 } from "./caddy-modules";
 import { type CaddyBuildSettings, getCaddyBuildSettings } from "./settings";
 
-import { requestCaddyBuild, tryGetAgentStatus } from "./agent/client";
+import { getAllAgentStatuses, requestCaddyBuild, tryGetAgentStatus } from "./agent/client";
 
 export type { CaddyBuildState, CaddyBuildStatus };
 
@@ -76,20 +76,40 @@ export function defaultModuleSpecs(): string[] {
 // ─── Applied state ───────────────────────────────────────────────────────────
 
 /**
- * The module specs actually compiled into the running binary.
+ * The module specs compiled into every running binary — the intersection across the fleet.
  *
- * From what the agent reports having built, which it records only after a build has succeeded and
+ * From what each agent reports having built, which it records only after a build has succeeded and
  * Caddy is healthy again — never from the selection. Using the selection would make applied equal
  * desired the instant a rebuild was requested, so any config apply during the build would emit
  * handlers the running binary lacks, and a failed build would reject every apply after it.
  *
- * Null from the agent, or no agent at all, means no rebuild has happened: the container is the
- * shipped image, which carries the full catalog.
+ * The intersection, not the union, because one document goes to every host: a handler only one
+ * agent's binary has makes Caddy reject the whole config on all the others. Null from an agent
+ * means it has never rebuilt, so it is still the shipped image and carries the full catalog.
+ *
+ * An unreachable agent contributes nothing rather than emptying the set. It cannot be configured
+ * either — the apply fails on it and says so — and stripping every plugin-backed handler from the
+ * hosts that *are* reachable would turn one unreachable agent into a fleet-wide outage.
  */
 export async function getAppliedModuleSpecs(): Promise<string[]> {
-  const status = await tryGetAgentStatus();
-  const applied = status?.caddyBuild.applied;
-  return applied && applied.length > 0 ? [...applied].sort() : defaultModuleSpecs();
+  const statuses = await getAllAgentStatuses();
+  const reachable = statuses.filter((result) => result.ok);
+  if (reachable.length === 0) return defaultModuleSpecs();
+
+  let intersection: Set<string> | null = null;
+  for (const result of reachable) {
+    if (!result.ok) continue;
+    const applied = result.value.caddyBuild.applied;
+    const specs = new Set<string>(applied && applied.length > 0 ? applied : defaultModuleSpecs());
+    if (intersection === null) {
+      intersection = specs;
+      continue;
+    }
+    const carried: Set<string> = intersection;
+    intersection = new Set([...carried].filter((spec) => specs.has(spec)));
+  }
+
+  return [...(intersection ?? new Set<string>(defaultModuleSpecs()))].sort();
 }
 
 /** Split the whitespace-separated CADDY_MODULES build arg into specs. */

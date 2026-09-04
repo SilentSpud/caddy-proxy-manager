@@ -210,6 +210,9 @@ services:
       # for an agent on a different host from its controller.
       AGENT_MODE: ${AGENT_MODE:-standalone}
       AGENT_PORT: ${AGENT_PORT:-3100}
+      # Every Caddy admin call the controller makes is proxied through the agent, because the
+      # agent is the only thing that knows where its Caddy is. This is that address.
+      CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
@@ -222,7 +225,10 @@ services:
       docker-socket-proxy:
         condition: service_started
     networks:
+      # socket-proxy for the Docker API, caddy-network to reach the Caddy admin API it proxies for.
+      # The agent already controls that container through Docker, so this grants it nothing new.
       - socket-proxy
+      - caddy-network
 
   # The controller's database. No profile: unlike clickhouse and geoipupdate this is not optional,
   # since SQLite support was removed. Unpublished on purpose — nothing outside the compose network
@@ -290,7 +296,7 @@ services:
 networks:
   caddy-network:
     driver: bridge
-  # Socket proxy and agent only; internal, with no external connectivity.
+  # The agent's route to the Docker API; internal, with no external connectivity.
   socket-proxy:
     driver: bridge
     internal: true

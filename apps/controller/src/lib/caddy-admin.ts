@@ -1,7 +1,14 @@
 /**
  * The seam between this app and the Caddy admin API: all traffic goes through one transport, so
- * production installs `httpCaddyAdminTransport` and tests an in-memory adapter, exercising the
+ * production installs `agentCaddyAdminTransport` and tests an in-memory adapter, exercising the
  * whole build-and-apply path with nothing listening.
+ *
+ * Requests go through an agent, not to an address of this app's own. The agent is the only thing
+ * that knows where its Caddy is, and a controller that dialled `CADDY_API_URL` itself would
+ * configure a Caddy on *this* host while a paired remote agent recreated the container on
+ * *another* — which is exactly the split brain the fan-out exists to prevent. `CADDY_API_URL` is
+ * the agent's setting now; `httpCaddyAdminTransport` remains only for a deployment running Caddy
+ * with no agent at all.
  */
 import http from "node:http";
 import https from "node:https";
@@ -99,7 +106,32 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   });
 };
 
-let transport: CaddyAdminTransport = httpCaddyAdminTransport;
+/**
+ * Production transport: ask the primary agent to make the request against its own Caddy.
+ *
+ * Falls back to a direct connection when no agent answers, so a development setup that runs Caddy
+ * without the agent container keeps working. That fallback is the only remaining use of this app's
+ * own `CADDY_API_URL`.
+ */
+export const agentCaddyAdminTransport: CaddyAdminTransport = async (request) => {
+  const { caddyAdminViaAgent, AgentUnavailableError } = await import("./agent/client");
+  try {
+    const response = await caddyAdminViaAgent({
+      path: request.path,
+      method: request.method,
+      body: request.body,
+      contentType: request.contentType,
+    });
+    return { status: response.status, text: response.text, headers: response.headers };
+  } catch (error) {
+    if (error instanceof AgentUnavailableError) {
+      return httpCaddyAdminTransport(request);
+    }
+    throw error;
+  }
+};
+
+let transport: CaddyAdminTransport = agentCaddyAdminTransport;
 
 /** Install an adapter at the seam. Returns the previous one so callers can restore it. */
 export function setCaddyAdminTransport(next: CaddyAdminTransport): CaddyAdminTransport {

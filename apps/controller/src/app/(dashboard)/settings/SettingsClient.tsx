@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import { useState, useActionState, useEffect, type ReactNode } from "react";
 import {
   Cloud,
   Globe,
@@ -76,6 +76,7 @@ import OAuthProvidersSection from "./OAuthProvidersSection";
 import { CheckboxInput } from "@/src/components/ui/FormBooleanControls";
 import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import type { AgentStatus } from "@cpm/shared";
+import type { AgentResult } from "@/src/lib/agent/client";
 import type { PairedAgent } from "@/src/lib/models/agents";
 import {
   updateDnsProviderSettingsAction,
@@ -422,8 +423,8 @@ type Props = {
   agents: {
     /** Agents paired over the network. Empty on a single-host deployment, which uses the socket. */
     paired: PairedAgent[];
-    /** What the agent in use reports, or null when none answered. */
-    status: AgentStatus | null;
+    /** What each agent reports, per agent, so one unreachable host is visible as itself. */
+    statuses: AgentResult<AgentStatus>[];
   };
 };
 
@@ -1547,6 +1548,55 @@ function whenText(iso: string | null): string {
   return Number.isNaN(parsed.getTime()) ? "never" : parsed.toLocaleString();
 }
 
+/** One agent's line in the fleet list: what it is, and whether it is answering. */
+function AgentRow({
+  name,
+  address,
+  status,
+  error,
+  lastSeenAt,
+  onRemove,
+}: {
+  name: string;
+  address: string | null;
+  status: AgentStatus | null;
+  error: string | null;
+  lastSeenAt: string | null;
+  onRemove: ReactNode;
+}) {
+  return (
+    <VStack gap={2}>
+      <HStack gap={2} align="center" justify="between">
+        <VStack gap={1}>
+          <HStack gap={2} align="center">
+            <Text size="sm" weight="semibold">
+              {name}
+            </Text>
+            {status ? (
+              <Text size="xsm" color="secondary">
+                v{status.version} · {status.mode} · project {status.composeProject}
+              </Text>
+            ) : (
+              <Badge variant="error" label="Not answering" />
+            )}
+          </HStack>
+          <Text size="xsm" color="secondary">
+            {address ? `${address} — ` : ""}last reached {whenText(lastSeenAt)}
+          </Text>
+          {status && (
+            <Text size="xsm" color="secondary">
+              {status.l4Ports.applied.length} published port(s) · ports:{" "}
+              {status.l4Ports.status.state} · build: {status.caddyBuild.status.state}
+            </Text>
+          )}
+        </VStack>
+        {onRemove}
+      </HStack>
+      {error && <WarnAlert title={`${name} is not reachable`}>{error}</WarnAlert>}
+    </VStack>
+  );
+}
+
 function AgentSection({
   agents,
   pairState,
@@ -1560,87 +1610,88 @@ function AgentSection({
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
 
-  const { paired, status } = agents;
+  const { paired, statuses } = agents;
   const usingPaired = paired.length > 0;
+  const statusFor = (agentName: string) => statuses.find((entry) => entry.agent === agentName);
+  const answering = statuses.filter((entry) => entry.ok).length;
 
   return (
     <>
-      <FormCard title="Current agent">
+      <FormCard title={usingPaired ? "Agents" : "Current agent"}>
         <VStack gap={3}>
           <Text size="sm" color="secondary">
-            The agent recreates and rebuilds the Caddy container. The controller has no Docker
-            access of its own, so publishing a layer-4 port and changing the compiled-in plugins
-            both go through it.
+            An agent recreates, rebuilds and configures the Caddy container on its host. The
+            controller has no Docker access of its own, and no address for any Caddy — everything
+            reaches a proxy through its agent.
           </Text>
 
-          {status ? (
-            <VStack gap={2}>
-              <HStack gap={2} align="center">
-                <Badge variant="success" label="Connected" />
-                <Text size="sm">
-                  version {status.version}, {status.mode} mode
-                </Text>
-              </HStack>
-              <Text size="sm" color="secondary">
-                Managing the <Code>{status.composeProject}</Code> Compose project.
-              </Text>
-              <Text size="sm" color="secondary">
-                Publishing {status.l4Ports.applied.length} port(s); last port change:{" "}
-                {status.l4Ports.status.state}. Last build: {status.caddyBuild.status.state}.
-              </Text>
-            </VStack>
-          ) : (
-            <WarnAlert title="No agent is answering">
-              {usingPaired
-                ? "The paired agent below did not respond. Layer-4 ports and Caddy rebuilds will fail until it does."
-                : "Start the agent container, or pair a remote one below. Everything else keeps working without it."}
-            </WarnAlert>
+          {usingPaired && paired.length > 1 && (
+            <InfoAlert title="Every agent runs the same configuration">
+              Proxy hosts, certificates and published ports belong to this controller, not to a
+              host. A change is applied to all {paired.length} agents or to none of them, so the
+              fleet cannot drift apart.
+            </InfoAlert>
           )}
 
-          {!usingPaired && status && (
-            <InfoAlert title="This is the local agent">
-              It is reached over a socket on the shared data volume and needs no pairing. Pair a
-              remote agent below only if Caddy runs on a different host from this controller.
-            </InfoAlert>
+          {statuses.length === 0 ? (
+            <WarnAlert title="No agent is answering">
+              {usingPaired
+                ? "Nothing was reached. Layer-4 ports, Caddy rebuilds and config changes will all fail until an agent answers."
+                : "Start the agent container, or pair a remote one below. Everything else keeps working without it."}
+            </WarnAlert>
+          ) : (
+            <VStack gap={3}>
+              {!usingPaired && (
+                <>
+                  <InfoAlert title="This is the local agent">
+                    It is reached over a socket on the shared data volume and needs no pairing. Pair
+                    a remote agent below only if Caddy runs on a different host from this
+                    controller.
+                  </InfoAlert>
+                  <AgentRow
+                    name="Local agent"
+                    address={null}
+                    status={statuses[0]?.ok ? statuses[0].value : null}
+                    error={statuses[0]?.ok ? null : (statuses[0]?.error ?? null)}
+                    lastSeenAt={null}
+                    onRemove={null}
+                  />
+                </>
+              )}
+
+              {paired.map((agent) => {
+                const entry = statusFor(agent.name);
+                return (
+                  <AgentRow
+                    key={agent.id}
+                    name={agent.name}
+                    address={agent.address}
+                    status={entry?.ok ? entry.value : null}
+                    error={entry && !entry.ok ? entry.error : agent.lastError}
+                    lastSeenAt={agent.lastSeenAt}
+                    onRemove={
+                      <form action={unpairAgentAction}>
+                        <input type="hidden" name="agentId" value={agent.id} />
+                        <Button type="submit" size="sm" variant="secondary" label="Unpair" />
+                      </form>
+                    }
+                  />
+                );
+              })}
+            </VStack>
+          )}
+
+          {usingPaired && (
+            <Text size="xsm" color="secondary">
+              {answering} of {paired.length} answering. Unpairing forgets this side only — the agent
+              keeps the secret until it is restarted or paired again, so restart it too if you are
+              removing an agent you no longer trust.
+            </Text>
           )}
         </VStack>
       </FormCard>
 
-      {usingPaired && (
-        <FormCard title="Paired agents">
-          <VStack gap={3}>
-            {paired.map((agent) => (
-              <VStack key={agent.id} gap={2}>
-                <HStack gap={2} align="center" justify="between">
-                  <VStack gap={1}>
-                    <Text size="sm" weight="semibold">
-                      {agent.name}
-                    </Text>
-                    <Text size="xsm" color="secondary">
-                      {agent.address} — last reached {whenText(agent.lastSeenAt)}
-                    </Text>
-                  </VStack>
-                  <form action={unpairAgentAction}>
-                    <input type="hidden" name="agentId" value={agent.id} />
-                    <Button type="submit" size="sm" variant="secondary" label="Unpair" />
-                  </form>
-                </HStack>
-                {agent.lastError && (
-                  <WarnAlert title="The last request to this agent failed">
-                    {agent.lastError}
-                  </WarnAlert>
-                )}
-              </VStack>
-            ))}
-            <Text size="xsm" color="secondary">
-              Unpairing only forgets this side. The agent keeps the secret until it is restarted or
-              paired again, so restart it if you are removing an agent you no longer trust.
-            </Text>
-          </VStack>
-        </FormCard>
-      )}
-
-      <FormCard title="Pair a remote agent">
+      <FormCard title="Pair an agent">
         <form action={pairFormAction}>
           <VStack gap={3}>
             <Text size="sm" color="secondary">

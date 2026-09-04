@@ -69,24 +69,30 @@ export async function listAgents(): Promise<PairedAgent[]> {
 }
 
 /**
- * The agent the controller should be talking to, with its secret.
+ * Every enabled agent, with its secret.
  *
- * Exactly one enabled agent is used. The table holds several so a deployment can keep a disabled
- * one it is about to switch back to, but nothing fans out to more than one yet — see
- * docs/overhaul-plan.md for why that is a larger decision than it looks.
+ * All of them run the identical configuration, so every write goes to every one. A row whose
+ * secret will not decrypt is dropped rather than failing the list: it was encrypted under a
+ * SESSION_SECRET this process no longer has, re-pairing is the only fix, and taking the whole
+ * fleet offline over one unusable row would be worse than running without it.
  */
-export async function getActiveAgent(): Promise<AgentCredentials | null> {
-  const [row] = await db.select().from(agents).where(eq(agents.enabled, true)).limit(1);
-  if (!row) return null;
+export async function listActiveAgents(): Promise<AgentCredentials[]> {
+  const rows = await db.select().from(agents).where(eq(agents.enabled, true)).orderBy(agents.id);
 
-  try {
-    return { ...toView(row), secret: decryptSecret(row.secret) };
-  } catch (error) {
-    // The secret was encrypted under a SESSION_SECRET this process no longer has. Re-pairing is
-    // the only fix, and reporting "no agent" is what puts that in front of the operator.
-    console.error(`Failed to decrypt the secret for agent "${row.name}":`, error);
-    return null;
+  const usable: AgentCredentials[] = [];
+  for (const row of rows) {
+    try {
+      usable.push({ ...toView(row), secret: decryptSecret(row.secret) });
+    } catch (error) {
+      console.error(`Failed to decrypt the secret for agent "${row.name}":`, error);
+    }
   }
+  return usable;
+}
+
+/** The first enabled agent, for the reads that only need one answer. */
+export async function getActiveAgent(): Promise<AgentCredentials | null> {
+  return (await listActiveAgents())[0] ?? null;
 }
 
 export async function saveAgent(input: {
