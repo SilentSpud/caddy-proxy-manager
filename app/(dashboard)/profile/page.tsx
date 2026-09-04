@@ -1,5 +1,5 @@
 import { requireUser, getCurrentSessionId } from "@/src/lib/auth";
-import { getUserById } from "@/src/lib/models/user";
+import { getUserById, listUserOAuthProviders } from "@/src/lib/models/user";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { listApiTokens } from "@/src/lib/models/api-tokens";
 import { listUserSessions } from "@/src/lib/models/sessions";
@@ -15,6 +15,10 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
+  // OAuth connection state comes from the authoritative accounts table — the
+  // informational users.provider/subject columns are only a projection (#261).
+  const linkedProviders = await listUserOAuthProviders(userId);
+
   const [enabledProviders, apiTokens, userSessions, currentSessionId] = await Promise.all([
     getProviderDisplayList(),
     listApiTokens(userId),
@@ -27,6 +31,7 @@ export default async function ProfilePage() {
   return (
     <ProfileClient
       user={user}
+      linkedProviders={linkedProviders}
       enabledProviders={enabledProviders}
       apiTokens={apiTokens}
       sessions={sessions}

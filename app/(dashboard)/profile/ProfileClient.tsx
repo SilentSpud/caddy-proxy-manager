@@ -72,12 +72,14 @@ interface UserData {
 
 interface ProfileClientProps {
   user: UserData;
+  /** Linked OAuth identities, read from the authoritative accounts table (#261). */
+  linkedProviders: Array<{ providerId: string; accountId: string }>;
   enabledProviders: Array<{ id: string; name: string; autoLink: boolean }>;
   apiTokens: ApiToken[];
   sessions: ActiveSession[];
 }
 
-export default function ProfileClient({ user, enabledProviders, apiTokens, sessions }: ProfileClientProps) {
+export default function ProfileClient({ user, linkedProviders, enabledProviders, apiTokens, sessions }: ProfileClientProps) {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -90,8 +92,18 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
   const [newToken, setNewToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const getProviderName = (provider: string) => {
+    if (provider === "credentials") return "Username/Password";
+    if (provider === "oauth2") return "OAuth2";
+    if (provider === "authentik") return "Authentik";
+    return provider;
+  };
+
   const hasPassword = !!user.passwordHash;
-  const hasOAuth = !!user.provider && user.provider !== "credentials";
+  const linkedNames = linkedProviders.map((l) =>
+    enabledProviders.find((p) => p.id === l.providerId)?.name ?? getProviderName(l.providerId)
+  );
+  const hasOAuth = linkedNames.length > 0;
 
   const handlePasswordChange = async () => {
     setError(null);
@@ -319,13 +331,6 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
     return new Date(expiresAt) <= new Date();
   };
 
-  const getProviderName = (provider: string) => {
-    if (provider === "credentials") return "Username/Password";
-    if (provider === "oauth2") return "OAuth2";
-    if (provider === "authentik") return "Authentik";
-    return provider;
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold tracking-tight">Profile & Account Settings</h1>
@@ -547,7 +552,9 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
               {hasOAuth ? (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Your account is linked to {getProviderName(user.provider ?? "")}
+                    {linkedNames.length === 1
+                      ? <>Your account is linked to {linkedNames[0]}</>
+                      : <>Your account is linked to: {linkedNames.join(", ")}</>}
                   </p>
 
                   {hasPassword ? (
@@ -769,7 +776,7 @@ export default function ProfileClient({ user, enabledProviders, apiTokens, sessi
           <DialogHeader>
             <DialogTitle>Unlink OAuth Account</DialogTitle>
             <DialogDescription>
-              Are you sure you want to unlink your {getProviderName(user.provider ?? "")} account?
+              Are you sure you want to unlink your {linkedNames.join(", ")} account?
               You will only be able to sign in with your username and password after this.
             </DialogDescription>
           </DialogHeader>

@@ -1,6 +1,6 @@
 import db, { nowIso, toIso } from "../db";
 import { users, accounts, oauthProviders } from "../db/schema";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
 import {
   CREDENTIAL_ACCOUNT_ISSUER,
@@ -171,6 +171,74 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
       eq(accounts.providerId, "credential"),
       eq(accounts.issuer, CREDENTIAL_ACCOUNT_ISSUER)
     ));
+}
+
+/**
+ * The OAuth identities linked to a user, read from the authoritative
+ * `accounts` table (Better Auth writes federated identities there).
+ *
+ * The informational `users.provider` / `users.subject` columns are a cached
+ * projection of this table and are re-derived via {@link syncUserOAuthIdentity};
+ * the Profile page must read connection state from here so a stale projection
+ * can never make a linked account look unlinked (or vice versa). (#261)
+ */
+export async function listUserOAuthProviders(userId: number): Promise<Array<{ providerId: string; accountId: string }>> {
+  return db
+    .select({ providerId: accounts.providerId, accountId: accounts.accountId })
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), ne(accounts.providerId, "credential")))
+    .orderBy(desc(accounts.id))
+    .all();
+}
+
+/**
+ * Re-derive `users.provider` / `users.subject` from the authoritative
+ * `accounts` table.
+ *
+ * Better Auth only writes to `accounts` when an OAuth identity is linked
+ * (auto-link, profile link, federated sign-up), so without this sync the two
+ * representations drift apart and the Profile UI reports the wrong connection
+ * state in both directions (#261). The most recently created OAuth account
+ * wins; with no OAuth identity left the user falls back to their credential
+ * account ("credentials"), or to null when they have neither.
+ */
+export async function syncUserOAuthIdentity(userId: number): Promise<void> {
+  const [oauthAccount] = await db
+    .select({ providerId: accounts.providerId, accountId: accounts.accountId })
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), ne(accounts.providerId, "credential")))
+    .orderBy(desc(accounts.id))
+    .limit(1);
+
+  const now = nowIso();
+  if (oauthAccount) {
+    await db
+      .update(users)
+      .set({
+        provider: oauthAccount.providerId,
+        subject: oauthAccount.accountId,
+        updatedAt: now,
+      })
+      .where(eq(users.id, userId));
+    return;
+  }
+
+  const credentialAccount = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+    .get();
+  const user = await getUserById(userId);
+  const hasCredential = !!credentialAccount || !!user?.passwordHash;
+
+  await db
+    .update(users)
+    .set({
+      provider: hasCredential ? "credentials" : null,
+      subject: null,
+      updatedAt: now,
+    })
+    .where(eq(users.id, userId));
 }
 
 export async function listUsers(): Promise<User[]> {

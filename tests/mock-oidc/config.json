@@ -17,6 +17,51 @@
           }
         }
       ]
+    },
+    {
+      "issuerId": "linker-a",
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "authorization_code",
+          "claims": {
+            "sub": "linker-sub-a",
+            "email": "testadmin@localhost",
+            "email_verified": true,
+            "name": "Test Admin"
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "linker-b",
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "authorization_code",
+          "claims": {
+            "sub": "linker-sub-b",
+            "email": "testadmin@localhost",
+            "email_verified": true,
+            "name": "Test Admin"
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "linker-c",
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "authorization_code",
+          "claims": {
+            "sub": "linker-sub-c",
+            "email": "testadmin@localhost",
+            "email_verified": true,
+            "name": "Test Admin"
+          }
+        }
+      ]
     }
   ]
 }
