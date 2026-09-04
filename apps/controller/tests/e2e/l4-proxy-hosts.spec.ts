@@ -160,23 +160,10 @@ test.describe('L4 Proxy Hosts page', () => {
 
       // Dialog closes on success, host appears in table — no page.reload()
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-      await expect(page.getByRole('table').getByText(`E2E Rapid Host ${i}`)).toBeVisible({
-        timeout: 10_000,
-      });
-    }
-  });
-
-  test('cleanup rapid hosts', async ({ page }) => {
-    await page.goto('/l4-proxy-hosts');
-    for (let i = 1; i <= 3; i++) {
-      const row = page.locator('tr', { hasText: `E2E Rapid Host ${i}` });
-      await expect(row).toBeVisible();
-      await row.getByRole('button').first().click();
-      await page.getByRole('menuitem', { name: /delete/i }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await page.getByRole('button', { name: /delete/i }).click();
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText(`E2E Rapid Host ${i}`)).not.toBeVisible({ timeout: 5_000 });
+      // exact: the row's switch is labelled `Enable <name>`, which contains the name.
+      await expect(
+        page.getByRole('table').getByText(`E2E Rapid Host ${i}`, { exact: true }),
+      ).toBeVisible({ timeout: 10_000 });
     }
   });
 
@@ -212,6 +199,28 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /delete/i }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('E2E Toggle Host')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('E2E Toggle Host', { exact: true })).not.toBeVisible({
+      timeout: 5_000,
+    });
+  });
+
+  /**
+   * Swept through the API rather than the UI, and unconditionally: the tests above create their
+   * hosts through the dialog, and a failure part-way would otherwise leave hosts — and their
+   * listen ports — behind for every later test in the suite.
+   */
+  test.afterAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    try {
+      const res = await page.request.get(API_L4_HOSTS);
+      if (!res.ok()) return;
+      const hosts = (await res.json()) as Array<{ id: number; name: string }>;
+      for (const host of hosts) {
+        if (!/^E2E (Rapid|Toggle) Host/.test(host.name)) continue;
+        await page.request.delete(`${API_L4_HOSTS}/${host.id}`, { headers: { Origin: ORIGIN } });
+      }
+    } finally {
+      await page.close();
+    }
   });
 });
