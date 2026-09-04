@@ -58,3 +58,8 @@ playwright-report/
 # Temp SQLite databases left behind by tests/integration/db-compat-accounts.test.ts on a
 # failure, before its cleanup runs.
 tmp-db-*/
+
+# The 3.0 SQLite database the migration e2e spec builds; the directory is tracked, not its
+# contents.
+apps/controller/tests/.legacy/*
+!apps/controller/tests/.legacy/.gitkeep

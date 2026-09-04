@@ -14,9 +14,25 @@ export default async function proxy(req: NextRequest) {
   const isSetupEntry =
     pathname === "/setup" || pathname === "/setup/migrate" || pathname === "/api/setup";
 
-  // Allow public routes
+  /** The sparse header set a page nobody has signed in for still needs. */
+  const publicPageResponse = () => {
+    const response = NextResponse.next();
+    // Anti-clickjacking for public pages (/login, /portal): the authenticated branch below sets the
+    // full header set, but public responses carried none, leaving those forms framable.
+    response.headers.set("X-Frame-Options", "DENY");
+    response.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    return response;
+  };
+
+  // Allow public routes.
+  //
+  // `/login` is deliberately NOT here. It used to be, and the effect was that a deployment which
+  // had never been set up could not be set up through a browser at all: `/` redirected to `/login`
+  // before the setup check ran, and `/login` returned early before it could redirect on to
+  // `/setup`. An operator saw a sign-in form for an account that did not exist, with no way
+  // forward but guessing the URL. It is handled below instead, after the setup state is known.
   if (
-    pathname === "/login" ||
     pathname === "/portal" ||
     isSetupEntry ||
     pathname.startsWith("/api/auth") ||
@@ -27,28 +43,19 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith("/api/agent/") ||
     pathname.startsWith("/api/forward-auth/")
   ) {
-    const publicResponse = NextResponse.next();
-    // Anti-clickjacking for public pages (/login, /portal): the authenticated branch below sets the
-    // full header set, but public responses carried none, leaving those forms framable.
-    publicResponse.headers.set("X-Frame-Options", "DENY");
-    publicResponse.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
-    publicResponse.headers.set("X-Content-Type-Options", "nosniff");
-    return publicResponse;
+    return publicPageResponse();
   }
 
   // Check authentication for protected routes
   const session = await auth(req);
   const isAuthenticated = !!session?.user;
 
-  // Redirect unauthenticated users to login
-  if (!isAuthenticated && !pathname.startsWith("/login")) {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // An unconfigured deployment serves nothing but the setup flow. Checked after authentication so
-  // the stage can tell "has an account but has not signed in" from "signed in, still configuring",
-  // and only for page requests — an API call gets its own answer rather than a redirect to HTML.
+  // An unconfigured deployment serves nothing but the setup flow.
+  //
+  // Before the sign-in redirect, so an unconfigured deployment sends an operator somewhere they
+  // can act rather than to a form nothing can answer. After authentication, so the stage can tell
+  // "has an account but has not signed in" from "signed in, still configuring" — and only for page
+  // requests, since an API call gets its own answer rather than a redirect to HTML.
   if (!pathname.startsWith("/api/")) {
     const { getSetupState, SETUP_PATHS } = await import("@/src/lib/setup");
     const { stage, required } = await getSetupState(isAuthenticated);
@@ -61,6 +68,18 @@ export default async function proxy(req: NextRequest) {
     if (!required && pathname.startsWith("/setup") && pathname !== "/setup/done") {
       return NextResponse.redirect(new URL("/", req.url));
     }
+  }
+
+  // Redirect unauthenticated users to login
+  if (!isAuthenticated && !pathname.startsWith("/login")) {
+    const loginUrl = new URL("/login", req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Reached only once the setup gate above is satisfied, which is what lets an unconfigured
+  // deployment redirect away from here instead of showing a form nothing can answer.
+  if (pathname.startsWith("/login")) {
+    return publicPageResponse();
   }
 
   // Generate per-request nonce for CSP

@@ -128,6 +128,75 @@ services:
       SESSION_SECRET: "test-l4-agent-interpolation-32chars"
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
       POSTGRES_PASSWORD: "e2e-postgres-password"
+  # ── First-run setup, on instances that have never been set up ────────────────
+  # Two more, rather than resetting the main one: setup is single-use by design, so an instance
+  # that has completed it cannot show those screens again. They are deliberately pointed at a dead
+  # Caddy admin address — the setup screens never touch Caddy, and sharing the suite's Caddy would
+  # let an empty database's startup apply wipe the routes the other tests just created.
+  web-setup:
+    container_name: caddy-proxy-manager-web-setup
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    ports:
+      - "3004:3000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "test-setup-session-secret-32chars!xxxYY"
+      # No ADMIN_USERNAME or ADMIN_PASSWORD, and no OAuth: nothing can sign in, which is what puts
+      # this instance in the setup flow rather than past it.
+      BASE_URL: http://localhost:3004
+      NEXTAUTH_URL: http://localhost:3004
+      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_setup
+      CADDY_API_URL: http://127.0.0.1:9
+      OAUTH_ENABLED: "false"
+      AUTH_RATE_LIMIT_ENABLED: "false"
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - web-setup-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - caddy-network
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web-migrate:
+    container_name: caddy-proxy-manager-web-migrate
+    image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    ports:
+      - "3005:3000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "test-migrate-session-secret-32chars!xxYY"
+      BASE_URL: http://localhost:3005
+      NEXTAUTH_URL: http://localhost:3005
+      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_migrate
+      CADDY_API_URL: http://127.0.0.1:9
+      OAUTH_ENABLED: "false"
+      AUTH_RATE_LIMIT_ENABLED: "false"
+      CLICKHOUSE_PASSWORD: ""
+      # The database the migration screens offer. The test writes it into the bind mount below at
+      # run time, so the application discovers it on disk exactly as it would on a real upgrade.
+      LEGACY_SQLITE_PATH: /legacy/caddy-proxy-manager.db
+    volumes:
+      - web-migrate-data:/app/data
+      - ./apps/controller/tests/.legacy:/legacy
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - caddy-network
+    healthcheck:
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
   # Dex OIDC provider for OAuth E2E tests
   dex:
     image: dexidp/dex:v2.41.1
@@ -215,6 +284,10 @@ volumes:
     name: caddy-manager-data-test
   caddy-manager-registration-data:
     name: caddy-manager-registration-data-test
+  web-setup-data:
+    name: web-setup-data-test
+  web-migrate-data:
+    name: web-migrate-data-test
   caddy-data:
     name: caddy-data-test
   caddy-config:

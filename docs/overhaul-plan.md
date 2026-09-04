@@ -342,6 +342,35 @@ the containers are configured.
 took IPv6 addresses and CIDR ranges before this phase. The agent already bound `::`, from the day
 it was written.
 
+### Setup and migration, in a browser
+
+The last open item, and it found a real bug on the first run.
+
+**`/login` was public and returned before the setup check ran.** So a deployment that had never
+been set up could not be set up through a browser: `/` redirected to `/login`, and `/login`
+redirected nowhere. An operator saw a sign-in form for an account that did not exist, with no way
+forward but guessing the URL. The integration tests could not have caught it — they call
+`getSetupState` directly and never go through the proxy. The proxy now resolves the setup state
+before the sign-in redirect, and `/login` is handled after it rather than as a public path.
+
+**Two more web instances**, `web-setup` and `web-migrate`, each with an empty database and no
+`ADMIN_USERNAME`. Setup is single-use by design, so an instance that has completed it cannot show
+those screens again — resetting the main one was not an option. Both point at a dead Caddy admin
+address: the setup screens never touch Caddy, and sharing the suite's would let an empty database's
+startup apply wipe the routes the other tests had just created.
+
+**The legacy database is real**, built from `drizzle/legacy-sqlite` and bind-mounted where the
+application scans. Building it needs Bun, and Playwright runs specs under Node — which cannot load
+`bun:sqlite` at all — so that half is a script the spec spawns rather than a function it imports.
+That was the first thing the local run caught.
+
+**One page per block, not one per test.** Playwright's default fresh context signed the operator
+out between every step of a flow that is walked through in one session. Three of the four failures
+in the local runs were that, or expectations about the flow that turned out to be wrong: creating
+the first administrator sends you to `/login` on purpose (proving the password works before more
+configuration is entered), and a migrated deployment finishes on `/setup/done` rather than the
+dashboard, because it is owed its old database and a trimmed `.env` first.
+
 ### Consumers still reading the environment directly
 
 Phase 2 built the service and moved the Caddy admin URL and the login throttle onto it. The rest

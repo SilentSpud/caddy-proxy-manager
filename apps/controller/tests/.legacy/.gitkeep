@@ -1,0 +1,3 @@
+# Bind-mounted into the web-migrate container as /legacy. The migration e2e spec writes a 3.0
+# SQLite database here at run time; the directory itself has to exist before compose starts, or
+# Docker creates it as root-owned and the test cannot write into it.
