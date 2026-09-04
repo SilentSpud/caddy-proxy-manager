@@ -13,6 +13,7 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Center } from "@astryxdesign/core/Center";
 import { Heading } from "@astryxdesign/core/Heading";
+import { SelectableCard } from "@astryxdesign/core/SelectableCard";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
@@ -63,12 +64,14 @@ export default function SetupMigrateClient({
                 {candidates.map((candidate) => {
                   const isSelected = selected === candidate.path;
                   return (
-                    <Button
+                    <SelectableCard
                       key={candidate.path}
-                      variant={isSelected ? "primary" : "secondary"}
+                      variant="muted"
+                      padding={3}
                       width="100%"
                       label={candidate.path}
-                      onClick={() => setSelected(candidate.path)}
+                      isSelected={isSelected}
+                      onChange={() => setSelected(candidate.path)}
                     >
                       <VStack gap={1} align="start">
                         <Text size="sm" weight="medium">
@@ -94,7 +97,7 @@ export default function SetupMigrateClient({
                           </Text>
                         )}
                       </VStack>
-                    </Button>
+                    </SelectableCard>
                   );
                 })}
                 <input type="hidden" name="path" value={selected} />
