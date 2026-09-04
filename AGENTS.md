@@ -20,10 +20,13 @@ reading a path off `process.cwd()` inside the controller now resolves against `a
 the e2e suite is the exception and pins `COMPOSE_CWD` to the repo root, because Compose anchors
 every relative path in every `-f` file to the first one's directory.
 
-`bunfig.toml` pins the **hoisted** installer. Bun 1.4 defaults workspaces to the isolated linker,
-under which four direct imports (`jose`, `@better-auth/core/db`, `topojson-specification`,
-`@maplibre/maplibre-gl-style-spec`) stop resolving because they arrive transitively. Declare those
-before changing it.
+`bunfig.toml` pins the **isolated** installer, Bun 1.4's workspace default: a package sees only what
+its own `package.json` declares. Import something a package depends on transitively and it fails at
+typecheck rather than at runtime on a machine that hoisted differently — so an import that stops
+resolving means adding the dependency, never loosening the linker. Note the layout this produces:
+the root `node_modules` holds the store (`.bun/`) plus the root's own devDependencies, and each
+workspace member gets a `node_modules` of relative symlinks into it. `docker/web/Dockerfile` copies
+both trees for that reason.
 
 ## Comments
 
@@ -41,8 +44,8 @@ read that list rather than repeating it. **A new user-facing setting is a regist
 environment variable.** Resolution is stored value → environment → default (`resolve.ts`).
 
 An environment variable is the right answer only for what has to be read before the database can
-be: bootstrap paths, the connection string, the key that encrypts the database's own secrets. The
-"Stays in `.env`" table in `docs/overhaul-plan.md` records which those are and why.
+be: bootstrap paths, the connection string, the key that encrypts the database's own secrets, and
+whatever Compose reads on the host. The header comment on `registry.ts` lists what stays out and why.
 
 ### When you do add, remove or rename one
 

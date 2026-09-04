@@ -1,9 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# dependencies. Unanchored: the isolated linker gives every workspace package its
+# own node_modules of symlinks, not just the repo root.
+node_modules/
 
 # testing. Unanchored: build and report output now lands inside each workspace
 # package, not only at the repo root.

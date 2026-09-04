@@ -14,7 +14,10 @@
  * - `CERTS_DIRECTORY`, `ACME_CA_ROOT_DIR`, `L4_PORTS_DIR`. Container paths describing where Caddy's
  *   files live on a particular host. They belong to the agent, and phase 5 moves them there.
  * - `INSTANCE_*`. The sync feature they configure is removed in phase 5.
- * - Anything in the "Stays in .env" table in docs/overhaul-plan.md.
+ * - Anything that has to be read before the database can be: the connection string and pool size,
+ *   `SESSION_SECRET` (it encrypts the database's own secrets), `NODE_ENV`, `PORT`/`HOST`, the
+ *   standalone-binary bootstrap paths, whatever Compose reads on the host, and the agent's own
+ *   pre-database configuration.
  */
 
 import { hasForbiddenControlCharacter } from "../settings-validation";

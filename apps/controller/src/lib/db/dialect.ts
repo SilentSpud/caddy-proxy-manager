@@ -41,7 +41,7 @@ function schemeOf(rawUrl: string): string | null {
 const SQLITE_MESSAGE =
   "DATABASE_URL points at a SQLite file, which is no longer supported as the application " +
   "database. Point it at PostgreSQL (postgres://user:pass@host:5432/db) and start the app: it " +
-  "detects the old file and offers to migrate it. See docs/overhaul-plan.md.";
+  "detects the old file and offers to migrate it.";
 
 export function resolveDatabaseTarget(rawUrl: string | undefined): DatabaseTarget {
   const url = rawUrl?.trim();

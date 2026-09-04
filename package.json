@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
+    "@socketsecurity/bun-security-scanner": "^1.1.2",
     "@types/bun": "^1.4.0",
     "typescript": "^7.0.2"
   },

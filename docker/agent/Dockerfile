@@ -7,7 +7,7 @@ FROM --platform=$BUILDPLATFORM oven/bun:1-slim AS builder
 WORKDIR /app
 
 # Every workspace manifest, not just the agent's: `bun install` resolves the whole workspace graph
-# up front and fails on a member it cannot read. bunfig.toml pins the hoisted linker.
+# up front and fails on a member it cannot read. bunfig.toml pins the isolated linker.
 COPY package.json bun.lock bunfig.toml ./
 COPY apps/controller/package.json ./apps/controller/
 COPY apps/agent/package.json ./apps/agent/

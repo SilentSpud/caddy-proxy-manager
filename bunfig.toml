@@ -3,11 +3,11 @@
 bun = true
 
 [install]
-# Bun 1.4 defaults workspaces to the isolated linker, which hides transitive
-# dependencies a package does not declare. Several direct imports here resolve
-# that way today — `jose` and `@better-auth/core/db` through better-auth,
-# `topojson-specification` through @types/topojson-client — and under isolation
-# they stop type-checking. Hoisted keeps the flat pre-monorepo layout, so the
-# workspace split changes no module resolution. Tightening this means declaring
-# those four as direct dependencies first.
-linker = "hoisted"
+# Isolated (Bun 1.4's workspace default) gives each package only what it
+# declares, so a phantom dependency fails at install/typecheck time here rather
+# than at runtime on a machine that hoisted differently. Stated explicitly
+# because the cost of drifting back to hoisted is silent.
+linker = "isolated"
+
+[install.security]
+scanner = "@socketsecurity/bun-security-scanner"

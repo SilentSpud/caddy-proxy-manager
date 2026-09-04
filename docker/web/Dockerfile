@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 # Every workspace manifest, not just the root one: `bun install` resolves the whole workspace graph
 # up front and fails on a member it cannot read. bunfig.toml comes along because it pins the
-# hoisted linker, without which transitive types stop resolving.
+# isolated linker, which decides the node_modules layout the builder stage copies below.
 COPY package.json bun.lock bunfig.toml ./
 COPY apps/controller/package.json ./apps/controller/
 COPY apps/agent/package.json ./apps/agent/
@@ -36,7 +36,13 @@ ENV DATABASE_URL=postgres://build:build@127.0.0.1:5/unused
 # Set by CI to the git tag (without the leading v) for release builds; when
 # unset, vite.config.ts falls back to the package.json version.
 ARG APP_VERSION
+# Both trees, because the isolated linker splits them: root node_modules holds the package store
+# (.bun/) plus the root's own devDependencies, and each workspace member gets a node_modules of
+# relative symlinks into that store. Copying only the root leaves the controller with nothing.
+# packages/shared has no node_modules of its own (it declares no dependencies), and the
+# @cpm/shared symlink resolves into the source tree that `COPY . .` lands on the next line.
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/controller/node_modules ./apps/controller/node_modules
 COPY . .
 # `build` emits dist/standalone; `build:binary` compiles scripts/standalone-entry.ts and the vinext
 # production server into dist/standalone/cpm-server. This stage runs on the host arch, so the binary
