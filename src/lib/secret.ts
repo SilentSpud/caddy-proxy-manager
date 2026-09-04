@@ -41,9 +41,21 @@ const LEGACY_KEY_CUTOFF = LEGACY_KEY_CUTOFF_ENV === "never"
   ? null
   : new Date(LEGACY_KEY_CUTOFF_ENV || "2026-06-01T00:00:00Z");
 
-export function decryptSecret(value: string): string {
+/**
+ * Decrypt a value that was encrypted with encryptSecret.
+ *
+ * @param context Optional human-readable label describing what is being
+ * decrypted (e.g. `DNS provider "cloudflare" credential "api_token"`).
+ * Included in error messages so users can tell which stored value failed.
+ */
+export function decryptSecret(value: string, context?: string): string {
   if (!value) return "";
   if (!isEncryptedSecret(value)) return value;
+
+  const label = context ? ` for ${context}` : "";
+  const recoveryHint =
+    "This usually happens when SESSION_SECRET changed after the value was stored. " +
+    "Fix: re-enter the affected token/secret in the UI to re-encrypt it with the current key, or restore the previous SESSION_SECRET.";
 
   // Try new HKDF key first
   try {
@@ -52,14 +64,22 @@ export function decryptSecret(value: string): string {
     // Only fall back to legacy key within the grace period
     if (LEGACY_KEY_CUTOFF && new Date() > LEGACY_KEY_CUTOFF) {
       throw new Error(
-        "[secret] HKDF decryption failed and legacy key grace period has expired. " +
-        "Re-encrypt this secret with the current key. " +
+        `[secret] Failed to decrypt stored secret${label}: HKDF decryption failed and the legacy key grace period has expired. ` +
+        recoveryHint + " " +
         "Set LEGACY_KEY_CUTOFF_DATE=never to temporarily restore legacy key support.",
         { cause: hkdfError }
       );
     }
     console.warn("[secret] HKDF decryption failed; retrying with legacy SHA-256 key. Re-encrypt this secret to remove the legacy key dependency.");
-    return _decryptWithKey(value, deriveKeyLegacy());
+    try {
+      return _decryptWithKey(value, deriveKeyLegacy());
+    } catch (legacyError: unknown) {
+      throw new Error(
+        `[secret] Failed to decrypt stored secret${label}: decryption failed with both the current (HKDF) and legacy keys. ` +
+        recoveryHint,
+        { cause: legacyError }
+      );
+    }
   }
 }
 

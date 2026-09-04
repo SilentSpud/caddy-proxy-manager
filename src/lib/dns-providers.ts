@@ -399,7 +399,7 @@ export function decryptProviderCredentials(
   const result = { ...credentials };
   for (const field of def.fields) {
     if (field.type === "password" && result[field.key] && isEncryptedSecret(result[field.key])) {
-      result[field.key] = decryptSecret(result[field.key]);
+      result[field.key] = decryptSecret(result[field.key], `DNS provider "${providerName}" credential "${field.key}"`);
     }
   }
   return result;

@@ -205,7 +205,7 @@ export async function getSlaveMasterToken(): Promise<string | null> {
     return stored;
   }
   try {
-    const token = decryptSecret(stored);
+    const token = decryptSecret(stored, "instance sync master token");
     assertValidInstanceSyncToken(token, "Stored instance sync token");
     return token;
   } catch (error) {
@@ -299,7 +299,7 @@ export async function buildSyncPayload(): Promise<SyncPayload> {
     providerOptions: sanitizeStoredCertificateProviderOptions(row.providerOptions),
     // Transport the operational value over the authenticated sync channel;
     // the slave re-encrypts it with its own SESSION_SECRET before storage.
-    privateKeyPem: row.privateKeyPem ? decryptSecret(row.privateKeyPem) : null,
+    privateKeyPem: row.privateKeyPem ? decryptSecret(row.privateKeyPem, "instance sync certificate private key") : null,
     createdBy: null
   }));
 
@@ -372,7 +372,7 @@ export async function syncInstances(): Promise<{ total: number; success: number;
 
       let token: string;
       try {
-        token = decryptSecret(instance.apiToken);
+        token = decryptSecret(instance.apiToken, `instance "${instance.name}" API token`);
       } catch {
         await recordInstanceSyncResult(instance.id, { ok: false, error: "Stored token could not be decrypted" });
         return { ok: false, skippedHttp: false };
