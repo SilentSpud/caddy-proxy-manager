@@ -37,10 +37,9 @@ test.describe('Settings — page load & layout', () => {
     await expect(page.locator('body')).toBeVisible();
   });
 
-  test('settings page defaults to Instance Sync section', async ({ page }) => {
+  test('settings page defaults to the General section', async ({ page }) => {
     await page.goto('/settings');
-    // The detail header should show Instance Sync
-    await expect(page.getByRole('heading', { name: 'Instance Sync' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
   });
 
   test('sidebar is visible and shows all group headers', async ({ page }) => {
@@ -57,7 +56,6 @@ test.describe('Settings — page load & layout', () => {
     await page.goto('/settings');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     const expectedItems = [
-      'Instance Sync',
       'General',
       'ACME Server',
       'Default Response',
@@ -88,24 +86,23 @@ test.describe('Settings — page load & layout', () => {
 test.describe('Settings — sidebar navigation', () => {
   test('clicking a nav item switches the detail pane', async ({ page }) => {
     await page.goto('/settings');
-    // Default: Instance Sync
-    await expect(page.getByRole('heading', { name: 'Instance Sync' })).toBeVisible();
+    // Default: General
+    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
 
-    // Navigate to General
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('button', { name: 'General', exact: true })
+      .getByRole('button', { name: 'ACME Server', exact: true })
       .click();
-    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
-    // Instance Sync heading should no longer be visible
-    await expect(page.getByRole('heading', { name: 'Instance Sync' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'ACME Server' })).toBeVisible();
+    // The section it came from is gone, not merely scrolled off.
+    await expect(page.getByRole('heading', { name: 'General' })).not.toBeVisible();
   });
 
   test('breadcrumb shows correct group for each section', async ({ page }) => {
     await page.goto('/settings');
     const breadcrumb = page.getByTestId('settings-breadcrumb');
 
-    // Instance Sync is under System
+    // General is under System
     await expect(breadcrumb.getByText('System')).toBeVisible();
 
     // Navigate to DNS Providers under Networking
@@ -122,7 +119,6 @@ test.describe('Settings — sidebar navigation', () => {
     const sidebar = page.locator(SETTINGS_SIDEBAR);
 
     const sections = [
-      'Instance Sync',
       'General',
       'Default Response',
       'DNS Providers',
@@ -144,17 +140,16 @@ test.describe('Settings — sidebar navigation', () => {
   test('only one section is visible at a time', async ({ page }) => {
     await page.goto('/settings');
 
-    // On the Instance Sync section, General's save button should not be present
-    await expect(page.getByRole('button', { name: /save general settings/i })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: /save instance mode/i })).toBeVisible();
+    // On General, the ACME section's save button must not be in the document at all.
+    await expect(page.getByRole('button', { name: /save general settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /save acme settings/i })).not.toBeVisible();
 
-    // Switch to General
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('button', { name: 'General', exact: true })
+      .getByRole('button', { name: 'ACME Server', exact: true })
       .click();
-    await expect(page.getByRole('button', { name: /save general settings/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /save instance mode/i })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: /save acme settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /save general settings/i })).not.toBeVisible();
   });
 });
 
@@ -179,7 +174,6 @@ test.describe('Settings — Cmd-K palette', () => {
     await page.goto('/settings');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Instance Sync')).toBeVisible();
     await expect(dialog.getByText('General')).toBeVisible();
     await expect(dialog.getByText('Default Response')).toBeVisible();
     await expect(dialog.getByText('DNS Providers')).toBeVisible();
@@ -191,12 +185,11 @@ test.describe('Settings — Cmd-K palette', () => {
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
-    // Use "geob" — specific enough that cmdk fuzzy matching won't hit unrelated items
-    // ("dns" fuzzy-matches "Instance Sync" via d-n-s in "Standalone, coordination, System")
+    // "geob" is specific enough that cmdk's fuzzy matching cannot reach an unrelated item.
     await input.fill('geob');
     await expect(dialog.getByText('Global Geoblocking')).toBeVisible();
     // Non-matching items should be hidden
-    await expect(dialog.getByText('Instance Sync')).not.toBeVisible();
+    await expect(dialog.getByText('Access Logging')).not.toBeVisible();
   });
 
   test('selecting a palette result navigates to that section', async ({ page }) => {
@@ -226,26 +219,6 @@ test.describe('Settings — Cmd-K palette', () => {
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('zzzzxyzzy');
     await expect(dialog.getByText(/no settings match/i)).toBeVisible();
-  });
-});
-
-// ─── Instance Sync section ───────────────────────────────────────────────────
-
-test.describe('Settings — Instance Sync', () => {
-  test('shows mode selector with Standalone/Controller/Agent options', async ({ page }) => {
-    await page.goto('/settings');
-    await expect(page.getByRole('heading', { name: 'Instance Sync' })).toBeVisible();
-    // The mode select trigger should be present
-    await expect(page.getByRole('combobox', { name: 'Instance mode' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /save instance mode/i })).toBeVisible();
-  });
-
-  test('mode selector displays the three options', async ({ page }) => {
-    await page.goto('/settings');
-    await page.getByRole('combobox', { name: 'Instance mode' }).click();
-    await expect(page.getByRole('option', { name: 'Standalone' })).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Controller' })).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Agent' })).toBeVisible();
   });
 });
 
@@ -689,8 +662,8 @@ test.describe('Settings — cross-section navigation', () => {
     await sidebar.getByRole('button', { name: 'OAuth Providers', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'OAuth Providers' })).toBeVisible();
 
-    await sidebar.getByRole('button', { name: 'Instance Sync', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Instance Sync' })).toBeVisible();
+    await sidebar.getByRole('button', { name: 'General', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
   });
 
   test('Cmd-K to navigate, then sidebar to navigate back', async ({ page }) => {
@@ -730,7 +703,7 @@ test.describe('Settings — mobile layout', () => {
     const mobileNav = page.getByTestId('mobile-settings-nav');
     const sectionSelect = mobileNav.getByRole('combobox', { name: 'Settings section' });
     await expect(sectionSelect).toBeVisible();
-    await expect(sectionSelect).toContainText('Instance Sync');
+    await expect(sectionSelect).toContainText('General');
   });
 
   test('mobile search button is visible', async ({ page }) => {

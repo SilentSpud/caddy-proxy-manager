@@ -282,13 +282,41 @@ describe("operations", () => {
     expect(store.caddyBuildStatus().state).toBe("applied");
   });
 
-  it("takes Docker's word for the published ports at startup", async () => {
-    // The record and reality drift without the agent: an operator editing compose by hand, or a
-    // stack brought up before this agent's first run. Docker is the authority.
-    store.setAppliedL4Ports(["1:1"]);
+  it("republishes at startup when Caddy came up without the port override", async () => {
+    // The operator's `docker compose up` starts Caddy from the base files, which carry no
+    // generated override, so a rebooted host comes up with every L4 port unpublished. This is the
+    // only thing that notices.
+    store.setAppliedL4Ports(["15432:15432"]);
     results.push({ exitCode: 0, stdout: JSON.stringify({ "80/tcp": [{ HostPort: "80" }] }) });
 
-    await operations.reconcileAppliedPorts();
-    expect(store.appliedL4Ports()).toEqual(["80:80"]);
+    await operations.restorePublishedPorts();
+    await Bun.sleep(100);
+
+    expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(true);
+    expect(readFileSync(join(dir, "docker-compose.l4-ports.yml"), "utf-8")).toContain(
+      '"15432:15432"',
+    );
+  });
+
+  it("does nothing at startup when the published ports already match", async () => {
+    store.setAppliedL4Ports(["80:80"]);
+    results.push({ exitCode: 0, stdout: JSON.stringify({ "80/tcp": [{ HostPort: "80" }] }) });
+
+    await operations.restorePublishedPorts();
+    await Bun.sleep(50);
+    // A recreate on every agent restart would drop every live connection for nothing.
+    expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
+  });
+
+  it("adopts what Docker publishes when it has never applied anything", async () => {
+    // First run, or a stack whose ports an operator manages by hand. Re-applying an empty list
+    // over either would unpublish ports this agent never published.
+    results.push({ exitCode: 0, stdout: JSON.stringify({ "443/tcp": [{ HostPort: "443" }] }) });
+
+    await operations.restorePublishedPorts();
+    await Bun.sleep(50);
+
+    expect(store.appliedL4Ports()).toEqual(["443:443"]);
+    expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
   });
 });

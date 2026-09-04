@@ -120,10 +120,11 @@ if (config.mode === "standalone") {
   console.log(`[agent] ${AGENT_VERSION} listening on ${config.host}:${config.port} (managed)`);
 }
 
-// Docker is the authority on what is published; the recorded list only describes it. Reconciling
-// after the listener is up means a slow `docker inspect` cannot delay readiness.
-void operations.reconcileAppliedPorts().catch((error: unknown) => {
-  console.warn("[agent] could not read the Caddy container's published ports:", error);
+// A restarted stack comes up from the base compose files, which carry no L4 port override, so this
+// is what keeps layer-4 routing alive across a host reboot. After the listener is up, so a slow
+// `docker inspect` cannot delay readiness.
+void operations.restorePublishedPorts().catch((error: unknown) => {
+  console.warn("[agent] could not restore the Caddy container's published ports:", error);
 });
 
 function shutdown(signal: string): void {

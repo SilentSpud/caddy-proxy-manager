@@ -1,7 +1,7 @@
 /**
- * Functional: Caddy rebuilder agent (#117). "Apply Ports" reaches "applied", and the agent
- * re-applies the override on startup after a restart. The bug: NETWORKS: 0 in the socket proxy
- * blocked the GET /networks/{id} compose makes.
+ * Functional: the agent (#117). "Apply Ports" reaches "applied", and the agent republishes on
+ * startup after a restart. The bug: NETWORKS: 0 in the socket proxy blocked the GET /networks/{id}
+ * compose makes.
  *
  * This used to say "must run after l4-proxy-routing.spec.ts", which was true and enforced by
  * nothing but the alphabet — the file was called sidecar.spec.ts and sorted after it. Renaming it
@@ -85,8 +85,8 @@ test.describe
       // fire first without this override.
       test.setTimeout(180_000);
 
-      // Trigger a fresh apply via the API (writes a new trigger file with a new
-      // timestamp, so the agent will process it even if ports haven't changed).
+      // Trigger a fresh apply through the API. The agent republishes unconditionally, so this
+      // completes even when the port set has not changed.
       const res = await page.request.post('/api/l4-ports', { headers: SESSION_HEADERS });
       expect(res.ok(), `POST /api/l4-ports failed: ${await res.text()}`).toBe(true);
 
@@ -105,28 +105,28 @@ test.describe
     });
 
     test('auto-applies on agent container restart — regression #117', async ({ page }) => {
-      // Container restart + do_apply + caddy health-check can take ~60 s total;
-      // waitForL4Terminal polls for up to 90 s.  Override to avoid the 60 s global cap.
+      // Container restart + republish + Caddy's health check can take ~60 s total;
+      // waitForL4Terminal polls for up to 90 s. Override to avoid the 60 s global cap.
       test.setTimeout(180_000);
 
-      // Record the current appliedAt so we can detect when a *new* apply finishes.
-      // The agent uses second-level timestamp precision, so sleep 1.5 s first to
-      // guarantee the new timestamp will be strictly greater.
+      // Record the current appliedAt so we can detect when a *new* apply finishes. Sleep first so
+      // the new timestamp is strictly greater whatever precision the clock has.
       const { status: before } = await fetchL4Status(page);
       const prevAppliedAt = before?.appliedAt ?? '';
       await page.waitForTimeout(1_500);
 
-      // Restarting the agent makes it find the override file and run `docker compose up
-      // --force-recreate caddy`. With NETWORKS: 0 that always failed, since compose needs
-      // GET /networks/{id} to inspect caddy-network before reconnecting.
+      // On startup the agent compares what Caddy publishes against what it last applied and
+      // republishes on a mismatch — which is what keeps L4 routing alive across a host reboot,
+      // since the base compose files carry no port override. With NETWORKS: 0 that always failed,
+      // since compose needs GET /networks/{id} to inspect caddy-network before reconnecting.
       execFileSync('docker', ['restart', AGENT_CONTAINER], {
         stdio: 'inherit',
         cwd: COMPOSE_CWD,
         env: ENV,
       });
 
-      // Wait for the agent to restart, run do_apply, and write a fresh status.
-      // Caddy health-check has a 10 s start_period so allow up to 90 s total.
+      // Wait for the agent to restart, republish, and record a fresh status. Caddy's health check
+      // has a 10 s start_period, so allow up to 90 s total.
       const state = await waitForL4Terminal(page, 90_000, prevAppliedAt);
       expect(
         state,

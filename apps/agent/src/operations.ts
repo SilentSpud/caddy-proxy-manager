@@ -62,16 +62,35 @@ export class Operations {
   }
 
   /**
-   * Reconcile the recorded port list with what Docker actually publishes.
+   * Reconcile the published ports with the ones this agent last applied.
    *
-   * Runs at startup because the two can drift without the agent: an operator who edits the compose
-   * file by hand, or a stack brought up before this agent's first run, leaves a container whose
-   * ports no one recorded. Docker is the authority — the record exists to describe it, not the
-   * other way round.
+   * This runs at startup and is not bookkeeping — it is the only thing that keeps layer-4 routing
+   * alive across a host reboot. The operator's `docker compose up` starts Caddy from the base
+   * files, which do not include the generated port override, so a restarted stack comes up with
+   * every L4 port unpublished. Nothing else would notice until someone opened the UI.
+   *
+   * With nothing recorded, Docker is adopted as the baseline instead: that is either this agent's
+   * first run or a stack whose ports an operator manages by hand, and re-applying an empty list
+   * over either would unpublish ports the agent never published.
    */
-  async reconcileAppliedPorts(): Promise<void> {
+  async restorePublishedPorts(): Promise<void> {
+    const recorded = this.store.appliedL4Ports();
     const published = await this.docker.publishedCaddyPorts();
-    if (published.length > 0) this.store.setAppliedL4Ports(published);
+
+    if (recorded.length === 0) {
+      if (published.length > 0) this.store.setAppliedL4Ports(published);
+      return;
+    }
+
+    // Compose's own spelling on both sides, both sorted, so this compares sets rather than text.
+    const same =
+      recorded.length === published.length && recorded.every((port, i) => port === published[i]);
+    if (same) return;
+
+    console.log(
+      `[agent] Caddy is publishing ${published.length} port(s) but ${recorded.length} were applied; republishing`,
+    );
+    this.applyL4Ports(recorded);
   }
 
   private begin(kind: "l4-ports" | "caddy-build"): void {

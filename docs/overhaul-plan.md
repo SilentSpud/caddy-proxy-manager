@@ -178,6 +178,13 @@ record written only when healthy, a stale status cleared on restart — is pinne
 against the argv the agent actually builds. The controller's side is tested against a real HTTP
 server that verifies the real signature, so nothing about this seam is covered only by a mock.
 
+**One behaviour that had to be carried across deliberately.** The old script re-applied the port
+override on every startup, because the operator's `docker compose up` starts Caddy from the base
+files, which carry no generated override — so a rebooted host comes up with every L4 port
+unpublished. The first version of the service reconciled the *record* to Docker instead, which is
+the opposite and would have silently broken layer-4 routing across a reboot. It now compares the
+two and republishes on a mismatch, adopting Docker's list only when it has never applied anything.
+
 **Not yet done, and owed to the next step:** the `agents` table and the pairing UI. `managed` mode
 works, but a remote agent is configured with `AGENT_URL` and `AGENT_SECRET` rather than by typing
 a code into Settings, and the controller can address one agent at a time. The ClickHouse credential

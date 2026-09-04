@@ -144,17 +144,6 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'GET', path: '/settings/general', auth: 'admin' },
   { method: 'PUT', path: '/settings/general', auth: 'admin', body: {} },
 
-  // instances
-  { method: 'GET', path: '/instances', auth: 'admin' },
-  {
-    method: 'POST',
-    path: '/instances',
-    auth: 'admin',
-    body: { name: 'x', baseUrl: 'http://x.test', apiToken: 'x' },
-  },
-  { method: 'DELETE', path: '/instances/999', auth: 'admin' },
-  { method: 'POST', path: '/instances/sync', auth: 'admin' },
-
   // forward-auth-sessions
   { method: 'GET', path: '/forward-auth-sessions', auth: 'admin' },
   { method: 'DELETE', path: '/forward-auth-sessions', auth: 'admin' },
