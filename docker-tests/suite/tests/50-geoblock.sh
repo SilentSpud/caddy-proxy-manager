@@ -12,11 +12,25 @@ if [ "${TEST_GEOBLOCK:-1}" != "1" ]; then
   finish
 fi
 
-empty_geoblock='{
+# The group's PUT rejects a missing key as hard as an unknown one, so every field goes in every
+# time. This is the whole document at its defaults; each assertion starts from it and overrides
+# only what it is about. A field added to the group fails here first, which is the intent — a
+# partial payload would otherwise be rejected wherever it happened to be sent.
+geoblock_defaults='{
   "enabled": false,
   "block_countries": [], "block_continents": [], "block_asns": [], "block_cidrs": [], "block_ips": [],
-  "allow_countries": [], "allow_continents": [], "allow_asns": [], "allow_cidrs": [], "allow_ips": []
+  "allow_countries": [], "allow_continents": [], "allow_asns": [], "allow_cidrs": [], "allow_ips": [],
+  "trusted_proxies": [], "fail_closed": false,
+  "response_status": 403, "response_body": "Forbidden", "response_headers": {}, "redirect_url": ""
 }'
+
+# geoblock_with FILTER [jq args...] — the default document with FILTER applied.
+geoblock_with() {
+  local filter="$1"; shift
+  printf '%s' "$geoblock_defaults" | jq -c "$@" "$filter"
+}
+
+empty_geoblock=$(geoblock_with '.')
 
 restore_global() { api PUT /api/v1/settings/geoblock "$empty_geoblock" >/dev/null 2>&1; }
 trap 'restore_global; cleanup_tracked' EXIT
@@ -92,13 +106,8 @@ t_eq "hosts without a rule are not blocked" "200" "$(http_code "https://$neutral
 # Applies to every host that has not overridden it, which is the interesting
 # part: the neutral host above must start returning a rejection.
 
-api PUT /api/v1/settings/geoblock "$(jq -nc --arg ip "$CLIENT_IP" '{
-  enabled: true,
-  block_countries: [], block_continents: [], block_asns: [],
-  block_cidrs: [], block_ips: [$ip],
-  allow_countries: [], allow_continents: [], allow_asns: [],
-  allow_cidrs: [], allow_ips: []
-}')"
+api PUT /api/v1/settings/geoblock "$(geoblock_with \
+  '.enabled = true | .block_ips = [$ip]' --arg ip "$CLIENT_IP")"
 
 if [ "$API_STATUS" != "200" ]; then
   skip "global IP blocking" "settings rejected (HTTP $API_STATUS): $(printf '%.200s' "$API_BODY")"

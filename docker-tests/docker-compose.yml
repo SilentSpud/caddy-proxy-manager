@@ -19,7 +19,9 @@ volumes:
   cpm-data:      # web: certificates and shared state
   caddy-data:    # caddy: certificate storage
   caddy-config:  # caddy: autosave.json
-  caddy-logs:    # shared: access log + coraza audit log (web parses these)
+  caddy-logs:    # shared: access log + coraza audit log. Nothing here reads them — that moved to
+                 # the agent, which this rig does not run. Mounted so the paths the controller
+                 # writes into Caddy's config exist.
   acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
   test-certs:    # certgen output: pebble server cert, https-origin cert
 
@@ -168,11 +170,9 @@ services:
       cpm-test:
         ipv4_address: 172.28.0.11
     healthcheck:
-      test:
-        - CMD
-        - bun
-        - -e
-        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      # The image's own probe. It cannot be a shell one-liner: the runtime stage is Debian with the
+      # compiled binary and nothing else — no Bun CLI, no curl, no wget.
+      test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 30

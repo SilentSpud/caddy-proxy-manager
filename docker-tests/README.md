@@ -143,6 +143,16 @@ Fixed in `apps/controller/src/lib/caddy.ts` by canonicalising the placeholder fo
 both the CPM and Authentik copy lists, and pinned at the unit level in
 `apps/controller/tests/unit/caddy-forward-auth-copy-headers.test.ts`.
 
+**A rig that cannot start catches nothing.** Between the compiled-binary change
+and 2026-09-04 this one could not come up at all: `web`'s healthcheck ran `bun`,
+which the runtime image stopped containing when its final stage became Debian
+with `cpm-server` and nothing else. `runner` waits on that healthcheck, so the
+whole run hung. Two suite files had drifted from the API in the meantime —
+tokens became session-only to mint, and the geoblock settings group gained
+required fields — and neither was noticed, because nothing was running. The
+healthcheck is now the image's own probe, the same one `docker-compose.yml`
+uses. Run it after anything that changes the images.
+
 Two lesser things the rig documents rather than treats as bugs, both pinned so
 a change to either is deliberate:
 
@@ -228,7 +238,7 @@ A full run ends with an API surface coverage report:
 
 ```
 API surface coverage (documented operations driven over the wire)
-  45/67 operations — 67%
+  42/70 operations — 60%
 
   not exercised:
     GET    /api/v1/certificates
@@ -266,8 +276,9 @@ showed that `POST /api/v1/users`, `DELETE /api/v1/users/{id}`, the whole
 `/api/v1/proxy-hosts/{id}/mtls-access-rules` path, `/api/v1/dns-providers` and
 `/api/v1/oauth-providers` are all implemented and exercised but absent from the
 OpenAPI document — i.e. the published API contract understates what the API
-does. (`/api/geoip-status`, `/api/l4-ports` and `/api/waf-events` also appear
-there, but those are UI-support endpoints and are meant to be undocumented.)
+does. `/api/v1/oauth-providers` has since been documented; the rest are still
+there. (`/api/geoip-status`, `/api/l4-ports` and `/api/waf-events` also appear,
+but those are UI-support endpoints and are meant to be undocumented.)
 
 For line coverage of the server-side library and API handlers, run the unit and
 integration suites instead, from the repository root:

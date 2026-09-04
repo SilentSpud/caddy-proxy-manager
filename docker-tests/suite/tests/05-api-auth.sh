@@ -15,21 +15,33 @@ api GET /api/v1/proxy-hosts
 t_eq "the proxy host listing is a JSON array" "array" "$(jqr 'type')"
 
 # ── Token validation ────────────────────────────────────────────────────────
+#
+# Minting a token needs an interactive session, so these go through the admin's
+# cookie jar rather than the suite's bearer token. That restriction is the point
+# of the first assertion: a stolen bearer token must not be able to mint a
+# replacement that survives the revocation of the one it came from.
 
-api_expect "a token with no name is rejected" 400 POST /api/v1/tokens '{}'
-api_expect "an expiry in the past is rejected" 400 POST /api/v1/tokens \
-  '{"name":"expired","expires_at":"2000-01-01T00:00:00.000Z"}'
-api_expect "a non-string expiry is rejected" 400 POST /api/v1/tokens \
-  '{"name":"bad-expiry","expires_at":12345}'
+api_expect "a bearer token cannot mint another token" 403 POST /api/v1/tokens \
+  '{"name":"docker-test-escalation"}'
 
-api POST /api/v1/tokens '{"name":"docker-test-throwaway"}'
-t_eq "a token can be minted over the API" "201" "$API_STATUS"
+api_session POST /api/v1/tokens '{}'
+t_eq "a token with no name is rejected" "400" "$API_STATUS"
+
+api_session POST /api/v1/tokens '{"name":"expired","expires_at":"2000-01-01T00:00:00.000Z"}'
+t_eq "an expiry in the past is rejected" "400" "$API_STATUS"
+
+api_session POST /api/v1/tokens '{"name":"bad-expiry","expires_at":12345}'
+t_eq "a non-string expiry is rejected" "400" "$API_STATUS"
+
+api_session POST /api/v1/tokens '{"name":"docker-test-throwaway"}'
+t_eq "a token can be minted from a session" "201" "$API_STATUS"
 throwaway_id=$(jqr '.token.id')
 throwaway_raw=$(jqr '.raw_token')
 t_matches "the raw token is 32 bytes of hex" '^[0-9a-f]{64}$' "$throwaway_raw"
 
 with_token "$throwaway_raw" api_expect "the new token authenticates" 200 GET /api/v1/proxy-hosts
 
+# Revocation is not session-only — only creation is.
 api DELETE "/api/v1/tokens/$throwaway_id"
 t_eq "the token can be revoked" "200" "$API_STATUS"
 with_token "$throwaway_raw" api_expect "a revoked token no longer authenticates" 401 GET /api/v1/proxy-hosts
@@ -95,16 +107,19 @@ cross_origin=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
   --data-binary '{"name":"csrf-probe"}' "$CPM_API/api/v1/tokens")
 t_eq "a session write from a foreign Origin is refused" "403" "$cross_origin"
 
-bearer_no_origin=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
+# A real write, not a token mint: creating a token is session-only regardless of
+# CSRF, so it can no longer tell the two guards apart.
+csrf_probe_body=$(jq -nc --arg d "$(domain_for "bearer-csrf")" '{
+  name: "docker-test-bearer-csrf", domains: [$d], upstreams: ["origin-a:8080"]
+}')
+bearer_probe=$(curl -sS --max-time 60 -o "$STATE_DIR/bearer-csrf.json" -w '%{http_code}' \
   -H "Authorization: Bearer $(cat "$TOKEN_FILE")" \
   -H 'Content-Type: application/json' \
-  --data-binary '{"name":"docker-test-bearer-csrf"}' "$CPM_API/api/v1/tokens")
-t_eq "a bearer write needs no Origin header" "201" "$bearer_no_origin"
+  --data-binary "$csrf_probe_body" "$CPM_API/api/v1/proxy-hosts")
+t_eq "a bearer write needs no Origin header" "201" "$bearer_probe"
 
-# Clean up the token the previous assertion created.
-api GET /api/v1/tokens
-bearer_probe_id=$(jqr '[.[] | select(.name == "docker-test-bearer-csrf")] | .[0].id')
-[ -n "$bearer_probe_id" ] && [ "$bearer_probe_id" != "null" ] && api DELETE "/api/v1/tokens/$bearer_probe_id"
+bearer_probe_id=$(jq -r '.id // empty' <"$STATE_DIR/bearer-csrf.json" 2>/dev/null)
+[ -n "$bearer_probe_id" ] && track "proxy-hosts/$bearer_probe_id"
 
 # ── Unknown routes ──────────────────────────────────────────────────────────
 
