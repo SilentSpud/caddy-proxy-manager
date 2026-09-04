@@ -127,6 +127,48 @@ export function parseHostPort(value: string): { host: string; port: string } | n
   return { host, port };
 }
 
+export type HostPort = {
+  /** Empty for a bare `:PORT`, meaning "every address". Never bracketed. */
+  host: string;
+  port: number;
+};
+
+/**
+ * Parse a listen or dial address: `HOST:PORT`, `:PORT` or `[v6]:PORT`.
+ *
+ * Built on parseHostPort so there is one place that knows how brackets work, with three things
+ * added that the upstream path does not need: a bare `:PORT` is valid (a listener with no host
+ * means every address), the port must be a number in range, and brackets must actually contain an
+ * IPv6 address.
+ *
+ * Returns null for a bare IPv6 literal. `2001:db8::1` ends in `:1`, and reading its last group as
+ * a port is how an address silently becomes a listener on port 1 — parseHostPort already refuses
+ * it, and this is the reason why.
+ */
+export function splitHostPort(value: string): HostPort | null {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+
+  const raw = trimmed.startsWith(":")
+    ? { host: "", port: trimmed.slice(1) }
+    : parseHostPort(trimmed);
+  if (!raw) return null;
+
+  // parseHostPort takes the brackets off but does not check what was inside them.
+  if (trimmed.startsWith("[") && isIP(raw.host) !== 6) return null;
+
+  if (!/^\d{1,5}$/.test(raw.port)) return null;
+  const port = Number(raw.port);
+  if (port < 1 || port > 65535) return null;
+
+  return { host: raw.host, port };
+}
+
+/** Join a host and port, bracketing an IPv6 literal. The inverse of splitHostPort. */
+export function formatHostPort(host: string, port: number): string {
+  return host.length === 0 ? `:${port}` : formatDialAddress(host, String(port));
+}
+
 export type ParsedUpstreamTarget = {
   original: string;
   dial: string;

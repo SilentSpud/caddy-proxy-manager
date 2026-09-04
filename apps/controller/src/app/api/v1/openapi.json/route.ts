@@ -2324,7 +2324,9 @@ const spec = {
           listenAddress: {
             type: "string",
             example: ":5432",
-            description: "Single host:port or :port to listen on",
+            description:
+              "Address to listen on: ':port', 'host:port', or '[ipv6]:port'. An IPv6 literal " +
+              "must be bracketed — unbracketed, its last group is indistinguishable from a port.",
           },
           upstreams: { type: "array", items: { type: "string" }, example: ["db-server:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },

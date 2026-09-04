@@ -11,6 +11,7 @@ import crypto from "node:crypto";
 import type { L4PortsStatus } from "@cpm/shared";
 import { eq } from "drizzle-orm";
 import db from "./db";
+import { splitHostPort } from "./caddy-utils";
 import { l4ProxyHosts } from "./db/schema";
 import { isAgentAvailable, requestL4Ports, tryGetAgentStatus } from "./agent/client";
 
@@ -35,13 +36,14 @@ export async function getRequiredL4Ports(): Promise<string[]> {
 
   const portSet = new Set<string>();
   for (const host of hosts) {
-    const addr = host.listenAddress.trim();
-    // Extract the port from ":PORT" or "HOST:PORT"
-    const match = addr.match(/:(\d+)$/);
-    if (!match) continue;
-    const port = match[1];
+    // splitHostPort, not a trailing-colon match: an unbracketed IPv6 literal ends in something
+    // that looks like a port, and publishing that number would open a port nobody asked for.
+    const parsed = splitHostPort(host.listenAddress);
+    if (!parsed) continue;
     const proto = host.protocol === "udp" ? "/udp" : "";
-    portSet.add(`${port}:${port}${proto}`);
+    // Docker publishes a port on every address family the network has; the listen address's own
+    // host part is Caddy's business, inside the container.
+    portSet.add(`${parsed.port}:${parsed.port}${proto}`);
   }
 
   return Array.from(portSet).sort();

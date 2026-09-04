@@ -109,8 +109,8 @@ Each phase ends green — tests, typecheck, lint, build — and lands on `main` 
 | 2 | Settings service: typed registry, DB-backed config with an env-override layer | Done |
 | 3 | First-run setup and login-verify flow | Done |
 | 4 | Migration flow | Done |
-| 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | In progress |
-| 6 | IPv6 | |
+| 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | Done |
+| 6 | IPv6 | Done |
 
 ### Phase 5, step 1: instance sync deleted
 
@@ -315,6 +315,32 @@ Caddy has that directory open and a partial file under the real name is one it w
 The agent's `geoip-data` mount becomes writable for this. It is the only place that volume is not
 read-only, and on a host with no `geoipupdate` of its own the agent is what puts the files there
 for Caddy.
+
+### Phase 6: IPv6
+
+Mostly small, with one trap worth naming.
+
+**The trap.** `2001:db8::1` ends in `:1`. Every place that split a listen address or an upstream on
+the last colon read that as port 1 and carried on — a silently wrong listener, not an error. The
+L4 listen address and upstream checks both did this, and so did the port computation that tells the
+agent what to publish. They now go through `splitHostPort`, which refuses a bare IPv6 literal
+outright: with a port, it must be bracketed, as it must everywhere else in this stack.
+
+That function is built on the `parseHostPort` the HTTP upstream path already had rather than beside
+it — the first draft duplicated the bracket handling, which is exactly the kind of second parser
+that drifts. It adds the three things the upstream path does not need: a bare `:PORT` is valid,
+the port must be numeric and in range, and brackets must actually contain an IPv6 address.
+
+**The rest is binding.** The controller binds `::` rather than `0.0.0.0` — a dual-stack socket
+accepts IPv4 too, while `0.0.0.0` leaves an IPv6-only client with nothing to connect to. Caddy's
+admin API moves from `0.0.0.0:2019` to `:2019` for the same reason, with the bracketed loopback
+added to its `origins` because Caddy matches the Host header literally. `caddy-network` gains
+`enable_ipv6`, without which Docker gives it IPv4 only and an IPv6 upstream is unreachable however
+the containers are configured.
+
+**Already fine:** trusted proxies, geo-blocking lists and access lists validate through `isIP` and
+took IPv6 addresses and CIDR ranges before this phase. The agent already bound `::`, from the day
+it was written.
 
 ### Consumers still reading the environment directly
 

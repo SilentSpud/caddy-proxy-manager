@@ -277,7 +277,7 @@ function L4HostForm({
           value={text.listenAddress}
           onChange={set("listenAddress")}
           isRequired
-          description="Format: :PORT or HOST:PORT. Make sure to expose this port in docker-compose.yml on the caddy service."
+          description="Format: :PORT, HOST:PORT, or [IPv6]:PORT — an IPv6 address must be bracketed. The agent publishes the port on the Caddy container for you."
         />
 
         <TextArea

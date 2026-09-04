@@ -2976,8 +2976,12 @@ export async function buildCaddyDocument() {
 
   return {
     admin: {
-      listen: "0.0.0.0:2019",
-      origins: ["caddy:2019", "localhost:2019", "localhost"],
+      // A bare port binds every address family; "0.0.0.0:2019" bound only IPv4, so an agent
+      // reaching Caddy over IPv6 found nothing listening.
+      listen: ":2019",
+      // Caddy matches the Host header against these literally. An IPv6 caller sends the bracketed
+      // form, which is a different string from the name and has to be listed separately.
+      origins: ["caddy:2019", "localhost:2019", "localhost", "[::1]:2019", "127.0.0.1:2019"],
     },
     ...loggingApp,
     apps: {

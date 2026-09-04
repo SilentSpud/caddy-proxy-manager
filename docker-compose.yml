@@ -307,6 +307,9 @@ services:
 networks:
   caddy-network:
     driver: bridge
+    # Dual-stack. Without this Docker gives the network IPv4 only, and a proxy host with an IPv6
+    # upstream has no route to it however the containers themselves are configured.
+    enable_ipv6: true
   # The agent's route to the Docker API; internal, with no external connectivity.
   socket-proxy:
     driver: bridge

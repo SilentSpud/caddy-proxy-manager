@@ -94,9 +94,7 @@ describe('L4 proxy host create validation', () => {
       listenAddress: '10.0.0.1',
       upstreams: ['10.0.0.1:5432'],
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(
-      "Listen address must be in format ':PORT' or 'HOST:PORT'",
-    );
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(/Listen address must be/);
   });
 
   it('rejects listen address with port 0', async () => {
@@ -106,7 +104,7 @@ describe('L4 proxy host create validation', () => {
       listenAddress: ':0',
       upstreams: ['10.0.0.1:5432'],
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow('Port must be between 1 and 65535');
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(/Listen address must be/);
   });
 
   it('rejects listen address with port > 65535', async () => {
@@ -116,7 +114,7 @@ describe('L4 proxy host create validation', () => {
       listenAddress: ':99999',
       upstreams: ['10.0.0.1:5432'],
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow('Port must be between 1 and 65535');
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(/Listen address must be/);
   });
 
   it('rejects empty upstreams', async () => {
@@ -138,7 +136,51 @@ describe('L4 proxy host create validation', () => {
       listenAddress: ':5432',
       upstreams: ['10.0.0.1'],
     };
-    await expect(createL4ProxyHost(input, 1)).rejects.toThrow("must be in 'host:port' format");
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(/must be in 'host:port'/);
+  });
+
+  it('accepts a bracketed IPv6 listen address', async () => {
+    const input: L4ProxyHostInput = {
+      name: 'Test',
+      protocol: 'tcp',
+      listenAddress: '[2001:db8::1]:5432',
+      upstreams: ['[2001:db8::2]:5432'],
+    };
+    await expect(createL4ProxyHost(input, 1)).resolves.toBeDefined();
+  });
+
+  it('rejects an unbracketed IPv6 listen address', async () => {
+    // `2001:db8::1` ends in `:1`. Anything that splits on the last colon reads that as port 1 and
+    // silently opens a listener nobody asked for.
+    const input: L4ProxyHostInput = {
+      name: 'Test',
+      protocol: 'tcp',
+      listenAddress: '2001:db8::1',
+      upstreams: ['10.0.0.1:5432'],
+    };
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(/Listen address must be/);
+  });
+
+  it('rejects an unbracketed IPv6 upstream', async () => {
+    // Same trap on the other side: it contains a colon, so the old check passed it through as
+    // "host:port" while naming no port at all.
+    const input: L4ProxyHostInput = {
+      name: 'Test',
+      protocol: 'tcp',
+      listenAddress: ':5432',
+      upstreams: ['2001:db8::2'],
+    };
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(/must be in 'host:port'/);
+  });
+
+  it('rejects brackets around something that is not an IPv6 address', async () => {
+    const input: L4ProxyHostInput = {
+      name: 'Test',
+      protocol: 'tcp',
+      listenAddress: '[example.com]:5432',
+      upstreams: ['10.0.0.1:5432'],
+    };
+    await expect(createL4ProxyHost(input, 1)).rejects.toThrow(/Listen address must be/);
   });
 
   it('rejects TLS termination with UDP', async () => {

@@ -8,7 +8,9 @@ import { dirname, join } from "node:path";
 import { startProdServer } from "vinext/server/prod-server";
 
 const port = Number.parseInt(process.env.PORT ?? "3000", 10);
-const host = process.env.HOST ?? "0.0.0.0";
+// `::` rather than `0.0.0.0`: a dual-stack socket accepts IPv4 too, so this binds both families,
+// while 0.0.0.0 binds only one and leaves an IPv6-only client with nothing to connect to.
+const host = process.env.HOST ?? "::";
 
 /** Directory holding the build output (`dist/`) and its runtime dependencies. */
 function resolveAppRoot(): string {

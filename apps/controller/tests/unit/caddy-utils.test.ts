@@ -5,7 +5,9 @@
 import { describe, it, expect } from 'bun:test';
 import {
   expandPrivateRanges,
+  formatHostPort,
   PRIVATE_RANGES_CIDRS,
+  splitHostPort,
   mergeDeep,
   parseJson,
   parseOptionalJson,
@@ -396,5 +398,91 @@ describe('stripCaddyPlaceholders', () => {
     const start = performance.now();
     expect(stripCaddyPlaceholders('{'.repeat(100_000))).toBe('{'.repeat(100_000));
     expect(performance.now() - start).toBeLessThan(1000);
+  });
+});
+
+describe('splitHostPort', () => {
+  it('splits a bare port', () => {
+    expect(splitHostPort(':5432')).toEqual({ host: '', port: 5432 });
+  });
+
+  it('splits a hostname and port', () => {
+    expect(splitHostPort('db.internal:5432')).toEqual({ host: 'db.internal', port: 5432 });
+  });
+
+  it('splits an IPv4 address and port', () => {
+    expect(splitHostPort('10.0.0.1:5432')).toEqual({ host: '10.0.0.1', port: 5432 });
+  });
+
+  it('splits a bracketed IPv6 address and port, without the brackets', () => {
+    expect(splitHostPort('[2001:db8::1]:5432')).toEqual({ host: '2001:db8::1', port: 5432 });
+  });
+
+  it('handles the IPv6 loopback and the unspecified address', () => {
+    expect(splitHostPort('[::1]:443')).toEqual({ host: '::1', port: 443 });
+    expect(splitHostPort('[::]:443')).toEqual({ host: '::', port: 443 });
+  });
+
+  it('refuses a bare IPv6 literal rather than reading its last group as a port', () => {
+    // This is the whole reason this function exists. `2001:db8::1` ends in `:1`, and anything that
+    // splits on the last colon turns an address into a listener on port 1.
+    expect(splitHostPort('2001:db8::1')).toBeNull();
+    expect(splitHostPort('::1')).toBeNull();
+    expect(splitHostPort('fe80::1234:5678')).toBeNull();
+  });
+
+  it('refuses brackets around something that is not an IPv6 address', () => {
+    expect(splitHostPort('[example.com]:443')).toBeNull();
+    expect(splitHostPort('[10.0.0.1]:443')).toBeNull();
+  });
+
+  it('refuses unbalanced or misplaced brackets', () => {
+    expect(splitHostPort('[2001:db8::1:5432')).toBeNull();
+    expect(splitHostPort('[2001:db8::1]5432')).toBeNull();
+    expect(splitHostPort('[2001:db8::1]')).toBeNull();
+  });
+
+  it('refuses a value with no port at all', () => {
+    expect(splitHostPort('example.com')).toBeNull();
+    expect(splitHostPort('')).toBeNull();
+    expect(splitHostPort('   ')).toBeNull();
+  });
+
+  it('refuses a port outside the usable range', () => {
+    expect(splitHostPort(':0')).toBeNull();
+    expect(splitHostPort(':65536')).toBeNull();
+    expect(splitHostPort(':99999')).toBeNull();
+  });
+
+  it('refuses a port that is not a number', () => {
+    expect(splitHostPort('host:http')).toBeNull();
+    expect(splitHostPort('host:-1')).toBeNull();
+    expect(splitHostPort('host:5432x')).toBeNull();
+  });
+
+  it('tolerates surrounding whitespace', () => {
+    expect(splitHostPort('  10.0.0.1:5432  ')).toEqual({ host: '10.0.0.1', port: 5432 });
+  });
+});
+
+describe('formatHostPort', () => {
+  it('brackets an IPv6 address and leaves everything else alone', () => {
+    expect(formatHostPort('2001:db8::1', 5432)).toBe('[2001:db8::1]:5432');
+    expect(formatHostPort('10.0.0.1', 5432)).toBe('10.0.0.1:5432');
+    expect(formatHostPort('db.internal', 5432)).toBe('db.internal:5432');
+  });
+
+  it('drops the host entirely when there is none', () => {
+    expect(formatHostPort('', 5432)).toBe(':5432');
+  });
+
+  it('round-trips with splitHostPort', () => {
+    for (const value of ['[2001:db8::1]:5432', '10.0.0.1:5432', 'db.internal:5432', ':5432']) {
+      const parsed = splitHostPort(value);
+      expect(parsed).not.toBeNull();
+      expect(
+        formatHostPort((parsed as { host: string }).host, (parsed as { port: number }).port),
+      ).toBe(value);
+    }
   });
 });

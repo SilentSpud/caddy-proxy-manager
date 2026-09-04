@@ -105,6 +105,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `BASE_URL` | Public URL where users access the dashboard.<br/>**Required for OAuth** - must match redirect URI | `http://localhost:3000` | **Yes** (if using OAuth) |
 | `APP_NAME` | Display name in the sidebar, on the login card, and as the suffix on every page title | `Caddy Proxy Manager` | No |
 | `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides | Unset (toggle decides) | No |
+| `HOST` | Address the controller binds. `::` accepts both IPv6 and IPv4 on a dual-stack socket; set `0.0.0.0` to bind IPv4 only | `::` | No |
 | `CADDY_API_URL` | Caddy Admin API endpoint. Read by the **agent**, which proxies every admin call; the controller uses it only when running Caddy with no agent at all | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
 | `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values below when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
 | `DATABASE_POOL_MAX` | Connections the database pool may open. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance pointing at it | `10` | No |
@@ -391,6 +392,22 @@ SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolo
 ```
 
 ---
+
+## IPv6
+
+Both families, everywhere, by default.
+
+- The controller binds `::`, a dual-stack socket that accepts IPv4 too. `HOST=0.0.0.0` restricts it
+  to IPv4 if you want that.
+- Caddy's admin API listens on a bare port rather than `0.0.0.0`, so an agent reaching it over IPv6
+  finds something there.
+- `caddy-network` is created with `enable_ipv6`, without which a proxy host with an IPv6 upstream
+  has no route to it however the containers themselves are configured.
+- Layer-4 listen addresses and upstreams accept `[2001:db8::1]:5432`. **The brackets are
+  required**: unbracketed, `2001:db8::1` ends in `:1`, which is indistinguishable from a port — so
+  it is rejected rather than silently read as one.
+- Trusted proxies, geo-blocking allow/block lists and access lists already took IPv6 addresses and
+  CIDR ranges.
 
 ## The Agent
 

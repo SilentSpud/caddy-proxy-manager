@@ -1,4 +1,5 @@
 import db, { nowIso, toIso } from "../db";
+import { splitHostPort } from "../caddy-utils";
 import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
@@ -419,15 +420,13 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
   }
 
   if (input.listenAddress !== undefined) {
-    const addr = input.listenAddress.trim();
-    // Must be :PORT or HOST:PORT
-    const portMatch = addr.match(/:(\d+)$/);
-    if (!portMatch) {
-      throw new Error("Listen address must be in format ':PORT' or 'HOST:PORT'");
-    }
-    const port = parseInt(portMatch[1], 10);
-    if (port < 1 || port > 65535) {
-      throw new Error("Port must be between 1 and 65535");
+    // splitHostPort rather than a trailing-colon match: `2001:db8::1` ends in `:1`, and reading
+    // that as a port is how an IPv6 address silently becomes a listener on port 1. An IPv6 literal
+    // has to be bracketed here, as it does everywhere else in this stack.
+    if (splitHostPort(input.listenAddress) === null) {
+      throw new Error(
+        "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535",
+      );
     }
   }
 
@@ -457,8 +456,10 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
 
   if (input.upstreams) {
     for (const upstream of input.upstreams) {
-      if (!upstream.includes(":")) {
-        throw new Error(`Upstream '${upstream}' must be in 'host:port' format`);
+      // A bare IPv6 literal contains colons and would have passed a `includes(":")` check while
+      // naming no port at all.
+      if (splitHostPort(upstream) === null || splitHostPort(upstream)?.host === "") {
+        throw new Error(`Upstream '${upstream}' must be in 'host:port' or '[IPv6]:port' format`);
       }
     }
   }
