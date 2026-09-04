@@ -261,6 +261,37 @@ enough that an e2e click landed before the page had settled. Concurrent callers 
 trip; only in-flight calls are shared, never a completed one, so nothing is ever served a status
 from before an apply the operator just triggered.
 
+### Phase 5, step 5: analytics move to the agent
+
+The decision was "instead of shipping events to the controller, have the controller give the
+ClickHouse credentials to the agents so they can add to it themselves". Doing that meant moving the
+log parsers too, because the thing being parsed is a file on the agent's host: a controller
+elsewhere cannot read it at all, and relaying every request through it would put the busiest write
+path in the fleet through a machine with nothing to do with it.
+
+`log-parser.ts`, `waf-log-parser.ts` and `log-read.ts` moved to `apps/agent` with two seams
+changed: the parse offsets now live in the agent's SQLite instead of two PostgreSQL tables, and the
+rows go to an insert-only ClickHouse client instead of the controller's. Their five test files came
+with them and got *simpler* — the controller's copies mocked `db`, `maxmind`, `node:fs` and the
+ClickHouse client to isolate pure functions; in the agent those are real dependencies of the
+package, so most of the mocking was deleted. The truncation test now runs against a real
+`AgentStore` on a temp file rather than a shape-mocked data layer.
+
+**Credentials are pushed, never fetched.** An agent needs no credential for the controller, and the
+direction of trust stays one-way. `POST /v1/fleet-config` validates the URL's scheme before storing
+it — the agent dials that value, and a pushed `file://` would be a different kind of request
+entirely — and persists it so a restarted agent keeps writing without waiting for the controller to
+notice it came back.
+
+**One thing had to be reported rather than checked.** The controller decided "logging is disabled"
+by looking for `/logs/access.log` on its own filesystem. That is now the agent's to answer, and it
+does, in its status: checking locally would have reported logging as off on every deployment whose
+Caddy runs somewhere else.
+
+**Still to do here:** GeoLite2 distribution. A remote agent needs the `.mmdb` to put country codes
+on its events and for Caddy's geo-blocking, and it currently only has one if the host happens to
+provide it.
+
 ### Consumers still reading the environment directly
 
 Phase 2 built the service and moved the Caddy admin URL and the login throttle onto it. The rest

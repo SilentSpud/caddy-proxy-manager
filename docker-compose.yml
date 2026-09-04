@@ -113,6 +113,8 @@ services:
     volumes:
       - caddy-manager-data:/app/data
       - geoip-data:/usr/share/GeoIP:ro,z
+      # Caddy's logs are read by the agent now, not here. Still mounted because the controller
+      # generates the log configuration and an operator reaching for them expects them present.
       - caddy-logs:/logs
       - acme-ca:/acme-ca
     depends_on:
@@ -213,12 +215,19 @@ services:
       # Every Caddy admin call the controller makes is proxied through the agent, because the
       # agent is the only thing that knows where its Caddy is. This is that address.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
+      # Analytics: the agent parses this host's Caddy logs and writes the events itself, using
+      # credentials the controller pushes. Nothing to configure here — the controller decides
+      # whether analytics are on at all.
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
     volumes:
       - caddy-manager-data:/data
       - .:/compose:ro
+      # Caddy's access and WAF logs, which this container is the one that reads.
+      - caddy-logs:/logs
+      # Country lookups for the events it writes.
+      - geoip-data:/usr/share/GeoIP:ro,z
     depends_on:
       caddy:
         condition: service_healthy

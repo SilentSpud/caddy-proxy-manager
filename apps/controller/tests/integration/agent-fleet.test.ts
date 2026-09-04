@@ -40,6 +40,7 @@ const { broadcastCaddyAdmin, getAllAgentStatuses, listAgentTargets, requestL4Por
   '../../src/lib/agent/client'
 );
 const { getAppliedModuleSpecs, defaultModuleSpecs } = await import('../../src/lib/caddy-build');
+const { pushFleetConfig } = await import('../../src/lib/agent/fleet-config');
 const { applyCaddyConfig } = await import('../../src/lib/caddy');
 const { startFakeAgent, clearAgentEnv } = await import('../helpers/fake-agent');
 
@@ -226,6 +227,42 @@ describe('module availability across the fleet', () => {
     await second.stop();
 
     expect(await getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
+  });
+});
+
+describe('handing agents the analytics credentials', () => {
+  it('pushes to every agent', async () => {
+    await pairBoth();
+    await pushFleetConfig();
+
+    for (const agent of [first, second]) {
+      expect(agent.requests.some((r) => r.path === '/v1/fleet-config')).toBe(true);
+    }
+  });
+
+  it('sends null when the deployment has no analytics', async () => {
+    // CLICKHOUSE_PASSWORD is unset in the test environment, which is what "analytics are off"
+    // means. Pushing nothing at all would leave an agent writing to a ClickHouse the operator has
+    // since turned off.
+    await pairBoth();
+    await pushFleetConfig();
+
+    const pushed = first.requests.find((r) => r.path === '/v1/fleet-config')?.body;
+    expect(pushed).toEqual({ clickhouse: null });
+  });
+
+  it('does not fail when an agent is unreachable', async () => {
+    // Analytics are optional and an unreachable agent is already reported everywhere else. Failing
+    // startup over one host being down would be worse than that host writing nothing until the
+    // next push.
+    await pairBoth();
+    await second.stop();
+    await expect(pushFleetConfig()).resolves.toBeUndefined();
+    expect(first.requests.some((r) => r.path === '/v1/fleet-config')).toBe(true);
+  });
+
+  it('does nothing at all when there is no agent', async () => {
+    await expect(pushFleetConfig()).resolves.toBeUndefined();
   });
 });
 

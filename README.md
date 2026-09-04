@@ -402,6 +402,16 @@ Every request is signed with a shared secret using HMAC-SHA256 over the method, 
 body. The secret never travels with a request, and the signature covers the path, so a captured
 read cannot be replayed as a write.
 
+### Analytics are written by the agent
+
+Caddy's access and WAF logs are files on the agent's host — a controller elsewhere cannot read them
+at all. So the agent parses them and inserts the events into ClickHouse itself, using credentials
+the controller pushes to it. ClickHouse still lives with the controller; only the write path moved.
+
+Nothing to configure: enabling analytics on the controller (`CLICKHOUSE_PASSWORD`) is what causes
+the credentials to be pushed, and turning it off pushes `null` and stops the agent writing. The
+push happens at startup and whenever those settings change.
+
 ### One controller, one configuration
 
 Everything a proxy serves — hosts, certificates, access lists, published ports, compiled-in

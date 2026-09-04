@@ -294,6 +294,14 @@ async function callOnAll<T>(
   );
 }
 
+/** The same request to every agent, for callers outside this module. */
+export async function callOnEveryAgent<T>(
+  path: string,
+  options: { method?: "GET" | "POST"; body?: unknown } = {},
+): Promise<AgentResult<T>[]> {
+  return callOnAll<T>(path, options);
+}
+
 /** Throw when any agent failed, naming them. Used where a partial apply is not an outcome. */
 function assertAllSucceeded<T>(results: AgentResult<T>[], what: string): T[] {
   const failed = results.filter((r) => !r.ok);

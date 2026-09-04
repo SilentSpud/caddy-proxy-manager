@@ -342,17 +342,9 @@ export const linkingTokens = pgTable("linking_tokens", {
   expiresAt: text("expiresAt").notNull(),
 });
 
-// traffic_events and waf_events now live in ClickHouse — see src/lib/clickhouse/client.ts.
-
-export const logParseState = pgTable("log_parse_state", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-});
-
-export const wafLogParseState = pgTable("waf_log_parse_state", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-});
+// traffic_events and waf_events live in ClickHouse — see src/lib/clickhouse/client.ts. The
+// parsers that fill them, and their read offsets, live in the agent: the Caddy log is a file on
+// the agent's host, which a controller elsewhere cannot read at all.
 
 // ── mTLS RBAC ──────────────────────────────────────────────────────────
 

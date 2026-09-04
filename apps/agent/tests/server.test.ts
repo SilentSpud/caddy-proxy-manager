@@ -464,3 +464,77 @@ describe("the Caddy admin proxy", () => {
     }
   });
 });
+
+describe("the fleet configuration", () => {
+  it("stores what the controller pushes, so a restart resumes from it", async () => {
+    const response = await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: {
+        clickhouse: {
+          url: "http://clickhouse:8123",
+          user: "cpm",
+          password: "hunter2",
+          database: "analytics",
+        },
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(store.fleetConfig()?.clickhouse?.user).toBe("cpm");
+  });
+
+  it("reports analytics as enabled once it has credentials", async () => {
+    await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: {
+        clickhouse: { url: "http://ch:8123", user: "u", password: "p", database: "d" },
+      },
+    });
+    const status = (await (await send(AGENT_ROUTES.status)).json()) as AgentStatus;
+    expect(status.analytics.enabled).toBe(true);
+  });
+
+  it("turns analytics off when the controller pushes null", async () => {
+    await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: {
+        clickhouse: { url: "http://ch:8123", user: "u", password: "p", database: "d" },
+      },
+    });
+    await send(AGENT_ROUTES.fleetConfig, { method: "POST", body: { clickhouse: null } });
+
+    const status = (await (await send(AGENT_ROUTES.status)).json()) as AgentStatus;
+    expect(status.analytics.enabled).toBe(false);
+  });
+
+  it("refuses a URL this process would then dial over some other scheme", async () => {
+    for (const url of ["file:///etc/passwd", "ftp://ch", "not-a-url"]) {
+      const response = await send(AGENT_ROUTES.fleetConfig, {
+        method: "POST",
+        body: { clickhouse: { url, user: "u", password: "p", database: "d" } },
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(store.fleetConfig()).toBeNull();
+  });
+
+  it("refuses incomplete credentials rather than storing half of them", async () => {
+    const response = await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: { clickhouse: { url: "http://ch:8123", user: "u" } },
+    });
+    expect(response.status).toBe(400);
+    expect(store.fleetConfig()).toBeNull();
+  });
+
+  it("refuses an unsigned push", async () => {
+    // These are database credentials. Anything that can set them can redirect every event this
+    // host writes to a server of its own choosing.
+    const response = await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: { clickhouse: null },
+      signed: false,
+    });
+    expect(response.status).toBe(401);
+    expect(store.fleetConfig()).toBeNull();
+  });
+});

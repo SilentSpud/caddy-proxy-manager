@@ -106,47 +106,18 @@ export async function register() {
       // Don't throw - analytics is non-critical
     }
 
-    // Start log parser for analytics
-    const { initLogParser, parseNewLogEntries, stopLogParser } = await import("./lib/log-parser");
+    // The log parsers moved to the agent: the Caddy log is a file on the agent's host, which a
+    // controller elsewhere cannot read at all. Hand each agent the credentials to write its own
+    // events instead.
+    const { pushFleetConfig } = await import("./lib/agent/fleet-config");
     try {
-      await initLogParser();
-      const logParserInterval = setInterval(async () => {
-        try {
-          await parseNewLogEntries();
-        } catch (err) {
-          console.error("Log parser interval error:", err);
-        }
-      }, 30_000);
-      process.on("SIGTERM", () => {
-        stopLogParser();
-        clearInterval(logParserInterval);
-        closeClickHouse();
-      });
-      console.log("Log parser started");
+      await pushFleetConfig();
     } catch (error) {
-      console.error("Failed to start log parser:", error);
+      console.error("Failed to send the fleet configuration to the agents:", error);
     }
 
-    // Start WAF log parser for WAF event tracking
-    const { initWafLogParser, parseNewWafLogEntries, stopWafLogParser } = await import(
-      "./lib/waf-log-parser"
-    );
-    try {
-      await initWafLogParser();
-      const wafParserInterval = setInterval(async () => {
-        try {
-          await parseNewWafLogEntries();
-        } catch (err) {
-          console.error("WAF log parser interval error:", err);
-        }
-      }, 30_000);
-      process.on("SIGTERM", () => {
-        stopWafLogParser();
-        clearInterval(wafParserInterval);
-      });
-      console.log("WAF log parser started");
-    } catch (error) {
-      console.error("Failed to start WAF log parser:", error);
-    }
+    process.on("SIGTERM", () => {
+      closeClickHouse();
+    });
   }
 }

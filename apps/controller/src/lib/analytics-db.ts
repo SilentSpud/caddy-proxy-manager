@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import db from "./db";
 import { proxyHosts } from "./db/schema";
 import {
@@ -23,8 +22,6 @@ export type { TimelineBucket, CountryStats, ProtoStats, UAStats, BlockedEvent, B
 
 export type Interval = "1h" | "12h" | "24h" | "7d" | "30d";
 
-const LOG_FILE = "/logs/access.log";
-
 export const INTERVAL_SECONDS: Record<Interval, number> = {
   "1h": 3600,
   "12h": 43200,
@@ -40,15 +37,30 @@ export interface AnalyticsSummary extends CHSummary {
   analyticsDisabled: boolean;
 }
 
+/**
+ * Whether any agent is writing an access log.
+ *
+ * Asked of the agents rather than checked on this filesystem: the log lives on the agent's host,
+ * so a controller looking at its own disk would report logging as disabled on every deployment
+ * whose Caddy is somewhere else. With no agent answering, nothing is being written either, which
+ * is the same answer.
+ */
+async function isLoggingActive(): Promise<boolean> {
+  const { getAllAgentStatuses } = await import("./agent/client");
+  const statuses = await getAllAgentStatuses();
+  return statuses.some((result) => result.ok && result.value.analytics.accessLogPresent);
+}
+
 export async function getAnalyticsSummary(
   from: number,
   to: number,
   hosts: string[],
 ): Promise<AnalyticsSummary> {
-  const loggingDisabled = !existsSync(LOG_FILE);
-  const analyticsDisabled = !isAnalyticsEnabled();
-  const summary = await querySummary(from, to, hosts);
-  return { ...summary, loggingDisabled, analyticsDisabled };
+  const [loggingActive, summary] = await Promise.all([
+    isLoggingActive(),
+    querySummary(from, to, hosts),
+  ]);
+  return { ...summary, loggingDisabled: !loggingActive, analyticsDisabled: !isAnalyticsEnabled() };
 }
 
 // ── Timeline ─────────────────────────────────────────────────────────────────

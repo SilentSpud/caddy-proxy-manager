@@ -9,9 +9,11 @@
     "start": "bun src/index.ts",
     "build:binary": "bun build --compile --target=${BUN_COMPILE_TARGET:-bun} --outfile dist/cpm-agent src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test tests"
+    "test": "bun test --parallel tests"
   },
   "dependencies": {
-    "@cpm/shared": "workspace:*"
+    "@clickhouse/client": "^1.23.1",
+    "@cpm/shared": "workspace:*",
+    "maxmind": "^5.0.7"
   }
 }

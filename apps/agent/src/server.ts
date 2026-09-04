@@ -14,10 +14,14 @@ import {
   type ApplyCaddyBuildRequest,
   type ApplyL4PortsRequest,
   type CaddyAdminProxyRequest,
+  type FleetConfig,
   MAX_CADDY_CONFIG_BYTES,
   type PairRequest,
   type PairResponse,
 } from "@cpm/shared";
+import { accessLogPresent } from "./analytics/log-parser";
+import { analyticsEnabled } from "./analytics/clickhouse";
+import { applyFleetConfig } from "./analytics/runner";
 import { CaddyAdminUnreachable, forwardToCaddy, isAllowedAdminPath } from "./caddy-admin";
 import { generateSecret, verifyRequest, type PairingCodeIssuer } from "./auth";
 import type { AgentConfig } from "./config";
@@ -131,6 +135,10 @@ export function createHandler(services: AgentServices) {
         return request.method === "POST"
           ? handleCaddyAdmin(body)
           : error(405, "BAD_REQUEST", "Use POST to reach the Caddy admin API.");
+      case AGENT_ROUTES.fleetConfig:
+        return request.method === "POST"
+          ? handleFleetConfig(body)
+          : error(405, "BAD_REQUEST", "Use POST to set the fleet configuration.");
       default:
         return error(404, "BAD_REQUEST", "No such endpoint.");
     }
@@ -256,6 +264,41 @@ export function createHandler(services: AgentServices) {
     }
   }
 
+  /**
+   * Take the credentials the controller pushed.
+   *
+   * Stored before they are applied, so a restart resumes from them without waiting for the
+   * controller to push again — and applied even when unchanged, since `applyFleetConfig` is
+   * idempotent and a repeat push must not restart a working parser.
+   */
+  async function handleFleetConfig(body: ArrayBuffer): Promise<Response> {
+    const parsed = parseJson(body) as FleetConfig | null;
+    if (!parsed || typeof parsed !== "object") {
+      return error(400, "BAD_REQUEST", "The request is not valid JSON.");
+    }
+
+    const clickhouse = parsed.clickhouse;
+    if (clickhouse !== null && clickhouse !== undefined) {
+      const fields = ["url", "user", "password", "database"] as const;
+      if (fields.some((field) => typeof clickhouse[field] !== "string")) {
+        return error(400, "BAD_REQUEST", "The ClickHouse credentials are incomplete.");
+      }
+      // The URL is dialled by this process. Refusing anything but http(s) keeps a pushed value
+      // from turning into a file read or a request over some other scheme.
+      try {
+        const protocol = new URL(clickhouse.url).protocol;
+        if (protocol !== "http:" && protocol !== "https:") throw new Error("scheme");
+      } catch {
+        return error(400, "BAD_REQUEST", "The ClickHouse URL must be http:// or https://.");
+      }
+    }
+
+    const config: FleetConfig = { clickhouse: clickhouse ?? null };
+    store.setFleetConfig(config);
+    await applyFleetConfig(store, config);
+    return Response.json({ ok: true });
+  }
+
   async function buildStatus(): Promise<AgentStatus> {
     return {
       agentId: store.agentId(),
@@ -269,6 +312,10 @@ export function createHandler(services: AgentServices) {
       caddyBuild: {
         applied: store.appliedCaddyModules(),
         status: store.caddyBuildStatus(),
+      },
+      analytics: {
+        enabled: analyticsEnabled(),
+        accessLogPresent: accessLogPresent(),
       },
     };
   }

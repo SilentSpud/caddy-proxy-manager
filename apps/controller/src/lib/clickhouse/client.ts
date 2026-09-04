@@ -31,6 +31,23 @@ const CH_RETENTION_DAYS = parseRetentionDays(process.env.CLICKHOUSE_RETENTION_DA
 
 const analyticsConfigured = CH_PASS.trim().length > 0;
 
+/**
+ * The credentials an agent needs to write its own events, or null when analytics are off.
+ *
+ * Agents insert directly rather than shipping events here: an agent on another host holds the only
+ * copy of its Caddy log, and relaying every request through the controller would put the busiest
+ * write path in the fleet through a machine with nothing to do with it.
+ */
+export function analyticsCredentialsForAgents(): {
+  url: string;
+  user: string;
+  password: string;
+  database: string;
+} | null {
+  if (!analyticsConfigured) return null;
+  return { url: CH_URL, user: CH_USER, password: CH_PASS, database: CH_DB };
+}
+
 /** Returns true when ClickHouse analytics is configured for this process. */
 export function isAnalyticsEnabled(): boolean {
   return analyticsConfigured;

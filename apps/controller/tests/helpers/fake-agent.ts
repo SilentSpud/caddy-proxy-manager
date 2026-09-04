@@ -42,6 +42,7 @@ export type FakeAgent = {
     buildStatus: CaddyBuildStatus;
     /** What this agent's Caddy answers a /v1/caddy-admin request with. */
     caddyAdmin: { status: number; text: string };
+    analytics: { enabled: boolean; accessLogPresent: boolean };
   };
   /** Finish the port apply the controller last asked for, as the real agent does once Caddy is up. */
   completeL4Ports: () => void;
@@ -74,6 +75,7 @@ export async function startFakeAgent(
     l4Status: { state: 'idle' },
     buildStatus: { state: 'idle' },
     caddyAdmin: { status: 200, text: '{}' },
+    analytics: { enabled: false, accessLogPresent: true },
     ...overrides,
   };
 
@@ -145,6 +147,7 @@ export async function startFakeAgent(
           composeProject: 'caddy-proxy-manager',
           l4Ports: { applied: state.appliedPorts, status: state.l4Status },
           caddyBuild: { applied: state.appliedModules, status: state.buildStatus },
+          analytics: state.analytics,
         } satisfies AgentStatus);
       }
 
@@ -161,6 +164,12 @@ export async function startFakeAgent(
           triggeredAt: new Date().toISOString(),
         };
         return Response.json({ accepted: true, status: state.l4Status }, { status: 202 });
+      }
+
+      if (url.pathname === AGENT_ROUTES.fleetConfig && request.method === 'POST') {
+        const pushed = JSON.parse(bodyText) as { clickhouse: unknown };
+        state.analytics = { ...state.analytics, enabled: pushed.clickhouse !== null };
+        return Response.json({ ok: true });
       }
 
       if (url.pathname === AGENT_ROUTES.caddyAdmin && request.method === 'POST') {

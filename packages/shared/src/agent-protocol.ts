@@ -27,6 +27,8 @@ export const AGENT_ROUTES = {
   caddyBuild: "/v1/caddy-build",
   /** Proxy a request to this agent's own Caddy admin API. */
   caddyAdmin: "/v1/caddy-admin",
+  /** Push the credentials an agent needs to reach the controller's shared services. */
+  fleetConfig: "/v1/fleet-config",
 } as const;
 
 // ─── Authentication ──────────────────────────────────────────────────────────
@@ -122,6 +124,18 @@ export type AgentStatus = {
     applied: string[] | null;
     status: CaddyBuildStatus;
   };
+  analytics: {
+    /** Whether the controller has given this agent somewhere to write events. */
+    enabled: boolean;
+    /**
+     * Whether Caddy's access log exists on this host.
+     *
+     * Reported by the agent because only the agent can see it. The controller shows "logging is
+     * off" from this: with the log on another host, checking its own filesystem would say the
+     * feature is disabled on every remote deployment that has it switched on.
+     */
+    accessLogPresent: boolean;
+  };
 };
 
 export type AgentMode = "standalone" | "managed";
@@ -176,6 +190,62 @@ export type CaddyAdminProxyResponse = {
  * them produces megabytes. Well above anything realistic, and still bounded.
  */
 export const MAX_CADDY_CONFIG_BYTES = 8 * 1024 * 1024;
+
+// ─── Fleet configuration ─────────────────────────────────────────────────────
+
+/**
+ * What an agent needs to reach the services that live with the controller.
+ *
+ * Pushed rather than fetched, so an agent needs no credential for the controller and the direction
+ * of trust stays one-way: the controller reaches agents, never the reverse.
+ */
+export type FleetConfig = {
+  /**
+   * Where to write analytics, or null when the deployment has none.
+   *
+   * The agent inserts its own events rather than shipping them to the controller: a controller on
+   * another host cannot read the Caddy log file at all, and proxying every request through it
+   * would put the busiest write path in the fleet through a machine that has nothing to do with it.
+   */
+  clickhouse: {
+    url: string;
+    user: string;
+    password: string;
+    database: string;
+  } | null;
+};
+
+// ─── Analytics rows ──────────────────────────────────────────────────────────
+
+/** One line of Caddy's access log, as the analytics tables store it. */
+export type TrafficEventRow = {
+  ts: number;
+  client_ip: string;
+  country_code: string | null;
+  host: string;
+  method: string;
+  uri: string;
+  status: number;
+  proto: string;
+  bytes_sent: number;
+  user_agent: string;
+  is_blocked: boolean;
+};
+
+/** One Coraza audit-log entry, as the analytics tables store it. */
+export type WafEventRow = {
+  ts: number;
+  host: string;
+  client_ip: string;
+  country_code: string | null;
+  rule_id: number | null;
+  rule_message: string | null;
+  severity: string | null;
+  raw_data: string | null;
+  blocked: boolean;
+  method: string;
+  uri: string;
+};
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 

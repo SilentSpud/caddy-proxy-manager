@@ -14,7 +14,9 @@
       "name": "@cpm/agent",
       "version": "3.0.0-beta.1",
       "dependencies": {
+        "@clickhouse/client": "^1.23.1",
         "@cpm/shared": "workspace:*",
+        "maxmind": "^5.0.7",
       },
     },
     "apps/controller": {

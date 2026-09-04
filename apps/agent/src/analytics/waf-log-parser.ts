@@ -1,14 +1,18 @@
+/**
+ * Coraza's audit log, turned into WAF events. Runs on the agent for the same reason the access-log
+ * parser does: the file is on this host. Its two seams are the same — the parse offset lives in the
+ * agent's SQLite, and the rows go straight to ClickHouse.
+ */
 import { existsSync, statSync, truncateSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
-import db from "./db";
-import { wafLogParseState } from "./db/schema";
-import { eq } from "drizzle-orm";
-import { insertWafEvents, type WafEventRow } from "./clickhouse/client";
+import type { WafEventRow } from "@cpm/shared";
+import type { AgentStore } from "../db";
+import { insertWafEvents } from "./clickhouse";
 import { readLines } from "./log-read";
 
-const AUDIT_LOG = "/logs/waf-audit.log";
-const RULES_LOG = "/logs/waf-rules.log";
-const GEOIP_DB = "/usr/share/GeoIP/GeoLite2-Country.mmdb";
+const AUDIT_LOG = process.env.WAF_AUDIT_LOG || "/logs/waf-audit.log";
+const RULES_LOG = process.env.WAF_RULES_LOG || "/logs/waf-rules.log";
+const GEOIP_DB = process.env.GEOIP_DB || "/usr/share/GeoIP/GeoLite2-Country.mmdb";
 const BATCH_SIZE = 200;
 // Coraza's SecAuditLog writes straight to AUDIT_LOG with no rotation of its own (unlike
 // access.log/waf-rules.log, which roll through Caddy's file writer). Once fully ingested,
@@ -22,20 +26,19 @@ let stopped = false;
 
 // ── state helpers ─────────────────────────────────────────────────────────────
 
+/** Set once at startup; every state read and write goes through it. */
+let store: AgentStore | null = null;
+
+export function bindStore(next: AgentStore): void {
+  store = next;
+}
+
 async function getState(key: string): Promise<string | null> {
-  const [row] = await db
-    .select({ value: wafLogParseState.value })
-    .from(wafLogParseState)
-    .where(eq(wafLogParseState.key, key))
-    .limit(1);
-  return row?.value ?? null;
+  return store?.parseState(key) ?? null;
 }
 
 async function setState(key: string, value: string): Promise<void> {
-  await db
-    .insert(wafLogParseState)
-    .values({ key, value })
-    .onConflictDoUpdate({ target: wafLogParseState.key, set: { value } });
+  store?.setParseState(key, value);
 }
 
 // ── GeoIP ─────────────────────────────────────────────────────────────────────
@@ -247,6 +250,7 @@ async function insertBatch(rows: WafEventRow[]): Promise<void> {
 // ── public API ────────────────────────────────────────────────────────────────
 
 export async function initWafLogParser(): Promise<void> {
+  stopped = false;
   await initGeoIP();
   console.log("[waf-log-parser] initialized");
 }

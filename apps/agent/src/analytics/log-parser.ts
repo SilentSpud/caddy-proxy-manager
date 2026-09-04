@@ -1,14 +1,33 @@
+/**
+ * Caddy's access log, turned into analytics rows.
+ *
+ * This runs on the agent rather than the controller because the log is a file on *this* host: a
+ * controller elsewhere cannot read it at all. Moved here verbatim apart from its two seams — the
+ * parse offset now lives in the agent's own SQLite, and the rows go straight to ClickHouse with
+ * credentials the controller pushed.
+ */
 import { existsSync, statSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
-import db from "./db";
-import { logParseState } from "./db/schema";
-import { eq } from "drizzle-orm";
-import { insertTrafficEvents, type TrafficEventRow } from "./clickhouse/client";
+import type { TrafficEventRow } from "@cpm/shared";
+import type { AgentStore } from "../db";
+import { insertTrafficEvents } from "./clickhouse";
 import { readLines as readLinesFrom } from "./log-read";
 
-const LOG_FILE = "/logs/access.log";
-const GEOIP_DB = "/usr/share/GeoIP/GeoLite2-Country.mmdb";
+const LOG_FILE = process.env.CADDY_ACCESS_LOG || "/logs/access.log";
+const GEOIP_DB = process.env.GEOIP_DB || "/usr/share/GeoIP/GeoLite2-Country.mmdb";
 const BATCH_SIZE = 500;
+
+/** Set once at startup; every state read and write goes through it. */
+let store: AgentStore | null = null;
+
+export function bindStore(next: AgentStore): void {
+  store = next;
+}
+
+/** Whether Caddy is writing an access log on this host. The controller has no way to see this. */
+export function accessLogPresent(): boolean {
+  return existsSync(LOG_FILE);
+}
 
 // GeoIP reader — null if mmdb not available
 let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
@@ -19,19 +38,11 @@ let stopped = false;
 // ── state helpers ────────────────────────────────────────────────────────────
 
 async function getState(key: string): Promise<string | null> {
-  const [row] = await db
-    .select({ value: logParseState.value })
-    .from(logParseState)
-    .where(eq(logParseState.key, key))
-    .limit(1);
-  return row?.value ?? null;
+  return store?.parseState(key) ?? null;
 }
 
 async function setState(key: string, value: string): Promise<void> {
-  await db
-    .insert(logParseState)
-    .values({ key, value })
-    .onConflictDoUpdate({ target: logParseState.key, set: { value } });
+  store?.setParseState(key, value);
 }
 
 // ── GeoIP ────────────────────────────────────────────────────────────────────
@@ -205,6 +216,7 @@ async function insertBatch(rows: TrafficEventRow[]): Promise<void> {
 // ── public API ───────────────────────────────────────────────────────────────
 
 export async function initLogParser(): Promise<void> {
+  stopped = false;
   await initGeoIP();
   console.log("[log-parser] initialized");
 }

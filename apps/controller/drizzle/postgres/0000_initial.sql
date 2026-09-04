@@ -190,11 +190,6 @@ CREATE TABLE "linking_tokens" (
 	"expiresAt" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "log_parse_state" (
-	"key" text PRIMARY KEY NOT NULL,
-	"value" text NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "mtls_access_rules" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"proxyHostId" integer NOT NULL,
@@ -330,11 +325,6 @@ CREATE TABLE "verifications" (
 	"expiresAt" text NOT NULL,
 	"createdAt" text,
 	"updatedAt" text
-);
---> statement-breakpoint
-CREATE TABLE "waf_log_parse_state" (
-	"key" text PRIMARY KEY NOT NULL,
-	"value" text NOT NULL
 );
 --> statement-breakpoint
 ALTER TABLE "access_list_entries" ADD CONSTRAINT "access_list_entries_accessListId_access_lists_id_fk" FOREIGN KEY ("accessListId") REFERENCES "public"."access_lists"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

@@ -11,7 +11,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
-import type { CaddyBuildStatus, L4PortsStatus } from "@cpm/shared";
+import type { CaddyBuildStatus, FleetConfig, L4PortsStatus } from "@cpm/shared";
 
 export type PairedController = {
   controllerId: string;
@@ -33,6 +33,14 @@ CREATE TABLE IF NOT EXISTS state (
   value     TEXT NOT NULL,
   updatedAt TEXT NOT NULL
 );
+
+-- How far the log parsers have read. Its own table rather than more rows in state: these are
+-- written on every parse tick, and keeping the hot rows apart from configuration makes it obvious
+-- which of them is safe to delete when a log is rotated out from under the agent.
+CREATE TABLE IF NOT EXISTS parse_state (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
 
 const AGENT_ID_KEY = "agent_id";
@@ -40,6 +48,7 @@ const L4_STATUS_KEY = "l4_ports_status";
 const BUILD_STATUS_KEY = "caddy_build_status";
 const APPLIED_PORTS_KEY = "applied_l4_ports";
 const APPLIED_MODULES_KEY = "applied_caddy_modules";
+const FLEET_CONFIG_KEY = "fleet_config";
 
 export class AgentStore {
   private readonly db: Database;
@@ -161,6 +170,42 @@ export class AgentStore {
 
   setAppliedCaddyModules(modules: string[]): void {
     this.writeState(APPLIED_MODULES_KEY, JSON.stringify(modules));
+  }
+
+  // ─── Fleet configuration ───────────────────────────────────────────────────
+
+  /**
+   * The credentials the controller last pushed, or null before it has pushed any.
+   *
+   * Persisted so the agent keeps writing analytics across a restart without waiting for the
+   * controller to notice it came back. Stored as it arrived: this file already holds the pairing
+   * secrets that grant container control on this host, so a database password beside them changes
+   * nothing about what an attacker with read access to the volume already has.
+   */
+  fleetConfig(): FleetConfig | null {
+    return this.readJson<FleetConfig>(FLEET_CONFIG_KEY);
+  }
+
+  setFleetConfig(config: FleetConfig): void {
+    this.writeState(FLEET_CONFIG_KEY, JSON.stringify(config));
+  }
+
+  // ─── Log parse offsets ─────────────────────────────────────────────────────
+
+  parseState(key: string): string | null {
+    const row = this.db.query("SELECT value FROM parse_state WHERE key = ?").get(key) as {
+      value: string;
+    } | null;
+    return row?.value ?? null;
+  }
+
+  setParseState(key: string, value: string): void {
+    this.db
+      .query(
+        `INSERT INTO parse_state (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(key, value);
   }
 
   // ─── Key/value plumbing ────────────────────────────────────────────────────

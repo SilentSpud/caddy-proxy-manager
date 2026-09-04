@@ -13,6 +13,7 @@
 
 import { chmodSync, existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { resumeFleetConfig, stop as stopAnalytics } from "./analytics/runner";
 import { PairingCodeIssuer, generateSecret } from "./auth";
 import { loadConfig } from "./config";
 import { AgentStore } from "./db";
@@ -127,15 +128,27 @@ void operations.restorePublishedPorts().catch((error: unknown) => {
   console.warn("[agent] could not restore the Caddy container's published ports:", error);
 });
 
+// Resume analytics from whatever the controller last pushed, so a restarted agent keeps writing
+// without waiting for the controller to notice it came back.
+void resumeFleetConfig(store).catch((error: unknown) => {
+  console.warn("[agent] could not resume the pushed fleet configuration:", error);
+});
+
 function shutdown(signal: string): void {
   console.log(`[agent] ${signal} received, shutting down`);
-  void server.stop(true).then(() => {
-    store.close();
-    if (config.mode === "standalone" && existsSync(config.socketPath)) {
-      unlinkSync(config.socketPath);
-    }
-    process.exit(0);
-  });
+  void Promise.resolve(stopAnalytics())
+    .catch(() => {
+      // Shutting down regardless: a ClickHouse connection that will not close cleanly must not
+      // stop the socket from being released.
+    })
+    .then(() => server.stop(true))
+    .then(() => {
+      store.close();
+      if (config.mode === "standalone" && existsSync(config.socketPath)) {
+        unlinkSync(config.socketPath);
+      }
+      process.exit(0);
+    });
 }
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
