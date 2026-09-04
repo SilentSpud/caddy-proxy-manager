@@ -64,6 +64,54 @@ with, and add their own. Two consequences are worth stating plainly:
 
 Only admins can reach either surface.
 
+### First-run Setup
+
+An installation with no accounts serves nothing but the setup flow, and that flow is necessarily
+public — there is no account to authenticate against yet. **Whoever reaches a fresh deployment
+first becomes its administrator.** Complete setup before the instance is reachable from anywhere
+you do not control, or set `ADMIN_USERNAME`/`ADMIN_PASSWORD`, which seeds an admin at startup and
+skips the flow entirely.
+
+Once setup completes the flag is stored, and the setup screens redirect away for good.
+
+### Controller and Agent
+
+The controller reaches its agents over a REST API, and the seam is signed rather than
+bearer-authenticated. Every request carries an HMAC-SHA256 over the method, path, timestamp and a
+hash of the body:
+
+- **The secret never travels with a request**, so it cannot be lifted from a proxy log or a
+  `curl -v` pasted into an issue.
+- **The path is bound into the signature**, so a captured read cannot be replayed as a write.
+- **The body is bound too**, so a valid request cannot be edited in flight.
+- A ±60 second window bounds replay.
+
+**Pairing.** An agent on another host prints a six-letter code valid for five minutes, burned on
+first use and refused after ten wrong guesses. The two exchange a secret, which is encrypted with
+`encryptSecret` before it reaches a row and is never returned to the browser, logged, or included
+in any view type. Unpairing forgets the controller's side only — restart the agent as well if you
+are removing one you no longer trust.
+
+**The agent's Caddy admin proxy is an allowlist**, not a sanitiser: `/load`, `/config/`, `/adapt`
+and `/reverse_proxy/upstreams` are the four paths the controller needs. Caddy's admin API can stop
+the server outright, so a request for anything else is treated as not having come from this
+application, whatever signed it.
+
+**Agent-to-controller** runs on exactly one route, the GeoLite2 download, signed with the same
+pairing secret. Every refusal on it answers `404` — unsigned, unknown agent id, stale timestamp,
+disabled agent, unknown database edition are all identical from outside, so nothing can learn the
+route exists or which agent ids are real without already holding a secret.
+
+**ClickHouse credentials travel to every agent.** Each host parses its own Caddy logs and inserts
+the events itself, using credentials the controller pushes. Two things follow: enabling analytics
+puts that password on every agent host, and it is currently the same account the controller reads
+with, not an insert-only one. On a fleet spread across hosts you do not equally trust, weigh that
+before turning analytics on.
+
+**`SESSION_SECRET` is the root of all of it.** It derives the key that encrypts DNS provider
+credentials, imported private keys, agent secrets and the secret settings. Rotating it makes every
+one of them unreadable.
+
 ### Dependency Management
 
 - Automated dependency updates via Dependabot

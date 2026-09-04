@@ -1,6 +1,12 @@
 # Caddy Proxy Manager
 
-Web interface for managing [Caddy Server](https://caddyserver.com/) reverse proxies and certificates. This fork is for redoing the original UI in a way that I like and trying to make the application as lightweight as possible. **THE CONFIG SETTINGS ON THIS PAGE HAVEN'T BEEN UPDATED, AND THEY WON'T BE UNTIL I'M SATISFIED WITH THE NEW CONFIG SETUP. IN THE MEANTIME, USE AT YOUR OWN RISK.** (As long as this message is here, I'm still not satisfied)
+Web interface for managing [Caddy Server](https://caddyserver.com/) reverse proxies and certificates. This fork is for redoing the original UI in a way that I like and trying to make the application as lightweight as possible.
+
+> **3.1 changes how this is configured.** Most settings now live in the database and are entered
+> through a first-run setup flow in the browser, not in `.env`. PostgreSQL replaces SQLite, and an
+> existing 3.0 installation is migrated in-app rather than by hand. See [First Run](#first-run) and
+> [The Database](#the-database). It is a substantial change and has not been through a release yet —
+> take a backup before upgrading.
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://mit-license.org)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
@@ -22,13 +28,50 @@ This project provides a web UI for Caddy Server, eliminating the need to manuall
 git clone https://github.com/silentspud/caddy-proxy-manager.git
 cd caddy-proxy-manager
 cp .env.example .env
-# Edit .env with your credentials
+
+# The only two values a fresh install has to have
+echo "SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
+
 docker compose up -d
 ```
 
-Access at `http://localhost:3000/login`
+Then open `http://localhost:3000` and follow [First Run](#first-run) — every URL redirects there
+until setup is finished. There is no administrator to sign in as until you create one.
 
-Data persists in Docker volumes (caddy-manager-data, caddy-data, caddy-config, caddy-logs).
+Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-data`, `caddy-data`,
+`caddy-config`, `caddy-logs`, `geoip-data`, `acme-ca`, and `clickhouse-data` when analytics are on.
+
+---
+
+## First Run
+
+A fresh install has no accounts and nothing configured. The first request lands on `/setup`, and
+the app serves nothing else until the flow finishes.
+
+1. **Controller or agent.** Agents are set up from their own host and paired later — choosing it
+   here just says so. See [The Agent](#the-agent).
+2. **Create the first administrator**, or configure an OAuth provider instead of a local account.
+3. **Sign in.** Deliberately before anything else is entered: a mistyped password or a wrong OAuth
+   client secret is otherwise only discovered after the whole configuration has been filled in, and
+   the only way out is deleting the database.
+4. **Settings.** Everything that used to live in `.env` — public URL, analytics, GeoIP credentials,
+   authentication policy — pre-filled with whatever the environment already provides, each field
+   showing where its value came from. **Save** writes them to the database and opens the dashboard.
+   Nothing is stored before Save.
+
+The stage is derived from what exists, not tracked as a counter, so a half-finished setup resumes
+where it left off and the back button cannot desynchronise it. Setup is one-way: once complete,
+`/setup` redirects away.
+
+Two things skip the flow entirely:
+
+- **An existing 3.0 installation.** A pre-3.1 SQLite database found on the host is offered for
+  migration *before* account creation — you want its accounts, not a new one alongside them. See
+  [Upgrading from 3.0](#upgrading-from-30-which-used-sqlite).
+- **A deployment that predates the flow.** If `ADMIN_USERNAME`/`ADMIN_PASSWORD` or `OAUTH_ENABLED`
+  configure a way in and someone can already sign in, setup is marked complete at startup and never
+  shown. Upgrading an existing install changes nothing about how it starts.
 
 ### Runtime
 
@@ -85,7 +128,10 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, Spaceship, deSEC, Dynu, and acme-dns. Credentials encrypted at rest. Per-certificate provider override supported
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
-- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format
+- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format — plus everything that used to be in `.env`, stored in the database and editable without a restart
+- **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
+- **In-app Migration** - A pre-3.1 SQLite installation is detected, verified against the expected schema, and imported — accounts, hosts, certificates and settings — with a backup of the old file and a trimmed `.env` at the end
+- **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. Every apply lands on all of them or none, and names the host that refused
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
@@ -95,82 +141,112 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 
 ## Configuration
 
-### Environment Variables
+Most configuration lives in the database and is edited on the **Settings** page. `.env` holds what
+has to be read before the database can be, plus what Docker Compose itself needs.
+
+### How a setting is resolved
+
+**Stored value → environment variable → default.** Three layers, in that order.
+
+The environment layer is what makes upgrading safe: until a deployment has been through setup or
+migration nothing is stored, every setting resolves from the variable it always did, and behaviour
+is unchanged. Once a value is stored it wins, and the variable can be deleted from your `.env`.
+Each field on the Settings page shows which layer its current value came from.
+
+A stored value that no longer validates — because a range was tightened, say — is ignored with a
+warning and falls through to the environment and the default, rather than taking the app down.
+
+### Stored in the database
+
+Each of these is a field on **Settings** (and on the setup flow's final step). The variable named
+is still honoured as an override until a value is stored.
+
+| Setting | Variable | Default |
+| ------- | -------- | ------- |
+| Application name — sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
+| Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
+| Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy:2019` |
+| Gravatar fallback for user icons. Off keeps every avatar lookup off the network | `AVATAR_GRAVATAR` | `true` |
+| Internal forward-auth address Caddy dials. Derived from the container network when empty | `FORWARD_AUTH_INTERNAL_URL` | Derived |
+| Seconds before an xcaddy rebuild is abandoned | `CADDY_BUILD_TIMEOUT` | `1800` |
+| Allow email/password self-registration | `AUTH_ALLOW_SELF_REGISTRATION` | `false` |
+| Let a first-time OAuth identity create an account | `AUTH_ALLOW_OAUTH_REGISTRATION` | `false` |
+| Trust the IdP's claims to set a new user's role and status. Off forces `user`/`active` | `AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS` | `false` |
+| OIDC-only mode: no local accounts, no credential sign-in, no bootstrap admin | `AUTH_DISABLE_LOCAL_USERS` | `false` |
+| Build URLs from the request's Host header. Only behind a proxy that rewrites it | `AUTH_TRUST_HOST` | `false` |
+| Force a reset for pre-argon2id bcrypt hashes. Leave unset to let the toggle decide | `AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH` | Unset |
+| Rate-limit the auth endpoints | `AUTH_RATE_LIMIT_ENABLED` | `true` |
+| Auth rate-limit window, in seconds | `AUTH_RATE_LIMIT_WINDOW` | `60` |
+| Auth requests allowed per window | `AUTH_RATE_LIMIT_MAX` | `5` |
+| Failed sign-ins before lockout | `LOGIN_MAX_ATTEMPTS` | `5` |
+| Window over which failed sign-ins are counted, in ms | `LOGIN_WINDOW_MS` | `300000` |
+| How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
+| ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
+| ClickHouse user | `CLICKHOUSE_USER` | `cpm` |
+| ClickHouse password. Empty disables analytics entirely. Encrypted at rest | `CLICKHOUSE_PASSWORD` | None |
+| ClickHouse database | `CLICKHOUSE_DB` | `analytics` |
+| Days of analytics kept. Lowering it migrates the tables' TTL on the next start | `CLICKHOUSE_RETENTION_DAYS` | `30` |
+| MaxMind account ID, for GeoLite2 downloads | `GEOIPUPDATE_ACCOUNT_ID` | None |
+| MaxMind license key. Encrypted at rest | `GEOIPUPDATE_LICENSE_KEY` | None |
+
+> `CLICKHOUSE_PASSWORD`, `GEOIPUPDATE_ACCOUNT_ID` and `GEOIPUPDATE_LICENSE_KEY` are read by Compose
+> as well, to provision the `clickhouse` and `geoipupdate` containers. Those two services are
+> started by Docker, which cannot read the database, so **keep them in `.env` even after saving
+> them in Settings**.
+
+### Stays in `.env`
 
 | Variable | Description | Default | Required |
 | -------- | ----------- | ------- | -------- |
-| `SESSION_SECRET` | Session encryption key (32+ chars) | None | **Yes** |
-| `ADMIN_USERNAME` | Admin login username | `admin` | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
-| `ADMIN_PASSWORD` | Admin password (see requirements below) | `admin` (dev only) | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
-| `BASE_URL` | Public URL where users access the dashboard.<br/>**Required for OAuth** - must match redirect URI | `http://localhost:3000` | **Yes** (if using OAuth) |
-| `APP_NAME` | Display name in the sidebar, on the login card, and as the suffix on every page title | `Caddy Proxy Manager` | No |
-| `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides | Unset (toggle decides) | No |
-| `HOST` | Address the controller binds. `::` accepts both IPv6 and IPv4 on a dual-stack socket; set `0.0.0.0` to bind IPv4 only | `::` | No |
-| `CADDY_API_URL` | Caddy Admin API endpoint. Read by the **agent**, which proxies every admin call; the controller uses it only when running Caddy with no agent at all | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
-| `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values below when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
-| `DATABASE_POOL_MAX` | Connections the database pool may open. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance pointing at it | `10` | No |
-| `POSTGRES_PASSWORD` | Password for the bundled `postgres` service. Interpolated by Compose on the host, not read by the app | None | **Yes** |
-| `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates. Compose-only, as above | `cpm` / `cpm` | No |
-| `CERTS_DIRECTORY` | Certificate storage directory | `./data/certs` | No |
-| `LOGIN_MAX_ATTEMPTS` | Max login attempts before rate limit | `5` | No |
-| `LOGIN_WINDOW_MS` | Rate limit window in milliseconds | `300000` (5 min) | No |
-| `LOGIN_BLOCK_MS` | Rate limit block duration in milliseconds | `900000` (15 min) | No |
-| `PUID` / `PGID` | Build args setting the UID/GID the containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
+| `SESSION_SECRET` | Session key, and the HKDF root every stored secret is encrypted with. 32+ chars (`openssl rand -base64 32`). It cannot live inside what it encrypts, and rotating it makes every stored secret unreadable | None | **Yes** |
+| `POSTGRES_PASSWORD` | Password for the bundled `postgres` service. Read by Compose, not the app | None | **Yes** |
+| `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates. Compose-only | `cpm` / `cpm` | No |
+| `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
+| `DATABASE_POOL_MAX` | Connections the pool may open — it sizes what reads the database, so it cannot be read from it. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance | `10` | No |
+| `NODE_ENV` | Read at module load, before any query. `production` enforces the password policy | `production` in the image | No |
+| `HOST` / `PORT` | The socket binds before anything can be read. `::` is dual-stack and accepts IPv4 too; `0.0.0.0` binds IPv4 only | `::` / `3000` | No |
+| `CPM_APP_ROOT` / `CPM_HEALTHCHECK_URL` | Bootstrap paths for the `cpm-server` binary, used before the app starts | Executable's directory / `http://127.0.0.1:${PORT}/api/health` | No |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.1 did. **Not required** — [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely | None | No |
+| `OAUTH_*` | An OAuth provider configured by environment. Synced into the `oauth_providers` table at startup rather than into the settings registry, so there is one source of truth per provider. See [OAuth Authentication](#oauth-authentication) | None | No |
+| `CERTS_DIRECTORY` | Where generated certificates are written | `./data/certs` | No |
+| `ACME_CA_ROOT_DIR` | Directory holding a custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
+| `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
+| `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
+| `LEGACY_SQLITE_PATH` | Pins which pre-3.1 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
+| `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (local socket) | No |
+| `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this encrypted in the database instead | None | With `AGENT_URL` |
+| `AGENT_SOCKET` / `AGENT_CONTROLLER_ID` | Override the local agent's socket path, and the identity the controller signs as | `$L4_PORTS_DIR/agent.sock` / built-in | No |
+| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate` | `clickhouse` | No |
+| `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
 | `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
-| `CADDY_BUILD_TIMEOUT` | Seconds the agent waits for an xcaddy rebuild triggered from **Settings → Caddy Build** before giving up | `1800` | No |
-| `AGENT_MODE` | How the agent listens: `standalone` (Unix socket on the shared volume) or `managed` (TCP, pairs with a controller by one-time code) | `standalone` | No |
-| `AGENT_PORT` | Port the agent listens on in `managed` mode | `3100` | No |
-| `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Interpolated by Compose on the host, not read by the app. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
-| `COMPOSE_PROFILES` | Comma-separated Compose profiles to activate: `clickhouse`, `geoipupdate` | `clickhouse` | No |
-| `GEOIPUPDATE_ACCOUNT_ID` | MaxMind account ID for GeoLite2 updates. Needed for geo blocking | None | No (required if `geoipupdate`) |
-| `GEOIPUPDATE_LICENSE_KEY` | MaxMind license key for GeoLite2 updates | None | No (required if `geoipupdate`) |
-| `OAUTH_ENABLED` | Enable OAuth2/OIDC authentication | `false` | No |
-| `OAUTH_PROVIDER_NAME` | Display name for OAuth provider | `OAuth2` | No |
-| `OAUTH_CLIENT_ID` | OAuth2 client ID | None | No |
-| `OAUTH_CLIENT_SECRET` | OAuth2 client secret | None | No |
-| `OAUTH_ISSUER` | OAuth2 OIDC issuer URL | None | No |
-| `OAUTH_AUTHORIZATION_URL` | Optional OAuth authorization endpoint override | Auto-discovered from `OAUTH_ISSUER` | No |
-| `OAUTH_TOKEN_URL` | Optional OAuth token endpoint override | Auto-discovered from `OAUTH_ISSUER` | No |
-| `OAUTH_USERINFO_URL` | Optional OAuth userinfo endpoint override | Auto-discovered from `OAUTH_ISSUER` | No |
-| `OAUTH_ALLOW_AUTO_LINKING` | Allow auto-linking OAuth identities to existing users | `false` | No |
-| `OAUTH_SCOPES` | Scopes requested from the provider. Group claims usually need an extra scope | `openid email profile` | No |
-| `OAUTH_GROUPS_CLAIM` | Claim holding the user's groups. Dots address nested claims (`resource_access.cpm.roles`) | `groups` | No |
-| `OAUTH_GROUP_PREFIX` | Prefix marking CPM-relevant groups, e.g. `CPM_` | None | No |
-| `OAUTH_ROLE_MAPPING` | Assign CPM roles from the group claim | `false` | No |
-| `OAUTH_ADMIN_GROUP` | Group(s) granting admin, comma-separated. Takes precedence over the prefix | `<prefix>Admin` | No |
-| `OAUTH_USER_GROUP` | Group(s) granting user, comma-separated. Takes precedence over the prefix | `<prefix>User` | No |
-| `OAUTH_VIEWER_GROUP` | Group(s) granting viewer, comma-separated. Takes precedence over the prefix | `<prefix>Viewer` | No |
-| `OAUTH_DEFAULT_ROLE` | Role assigned when no role group matches | `user` | No |
-| `OAUTH_SYNC_GROUPS` | Mirror the remaining prefixed IdP groups into CPM groups | `false` | No |
-| `AUTH_TRUST_HOST` | Trust the Host header for URL construction (only behind proxies that rewrite Host) | `false` | No |
-| `AUTH_ALLOW_SELF_REGISTRATION` | Allow public email/password account registration | `false` | No |
-| `AUTH_ALLOW_OAUTH_REGISTRATION` | Allow first-time OAuth/OIDC identities to create user accounts | `false` (`true` when `AUTH_DISABLE_LOCAL_USERS=true`) | No |
-| `AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS` | Trust the IdP's profile claims to set a new user's role and status. When `false`, OAuth-created accounts are forced to `user`/`active` regardless of claims. Enable only if you control the IdP | `false` | No |
-| `AUTH_DISABLE_LOCAL_USERS` | OIDC-only mode: no local accounts, no credential sign-in, no bootstrap admin | `false` | No |
-| `AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH` | Force a password reset for users still on a pre-argon2id bcrypt hash. Setting it pins the policy and locks the **Settings → Security** toggle; when unset, that toggle decides | Unset (toggle decides) | No |
-| `AUTH_RATE_LIMIT_ENABLED` | Enable Better Auth rate limiting | `true` | No |
-| `AUTH_RATE_LIMIT_WINDOW` | Rate limit window in seconds | `60` | No |
-| `AUTH_RATE_LIMIT_MAX` | Max requests per window | `5` | No |
-| `CLICKHOUSE_URL` | ClickHouse HTTP endpoint for analytics | `http://clickhouse:8123` | No |
-| `CLICKHOUSE_USER` | ClickHouse username | `cpm` | No |
-| `CLICKHOUSE_PASSWORD` | ClickHouse password (`openssl rand -base64 32`). Required when the `clickhouse` profile is active. | None | No (required if analytics enabled) |
-| `CLICKHOUSE_DB` | ClickHouse database name | `analytics` | No |
-| `CLICKHOUSE_RETENTION_DAYS` | Days of analytics kept before ClickHouse's TTL deletes them. Changing it migrates the existing tables' TTL on the next startup | `30` | No |
-| `FORWARD_AUTH_INTERNAL_URL` | Dial address Caddy uses to reach this app for `forward_auth`. Override only if the derived container address does not work | Derived from the container network | No |
-| `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` to disable | Built-in cutoff date | No |
-| `ACME_CA_ROOT_DIR` | Directory holding the custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
-| `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
-| `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (use the local socket) | No |
-| `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this in the database instead | None | No (required with `AGENT_URL`) |
-| `PORT` / `HOST` | Listen address for the `cpm-server` binary when run directly instead of in the container | `3000` / `0.0.0.0` | No |
-| `CPM_APP_ROOT` | Application root for the `cpm-server` binary | Directory of the executable | No |
-| `CPM_HEALTHCHECK_URL` | Target for `cpm-server --healthcheck` | `http://127.0.0.1:${PORT}/api/health` | No |
+| `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Compose-only. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 
-**Production Requirements:**
+### The agent's environment
+
+The agent has no database to read configuration from until it has one, and none of this is
+changeable at runtime — it describes the host the agent is bolted to. So it stays environment-only.
+
+| Variable | Description | Default |
+| -------- | ----------- | ------- |
+| `AGENT_MODE` | `standalone` binds a Unix socket on the shared volume; `managed` binds TCP and prints a pairing code. Startup fails on any other value rather than guessing | `standalone` |
+| `AGENT_HOST` / `AGENT_PORT` | Listen address in `managed` mode | `::` / `3100` |
+| `AGENT_SOCKET` | Socket path in `standalone` mode | `$DATA_DIR/agent.sock` |
+| `DATA_DIR` | Where the agent's SQLite state, socket and secret live. Must be writable | `/data` |
+| `COMPOSE_DIR` | Where the compose project files are mounted, read-only | `/compose` |
+| `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy:2019` |
+| `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
+| `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
+| `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
+| `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
+| `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs | Auto-detected |
+| `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` / `GEOIP_DIR` / `GEOIP_DB` | Where the agent reads Caddy's logs and the GeoLite2 databases from | Container paths |
+
+**Production requirements:**
 
 - `SESSION_SECRET`: 32+ characters (`openssl rand -base64 32`)
-- `ADMIN_PASSWORD`: 12+ chars with uppercase, lowercase, numbers, and special characters — not required when `AUTH_DISABLE_LOCAL_USERS=true`
+- Any password you set, whether through setup or `ADMIN_PASSWORD`: 12+ chars with uppercase,
+  lowercase, numbers, and special characters — not required when OIDC-only mode is on
 
 Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credentials.
 
@@ -202,8 +278,24 @@ depend on `RETURNING`.
 
 Leave the old `.env` alone and stand up PostgreSQL first, then point `DATABASE_URL` at it. On the
 next start the app finds the old SQLite file, checks it against the schema it expects, and offers
-to migrate it — proxy hosts, certificates, users and settings included. If several candidate files
-are found, it asks which one.
+to migrate it. If several candidate files are found, it asks which one; `LEGACY_SQLITE_PATH` pins
+one instead of scanning.
+
+The offer comes **before** account creation — an operator with an old database wants its accounts,
+not a new one alongside them. Migrating copies everything across: proxy hosts, certificates, access
+lists, users and their credentials, groups, tokens, and the settings blobs. You then sign in with
+an account it just imported, using the password you already had, which is what proves the
+credential rows arrived intact.
+
+Your old `.env` is read too. Anything in it that is now a database setting is carried into the
+[settings step](#first-run) pre-filled and marked as having come from the environment, so you can
+see what is being taken over before agreeing to it.
+
+Setup finishes on a summary rather than the dashboard, because a deployment that has just replaced
+its database is owed three things first: a download of the old SQLite file, the path it was read
+from, and a copy of your `.env` with the migrated entries commented out — commented rather than
+deleted, so you keep a record of what they were. The old database file is read, never
+moved or deleted — take the backup before you clean anything up.
 
 Starting with a SQLite `DATABASE_URL` still set fails immediately, with a message saying so. That
 is deliberate: silently starting against an empty database would look like total data loss.
@@ -246,13 +338,16 @@ TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:5432/cpm_test bun run test
 
 ```bash
 export SESSION_SECRET=$(openssl rand -base64 32)
-export ADMIN_USERNAME="admin"
-export ADMIN_PASSWORD="YourStr0ng-P@ssw0rd123!"
+export POSTGRES_PASSWORD=$(openssl rand -base64 32)
 docker compose up -d
 ```
 
+Then create the administrator through [First Run](#first-run). Nothing needs a password in `.env`.
+
 **Limitations:**
 - In-memory rate limiting (not suitable for multi-instance deployments)
+- `SESSION_SECRET` encrypts every secret the database holds — DNS credentials, private keys, agent
+  secrets. Rotating it makes all of them unreadable
 
 ---
 
@@ -271,7 +366,7 @@ CPM has three roles with increasing privileges:
 | Create and manage own API tokens | Yes | Yes | Yes |
 | Access role-appropriate REST API endpoints (`/api/v1/`) | Yes | Yes | Yes |
 
-New users default to the **user** role. The initial admin account is created from the `ADMIN_USERNAME` / `ADMIN_PASSWORD` environment variables.
+New users default to the **user** role. The first administrator is created in [First Run](#first-run), or imported from a migrated 3.0 database. `ADMIN_USERNAME` / `ADMIN_PASSWORD` still seed one at startup for deployments that predate the setup flow.
 
 API tokens can only be created from an authenticated dashboard session; an
 existing bearer token cannot mint replacement credentials. Viewer and user
@@ -428,6 +523,9 @@ the controller pushes to it. ClickHouse still lives with the controller; only th
 Nothing to configure: enabling analytics on the controller (`CLICKHOUSE_PASSWORD`) is what causes
 the credentials to be pushed, and turning it off pushes `null` and stops the agent writing. The
 push happens at startup and whenever those settings change.
+
+Worth knowing before enabling analytics on a fleet: the credential pushed is the same ClickHouse
+account the controller reads with, not an insert-only one, and it goes to every agent host.
 
 ### GeoIP databases come from the controller
 

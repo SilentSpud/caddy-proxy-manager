@@ -34,6 +34,7 @@ else.
 | `dns`        | `172.28.0.5`  | dnsmasq — `*.cpm.test` → Caddy, everything else → Docker DNS |
 | `caddy`      | `172.28.0.10` | **system under test** — the project's Caddy image            |
 | `web`        | `172.28.0.11` | **system under test** — the project's CPM image              |
+| `postgres`   | DHCP          | the controller's database — the only backend since 3.1       |
 | `origin-a`   | `172.28.0.20` | L7 HTTP origin                                               |
 | `origin-b`   | `172.28.0.21` | L7 HTTP origin, second identity for load-balancing tests     |
 | `origin-tls` | `172.28.0.22` | L7 HTTPS origin with a deliberately mismatched certificate   |
@@ -138,9 +139,9 @@ text. The `not vars … ""` guard around each copy then matched the empty string
 the route was skipped, and nothing was set at all — so every application behind
 CPM forward auth saw an anonymous request.
 
-Fixed in `src/lib/caddy.ts` by canonicalising the placeholder for both the CPM
-and Authentik copy lists, and pinned at the unit level in
-`tests/unit/caddy-forward-auth-copy-headers.test.ts`.
+Fixed in `apps/controller/src/lib/caddy.ts` by canonicalising the placeholder for
+both the CPM and Authentik copy lists, and pinned at the unit level in
+`apps/controller/tests/unit/caddy-forward-auth-copy-headers.test.ts`.
 
 Two lesser things the rig documents rather than treats as bugs, both pinned so
 a change to either is deliberate:
@@ -167,10 +168,18 @@ a change to either is deliberate:
   auth, which shares the same route-building code, is covered end to end.
 - **Analytics** (ClickHouse) is not started. `55-waf` checks that the WAF event
   endpoint answers, not that a specific event was ingested.
-- The **agent** is not run. It only exists to recreate the Caddy container —
-  republishing host ports when L4 hosts change, and rebuilding the binary when
-  the module selection changes — and neither is exercised here. The client is on
-  the same network as Caddy, so it reaches stream listeners directly.
+- The **agent** is not run. `web` is pointed straight at Caddy's admin API with
+  `CADDY_API_URL`, which is the no-agent path the controller keeps for exactly
+  this shape of deployment. What the agent adds — republishing host ports when
+  L4 hosts change, rebuilding the binary when the module selection changes,
+  parsing this host's logs into ClickHouse, and fanning one configuration out to
+  several hosts — is therefore not exercised here. The client is on the same
+  network as Caddy, so it reaches stream listeners directly.
+- **First-run setup and migration** are not reachable: `web` is given
+  `ADMIN_USERNAME`/`ADMIN_PASSWORD`, so the setup flow is marked complete at
+  startup, which is what every pre-3.1 deployment does. Those flows are covered
+  in a browser instead — `apps/controller/tests/e2e/setup.spec.ts` and
+  `setup-migrate.spec.ts`, each against its own empty database.
 
 ## How a test file is written
 

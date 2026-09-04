@@ -102,15 +102,31 @@ the request origin at setup time and stored.
 
 Each phase ends green — tests, typecheck, lint, build — and lands on `main` on its own.
 
+**All phases landed on `main` as of 2026-09-04**, each green on tests, typecheck, lint and build.
+
 | # | Phase | Status |
 | --- | --- | --- |
 | 0 | Monorepo restructure | Done — `4463b947` |
-| 1 | PostgreSQL only | Done |
-| 2 | Settings service: typed registry, DB-backed config with an env-override layer | Done |
-| 3 | First-run setup and login-verify flow | Done |
-| 4 | Migration flow | Done |
-| 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | Done |
-| 6 | IPv6 | Done |
+| 1 | PostgreSQL only | Done — `51d0347c` |
+| 2 | Settings service: typed registry, DB-backed config with an env-override layer | Done — `58bf9d49` |
+| 3 | First-run setup and login-verify flow | Done — `4c91eb6b`, `cc99b741` |
+| 4 | Migration flow | Done — `d43d2a27`, `d5d16c02` |
+| 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | Done — `53eaf48b`…`c53b2c66` |
+| 6 | IPv6 | Done — `c01571fa` |
+| — | Setup and migration covered in a browser | Done — `194ef45d` |
+
+### What was not done
+
+Three things this plan called for are not in the shipped work. Recorded here rather than dropped,
+because each reads as complete from the sections above:
+
+- **The ClickHouse credential is not insert-only.** Decision 3 scoped it to an insert-only user on
+  the grounds that it now travels to every agent host. What is actually pushed is the same account
+  the controller reads with. The scoping is the missing half.
+- **There is no `/api/v1/agents`.** The old `/api/v1/instances*` routes went with instance-sync and
+  nothing replaced them, so a fleet is manageable only through the UI.
+- **The issuer backfill's collision refusal** is still not exercised against a migrated database —
+  see "Owed to phase 4" below.
 
 ### Phase 5, step 1: instance sync deleted
 

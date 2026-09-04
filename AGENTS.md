@@ -32,18 +32,44 @@ workflows and shell included. Explain *why*: a constraint, a gotcha, a decision 
 mistake without it. Never restate what the line does, and leave code that holds no surprise
 uncommented. Prefer tightening an existing comment to adding one beside it.
 
-## Environment variables
+## Configuration
 
-Adding, removing, or renaming one is never a one-file change. Update `.env.example` and the
-README's Environment Variables table in the same commit as the code, and delete the entries when
-the variable goes away — a stale row is worse than a missing one, because it reads as supported.
+Most settings live in the database, defined once in `apps/controller/src/lib/settings/registry.ts`.
+One definition carries the storage key, the environment variable it migrates from, validation, the
+default, and where it renders — the setup flow, the Settings page and the migration carry-over all
+read that list rather than repeating it. **A new user-facing setting is a registry entry, not a new
+environment variable.** Resolution is stored value → environment → default (`resolve.ts`).
 
-A variable the app reads must also be listed under `web.environment` in `docker-compose.yml`.
-Compose forwards nothing implicitly and there is no `env_file`, so an undeclared one is simply
-unset in the container: documented, honored in development, silently ignored in production.
+An environment variable is the right answer only for what has to be read before the database can
+be: bootstrap paths, the connection string, the key that encrypts the database's own secrets. The
+"Stays in `.env`" table in `docs/overhaul-plan.md` records which those are and why.
+
+### When you do add, remove or rename one
+
+Never a one-file change. Update `.env.example` and the README's environment tables in the same
+commit as the code, and delete the entries when the variable goes away — a stale row is worse than
+a missing one, because it reads as supported.
+
+A variable the app reads must also be listed under `web.environment` in `docker-compose.yml` (or
+`agent.environment` for an agent-side one). Compose forwards nothing implicitly and there is no
+`env_file`, so an undeclared one is simply unset in the container: documented, honored in
+development, silently ignored in production.
 
 Give Compose the real default, not `${VAR:-}`, for anything parsed as `Number(process.env.X ?? d)`
 — `??` does not catch the empty string that form produces, so the fallback lands as 0.
+
+## Tests
+
+`bun run test` from the root runs everything. It starts a throwaway PostgreSQL container, gives
+each test its own schema, and removes it afterwards; `TEST_POSTGRES_URL` points at a server of your
+own instead. Two constraints are not obvious from reading the suites:
+
+- **`mock.module` is global and leaks across files sharing a process.** The agent's tests run with
+  `--parallel` for that reason — a `node:fs` mock in one file was reaching every file that ran
+  after it. A test that passes alone and fails in the suite is this, not flake.
+- **Playwright specs run under Node, not Bun.** `bun:sqlite`, `Bun.password` and the rest are
+  unavailable in `tests/e2e/**`. Anything needing them belongs in a script the spec spawns with
+  `bun` — see `tests/helpers/build-legacy-db.ts`.
 
 <!-- ASTRYX:START -->
 Astryx v0.4.5 · 90+ components
