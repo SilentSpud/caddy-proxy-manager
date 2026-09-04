@@ -3,22 +3,11 @@
  * one document, so a handler naming an absent module takes every host offline — the handler must
  * not appear at all. The Caddyfile escape hatch is covered too: an unadaptable snippet is skipped.
  */
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { fresh } from '@/tests/helpers/fresh';
-import { rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
 
-const ctx = vi.hoisted(() => {
-  const { mkdirSync } = require('node:fs');
-  const { join: joinPath } = require('node:path');
-  const { tmpdir } = require('node:os');
-  const dir = joinPath(tmpdir(), `caddy-gating-test-${Date.now()}`);
-  mkdirSync(dir, { recursive: true });
-  process.env.L4_PORTS_DIR = dir;
-  return { db: null as unknown as TestDb, tmpDir: dir };
-});
+const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
@@ -42,13 +31,6 @@ vi.mock('../../src/lib/db', () => {
 
 vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
-// caddy-build resolves its data directory once, when the module is first
-// evaluated — before this file's body sets L4_PORTS_DIR above. Evaluate a
-// second copy now and point the plain specifier at it, so buildCaddyDocument
-// gates on the applied-module record this test writes.
-const freshCaddyBuild = await import(`../../src/lib/caddy-build${fresh()}`);
-vi.mock('../../src/lib/caddy-build', () => ({ ...freshCaddyBuild }));
-
 import { setCaddyAdminTransport, type CaddyAdminRequest } from '../../src/lib/caddy-admin';
 import { buildCaddyDocument } from '../../src/lib/caddy';
 import { CADDY_MODULES } from '../../src/lib/caddy-modules';
@@ -60,9 +42,12 @@ import {
 } from '../../src/lib/settings';
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { createL4ProxyHost } from '../../src/lib/models/l4-proxy-hosts';
+import { startFakeAgent } from '../helpers/fake-agent';
 import * as schema from '../../src/lib/db/schema';
 
-const APPLIED_PATH = join(ctx.tmpDir, 'caddy-build.applied.json');
+type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
+let agent: FakeAgent;
+
 const ALL_MODULE_PATHS = CADDY_MODULES.map((m) => m.modulePath);
 
 const GEOBLOCK: GeoBlockSettings = {
@@ -86,11 +71,11 @@ const GEOBLOCK: GeoBlockSettings = {
 };
 
 /**
- * Pretend a rebuild already completed with exactly these module paths — i.e.
- * write the agent's post-build record, not the pre-build compose override.
+ * Pretend a rebuild already completed with exactly these module paths — the agent's *applied* set,
+ * which it reports only after a build has succeeded, not the selection that requested it.
  */
 function setAppliedModules(specs: string[]) {
-  writeFileSync(APPLIED_PATH, JSON.stringify({ modules: specs.join(' ') }), 'utf-8');
+  agent.state.appliedModules = specs;
 }
 
 /** Select every catalog module except the named ids. */
@@ -162,7 +147,7 @@ function handlerNames(document: unknown): string[] {
 }
 
 beforeEach(async () => {
-  rmSync(APPLIED_PATH, { force: true });
+  agent = await startFakeAgent();
   installAdapter();
   await ctx.db.delete(schema.proxyHosts);
   await ctx.db.delete(schema.l4ProxyHosts);
@@ -176,6 +161,10 @@ beforeEach(async () => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
+});
+
+afterEach(async () => {
+  await agent.stop();
 });
 
 async function createHost(overrides: Record<string, unknown> = {}) {

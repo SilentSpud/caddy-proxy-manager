@@ -1,48 +1,156 @@
 /**
  * The controller <-> agent contract.
  *
- * Today that contract is files on a shared volume: the controller writes a trigger, the agent acts
- * on it and writes back a status. The names live here because both sides hard-code them — the
- * controller in TypeScript, the agent in shell — and a rename that reaches only one side leaves the
- * controller waiting forever on a status the agent is writing under a different name.
+ * The agent is a separate service reached over HTTP: a Unix socket on the same host, or a TCP
+ * address after an operator has paired the two. Every field either side puts on the wire is named
+ * here, because the two are built from different source trees and a rename that reaches only one
+ * of them fails at runtime rather than at compile time.
+ *
+ * Request authentication is HMAC-SHA256 over a canonical string, not a bearer token — see
+ * `signatureBase`. The secret is established once (written beside the socket in standalone mode,
+ * handed back by `POST /v1/pair` in managed mode) and never travels with a request.
  */
 
-/** Filenames on the shared data volume, relative to the agent's DATA_DIR. */
-export const AGENT_FILES = {
-  l4Ports: {
-    /** Compose override with the published ports enabled L4 hosts need. Controller writes. */
-    override: "docker-compose.l4-ports.yml",
-    /** Controller signals here; the agent deletes it once handled. */
-    trigger: "l4-ports.trigger",
-    /** Agent writes the outcome of the port apply. */
-    status: "l4-ports.status",
-  },
-  caddyBuild: {
-    /** DESIRED module list, carried into the build. Controller writes before triggering. */
-    override: "docker-compose.caddy-build.yml",
-    trigger: "caddy-build.trigger",
-    status: "caddy-build.status",
-    /**
-     * APPLIED module list, written only after a build succeeds and caddy is healthy. The
-     * controller treats it as the authority on what the running binary contains — distinct from
-     * `override`, which is only ever a request.
-     */
-    applied: "caddy-build.applied.json",
-  },
+/** Path prefix every authenticated endpoint sits under. */
+export const AGENT_API_PREFIX = "/v1";
+
+export const AGENT_ROUTES = {
+  /** Unauthenticated liveness. Answers before pairing, so the UI can say "reachable, not paired". */
+  health: "/health",
+  /** Exchange a one-time code for the shared secret. Managed mode only. */
+  pair: "/v1/pair",
+  /** Everything the controller shows about this agent in one round trip. */
+  status: "/v1/status",
+  /** GET the applied ports; POST a new set to publish. */
+  l4Ports: "/v1/l4-ports",
+  /** GET the applied module list; POST a new one to rebuild with. */
+  caddyBuild: "/v1/caddy-build",
 } as const;
 
-/** Shared shape of both status files. `state` narrows per operation. */
+// ─── Authentication ──────────────────────────────────────────────────────────
+
+/** Header carrying the request's Unix-millisecond timestamp. Part of the signed material. */
+export const AGENT_TIMESTAMP_HEADER = "x-cpm-timestamp";
+/** Header carrying the lowercase hex HMAC-SHA256 of `signatureBase`. */
+export const AGENT_SIGNATURE_HEADER = "x-cpm-signature";
+/** Header naming which paired controller is calling, so the agent can pick the right secret. */
+export const AGENT_CONTROLLER_HEADER = "x-cpm-controller";
+
+/**
+ * How far a request's timestamp may be from the agent's clock. Wide enough to survive two
+ * containers whose clocks were never synchronised, narrow enough that a captured request stops
+ * being replayable in a minute rather than a day.
+ */
+export const AGENT_CLOCK_SKEW_MS = 60_000;
+
+/**
+ * The exact bytes both sides sign. Newline-separated with a fixed field count, so no combination
+ * of path and body can be made to produce another request's base string.
+ *
+ * `bodyHash` is the hex SHA-256 of the raw body — of the empty string when there is none — which
+ * keeps the signature over the body without making the signer buffer it twice.
+ */
+export function signatureBase(
+  method: string,
+  path: string,
+  timestamp: number,
+  bodyHash: string,
+): string {
+  return `${method.toUpperCase()}\n${path}\n${timestamp}\n${bodyHash}`;
+}
+
+// ─── Pairing ─────────────────────────────────────────────────────────────────
+
+/** Alphabet the pairing code is drawn from: capitals only, so it can be read aloud and typed. */
+export const PAIRING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+export const PAIRING_CODE_LENGTH = 6;
+/** How long a pairing code stays valid. The agent prints a fresh one when this elapses. */
+export const PAIRING_CODE_TTL_MS = 5 * 60_000;
+
+export type PairRequest = {
+  /** The code the operator read off the agent's logs. */
+  code: string;
+  /** Stable id of the controller asking, so re-pairing replaces its secret rather than adding one. */
+  controllerId: string;
+  /** Shown in the agent's logs so an operator can tell two controllers apart. */
+  controllerName?: string;
+};
+
+export type PairResponse = {
+  /** Hex-encoded shared secret. Returned exactly once, at pairing time. */
+  secret: string;
+  agentId: string;
+  agentVersion: string;
+};
+
+// ─── Status ──────────────────────────────────────────────────────────────────
+
+export type L4PortsState = "idle" | "pending" | "applying" | "applied" | "failed";
+export type CaddyBuildState = "idle" | "pending" | "building" | "applied" | "failed";
+
+/** Shared shape of both operation statuses. `state` narrows per operation. */
 export type AgentOperationStatus<TState extends string> = {
   state: TState;
   message?: string;
   appliedAt?: string;
   triggeredAt?: string;
-  appliedHash?: string;
   error?: string;
 };
 
-export type L4PortsState = "idle" | "pending" | "applying" | "applied" | "failed";
-export type CaddyBuildState = "idle" | "pending" | "building" | "applied" | "failed";
-
 export type L4PortsStatus = AgentOperationStatus<L4PortsState>;
 export type CaddyBuildStatus = AgentOperationStatus<CaddyBuildState>;
+
+export type AgentStatus = {
+  agentId: string;
+  version: string;
+  mode: AgentMode;
+  /** Compose project the agent operates on, as detected from the Caddy container's labels. */
+  composeProject: string;
+  l4Ports: {
+    /** Ports currently published on the Caddy container, as `HOST:CONTAINER[/proto]`. */
+    applied: string[];
+    status: L4PortsStatus;
+  };
+  caddyBuild: {
+    /**
+     * xcaddy `--with` specs the running binary was actually built with, or null when this agent
+     * has never rebuilt it — which the controller reads as the shipped image's full catalog. An
+     * empty array is a different and much worse claim: "built with no plugins at all".
+     */
+    applied: string[] | null;
+    status: CaddyBuildStatus;
+  };
+};
+
+export type AgentMode = "standalone" | "managed";
+
+// ─── Requests ────────────────────────────────────────────────────────────────
+
+export type ApplyL4PortsRequest = {
+  /** `HOST:CONTAINER` or `HOST:CONTAINER/udp`, already deduplicated and sorted by the controller. */
+  ports: string[];
+};
+
+export type ApplyCaddyBuildRequest = {
+  /** xcaddy `--with` module specs to compile the new image with. */
+  modules: string[];
+};
+
+/** Every write returns the status the operation started in, never a bare 204. */
+export type ApplyResponse<TStatus> = {
+  accepted: boolean;
+  status: TStatus;
+};
+
+// ─── Errors ──────────────────────────────────────────────────────────────────
+
+export type AgentErrorBody = { error: string; code: AgentErrorCode };
+
+export type AgentErrorCode =
+  | "UNAUTHENTICATED"
+  | "PAIRING_DISABLED"
+  | "PAIRING_CODE_INVALID"
+  | "PAIRING_CODE_EXPIRED"
+  | "BAD_REQUEST"
+  | "BUSY"
+  | "INTERNAL";

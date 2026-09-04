@@ -1,0 +1,228 @@
+/**
+ * The agent's REST surface.
+ *
+ * Small on purpose. Everything the controller can ask for is one of four things — are you alive,
+ * what is your state, publish these ports, build with these modules — and each maps to exactly one
+ * route. Anything richer would put decisions on the agent that the controller is the authority on.
+ */
+
+import {
+  AGENT_ROUTES,
+  type AgentErrorBody,
+  type AgentErrorCode,
+  type AgentStatus,
+  type ApplyCaddyBuildRequest,
+  type ApplyL4PortsRequest,
+  type PairRequest,
+  type PairResponse,
+} from "@cpm/shared";
+import { generateSecret, verifyRequest, type PairingCodeIssuer } from "./auth";
+import type { AgentConfig } from "./config";
+import type { AgentStore } from "./db";
+import type { DockerHost } from "./docker";
+import { OperationBusyError, type Operations } from "./operations";
+
+export const AGENT_VERSION = "3.1.0";
+
+/** Largest body any endpoint accepts. Every one of them is a short JSON object. */
+const MAX_BODY_BYTES = 64 * 1024;
+
+function error(status: number, code: AgentErrorCode, message: string): Response {
+  return Response.json({ error: message, code } satisfies AgentErrorBody, { status });
+}
+
+/** A compose port spec: `HOST:CONTAINER` or `HOST:CONTAINER/udp`, numeric on both sides. */
+const PORT_SPEC = /^\d{1,5}:\d{1,5}(\/(tcp|udp))?$/;
+
+/**
+ * An xcaddy `--with` spec: a Go module path, optionally `@version` and `=replacement`.
+ *
+ * Validated here as well as in the controller because this string is interpolated into a compose
+ * build arg and reaches a shell-free `docker compose` invocation as one argument — but a newline or
+ * a quote in it would still corrupt the generated YAML, which is a config-injection route into the
+ * build regardless of how the process is spawned.
+ */
+const MODULE_SPEC = /^[A-Za-z0-9][A-Za-z0-9._~\-/]*(@[A-Za-z0-9._~\-+/]+)?(=[A-Za-z0-9._~\-/]+)?$/;
+
+function validateStringList(
+  value: unknown,
+  pattern: RegExp,
+  label: string,
+  limit: number,
+): string[] | string {
+  if (!Array.isArray(value)) return `${label} must be an array of strings.`;
+  if (value.length > limit) return `${label} must contain at most ${limit} entries.`;
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string" || !pattern.test(entry)) {
+      return `${label} contains an entry that is not a valid value.`;
+    }
+    out.push(entry);
+  }
+  return out;
+}
+
+export type AgentServices = {
+  config: AgentConfig;
+  store: AgentStore;
+  docker: DockerHost;
+  operations: Operations;
+  pairing: PairingCodeIssuer;
+};
+
+export function createHandler(services: AgentServices) {
+  const { config, store, docker, operations, pairing } = services;
+
+  return async function handle(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === AGENT_ROUTES.health) {
+      // Deliberately unauthenticated and deliberately sparse: it exists for a container
+      // healthcheck and for a controller asking "is anything there" before it has a secret, so it
+      // must not describe a host to an unpaired caller.
+      return Response.json({ ok: true, version: AGENT_VERSION });
+    }
+
+    const contentLength = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
+    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+      return error(413, "BAD_REQUEST", "The request body is too large.");
+    }
+    const body = await request.arrayBuffer();
+    if (body.byteLength > MAX_BODY_BYTES) {
+      return error(413, "BAD_REQUEST", "The request body is too large.");
+    }
+
+    if (url.pathname === AGENT_ROUTES.pair) {
+      if (request.method !== "POST") return error(405, "BAD_REQUEST", "Use POST to pair.");
+      return handlePair(body);
+    }
+
+    const auth = await verifyRequest(store, request, url, body);
+    if (!auth.ok) return error(401, auth.code, auth.message);
+
+    switch (url.pathname) {
+      case AGENT_ROUTES.status:
+        return Response.json(await buildStatus());
+      case AGENT_ROUTES.l4Ports:
+        return request.method === "POST"
+          ? handleApplyPorts(body)
+          : Response.json({
+              applied: store.appliedL4Ports(),
+              status: store.l4PortsStatus(),
+            });
+      case AGENT_ROUTES.caddyBuild:
+        return request.method === "POST"
+          ? handleApplyBuild(body)
+          : Response.json({
+              applied: store.appliedCaddyModules(),
+              status: store.caddyBuildStatus(),
+            });
+      default:
+        return error(404, "BAD_REQUEST", "No such endpoint.");
+    }
+  };
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
+
+  function parseJson(body: ArrayBuffer): unknown {
+    if (body.byteLength === 0) return {};
+    try {
+      return JSON.parse(new TextDecoder().decode(body));
+    } catch {
+      return null;
+    }
+  }
+
+  function handlePair(body: ArrayBuffer): Response {
+    const parsed = parseJson(body) as PairRequest | null;
+    if (!parsed || typeof parsed !== "object") {
+      return error(400, "BAD_REQUEST", "The pairing request is not valid JSON.");
+    }
+    if (typeof parsed.code !== "string" || typeof parsed.controllerId !== "string") {
+      return error(400, "BAD_REQUEST", "A pairing request needs a code and a controller id.");
+    }
+    if (parsed.controllerId.length === 0 || parsed.controllerId.length > 128) {
+      return error(400, "BAD_REQUEST", "The controller id is not a usable length.");
+    }
+
+    const redeemed = pairing.redeem(parsed.code);
+    if (!redeemed.ok) {
+      const message =
+        redeemed.code === "PAIRING_DISABLED"
+          ? "This agent runs in standalone mode and does not pair over the network."
+          : "That pairing code is not valid. Check the agent's logs for the current one.";
+      return error(redeemed.code === "PAIRING_DISABLED" ? 403 : 401, redeemed.code, message);
+    }
+
+    const secret = generateSecret();
+    const controllerName =
+      typeof parsed.controllerName === "string" && parsed.controllerName.trim().length > 0
+        ? parsed.controllerName.trim().slice(0, 128)
+        : null;
+    store.upsertController({ controllerId: parsed.controllerId, controllerName, secret });
+    console.log(
+      `[agent] paired with controller ${parsed.controllerId}${controllerName ? ` (${controllerName})` : ""}`,
+    );
+
+    return Response.json({
+      secret,
+      agentId: store.agentId(),
+      agentVersion: AGENT_VERSION,
+    } satisfies PairResponse);
+  }
+
+  function handleApplyPorts(body: ArrayBuffer): Response {
+    const parsed = parseJson(body) as ApplyL4PortsRequest | null;
+    if (!parsed || typeof parsed !== "object") {
+      return error(400, "BAD_REQUEST", "The request is not valid JSON.");
+    }
+    const ports = validateStringList(parsed.ports, PORT_SPEC, "ports", 200);
+    if (typeof ports === "string") return error(400, "BAD_REQUEST", ports);
+
+    try {
+      operations.applyL4Ports(ports);
+    } catch (busy) {
+      if (busy instanceof OperationBusyError) {
+        return error(409, "BUSY", `The agent is busy: ${busy.running} is already running.`);
+      }
+      throw busy;
+    }
+    return Response.json({ accepted: true, status: store.l4PortsStatus() }, { status: 202 });
+  }
+
+  function handleApplyBuild(body: ArrayBuffer): Response {
+    const parsed = parseJson(body) as ApplyCaddyBuildRequest | null;
+    if (!parsed || typeof parsed !== "object") {
+      return error(400, "BAD_REQUEST", "The request is not valid JSON.");
+    }
+    const modules = validateStringList(parsed.modules, MODULE_SPEC, "modules", 200);
+    if (typeof modules === "string") return error(400, "BAD_REQUEST", modules);
+
+    try {
+      operations.applyCaddyBuild(modules);
+    } catch (busy) {
+      if (busy instanceof OperationBusyError) {
+        return error(409, "BUSY", `The agent is busy: ${busy.running} is already running.`);
+      }
+      throw busy;
+    }
+    return Response.json({ accepted: true, status: store.caddyBuildStatus() }, { status: 202 });
+  }
+
+  async function buildStatus(): Promise<AgentStatus> {
+    return {
+      agentId: store.agentId(),
+      version: AGENT_VERSION,
+      mode: config.mode,
+      composeProject: await docker.composeProject(),
+      l4Ports: {
+        applied: store.appliedL4Ports(),
+        status: store.l4PortsStatus(),
+      },
+      caddyBuild: {
+        applied: store.appliedCaddyModules(),
+        status: store.caddyBuildStatus(),
+      },
+    };
+  }
+}

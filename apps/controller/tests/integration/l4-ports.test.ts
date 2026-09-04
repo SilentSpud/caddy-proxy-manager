@@ -1,23 +1,20 @@
-/** Integration: L4 port computation, override file generation, diff detection, status lifecycle. */
-import { describe, it, expect, beforeEach } from 'bun:test';
+/**
+ * Integration: port computation, and the round trip through the agent that publishes them.
+ *
+ * The agent here is a real HTTP server speaking the real protocol, not a mock of the client — see
+ * tests/helpers/fake-agent.ts. Every assertion about what the controller sent is
+ * therefore also an assertion that it signed the request correctly, which is the half of this seam
+ * that fails silently.
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
 
 // ---------------------------------------------------------------------------
-// Mock db and set L4_PORTS_DIR to a temp directory for file operations
+// Mock the database the port computation reads from.
 // ---------------------------------------------------------------------------
 
-const ctx = vi.hoisted(() => {
-  const { mkdirSync } = require('node:fs');
-  const { join } = require('node:path');
-  const { tmpdir } = require('node:os');
-  const dir = join(tmpdir(), `l4-ports-test-${Date.now()}`);
-  mkdirSync(dir, { recursive: true });
-  process.env.L4_PORTS_DIR = dir;
-  return { db: null as unknown as TestDb, tmpDir: dir };
-});
+const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
@@ -43,8 +40,18 @@ vi.mock('../../src/lib/audit', () => ({
 }));
 
 import * as schema from '../../src/lib/db/schema';
-const { getRequiredL4Ports, getAppliedL4Ports, getL4PortsDiff, applyL4Ports, getL4PortsStatus } =
-  await import('../../src/lib/l4-ports');
+const {
+  getRequiredL4Ports,
+  getAppliedL4Ports,
+  getL4PortsDiff,
+  applyL4Ports,
+  getL4PortsStatus,
+  isAgentAvailable,
+} = await import('../../src/lib/l4-ports');
+const { startFakeAgent, clearAgentEnv } = await import('../helpers/fake-agent');
+
+type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
+let agent: FakeAgent;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,16 +82,13 @@ function makeL4Host(overrides: Partial<typeof schema.l4ProxyHosts.$inferInsert> 
   } satisfies typeof schema.l4ProxyHosts.$inferInsert;
 }
 
-function cleanTmpDir() {
-  for (const file of ['docker-compose.l4-ports.yml', 'l4-ports.trigger', 'l4-ports.status']) {
-    const path = join(ctx.tmpDir, file);
-    if (existsSync(path)) rmSync(path);
-  }
-}
-
 beforeEach(async () => {
   await ctx.db.delete(schema.l4ProxyHosts);
-  cleanTmpDir();
+  agent = await startFakeAgent();
+});
+
+afterEach(async () => {
+  await agent.stop();
 });
 
 // ---------------------------------------------------------------------------
@@ -196,33 +200,20 @@ describe('getRequiredL4Ports', () => {
 // ---------------------------------------------------------------------------
 
 describe('getAppliedL4Ports', () => {
-  it('returns empty when no override file exists', () => {
-    const ports = getAppliedL4Ports();
-    expect(ports).toEqual([]);
+  it('is empty when the agent has published nothing', async () => {
+    expect(await getAppliedL4Ports()).toEqual([]);
   });
 
-  it('parses ports from override file', () => {
-    writeFileSync(
-      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
-      `services:
-  caddy:
-    ports:
-      - "5432:5432"
-      - "3306:3306"
-`,
-    );
-    const ports = getAppliedL4Ports();
-    expect(ports).toEqual(['3306:3306', '5432:5432']);
+  it('reports what the agent says is published', async () => {
+    agent.state.appliedPorts = ['3306:3306', '5432:5432'];
+    expect(await getAppliedL4Ports()).toEqual(['3306:3306', '5432:5432']);
   });
 
-  it('handles empty override file', () => {
-    writeFileSync(
-      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
-      `services: {}
-`,
-    );
-    const ports = getAppliedL4Ports();
-    expect(ports).toEqual([]);
+  it('is empty when no agent is reachable at all', async () => {
+    await agent.stop();
+    clearAgentEnv();
+    // Not an error: a deployment whose agent container is not running still serves every page.
+    expect(await getAppliedL4Ports()).toEqual([]);
   });
 });
 
@@ -231,59 +222,40 @@ describe('getAppliedL4Ports', () => {
 // ---------------------------------------------------------------------------
 
 describe('getL4PortsDiff', () => {
-  it('needsApply is false when no hosts and no override', async () => {
+  it('needsApply is false when nothing is required and nothing is published', async () => {
     const diff = await getL4PortsDiff();
     expect(diff.needsApply).toBe(false);
     expect(diff.requiredPorts).toEqual([]);
     expect(diff.currentPorts).toEqual([]);
   });
 
-  it('needsApply is true when host exists but no override', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(
-      makeL4Host({
-        listenAddress: ':5432',
-      }),
-    );
+  it('needsApply is true when a host needs a port the agent has not published', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
     const diff = await getL4PortsDiff();
     expect(diff.needsApply).toBe(true);
     expect(diff.requiredPorts).toEqual(['5432:5432']);
     expect(diff.currentPorts).toEqual([]);
   });
 
-  it('needsApply is false when override matches', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(
-      makeL4Host({
-        listenAddress: ':5432',
-      }),
-    );
-    writeFileSync(
-      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
-      `services:
-  caddy:
-    ports:
-      - "5432:5432"
-`,
-    );
-    const diff = await getL4PortsDiff();
-    expect(diff.needsApply).toBe(false);
+  it('needsApply is false once the agent publishes exactly those ports', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
+    agent.state.appliedPorts = ['5432:5432'];
+    expect((await getL4PortsDiff()).needsApply).toBe(false);
   });
 
-  it('needsApply is true when override has different ports', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(
-      makeL4Host({
-        listenAddress: ':5432',
-      }),
-    );
-    writeFileSync(
-      join(ctx.tmpDir, 'docker-compose.l4-ports.yml'),
-      `services:
-  caddy:
-    ports:
-      - "3306:3306"
-`,
-    );
-    const diff = await getL4PortsDiff();
-    expect(diff.needsApply).toBe(true);
+  it('needsApply is true when the agent publishes a different port', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
+    agent.state.appliedPorts = ['3306:3306'];
+    expect((await getL4PortsDiff()).needsApply).toBe(true);
+  });
+
+  it('needsApply is true for a required port when the agent is unreachable', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
+    await agent.stop();
+    clearAgentEnv();
+    // Nothing can be published without an agent, so claiming the ports are already up would be
+    // the one answer an operator cannot act on.
+    expect((await getL4PortsDiff()).needsApply).toBe(true);
   });
 });
 
@@ -292,139 +264,112 @@ describe('getL4PortsDiff', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyL4Ports', () => {
-  it('writes override file with required ports', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(
-      makeL4Host({
-        listenAddress: ':5432',
-      }),
-    );
-    await ctx.db.insert(schema.l4ProxyHosts).values(
-      makeL4Host({
-        name: 'DNS',
-        listenAddress: ':5353',
-        protocol: 'udp',
-      }),
-    );
+  it('sends the required ports to the agent', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
+    await applyL4Ports();
 
-    const status = await applyL4Ports();
-    expect(status.state).toBe('pending');
-
-    const overrideContent = readFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), 'utf-8');
-    expect(overrideContent).toContain('"5432:5432"');
-    expect(overrideContent).toContain('"5353:5353/udp"');
+    const posted = agent.requests.filter((r) => r.method === 'POST');
+    expect(posted).toHaveLength(1);
+    expect(posted[0].path).toBe('/v1/l4-ports');
+    expect(posted[0].body).toEqual({ ports: ['5432:5432'] });
   });
 
-  it('writes trigger file', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(
-      makeL4Host({
-        listenAddress: ':5432',
-      }),
-    );
-
+  it('signs the request it sends', async () => {
     await applyL4Ports();
-    const triggerPath = join(ctx.tmpDir, 'l4-ports.trigger');
-    expect(existsSync(triggerPath)).toBe(true);
-
-    const trigger = JSON.parse(readFileSync(triggerPath, 'utf-8'));
-    expect(trigger.triggeredAt).toBeDefined();
-    expect(trigger.ports).toEqual(['5432:5432']);
+    // The fake verifies the HMAC itself; an unsigned request is answered 401 and would have thrown
+    // above. Asserted explicitly so a change that stops signing cannot pass quietly.
+    expect(agent.requests.every((r) => r.signed)).toBe(true);
   });
 
-  it('writes empty override when no ports needed', async () => {
-    const status = await applyL4Ports();
-    expect(status.state).toBe('pending');
+  it('returns the in-progress status the agent answers with', async () => {
+    await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
+    // Accepted, not finished: a recreate takes seconds, so the agent answers immediately and the
+    // controller polls. Reporting "applied" here would tell the operator the ports are up before
+    // the container has come back.
+    expect((await applyL4Ports()).state).toBe('applying');
 
-    const overrideContent = readFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), 'utf-8');
-    expect(overrideContent).toContain('services: {}');
+    agent.completeL4Ports();
+    expect(await getAppliedL4Ports()).toEqual(['5432:5432']);
+    expect((await getL4PortsStatus()).state).toBe('applied');
   });
 
-  it('override file is idempotent — same ports produce same content', async () => {
-    await ctx.db.insert(schema.l4ProxyHosts).values(
-      makeL4Host({
-        listenAddress: ':5432',
-      }),
-    );
-
+  it('sends an empty list when no host needs a port', async () => {
     await applyL4Ports();
-    const content1 = readFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), 'utf-8');
+    expect(agent.requests.find((r) => r.method === 'POST')?.body).toEqual({ ports: [] });
+  });
 
+  it('sends the same ports for the same hosts, whatever order they were added in', async () => {
+    await ctx.db
+      .insert(schema.l4ProxyHosts)
+      .values([
+        makeL4Host({ listenAddress: ':6379', name: 'b' }),
+        makeL4Host({ listenAddress: ':5432', name: 'a' }),
+      ]);
     await applyL4Ports();
-    const content2 = readFileSync(join(ctx.tmpDir, 'docker-compose.l4-ports.yml'), 'utf-8');
+    expect(agent.requests.find((r) => r.method === 'POST')?.body).toEqual({
+      ports: ['5432:5432', '6379:6379'],
+    });
+  });
 
-    expect(content1).toBe(content2);
+  it('fails loudly when there is no agent to send to', async () => {
+    await agent.stop();
+    clearAgentEnv();
+    // Unlike the read paths, this one must not degrade quietly: the operator clicked a button and
+    // has to be told nothing happened.
+    expect(applyL4Ports()).rejects.toThrow(/agent/i);
   });
 });
 
 // ---------------------------------------------------------------------------
-// getL4PortsStatus
+// getL4PortsStatus / isAgentAvailable
 // ---------------------------------------------------------------------------
 
 describe('getL4PortsStatus', () => {
-  it('returns idle when no status file exists', () => {
-    const status = getL4PortsStatus();
-    expect(status.state).toBe('idle');
+  it('is idle before anything has been applied', async () => {
+    expect(await getL4PortsStatus()).toEqual({ state: 'idle' });
   });
 
-  it('returns idle when no status file exists even if trigger file is present', () => {
-    // Trigger files are deleted by the agent after processing.
-    // A leftover trigger file must NEVER cause "Waiting for the agent..."
-    // because that message gets permanently stuck if the agent is slow or restarting.
-    writeFileSync(
-      join(ctx.tmpDir, 'l4-ports.trigger'),
-      JSON.stringify({
-        triggeredAt: new Date().toISOString(),
-      }),
-    );
-    const status = getL4PortsStatus();
-    expect(status.state).toBe('idle');
+  it('reports what the agent last did', async () => {
+    agent.state.l4Status = { state: 'applied', message: 'Recreated', appliedAt: 'now' };
+    expect(await getL4PortsStatus()).toEqual({
+      state: 'applied',
+      message: 'Recreated',
+      appliedAt: 'now',
+    });
   });
 
-  it('returns applied when status file says applied', () => {
-    writeFileSync(
-      join(ctx.tmpDir, 'l4-ports.status'),
-      JSON.stringify({
-        state: 'applied',
-        message: 'Success',
-        appliedAt: new Date().toISOString(),
-      }),
-    );
-    const status = getL4PortsStatus();
-    expect(status.state).toBe('applied');
-  });
-
-  it('returns failed when status file says failed', () => {
-    writeFileSync(
-      join(ctx.tmpDir, 'l4-ports.status'),
-      JSON.stringify({
-        state: 'failed',
-        message: 'Failed',
-        error: 'Container failed',
-        appliedAt: new Date().toISOString(),
-      }),
-    );
-    const status = getL4PortsStatus();
+  it('reports a failure the agent recorded', async () => {
+    agent.state.l4Status = { state: 'failed', message: 'port in use', error: 'port in use' };
+    const status = await getL4PortsStatus();
     expect(status.state).toBe('failed');
-    expect(status.error).toBe('Container failed');
+    expect(status.error).toBe('port in use');
   });
 
-  it('returns status from file regardless of trigger file presence', () => {
-    // The agent deletes triggers after processing, so the status file is
-    // the single source of truth — trigger file presence is irrelevant here.
-    writeFileSync(
-      join(ctx.tmpDir, 'l4-ports.trigger'),
-      JSON.stringify({
-        triggeredAt: '2026-03-21T12:00:00Z',
-      }),
-    );
-    writeFileSync(
-      join(ctx.tmpDir, 'l4-ports.status'),
-      JSON.stringify({
-        state: 'applied',
-        message: 'Done',
-        appliedAt: '2026-01-01T00:00:00Z',
-      }),
-    );
-    const status = getL4PortsStatus();
-    expect(status.state).toBe('applied');
+  it('is idle when no agent is reachable', async () => {
+    await agent.stop();
+    clearAgentEnv();
+    expect(await getL4PortsStatus()).toEqual({ state: 'idle' });
+  });
+});
+
+describe('isAgentAvailable', () => {
+  it('is true while the agent answers', async () => {
+    expect(await isAgentAvailable()).toBe(true);
+  });
+
+  it('is false with nothing configured', async () => {
+    await agent.stop();
+    clearAgentEnv();
+    expect(await isAgentAvailable()).toBe(false);
+  });
+
+  it('is false when an agent is configured but not answering', async () => {
+    const { url, secret } = agent;
+    await agent.stop();
+    // Configured, but the process behind it is gone — the case a health probe exists for.
+    process.env.AGENT_URL = url;
+    process.env.AGENT_SECRET = secret;
+    expect(await isAgentAvailable()).toBe(false);
+    clearAgentEnv();
   });
 });

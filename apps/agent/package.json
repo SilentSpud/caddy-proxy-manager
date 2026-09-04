@@ -4,6 +4,13 @@
   "description": "Caddy Proxy Manager agent — manages the Caddy container on its host",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build:binary": "bun build --compile --target=${BUN_COMPILE_TARGET:-bun} --outfile dist/cpm-agent src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test tests"
+  },
   "dependencies": {
     "@cpm/shared": "workspace:*"
   }

@@ -1,20 +1,19 @@
 /**
  * Caddy image build management.
  *
- * Plugins are compiled in, so a module-list change means rebuilding and recreating the container:
- * the web app writes a compose override plus a trigger to the shared volume, and the agent builds
- * and writes caddy-build.status — plus caddy-build.applied.json on success only.
+ * Plugins are compiled in, so changing the module list means rebuilding the image and recreating
+ * the container — which the controller cannot do itself, having no Docker socket. It sends the
+ * selection to the agent and reads back what the agent actually built.
  *
- * *desired* is the admin's selection (the compose override, drives the UI); *applied* is what the
- * running binary was built with (the agent's record). Generation must never emit a handler
- * outside *applied*, since Caddy rejects a config naming an unknown module in full — hence separate
- * files, since the override is written before the build. Generation uses the intersection.
+ * *desired* is the admin's selection, which drives the UI; *applied* is what the running binary was
+ * built with, which the agent reports and only after a build has succeeded and Caddy is healthy
+ * again. Generation must never emit a handler outside *applied*, since Caddy rejects a config
+ * naming an unknown module in full — so the two are kept apart, and generation uses the
+ * intersection.
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import crypto from "node:crypto";
-import { AGENT_FILES, type CaddyBuildState, type CaddyBuildStatus } from "@cpm/shared";
+import type { CaddyBuildState, CaddyBuildStatus } from "@cpm/shared";
 import {
   CADDY_MODULES,
   type CaddyCustomModule,
@@ -27,17 +26,7 @@ import {
 } from "./caddy-modules";
 import { type CaddyBuildSettings, getCaddyBuildSettings } from "./settings";
 
-// Shares the data volume and env override with l4-ports.ts, so tests can point both at a
-// scratch directory.
-const DATA_DIR = process.env.L4_PORTS_DIR || "/app/data";
-const {
-  override: OVERRIDE_FILE,
-  trigger: TRIGGER_FILE,
-  status: STATUS_FILE,
-  // Written by the agent after a build succeeds and caddy is healthy again. Separate from
-  // OVERRIDE_FILE on purpose — see getAppliedModuleSpecs.
-  applied: APPLIED_FILE,
-} = AGENT_FILES.caddyBuild;
+import { requestCaddyBuild, tryGetAgentStatus } from "./agent/client";
 
 export type { CaddyBuildState, CaddyBuildStatus };
 
@@ -89,24 +78,18 @@ export function defaultModuleSpecs(): string[] {
 /**
  * The module specs actually compiled into the running binary.
  *
- * From the record the agent writes only after a successful, healthy build — not the compose
- * override, which holds the *desired* list and is written first. Using that would make applied
- * equal desired the instant a rebuild is requested, so any apply during the build would emit
- * handlers the binary lacks, and a failed build would reject every later apply.
+ * From what the agent reports having built, which it records only after a build has succeeded and
+ * Caddy is healthy again — never from the selection. Using the selection would make applied equal
+ * desired the instant a rebuild was requested, so any config apply during the build would emit
+ * handlers the running binary lacks, and a failed build would reject every apply after it.
  *
- * No record means no rebuild yet, so the container is the shipped image with the full catalog.
+ * Null from the agent, or no agent at all, means no rebuild has happened: the container is the
+ * shipped image, which carries the full catalog.
  */
-export function getAppliedModuleSpecs(): string[] {
-  const filePath = join(DATA_DIR, APPLIED_FILE);
-  if (!existsSync(filePath)) return defaultModuleSpecs();
-
-  try {
-    const parsed = JSON.parse(readFileSync(filePath, "utf-8")) as { modules?: string };
-    if (typeof parsed.modules !== "string") return defaultModuleSpecs();
-    return parseModuleSpecList(parsed.modules);
-  } catch {
-    return defaultModuleSpecs();
-  }
+export async function getAppliedModuleSpecs(): Promise<string[]> {
+  const status = await tryGetAgentStatus();
+  const applied = status?.caddyBuild.applied;
+  return applied && applied.length > 0 ? [...applied].sort() : defaultModuleSpecs();
 }
 
 /** Split the whitespace-separated CADDY_MODULES build arg into specs. */
@@ -123,9 +106,11 @@ function hashSpecs(specs: string[]): string {
 }
 
 export async function getCaddyBuildDiff(): Promise<CaddyBuildDiff> {
-  const settings = await getCaddyBuildSettings();
+  const [settings, appliedSpecs] = await Promise.all([
+    getCaddyBuildSettings(),
+    getAppliedModuleSpecs(),
+  ]);
   const desiredSpecs = resolveModuleSpecs(settings);
-  const appliedSpecs = getAppliedModuleSpecs();
   const appliedSet = new Set(appliedSpecs);
   const desiredSet = new Set(desiredSpecs);
   return {
@@ -160,7 +145,10 @@ function featuresForPaths(paths: Set<string>): Set<CaddyFeatureId> {
 }
 
 export async function getCaddyModuleAvailability(): Promise<CaddyModuleAvailability> {
-  const settings = await getCaddyBuildSettings();
+  const [settings, appliedSpecs] = await Promise.all([
+    getCaddyBuildSettings(),
+    getAppliedModuleSpecs(),
+  ]);
   const desiredIds = new Set(resolveEnabledModuleIds(settings));
   const desiredPaths = new Set(
     Array.from(desiredIds, (id) => findCaddyModule(id)?.modulePath).filter((p): p is string =>
@@ -169,7 +157,7 @@ export async function getCaddyModuleAvailability(): Promise<CaddyModuleAvailabil
   );
   // Custom modules are opaque — no feature mapping, but they belong in appliedPaths so a
   // caller checking a specific path can find one an operator added by hand.
-  const appliedPaths = new Set(getAppliedModuleSpecs().map((spec) => stripVersion(spec)));
+  const appliedPaths = new Set(appliedSpecs.map((spec) => stripVersion(spec)));
   return {
     desired: featuresForPaths(desiredPaths),
     applied: featuresForPaths(appliedPaths),
@@ -230,21 +218,9 @@ ARG CADDY_MODULES="${specs.join(" ")}"
 `;
 }
 
-/** The compose override that carries the module list into the build. */
-export function generateCaddyBuildOverride(specs: string[]): string {
-  return `# Auto-generated by Caddy Proxy Manager — Caddy module selection
-# Do not edit manually — this file is regenerated when you click "Rebuild Caddy"
-services:
-  caddy:
-    build:
-      args:
-        CADDY_MODULES: "${specs.join(" ")}"
-`;
-}
-
 /**
- * Persist the selection as a compose override and signal the agent. Validated here as well as in
- * the UI, since the REST API reaches it too and a bad path would fail opaquely later.
+ * Send the selection to the agent to build with. Validated here as well as in the UI, since the
+ * REST API reaches this too and a bad module path would otherwise fail opaquely inside the build.
  */
 export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
   const settings = await getCaddyBuildSettings();
@@ -261,34 +237,13 @@ export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
   const { applyCaddyConfig } = await import("./caddy");
   await applyCaddyConfig();
 
-  const specs = resolveModuleSpecs(settings);
-  const overridePath = join(DATA_DIR, OVERRIDE_FILE);
-  const triggerPath = join(DATA_DIR, TRIGGER_FILE);
-
-  writeFileSync(overridePath, generateCaddyBuildOverride(specs), "utf-8");
-
-  const triggeredAt = new Date().toISOString();
-  writeFileSync(
-    triggerPath,
-    JSON.stringify({ triggeredAt, hash: hashSpecs(specs), modules: specs }),
-    "utf-8",
-  );
-
-  return {
-    state: "pending",
-    message: `Trigger written. Waiting for the agent to rebuild Caddy with ${specs.length} module(s). This can take several minutes.`,
-    triggeredAt,
-  };
+  return requestCaddyBuild(resolveModuleSpecs(settings));
 }
 
-export function getCaddyBuildStatus(): CaddyBuildStatus {
-  const statusPath = join(DATA_DIR, STATUS_FILE);
-  if (!existsSync(statusPath)) return { state: "idle" };
-  try {
-    return JSON.parse(readFileSync(statusPath, "utf-8")) as CaddyBuildStatus;
-  } catch {
-    return { state: "idle" };
-  }
+/** The agent's last word on the rebuild. */
+export async function getCaddyBuildStatus(): Promise<CaddyBuildStatus> {
+  const status = await tryGetAgentStatus();
+  return status?.caddyBuild.status ?? { state: "idle" };
 }
 
 /** Normalize a settings payload: drop unknown module ids, clean and validate custom entries. */

@@ -205,7 +205,11 @@ services:
     environment:
       DATA_DIR: /data
       COMPOSE_DIR: /compose
-      POLL_INTERVAL: "${AGENT_POLL_INTERVAL:-2}"
+      # standalone listens on a socket on the shared volume, which is how the controller in this
+      # same stack reaches it. `managed` listens on AGENT_PORT and prints a pairing code instead —
+      # for an agent on a different host from its controller.
+      AGENT_MODE: ${AGENT_MODE:-standalone}
+      AGENT_PORT: ${AGENT_PORT:-3100}
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375

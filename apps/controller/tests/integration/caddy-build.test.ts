@@ -3,24 +3,12 @@
  * (what the admin selected) vs *applied* (what the binary was built with). Generation uses the
  * intersection — Caddy rejects a whole document naming a module it lacks.
  */
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { fresh } from '@/tests/helpers/fresh';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { TestDb } from '../helpers/db';
 
-const ctx = vi.hoisted(() => {
-  const { mkdirSync: mkdir } = require('node:fs');
-  const { join: joinPath } = require('node:path');
-  const { tmpdir } = require('node:os');
-  const dir = joinPath(tmpdir(), `caddy-build-test-${Date.now()}`);
-  mkdir(dir, { recursive: true });
-  // caddy-build.ts resolves its data directory at module load, so this has to
-  // be set before the import below.
-  process.env.L4_PORTS_DIR = dir;
-  return { db: null as unknown as TestDb, tmpDir: dir };
-});
+const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 
 const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
@@ -44,7 +32,6 @@ vi.mock('../../src/lib/db', () => {
 const {
   applyCaddyBuild,
   defaultModuleSpecs,
-  generateCaddyBuildOverride,
   getAppliedModuleSpecs,
   getCaddyBuildDiff,
   getCaddyBuildStatus,
@@ -60,12 +47,16 @@ const {
 import { CADDY_MODULES, dnsModuleId } from '../../src/lib/caddy-modules';
 import { saveCaddyBuildSettings } from '../../src/lib/settings';
 import { installFakeCaddy, type FakeCaddy } from '../helpers/caddy-admin';
+import { startFakeAgent } from '../helpers/fake-agent';
 import * as schema from '../../src/lib/db/schema';
 
-const OVERRIDE_PATH = join(ctx.tmpDir, 'docker-compose.caddy-build.yml');
-const TRIGGER_PATH = join(ctx.tmpDir, 'caddy-build.trigger');
-const STATUS_PATH = join(ctx.tmpDir, 'caddy-build.status');
-const APPLIED_PATH = join(ctx.tmpDir, 'caddy-build.applied.json');
+type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
+let agent: FakeAgent;
+
+/** Whether the controller has asked the agent to rebuild. */
+function rebuildRequested(): boolean {
+  return agent.requests.some((r) => r.method === 'POST' && r.path === '/v1/caddy-build');
+}
 
 const L4 = 'github.com/mholt/caddy-l4';
 const CORAZA = 'github.com/corazawaf/coraza-caddy/v2';
@@ -73,19 +64,20 @@ const BLOCKER = 'github.com/fuomag9/caddy-blocker-plugin';
 const CLOUDFLARE = 'github.com/caddy-dns/cloudflare';
 
 /**
- * Pretend a rebuild already completed with these modules. Writes the *applied record* — what the
- * agent produces only after a successful build — not the compose override.
+ * Pretend a rebuild already completed with these modules — the agent's *applied* set, which it
+ * reports only after a build has succeeded and Caddy is healthy again. Never the selection.
  */
 function setAppliedModules(specs: string[]) {
-  writeFileSync(APPLIED_PATH, JSON.stringify({ modules: specs.join(' ') }), 'utf-8');
+  agent.state.appliedModules = specs;
 }
 
 beforeEach(async () => {
-  for (const path of [OVERRIDE_PATH, TRIGGER_PATH, STATUS_PATH, APPLIED_PATH]) {
-    rmSync(path, { force: true });
-  }
-  mkdirSync(ctx.tmpDir, { recursive: true });
+  agent = await startFakeAgent();
   await ctx.db.delete(schema.settings);
+});
+
+afterEach(async () => {
+  await agent.stop();
 });
 
 describe('selection resolution', () => {
@@ -138,56 +130,32 @@ describe('selection resolution', () => {
 });
 
 describe('applied module specs', () => {
-  it('reports the full catalog when no rebuild has happened', () => {
-    // No applied record means the container is still the shipped image, which is built with
-    // everything. Returning an empty list here would make config generation drop every handler.
-    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
+  it('reports the full catalog when no rebuild has happened', async () => {
+    // The agent reports null until it has built something, meaning the container is still the
+    // shipped image — which carries everything. Returning an empty list here would make config
+    // generation drop every plugin-backed handler on a perfectly healthy install.
+    expect(await getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 
-  it('reads back exactly what the applied record holds', () => {
+  it('reads back exactly what the agent says it built', async () => {
     setAppliedModules([L4, CORAZA]);
-    expect(getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
+    expect(await getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
   });
 
-  it('ignores the compose override entirely', () => {
-    // The override is the build's *input*, written before anything is compiled. Reading it as the
-    // applied set is exactly the bug this split fixes, so a stray override must not move the answer.
-    writeFileSync(OVERRIDE_PATH, generateCaddyBuildOverride([L4]), 'utf-8');
-    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
+  it('sorts what the agent reports, so the order it arrives in cannot move a diff', async () => {
+    setAppliedModules([CORAZA, L4]);
+    expect(await getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
+  });
+
+  it('falls back to the full catalog when no agent answers at all', async () => {
+    await agent.stop();
+    // A missing agent is not evidence that the binary has no plugins. Claiming an empty set would
+    // silently strip every gated feature from a config that was working a moment ago.
+    expect(await getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 
   it('parses a whitespace-separated build arg', () => {
     expect(parseModuleSpecList(`  ${L4}   ${CORAZA}\n`)).toEqual([CORAZA, L4].sort());
-  });
-});
-
-describe("the agent's applied record", () => {
-  it('parses the exact JSON shape entrypoint.sh writes', () => {
-    // Verified by running the real script: byte-for-byte what write_applied_modules produces,
-    // including the two-space indent from its heredoc and the trailing newline. The app and the
-    // agent are separate programs in separate containers, so nothing else checks this seam.
-    const fromAgent = [
-      '{',
-      '  "modules": "github.com/mholt/caddy-l4 github.com/o/x@v1.2.3",',
-      '  "appliedAt": "2026-08-25T00:33:17Z"',
-      '}',
-      '',
-    ].join('\n');
-    writeFileSync(APPLIED_PATH, fromAgent, 'utf-8');
-
-    expect(getAppliedModuleSpecs()).toEqual(['github.com/mholt/caddy-l4', 'github.com/o/x@v1.2.3']);
-  });
-
-  it('falls back to the full catalog when the record is absent or unreadable', () => {
-    // Absent means no rebuild has happened, so the container is still the shipped image. Claiming
-    // an empty module set would drop every plugin-backed handler on a perfectly healthy install.
-    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
-
-    writeFileSync(APPLIED_PATH, '{"modules": ', 'utf-8');
-    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
-
-    writeFileSync(APPLIED_PATH, '{"modules": ["not", "a", "string"]}', 'utf-8');
-    expect(getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
 });
 
@@ -326,30 +294,34 @@ describe('applyCaddyBuild', () => {
     await applyCaddyBuild();
 
     expect(caddy.loads.length).toBeGreaterThan(0);
-    // And the trigger only exists once that apply has happened.
-    expect(existsSync(TRIGGER_PATH)).toBe(true);
+    // And the rebuild is only requested once that apply has happened.
+    expect(rebuildRequested()).toBe(true);
   });
 
-  it('does not signal a rebuild when the config apply fails', async () => {
-    // Writing the trigger anyway would hand the agent a rebuild whose new
-    // binary is guaranteed not to match the config Caddy will resume from.
+  it('does not ask for a rebuild when the config apply fails', async () => {
+    // Asking anyway would hand the agent a rebuild whose new binary is guaranteed not to match
+    // the config Caddy will resume from.
     const caddy: FakeCaddy = installFakeCaddy();
     caddy.failWith(500, 'nope');
     await saveCaddyBuildSettings({ modules: {}, customModules: [] });
 
     await expect(applyCaddyBuild()).rejects.toThrow();
-    expect(existsSync(TRIGGER_PATH)).toBe(false);
+    expect(rebuildRequested()).toBe(false);
   });
 
-  it('writes an override and a trigger the agent can act on', async () => {
+  it('sends the selected module list to the agent', async () => {
+    installFakeCaddy();
     await saveCaddyBuildSettings({ modules: { 'caddy-l4': false }, customModules: [] });
 
     const status = await applyCaddyBuild();
-    expect(status.state).toBe('pending');
-    expect(existsSync(OVERRIDE_PATH)).toBe(true);
-    expect(existsSync(TRIGGER_PATH)).toBe(true);
-    // The override carries the desired list into the build.
-    expect(readFileSync(OVERRIDE_PATH, 'utf-8')).toContain('CADDY_MODULES:');
+    // Accepted, not finished: xcaddy compiles from source and can take minutes.
+    expect(status.state).toBe('building');
+
+    const posted = agent.requests.find((r) => r.method === 'POST');
+    expect(posted?.path).toBe('/v1/caddy-build');
+    const modules = (posted as { body: { modules: string[] } }).body.modules;
+    expect(modules).not.toContain(L4);
+    expect(modules).toContain(CORAZA);
   });
 
   it('does not claim the new modules are applied until the build succeeds', async () => {
@@ -365,66 +337,62 @@ describe('applyCaddyBuild', () => {
     await applyCaddyBuild();
 
     // Still the old binary's module set, and the diff still says a rebuild is
-    // outstanding — it only settles once the agent records success.
-    expect(getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
+    // outstanding — it only settles once the agent reports success.
+    expect(await getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
     expect((await getCaddyBuildDiff()).needsRebuild).toBe(true);
   });
 
   it('leaves the applied set untouched when a build never completes', async () => {
-    // A failed xcaddy compile is routine. The override stays on disk either way, so if that file
-    // were the applied record the wrong answer would persist across restarts.
+    // A failed xcaddy compile is routine, and the request that started it is not evidence of
+    // anything. Treating "asked for" as "built" would persist the wrong answer across restarts.
     setAppliedModules([L4]);
     await saveCaddyBuildSettings({
       modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, true])),
       customModules: [],
     });
 
-    await applyCaddyBuild(); // agent never reports success
+    await applyCaddyBuild(); // the agent never reports success
 
-    expect(getAppliedModuleSpecs()).toEqual([L4]);
+    expect(await getAppliedModuleSpecs()).toEqual([L4]);
     expect(isFeatureUsable(await getCaddyModuleAvailability(), 'waf')).toBe(false);
   });
 
-  it('reports the new set once the agent records a successful build', async () => {
+  it('reports the new set once the agent reports a successful build', async () => {
+    installFakeCaddy();
     setAppliedModules([L4]);
     await saveCaddyBuildSettings({ modules: {}, customModules: [] });
     await applyCaddyBuild();
 
-    // What the agent does after build + up + healthy.
-    setAppliedModules(defaultModuleSpecs());
+    // What the agent does after build + up + healthy, and only then.
+    agent.completeBuild();
 
     expect((await getCaddyBuildDiff()).needsRebuild).toBe(false);
     expect(isFeatureUsable(await getCaddyModuleAvailability(), 'waf')).toBe(true);
   });
 
-  it('refuses to trigger a build with an invalid custom module', async () => {
+  it('refuses to ask for a build with an invalid custom module', async () => {
     // Otherwise the failure surfaces minutes later as an opaque compile error.
     await saveCaddyBuildSettings({
       modules: {},
       customModules: [{ modulePath: 'github.com/o/r && evil', enabled: true }],
     });
     await expect(applyCaddyBuild()).rejects.toThrow(/Invalid module path/);
-    expect(existsSync(TRIGGER_PATH)).toBe(false);
+    expect(rebuildRequested()).toBe(false);
   });
 });
 
 describe('build status', () => {
-  it('is idle before the agent has written anything', () => {
-    expect(getCaddyBuildStatus()).toEqual({ state: 'idle' });
+  it('is idle before the agent has done anything', async () => {
+    expect(await getCaddyBuildStatus()).toEqual({ state: 'idle' });
   });
 
-  it('reads what the agent wrote', () => {
-    writeFileSync(
-      STATUS_PATH,
-      JSON.stringify({ state: 'building', message: 'compiling' }),
-      'utf-8',
-    );
-    expect(getCaddyBuildStatus()).toMatchObject({ state: 'building', message: 'compiling' });
+  it('reports what the agent is doing', async () => {
+    agent.state.buildStatus = { state: 'building', message: 'compiling' };
+    expect(await getCaddyBuildStatus()).toMatchObject({ state: 'building', message: 'compiling' });
   });
 
-  it('falls back to idle rather than throwing on a truncated status file', () => {
-    // The agent writes this file while the web container may be reading it.
-    writeFileSync(STATUS_PATH, '{"state": "buil', 'utf-8');
-    expect(getCaddyBuildStatus()).toEqual({ state: 'idle' });
+  it('falls back to idle rather than throwing when no agent answers', async () => {
+    await agent.stop();
+    expect(await getCaddyBuildStatus()).toEqual({ state: 'idle' });
   });
 });

@@ -140,6 +140,49 @@ rather than adding a migration: PostgreSQL support is unreleased, so no deployme
 the version that created it. The legacy importer is schema-derived, so a pre-3.1 database's
 `instances` rows are simply not copied — which is correct, since nothing would read them.
 
+### Phase 5, step 2: the agent is a service
+
+The agent was a 400-line POSIX shell script polling files on a shared volume. It is now a Bun HTTP
+service with its own SQLite database, and the controller reaches it over a signed REST API.
+
+**Why signing rather than a bearer token.** Every request carries an HMAC-SHA256 over
+`METHOD
+PATH
+TIMESTAMP
+SHA256(body)`; the secret never travels with a request, so it cannot be
+lifted from a proxy log or a `curl -v` pasted into an issue. Binding the path into the signature is
+what stops a captured `GET /v1/status` from being replayed as `POST /v1/caddy-build`, and binding
+the body stops a valid request being edited in flight. A ±60s window bounds replay.
+
+**Two listening modes, one code path.** `standalone` binds a Unix socket on the shared volume and
+writes the secret beside it, rotating it on every start — a controller in the same stack is
+configured by mounting the volume and nothing else. `managed` binds TCP and prints a six-capital
+one-time code, valid five minutes, burned on use or after ten wrong guesses. Both modes verify the
+same signature, which is what keeps them one program.
+
+**What moved.** The controller no longer writes the compose overrides or the trigger files; it
+sends `{ports}` or `{modules}` and reads a status back. Both writes answer 202 — a recreate takes
+seconds and a rebuild takes minutes — and the agent records the applied set only once Caddy is
+healthy again, which is the invariant the whole desired/applied split exists to protect.
+
+**Validation moved with it.** The port and module specs are interpolated into generated YAML, so
+the agent re-validates them against a strict pattern rather than trusting a caller that has already
+authenticated. `docker compose` is spawned without a shell, so this is not a command-injection
+route — but a quote or a newline still corrupts the compose file, which is a config-injection route
+into the build.
+
+The 28 tests that pinned the old script's behaviour by grepping its source are gone. What they
+covered — `--no-deps`, `--force-recreate`, `--pull never`, only the caddy service, both overrides
+on every invocation, a bounded build, a failed build leaving the container alone, the applied
+record written only when healthy, a stale status cleared on restart — is pinned properly now,
+against the argv the agent actually builds. The controller's side is tested against a real HTTP
+server that verifies the real signature, so nothing about this seam is covered only by a mock.
+
+**Not yet done, and owed to the next step:** the `agents` table and the pairing UI. `managed` mode
+works, but a remote agent is configured with `AGENT_URL` and `AGENT_SECRET` rather than by typing
+a code into Settings, and the controller can address one agent at a time. The ClickHouse credential
+handoff and GeoLite2 distribution are also still outstanding.
+
 ### Consumers still reading the environment directly
 
 Phase 2 built the service and moved the Caddy admin URL and the login throttle onto it. The rest

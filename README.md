@@ -104,7 +104,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `ADMIN_PASSWORD` | Admin password (see requirements below) | `admin` (dev only) | **Yes** (unless `AUTH_DISABLE_LOCAL_USERS=true`) |
 | `BASE_URL` | Public URL where users access the dashboard.<br/>**Required for OAuth** - must match redirect URI | `http://localhost:3000` | **Yes** (if using OAuth) |
 | `APP_NAME` | Display name in the sidebar, on the login card, and as the suffix on every page title | `Caddy Proxy Manager` | No |
-| `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides (and syncs from controller to agents) | Unset (toggle decides) | No |
+| `AVATAR_GRAVATAR` | Allow user icons to fall back to Gravatar. Set `false` to keep all avatar lookups off the network. When unset, the **Settings → User Avatars** toggle decides | Unset (toggle decides) | No |
 | `CADDY_API_URL` | Caddy Admin API endpoint | `http://caddy:2019` (prod)<br/>`http://localhost:2019` (dev) | No |
 | `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values below when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
 | `DATABASE_POOL_MAX` | Connections the database pool may open. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance pointing at it | `10` | No |
@@ -118,7 +118,8 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
 | `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
 | `CADDY_BUILD_TIMEOUT` | Seconds the agent waits for an xcaddy rebuild triggered from **Settings → Caddy Build** before giving up | `1800` | No |
-| `AGENT_POLL_INTERVAL` | Seconds between the agent's checks of the apply/rebuild trigger files (reaches the container as `POLL_INTERVAL`) | `2` | No |
+| `AGENT_MODE` | How the agent listens: `standalone` (Unix socket on the shared volume) or `managed` (TCP, pairs with a controller by one-time code) | `standalone` | No |
+| `AGENT_PORT` | Port the agent listens on in `managed` mode | `3100` | No |
 | `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Interpolated by Compose on the host, not read by the app. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 | `COMPOSE_PROFILES` | Comma-separated Compose profiles to activate: `clickhouse`, `geoipupdate` | `clickhouse` | No |
 | `GEOIPUPDATE_ACCOUNT_ID` | MaxMind account ID for GeoLite2 updates. Needed for geo blocking | None | No (required if `geoipupdate`) |
@@ -158,7 +159,9 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `FORWARD_AUTH_INTERNAL_URL` | Dial address Caddy uses to reach this app for `forward_auth`. Override only if the derived container address does not work | Derived from the container network | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` to disable | Built-in cutoff date | No |
 | `ACME_CA_ROOT_DIR` | Directory holding the custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
-| `L4_PORTS_DIR` | Directory holding the layer-4 port state file. For non-Docker deployments | `/app/data` | No |
+| `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
+| `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100` | Unset (use the local socket) | No |
+| `AGENT_SECRET` | Shared secret for `AGENT_URL`, as returned when the agent was paired | None | No (required with `AGENT_URL`) |
 | `PORT` / `HOST` | Listen address for the `cpm-server` binary when run directly instead of in the container | `3000` / `0.0.0.0` | No |
 | `CPM_APP_ROOT` | Application root for the `cpm-server` binary | Directory of the executable | No |
 | `CPM_HEALTHCHECK_URL` | Target for `cpm-server --healthcheck` | `http://127.0.0.1:${PORT}/api/health` | No |
@@ -455,24 +458,23 @@ Add only modules you trust, from sources you would trust with the proxy itself.
 ### Rebuilding
 
 Saving records the selection; it does not change the running container. **Rebuild
-Caddy** writes a Compose override onto the shared data volume and signals the
-agent, which runs `docker compose build caddy` and then recreates the
-container. Compiling Caddy takes several minutes; the proxy keeps serving on the
-current binary until the new one is ready, then restarts.
+Caddy** sends the selection to the agent, which runs `docker compose build caddy`
+and then recreates the container. Compiling Caddy takes several minutes; the proxy
+keeps serving on the current binary until the new one is ready, then restarts.
 
 Because *enabling* a module only takes effect once it is actually in the binary,
 config generation uses the intersection of what you selected and what the running
 image was built with. The panel shows a "Rebuild required" banner in between.
 
-That distinction is tracked with two separate files on the data volume, and the
-split is what makes a failed build harmless:
+Those are two different things, and keeping them apart is what makes a failed
+build harmless:
 
-| File | Written by | Holds |
+| | Owned by | Holds |
 | --- | --- | --- |
-| `docker-compose.caddy-build.yml` | web, when you click Rebuild | the *desired* module list — the build's input |
-| `caddy-build.applied.json` | agent, only after the build succeeds and Caddy is healthy | what the running binary *actually* contains |
+| the selection | the controller's database | the *desired* module list — the build's input |
+| the applied set | the agent, recorded only after the build succeeds and Caddy is healthy | what the running binary *actually* contains |
 
-If a build fails, the applied record is left alone, so the app keeps generating
+If a build fails, the applied set is left alone, so the app keeps generating
 config the current binary can load. Nothing needs cleaning up by hand — fix the
 selection and click Rebuild again. If the agent is restarted mid-build (a host
 reboot, say), it clears the stale "building" state on startup and the button
@@ -480,10 +482,9 @@ becomes available again.
 
 Rebuilding needs `BUILD: 1` on the `docker-socket-proxy` service (the default in
 `docker-compose.yml`). Set it to `0` to opt out: everything else keeps working,
-and you can run `docker compose build caddy` yourself — the generated module list
-is written to the data volume as `docker-compose.caddy-build.yml` either way.
-Note that a hand-run build does not write the applied record, so the app will
-keep assuming the shipped module set until a agent rebuild happens.
+and you can run `docker compose build caddy` yourself. Note that a hand-run build
+does not tell the agent anything, so the app keeps assuming the shipped module set
+until a rebuild goes through the agent.
 
 Every image records what it was compiled with, so you can check a container
 directly rather than inferring it:
