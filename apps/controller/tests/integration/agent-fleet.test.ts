@@ -229,6 +229,34 @@ describe('module availability across the fleet', () => {
   });
 });
 
+describe('sharing a round trip', () => {
+  const statusCalls = (agent: FakeAgent) =>
+    agent.requests.filter((r) => r.path === '/v1/status').length;
+
+  it('asks each agent once when several callers ask at the same time', async () => {
+    // A single render asks for this several times — the port diff and the port status, the build
+    // diff and the module gate — and each was a file read before the agent spoke HTTP. Fanning
+    // that out per caller is what made the layer-4 page slow enough for a click to miss.
+    await pairBoth();
+    const before = statusCalls(first);
+
+    await Promise.all([getAllAgentStatuses(), getAllAgentStatuses(), getAppliedModuleSpecs()]);
+
+    expect(statusCalls(first) - before).toBe(1);
+  });
+
+  it('goes back to the agents for a later call', async () => {
+    // Only in-flight calls are shared, never a completed one: a status served from a finished call
+    // would show an operator the state before the apply they just triggered.
+    await pairBoth();
+    await getAllAgentStatuses();
+    const after = statusCalls(first);
+
+    await getAllAgentStatuses();
+    expect(statusCalls(first)).toBe(after + 1);
+  });
+});
+
 describe('a Caddy admin broadcast', () => {
   it('reports each agent on its own', async () => {
     await pairBoth();

@@ -330,26 +330,47 @@ export async function getAgentStatus(): Promise<AgentStatus> {
 }
 
 /**
+ * The primary agent's state, sharing a round trip with any concurrent caller.
+ *
+ * The read paths that render a page use this: several of them run in the same `Promise.all`, and
+ * asking every agent once per caller is what made the layer-4 page slow enough to notice.
+ */
+async function sharedPrimaryStatus(): Promise<AgentStatus | null> {
+  const statuses = await getAllAgentStatuses();
+  const first = statuses[0];
+  return first?.ok ? first.value : null;
+}
+
+/**
  * The primary agent's state, or null when there is none.
  *
  * Callers that render a page use this rather than getAgentStatus: a missing agent must not turn
  * the Settings page into an error, and every caller would otherwise write the same try/catch.
  */
 export async function tryGetAgentStatus(): Promise<AgentStatus | null> {
-  try {
-    return await getAgentStatus();
-  } catch {
-    return null;
-  }
+  return sharedPrimaryStatus();
 }
 
-/** Every agent's state, for the screen that lists them. Never throws. */
+/**
+ * Every agent's state, for the screen that lists them. Never throws.
+ *
+ * Concurrent callers share one round trip. A single render asks for this several times — the port
+ * diff and the port status, the build diff and the module gate — and each was a file read before
+ * the agent spoke HTTP. Fanning that out to N agents per caller made a page's time-to-interactive
+ * visibly worse. Only in-flight calls are shared, never a completed one, so nothing is ever served
+ * a stale status: a later call always goes back to the agents.
+ */
+let statusesInFlight: Promise<AgentResult<AgentStatus>[]> | null = null;
+
 export async function getAllAgentStatuses(): Promise<AgentResult<AgentStatus>[]> {
-  try {
-    return await callOnAll<AgentStatus>(AGENT_ROUTES.status);
-  } catch {
-    return [];
-  }
+  if (statusesInFlight) return statusesInFlight;
+
+  statusesInFlight = callOnAll<AgentStatus>(AGENT_ROUTES.status)
+    .catch(() => [] as AgentResult<AgentStatus>[])
+    .finally(() => {
+      statusesInFlight = null;
+    });
+  return statusesInFlight;
 }
 
 /**

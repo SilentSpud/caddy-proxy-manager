@@ -254,6 +254,13 @@ application, whatever signed it.
 The compose file puts the agent on `caddy-network` for this. It already controls that container
 through the Docker API, so reaching its admin port grants it nothing it did not have.
 
+**One cost had to be paid back.** Reads that were file reads are now HTTP round trips, and a single
+render asks for the agent's status several times — the port diff and the port status, the build
+diff and the module gate. Fanning each of those out to every agent made the layer-4 page slow
+enough that an e2e click landed before the page had settled. Concurrent callers now share one round
+trip; only in-flight calls are shared, never a completed one, so nothing is ever served a status
+from before an apply the operator just triggered.
+
 ### Consumers still reading the environment directly
 
 Phase 2 built the service and moved the Caddy admin URL and the login throttle onto it. The rest
