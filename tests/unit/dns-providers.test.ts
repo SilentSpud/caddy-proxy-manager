@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   DNS_PROVIDERS,
   buildDnsChallengeConfig,
+  challengeOptionFields,
   decryptProviderCredentials,
   encryptProviderCredentials,
   getProviderDefinition,
+  isValidDnsDuration,
   redactDnsProviderSettingsForApi,
   redactLegacyCloudflareSettingsForApi,
 } from "@/src/lib/dns-providers";
 import { isEncryptedSecret } from "@/src/lib/secret";
+
+const NETCUP_CHALLENGE_DEFAULTS = { propagation_delay: "600s", propagation_timeout: "900s" };
 
 describe("DNS provider registry", () => {
   it("redacts every credential value from API status metadata", () => {
@@ -69,6 +73,7 @@ describe("DNS provider registry", () => {
         type: "password",
         required: true,
       },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("njalla");
   });
@@ -103,6 +108,7 @@ describe("DNS provider registry", () => {
     expect(provider?.fields).toEqual([
       { key: "api_key", label: "API Key", type: "password", required: true },
       { key: "api_secret", label: "API Secret", type: "password", required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("spaceship");
   });
@@ -140,6 +146,7 @@ describe("DNS provider registry", () => {
     });
     expect(provider?.fields).toEqual([
       { key: "token", label: "API Token", type: "password", required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("desec");
   });
@@ -173,6 +180,7 @@ describe("DNS provider registry", () => {
     });
     expect(provider?.fields).toEqual([
       { key: "api_token", label: "API Token", type: "password", required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("dynu");
   });
@@ -215,6 +223,7 @@ describe("DNS provider registry", () => {
         required: true,
         placeholder: "https://auth.acme-dns.io",
       },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("acmedns");
   });
@@ -257,6 +266,7 @@ describe("DNS provider registry", () => {
     });
     expect(provider?.fields).toEqual([
       { key: "api_token", label: "API Token", type: "password", required: true },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("infomaniak");
   });
@@ -279,7 +289,7 @@ describe("DNS provider registry", () => {
     });
   });
 
-  it("registers netcup with the Caddy module path and customer/key/password fields", () => {
+  it("registers netcup with the Caddy module path, customer/key/password fields, and slow-propagation defaults", () => {
     const provider = getProviderDefinition("netcup");
 
     expect(provider).toMatchObject({
@@ -292,7 +302,9 @@ describe("DNS provider registry", () => {
       { key: "customer_number", label: "Customer Number", type: "string", required: true },
       { key: "api_key", label: "API Key", type: "password", required: true },
       { key: "api_password", label: "API Password", type: "password", required: true },
+      ...challengeOptionFields(NETCUP_CHALLENGE_DEFAULTS),
     ]);
+    expect(provider?.challengeDefaults).toEqual(NETCUP_CHALLENGE_DEFAULTS);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("netcup");
   });
 
@@ -319,6 +331,8 @@ describe("DNS provider registry", () => {
         api_password: "netcup-password",
       },
       resolvers: ["1.1.1.1"],
+      propagation_delay: "600s",
+      propagation_timeout: "900s",
     });
   });
 
@@ -354,6 +368,7 @@ describe("DNS provider registry", () => {
         required: true,
         description: "Password of the API user or sub-user.",
       },
+      ...challengeOptionFields(),
     ]);
     expect(DNS_PROVIDERS.map((p) => p.name)).toContain("cloudns");
   });
@@ -393,5 +408,66 @@ describe("DNS provider registry", () => {
         auth_password: "cloudns-password",
       },
     });
+  });
+
+  it("applies netcup propagation defaults and keeps them out of the provider module config", () => {
+    const challenge = buildDnsChallengeConfig(
+      "netcup",
+      { customer_number: "123456", api_key: "netcup-key", api_password: "netcup-password" },
+      []
+    );
+
+    expect(challenge).toEqual({
+      provider: {
+        name: "netcup",
+        customer_number: "123456",
+        api_key: "netcup-key",
+        api_password: "netcup-password",
+      },
+      propagation_delay: "600s",
+      propagation_timeout: "900s",
+    });
+  });
+
+  it("lets stored propagation settings override the provider defaults", () => {
+    const challenge = buildDnsChallengeConfig(
+      "netcup",
+      { propagation_delay: "300s", propagation_timeout: "-1" },
+      []
+    );
+
+    expect(challenge).toMatchObject({
+      propagation_delay: "300s",
+      // "-1" (disable propagation checks) is emitted as a Caddy duration number
+      propagation_timeout: -1,
+    });
+  });
+
+  it("emits propagation settings for providers without registered defaults", () => {
+    const challenge = buildDnsChallengeConfig(
+      "njalla",
+      { api_token: "njalla-token", propagation_delay: "120s", propagation_timeout: "15m" },
+      ["1.1.1.1"]
+    );
+
+    expect(challenge).toEqual({
+      provider: { name: "njalla", api_token: "njalla-token" },
+      resolvers: ["1.1.1.1"],
+      propagation_delay: "120s",
+      propagation_timeout: "15m",
+    });
+  });
+
+  it("validates Caddy duration strings for the challenge option fields", () => {
+    expect(isValidDnsDuration("600s")).toBe(true);
+    expect(isValidDnsDuration("2m")).toBe(true);
+    expect(isValidDnsDuration("1h30m")).toBe(true);
+    expect(isValidDnsDuration("1.5h")).toBe(true);
+    expect(isValidDnsDuration("2d")).toBe(true);
+    expect(isValidDnsDuration("-1")).toBe(true);
+    expect(isValidDnsDuration("")).toBe(false);
+    expect(isValidDnsDuration("600")).toBe(false);
+    expect(isValidDnsDuration("900 sec")).toBe(false);
+    expect(isValidDnsDuration("soon")).toBe(false);
   });
 });

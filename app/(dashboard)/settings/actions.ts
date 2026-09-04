@@ -10,7 +10,7 @@ import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSetting
 import { listProxyHosts, updateProxyHost, sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import type { CloudflareSettings, DnsProviderSettings, GeoBlockSettings, WafSettings } from "@/src/lib/settings";
-import { getProviderDefinition, encryptProviderCredentials } from "@/src/lib/dns-providers";
+import { getProviderDefinition, encryptProviderCredentials, isValidDnsDuration } from "@/src/lib/dns-providers";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import {
   instanceSyncTokenValidationError,
@@ -269,6 +269,16 @@ async function updateDnsProviderSettingsActionUnlocked(_prevState: ActionResult 
     for (const field of def.fields) {
       if (field.required && !credentials[field.key]) {
         return { success: false, message: `${field.label} is required for ${def.displayName}` };
+      }
+    }
+
+    // Validate duration-typed option fields (e.g. propagation delay/timeout)
+    for (const field of def.fields) {
+      if (field.type === "duration" && credentials[field.key] && !isValidDnsDuration(credentials[field.key])) {
+        return {
+          success: false,
+          message: `${field.label} must be a duration like "600s" or "10m" (or -1 to disable)`,
+        };
       }
     }
 
