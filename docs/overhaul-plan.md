@@ -288,9 +288,33 @@ by looking for `/logs/access.log` on its own filesystem. That is now the agent's
 does, in its status: checking locally would have reported logging as off on every deployment whose
 Caddy runs somewhere else.
 
-**Still to do here:** GeoLite2 distribution. A remote agent needs the `.mmdb` to put country codes
-on its events and for Caddy's geo-blocking, and it currently only has one if the host happens to
-provide it.
+### Phase 5, step 6: GeoLite2 distribution
+
+The controller holds the subscription and the `geoipupdate` container; agents fetch the databases
+through it, which is what "the agents will reach them through the controller" asked for.
+
+**Pulled, not pushed** — the only route in the protocol that runs agent-to-controller. These files
+are tens of megabytes, and chunking them over the JSON push API to preserve a direction would have
+been ceremony rather than design.
+
+**It needs no new credential.** The pairing secret is symmetric, so the agent signs with the same
+`signatureBase` and the controller verifies against the row it stored. The local agent never uses
+this at all: it shares the volume the files are on.
+
+**Every refusal is 404, not 401.** An unsigned caller, an unknown agent id, a stale timestamp, a
+disabled agent, an edition this controller does not have — all identical from outside, so nothing
+can learn the route exists or which agent ids are real without already holding a secret. The
+edition name is checked against a fixed list *before* authentication, because it becomes a path on
+the controller's filesystem.
+
+**Conditional, and atomic.** The controller answers `304` against a size+mtime ETag, so a daily
+check moves nothing when nothing changed — including in the single-host case, where both sides are
+looking at the same file. The agent downloads to a temporary name and renames into place, because
+Caddy has that directory open and a partial file under the real name is one it would try to load.
+
+The agent's `geoip-data` mount becomes writable for this. It is the only place that volume is not
+read-only, and on a host with no `geoipupdate` of its own the agent is what puts the files there
+for Caddy.
 
 ### Consumers still reading the environment directly
 

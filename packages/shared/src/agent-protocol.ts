@@ -39,6 +39,14 @@ export const AGENT_TIMESTAMP_HEADER = "x-cpm-timestamp";
 export const AGENT_SIGNATURE_HEADER = "x-cpm-signature";
 /** Header naming which paired controller is calling, so the agent can pick the right secret. */
 export const AGENT_CONTROLLER_HEADER = "x-cpm-controller";
+/**
+ * Header naming which paired agent is calling, for the one route that runs the other way.
+ *
+ * The shared secret is symmetric, so an agent can sign a request to the controller with the same
+ * primitive and the controller can verify it against the row it stored at pairing. That is why
+ * fetching the GeoIP databases needs no second credential.
+ */
+export const AGENT_ID_HEADER = "x-cpm-agent";
 
 /**
  * How far a request's timestamp may be from the agent's clock. Wide enough to survive two
@@ -199,6 +207,16 @@ export const MAX_CADDY_CONFIG_BYTES = 8 * 1024 * 1024;
  * Pushed rather than fetched, so an agent needs no credential for the controller and the direction
  * of trust stays one-way: the controller reaches agents, never the reverse.
  */
+/**
+ * The MaxMind databases an agent may be given.
+ *
+ * Country is what the log parsers read; Caddy's geo-blocking uses Country and ASN. City is
+ * included because a deployment that subscribes to it expects it present, not because anything
+ * here requires it.
+ */
+export const GEOIP_EDITIONS = ["GeoLite2-Country", "GeoLite2-ASN", "GeoLite2-City"] as const;
+export type GeoipEdition = (typeof GEOIP_EDITIONS)[number];
+
 export type FleetConfig = {
   /**
    * Where to write analytics, or null when the deployment has none.
@@ -212,6 +230,22 @@ export type FleetConfig = {
     user: string;
     password: string;
     database: string;
+  } | null;
+
+  /**
+   * Where to fetch the MaxMind databases, or null when the controller has none.
+   *
+   * The controller holds the subscription and the files; agents reach them through it rather than
+   * each host holding a licence key of its own. Pulled rather than pushed because these are tens
+   * of megabytes — the only route in the protocol that runs agent-to-controller, and the reason
+   * `AGENT_ID_HEADER` exists.
+   *
+   * `url` must be an address the agent can reach, which for a remote agent means the controller's
+   * public one.
+   */
+  geoip: {
+    url: string;
+    editions: string[];
   } | null;
 };
 

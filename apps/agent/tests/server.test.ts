@@ -538,3 +538,36 @@ describe("the fleet configuration", () => {
     expect(store.fleetConfig()).toBeNull();
   });
 });
+
+describe("the GeoIP configuration", () => {
+  const geoip = { url: "http://controller.example:3000/api/agent/geoip" };
+
+  it("keeps only editions it recognises", async () => {
+    // The edition name becomes a path on this host's filesystem. An unknown one is either a
+    // controller this agent does not understand or something that should not be there at all.
+    await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: {
+        clickhouse: null,
+        geoip: { ...geoip, editions: ["GeoLite2-Country", "../../etc/passwd", "GeoLite2-ASN"] },
+      },
+    });
+    expect(store.fleetConfig()?.geoip?.editions).toEqual(["GeoLite2-Country", "GeoLite2-ASN"]);
+  });
+
+  it("stores null when the controller has no databases", async () => {
+    await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: { clickhouse: null, geoip: null },
+    });
+    expect(store.fleetConfig()?.geoip).toBeNull();
+  });
+
+  it("ignores a malformed geoip block rather than storing half of it", async () => {
+    await send(AGENT_ROUTES.fleetConfig, {
+      method: "POST",
+      body: { clickhouse: null, geoip: { url: 42, editions: "all" } },
+    });
+    expect(store.fleetConfig()?.geoip).toBeNull();
+  });
+});

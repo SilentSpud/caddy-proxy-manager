@@ -22,6 +22,9 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname === "/api/health" ||
     pathname.startsWith("/api/v1/") ||
+    // Authenticates itself: an agent signs with the secret agreed at pairing, and an unsigned
+    // caller is answered 404 rather than being redirected to a login page it cannot use.
+    pathname.startsWith("/api/agent/") ||
     pathname.startsWith("/api/forward-auth/")
   ) {
     const publicResponse = NextResponse.next();

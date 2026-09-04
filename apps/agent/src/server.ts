@@ -15,6 +15,7 @@ import {
   type ApplyL4PortsRequest,
   type CaddyAdminProxyRequest,
   type FleetConfig,
+  GEOIP_EDITIONS,
   MAX_CADDY_CONFIG_BYTES,
   type PairRequest,
   type PairResponse,
@@ -38,6 +39,11 @@ export const AGENT_VERSION = "3.1.0";
  * the number of proxy hosts.
  */
 const MAX_BODY_BYTES = 64 * 1024;
+
+/** An edition this agent will fetch. An unknown name becomes a path on this host's filesystem. */
+function isGeoipEdition(value: unknown): value is string {
+  return typeof value === "string" && (GEOIP_EDITIONS as readonly string[]).includes(value);
+}
 
 function error(status: number, code: AgentErrorCode, message: string): Response {
   return Response.json({ error: message, code } satisfies AgentErrorBody, { status });
@@ -113,6 +119,7 @@ export function createHandler(services: AgentServices) {
 
     const auth = await verifyRequest(store, request, url, body);
     if (!auth.ok) return error(401, auth.code, auth.message);
+    const { controllerId } = auth;
 
     switch (url.pathname) {
       case AGENT_ROUTES.status:
@@ -137,7 +144,7 @@ export function createHandler(services: AgentServices) {
           : error(405, "BAD_REQUEST", "Use POST to reach the Caddy admin API.");
       case AGENT_ROUTES.fleetConfig:
         return request.method === "POST"
-          ? handleFleetConfig(body)
+          ? handleFleetConfig(body, controllerId)
           : error(405, "BAD_REQUEST", "Use POST to set the fleet configuration.");
       default:
         return error(404, "BAD_REQUEST", "No such endpoint.");
@@ -271,7 +278,7 @@ export function createHandler(services: AgentServices) {
    * controller to push again — and applied even when unchanged, since `applyFleetConfig` is
    * idempotent and a repeat push must not restart a working parser.
    */
-  async function handleFleetConfig(body: ArrayBuffer): Promise<Response> {
+  async function handleFleetConfig(body: ArrayBuffer, controllerId: string): Promise<Response> {
     const parsed = parseJson(body) as FleetConfig | null;
     if (!parsed || typeof parsed !== "object") {
       return error(400, "BAD_REQUEST", "The request is not valid JSON.");
@@ -293,9 +300,14 @@ export function createHandler(services: AgentServices) {
       }
     }
 
-    const config: FleetConfig = { clickhouse: clickhouse ?? null };
+    const geoip =
+      parsed.geoip && typeof parsed.geoip.url === "string" && Array.isArray(parsed.geoip.editions)
+        ? { url: parsed.geoip.url, editions: parsed.geoip.editions.filter(isGeoipEdition) }
+        : null;
+
+    const config: FleetConfig = { clickhouse: clickhouse ?? null, geoip };
     store.setFleetConfig(config);
-    await applyFleetConfig(store, config);
+    await applyFleetConfig(store, config, controllerId);
     return Response.json({ ok: true });
   }
 

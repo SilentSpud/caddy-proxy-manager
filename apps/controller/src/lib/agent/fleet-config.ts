@@ -10,10 +10,11 @@
 import { AGENT_ROUTES, type FleetConfig } from "@cpm/shared";
 import { analyticsCredentialsForAgents } from "../clickhouse/client";
 import { callOnEveryAgent } from "./client";
+import { geoipFleetConfig } from "./geoip";
 
 /** What every agent should currently be configured with. */
 export function currentFleetConfig(): FleetConfig {
-  return { clickhouse: analyticsCredentialsForAgents() };
+  return { clickhouse: analyticsCredentialsForAgents(), geoip: geoipFleetConfig() };
 }
 
 /**

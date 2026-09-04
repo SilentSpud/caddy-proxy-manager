@@ -247,8 +247,14 @@ describe('handing agents the analytics credentials', () => {
     await pairBoth();
     await pushFleetConfig();
 
-    const pushed = first.requests.find((r) => r.path === '/v1/fleet-config')?.body;
-    expect(pushed).toEqual({ clickhouse: null });
+    const pushed = first.requests.find((r) => r.path === '/v1/fleet-config')?.body as {
+      clickhouse: unknown;
+      geoip: unknown;
+    };
+    expect(pushed.clickhouse).toBeNull();
+    // No MaxMind databases on this machine either, and the same reasoning applies: an agent has to
+    // be told the controller has none, not left with whatever it was told last time.
+    expect(pushed.geoip).toBeNull();
   });
 
   it('does not fail when an agent is unreachable', async () => {

@@ -226,8 +226,10 @@ services:
       - .:/compose:ro
       # Caddy's access and WAF logs, which this container is the one that reads.
       - caddy-logs:/logs
-      # Country lookups for the events it writes.
-      - geoip-data:/usr/share/GeoIP:ro,z
+      # Country lookups for the events it writes, and where it installs the databases it fetches
+      # from the controller. Writable, unlike everywhere else this volume is mounted: on a host
+      # that has no geoipupdate of its own, the agent is what puts the files here for Caddy.
+      - geoip-data:/usr/share/GeoIP:z
     depends_on:
       caddy:
         condition: service_healthy

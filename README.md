@@ -412,6 +412,17 @@ Nothing to configure: enabling analytics on the controller (`CLICKHOUSE_PASSWORD
 the credentials to be pushed, and turning it off pushes `null` and stops the agent writing. The
 push happens at startup and whenever those settings change.
 
+### GeoIP databases come from the controller
+
+The controller holds the MaxMind subscription and the `geoipupdate` container that refreshes the
+databases. An agent on another host fetches them through the controller rather than needing a
+licence key of its own, checking daily and downloading only when the copy it has is out of date.
+It writes them where Caddy reads them, so geo-blocking works on every host in the fleet.
+
+This is the only request that runs agent-to-controller, and it is signed with the same pairing
+secret — no extra credential. It does mean a remote agent has to be able to reach `BASE_URL`. An
+agent that cannot keeps using whatever database it already has.
+
 ### One controller, one configuration
 
 Everything a proxy serves — hosts, certificates, access lists, published ports, compiled-in

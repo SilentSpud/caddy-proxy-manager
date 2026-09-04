@@ -9,6 +9,7 @@
 import type { FleetConfig } from "@cpm/shared";
 import type { AgentStore } from "../db";
 import { analyticsEnabled, closeAnalytics, configureAnalytics } from "./clickhouse";
+import { syncGeoipDatabases } from "./geoip";
 import {
   initLogParser,
   parseNewLogEntries,
@@ -28,13 +29,25 @@ const PARSE_INTERVAL_MS = 30_000;
 let timers: NodeJS.Timeout[] = [];
 let running = false;
 
+/** How often the MaxMind databases are re-checked. They are published a couple of times a week. */
+const GEOIP_REFRESH_MS = 24 * 60 * 60_000;
+
+let geoipTimer: NodeJS.Timeout | null = null;
+
 /**
  * Apply a pushed configuration.
  *
  * Idempotent: the controller pushes on every startup and whenever the settings change, and a
  * repeat of the configuration already in force must not restart a working parser.
+ *
+ * `controllerId` names which paired controller pushed this, so the GeoIP fetch — the one request
+ * that runs the other way — can be signed with the secret shared with that controller.
  */
-export async function applyFleetConfig(store: AgentStore, config: FleetConfig): Promise<void> {
+export async function applyFleetConfig(
+  store: AgentStore,
+  config: FleetConfig,
+  controllerId: string,
+): Promise<void> {
   bindTrafficStore(store);
   bindWafStore(store);
 
@@ -42,6 +55,37 @@ export async function applyFleetConfig(store: AgentStore, config: FleetConfig): 
 
   if (analyticsEnabled() && !running) await start();
   else if (!analyticsEnabled() && running) await stop();
+
+  scheduleGeoipSync(store, config, controllerId);
+}
+
+/**
+ * Fetch the GeoIP databases now, and daily after that.
+ *
+ * Skipped entirely when the controller offered none, and when this agent talks over a socket: that
+ * agent shares the volume the databases are on, so it would be downloading a file it can already
+ * see.
+ */
+function scheduleGeoipSync(store: AgentStore, config: FleetConfig, controllerId: string): void {
+  if (geoipTimer) {
+    clearInterval(geoipTimer);
+    geoipTimer = null;
+  }
+  const geoip = config.geoip;
+  if (!geoip || geoip.editions.length === 0) return;
+
+  const secret = store.findController(controllerId)?.secret;
+  if (!secret) return;
+  const agentId = store.agentId();
+
+  const run = () => {
+    void syncGeoipDatabases(store, geoip, agentId, secret).catch((error: unknown) => {
+      console.warn("[geoip] sync failed:", error);
+    });
+  };
+  run();
+  geoipTimer = setInterval(run, GEOIP_REFRESH_MS);
+  geoipTimer.unref();
 }
 
 async function start(): Promise<void> {
@@ -68,6 +112,10 @@ async function start(): Promise<void> {
 
 export async function stop(): Promise<void> {
   running = false;
+  if (geoipTimer) {
+    clearInterval(geoipTimer);
+    geoipTimer = null;
+  }
   for (const timer of timers) clearInterval(timer);
   timers = [];
   stopLogParser();
@@ -85,5 +133,9 @@ export async function stop(): Promise<void> {
 export async function resumeFleetConfig(store: AgentStore): Promise<void> {
   const stored = store.fleetConfig();
   if (!stored) return;
-  await applyFleetConfig(store, stored);
+  // Whichever controller is paired: in managed mode there is exactly one, and in standalone mode
+  // there is no GeoIP fetch to sign anyway.
+  const controller = store.listControllers()[0];
+  if (!controller) return;
+  await applyFleetConfig(store, stored, controller.controllerId);
 }
