@@ -10,13 +10,19 @@ const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings navigation"]'
 const SETTINGS_ORIGIN = 'http://localhost:3000';
 
 /**
- * Opens the settings command palette by keyboard. The shortcut binds to `window` in a useEffect, so
- * pressing it straight after goto() does nothing — wait for the sidebar's search control first.
+ * Opens the settings command palette by keyboard.
+ *
+ * The shortcut binds to `window` in a useEffect, and the control waited for below is
+ * server-rendered — so it can be visible a moment before the handler exists, and a single press
+ * lands on nothing. Retrying the press is the only way to wait for a listener with no DOM of its
+ * own; waiting harder before the first one just moves the race.
  */
 async function openPaletteWithKeyboard(page: Page) {
   await expect(page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...')).toBeVisible();
-  await page.keyboard.press('ControlOrMeta+k');
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(async () => {
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 /** Navigate to a specific settings section via the sidebar. */
