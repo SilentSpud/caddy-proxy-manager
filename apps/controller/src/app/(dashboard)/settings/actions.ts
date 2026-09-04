@@ -5,15 +5,6 @@ import { requireAdmin } from "@/src/lib/auth";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import {
-  getInstanceMode,
-  getAgentControllerToken,
-  setInstanceMode,
-  setAgentControllerToken,
-  syncInstances,
-} from "@/src/lib/instance-sync";
-import { createInstance, deleteInstance, updateInstance } from "@/src/lib/models/instances";
-import {
-  clearSetting,
   getSetting,
   saveCloudflareSettings,
   getDnsProviderSettings,
@@ -61,10 +52,6 @@ import type {
 import { getProviderDefinition, encryptProviderCredentials } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
-import {
-  instanceSyncTokenValidationError,
-  MIN_INSTANCE_SYNC_TOKEN_LENGTH,
-} from "@/src/lib/instance-sync-token";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
 
 type ActionResult = {
@@ -80,39 +67,16 @@ function serializedSettingsAction<TArgs extends unknown[], TResult>(
   return async (...args: TArgs) => withSettingsUpdateLock(() => action(...args));
 }
 
-/**
- * Validates a sync token: at least 32 characters, for adequate entropy.
- */
-function validateSyncToken(token: string): { valid: boolean; error?: string } {
-  const error = instanceSyncTokenValidationError(token);
-  if (error) {
-    return {
-      valid: false,
-      error: `${error}. Consider using a randomly generated ${MIN_INSTANCE_SYNC_TOKEN_LENGTH}-byte token.`,
-    };
-  }
-  return { valid: true };
-}
-
 async function updateGeneralSettingsActionUnlocked(
   _prevState: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("general");
-      await syncInstances();
-      revalidatePath("/settings");
-      return { success: true, message: "General settings reset to controller defaults" };
-    }
     await saveGeneralSettings({
       primaryDomain: String(formData.get("primaryDomain") ?? ""),
       acmeEmail: formData.get("acmeEmail") ? String(formData.get("acmeEmail")) : undefined,
     });
-    await syncInstances();
     revalidatePath("/settings");
     return { success: true, message: "General settings saved successfully" };
   } catch (error) {
@@ -130,25 +94,6 @@ async function updateAcmeSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("acme");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "ACME settings reset to controller defaults" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
 
     const caUrl = formData.get("caUrl") ? String(formData.get("caUrl")).trim() : "";
     const caRootPem = formData.get("caRootPem") ? String(formData.get("caRootPem")).trim() : "";
@@ -178,7 +123,6 @@ async function updateAcmeSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -199,25 +143,6 @@ async function updateCloudflareSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("cloudflare");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "Cloudflare settings reset to controller defaults" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
     const rawToken = formData.get("apiToken") ? String(formData.get("apiToken")).trim() : "";
     const clearToken = formData.get("clearToken") === "on";
     const current = await getSetting<CloudflareSettings>("cloudflare");
@@ -244,7 +169,6 @@ async function updateCloudflareSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true, // Settings were saved successfully
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}. You may need to start Caddy or check your configuration.`,
@@ -265,25 +189,6 @@ async function updateDnsProviderSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("dns_provider");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "DNS provider settings reset to controller defaults" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
 
     const action = String(formData.get("action") ?? "save").trim();
     const providerName = String(formData.get("provider") ?? "").trim();
@@ -302,7 +207,6 @@ async function updateDnsProviderSettingsActionUnlocked(
         settings.default = remaining.length > 0 ? remaining[0] : null;
       }
       await saveDnsProviderSettings(settings);
-      await syncInstances();
       try {
         await applyCaddyConfig();
       } catch {
@@ -322,7 +226,6 @@ async function updateDnsProviderSettingsActionUnlocked(
       }
       settings.default = newDefault;
       await saveDnsProviderSettings(settings);
-      await syncInstances();
       try {
         await applyCaddyConfig();
       } catch {
@@ -375,7 +278,6 @@ async function updateDnsProviderSettingsActionUnlocked(
     }
 
     await saveDnsProviderSettings(settings);
-    await syncInstances();
 
     try {
       await applyCaddyConfig();
@@ -406,14 +308,6 @@ async function updateAuthentikSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("authentik");
-      await syncInstances();
-      revalidatePath("/settings");
-      return { success: true, message: "Authentik defaults reset to controller values" };
-    }
     const outpostDomain = String(formData.get("outpostDomain") ?? "").trim();
     const outpostUpstream = String(formData.get("outpostUpstream") ?? "").trim();
     const authEndpoint = formData.get("authEndpoint")
@@ -430,7 +324,6 @@ async function updateAuthentikSettingsActionUnlocked(
       authEndpoint: authEndpoint && authEndpoint.length > 0 ? authEndpoint : undefined,
     });
 
-    await syncInstances();
     revalidatePath("/settings");
     return { success: true, message: "Authentik defaults saved successfully" };
   } catch (error) {
@@ -494,19 +387,8 @@ async function updateAvatarSettingsActionUnlocked(
       };
     }
 
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("avatars");
-      revalidatePath("/settings");
-      revalidatePath("/users");
-      revalidatePath("/profile");
-      return { success: true, message: "Avatar settings reset to controller defaults" };
-    }
-
     const gravatarEnabled = formData.get("gravatarEnabled") === "on";
     await saveAvatarSettings({ gravatarEnabled });
-    await syncInstances();
 
     revalidatePath("/settings");
     revalidatePath("/users");
@@ -532,25 +414,6 @@ async function updateMetricsSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("metrics");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "Metrics settings reset to controller defaults" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
     const enabled = formData.get("enabled") === "on";
     const portStr = formData.get("port") ? String(formData.get("port")).trim() : "";
     const port = portStr && !Number.isNaN(Number(portStr)) ? Number(portStr) : 9090;
@@ -569,7 +432,6 @@ async function updateMetricsSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -590,25 +452,6 @@ async function updateLoggingSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("logging");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "Logging settings reset to controller defaults" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
     const enabled = formData.get("enabled") === "on";
     const format = formData.get("format") ? String(formData.get("format")).trim() : "json";
 
@@ -631,7 +474,6 @@ async function updateLoggingSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -660,25 +502,6 @@ async function updateTrustedProxiesSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("trusted_proxies");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "Trusted proxies settings reset to controller defaults" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
 
     const ranges = parseResolverList(
       formData.get("ranges") ? String(formData.get("ranges")) : null,
@@ -704,7 +527,6 @@ async function updateTrustedProxiesSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -725,25 +547,6 @@ async function updateDnsSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("dns");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "DNS settings reset to controller defaults" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
     const enabled = formData.get("enabled") === "on";
     const resolversRaw = formData.get("resolvers") ? String(formData.get("resolvers")) : "";
     const fallbacksRaw = formData.get("fallbacks") ? String(formData.get("fallbacks")) : "";
@@ -772,7 +575,6 @@ async function updateDnsSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -793,28 +595,6 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("upstream_dns_resolution");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return {
-          success: true,
-          message: "Upstream DNS resolution settings reset to controller defaults",
-        };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
 
     const enabled = formData.get("enabled") === "on";
     const familyRaw = formData.get("family") ? String(formData.get("family")).trim() : "both";
@@ -842,7 +622,6 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -856,138 +635,6 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
         error instanceof Error ? error.message : "Failed to save upstream DNS resolution settings",
     };
   }
-}
-
-async function updateInstanceModeActionUnlocked(
-  _prevState: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    await requireAdmin();
-    const mode = String(formData.get("mode") ?? "").trim() as "standalone" | "controller" | "agent";
-    if (mode !== "standalone" && mode !== "controller" && mode !== "agent") {
-      return { success: false, message: "Invalid instance mode" };
-    }
-    await setInstanceMode(mode);
-    revalidatePath("/settings");
-    return { success: true, message: `Instance mode set to ${mode}` };
-  } catch (error) {
-    console.error("Failed to update instance mode:", error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to update instance mode",
-    };
-  }
-}
-
-async function updateAgentControllerTokenActionUnlocked(
-  _prevState: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    await requireAdmin();
-    const clearToken = formData.get("clearToken") === "on";
-    const rawToken = formData.get("controllerToken")
-      ? String(formData.get("controllerToken")).trim()
-      : "";
-
-    // If clearing, allow empty token
-    if (clearToken) {
-      await setAgentControllerToken("");
-      revalidatePath("/settings");
-      return { success: true, message: "Controller sync token removed" };
-    }
-
-    // If a new token is provided, validate it
-    if (rawToken) {
-      const validation = validateSyncToken(rawToken);
-      if (!validation.valid) {
-        return { success: false, message: validation.error };
-      }
-      await setAgentControllerToken(rawToken);
-      revalidatePath("/settings");
-      return { success: true, message: "Controller sync token updated" };
-    }
-
-    // No change - keep existing token
-    const current = await getAgentControllerToken();
-    if (!current) {
-      return { success: false, message: "No token provided. Please enter a sync token." };
-    }
-    return { success: true, message: "Controller sync token unchanged" };
-  } catch (error) {
-    console.error("Failed to update controller token:", error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to update controller token",
-    };
-  }
-}
-
-export async function createAgentInstanceAction(
-  _prevState: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    await requireAdmin();
-    const mode = await getInstanceMode();
-    if (mode !== "controller") {
-      return { success: false, message: "Instance mode must be set to controller to add agents" };
-    }
-    const name = String(formData.get("name") ?? "").trim();
-    const baseUrl = String(formData.get("baseUrl") ?? "")
-      .trim()
-      .replace(/\/$/, "");
-    const apiToken = String(formData.get("apiToken") ?? "").trim();
-    if (!name || !baseUrl || !apiToken) {
-      return { success: false, message: "Name, base URL, and API token are required" };
-    }
-
-    // Validate token complexity
-    const validation = validateSyncToken(apiToken);
-    if (!validation.valid) {
-      return { success: false, message: validation.error };
-    }
-
-    await createInstance({ name, baseUrl, apiToken, enabled: true });
-    revalidatePath("/settings");
-    return { success: true, message: "Agent instance added" };
-  } catch (error) {
-    console.error("Failed to create agent instance:", error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to create agent instance",
-    };
-  }
-}
-
-export async function deleteAgentInstanceAction(formData: FormData): Promise<void> {
-  await requireAdmin();
-  const mode = await getInstanceMode();
-  if (mode !== "controller") {
-    return;
-  }
-  const id = Number(formData.get("instanceId"));
-  if (Number.isNaN(id)) {
-    return;
-  }
-  await deleteInstance(id);
-  revalidatePath("/settings");
-}
-
-export async function toggleAgentInstanceAction(formData: FormData): Promise<void> {
-  await requireAdmin();
-  const mode = await getInstanceMode();
-  if (mode !== "controller") {
-    return;
-  }
-  const id = Number(formData.get("instanceId"));
-  const enabled = formData.get("enabled") === "on";
-  if (Number.isNaN(id)) {
-    return;
-  }
-  await updateInstance(id, { enabled });
-  revalidatePath("/settings");
 }
 
 function parseRedirectUrl(raw: FormDataEntryValue | null): string {
@@ -1091,7 +738,6 @@ async function updateGeoBlockSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -1133,7 +779,6 @@ async function updateErrorPagesSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -1172,25 +817,6 @@ async function updateDefaultResponseSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const mode = await getInstanceMode();
-    const overrideEnabled = formData.get("overrideEnabled") === "on";
-    if (mode === "agent" && !overrideEnabled) {
-      await clearSetting("default_response");
-      try {
-        await applyCaddyConfig();
-        revalidatePath("/settings");
-        return { success: true, message: "Default response reset to controller settings" };
-      } catch (error) {
-        console.error("Failed to apply Caddy config:", error);
-        revalidatePath("/settings");
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        await syncInstances();
-        return {
-          success: true,
-          message: `Settings reset, but could not apply to Caddy: ${errorMsg}`,
-        };
-      }
-    }
 
     const responseMode = String(formData.get("mode") ?? "caddy");
     let next: DefaultResponseSettings;
@@ -1224,7 +850,6 @@ async function updateDefaultResponseSettingsActionUnlocked(
       console.error("Failed to apply Caddy config:", error);
       revalidatePath("/settings");
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      await syncInstances();
       return {
         success: true,
         message: `Settings saved, but could not apply to Caddy: ${errorMsg}`,
@@ -1235,51 +860,6 @@ async function updateDefaultResponseSettingsActionUnlocked(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save default response settings",
-    };
-  }
-}
-
-export async function syncAgentInstancesAction(
-  _prevState: ActionResult | null,
-  _formData: FormData,
-): Promise<ActionResult> {
-  void _prevState;
-  void _formData;
-  try {
-    await requireAdmin();
-    const mode = await getInstanceMode();
-    if (mode !== "controller") {
-      return { success: false, message: "Instance mode must be set to controller to sync agents" };
-    }
-    const result = await syncInstances();
-    revalidatePath("/settings");
-
-    const parts: string[] = [];
-    if (result.success > 0) parts.push(`${result.success} succeeded`);
-    if (result.failed > 0) parts.push(`${result.failed} failed`);
-    if (result.skippedHttp > 0) parts.push(`${result.skippedHttp} skipped (HTTP blocked)`);
-
-    if (result.skippedHttp > 0) {
-      return {
-        success: result.success > 0,
-        message: `Sync: ${parts.join(", ")}. Set INSTANCE_SYNC_ALLOW_HTTP=true to allow insecure HTTP sync.`,
-      };
-    }
-    if (result.failed > 0) {
-      return {
-        success: true,
-        message: `Sync completed with ${result.failed} failures (${result.success}/${result.total} succeeded)`,
-      };
-    }
-    return {
-      success: true,
-      message: `Sync completed (${result.success}/${result.total} succeeded)`,
-    };
-  } catch (error) {
-    console.error("Failed to sync agent instances:", error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to sync agent instances",
     };
   }
 }
@@ -1701,10 +1281,6 @@ export const updateTrustedProxiesSettingsAction = serializedSettingsAction(
 export const updateDnsSettingsAction = serializedSettingsAction(updateDnsSettingsActionUnlocked);
 export const updateUpstreamDnsResolutionSettingsAction = serializedSettingsAction(
   updateUpstreamDnsResolutionSettingsActionUnlocked,
-);
-export const updateInstanceModeAction = serializedSettingsAction(updateInstanceModeActionUnlocked);
-export const updateAgentControllerTokenAction = serializedSettingsAction(
-  updateAgentControllerTokenActionUnlocked,
 );
 export const updateGeoBlockSettingsAction = serializedSettingsAction(
   updateGeoBlockSettingsActionUnlocked,

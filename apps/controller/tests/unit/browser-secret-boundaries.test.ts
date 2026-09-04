@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 import { toCertificateApiResponse, toCertificatePickerOption } from '@/src/lib/certificate-api';
-import { toEnvAgentInstanceView } from '@/src/lib/instance-sync-view';
 
 const certificate = {
   id: 7,
@@ -56,26 +55,5 @@ describe('browser secret boundaries', () => {
     expect(settingsPage).not.toMatch(/dnsProvider=\{dnsProvider\}/);
     expect(proxyHostsPage).toContain('certificates.map(toCertificatePickerOption)');
     expect(proxyHostsPage).not.toMatch(/certificates=\{certificates\}/);
-  });
-
-  it('allowlists environment agent metadata before client-component props', () => {
-    const view = JSON.stringify(
-      toEnvAgentInstanceView({
-        name: 'Edge node',
-        url: 'https://edge.example.com',
-        token: 'instance-sync-token-secret-sentinel',
-        futureSecret: 'future-instance-secret-sentinel',
-      } as Parameters<typeof toEnvAgentInstanceView>[0]),
-    );
-
-    expect(view).toBe('{"name":"Edge node","url":"https://edge.example.com"}');
-    expect(view).not.toContain('instance-sync-token-secret-sentinel');
-    expect(view).not.toContain('future-instance-secret-sentinel');
-
-    const settingsPage = readFileSync(
-      join(process.cwd(), 'src/app/(dashboard)/settings/page.tsx'),
-      'utf8',
-    );
-    expect(settingsPage).toMatch(/getEnvAgentInstances\(\)\.map\(toEnvAgentInstanceView\)/);
   });
 });

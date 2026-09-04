@@ -180,24 +180,6 @@ export const settings = pgTable("settings", {
   updatedAt: text("updatedAt").notNull(),
 });
 
-export const instances = pgTable(
-  "instances",
-  {
-    id: serial("id").primaryKey(),
-    name: text("name").notNull(),
-    baseUrl: text("baseUrl").notNull(),
-    apiToken: text("apiToken").notNull(),
-    enabled: boolean("enabled").notNull().default(true),
-    lastSyncAt: text("lastSyncAt"),
-    lastSyncError: text("lastSyncError"),
-    createdAt: text("createdAt").notNull(),
-    updatedAt: text("updatedAt").notNull(),
-  },
-  (table) => ({
-    baseUrlUnique: uniqueIndex("instances_base_url_unique").on(table.baseUrl),
-  }),
-);
-
 export const accessLists = pgTable("access_lists", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),

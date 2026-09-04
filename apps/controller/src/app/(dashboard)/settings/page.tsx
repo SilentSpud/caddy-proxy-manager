@@ -7,7 +7,6 @@ import {
   getLoggingSettings,
   getDnsSettings,
   getDnsProviderSettings,
-  getSetting,
   getUpstreamDnsResolutionSettings,
   getGeoBlockSettings,
   getErrorPagesSettings,
@@ -17,16 +16,6 @@ import {
   getPasswordPolicySettings,
   getCaddyBuildSettings,
 } from "@/src/lib/settings";
-import {
-  getInstanceMode,
-  getAgentLastSync,
-  getAgentControllerToken,
-  isInstanceModeFromEnv,
-  isSyncTokenFromEnv,
-  getEnvAgentInstances,
-} from "@/src/lib/instance-sync";
-import { toEnvAgentInstanceView } from "@/src/lib/instance-sync-view";
-import { listInstances } from "@/src/lib/models/instances";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
@@ -41,10 +30,6 @@ export const metadata: Metadata = {
 export default async function SettingsPage() {
   await requireAdmin();
 
-  // Check if configuration is from environment variables
-  const modeFromEnv = isInstanceModeFromEnv();
-  const tokenFromEnv = isSyncTokenFromEnv();
-
   const [
     general,
     acme,
@@ -54,7 +39,6 @@ export default async function SettingsPage() {
     logging,
     dns,
     upstreamDnsResolution,
-    instanceMode,
     globalGeoBlock,
     globalErrorPages,
     trustedProxies,
@@ -72,7 +56,6 @@ export default async function SettingsPage() {
     getLoggingSettings(),
     getDnsSettings(),
     getUpstreamDnsResolutionSettings(),
-    getInstanceMode(),
     getGeoBlockSettings(),
     getErrorPagesSettings(),
     getTrustedProxiesSettings(),
@@ -82,44 +65,6 @@ export default async function SettingsPage() {
     getPasswordPolicySettings(),
     getCaddyBuildSettings(),
   ]);
-
-  const [
-    overrideGeneral,
-    overrideAcme,
-    overrideDnsProvider,
-    overrideAuthentik,
-    overrideMetrics,
-    overrideLogging,
-    overrideDns,
-    overrideUpstreamDnsResolution,
-    overrideTrustedProxies,
-    overrideDefaultResponse,
-    overrideAvatars,
-  ] =
-    instanceMode === "agent"
-      ? await Promise.all([
-          getSetting("general"),
-          getSetting("acme"),
-          getSetting("dns_provider"),
-          getSetting("authentik"),
-          getSetting("metrics"),
-          getSetting("logging"),
-          getSetting("dns"),
-          getSetting("upstream_dns_resolution"),
-          getSetting("trusted_proxies"),
-          getSetting("default_response"),
-          getSetting("avatars"),
-        ])
-      : [null, null, null, null, null, null, null, null, null, null, null];
-
-  const [agentToken, agentLastSync] =
-    instanceMode === "agent"
-      ? await Promise.all([getAgentControllerToken(), getAgentLastSync()])
-      : [null, null];
-
-  const instances = instanceMode === "controller" ? await listInstances() : [];
-  const envInstances =
-    instanceMode === "controller" ? getEnvAgentInstances().map(toEnvAgentInstanceView) : [];
 
   return (
     <SettingsClient
@@ -153,33 +98,6 @@ export default async function SettingsPage() {
       }}
       caddyBuild={caddyBuild}
       baseUrl={config.baseUrl}
-      instanceSync={{
-        mode: instanceMode,
-        modeFromEnv,
-        tokenFromEnv,
-        overrides: {
-          general: overrideGeneral !== null,
-          acme: overrideAcme !== null,
-          dnsProvider: overrideDnsProvider !== null,
-          authentik: overrideAuthentik !== null,
-          metrics: overrideMetrics !== null,
-          logging: overrideLogging !== null,
-          dns: overrideDns !== null,
-          upstreamDnsResolution: overrideUpstreamDnsResolution !== null,
-          trustedProxies: overrideTrustedProxies !== null,
-          defaultResponse: overrideDefaultResponse !== null,
-          avatars: overrideAvatars !== null,
-        },
-        agent:
-          instanceMode === "agent"
-            ? {
-                hasToken: Boolean(agentToken),
-                lastSyncAt: agentLastSync?.at ?? null,
-                lastSyncError: agentLastSync?.error ?? null,
-              }
-            : null,
-        controller: instanceMode === "controller" ? { instances, envInstances } : null,
-      }}
     />
   );
 }

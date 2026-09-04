@@ -3,7 +3,6 @@
 #
 #   ./run.sh                     build if needed, bring the rig up, run everything, tear down
 #   ./run.sh mtls l4             run only the test files matching those patterns
-#   ./run.sh --sync              also start the second CPM instance and run the replication tests
 #   ./run.sh --keep              leave the rig running afterwards
 #   ./run.sh --rebuild           force a rebuild of the web and caddy images
 #   ./run.sh --shell             drop into a shell in the client container
@@ -29,7 +28,6 @@ FILTERS=()
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --sync)    PROFILES+=(--profile sync); export CPM_TEST_SYNC=1 ;;
     --keep)    KEEP=1 ;;
     --rebuild) REBUILD=1 ;;
     --shell)   ACTION=shell ;;
@@ -49,7 +47,7 @@ compose() { "${COMPOSE[@]}" "${PROFILES[@]}" "$@"; }
 case "$ACTION" in
   down)
     echo "==> tearing the rig down"
-    compose --profile sync down -v --remove-orphans
+    compose down -v --remove-orphans
     exit $?
     ;;
   logs)
@@ -66,7 +64,7 @@ teardown() {
   fi
   echo
   echo "==> tearing the rig down"
-  compose --profile sync down -v --remove-orphans >/dev/null 2>&1
+  compose down -v --remove-orphans >/dev/null 2>&1
 }
 
 # ── Build ───────────────────────────────────────────────────────────────────
@@ -96,14 +94,6 @@ if ! compose up -d --wait --wait-timeout 300 \
   compose logs --tail 60 web caddy pebble
   teardown
   exit 1
-fi
-
-if [ "${CPM_TEST_SYNC:-0}" = "1" ]; then
-  echo "==> starting the second CPM instance"
-  compose up -d --wait --wait-timeout 300 web-agent caddy-agent || {
-    echo "the agent instance did not come up healthy" >&2
-    compose logs --tail 60 web-agent caddy-agent
-  }
 fi
 
 compose up -d runner >/dev/null 2>&1

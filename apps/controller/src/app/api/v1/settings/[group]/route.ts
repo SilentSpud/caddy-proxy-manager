@@ -33,15 +33,8 @@ import {
   setSetting,
   clearSetting,
 } from "@/src/lib/settings";
-import {
-  getInstanceMode,
-  setInstanceMode,
-  getAgentControllerToken,
-  setAgentControllerToken,
-} from "@/src/lib/instance-sync";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { DefaultResponseValidationError } from "@/src/lib/caddy-default-response";
-import { instanceSyncTokenValidationError } from "@/src/lib/instance-sync-token";
 import {
   redactDnsProviderSettingsForApi,
   redactLegacyCloudflareSettingsForApi,
@@ -148,7 +141,7 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
   },
 };
 
-function unknownKey(input: Record<string, unknown>, allowed: readonly string[]): string | null {
+function _unknownKey(input: Record<string, unknown>, allowed: readonly string[]): string | null {
   const allowedKeys = new Set(allowed);
   return Object.keys(input).find((key) => !allowedKeys.has(key)) ?? null;
 }
@@ -160,16 +153,6 @@ export async function GET(
   try {
     await requireApiAdmin(request);
     const { group } = await params;
-
-    if (group === "instance-mode") {
-      const mode = await getInstanceMode();
-      return NextResponse.json({ mode });
-    }
-
-    if (group === "sync-token") {
-      const token = await getAgentControllerToken();
-      return NextResponse.json({ has_token: token !== null });
-    }
 
     const handler = SETTINGS_HANDLERS[group];
     if (!handler) {
@@ -219,50 +202,6 @@ export async function PUT(
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
       throw error;
-    }
-
-    if (group === "instance-mode") {
-      const unexpected = unknownKey(input, ["mode"]);
-      if (unexpected) {
-        return NextResponse.json(
-          { error: `instance-mode settings contains unknown field: ${unexpected}` },
-          { status: 400 },
-        );
-      }
-      const validModes = ["standalone", "controller", "agent"];
-      if (!validModes.includes(input.mode as string)) {
-        return NextResponse.json(
-          { error: `Invalid mode. Must be one of: ${validModes.join(", ")}` },
-          { status: 400 },
-        );
-      }
-      return await withSettingsUpdateLock(async () => {
-        await setInstanceMode(input.mode as "standalone" | "controller" | "agent");
-        return NextResponse.json({ ok: true });
-      });
-    }
-
-    if (group === "sync-token") {
-      const unexpected = unknownKey(input, ["token"]);
-      if (unexpected) {
-        return NextResponse.json(
-          { error: `sync-token settings contains unknown field: ${unexpected}` },
-          { status: 400 },
-        );
-      }
-      const token = input.token ?? null;
-      const validationError = token === null ? null : instanceSyncTokenValidationError(token);
-      if (validationError) {
-        return NextResponse.json(
-          { error: `${validationError}; token must otherwise be null` },
-          { status: 400 },
-        );
-      }
-      // instanceSyncTokenValidationError rejects every non-string value above.
-      return await withSettingsUpdateLock(async () => {
-        await setAgentControllerToken(token as string | null);
-        return NextResponse.json({ ok: true });
-      });
     }
 
     const handler = SETTINGS_HANDLERS[group];

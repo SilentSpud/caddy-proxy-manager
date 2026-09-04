@@ -22,11 +22,6 @@ volumes:
   caddy-logs:    # shared: access log + coraza audit log (web parses these)
   acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
   test-certs:    # certgen output: pebble server cert, https-origin cert
-  cpm-data-agent:
-  caddy-data-agent:
-  caddy-config-agent:
-  caddy-logs-agent:
-  acme-ca-agent:
 
 services:
   # ── Test PKI ────────────────────────────────────────────────────────────
@@ -106,7 +101,6 @@ services:
       POSTGRES_DB: cpm
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./config/postgres-init.sql:/docker-entrypoint-initdb.d/10-agent.sql:ro
     networks:
       - cpm-test
     healthcheck:
@@ -159,10 +153,6 @@ services:
       AUTH_ALLOW_OAUTH_REGISTRATION: "false"
       AUTH_DISABLE_LOCAL_USERS: "false"
       OAUTH_ENABLED: "false"
-      # Controller → agent replication normally refuses plaintext targets. The rig
-      # has no public CA to issue a certificate for web-agent and the network
-      # is isolated, so the guard is lifted here and nowhere else.
-      INSTANCE_SYNC_ALLOW_HTTP: "true"
       # No ClickHouse in the rig — an empty password disables analytics.
       CLICKHOUSE_PASSWORD: ""
     volumes:
@@ -272,67 +262,6 @@ services:
       cpm-test:
         ipv4_address: 172.28.0.24
 
-  # ── Second CPM instance, for controller → agent replication ─────────────────
-  # The generated Caddy config pins the admin API's accepted Host headers, and only one container
-  # can answer to "caddy". The agent pair therefore shares a network namespace, so web-agent reaches
-  # its own Caddy on localhost:2019 — an accepted origin.
-  web-agent:
-    image: cpm-test/web:latest
-    container_name: cpm-test-web-agent
-    profiles: [sync]
-    environment:
-      NODE_ENV: production
-      SESSION_SECRET: test-session-secret-not-for-production-use-9876543210
-      CADDY_API_URL: http://localhost:2019
-      BASE_URL: http://web-agent:3000
-      NEXTAUTH_URL: http://web-agent:3000
-      DATABASE_URL: postgres://cpm:docker-tests@postgres:5432/cpm_agent
-      ADMIN_USERNAME: cpmadmin
-      ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
-      CLICKHOUSE_PASSWORD: ""
-    volumes:
-      - cpm-data-agent:/app/data
-      - caddy-logs-agent:/logs
-      - acme-ca-agent:/acme-ca
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      cpm-test:
-        ipv4_address: 172.28.0.13
-    healthcheck:
-      test:
-        - CMD
-        - bun
-        - -e
-        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 10s
-
-  caddy-agent:
-    image: cpm-test/caddy:latest
-    container_name: cpm-test-caddy-agent
-    profiles: [sync]
-    # Shares web-agent's network namespace; see the note above.
-    network_mode: "service:web-agent"
-    environment:
-      PRIMARY_DOMAIN: agent.cpm.test
-    volumes:
-      - caddy-data-agent:/data
-      - caddy-config-agent:/config
-      - caddy-logs-agent:/logs
-      - acme-ca-agent:/acme-ca:ro
-    depends_on:
-      web-agent:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
   # ── Simulated client ────────────────────────────────────────────────────
   # The only container that drives the tests. It resolves test domains through
   # dnsmasq exactly as a browser would, and reaches Caddy over TLS by name.
@@ -346,13 +275,11 @@ services:
       CPM_API: http://web:3000
       CPM_ADMIN_USER: cpmadmin
       CPM_ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
-      CPM_AGENT_API: http://web-agent:3000
       TEST_DOMAIN: cpm.test
       CADDY_IP: 172.28.0.10
       CLIENT_IP: 172.28.0.40
       PEBBLE_DIRECTORY: https://pebble:14000/dir
       PEBBLE_MGMT: https://pebble:15000
-      TEST_SYNC: ${CPM_TEST_SYNC:-0}
       TEST_GEOBLOCK: ${CPM_TEST_GEOBLOCK:-1}
       TEST_WAF: ${CPM_TEST_WAF:-1}
     volumes:

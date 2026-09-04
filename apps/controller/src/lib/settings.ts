@@ -1,5 +1,4 @@
 import db, { nowIso } from "./db";
-import { INSTANCE_MODE_KEY, normalizeInstanceMode, type InstanceMode } from "./instance-mode";
 import { settings } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { sanitizeErrorPageRules, type ErrorPageRule } from "./models/proxy-hosts";
@@ -124,8 +123,6 @@ export type GeoBlockSettings = {
   redirect_url: string; // if set, 302 redirect instead of status/body
 };
 
-const SYNCED_PREFIX = "synced:";
-
 export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
   const setting = await db.query.settings.findFirst({
     where: (table, { eq }) => eq(table.key, key),
@@ -141,36 +138,6 @@ export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
     console.warn(`Failed to parse setting ${key}`, error);
     return null;
   }
-}
-
-async function getInstanceModeForSettings(): Promise<InstanceMode> {
-  // Env takes precedence — mirrors getInstanceMode(). An env-configured agent never writes the
-  // mode to the DB, so reading the DB alone would report "standalone" and getEffectiveSetting
-  // would never serve synced:* values.
-  const envMode = normalizeInstanceMode(process.env.INSTANCE_MODE);
-  if (envMode) {
-    return envMode;
-  }
-
-  return normalizeInstanceMode(await getSetting<string>(INSTANCE_MODE_KEY)) ?? "standalone";
-}
-
-async function getSyncedSetting<T>(key: string): Promise<SettingValue<T>> {
-  return await getSetting<T>(`${SYNCED_PREFIX}${key}`);
-}
-
-export async function getEffectiveSetting<T>(key: string): Promise<SettingValue<T>> {
-  const mode = await getInstanceModeForSettings();
-  if (mode !== "agent") {
-    return await getSetting<T>(key);
-  }
-
-  const override = await getSetting<T>(key);
-  if (override !== null) {
-    return override;
-  }
-
-  return await getSyncedSetting<T>(key);
 }
 
 export async function setSetting<T>(key: string, value: T): Promise<void> {
@@ -198,7 +165,7 @@ export async function clearSetting(key: string): Promise<void> {
 }
 
 export async function getCloudflareSettings(): Promise<CloudflareSettings | null> {
-  return await getEffectiveSetting<CloudflareSettings>("cloudflare");
+  return await getSetting<CloudflareSettings>("cloudflare");
 }
 
 export async function saveCloudflareSettings(settings: CloudflareSettings): Promise<void> {
@@ -206,7 +173,7 @@ export async function saveCloudflareSettings(settings: CloudflareSettings): Prom
 }
 
 export async function getGeneralSettings(): Promise<GeneralSettings | null> {
-  return await getEffectiveSetting<GeneralSettings>("general");
+  return await getSetting<GeneralSettings>("general");
 }
 
 export async function saveGeneralSettings(settings: GeneralSettings): Promise<void> {
@@ -215,7 +182,7 @@ export async function saveGeneralSettings(settings: GeneralSettings): Promise<vo
 
 export async function getAvatarSettings(): Promise<AvatarSettings | null> {
   // Effective, so an agent inherits its controller's choice unless it stored a local override.
-  return await getEffectiveSetting<AvatarSettings>("avatars");
+  return await getSetting<AvatarSettings>("avatars");
 }
 
 export async function saveAvatarSettings(settings: AvatarSettings): Promise<void> {
@@ -243,7 +210,7 @@ export async function isGravatarEnabled(): Promise<boolean> {
 }
 
 export async function getPasswordPolicySettings(): Promise<PasswordPolicySettings | null> {
-  return await getEffectiveSetting<PasswordPolicySettings>("password_policy");
+  return await getSetting<PasswordPolicySettings>("password_policy");
 }
 
 export async function savePasswordPolicySettings(settings: PasswordPolicySettings): Promise<void> {
@@ -270,7 +237,7 @@ export async function isLegacyPasswordChangeRequired(): Promise<boolean> {
 }
 
 export async function getAcmeSettings(): Promise<AcmeSettings | null> {
-  return await getEffectiveSetting<AcmeSettings>("acme");
+  return await getSetting<AcmeSettings>("acme");
 }
 
 export async function saveAcmeSettings(settings: AcmeSettings): Promise<void> {
@@ -278,7 +245,7 @@ export async function saveAcmeSettings(settings: AcmeSettings): Promise<void> {
 }
 
 export async function getAuthentikSettings(): Promise<AuthentikSettings | null> {
-  return await getEffectiveSetting<AuthentikSettings>("authentik");
+  return await getSetting<AuthentikSettings>("authentik");
 }
 
 export async function saveAuthentikSettings(settings: AuthentikSettings): Promise<void> {
@@ -286,7 +253,7 @@ export async function saveAuthentikSettings(settings: AuthentikSettings): Promis
 }
 
 export async function getMetricsSettings(): Promise<MetricsSettings | null> {
-  return await getEffectiveSetting<MetricsSettings>("metrics");
+  return await getSetting<MetricsSettings>("metrics");
 }
 
 export async function saveMetricsSettings(settings: MetricsSettings): Promise<void> {
@@ -294,7 +261,7 @@ export async function saveMetricsSettings(settings: MetricsSettings): Promise<vo
 }
 
 export async function getLoggingSettings(): Promise<LoggingSettings | null> {
-  return await getEffectiveSetting<LoggingSettings>("logging");
+  return await getSetting<LoggingSettings>("logging");
 }
 
 export async function saveLoggingSettings(settings: LoggingSettings): Promise<void> {
@@ -302,7 +269,7 @@ export async function saveLoggingSettings(settings: LoggingSettings): Promise<vo
 }
 
 export async function getTrustedProxiesSettings(): Promise<TrustedProxiesSettings | null> {
-  return await getEffectiveSetting<TrustedProxiesSettings>("trusted_proxies");
+  return await getSetting<TrustedProxiesSettings>("trusted_proxies");
 }
 
 export async function saveTrustedProxiesSettings(settings: TrustedProxiesSettings): Promise<void> {
@@ -310,7 +277,7 @@ export async function saveTrustedProxiesSettings(settings: TrustedProxiesSetting
 }
 
 export async function getDnsSettings(): Promise<DnsSettings | null> {
-  return await getEffectiveSetting<DnsSettings>("dns");
+  return await getSetting<DnsSettings>("dns");
 }
 
 export async function saveDnsSettings(settings: DnsSettings): Promise<void> {
@@ -318,7 +285,7 @@ export async function saveDnsSettings(settings: DnsSettings): Promise<void> {
 }
 
 export async function getDnsProviderSettings(): Promise<DnsProviderSettings | null> {
-  const raw = await getEffectiveSetting<Record<string, unknown>>("dns_provider");
+  const raw = await getSetting<Record<string, unknown>>("dns_provider");
   if (!raw) return null;
 
   // Normalize the old single-provider { provider, credentials } shape into the multi-provider
@@ -337,7 +304,7 @@ export async function saveDnsProviderSettings(settings: DnsProviderSettings): Pr
 }
 
 export async function getUpstreamDnsResolutionSettings(): Promise<UpstreamDnsResolutionSettings | null> {
-  return await getEffectiveSetting<UpstreamDnsResolutionSettings>("upstream_dns_resolution");
+  return await getSetting<UpstreamDnsResolutionSettings>("upstream_dns_resolution");
 }
 
 export async function saveUpstreamDnsResolutionSettings(
@@ -347,7 +314,7 @@ export async function saveUpstreamDnsResolutionSettings(
 }
 
 export async function getGeoBlockSettings(): Promise<GeoBlockSettings | null> {
-  return await getEffectiveSetting<GeoBlockSettings>("geoblock");
+  return await getSetting<GeoBlockSettings>("geoblock");
 }
 
 export async function saveGeoBlockSettings(settings: GeoBlockSettings): Promise<void> {
@@ -373,7 +340,7 @@ export type WafSettings = {
 };
 
 export async function getWafSettings(): Promise<WafSettings | null> {
-  return await getEffectiveSetting<WafSettings>("waf");
+  return await getSetting<WafSettings>("waf");
 }
 
 export async function saveWafSettings(s: WafSettings): Promise<void> {
@@ -387,7 +354,7 @@ export type ErrorPagesSettings = {
 };
 
 export async function getErrorPagesSettings(): Promise<ErrorPagesSettings | null> {
-  return await getEffectiveSetting<ErrorPagesSettings>("error_pages");
+  return await getSetting<ErrorPagesSettings>("error_pages");
 }
 
 export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<void> {
@@ -396,11 +363,7 @@ export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<voi
 
 // ─── Caddy build ─────────────────────────────────────────────────────────────
 
-/**
- * Which Caddy plugins this instance's image is built with. getSetting, not getEffectiveSetting:
- * the list describes a binary on *this* host, so inheriting a controller's would tell an agent it has
- * plugins it never compiled.
- */
+/** Which Caddy plugins this deployment's image is built with. */
 export type CaddyBuildSettings = {
   /** Built-in module id -> enabled. Absent ids fall back to enabled. */
   modules: Record<string, boolean>;
@@ -418,7 +381,7 @@ export async function saveCaddyBuildSettings(s: CaddyBuildSettings): Promise<voi
 // Response for requests that do not match any configured proxy host. A missing
 // setting (or mode "caddy") preserves Caddy's native routing/HTTPS behavior.
 export async function getDefaultResponseSettings(): Promise<DefaultResponseSettings | null> {
-  const value = await getEffectiveSetting<unknown>("default_response");
+  const value = await getSetting<unknown>("default_response");
   if (value === null) return null;
 
   try {

@@ -21,7 +21,6 @@ export default async function proxy(req: NextRequest) {
     isSetupEntry ||
     pathname.startsWith("/api/auth") ||
     pathname === "/api/health" ||
-    pathname === "/api/instances/sync" ||
     pathname.startsWith("/api/v1/") ||
     pathname.startsWith("/api/forward-auth/")
   ) {

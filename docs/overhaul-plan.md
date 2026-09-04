@@ -109,8 +109,36 @@ Each phase ends green — tests, typecheck, lint, build — and lands on `main` 
 | 2 | Settings service: typed registry, DB-backed config with an env-override layer | Done |
 | 3 | First-run setup and login-verify flow | Done |
 | 4 | Migration flow | Done |
-| 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | |
+| 5 | Agent extraction, pairing, and the ClickHouse/GeoIP handoff | In progress |
 | 6 | IPv6 | |
+
+### Phase 5, step 1: instance sync deleted
+
+The old feature is gone in one commit, ahead of the agent work, because everything the agent
+replaces it with would otherwise have to keep it compiling.
+
+What went: `instance-sync.ts` and its four leaf modules, the `instances` table and model, both
+`/api/instances/sync` and `/api/v1/instances*`, the Settings → Instance Sync screen, and the
+`INSTANCE_*` environment variables. Two collapses fell out of it and are the parts worth
+remembering:
+
+- **`getEffectiveSetting` is `getSetting` again.** The `synced:` key prefix existed so an agent
+  could inherit a controller's settings and override them locally. With no controller pushing,
+  every read is a plain read, and the eleven "Override controller settings" toggles in the
+  Settings UI went with it.
+- **`applyCaddyConfig` no longer pushes.** It ended by calling `syncInstances()` and could fail
+  with `INSTANCE_SYNC_FAILED` after Caddy had already accepted the config — an apply that both
+  succeeded and reported failure. That code is gone from `CaddyApplyErrorCode`.
+
+The end-to-end stack lost the four services that only existed for this feature — `web-controller`,
+`web-agent` and their two Caddy instances — along with three networks, four volumes and two of the
+extra databases `postgres-init.sql` created. The `docker-tests` rig lost its `--sync` profile for
+the same reason.
+
+The `instances` table was dropped from `drizzle/postgres/0000_initial.sql` by regenerating it
+rather than adding a migration: PostgreSQL support is unreleased, so no deployment has ever run
+the version that created it. The legacy importer is schema-derived, so a pre-3.1 database's
+`instances` rows are simply not copied — which is correct, since nothing would read them.
 
 ### Consumers still reading the environment directly
 

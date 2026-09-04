@@ -25,18 +25,6 @@ vi.mock('@/src/lib/models/proxy-hosts', () => ({
 }));
 
 // Stub other transitive deps of actions.ts that we don't exercise.
-vi.mock('@/src/lib/instance-sync', () => ({
-  getInstanceMode: vi.fn(),
-  getAgentControllerToken: vi.fn(),
-  setInstanceMode: vi.fn(),
-  setAgentControllerToken: vi.fn(),
-  syncInstances: vi.fn(),
-}));
-vi.mock('@/src/lib/models/instances', () => ({
-  createInstance: vi.fn(),
-  deleteInstance: vi.fn(),
-  updateInstance: vi.fn(),
-}));
 vi.mock('@/src/lib/settings', () => ({
   clearSetting: vi.fn(),
   getSetting: vi.fn(),

@@ -4,7 +4,6 @@ import { useState, useActionState, useEffect } from "react";
 import {
   Cloud,
   Globe,
-  Network,
   Pin,
   Activity,
   ScrollText,
@@ -26,7 +25,6 @@ import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
-import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Kbd } from "@astryxdesign/core/Kbd";
 import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
@@ -46,7 +44,6 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { createStaticSource } from "@astryxdesign/core/Typeahead/utils";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { StatusChip } from "@/components/ui/StatusChip";
 import {
   AUTOFILL_NEW_PASSWORD,
   AUTOFILL_OFF,
@@ -87,12 +84,6 @@ import {
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
   updateUpstreamDnsResolutionSettingsAction,
-  updateInstanceModeAction,
-  updateAgentControllerTokenAction,
-  createAgentInstanceAction,
-  deleteAgentInstanceAction,
-  toggleAgentInstanceAction,
-  syncAgentInstancesAction,
   updateGeoBlockSettingsAction,
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
@@ -120,12 +111,6 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "system",
     label: "System",
     items: [
-      {
-        id: "sync",
-        name: "Instance Sync",
-        desc: "Standalone, controller, or agent coordination",
-        icon: Network,
-      },
       {
         id: "general",
         name: "General",
@@ -248,27 +233,6 @@ function findItem(id: string) {
 }
 
 // ─── Layout primitives ───────────────────────────────────────────────────────
-
-/** The "Override controller settings" toggle an agent shows above each form. */
-function OverrideToggle({
-  value,
-  onChange,
-  isDisabled,
-}: {
-  value: boolean;
-  onChange: (v: boolean) => void;
-  isDisabled?: boolean;
-}) {
-  return (
-    <CheckboxInput
-      label="Override controller settings"
-      htmlName="overrideEnabled"
-      value={value}
-      onChange={onChange}
-      isDisabled={isDisabled}
-    />
-  );
-}
 
 // ─── Cmd-K Palette ───────────────────────────────────────────────────────────
 
@@ -443,43 +407,6 @@ type Props = {
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   caddyBuild: CaddyBuildSettings | null;
   baseUrl: string;
-  instanceSync: {
-    mode: "standalone" | "controller" | "agent";
-    modeFromEnv: boolean;
-    tokenFromEnv: boolean;
-    overrides: {
-      general: boolean;
-      acme: boolean;
-      dnsProvider: boolean;
-      authentik: boolean;
-      metrics: boolean;
-      logging: boolean;
-      dns: boolean;
-      upstreamDnsResolution: boolean;
-      trustedProxies: boolean;
-      avatars: boolean;
-      defaultResponse: boolean;
-    };
-    agent: {
-      hasToken: boolean;
-      lastSyncAt: string | null;
-      lastSyncError: string | null;
-    } | null;
-    controller: {
-      instances: Array<{
-        id: number;
-        name: string;
-        baseUrl: string;
-        enabled: boolean;
-        lastSyncAt: string | null;
-        lastSyncError: string | null;
-      }>;
-      envInstances: Array<{
-        name: string;
-        url: string;
-      }>;
-    } | null;
-  };
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -504,9 +431,8 @@ export default function SettingsClient({
   passwordPolicy,
   caddyBuild,
   baseUrl,
-  instanceSync,
 }: Props) {
-  const [active, setActive] = useState("sync");
+  const [active, setActive] = useState("general");
   const [cmdkOpen, setCmdkOpen] = useState(false);
 
   // Cmd-K keyboard shortcut
@@ -547,19 +473,6 @@ export default function SettingsClient({
     updateUpstreamDnsResolutionSettingsAction,
     null,
   );
-  const [instanceModeState, instanceModeFormAction] = useActionState(
-    updateInstanceModeAction,
-    null,
-  );
-  const [agentTokenState, agentTokenFormAction] = useActionState(
-    updateAgentControllerTokenAction,
-    null,
-  );
-  const [agentInstanceState, agentInstanceFormAction] = useActionState(
-    createAgentInstanceAction,
-    null,
-  );
-  const [syncState, syncFormAction] = useActionState(syncAgentInstancesAction, null);
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
   const [errorPagesState, errorPagesFormAction] = useActionState(
     updateErrorPagesSettingsAction,
@@ -572,28 +485,6 @@ export default function SettingsClient({
   const [defaultResponseState, defaultResponseFormAction] = useActionState(
     updateDefaultResponseSettingsAction,
     null,
-  );
-
-  const isAgent = instanceSync.mode === "agent";
-  const isController = instanceSync.mode === "controller";
-  const [generalOverride, setGeneralOverride] = useState(instanceSync.overrides.general);
-  const [acmeOverride, setAcmeOverride] = useState(instanceSync.overrides.acme);
-  const [dnsProviderOverride, setDnsProviderOverride] = useState(
-    instanceSync.overrides.dnsProvider,
-  );
-  const [authentikOverride, setAuthentikOverride] = useState(instanceSync.overrides.authentik);
-  const [metricsOverride, setMetricsOverride] = useState(instanceSync.overrides.metrics);
-  const [avatarsOverride, setAvatarsOverride] = useState(instanceSync.overrides.avatars);
-  const [loggingOverride, setLoggingOverride] = useState(instanceSync.overrides.logging);
-  const [dnsOverride, setDnsOverride] = useState(instanceSync.overrides.dns);
-  const [upstreamDnsResolutionOverride, setUpstreamDnsResolutionOverride] = useState(
-    instanceSync.overrides.upstreamDnsResolution,
-  );
-  const [trustedProxiesOverride, setTrustedProxiesOverride] = useState(
-    instanceSync.overrides.trustedProxies,
-  );
-  const [defaultResponseOverride, setDefaultResponseOverride] = useState(
-    instanceSync.overrides.defaultResponse,
   );
 
   // The page has two navigations — the sidebar panel and the compact picker in the content column
@@ -630,49 +521,21 @@ export default function SettingsClient({
               )}
 
               <VStack gap={4}>
-                {active === "sync" && (
-                  <SyncSection
-                    instanceSync={instanceSync}
-                    instanceModeState={instanceModeState}
-                    instanceModeFormAction={instanceModeFormAction}
-                    agentTokenState={agentTokenState}
-                    agentTokenFormAction={agentTokenFormAction}
-                    agentInstanceState={agentInstanceState}
-                    agentInstanceFormAction={agentInstanceFormAction}
-                    syncState={syncState}
-                    syncFormAction={syncFormAction}
-                    isAgent={isAgent}
-                    isController={isController}
-                  />
-                )}
                 {active === "general" && (
                   <GeneralSection
                     general={general}
                     generalState={generalState}
                     generalFormAction={generalFormAction}
-                    isAgent={isAgent}
-                    generalOverride={generalOverride}
-                    setGeneralOverride={setGeneralOverride}
                   />
                 )}
                 {active === "acme" && (
-                  <AcmeSection
-                    acme={acme}
-                    acmeState={acmeState}
-                    acmeFormAction={acmeFormAction}
-                    isAgent={isAgent}
-                    acmeOverride={acmeOverride}
-                    setAcmeOverride={setAcmeOverride}
-                  />
+                  <AcmeSection acme={acme} acmeState={acmeState} acmeFormAction={acmeFormAction} />
                 )}
                 {active === "default-response" && (
                   <DefaultResponseSection
                     defaultResponse={defaultResponse}
                     defaultResponseState={defaultResponseState}
                     defaultResponseFormAction={defaultResponseFormAction}
-                    isAgent={isAgent}
-                    defaultResponseOverride={defaultResponseOverride}
-                    setDefaultResponseOverride={setDefaultResponseOverride}
                   />
                 )}
                 {active === "dns-providers" && (
@@ -684,9 +547,6 @@ export default function SettingsClient({
                     selectedProvider={selectedProvider}
                     setSelectedProvider={setSelectedProvider}
                     configuredProviders={configuredProviders}
-                    isAgent={isAgent}
-                    dnsProviderOverride={dnsProviderOverride}
-                    setDnsProviderOverride={setDnsProviderOverride}
                   />
                 )}
                 {active === "dns-resolvers" && (
@@ -694,9 +554,6 @@ export default function SettingsClient({
                     dns={dns}
                     dnsState={dnsState}
                     dnsFormAction={dnsFormAction}
-                    isAgent={isAgent}
-                    dnsOverride={dnsOverride}
-                    setDnsOverride={setDnsOverride}
                   />
                 )}
                 {active === "upstream-dns" && (
@@ -704,9 +561,6 @@ export default function SettingsClient({
                     upstreamDnsResolution={upstreamDnsResolution}
                     upstreamDnsResolutionState={upstreamDnsResolutionState}
                     upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
-                    isAgent={isAgent}
-                    upstreamDnsResolutionOverride={upstreamDnsResolutionOverride}
-                    setUpstreamDnsResolutionOverride={setUpstreamDnsResolutionOverride}
                   />
                 )}
                 {active === "trusted-proxies" && (
@@ -714,9 +568,6 @@ export default function SettingsClient({
                     trustedProxies={trustedProxies}
                     trustedProxiesState={trustedProxiesState}
                     trustedProxiesFormAction={trustedProxiesFormAction}
-                    isAgent={isAgent}
-                    trustedProxiesOverride={trustedProxiesOverride}
-                    setTrustedProxiesOverride={setTrustedProxiesOverride}
                   />
                 )}
                 {active === "geoblock" && (
@@ -738,9 +589,6 @@ export default function SettingsClient({
                     authentik={authentik}
                     authentikState={authentikState}
                     authentikFormAction={authentikFormAction}
-                    isAgent={isAgent}
-                    authentikOverride={authentikOverride}
-                    setAuthentikOverride={setAuthentikOverride}
                   />
                 )}
                 {active === "oauth" && (
@@ -762,9 +610,6 @@ export default function SettingsClient({
                     avatars={avatars}
                     avatarsState={avatarsState}
                     avatarsFormAction={avatarsFormAction}
-                    isAgent={isAgent}
-                    avatarsOverride={avatarsOverride}
-                    setAvatarsOverride={setAvatarsOverride}
                   />
                 )}
                 {active === "caddy-build" && (
@@ -779,9 +624,6 @@ export default function SettingsClient({
                     metrics={metrics}
                     metricsState={metricsState}
                     metricsFormAction={metricsFormAction}
-                    isAgent={isAgent}
-                    metricsOverride={metricsOverride}
-                    setMetricsOverride={setMetricsOverride}
                   />
                 )}
                 {active === "logging" && (
@@ -789,9 +631,6 @@ export default function SettingsClient({
                     logging={logging}
                     loggingState={loggingState}
                     loggingFormAction={loggingFormAction}
-                    isAgent={isAgent}
-                    loggingOverride={loggingOverride}
-                    setLoggingOverride={setLoggingOverride}
                   />
                 )}
               </VStack>
@@ -805,306 +644,21 @@ export default function SettingsClient({
   );
 }
 
-// ─── Section: Instance Sync ──────────────────────────────────────────────────
-
-const MODE_OPTIONS = [
-  { value: "standalone", label: "Standalone" },
-  { value: "controller", label: "Controller" },
-  { value: "agent", label: "Agent" },
-];
-
-function SyncSection({
-  instanceSync,
-  instanceModeState,
-  instanceModeFormAction,
-  agentTokenState,
-  agentTokenFormAction,
-  agentInstanceState,
-  agentInstanceFormAction,
-  syncState,
-  syncFormAction,
-  isAgent,
-  isController,
-}: {
-  instanceSync: Props["instanceSync"];
-  instanceModeState: { success: boolean; message?: string } | null;
-  instanceModeFormAction: (payload: FormData) => void;
-  agentTokenState: { success: boolean; message?: string } | null;
-  agentTokenFormAction: (payload: FormData) => void;
-  agentInstanceState: { success: boolean; message?: string } | null;
-  agentInstanceFormAction: (payload: FormData) => void;
-  syncState: { success: boolean; message?: string } | null;
-  syncFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  isController: boolean;
-}) {
-  const [mode, setMode] = useState<string>(instanceSync.mode);
-  const [controllerToken, setControllerToken] = useState("");
-  const [clearToken, setClearToken] = useState(false);
-  const [instName, setInstName] = useState("");
-  const [instBaseUrl, setInstBaseUrl] = useState("");
-  const [instApiToken, setInstApiToken] = useState("");
-
-  return (
-    <>
-      <FormCard title="Mode">
-        <form action={instanceModeFormAction}>
-          <VStack gap={3}>
-            {instanceSync.modeFromEnv && (
-              <InfoAlert title="Instance mode is set by the INSTANCE_MODE environment variable">
-                It cannot be changed at runtime.
-              </InfoAlert>
-            )}
-            {instanceModeState?.message && (
-              <StatusAlert
-                message={instanceModeState.message}
-                success={instanceModeState.success}
-              />
-            )}
-            <Selector
-              label="Instance mode"
-              description="Standalone runs alone. Controller pushes config to agents. Agent pulls from a controller."
-              htmlName="mode"
-              options={MODE_OPTIONS}
-              value={mode}
-              onChange={setMode}
-              isDisabled={instanceSync.modeFromEnv}
-            />
-            <SaveButton label="Save instance mode" isDisabled={instanceSync.modeFromEnv} />
-          </VStack>
-        </form>
-      </FormCard>
-
-      {isAgent && (
-        <FormCard title="Controller Connection">
-          <VStack gap={3}>
-            <form action={agentTokenFormAction}>
-              <VStack gap={3}>
-                {instanceSync.tokenFromEnv && (
-                  <InfoAlert title="Sync token is set by the INSTANCE_SYNC_TOKEN environment variable">
-                    It cannot be changed at runtime.
-                  </InfoAlert>
-                )}
-                {agentTokenState?.message && (
-                  <StatusAlert
-                    message={agentTokenState.message}
-                    success={agentTokenState.success}
-                  />
-                )}
-                {instanceSync.agent?.hasToken && !instanceSync.tokenFromEnv && (
-                  <InfoAlert title="A controller sync token is configured">
-                    Leave the token field blank to keep it, or select &ldquo;Remove existing
-                    token&rdquo; to delete it.
-                  </InfoAlert>
-                )}
-                <TextInput
-                  {...AUTOFILL_NEW_PASSWORD}
-                  label="Controller sync token"
-                  type="password"
-                  htmlName="controllerToken"
-                  value={controllerToken}
-                  onChange={setControllerToken}
-                  placeholder="Enter new token"
-                  isDisabled={instanceSync.tokenFromEnv}
-                />
-                <CheckboxInput
-                  label="Remove existing token"
-                  htmlName="clearToken"
-                  value={clearToken}
-                  onChange={setClearToken}
-                  isDisabled={!instanceSync.agent?.hasToken || instanceSync.tokenFromEnv}
-                />
-                <SaveButton label="Save controller token" isDisabled={instanceSync.tokenFromEnv} />
-              </VStack>
-            </form>
-            {instanceSync.agent?.lastSyncError ? (
-              <WarnAlert
-                title={
-                  instanceSync.agent?.lastSyncAt
-                    ? `Last sync: ${instanceSync.agent.lastSyncAt}`
-                    : "No sync payload has been received yet."
-                }
-              >
-                {instanceSync.agent?.lastSyncError}
-              </WarnAlert>
-            ) : (
-              <InfoAlert
-                title={
-                  instanceSync.agent?.lastSyncAt
-                    ? `Last sync: ${instanceSync.agent.lastSyncAt}`
-                    : "No sync payload has been received yet."
-                }
-              />
-            )}
-          </VStack>
-        </FormCard>
-      )}
-
-      {isController && (
-        <FormCard
-          title={`Agent Instances (${(instanceSync.controller?.instances.length ?? 0) + (instanceSync.controller?.envInstances.length ?? 0)})`}
-        >
-          <VStack gap={3}>
-            <form action={agentInstanceFormAction}>
-              <VStack gap={3}>
-                {agentInstanceState?.message && (
-                  <StatusAlert
-                    message={agentInstanceState.message}
-                    success={agentInstanceState.success}
-                  />
-                )}
-                <Grid columns={{ minWidth: 220, max: 2 }} gap={3}>
-                  <TextInput
-                    label="Instance name"
-                    htmlName="name"
-                    value={instName}
-                    onChange={setInstName}
-                    placeholder="Edge node EU-1"
-                  />
-                  <TextInput
-                    label="Base URL"
-                    htmlName="baseUrl"
-                    value={instBaseUrl}
-                    onChange={setInstBaseUrl}
-                    placeholder="https://agent-1.example.com"
-                  />
-                </Grid>
-                <TextInput
-                  {...AUTOFILL_NEW_PASSWORD}
-                  label="Agent API token"
-                  type="password"
-                  htmlName="apiToken"
-                  value={instApiToken}
-                  onChange={setInstApiToken}
-                />
-                <HStack justify="end">
-                  <Button type="submit" size="sm" label="Add agent instance" />
-                </HStack>
-              </VStack>
-            </form>
-
-            {/* Its own form: nesting one inside the add-instance form was
-                invalid HTML, and the browser silently dropped it. */}
-            <form action={syncFormAction}>
-              <VStack gap={2}>
-                {syncState?.message && (
-                  <StatusAlert message={syncState.message} success={syncState.success} />
-                )}
-                <HStack>
-                  <Button type="submit" variant="secondary" size="sm" label="Sync now" />
-                </HStack>
-              </VStack>
-            </form>
-
-            {instanceSync.controller?.instances.length === 0 &&
-              instanceSync.controller?.envInstances.length === 0 && (
-                <InfoAlert title="No agent instances configured yet." />
-              )}
-
-            {instanceSync.controller?.envInstances &&
-              instanceSync.controller.envInstances.length > 0 && (
-                <VStack gap={2}>
-                  <Text type="label" size="xsm" weight="semibold" color="secondary">
-                    Environment-configured (INSTANCE_AGENTS)
-                  </Text>
-                  {instanceSync.controller.envInstances.map((instance) => (
-                    <Card key={instance.url} variant="muted" padding={3}>
-                      <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
-                        <VStack gap={0}>
-                          <Text type="body" size="sm" weight="semibold">
-                            {instance.name}
-                          </Text>
-                          <Text type="code" size="xsm" color="secondary">
-                            {instance.url}
-                          </Text>
-                        </VStack>
-                        <StatusChip status="active" label="ENV" />
-                      </HStack>
-                    </Card>
-                  ))}
-                </VStack>
-              )}
-
-            {instanceSync.controller?.instances && instanceSync.controller.instances.length > 0 && (
-              <VStack gap={2}>
-                <Text type="label" size="xsm" weight="semibold" color="secondary">
-                  UI-configured instances
-                </Text>
-                {instanceSync.controller.instances.map((instance) => (
-                  <Card key={instance.id} padding={3}>
-                    <HStack justify="between" gap={3} wrap="wrap" vAlign="center">
-                      <VStack gap={0}>
-                        <Text type="body" size="sm" weight="semibold">
-                          {instance.name}
-                        </Text>
-                        <Text type="code" size="xsm" color="secondary">
-                          {instance.baseUrl}
-                        </Text>
-                        <Text type="body" size="xsm" color="secondary">
-                          {instance.lastSyncAt
-                            ? `Last sync: ${instance.lastSyncAt}`
-                            : "No sync yet"}
-                        </Text>
-                        {instance.lastSyncError && (
-                          <Text type="body" size="xsm" color="secondary">
-                            {instance.lastSyncError}
-                          </Text>
-                        )}
-                      </VStack>
-                      <HStack gap={2}>
-                        <form action={toggleAgentInstanceAction}>
-                          <input type="hidden" name="instanceId" value={instance.id} />
-                          <input
-                            type="hidden"
-                            name="enabled"
-                            value={instance.enabled ? "" : "on"}
-                          />
-                          <Button
-                            type="submit"
-                            variant="secondary"
-                            size="sm"
-                            label={instance.enabled ? "Disable" : "Enable"}
-                          />
-                        </form>
-                        <form action={deleteAgentInstanceAction}>
-                          <input type="hidden" name="instanceId" value={instance.id} />
-                          <Button type="submit" variant="destructive" size="sm" label="Remove" />
-                        </form>
-                      </HStack>
-                    </HStack>
-                  </Card>
-                ))}
-              </VStack>
-            )}
-          </VStack>
-        </FormCard>
-      )}
-    </>
-  );
-}
-
 // ─── Section: General ────────────────────────────────────────────────────────
 
 function GeneralSection({
   general,
   generalState,
   generalFormAction,
-  isAgent,
-  generalOverride,
-  setGeneralOverride,
 }: {
   general: GeneralSettings | null;
   generalState: { success: boolean; message?: string } | null;
   generalFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  generalOverride: boolean;
-  setGeneralOverride: (v: boolean) => void;
 }) {
   const [primaryDomain, setPrimaryDomain] = useState(
     general?.primaryDomain ?? "caddyproxymanager.com",
   );
   const [acmeEmail, setAcmeEmail] = useState(general?.acmeEmail ?? "");
-  const disabled = isAgent && !generalOverride;
 
   return (
     <FormCard title="Defaults">
@@ -1113,7 +667,6 @@ function GeneralSection({
           {generalState?.message && (
             <StatusAlert message={generalState.message} success={generalState.success} />
           )}
-          {isAgent && <OverrideToggle value={generalOverride} onChange={setGeneralOverride} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label="Primary domain"
@@ -1122,7 +675,6 @@ function GeneralSection({
             value={primaryDomain}
             onChange={setPrimaryDomain}
             isRequired
-            isDisabled={disabled}
           />
           <TextInput
             label="ACME contact email"
@@ -1131,7 +683,6 @@ function GeneralSection({
             htmlName="acmeEmail"
             value={acmeEmail}
             onChange={setAcmeEmail}
-            isDisabled={disabled}
           />
           <SaveButton label="Save general settings" />
         </VStack>
@@ -1161,16 +712,10 @@ function DefaultResponseSection({
   defaultResponse,
   defaultResponseState,
   defaultResponseFormAction,
-  isAgent,
-  defaultResponseOverride,
-  setDefaultResponseOverride,
 }: {
   defaultResponse: DefaultResponseSettings | null;
   defaultResponseState: { success: boolean; message?: string } | null;
   defaultResponseFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  defaultResponseOverride: boolean;
-  setDefaultResponseOverride: (v: boolean) => void;
 }) {
   const [mode, setMode] = useState<DefaultResponseSettings["mode"]>(
     defaultResponse?.mode ?? "caddy",
@@ -1197,7 +742,6 @@ function DefaultResponseSection({
       ? storedHeaders
       : "Content-Type: text/plain; charset=utf-8",
   );
-  const disabled = isAgent && !defaultResponseOverride;
 
   return (
     <VStack gap={4}>
@@ -1210,12 +754,6 @@ function DefaultResponseSection({
                 success={defaultResponseState.success}
               />
             )}
-            {isAgent && (
-              <OverrideToggle
-                value={defaultResponseOverride}
-                onChange={setDefaultResponseOverride}
-              />
-            )}
             <Selector
               label="Behavior"
               description="Applied only when no configured proxy host matches the request."
@@ -1223,7 +761,6 @@ function DefaultResponseSection({
               options={DEFAULT_RESPONSE_MODES}
               value={mode}
               onChange={(v) => setMode(v as DefaultResponseSettings["mode"])}
-              isDisabled={disabled}
             />
 
             {mode === "respond" && (
@@ -1237,7 +774,6 @@ function DefaultResponseSection({
                   isIntegerOnly
                   value={status}
                   onChange={setStatus}
-                  isDisabled={disabled}
                 />
                 <TextArea
                   label="Response body"
@@ -1248,7 +784,6 @@ function DefaultResponseSection({
                   onChange={setBody}
                   rows={8}
                   placeholder="Not Found"
-                  isDisabled={disabled}
                 />
               </>
             )}
@@ -1262,7 +797,6 @@ function DefaultResponseSection({
                   options={REDIRECT_STATUS_OPTIONS}
                   value={redirectStatus}
                   onChange={setRedirectStatus}
-                  isDisabled={disabled}
                 />
                 <TextInput
                   label="Redirect URL"
@@ -1272,7 +806,6 @@ function DefaultResponseSection({
                   value={redirectUrl}
                   onChange={setRedirectUrl}
                   placeholder="https://example.com{http.request.uri}"
-                  isDisabled={disabled}
                 />
               </>
             )}
@@ -1287,7 +820,6 @@ function DefaultResponseSection({
                 onChange={setHeaders}
                 rows={4}
                 placeholder={"Content-Type: text/html; charset=utf-8\nCache-Control: no-store"}
-                isDisabled={disabled}
               />
             )}
 
@@ -1298,7 +830,7 @@ function DefaultResponseSection({
               </WarnAlert>
             )}
 
-            <SaveButton label="Save default response" isDisabled={disabled} />
+            <SaveButton label="Save default response" />
           </VStack>
         </form>
       </FormCard>
@@ -1316,20 +848,13 @@ function AcmeSection({
   acme,
   acmeState,
   acmeFormAction,
-  isAgent,
-  acmeOverride,
-  setAcmeOverride,
 }: {
   acme: AcmeSettings | null;
   acmeState: { success: boolean; message?: string } | null;
   acmeFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  acmeOverride: boolean;
-  setAcmeOverride: (v: boolean) => void;
 }) {
   const [caUrl, setCaUrl] = useState(acme?.caUrl ?? "");
   const [caRootPem, setCaRootPem] = useState(acme?.caRootPem ?? "");
-  const disabled = isAgent && !acmeOverride;
 
   return (
     <FormCard title="Custom ACME Directory">
@@ -1338,7 +863,6 @@ function AcmeSection({
           {acmeState?.message && (
             <StatusAlert message={acmeState.message} success={acmeState.success} />
           )}
-          {isAgent && <OverrideToggle value={acmeOverride} onChange={setAcmeOverride} />}
           <TextInput
             label="ACME directory URL"
             isOptional
@@ -1347,7 +871,6 @@ function AcmeSection({
             value={caUrl}
             onChange={setCaUrl}
             placeholder="https://ca.internal.example.com/acme/acme/directory"
-            isDisabled={disabled}
           />
           <TextArea
             label="CA root certificate (PEM)"
@@ -1358,9 +881,8 @@ function AcmeSection({
             onChange={setCaRootPem}
             placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
             rows={6}
-            isDisabled={disabled}
           />
-          <SaveButton label="Save ACME settings" isDisabled={disabled} />
+          <SaveButton label="Save ACME settings" />
         </VStack>
       </form>
     </FormCard>
@@ -1369,13 +891,7 @@ function AcmeSection({
 
 // ─── Section: DNS Providers ──────────────────────────────────────────────────
 
-function DnsProviderCredentialFields({
-  providerDef,
-  isDisabled,
-}: {
-  providerDef: DnsProviderDefinition;
-  isDisabled: boolean;
-}) {
+function DnsProviderCredentialFields({ providerDef }: { providerDef: DnsProviderDefinition }) {
   // Keyed on the provider so switching providers resets the credentials instead of carrying the
   // previous provider's values across.
   const [values, setValues] = useState<Record<string, string>>({});
@@ -1400,7 +916,6 @@ function DnsProviderCredentialFields({
           value={values[field.key] ?? ""}
           onChange={(v) => setValues((prev) => ({ ...prev, [field.key]: v }))}
           placeholder={field.placeholder ?? ""}
-          isDisabled={isDisabled}
         />
       ))}
     </>
@@ -1415,9 +930,6 @@ function DnsProvidersSection({
   selectedProvider,
   setSelectedProvider,
   configuredProviders,
-  isAgent,
-  dnsProviderOverride,
-  setDnsProviderOverride,
 }: {
   dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
@@ -1426,9 +938,6 @@ function DnsProvidersSection({
   selectedProvider: string;
   setSelectedProvider: (v: string) => void;
   configuredProviders: string[];
-  isAgent: boolean;
-  dnsProviderOverride: boolean;
-  setDnsProviderOverride: (v: boolean) => void;
 }) {
   const { enabledModuleIds } = useModuleGate();
   // Each provider is a separate caddy-dns plugin, so availability is per provider, not one blanket
@@ -1441,7 +950,6 @@ function DnsProvidersSection({
   const isUpdate = configuredProviders.includes(selectedProvider);
   const hasProvider = Boolean(selectedProvider) && selectedProvider !== "none";
   const selectedUnavailable = hasProvider && !isProviderAvailable(selectedProvider);
-  const disabled = isAgent && !dnsProviderOverride;
 
   const unavailableCount = dnsProviderDefinitions.filter(
     (p) => !isProviderAvailable(p.name),
@@ -1466,15 +974,6 @@ function DnsProvidersSection({
       {dnsProviderState?.message && (
         <StatusAlert message={dnsProviderState.message} success={dnsProviderState.success} />
       )}
-      {isAgent && (
-        /* Lives outside the form it belongs to, so its value is carried by the
-           hidden field inside dnsp-add-form rather than by the control itself. */
-        <CheckboxInput
-          label="Override controller settings"
-          value={dnsProviderOverride}
-          onChange={setDnsProviderOverride}
-        />
-      )}
 
       {configuredProviders.length > 0 && (
         <FormCard title="Configured providers">
@@ -1496,26 +995,12 @@ function DnsProvidersSection({
                         <form action={dnsProviderFormAction}>
                           <input type="hidden" name="action" value="set-default" />
                           <input type="hidden" name="provider" value={name} />
-                          {isAgent && (
-                            <input
-                              type="hidden"
-                              name="overrideEnabled"
-                              value={dnsProviderOverride ? "on" : ""}
-                            />
-                          )}
                           <Button type="submit" variant="secondary" size="sm" label="Set default" />
                         </form>
                       )}
                       <form action={dnsProviderFormAction}>
                         <input type="hidden" name="action" value="remove" />
                         <input type="hidden" name="provider" value={name} />
-                        {isAgent && (
-                          <input
-                            type="hidden"
-                            name="overrideEnabled"
-                            value={dnsProviderOverride ? "on" : ""}
-                          />
-                        )}
                         <Button type="submit" variant="destructive" size="sm" label="Remove" />
                       </form>
                     </HStack>
@@ -1527,13 +1012,6 @@ function DnsProvidersSection({
               <form action={dnsProviderFormAction}>
                 <input type="hidden" name="action" value="set-default" />
                 <input type="hidden" name="provider" value="none" />
-                {isAgent && (
-                  <input
-                    type="hidden"
-                    name="overrideEnabled"
-                    value={dnsProviderOverride ? "on" : ""}
-                  />
-                )}
                 <Button
                   type="submit"
                   variant="ghost"
@@ -1549,23 +1027,13 @@ function DnsProvidersSection({
       <FormCard
         title={configuredProviders.length > 0 ? "Add or update provider" : "Add a provider"}
         footer={
-          <>
-            {isAgent && (
-              <input
-                type="hidden"
-                name="overrideEnabled"
-                form="dnsp-add-form"
-                value={dnsProviderOverride ? "on" : ""}
-              />
-            )}
-            <Button
-              type="submit"
-              form="dnsp-add-form"
-              size="sm"
-              label={hasProvider && isUpdate ? "Update provider" : "Add provider"}
-              isDisabled={!hasProvider}
-            />
-          </>
+          <Button
+            type="submit"
+            form="dnsp-add-form"
+            size="sm"
+            label={hasProvider && isUpdate ? "Update provider" : "Add provider"}
+            isDisabled={!hasProvider}
+          />
         }
       >
         <form id="dnsp-add-form" action={dnsProviderFormAction}>
@@ -1584,7 +1052,6 @@ function DnsProvidersSection({
               onChange={setSelectedProvider}
               placeholder="Select a DNS provider..."
               hasSearch
-              isDisabled={disabled}
             />
 
             {selectedUnavailable && (
@@ -1596,11 +1063,7 @@ function DnsProvidersSection({
 
             {hasProvider && providerDef && (
               <>
-                <DnsProviderCredentialFields
-                  key={providerDef.name}
-                  providerDef={providerDef}
-                  isDisabled={disabled}
-                />
+                <DnsProviderCredentialFields key={providerDef.name} providerDef={providerDef} />
                 {isUpdate && (
                   <InfoAlert title="Credentials are already configured">
                     Leave fields blank to keep existing values.
@@ -1612,9 +1075,6 @@ function DnsProvidersSection({
                   </Link>
                 )}
               </>
-            )}
-            {isAgent && (
-              <input type="hidden" name="overrideEnabled" value={dnsProviderOverride ? "on" : ""} />
             )}
           </VStack>
         </form>
@@ -1629,22 +1089,15 @@ function DnsResolversSection({
   dns,
   dnsState,
   dnsFormAction,
-  isAgent,
-  dnsOverride,
-  setDnsOverride,
 }: {
   dns: DnsSettings | null;
   dnsState: { success: boolean; message?: string } | null;
   dnsFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  dnsOverride: boolean;
-  setDnsOverride: (v: boolean) => void;
 }) {
   const [enabled, setEnabled] = useState(dns?.enabled ?? false);
   const [resolvers, setResolvers] = useState(dns?.resolvers?.join("\n") ?? "");
   const [fallbacks, setFallbacks] = useState(dns?.fallbacks?.join("\n") ?? "");
   const [timeout, setTimeoutValue] = useState(dns?.timeout ?? "");
-  const disabled = isAgent && !dnsOverride;
 
   return (
     <>
@@ -1654,13 +1107,11 @@ function DnsResolversSection({
             {dnsState?.message && (
               <StatusAlert message={dnsState.message} success={dnsState.success} />
             )}
-            {isAgent && <OverrideToggle value={dnsOverride} onChange={setDnsOverride} />}
             <CheckboxInput
               label="Enable custom DNS resolvers"
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
-              isDisabled={disabled}
             />
             <TextArea
               label="Primary resolvers"
@@ -1670,7 +1121,6 @@ function DnsResolversSection({
               onChange={setResolvers}
               placeholder={"1.1.1.1\n9.9.9.9"}
               rows={2}
-              isDisabled={disabled}
             />
             <TextArea
               label="Fallback resolvers"
@@ -1680,7 +1130,6 @@ function DnsResolversSection({
               onChange={setFallbacks}
               placeholder={"1.0.0.1\n149.112.112.112"}
               rows={2}
-              isDisabled={disabled}
             />
             <TextInput
               label="Query timeout"
@@ -1691,7 +1140,6 @@ function DnsResolversSection({
               onChange={setTimeoutValue}
               placeholder="5s"
               width={160}
-              isDisabled={disabled}
             />
             <SaveButton label="Save DNS settings" />
           </VStack>
@@ -1717,20 +1165,13 @@ function UpstreamDnsSection({
   upstreamDnsResolution,
   upstreamDnsResolutionState,
   upstreamDnsResolutionFormAction,
-  isAgent,
-  upstreamDnsResolutionOverride,
-  setUpstreamDnsResolutionOverride,
 }: {
   upstreamDnsResolution: UpstreamDnsResolutionSettings | null;
   upstreamDnsResolutionState: { success: boolean; message?: string } | null;
   upstreamDnsResolutionFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  upstreamDnsResolutionOverride: boolean;
-  setUpstreamDnsResolutionOverride: (v: boolean) => void;
 }) {
   const [enabled, setEnabled] = useState(upstreamDnsResolution?.enabled ?? false);
   const [family, setFamily] = useState<string>(upstreamDnsResolution?.family ?? "both");
-  const disabled = isAgent && !upstreamDnsResolutionOverride;
 
   return (
     <>
@@ -1743,19 +1184,12 @@ function UpstreamDnsSection({
                 success={upstreamDnsResolutionState.success}
               />
             )}
-            {isAgent && (
-              <OverrideToggle
-                value={upstreamDnsResolutionOverride}
-                onChange={setUpstreamDnsResolutionOverride}
-              />
-            )}
             <CheckboxInput
               label="Enable upstream DNS pinning"
               description="Resolves upstream hostnames at config-apply time and writes IPs into Caddy's active config."
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
-              isDisabled={disabled}
             />
             <Selector
               label="Address family"
@@ -1764,7 +1198,6 @@ function UpstreamDnsSection({
               options={FAMILY_OPTIONS}
               value={family}
               onChange={setFamily}
-              isDisabled={disabled}
               width={280}
             />
             <SaveButton label="Save upstream DNS pinning settings" />
@@ -1786,16 +1219,10 @@ function TrustedProxiesSection({
   trustedProxies,
   trustedProxiesState,
   trustedProxiesFormAction,
-  isAgent,
-  trustedProxiesOverride,
-  setTrustedProxiesOverride,
 }: {
   trustedProxies: TrustedProxiesSettings | null;
   trustedProxiesState: { success: boolean; message?: string } | null;
   trustedProxiesFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  trustedProxiesOverride: boolean;
-  setTrustedProxiesOverride: (v: boolean) => void;
 }) {
   const [ranges, setRanges] = useState((trustedProxies?.ranges ?? []).join("\n"));
   const [clientIpHeaders, setClientIpHeaders] = useState(
@@ -1803,7 +1230,6 @@ function TrustedProxiesSection({
   );
   const [strict, setStrict] = useState(trustedProxies?.strict ?? false);
   const [defaultGeoblock, setDefaultGeoblock] = useState(trustedProxies?.default_geoblock ?? false);
-  const disabled = isAgent && !trustedProxiesOverride;
 
   return (
     <>
@@ -1816,9 +1242,6 @@ function TrustedProxiesSection({
                 success={trustedProxiesState.success}
               />
             )}
-            {isAgent && (
-              <OverrideToggle value={trustedProxiesOverride} onChange={setTrustedProxiesOverride} />
-            )}
             <TextArea
               label="Trusted proxy ranges"
               isOptional
@@ -1828,7 +1251,6 @@ function TrustedProxiesSection({
               onChange={setRanges}
               rows={3}
               placeholder={"private_ranges\n172.21.0.1/32"}
-              isDisabled={disabled}
             />
             <TextArea
               label="Client IP headers"
@@ -1839,7 +1261,6 @@ function TrustedProxiesSection({
               onChange={setClientIpHeaders}
               rows={2}
               placeholder="X-Forwarded-For"
-              isDisabled={disabled}
             />
             <CheckboxInput
               label="Enable strict trusted proxies"
@@ -1847,7 +1268,6 @@ function TrustedProxiesSection({
               htmlName="strict"
               value={strict}
               onChange={setStrict}
-              isDisabled={disabled}
             />
             <CheckboxInput
               label="Default geoblock trusted proxies from this list"
@@ -1855,7 +1275,6 @@ function TrustedProxiesSection({
               htmlName="defaultGeoblock"
               value={defaultGeoblock}
               onChange={setDefaultGeoblock}
-              isDisabled={disabled}
             />
             <SaveButton label="Save trusted proxies settings" />
           </VStack>
@@ -1934,21 +1353,14 @@ function AuthentikSection({
   authentik,
   authentikState,
   authentikFormAction,
-  isAgent,
-  authentikOverride,
-  setAuthentikOverride,
 }: {
   authentik: AuthentikSettings | null;
   authentikState: { success: boolean; message?: string } | null;
   authentikFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  authentikOverride: boolean;
-  setAuthentikOverride: (v: boolean) => void;
 }) {
   const [outpostDomain, setOutpostDomain] = useState(authentik?.outpostDomain ?? "");
   const [outpostUpstream, setOutpostUpstream] = useState(authentik?.outpostUpstream ?? "");
   const [authEndpoint, setAuthEndpoint] = useState(authentik?.authEndpoint ?? "");
-  const disabled = isAgent && !authentikOverride;
 
   return (
     <FormCard>
@@ -1957,7 +1369,6 @@ function AuthentikSection({
           {authentikState?.message && (
             <StatusAlert message={authentikState.message} success={authentikState.success} />
           )}
-          {isAgent && <OverrideToggle value={authentikOverride} onChange={setAuthentikOverride} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label="Outpost domain"
@@ -1966,7 +1377,6 @@ function AuthentikSection({
             onChange={setOutpostDomain}
             placeholder="outpost.goauthentik.io"
             isRequired
-            isDisabled={disabled}
           />
           <TextInput
             {...NATIVE_REQUIRED}
@@ -1976,7 +1386,6 @@ function AuthentikSection({
             onChange={setOutpostUpstream}
             placeholder="http://authentik-server:9000"
             isRequired
-            isDisabled={disabled}
           />
           <TextInput
             label="Auth endpoint"
@@ -1985,7 +1394,6 @@ function AuthentikSection({
             value={authEndpoint}
             onChange={setAuthEndpoint}
             placeholder="/outpost.goauthentik.io/auth/caddy"
-            isDisabled={disabled}
           />
           <SaveButton label="Save Authentik defaults" />
         </VStack>
@@ -2069,16 +1477,10 @@ function AvatarsSection({
   avatars,
   avatarsState,
   avatarsFormAction,
-  isAgent,
-  avatarsOverride,
-  setAvatarsOverride,
 }: {
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   avatarsState: { success: boolean; message?: string } | null;
   avatarsFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  avatarsOverride: boolean;
-  setAvatarsOverride: (v: boolean) => void;
 }) {
   const [gravatarEnabled, setGravatarEnabled] = useState(avatars.gravatarEnabled);
 
@@ -2094,16 +1496,13 @@ function AvatarsSection({
           {avatarsState?.message && (
             <StatusAlert message={avatarsState.message} success={avatarsState.success} />
           )}
-          {isAgent && !avatars.fromEnv && (
-            <OverrideToggle value={avatarsOverride} onChange={setAvatarsOverride} />
-          )}
           <CheckboxInput
             label="Use Gravatar when a user has no icon"
             description="For users with no icon of their own, look one up from gravatar.com by their email address. Their browser contacts gravatar.com directly, which discloses their IP and a hash of their address to a third party. Accounts with a local-only address are never looked up, and anyone without a Gravatar falls back to their initial."
             htmlName="gravatarEnabled"
             value={gravatarEnabled}
             onChange={setGravatarEnabled}
-            isDisabled={avatars.fromEnv || (isAgent && !avatarsOverride)}
+            isDisabled={avatars.fromEnv}
           />
           <SaveButton label="Save avatar settings" isDisabled={avatars.fromEnv} />
         </VStack>
@@ -2152,20 +1551,13 @@ function MetricsSection({
   metrics,
   metricsState,
   metricsFormAction,
-  isAgent,
-  metricsOverride,
-  setMetricsOverride,
 }: {
   metrics: MetricsSettings | null;
   metricsState: { success: boolean; message?: string } | null;
   metricsFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  metricsOverride: boolean;
-  setMetricsOverride: (v: boolean) => void;
 }) {
   const [enabled, setEnabled] = useState(metrics?.enabled ?? false);
   const [port, setPort] = useState(metrics?.port ?? 9090);
-  const disabled = isAgent && !metricsOverride;
 
   return (
     <>
@@ -2175,14 +1567,12 @@ function MetricsSection({
             {metricsState?.message && (
               <StatusAlert message={metricsState.message} success={metricsState.success} />
             )}
-            {isAgent && <OverrideToggle value={metricsOverride} onChange={setMetricsOverride} />}
             <CheckboxInput
               label="Enable metrics endpoint"
               description="Prometheus-compatible scrape endpoint, exposed on a dedicated port."
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
-              isDisabled={disabled}
             />
             <NumberInput
               label="Port"
@@ -2194,7 +1584,6 @@ function MetricsSection({
               min={1}
               max={65535}
               width={160}
-              isDisabled={disabled}
             />
             <SaveButton label="Save metrics settings" />
           </VStack>
@@ -2218,20 +1607,13 @@ function LoggingSection({
   logging,
   loggingState,
   loggingFormAction,
-  isAgent,
-  loggingOverride,
-  setLoggingOverride,
 }: {
   logging: LoggingSettings | null;
   loggingState: { success: boolean; message?: string } | null;
   loggingFormAction: (payload: FormData) => void;
-  isAgent: boolean;
-  loggingOverride: boolean;
-  setLoggingOverride: (v: boolean) => void;
 }) {
   const [enabled, setEnabled] = useState(logging?.enabled ?? false);
   const [format, setFormat] = useState<string>(logging?.format ?? "json");
-  const disabled = isAgent && !loggingOverride;
 
   return (
     <>
@@ -2241,13 +1623,11 @@ function LoggingSection({
             {loggingState?.message && (
               <StatusAlert message={loggingState.message} success={loggingState.success} />
             )}
-            {isAgent && <OverrideToggle value={loggingOverride} onChange={setLoggingOverride} />}
             <CheckboxInput
               label="Enable access logging"
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
-              isDisabled={disabled}
             />
             <Selector
               label="Format"
@@ -2255,7 +1635,6 @@ function LoggingSection({
               options={LOG_FORMAT_OPTIONS}
               value={format}
               onChange={setFormat}
-              isDisabled={disabled}
               width={280}
             />
             <SaveButton label="Save logging settings" />

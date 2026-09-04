@@ -50,7 +50,6 @@ import {
 } from "./settings";
 import { buildDefaultResponseRoute } from "./caddy-default-response";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
-import { syncInstances } from "./instance-sync";
 import { caddyAdminRequest } from "./caddy-admin";
 import {
   accessListEntries,
@@ -3023,16 +3022,6 @@ export async function applyCaddyConfig() {
     throw new CaddyApplyError(
       reason ? `Caddy rejected configuration: ${reason}` : "Caddy rejected configuration",
       "CADDY_REJECTED",
-    );
-  }
-
-  try {
-    await syncInstances();
-  } catch (error) {
-    logCaddyApplyFailure("Instance synchronization failed after Caddy apply", error);
-    throw new CaddyApplyError(
-      "Caddy configuration applied but instance synchronization failed",
-      "INSTANCE_SYNC_FAILED",
     );
   }
 }

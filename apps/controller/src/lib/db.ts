@@ -10,16 +10,7 @@
 import { eq, ne, and, isNull } from "drizzle-orm";
 import * as schema from "./db/schema";
 import { CREDENTIAL_ISSUER, accountIssuerFor } from "./account-issuer";
-import {
-  CONTROLLER_TOKEN_KEY,
-  INSTANCE_MODE_KEY,
-  LEGACY_CONTROLLER_TOKEN_KEY,
-  LEGACY_INSTANCE_MODES,
-} from "./instance-mode";
 import { db, isEphemeral, runSchemaMigrations } from "./db/connection";
-
-/** Idempotency flag for runInstanceRoleRename(). */
-const INSTANCE_ROLES_RENAMED_KEY = "instance_roles_renamed";
 
 export { db, client, runInTransaction } from "./db/connection";
 export type { Db } from "./db/connection";
@@ -313,83 +304,6 @@ async function runCloudflareToProviderMigration() {
     .insert(settingsTable)
     .values({ key: "dns_provider_migrated", value: "true", updatedAt: now });
 }
-
-/**
- * One-time migration: the instance roles were renamed from master/slave to controller/agent, and
- * the agent's controller-token setting key along with them.
- *
- * Nothing reads the old spellings any more, so this has to complete before the first read of
- * `instance_mode` — an unmigrated "slave" now normalizes to null, and the caller's fallback is
- * "standalone", which would quietly make an agent serve its own settings instead of the
- * controller's. Ordered before the other data migrations and outside their warn-and-continue
- * handler for the same reason: failing here must stop startup, not be logged past.
- */
-export async function runInstanceRoleRename() {
-  if (isEphemeral) return;
-
-  const { settings } = schema;
-  const [flag] = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, INSTANCE_ROLES_RENAMED_KEY))
-    .limit(1);
-  if (flag) return;
-
-  const now = new Date().toISOString();
-
-  // ── instance_mode: "master" -> "controller", "slave" -> "agent" ────────────
-  // Values are JSON-encoded by setSetting, so the stored text is `"master"`, quotes included.
-  const [modeRow] = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, INSTANCE_MODE_KEY))
-    .limit(1);
-  if (modeRow) {
-    let stored: unknown;
-    try {
-      stored = JSON.parse(modeRow.value);
-    } catch {
-      stored = null;
-    }
-    const renamed = typeof stored === "string" ? LEGACY_INSTANCE_MODES[stored] : undefined;
-    if (renamed) {
-      await db
-        .update(settings)
-        .set({ value: JSON.stringify(renamed), updatedAt: now })
-        .where(eq(settings.key, INSTANCE_MODE_KEY));
-      console.log(`Instance role migrated: ${stored} -> ${renamed}`);
-    }
-  }
-
-  // ── instance_master_token -> instance_controller_token ────────────────────
-  const [legacyToken] = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, LEGACY_CONTROLLER_TOKEN_KEY))
-    .limit(1);
-  if (legacyToken) {
-    const [currentToken] = await db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, CONTROLLER_TOKEN_KEY))
-      .limit(1);
-    // A value already under the new key wins: it can only have been written by a build that had
-    // already migrated, so it is the newer of the two.
-    if (!currentToken) {
-      await db
-        .insert(settings)
-        .values({ key: CONTROLLER_TOKEN_KEY, value: legacyToken.value, updatedAt: now });
-      console.log("Instance sync token moved to instance_controller_token");
-    }
-    await db.delete(settings).where(eq(settings.key, LEGACY_CONTROLLER_TOKEN_KEY));
-  }
-
-  await db
-    .insert(settings)
-    .values({ key: INSTANCE_ROLES_RENAMED_KEY, value: "true", updatedAt: now });
-}
-
-await runInstanceRoleRename();
 
 try {
   await runBetterAuthDataMigration();

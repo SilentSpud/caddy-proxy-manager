@@ -1,5 +1,5 @@
 {
-  "id": "5b467f6b-5617-4f2e-89f9-e2356f2c4043",
+  "id": "9211f122-bd6e-4e5e-8de1-f5b9cef8ea10",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1255,90 +1255,6 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.instances": {
-      "name": "instances",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "baseUrl": {
-          "name": "baseUrl",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "apiToken": {
-          "name": "apiToken",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "lastSyncAt": {
-          "name": "lastSyncAt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lastSyncError": {
-          "name": "lastSyncError",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "instances_base_url_unique": {
-          "name": "instances_base_url_unique",
-          "columns": [
-            {
-              "expression": "baseUrl",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

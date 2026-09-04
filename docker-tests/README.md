@@ -16,7 +16,7 @@ the system, over the wire.
 The first run builds Caddy from source with its plugin set and can take several
 minutes. Afterwards a full pass is a couple of minutes.
 
-A full `./run.sh --sync` is currently 389 assertions, all green. Its first run
+A full run is several hundred assertions, all green. Its first run
 was not — see [What the rig has caught](#what-the-rig-has-caught).
 
 ## What the rig looks like
@@ -34,7 +34,6 @@ else.
 | `dns`        | `172.28.0.5`  | dnsmasq — `*.cpm.test` → Caddy, everything else → Docker DNS |
 | `caddy`      | `172.28.0.10` | **system under test** — the project's Caddy image            |
 | `web`        | `172.28.0.11` | **system under test** — the project's CPM image              |
-| `web-agent`  | `172.28.0.13` | second CPM instance (`--sync` only), Caddy in the same netns |
 | `origin-a`   | `172.28.0.20` | L7 HTTP origin                                               |
 | `origin-b`   | `172.28.0.21` | L7 HTTP origin, second identity for load-balancing tests     |
 | `origin-tls` | `172.28.0.22` | L7 HTTPS origin with a deliberately mismatched certificate   |
@@ -84,7 +83,6 @@ Two CAs are in play, and they are unrelated:
 ```bash
 ./run.sh                    # everything, then tear down
 ./run.sh mtls l4            # only files whose name matches a pattern
-./run.sh --sync             # add the second CPM instance and the replication tests
 ./run.sh --keep             # leave the rig up afterwards
 ./run.sh --shell            # a shell in the client container
 ./run.sh --logs caddy       # tail a service
@@ -123,7 +121,6 @@ Test files are ordinary bash. Editing one on the host takes effect immediately �
 | `55-waf`                   | Coraza rules, DetectionOnly, global/host merge, directive allowlist, WebSocket carve-out |
 | `60-forward-auth`          | portal bounce, full login round-trip, identity headers, header spoofing, revocation    |
 | `65-settings-and-admin`    | every settings group, metrics listener, groups, sessions, audit log, OpenAPI           |
-| `90-instance-sync`         | controller → agent replication, receiving-end auth, target removal (`--sync` only)         |
 
 ### What the rig has caught
 

@@ -143,8 +143,8 @@ api GET /api/v1/oauth-providers
 t_eq "OAuth providers can be listed" "200" "$API_STATUS"
 
 # ── Endpoints outside /api/v1 ───────────────────────────────────────────────
-# The session middleware treats everything except /api/v1, /api/auth, /api/health,
-# /api/instances/sync and /api/forward-auth as a page request, so these three answer to a browser
+# The session middleware treats everything except /api/v1, /api/auth, /api/health and
+# /api/forward-auth as a page request, so these three answer to a browser
 # session and redirect a bearer-token caller to the login page. Both halves are pinned: the
 # middleware's allowlist is easy to change by accident.
 

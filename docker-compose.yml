@@ -100,23 +100,6 @@ services:
       OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
       OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
 
-      # Optional instance sync. A controller pushes proxy hosts, certificates, access
-      # lists and settings to its agents; user accounts are not synced. Generate the
-      # shared token with: openssl rand -hex 32
-      # No `:-standalone` default. isInstanceModeFromEnv() treats any valid value as the
-      # environment pinning the mode, which locks the Settings selector — so defaulting it here
-      # would make the mode permanently unchangeable on every deployment that never set it.
-      INSTANCE_MODE: ${INSTANCE_MODE:-}
-      INSTANCE_SYNC_TOKEN: ${INSTANCE_SYNC_TOKEN:-}
-      INSTANCE_AGENTS: ${INSTANCE_AGENTS:-}
-      INSTANCE_SYNC_INTERVAL: ${INSTANCE_SYNC_INTERVAL:-0}
-      # Sync sends tokens in plaintext over HTTP — trusted internal networks only.
-      INSTANCE_SYNC_ALLOW_HTTP: ${INSTANCE_SYNC_ALLOW_HTTP:-false}
-      # Agent-side limits on inbound sync requests. Empty size means the 10 MB default.
-      INSTANCE_SYNC_MAX_BYTES: ${INSTANCE_SYNC_MAX_BYTES:-}
-      INSTANCE_SYNC_RATE_MAX: ${INSTANCE_SYNC_RATE_MAX:-60}
-      INSTANCE_SYNC_RATE_WINDOW_MS: ${INSTANCE_SYNC_RATE_WINDOW_MS:-60000}
-
       # Optional analytics. Omit CLICKHOUSE_PASSWORD to disable; to enable, also start the
       # clickhouse service with: docker compose --profile clickhouse up -d
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}

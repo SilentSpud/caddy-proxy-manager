@@ -1,10 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-export type CaddyApplyErrorCode =
-  | "CADDY_REJECTED"
-  | "CADDY_UNREACHABLE"
-  | "CADDY_REQUEST_FAILED"
-  | "INSTANCE_SYNC_FAILED";
+export type CaddyApplyErrorCode = "CADDY_REJECTED" | "CADDY_UNREACHABLE" | "CADDY_REQUEST_FAILED";
 
 export class CaddyApplyError extends Error {
   readonly code: CaddyApplyErrorCode;

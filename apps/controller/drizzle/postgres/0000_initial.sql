@@ -137,18 +137,6 @@ CREATE TABLE "groups" (
 	"updatedAt" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "instances" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"name" text NOT NULL,
-	"baseUrl" text NOT NULL,
-	"apiToken" text NOT NULL,
-	"enabled" boolean DEFAULT true NOT NULL,
-	"lastSyncAt" text,
-	"lastSyncError" text,
-	"createdAt" text NOT NULL,
-	"updatedAt" text NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "issued_client_certificates" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"caCertificateId" integer NOT NULL,
@@ -385,7 +373,6 @@ CREATE INDEX "fas_expires_idx" ON "forward_auth_sessions" USING btree ("expiresA
 CREATE UNIQUE INDEX "group_members_unique" ON "group_members" USING btree ("groupId","userId");--> statement-breakpoint
 CREATE INDEX "group_members_user_idx" ON "group_members" USING btree ("userId");--> statement-breakpoint
 CREATE UNIQUE INDEX "groups_name_unique" ON "groups" USING btree ("name");--> statement-breakpoint
-CREATE UNIQUE INDEX "instances_base_url_unique" ON "instances" USING btree ("baseUrl");--> statement-breakpoint
 CREATE INDEX "issued_client_certificates_ca_idx" ON "issued_client_certificates" USING btree ("caCertificateId");--> statement-breakpoint
 CREATE INDEX "issued_client_certificates_revoked_at_idx" ON "issued_client_certificates" USING btree ("revokedAt");--> statement-breakpoint
 CREATE INDEX "mtls_access_rules_proxy_host_idx" ON "mtls_access_rules" USING btree ("proxyHostId");--> statement-breakpoint

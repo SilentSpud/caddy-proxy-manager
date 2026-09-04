@@ -21,7 +21,6 @@ const spec = {
     { name: "Client Certificates", description: "Client certificate management" },
     { name: "Access Lists", description: "HTTP basic-auth access lists" },
     { name: "Settings", description: "Application settings" },
-    { name: "Instances", description: "Multi-instance management" },
     { name: "Users", description: "User management" },
     { name: "Groups", description: "User groups for forward auth access control" },
     { name: "mTLS Roles", description: "Role-based access control for mTLS client certificates" },
@@ -872,8 +871,6 @@ const spec = {
                 "waf",
                 "error-pages",
                 "default-response",
-                "instance-mode",
-                "sync-token",
               ],
             },
             description: "Settings group name",
@@ -881,8 +878,7 @@ const spec = {
         ],
         responses: {
           "200": {
-            description:
-              "Settings object (shape varies by group). For instance-mode: `{mode}`. For sync-token: `{has_token}`.",
+            description: "Settings object (shape varies by group).",
             content: {
               "application/json": {
                 schema: {
@@ -931,8 +927,6 @@ const spec = {
                 "waf",
                 "error-pages",
                 "default-response",
-                "instance-mode",
-                "sync-token",
               ],
             },
             description: "Settings group name",
@@ -968,94 +962,6 @@ const spec = {
             },
           },
           "400": { $ref: "#/components/responses/BadRequest" },
-          "401": { $ref: "#/components/responses/Unauthorized" },
-        },
-      },
-    },
-
-    // ── Instances ───────────────────────────────────────────────────
-    "/api/v1/instances": {
-      get: {
-        tags: ["Instances"],
-        summary: "List instances",
-        operationId: "listInstances",
-        responses: {
-          "200": {
-            description: "List of instances",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "array",
-                  items: { $ref: "#/components/schemas/Instance" },
-                },
-              },
-            },
-          },
-          "401": { $ref: "#/components/responses/Unauthorized" },
-        },
-      },
-      post: {
-        tags: ["Instances"],
-        summary: "Create an instance",
-        operationId: "createInstance",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/InstanceInput" },
-            },
-          },
-        },
-        responses: {
-          "201": {
-            description: "Instance created",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/Instance" },
-              },
-            },
-          },
-          "400": { $ref: "#/components/responses/BadRequest" },
-          "401": { $ref: "#/components/responses/Unauthorized" },
-        },
-      },
-    },
-    "/api/v1/instances/{id}": {
-      delete: {
-        tags: ["Instances"],
-        summary: "Delete an instance",
-        operationId: "deleteInstance",
-        parameters: [{ $ref: "#/components/parameters/IdPath" }],
-        responses: {
-          "200": { $ref: "#/components/responses/Ok" },
-          "401": { $ref: "#/components/responses/Unauthorized" },
-          "404": { $ref: "#/components/responses/NotFound" },
-        },
-      },
-    },
-    "/api/v1/instances/sync": {
-      post: {
-        tags: ["Instances"],
-        summary: "Trigger instance sync",
-        operationId: "syncInstances",
-        responses: {
-          "200": {
-            description: "Sync result",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    total: { type: "integer" },
-                    success: { type: "integer" },
-                    failed: { type: "integer" },
-                    skippedHttp: { type: "integer" },
-                  },
-                  required: ["total", "success", "failed", "skippedHttp"],
-                },
-              },
-            },
-          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -2892,47 +2798,6 @@ const spec = {
       },
 
       // ── Other resources ─────────────────────────────────────────
-      Instance: {
-        type: "object",
-        properties: {
-          id: { type: "integer" },
-          name: { type: "string" },
-          baseUrl: { type: "string", example: "https://agent.example.com:3000" },
-          enabled: { type: "boolean" },
-          hasToken: { type: "boolean" },
-          lastSyncAt: { type: ["string", "null"], format: "date-time" },
-          lastSyncError: { type: ["string", "null"] },
-          createdAt: { type: "string", format: "date-time" },
-          updatedAt: { type: "string", format: "date-time" },
-        },
-        required: ["id", "name", "baseUrl", "enabled", "hasToken", "createdAt", "updatedAt"],
-      },
-      InstanceInput: {
-        type: "object",
-        properties: {
-          name: { type: "string", example: "Agent 1" },
-          baseUrl: { type: "string", example: "https://agent.example.com:3000" },
-          apiToken: {
-            type: "string",
-            minLength: 32,
-            maxLength: 512,
-            description:
-              "Random sync token for the agent instance (generate with: openssl rand -hex 32)",
-          },
-          enabled: { type: "boolean" },
-        },
-        required: ["name", "baseUrl", "apiToken"],
-      },
-      SyncResult: {
-        type: "object",
-        properties: {
-          total: { type: "integer" },
-          success: { type: "integer" },
-          failed: { type: "integer" },
-          skippedHttp: { type: "integer" },
-        },
-        required: ["total", "success", "failed", "skippedHttp"],
-      },
       OauthProvider: {
         type: "object",
         description:

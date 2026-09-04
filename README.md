@@ -81,7 +81,6 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
 - **REST API** - Full REST API under `/api/v1/` with Bearer token authentication, covering all resources. Interactive OpenAPI 3.1.0 docs at `/api-docs`
 - **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
-- **Instance Sync** - Controller/agent configuration sync for multi-instance deployments. The controller pushes proxy hosts, certificates, access lists, and settings to agents on every change
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, Spaceship, deSEC, Dynu, and acme-dns. Credentials encrypted at rest. Per-certificate provider override supported
@@ -151,14 +150,6 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `AUTH_RATE_LIMIT_ENABLED` | Enable Better Auth rate limiting | `true` | No |
 | `AUTH_RATE_LIMIT_WINDOW` | Rate limit window in seconds | `60` | No |
 | `AUTH_RATE_LIMIT_MAX` | Max requests per window | `5` | No |
-| `INSTANCE_MODE` | Instance role: `standalone`, `controller`, or `agent` | `standalone` | No |
-| `INSTANCE_SYNC_TOKEN` | Bearer token agents use to authenticate sync requests (32+ characters) | None | No (required if `agent`) |
-| `INSTANCE_AGENTS` | JSON array of agent instances for the controller to push to (tokens must be 32+ characters) | None | No |
-| `INSTANCE_SYNC_INTERVAL` | Periodic sync interval in seconds (`0` = disabled) | `0` | No |
-| `INSTANCE_SYNC_ALLOW_HTTP` | Allow sync over HTTP (for internal Docker networks) | `false` | No |
-| `INSTANCE_SYNC_MAX_BYTES` | Agent-side cap on the size of an inbound sync payload | Unset (no cap) | No |
-| `INSTANCE_SYNC_RATE_MAX` | Agent-side max inbound sync requests per window | `60` | No |
-| `INSTANCE_SYNC_RATE_WINDOW_MS` | Agent-side sync rate-limit window in milliseconds | `60000` (1 min) | No |
 | `CLICKHOUSE_URL` | ClickHouse HTTP endpoint for analytics | `http://clickhouse:8123` | No |
 | `CLICKHOUSE_USER` | ClickHouse username | `cpm` | No |
 | `CLICKHOUSE_PASSWORD` | ClickHouse password (`openssl rand -base64 32`). Required when the `clickhouse` profile is active. | None | No (required if analytics enabled) |
@@ -527,59 +518,6 @@ naming the line. A snippet that stops adapting later — because it referenced a
 plugin you have since removed — is skipped with a warning in the web container's
 logs rather than failing the whole config, so one stale snippet cannot take the
 other hosts down with it.
-
----
-
-## Instance Sync
-
-Run a controller instance that pushes configuration to one or more agents on every change.
-
-```bash
-# Generate once, then configure the same 64-character value on both sides.
-openssl rand -hex 32
-
-# Controller
-INSTANCE_MODE=controller
-INSTANCE_AGENTS='[{"name":"replica","url":"https://replica.example.com","token":"<64-hex-character-token>"}]'
-
-# Agent
-INSTANCE_MODE=agent
-INSTANCE_SYNC_TOKEN=<64-hex-character-token>
-```
-
-Sync tokens shorter than 32 characters, longer than 512 characters, or padded with whitespace are rejected.
-
-Synced data: proxy hosts, certificates, access lists, and settings. User accounts are **not** synced.
-
-### Upgrading from `master`/`slave`
-
-These roles were previously called `master`/`slave`. Those names are gone — nothing translates them
-any more.
-
-**Stored settings migrate themselves.** On first start, a stored `instance_mode` of `master` or
-`slave` is rewritten to `controller`/`agent`, and the `instance_master_token` setting moves to
-`instance_controller_token`. Nothing to do.
-
-**Environment variables must be renamed by hand**, because this process cannot rewrite your `.env`:
-
-| Before | After |
-| ------ | ----- |
-| `INSTANCE_MODE=master` | `INSTANCE_MODE=controller` |
-| `INSTANCE_MODE=slave` | `INSTANCE_MODE=agent` |
-| `INSTANCE_SLAVES=[...]` | `INSTANCE_AGENTS=[...]` |
-
-Startup **fails** with a message naming the variable and its replacement if an old value is still
-set. That is deliberate: an unrecognized `INSTANCE_MODE` falls back to `standalone`, which would
-turn an agent into an instance serving its own configuration instead of the controller's, and leave
-a controller pushing to nobody — silently, in both cases.
-
-Controllers and agents can be upgraded independently. A role is local configuration and never
-appears in the sync payload, so a mixed-build pair keeps syncing as long as each instance's own
-`INSTANCE_MODE` is valid for the build it is running.
-
-Use HTTPS agent URLs in production. Set `INSTANCE_SYNC_ALLOW_HTTP=true` only for internal Docker networks.
-
-See the [Environment Variables Reference](https://github.com/fuomag9/caddy-proxy-manager/wiki/Environment-Variables-Reference) for all `INSTANCE_*` options.
 
 ---
 

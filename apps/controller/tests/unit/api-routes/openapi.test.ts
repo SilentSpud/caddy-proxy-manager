@@ -60,7 +60,6 @@ describe('GET /api/v1/openapi.json', () => {
     expect(paths).toContain('/api/v1/client-certificates');
     expect(paths).toContain('/api/v1/access-lists');
     expect(paths).toContain('/api/v1/settings/{group}');
-    expect(paths).toContain('/api/v1/instances');
     expect(paths).toContain('/api/v1/users');
     expect(paths).toContain('/api/v1/audit-log');
     expect(paths).toContain('/api/v1/caddy/apply');
