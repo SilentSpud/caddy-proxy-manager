@@ -109,17 +109,17 @@ t_eq "a session write from a foreign Origin is refused" "403" "$cross_origin"
 
 # A real write, not a token mint: creating a token is session-only regardless of
 # CSRF, so it can no longer tell the two guards apart.
-csrf_probe_body=$(jq -nc --arg d "$(domain_for "bearer-csrf")" '{
+#
+# Through create_host rather than a bare curl. `api` sends no Origin header of
+# its own, so the assertion is the same one either way, and this keeps the host
+# on the teardown stack. That matters here specifically: CPM writes the row
+# before it pushes the Caddy config, so a push that fails leaves a live host
+# behind in a reply that carries no id — nothing a raw curl could have tracked,
+# and every later file's config push would then fail on it.
+create_host "$(jq -nc --arg d "$(domain_for "bearer-csrf")" '{
   name: "docker-test-bearer-csrf", domains: [$d], upstreams: ["origin-a:8080"]
-}')
-bearer_probe=$(curl -sS --max-time 60 -o "$STATE_DIR/bearer-csrf.json" -w '%{http_code}' \
-  -H "Authorization: Bearer $(cat "$TOKEN_FILE")" \
-  -H 'Content-Type: application/json' \
-  --data-binary "$csrf_probe_body" "$CPM_API/api/v1/proxy-hosts")
-t_eq "a bearer write needs no Origin header" "201" "$bearer_probe"
-
-bearer_probe_id=$(jq -r '.id // empty' <"$STATE_DIR/bearer-csrf.json" 2>/dev/null)
-[ -n "$bearer_probe_id" ] && track "proxy-hosts/$bearer_probe_id"
+}')"
+t_eq "a bearer write needs no Origin header" "201" "$API_STATUS"
 
 # ── Unknown routes ──────────────────────────────────────────────────────────
 
