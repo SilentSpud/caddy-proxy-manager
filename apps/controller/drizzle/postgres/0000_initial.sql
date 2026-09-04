@@ -33,6 +33,19 @@ CREATE TABLE "accounts" (
 	"updatedAt" text NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "agents" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"address" text NOT NULL,
+	"agentId" text,
+	"secret" text NOT NULL,
+	"enabled" boolean DEFAULT true NOT NULL,
+	"lastSeenAt" text,
+	"lastError" text,
+	"createdAt" text NOT NULL,
+	"updatedAt" text NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "api_tokens" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -359,6 +372,7 @@ CREATE INDEX "access_list_entries_list_idx" ON "access_list_entries" USING btree
 CREATE UNIQUE INDEX "accounts_provider_account_idx" ON "accounts" USING btree ("providerId","accountId");--> statement-breakpoint
 CREATE UNIQUE INDEX "accounts_issuer_account_idx" ON "accounts" USING btree ("issuer","accountId");--> statement-breakpoint
 CREATE INDEX "accounts_user_idx" ON "accounts" USING btree ("userId");--> statement-breakpoint
+CREATE UNIQUE INDEX "agents_address_unique" ON "agents" USING btree ("address");--> statement-breakpoint
 CREATE UNIQUE INDEX "api_tokens_token_hash_unique" ON "api_tokens" USING btree ("tokenHash");--> statement-breakpoint
 CREATE INDEX "faa_host_idx" ON "forward_auth_access" USING btree ("proxyHostId");--> statement-breakpoint
 CREATE UNIQUE INDEX "faa_user_unique" ON "forward_auth_access" USING btree ("proxyHostId","userId");--> statement-breakpoint

@@ -18,12 +18,14 @@ import {
   UserCircle,
   Package,
   Server,
+  Cpu,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
+import { Code } from "@astryxdesign/core/Code";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Kbd } from "@astryxdesign/core/Kbd";
@@ -73,6 +75,8 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import OAuthProvidersSection from "./OAuthProvidersSection";
 import { CheckboxInput } from "@/src/components/ui/FormBooleanControls";
 import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
+import type { AgentStatus } from "@cpm/shared";
+import type { PairedAgent } from "@/src/lib/models/agents";
 import {
   updateDnsProviderSettingsAction,
   updateGeneralSettingsAction,
@@ -89,6 +93,8 @@ import {
   updateTrustedProxiesSettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
+  pairAgentAction,
+  unpairAgentAction,
 } from "./actions";
 
 // ─── Settings navigation catalog ─────────────────────────────────────────────
@@ -140,6 +146,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Caddy Build",
         desc: "Which plugins the Caddy image is compiled with",
         icon: Package,
+      },
+      {
+        id: "agent",
+        name: "Agent",
+        desc: "The service that recreates and rebuilds the Caddy container",
+        icon: Cpu,
       },
     ],
   },
@@ -407,6 +419,12 @@ type Props = {
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   caddyBuild: CaddyBuildSettings | null;
   baseUrl: string;
+  agents: {
+    /** Agents paired over the network. Empty on a single-host deployment, which uses the socket. */
+    paired: PairedAgent[];
+    /** What the agent in use reports, or null when none answered. */
+    status: AgentStatus | null;
+  };
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -431,6 +449,7 @@ export default function SettingsClient({
   passwordPolicy,
   caddyBuild,
   baseUrl,
+  agents,
 }: Props) {
   const [active, setActive] = useState("general");
   const [cmdkOpen, setCmdkOpen] = useState(false);
@@ -486,6 +505,7 @@ export default function SettingsClient({
     updateDefaultResponseSettingsAction,
     null,
   );
+  const [pairState, pairFormAction] = useActionState(pairAgentAction, null);
 
   // The page has two navigations — the sidebar panel and the compact picker in the content column
   // — and neither carried a media gate, so both rendered at every width. Same breakpoint DataTable
@@ -617,6 +637,13 @@ export default function SettingsClient({
                     caddyBuild={caddyBuild}
                     caddyBuildState={caddyBuildState}
                     caddyBuildFormAction={caddyBuildFormAction}
+                  />
+                )}
+                {active === "agent" && (
+                  <AgentSection
+                    agents={agents}
+                    pairState={pairState}
+                    pairFormAction={pairFormAction}
                   />
                 )}
                 {active === "metrics" && (
@@ -1508,6 +1535,156 @@ function AvatarsSection({
         </VStack>
       </form>
     </FormCard>
+  );
+}
+
+// ─── Section: Agent ──────────────────────────────────────────────────────────
+
+/** Human date for a timestamp the agent or the pairing recorded. */
+function whenText(iso: string | null): string {
+  if (!iso) return "never";
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? "never" : parsed.toLocaleString();
+}
+
+function AgentSection({
+  agents,
+  pairState,
+  pairFormAction,
+}: {
+  agents: Props["agents"];
+  pairState: { success: boolean; message?: string } | null;
+  pairFormAction: (payload: FormData) => void;
+}) {
+  const [address, setAddress] = useState("");
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+
+  const { paired, status } = agents;
+  const usingPaired = paired.length > 0;
+
+  return (
+    <>
+      <FormCard title="Current agent">
+        <VStack gap={3}>
+          <Text size="sm" color="secondary">
+            The agent recreates and rebuilds the Caddy container. The controller has no Docker
+            access of its own, so publishing a layer-4 port and changing the compiled-in plugins
+            both go through it.
+          </Text>
+
+          {status ? (
+            <VStack gap={2}>
+              <HStack gap={2} align="center">
+                <Badge variant="success" label="Connected" />
+                <Text size="sm">
+                  version {status.version}, {status.mode} mode
+                </Text>
+              </HStack>
+              <Text size="sm" color="secondary">
+                Managing the <Code>{status.composeProject}</Code> Compose project.
+              </Text>
+              <Text size="sm" color="secondary">
+                Publishing {status.l4Ports.applied.length} port(s); last port change:{" "}
+                {status.l4Ports.status.state}. Last build: {status.caddyBuild.status.state}.
+              </Text>
+            </VStack>
+          ) : (
+            <WarnAlert title="No agent is answering">
+              {usingPaired
+                ? "The paired agent below did not respond. Layer-4 ports and Caddy rebuilds will fail until it does."
+                : "Start the agent container, or pair a remote one below. Everything else keeps working without it."}
+            </WarnAlert>
+          )}
+
+          {!usingPaired && status && (
+            <InfoAlert title="This is the local agent">
+              It is reached over a socket on the shared data volume and needs no pairing. Pair a
+              remote agent below only if Caddy runs on a different host from this controller.
+            </InfoAlert>
+          )}
+        </VStack>
+      </FormCard>
+
+      {usingPaired && (
+        <FormCard title="Paired agents">
+          <VStack gap={3}>
+            {paired.map((agent) => (
+              <VStack key={agent.id} gap={2}>
+                <HStack gap={2} align="center" justify="between">
+                  <VStack gap={1}>
+                    <Text size="sm" weight="semibold">
+                      {agent.name}
+                    </Text>
+                    <Text size="xsm" color="secondary">
+                      {agent.address} — last reached {whenText(agent.lastSeenAt)}
+                    </Text>
+                  </VStack>
+                  <form action={unpairAgentAction}>
+                    <input type="hidden" name="agentId" value={agent.id} />
+                    <Button type="submit" size="sm" variant="secondary" label="Unpair" />
+                  </form>
+                </HStack>
+                {agent.lastError && (
+                  <WarnAlert title="The last request to this agent failed">
+                    {agent.lastError}
+                  </WarnAlert>
+                )}
+              </VStack>
+            ))}
+            <Text size="xsm" color="secondary">
+              Unpairing only forgets this side. The agent keeps the secret until it is restarted or
+              paired again, so restart it if you are removing an agent you no longer trust.
+            </Text>
+          </VStack>
+        </FormCard>
+      )}
+
+      <FormCard title="Pair a remote agent">
+        <form action={pairFormAction}>
+          <VStack gap={3}>
+            <Text size="sm" color="secondary">
+              Start the agent with <Code>AGENT_MODE=managed</Code>. It prints a six-letter code to
+              its logs — <Code>docker logs caddy-proxy-manager-agent</Code> — which is valid for
+              five minutes and works once. The two exchange a secret; the code is never used again.
+            </Text>
+            {pairState?.message && (
+              <StatusAlert message={pairState.message} success={pairState.success} />
+            )}
+            <TextInput
+              {...NATIVE_REQUIRED}
+              label="Agent address"
+              description="Host and port, e.g. agent.example.com:3100. Defaults to port 3100."
+              htmlName="address"
+              value={address}
+              onChange={setAddress}
+              placeholder="agent.example.com:3100"
+              isRequired
+            />
+            <TextInput
+              {...NATIVE_REQUIRED}
+              {...AUTOFILL_OFF}
+              label="Pairing code"
+              description="Six letters, from the agent's logs."
+              htmlName="code"
+              value={code}
+              onChange={setCode}
+              placeholder="ABCDEF"
+              isRequired
+            />
+            <TextInput
+              label="Name"
+              description="What to call this agent here. Defaults to its hostname."
+              htmlName="name"
+              value={name}
+              onChange={setName}
+              isOptional
+            />
+            <SaveButton label="Pair agent" />
+          </VStack>
+        </form>
+      </FormCard>
+    </>
   );
 }
 

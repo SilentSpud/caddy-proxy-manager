@@ -32,6 +32,8 @@ export type AgentRequestLog = {
 export type FakeAgent = {
   url: string;
   secret: string;
+  /** The code `POST /v1/pair` will accept, and the secret it hands back. Null refuses to pair. */
+  pairing: { code: string | null; issued: string };
   requests: AgentRequestLog[];
   state: {
     appliedPorts: string[];
@@ -57,6 +59,10 @@ export async function startFakeAgent(
   overrides: Partial<FakeAgent['state']> = {},
 ): Promise<FakeAgent> {
   const secret = randomBytes(32).toString('hex');
+  const pairing = { code: null as string | null, issued: randomBytes(32).toString('hex') };
+  // Which secret belongs to which controller, exactly as the real agent stores it. `local` is the
+  // one AGENT_URL/AGENT_SECRET uses; pairing adds a row under whatever id the controller sent.
+  const secrets = new Map<string, string>([['local', secret]]);
   const requests: AgentRequestLog[] = [];
   let pendingPorts: string[] | null = null;
   let pendingModules: string[] | null = null;
@@ -76,15 +82,43 @@ export async function startFakeAgent(
       const raw = await request.arrayBuffer();
       const bodyText = new TextDecoder().decode(raw);
 
+      // Pairing is the one unauthenticated route, since it is what establishes the secret.
+      if (url.pathname === AGENT_ROUTES.pair) {
+        const body = bodyText.length > 0 ? (JSON.parse(bodyText) as Record<string, unknown>) : {};
+        requests.push({ method: request.method, path: url.pathname, body, signed: false });
+        if (pairing.code === null) {
+          return Response.json(
+            { error: 'This agent runs in standalone mode.', code: 'PAIRING_DISABLED' },
+            { status: 403 },
+          );
+        }
+        if (body.code !== pairing.code) {
+          return Response.json(
+            { error: 'That pairing code is not valid.', code: 'PAIRING_CODE_INVALID' },
+            { status: 401 },
+          );
+        }
+        // One-time, exactly as the real agent treats it.
+        pairing.code = null;
+        secrets.set(String(body.controllerId), pairing.issued);
+        return Response.json({
+          secret: pairing.issued,
+          agentId: 'fake-agent',
+          agentVersion: 'test',
+        });
+      }
+
+      const controllerId = request.headers.get(AGENT_CONTROLLER_HEADER) ?? '';
+      const controllerSecret = secrets.get(controllerId);
       const timestamp = Number(request.headers.get(AGENT_TIMESTAMP_HEADER) ?? '0');
       const hasher = new Bun.CryptoHasher('sha256');
       hasher.update(bodyText);
-      const expected = createHmac('sha256', secret)
-        .update(signatureBase(request.method, url.pathname, timestamp, hasher.digest('hex')))
-        .digest('hex');
-      const signed =
-        request.headers.get(AGENT_SIGNATURE_HEADER) === expected &&
-        request.headers.get(AGENT_CONTROLLER_HEADER) === 'local';
+      const expected = controllerSecret
+        ? createHmac('sha256', controllerSecret)
+            .update(signatureBase(request.method, url.pathname, timestamp, hasher.digest('hex')))
+            .digest('hex')
+        : null;
+      const signed = expected !== null && request.headers.get(AGENT_SIGNATURE_HEADER) === expected;
 
       requests.push({
         method: request.method,
@@ -147,6 +181,7 @@ export async function startFakeAgent(
   return {
     url,
     secret,
+    pairing,
     requests,
     state,
     completeL4Ports: () => {

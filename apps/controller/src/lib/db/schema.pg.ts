@@ -180,6 +180,36 @@ export const settings = pgTable("settings", {
   updatedAt: text("updatedAt").notNull(),
 });
 
+/**
+ * Agents this controller has paired with.
+ *
+ * The local agent is not in here: it is found by its socket on the shared volume and proves itself
+ * with a secret it rotates on every start, so a stored row would go stale on every restart. This
+ * table is for agents reached over the network, whose secret was agreed once during pairing and is
+ * the only way back to them.
+ */
+export const agents = pgTable(
+  "agents",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    /** Origin the agent listens on, e.g. `https://agent.example.com:3100`. No trailing slash. */
+    address: text("address").notNull(),
+    /** The agent's own stable id, as it reported at pairing. Detects a replaced host. */
+    agentId: text("agentId"),
+    /** Shared secret, encrypted at rest. Never leaves the server. */
+    secret: text("secret").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    lastSeenAt: text("lastSeenAt"),
+    lastError: text("lastError"),
+    createdAt: text("createdAt").notNull(),
+    updatedAt: text("updatedAt").notNull(),
+  },
+  (table) => ({
+    addressUnique: uniqueIndex("agents_address_unique").on(table.address),
+  }),
+);
+
 export const accessLists = pgTable("access_lists", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),

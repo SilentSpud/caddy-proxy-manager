@@ -26,6 +26,7 @@ import {
   type CaddyBuildStatus,
   type L4PortsStatus,
 } from "@cpm/shared";
+import { getActiveAgent, getControllerId, recordAgentContact } from "../models/agents";
 
 /** Matches the agent's own default, and its `LOCAL_CONTROLLER_ID`. */
 const LOCAL_CONTROLLER_ID = "local";
@@ -76,30 +77,12 @@ type Transport = {
   unix?: string;
   secret: string;
   controllerId: string;
+  /** Row id of the paired agent, when the transport came from the database. */
+  agentRowId?: number;
 };
 
-/**
- * Resolve how to reach the agent, or null when there is none.
- *
- * Null is a normal state, not an error: a deployment that has not started the agent container, or
- * one whose agent has not come up yet, still serves every page — it just cannot publish a port or
- * rebuild Caddy, and the UI says so.
- *
- * Two ways to be configured. `AGENT_URL` + `AGENT_SECRET` name an agent directly, which is how a
- * remote one is reached before it has been paired through the UI; otherwise the agent is the local
- * one, found by its socket and secret on the shared volume.
- */
-function resolveTransport(): Transport | null {
-  const url = process.env.AGENT_URL?.trim();
-  const secret = process.env.AGENT_SECRET?.trim();
-  if (url && secret) {
-    return {
-      origin: url.replace(/\/$/, ""),
-      secret,
-      controllerId: process.env.AGENT_CONTROLLER_ID?.trim() || LOCAL_CONTROLLER_ID,
-    };
-  }
-
+/** The local agent, found by its socket and secret on the shared volume, or null if absent. */
+function resolveLocalTransport(): Transport | null {
   const secretFile = join(dataDir(), SECRET_FILE);
   const socket = socketPath();
   if (!existsSync(secretFile) || !existsSync(socket)) return null;
@@ -120,6 +103,49 @@ function resolveTransport(): Transport | null {
   }
 }
 
+/**
+ * Resolve how to reach the agent, or null when there is none.
+ *
+ * Null is a normal state, not an error: a deployment that has not started the agent container, or
+ * one whose agent has not come up yet, still serves every page — it just cannot publish a port or
+ * rebuild Caddy, and the UI says so.
+ *
+ * Three ways to be configured, in order. A paired agent in the database wins, because pairing is
+ * an explicit act by an operator and should not be silently overridden by a leftover variable.
+ * `AGENT_URL` + `AGENT_SECRET` come next, for a deployment that configures its agent the way it
+ * configures everything else. The local socket is the fallback, and the case almost every
+ * deployment is in.
+ */
+async function resolveTransport(): Promise<Transport | null> {
+  try {
+    const paired = await getActiveAgent();
+    if (paired) {
+      return {
+        origin: paired.address.replace(/\/$/, ""),
+        secret: paired.secret,
+        controllerId: await getControllerId(),
+        agentRowId: paired.id,
+      };
+    }
+  } catch (error) {
+    // A database that cannot be read is not a reason to stop trying the local socket, which is
+    // what a single-host deployment uses and which needs no database at all.
+    console.warn("[agent] could not read the paired agent:", error);
+  }
+
+  const url = process.env.AGENT_URL?.trim();
+  const secret = process.env.AGENT_SECRET?.trim();
+  if (url && secret) {
+    return {
+      origin: url.replace(/\/$/, ""),
+      secret,
+      controllerId: process.env.AGENT_CONTROLLER_ID?.trim() || LOCAL_CONTROLLER_ID,
+    };
+  }
+
+  return resolveLocalTransport();
+}
+
 async function sha256Hex(body: string): Promise<string> {
   const hasher = new Bun.CryptoHasher("sha256");
   hasher.update(body);
@@ -130,7 +156,7 @@ async function call<T>(
   path: string,
   options: { method?: "GET" | "POST"; body?: unknown } = {},
 ): Promise<T> {
-  const transport = resolveTransport();
+  const transport = await resolveTransport();
   if (!transport) {
     throw new AgentUnavailableError(
       "No agent is reachable. Start the agent container — it is what recreates the Caddy " +
@@ -163,6 +189,9 @@ async function call<T>(
     // Never surfaces the underlying message: it carries the socket path and, on some failures, the
     // request headers — which include the signature.
     console.error("[agent] request failed", { path, method, error });
+    if (transport.agentRowId !== undefined) {
+      await recordAgentContact(transport.agentRowId, { ok: false, error: "Unreachable" });
+    }
     throw new AgentUnavailableError("The agent did not answer.");
   }
 
@@ -177,12 +206,21 @@ async function call<T>(
           : null,
       )
       .catch(() => null);
+    if (transport.agentRowId !== undefined) {
+      await recordAgentContact(transport.agentRowId, {
+        ok: false,
+        error: detail ?? `HTTP ${response.status}`,
+      });
+    }
     throw new AgentRequestError(
       detail ?? `The agent rejected the request (HTTP ${response.status}).`,
       response.status,
     );
   }
 
+  if (transport.agentRowId !== undefined) {
+    await recordAgentContact(transport.agentRowId, { ok: true });
+  }
   return (await response.json()) as T;
 }
 
@@ -190,7 +228,7 @@ async function call<T>(
 
 /** Whether an agent is configured and reachable at all. Never throws. */
 export async function isAgentAvailable(): Promise<boolean> {
-  if (!resolveTransport()) return false;
+  if (!(await resolveTransport())) return false;
   try {
     await getAgentStatus();
     return true;

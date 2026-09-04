@@ -160,8 +160,8 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` to disable | Built-in cutoff date | No |
 | `ACME_CA_ROOT_DIR` | Directory holding the custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
 | `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
-| `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100` | Unset (use the local socket) | No |
-| `AGENT_SECRET` | Shared secret for `AGENT_URL`, as returned when the agent was paired | None | No (required with `AGENT_URL`) |
+| `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (use the local socket) | No |
+| `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this in the database instead | None | No (required with `AGENT_URL`) |
 | `PORT` / `HOST` | Listen address for the `cpm-server` binary when run directly instead of in the container | `3000` / `0.0.0.0` | No |
 | `CPM_APP_ROOT` | Application root for the `cpm-server` binary | Directory of the executable | No |
 | `CPM_HEALTHCHECK_URL` | Target for `cpm-server --healthcheck` | `http://127.0.0.1:${PORT}/api/health` | No |
@@ -389,6 +389,43 @@ Enable globally in **WAF → Settings**, then optionally override per proxy host
 ```text
 SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
 ```
+
+---
+
+## The Agent
+
+Publishing a layer-4 port and changing Caddy's compiled-in plugins both need the Caddy *container*
+recreated, not just its config reloaded. The controller has no Docker access — deliberately — so a
+second container does that work and the two talk over a small REST API.
+
+Every request is signed with a shared secret using HMAC-SHA256 over the method, path, timestamp and
+body. The secret never travels with a request, and the signature covers the path, so a captured
+read cannot be replayed as a write.
+
+### Same host — nothing to configure
+
+The default. The agent listens on a Unix socket on the shared data volume and writes its secret
+beside it, rotating that secret on every start. A controller that mounts the same volume finds both.
+This is what `docker-compose.yml` sets up, and there is nothing to enter anywhere.
+
+### A different host — pairing
+
+Run the agent with `AGENT_MODE=managed` and publish its port (3100 by default). It prints a
+six-letter code to its logs:
+
+```bash
+docker logs caddy-proxy-manager-agent
+```
+
+The code is valid for five minutes, works once, and is refused after ten wrong guesses. Enter it
+with the agent's address under **Settings → Agent**; the two exchange a secret, which is stored
+encrypted and is the only thing used from then on. The code is never needed again.
+
+Unpairing forgets this side only. The agent keeps the secret until it is restarted or paired again,
+so restart it too if you are removing an agent you no longer trust.
+
+`AGENT_URL` and `AGENT_SECRET` do the same thing without the UI, for a deployment that configures
+everything through the environment. An agent paired through Settings takes precedence over them.
 
 ---
 

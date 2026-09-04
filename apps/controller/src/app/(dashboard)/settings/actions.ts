@@ -53,6 +53,8 @@ import { getProviderDefinition, encryptProviderCredentials } from "@/src/lib/dns
 import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
+import { PairingError, pairWithAgent } from "@/src/lib/agent/pairing";
+import { deleteAgent } from "@/src/lib/models/agents";
 
 type ActionResult = {
   success: boolean;
@@ -1307,3 +1309,48 @@ export const updateAvatarSettingsAction = serializedSettingsAction(
 export const updateCaddyBuildSettingsAction = serializedSettingsAction(
   updateCaddyBuildSettingsActionUnlocked,
 );
+
+// ─── Agents ──────────────────────────────────────────────────────────────────
+
+/**
+ * Pair with an agent using the one-time code it printed to its logs.
+ *
+ * The secret the exchange produces never comes back through this result: a server action's return
+ * value is serialized to the browser, so putting it here would publish the credential the whole
+ * exchange exists to keep on the server.
+ */
+export async function pairAgentAction(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const agent = await pairWithAgent({
+      address: String(formData.get("address") ?? ""),
+      code: String(formData.get("code") ?? ""),
+      name: formData.get("name") ? String(formData.get("name")) : undefined,
+    });
+    revalidatePath("/settings");
+    return { success: true, message: `Paired with ${agent.name} at ${agent.address}.` };
+  } catch (error) {
+    if (error instanceof PairingError) {
+      return { success: false, message: error.message };
+    }
+    console.error("Failed to pair with the agent:", error);
+    return { success: false, message: "Pairing failed." };
+  }
+}
+
+/**
+ * Forget a paired agent.
+ *
+ * Only removes this controller's side. The agent keeps the secret until it is re-paired or
+ * restarted, which is why the UI says so rather than implying the grant has been revoked.
+ */
+export async function unpairAgentAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("agentId"));
+  if (Number.isNaN(id)) return;
+  await deleteAgent(id);
+  revalidatePath("/settings");
+}
