@@ -19,6 +19,7 @@ import {
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { listAgents } from "@/src/lib/models/agents";
 import { getAllAgentStatuses } from "@/src/lib/agent/client";
+import { getFavicon } from "@/src/lib/branding";
 import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
@@ -52,6 +53,7 @@ export default async function SettingsPage() {
     caddyBuild,
     analytics,
     geoip,
+    favicon,
   ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
@@ -71,6 +73,7 @@ export default async function SettingsPage() {
     getCaddyBuildSettings(),
     analyticsView(),
     geoipView(),
+    getFavicon(),
   ]);
 
   // Separate from the settings reads above: these go out over the network to each agent, so a slow
@@ -109,6 +112,9 @@ export default async function SettingsPage() {
         fromEnv: config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null,
       }}
       caddyBuild={caddyBuild}
+      // Only whether one exists: the image itself is served by its own route, so shipping it in
+      // this page's HTML would be a couple of hundred kilobytes of base64 for nothing.
+      hasFavicon={favicon !== null}
       analytics={analytics}
       geoip={geoip}
       // Starting or stopping the optional containers needs an agent to run compose. Without one the

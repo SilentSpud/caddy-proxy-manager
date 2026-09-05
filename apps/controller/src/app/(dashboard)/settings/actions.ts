@@ -54,6 +54,7 @@ import {
   encryptProviderCredentials,
   isValidDnsDuration,
 } from "@/src/lib/dns-providers";
+import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
 import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { saveAnalyticsSettings, saveGeoipSettings } from "@/src/lib/settings/optional-features";
@@ -505,6 +506,47 @@ async function updateGeoipSettingsActionUnlocked(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save GeoIP settings",
+    };
+  }
+}
+
+/**
+ * Store an uploaded favicon, or remove the one already stored.
+ *
+ * One action for both so the section has a single form: `remove` is a submit button of its own
+ * rather than a second form, which would have to live outside this one to be valid HTML.
+ */
+async function updateFaviconActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    if (formData.get("intent") === "remove") {
+      await clearFavicon();
+      revalidatePath("/", "layout");
+      return { success: true, message: "Custom favicon removed" };
+    }
+
+    const file = formData.get("favicon");
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Choose an image file to upload." };
+    }
+
+    await saveFavicon(file);
+    // The whole layout, not just /settings: the icon is declared in the root layout, so every
+    // route's metadata is what has just gone stale.
+    revalidatePath("/", "layout");
+    return { success: true, message: "Favicon updated" };
+  } catch (error) {
+    if (error instanceof FaviconValidationError) {
+      return { success: false, message: error.message };
+    }
+    console.error("Failed to save the favicon:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save the favicon",
     };
   }
 }
@@ -1408,6 +1450,7 @@ export const updateAvatarSettingsAction = serializedSettingsAction(
 export const updateCaddyBuildSettingsAction = serializedSettingsAction(
   updateCaddyBuildSettingsActionUnlocked,
 );
+export const updateFaviconAction = serializedSettingsAction(updateFaviconActionUnlocked);
 export const updateAnalyticsSettingsAction = serializedSettingsAction(
   updateAnalyticsSettingsActionUnlocked,
 );

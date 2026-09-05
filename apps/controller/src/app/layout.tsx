@@ -15,6 +15,10 @@ export const metadata: Metadata = {
     template: `%s · ${config.appName}`,
   },
   description: "Web UI for managing Caddy reverse proxies, certificates, and access control.",
+  // Pointed at the route unconditionally rather than looked up here: this is the root layout, so a
+  // database read would run on every page of every request. The route answers 404 when no icon has
+  // been uploaded, which the browser treats exactly as it treated the missing /favicon.ico before.
+  icons: { icon: "/api/branding/favicon" },
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {

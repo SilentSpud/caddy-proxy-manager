@@ -37,6 +37,10 @@ export default async function proxy(req: NextRequest) {
     isSetupEntry ||
     pathname.startsWith("/api/auth") ||
     pathname === "/api/health" ||
+    // The login, portal and setup pages all render before there is a session, and a favicon that
+    // redirected to /login would leave every unauthenticated page without one. It is branding, not
+    // a secret: anyone who can reach the instance can already see it in their tab.
+    pathname === "/api/branding/favicon" ||
     pathname.startsWith("/api/v1/") ||
     // Authenticates itself: an agent signs with the secret agreed at pairing, and an unsigned
     // caller is answered 404 rather than being redirected to a login page it cannot use.

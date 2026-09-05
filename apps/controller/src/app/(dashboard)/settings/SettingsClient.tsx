@@ -21,6 +21,7 @@ import {
   Cpu,
   BarChart2,
   Globe2,
+  Image,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -90,6 +91,7 @@ import {
   updateAnalyticsSettingsAction,
   updateGeoipSettingsAction,
   updateAvatarSettingsAction,
+  updateFaviconAction,
   updatePasswordPolicySettingsAction,
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
@@ -146,6 +148,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "User Avatars",
         desc: "Gravatar fallback for users without an icon",
         icon: UserCircle,
+      },
+      {
+        id: "branding",
+        name: "Branding",
+        desc: "The favicon browsers show for this instance",
+        icon: Image,
       },
       {
         id: "caddy-build",
@@ -436,6 +444,8 @@ type Props = {
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   caddyBuild: CaddyBuildSettings | null;
+  /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
+  hasFavicon: boolean;
   analytics: AnalyticsView;
   geoip: GeoipView;
   /** Whether any agent is answering, and can therefore start or stop the optional containers. */
@@ -470,6 +480,7 @@ export default function SettingsClient({
   avatars,
   passwordPolicy,
   caddyBuild,
+  hasFavicon,
   analytics,
   geoip,
   canManageServices,
@@ -509,6 +520,7 @@ export default function SettingsClient({
   const [analyticsState, analyticsFormAction] = useActionState(updateAnalyticsSettingsAction, null);
   const [geoipState, geoipFormAction] = useActionState(updateGeoipSettingsAction, null);
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
+  const [faviconState, faviconFormAction] = useActionState(updateFaviconAction, null);
   const [passwordPolicyState, passwordPolicyFormAction] = useActionState(
     updatePasswordPolicySettingsAction,
     null,
@@ -657,6 +669,13 @@ export default function SettingsClient({
                     avatars={avatars}
                     avatarsState={avatarsState}
                     avatarsFormAction={avatarsFormAction}
+                  />
+                )}
+                {active === "branding" && (
+                  <BrandingSection
+                    hasFavicon={hasFavicon}
+                    faviconState={faviconState}
+                    faviconFormAction={faviconFormAction}
                   />
                 )}
                 {active === "caddy-build" && (
@@ -1575,6 +1594,102 @@ function AvatarsSection({
             isDisabled={avatars.fromEnv}
           />
           <SaveButton label="Save avatar settings" isDisabled={avatars.fromEnv} />
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+// ─── Section: Branding ───────────────────────────────────────────────────────
+
+/**
+ * Upload or remove the favicon.
+ *
+ * A plain `<input type="file">` rather than a design-system control: Astryx has no file input, and
+ * the point of this field is the native picker anyway. The preview is built from the chosen File
+ * with an object URL — the stored icon is never sent to this page, only served by its own route.
+ */
+function BrandingSection({
+  hasFavicon,
+  faviconState,
+  faviconFormAction,
+}: {
+  hasFavicon: boolean;
+  faviconState: { success: boolean; message?: string } | null;
+  faviconFormAction: (payload: FormData) => void;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+
+  // Revoked on replacement and unmount: an object URL pins the file in memory until it is.
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
+
+  // A cache-busting query so the tab icon and the preview below update on the same save. The
+  // route revalidates by ETag, which a browser is entitled to skip for an unchanged URL.
+  const currentSrc = `/api/branding/favicon?v=${faviconState?.success ? "new" : "current"}`;
+
+  return (
+    <FormCard title="Favicon">
+      <form action={faviconFormAction}>
+        <VStack gap={3}>
+          {faviconState?.message && (
+            <StatusAlert message={faviconState.message} success={faviconState.success} />
+          )}
+          <InfoAlert title="Shown in the browser tab and in bookmarks">
+            PNG, ICO, SVG, WebP, GIF or JPEG, up to 256 KB. A square image of at least 32×32 works
+            everywhere; browsers scale it down themselves.
+          </InfoAlert>
+
+          <HStack gap={3} align="center">
+            {(preview || hasFavicon) && (
+              // A plain <img>: next/image cannot serve an object URL built from a File the user
+              // has only just picked, and that preview is the point of this control.
+              <img
+                src={preview ?? currentSrc}
+                alt={preview ? "The favicon you selected" : "The current favicon"}
+                width={32}
+                height={32}
+                style={{ width: 32, height: 32, objectFit: "contain" }}
+              />
+            )}
+            <Text size="sm" color="secondary">
+              {preview
+                ? `Selected: ${chosen}. Save to apply it.`
+                : hasFavicon
+                  ? "A custom favicon is set."
+                  : "No custom favicon — browsers show their own default."}
+            </Text>
+          </HStack>
+
+          <input
+            type="file"
+            name="favicon"
+            accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/webp,image/gif,image/jpeg,.ico"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              setChosen(file?.name ?? null);
+              setPreview(file ? URL.createObjectURL(file) : null);
+            }}
+          />
+
+          <HStack gap={2} justify="end">
+            {hasFavicon && (
+              <Button
+                type="submit"
+                size="sm"
+                variant="secondary"
+                name="intent"
+                value="remove"
+                label="Remove favicon"
+              />
+            )}
+            <Button type="submit" size="sm" label="Save favicon" isDisabled={!preview} />
+          </HStack>
         </VStack>
       </form>
     </FormCard>
