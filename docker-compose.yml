@@ -100,14 +100,24 @@ services:
       OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
       OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
 
-      # Optional analytics. Omit CLICKHOUSE_PASSWORD to disable; to enable, also start the
-      # clickhouse service with: docker compose --profile clickhouse up -d
+      # Optional analytics and GeoIP. Both are Settings toggles now: a stored value wins over the
+      # variable, and the agent starts or stops the container to match — so neither the profile nor
+      # these need setting on a stack with an agent. They remain for a first start, and for a
+      # deployment with no agent, where Docker is the only thing that can start those services.
+      # Unset means "decide from whether the credentials below are configured", which is what
+      # earlier releases did.
+      ANALYTICS_ENABLED: ${ANALYTICS_ENABLED:-}
+      GEOIP_ENABLED: ${GEOIP_ENABLED:-}
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-cpm}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
       # Days of analytics kept before deletion.
       CLICKHOUSE_RETENTION_DAYS: ${CLICKHOUSE_RETENTION_DAYS:-30}
+      # Only Compose reads these, to run geoipupdate. Listed here so the controller can show an
+      # operator what is currently configured before they save it into the database.
+      GEOIPUPDATE_ACCOUNT_ID: ${GEOIPUPDATE_ACCOUNT_ID:-}
+      GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY:-}
     group_add:
       - "${CADDY_GID:-10000}"  # caddy's GID, so web can write /logs
     volumes:
@@ -220,6 +230,9 @@ services:
       # whether analytics are on at all.
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
+      # Seconds before starting clickhouse or geoipupdate on the controller's behalf is abandoned.
+      # Generous: the first start of either pulls its image.
+      SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
     volumes:
       - caddy-manager-data:/data
@@ -263,6 +276,9 @@ services:
       retries: 5
       start_period: 30s
 
+  # Optional. The profile is what keeps it out of a plain `docker compose up`; the agent enables it
+  # per-invocation with `--profile clickhouse` when Settings → Analytics asks for it, so listing it
+  # in COMPOSE_PROFILES is only needed on a deployment with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
     image: clickhouse/clickhouse-server:latest-alpine
@@ -271,7 +287,13 @@ services:
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-cpm}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?ERROR - CLICKHOUSE_PASSWORD is required}
+      # `:-` rather than `:?`, because the agent supplies this from the Settings page by putting it
+      # in the environment of the `docker compose` it runs — and interpolation happens while this
+      # file is parsed, so a `:?` here fails every invocation that so much as mentions the project,
+      # `stop` included, on a deployment that keeps its password in the database instead of .env.
+      # An empty value still cannot start ClickHouse; the controller refuses to enable analytics
+      # without one, which is where that check now lives.
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
@@ -279,7 +301,7 @@ services:
     networks:
       - caddy-network
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --user ${CLICKHOUSE_USER:-cpm} --password ${CLICKHOUSE_PASSWORD:?ERROR - CLICKHOUSE_PASSWORD is required} --query 'SELECT 1'"]
+      test: ["CMD-SHELL", "clickhouse-client --user ${CLICKHOUSE_USER:-cpm} --password ${CLICKHOUSE_PASSWORD:-} --query 'SELECT 1'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -289,6 +311,7 @@ services:
         soft: 262144
         hard: 262144
 
+  # Optional, and started the same way: Settings → GeoIP, or the profile without an agent.
   geoipupdate:
     container_name: geoipupdate-${HOSTNAME}
     image: ghcr.io/maxmind/geoipupdate

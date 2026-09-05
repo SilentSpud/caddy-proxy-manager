@@ -11,7 +11,13 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
-import type { CaddyBuildStatus, FleetConfig, L4PortsStatus } from "@cpm/shared";
+import type {
+  CaddyBuildStatus,
+  FleetConfig,
+  L4PortsStatus,
+  ManagedServiceName,
+  ManagedServicesStatus,
+} from "@cpm/shared";
 
 export type PairedController = {
   controllerId: string;
@@ -49,6 +55,8 @@ const BUILD_STATUS_KEY = "caddy_build_status";
 const APPLIED_PORTS_KEY = "applied_l4_ports";
 const APPLIED_MODULES_KEY = "applied_caddy_modules";
 const FLEET_CONFIG_KEY = "fleet_config";
+const SERVICES_STATUS_KEY = "managed_services_status";
+const APPLIED_SERVICES_KEY = "applied_managed_services";
 
 export class AgentStore {
   private readonly db: Database;
@@ -140,6 +148,29 @@ export class AgentStore {
 
   setCaddyBuildStatus(status: CaddyBuildStatus): void {
     this.writeState(BUILD_STATUS_KEY, JSON.stringify(status));
+  }
+
+  managedServicesStatus(): ManagedServicesStatus {
+    return this.readJson<ManagedServicesStatus>(SERVICES_STATUS_KEY) ?? { state: "idle" };
+  }
+
+  setManagedServicesStatus(status: ManagedServicesStatus): void {
+    this.writeState(SERVICES_STATUS_KEY, JSON.stringify(status));
+  }
+
+  /**
+   * Which optional services this agent last brought up, or null before it has been asked.
+   *
+   * Null and "both false" are different answers: the first means the controller has never spoken
+   * about these, so whatever the operator started by hand with COMPOSE_PROFILES is still theirs to
+   * own. The second means the controller asked for them off, and they are.
+   */
+  appliedManagedServices(): Record<ManagedServiceName, boolean> | null {
+    return this.readJson<Record<ManagedServiceName, boolean>>(APPLIED_SERVICES_KEY);
+  }
+
+  setAppliedManagedServices(services: Record<ManagedServiceName, boolean>): void {
+    this.writeState(APPLIED_SERVICES_KEY, JSON.stringify(services));
   }
 
   /**

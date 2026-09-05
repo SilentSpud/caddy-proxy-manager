@@ -56,11 +56,12 @@ export async function getAnalyticsSummary(
   to: number,
   hosts: string[],
 ): Promise<AnalyticsSummary> {
-  const [loggingActive, summary] = await Promise.all([
+  const [loggingActive, summary, analyticsOn] = await Promise.all([
     isLoggingActive(),
     querySummary(from, to, hosts),
+    isAnalyticsEnabled(),
   ]);
-  return { ...summary, loggingDisabled: !loggingActive, analyticsDisabled: !isAnalyticsEnabled() };
+  return { ...summary, loggingDisabled: !loggingActive, analyticsDisabled: !analyticsOn };
 }
 
 // ── Timeline ─────────────────────────────────────────────────────────────────

@@ -2,34 +2,95 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
-const CH_URL = process.env.CLICKHOUSE_URL ?? "http://clickhouse:8123";
-const CH_USER = process.env.CLICKHOUSE_USER ?? "cpm";
-const CH_PASS = process.env.CLICKHOUSE_PASSWORD ?? "";
-const CH_DB = process.env.CLICKHOUSE_DB ?? "analytics";
+/**
+ * Where analytics are written, resolved from the settings registry rather than the environment.
+ *
+ * Read per call rather than captured at module load, which is what makes the Settings toggle mean
+ * anything: these values used to be `process.env` constants frozen the first time anything imported
+ * this file, so a saved change could not take effect before a restart. The registry's own
+ * stored → environment → default order keeps an unmigrated deployment behaving exactly as it did.
+ */
+type ClickHouseConfig = {
+  url: string;
+  user: string;
+  password: string;
+  database: string;
+  retentionDays: number;
+  /** Whether to talk to ClickHouse at all. See resolveConfig for how an unset toggle is read. */
+  enabled: boolean;
+};
 
-// Validate CH_DB is a safe identifier (alphanumeric + underscore only)
-if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(CH_DB)) {
-  throw new Error(`CLICKHOUSE_DB contains invalid characters: ${CH_DB}`);
-}
+/**
+ * Cached for the process, and dropped by `invalidateClickHouseConfig` when settings are saved.
+ *
+ * The promise is cached rather than the value, so the several queries a single analytics page fires
+ * share one settings read instead of racing to do the same work.
+ */
+let configPromise: Promise<ClickHouseConfig> | null = null;
 
-const DEFAULT_RETENTION_DAYS = 30;
+async function resolveConfig(): Promise<ClickHouseConfig> {
+  // Imported lazily: this module is pulled in by the agent fleet configuration, which the settings
+  // layer reaches in turn, and a static import would close that cycle.
+  const [registry, { getSetting }] = await Promise.all([
+    import("../settings/registry"),
+    import("../settings/resolve"),
+  ]);
 
-/** Parse CLICKHOUSE_RETENTION_DAYS into a positive integer number of days. */
-function parseRetentionDays(raw: string | undefined): number {
-  if (raw == null || raw.trim() === "") return DEFAULT_RETENTION_DAYS;
-  const n = Number(raw.trim());
-  if (!Number.isInteger(n) || n <= 0) {
-    throw new Error(`CLICKHOUSE_RETENTION_DAYS must be a positive integer (got: ${raw})`);
+  const [toggle, url, user, password, database, retentionDays] = await Promise.all([
+    getSetting(registry.analyticsEnabled),
+    getSetting(registry.clickhouseUrl),
+    getSetting(registry.clickhouseUser),
+    getSetting(registry.clickhousePassword),
+    getSetting(registry.clickhouseDb),
+    getSetting(registry.clickhouseRetentionDays),
+  ]);
+
+  // No password, no analytics, whatever the toggle says: the ClickHouse container will not start
+  // without one, and an empty password would only produce a connection refused per query.
+  const configured = password.trim().length > 0;
+  if (toggle === true && !configured) {
+    console.warn(
+      "Analytics are switched on but no ClickHouse password is set — nothing will be recorded.",
+    );
   }
-  return n;
+  // An unset toggle means "decide from the configuration", which is the rule this file applied
+  // before the toggle existed. Upgrading must not turn a working deployment's analytics off.
+  const enabled = (toggle ?? configured) && configured;
+
+  // Interpolated into DDL, which has no placeholder for an identifier. The registry rejects a bad
+  // value on the way in; this catches one that reached the table before that pattern existed.
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(database)) {
+    throw new Error(`The ClickHouse database name contains invalid characters: ${database}`);
+  }
+
+  return { url, user, password, database, retentionDays, enabled };
 }
 
-// Number of days analytics events are kept before ClickHouse's TTL deletes them.
-const CH_RETENTION_DAYS = parseRetentionDays(process.env.CLICKHOUSE_RETENTION_DAYS);
+function chConfig(): Promise<ClickHouseConfig> {
+  configPromise ??= resolveConfig();
+  return configPromise;
+}
 
-// ── Analytics state ─────────────────────────────────────────────────────────
-
-const analyticsConfigured = CH_PASS.trim().length > 0;
+/**
+ * Forget the resolved configuration, and drop a client built from the old one.
+ *
+ * Called when the analytics settings are saved. Without the close, a changed URL or password would
+ * be ignored until the process restarted — the singleton below would keep answering with a
+ * connection opened under the previous credentials.
+ */
+export async function invalidateClickHouseConfig(): Promise<void> {
+  configPromise = null;
+  try {
+    await closeClickHouse();
+  } catch (error) {
+    // Best-effort. The settings are already saved by the time this runs, so a socket that will not
+    // close cleanly must not turn a successful save into a reported failure — and the next
+    // getClient rebuilds from the new configuration either way.
+    console.warn("Could not close the previous ClickHouse client:", error);
+    client = null;
+    clientKey = null;
+  }
+}
 
 /**
  * The credentials an agent needs to write its own events, or null when analytics are off.
@@ -38,53 +99,60 @@ const analyticsConfigured = CH_PASS.trim().length > 0;
  * copy of its Caddy log, and relaying every request through the controller would put the busiest
  * write path in the fleet through a machine with nothing to do with it.
  */
-export function analyticsCredentialsForAgents(): {
+export async function analyticsCredentialsForAgents(): Promise<{
   url: string;
   user: string;
   password: string;
   database: string;
-} | null {
-  if (!analyticsConfigured) return null;
-  return { url: CH_URL, user: CH_USER, password: CH_PASS, database: CH_DB };
+} | null> {
+  const { enabled, url, user, password, database } = await chConfig();
+  if (!enabled) return null;
+  return { url, user, password, database };
 }
 
-/** Returns true when ClickHouse analytics is configured for this process. */
-export function isAnalyticsEnabled(): boolean {
-  return analyticsConfigured;
+/** Whether traffic and WAF events are being recorded. */
+export async function isAnalyticsEnabled(): Promise<boolean> {
+  return (await chConfig()).enabled;
 }
 
 /** Number of days analytics events are retained before TTL deletion. */
-export function getRetentionDays(): number {
-  return CH_RETENTION_DAYS;
+export async function getRetentionDays(): Promise<number> {
+  return (await chConfig()).retentionDays;
 }
 
 // ── Singleton client ────────────────────────────────────────────────────────
 
 let client: ClickHouseClient | null = null;
+/** The connection settings `client` was opened with, so a changed one is noticed. */
+let clientKey: string | null = null;
 
-export function getClient(): ClickHouseClient {
-  if (!client) {
-    client = createClient({
-      url: CH_URL,
-      username: CH_USER,
-      password: CH_PASS,
-      database: CH_DB,
-      clickhouse_settings: {
-        async_insert: 1,
-        wait_for_async_insert: 0,
-      },
-      log: {
-        // 127 is ClickHouseLogLevel.OFF; keep this numeric to avoid widening test mocks.
-        level: 127,
-      },
-    });
-  }
+export async function getClient(): Promise<ClickHouseClient> {
+  const { url, user, password, database } = await chConfig();
+  const key = JSON.stringify([url, user, password, database]);
+  if (client && clientKey === key) return client;
+
+  if (client) await client.close();
+  clientKey = key;
+  client = createClient({
+    url,
+    username: user,
+    password,
+    database,
+    clickhouse_settings: {
+      async_insert: 1,
+      wait_for_async_insert: 0,
+    },
+    log: {
+      // 127 is ClickHouseLogLevel.OFF; keep this numeric to avoid widening test mocks.
+      level: 127,
+    },
+  });
   return client;
 }
 
 // ── Table creation ──────────────────────────────────────────────────────────
 
-const TRAFFIC_EVENTS_DDL = `
+const trafficEventsDdl = (retentionDays: number) => `
 CREATE TABLE IF NOT EXISTS traffic_events (
     ts           DateTime          CODEC(Delta, ZSTD),
     client_ip    String            CODEC(ZSTD(3)),
@@ -100,11 +168,11 @@ CREATE TABLE IF NOT EXISTS traffic_events (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(ts)
 ORDER BY (host, ts)
-TTL ts + INTERVAL ${CH_RETENTION_DAYS} DAY DELETE
+TTL ts + INTERVAL ${retentionDays} DAY DELETE
 SETTINGS index_granularity = 8192
 `;
 
-const WAF_EVENTS_DDL = `
+const wafEventsDdl = (retentionDays: number) => `
 CREATE TABLE IF NOT EXISTS waf_events (
     ts           DateTime          CODEC(Delta, ZSTD),
     host         LowCardinality(String) DEFAULT '' CODEC(ZSTD(3)),
@@ -120,7 +188,7 @@ CREATE TABLE IF NOT EXISTS waf_events (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(ts)
 ORDER BY (host, ts)
-TTL ts + INTERVAL ${CH_RETENTION_DAYS} DAY DELETE
+TTL ts + INTERVAL ${retentionDays} DAY DELETE
 SETTINGS index_granularity = 8192
 `;
 
@@ -168,17 +236,19 @@ function ttlDaysFromCreateQuery(createQuery: string): number | null {
 async function ensureRetentionTtl(
   ch: ClickHouseClient,
   table: (typeof RETENTION_TABLES)[number],
+  database: string,
+  retentionDays: number,
 ): Promise<void> {
   const result = await ch.query({
     query: `SELECT create_table_query FROM system.tables WHERE database = {db:String} AND name = {tbl:String}`,
-    query_params: { db: CH_DB, tbl: table },
+    query_params: { db: database, tbl: table },
     format: "JSONEachRow",
   });
   const rows = await result.json<{ create_table_query: string }>();
   const current = ttlDaysFromCreateQuery(rows[0]?.create_table_query ?? "");
-  if (current === CH_RETENTION_DAYS) return;
+  if (current === retentionDays) return;
   await ch.command({
-    query: `ALTER TABLE ${table} MODIFY TTL ts + INTERVAL ${CH_RETENTION_DAYS} DAY DELETE`,
+    query: `ALTER TABLE ${table} MODIFY TTL ts + INTERVAL ${retentionDays} DAY DELETE`,
   });
 }
 
@@ -244,19 +314,20 @@ async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
 }
 
 export async function initClickHouse(): Promise<void> {
-  if (!analyticsConfigured) {
-    console.log("ClickHouse analytics disabled (CLICKHOUSE_PASSWORD not set)");
+  const { enabled, database, retentionDays } = await chConfig();
+  if (!enabled) {
+    console.log("ClickHouse analytics disabled");
     return;
   }
-  const ch = getClient();
-  await ch.command({ query: `CREATE DATABASE IF NOT EXISTS ${CH_DB}` });
-  await ch.command({ query: TRAFFIC_EVENTS_DDL });
-  await ch.command({ query: WAF_EVENTS_DDL });
+  const ch = await getClient();
+  await ch.command({ query: `CREATE DATABASE IF NOT EXISTS ${database}` });
+  await ch.command({ query: trafficEventsDdl(retentionDays) });
+  await ch.command({ query: wafEventsDdl(retentionDays) });
   for (const q of [...TRAFFIC_EVENTS_MIGRATIONS, ...WAF_EVENTS_MIGRATIONS]) {
     await ch.command({ query: q });
   }
   for (const table of RETENTION_TABLES) {
-    await ensureRetentionTtl(ch, table);
+    await ensureRetentionTtl(ch, table, database, retentionDays);
   }
   await dropDisabledSystemLogs(ch);
 }
@@ -265,6 +336,7 @@ export async function closeClickHouse(): Promise<void> {
   if (client) {
     await client.close();
     client = null;
+    clientKey = null;
   }
 }
 
@@ -299,8 +371,8 @@ export interface WafEventRow {
 }
 
 export async function insertTrafficEvents(rows: TrafficEventRow[]): Promise<void> {
-  if (!analyticsConfigured || rows.length === 0) return;
-  const ch = getClient();
+  if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
+  const ch = await getClient();
   // Convert unix timestamp to ClickHouse DateTime string
   const values = rows.map((r) => ({
     ...r,
@@ -311,8 +383,8 @@ export async function insertTrafficEvents(rows: TrafficEventRow[]): Promise<void
 }
 
 export async function insertWafEvents(rows: WafEventRow[]): Promise<void> {
-  if (!analyticsConfigured || rows.length === 0) return;
-  const ch = getClient();
+  if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
+  const ch = await getClient();
   const values = rows.map((r) => ({
     ...r,
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
@@ -382,8 +454,8 @@ function safeUint(n: number): number {
 }
 
 async function queryRows<T>(query: string, query_params?: QueryParams): Promise<T[]> {
-  if (!analyticsConfigured) return [];
-  const ch = getClient();
+  if (!(await isAnalyticsEnabled())) return [];
+  const ch = await getClient();
   const result = await ch.query({ query, query_params, format: "JSONEachRow" });
   return result.json<T>();
 }
@@ -628,7 +700,7 @@ export async function queryBlocked(
   hosts: string[],
   page: number,
 ): Promise<BlockedPage> {
-  if (!analyticsConfigured) return { events: [], total: 0, page: 1, pages: 1 };
+  if (!(await isAnalyticsEnabled())) return { events: [], total: 0, page: 1, pages: 1 };
   const pageSize = 10;
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);

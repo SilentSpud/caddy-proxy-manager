@@ -11,6 +11,7 @@
 import { useActionState, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Center } from "@astryxdesign/core/Center";
+import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
@@ -28,6 +29,8 @@ export type SettingField = {
   description: string;
   kind: "string" | "number" | "boolean" | "tristate";
   secret: boolean;
+  /** Switches its whole group on and off. At most one per group; see the registry's `gate`. */
+  gate: boolean;
   value: string | number | boolean | null;
   source: "stored" | "environment" | "default";
 };
@@ -40,16 +43,29 @@ export default function SetupSettingsClient({
   groups: Array<{ id: string; title: string }>;
 }) {
   const [state, submit] = useActionState(saveSetupSettings, { error: null });
+
   const [values, setValues] = useState<Record<string, string | boolean>>(() =>
     Object.fromEntries(
       fields.map((field) => [
         field.key,
-        field.kind === "boolean" ? field.value === true : String(field.value ?? ""),
+        field.kind === "boolean" || field.gate ? field.value === true : String(field.value ?? ""),
       ]),
     ),
   );
 
-  const migratedCount = fields.filter((field) => field.source === "environment").length;
+  /** Whether a field is on screen: everything, minus the groups whose gate is switched off. */
+  const isVisible = (field: SettingField) => {
+    if (field.gate) return true;
+    const gate = fields.find((other) => other.group === field.group && other.gate);
+    return !gate || values[gate.key] === true;
+  };
+
+  // Only what is actually on screen. A hidden field is not migrated either, so counting it would
+  // tell the operator a value had been copied into the database and invite them to delete it from
+  // their .env — where it is still the only copy.
+  const migratedCount = fields.filter(
+    (field) => field.source === "environment" && isVisible(field),
+  ).length;
 
   return (
     <Center>
@@ -77,17 +93,30 @@ export default function SetupSettingsClient({
               const groupFields = fields.filter((field) => field.group === group.id);
               if (groupFields.length === 0) return null;
 
+              const gate = groupFields.find((field) => field.gate);
+              const rest = groupFields.filter((field) => !field.gate);
+              const change = (key: string) => (next: string | boolean) =>
+                setValues((previous) => ({ ...previous, [key]: next }));
+
               return (
                 <FormCard key={group.id} title={group.title}>
                   <VStack gap={4}>
-                    {groupFields.map((field) => (
+                    {gate && (
+                      <GateSwitch
+                        field={gate}
+                        value={values[gate.key] === true}
+                        onChange={change(gate.key)}
+                      />
+                    )}
+                    {/* Hidden rather than disabled when the gate is off: an unrendered field posts
+                        nothing, and the save skips what it was not sent — so turning analytics off
+                        leaves the ClickHouse password stored rather than clearing it. */}
+                    {rest.filter(isVisible).map((field) => (
                       <SettingRow
                         key={field.key}
                         field={field}
                         value={values[field.key]}
-                        onChange={(next) =>
-                          setValues((previous) => ({ ...previous, [field.key]: next }))
-                        }
+                        onChange={change(field.key)}
                       />
                     ))}
                   </VStack>
@@ -100,6 +129,38 @@ export default function SetupSettingsClient({
         </form>
       </VStack>
     </Center>
+  );
+}
+
+/**
+ * The switch that decides whether a group's feature runs at all.
+ *
+ * Its own component rather than a `kind` on SettingRow: this one is stored tri-state but must post
+ * a definite yes or no. Setup is where the operator makes the choice explicit, so "leave it to be
+ * inferred" is not an answer worth offering here — the switch arrives showing whatever is inferred
+ * today, and saving pins it.
+ */
+function GateSwitch({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingField;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <VStack gap={2}>
+      <Switch
+        label={field.label}
+        description={field.description}
+        htmlName={field.key}
+        value={value}
+        onChange={onChange}
+      />
+      {field.source === "environment" && <Badge label={`from ${field.env}`} />}
+      {value && <Divider />}
+    </VStack>
   );
 }
 

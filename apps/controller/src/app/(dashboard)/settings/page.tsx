@@ -19,6 +19,7 @@ import {
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { listAgents } from "@/src/lib/models/agents";
 import { getAllAgentStatuses } from "@/src/lib/agent/client";
+import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
@@ -49,6 +50,8 @@ export default async function SettingsPage() {
     avatarSettings,
     passwordPolicySettings,
     caddyBuild,
+    analytics,
+    geoip,
   ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
@@ -66,6 +69,8 @@ export default async function SettingsPage() {
     getAvatarSettings(),
     getPasswordPolicySettings(),
     getCaddyBuildSettings(),
+    analyticsView(),
+    geoipView(),
   ]);
 
   // Separate from the settings reads above: these go out over the network to each agent, so a slow
@@ -104,6 +109,11 @@ export default async function SettingsPage() {
         fromEnv: config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null,
       }}
       caddyBuild={caddyBuild}
+      analytics={analytics}
+      geoip={geoip}
+      // Starting or stopping the optional containers needs an agent to run compose. Without one the
+      // settings still save and still gate the features; only the container management is missing.
+      canManageServices={agentStatuses.some((result) => result.ok)}
       baseUrl={config.baseUrl}
       agents={{ paired: pairedAgents, statuses: agentStatuses }}
     />

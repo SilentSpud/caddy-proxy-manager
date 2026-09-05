@@ -41,6 +41,12 @@ const { broadcastCaddyAdmin, getAllAgentStatuses, listAgentTargets, requestL4Por
 );
 const { getAppliedModuleSpecs, defaultModuleSpecs } = await import('../../src/lib/caddy-build');
 const { pushFleetConfig } = await import('../../src/lib/agent/fleet-config');
+const { applyManagedServices, desiredManagedServices } = await import(
+  '../../src/lib/agent/managed-services'
+);
+const { invalidateClickHouseConfig } = await import('../../src/lib/clickhouse/client');
+const registry = await import('../../src/lib/settings/registry');
+const { invalidateSettingsCache, saveSettings } = await import('../../src/lib/settings/resolve');
 const { applyCaddyConfig } = await import('../../src/lib/caddy');
 const { startFakeAgent, clearAgentEnv } = await import('../helpers/fake-agent');
 
@@ -70,6 +76,11 @@ beforeEach(async () => {
   second = await startFakeAgent();
   // startFakeAgent points AGENT_URL at whichever ran last; the fleet has to come from the table.
   clearAgentEnv();
+  // Both layers cache for the process, and the row deletion above goes straight to the table — the
+  // one write resolve.ts documents as invisible to it. Without these, a test that stores a
+  // ClickHouse password leaves the next one resolving it from a cache the delete never reached.
+  invalidateSettingsCache();
+  await invalidateClickHouseConfig();
 });
 
 afterEach(async () => {
@@ -269,6 +280,78 @@ describe('handing agents the analytics credentials', () => {
 
   it('does nothing at all when there is no agent', async () => {
     await expect(pushFleetConfig()).resolves.toBeUndefined();
+  });
+});
+
+describe('starting the optional containers', () => {
+  /** The body of the last /v1/services request an agent received. */
+  function lastServicesRequest(agent: FakeAgent) {
+    return [...agent.requests].reverse().find((r) => r.path === '/v1/services')?.body as {
+      services: { clickhouse: boolean; geoipupdate: boolean };
+      env: Record<string, string>;
+    };
+  }
+
+  it('asks for ClickHouse once analytics are configured', async () => {
+    await saveSettings({
+      [registry.analyticsEnabled.key]: true,
+      [registry.clickhousePassword.key]: 's3cret',
+    });
+    await invalidateClickHouseConfig();
+    await pairBoth();
+    await applyManagedServices();
+
+    expect(lastServicesRequest(first).services.clickhouse).toBe(true);
+    // The credential travels with the request: compose reads it from the host .env, which the
+    // agent mounts read-only, so this is the only way a setting stored here reaches the container.
+    expect(lastServicesRequest(first).env.CLICKHOUSE_PASSWORD).toBe('s3cret');
+  });
+
+  it('asks for it to stop when analytics are switched off', async () => {
+    await saveSettings({
+      [registry.analyticsEnabled.key]: false,
+      [registry.clickhousePassword.key]: 's3cret',
+    });
+    await invalidateClickHouseConfig();
+    await pairBoth();
+    await applyManagedServices();
+
+    expect(lastServicesRequest(first).services.clickhouse).toBe(false);
+  });
+
+  it('leaves geoipupdate off without a MaxMind subscription', async () => {
+    // Started without credentials it fails its download in a loop, which reads to an operator as a
+    // broken feature rather than an unconfigured one.
+    await saveSettings({ [registry.geoipEnabled.key]: true });
+    const desired = await desiredManagedServices();
+    expect(desired.services.geoipupdate).toBe(false);
+  });
+
+  it('asks for geoipupdate once a subscription is stored', async () => {
+    await saveSettings({
+      [registry.geoipEnabled.key]: true,
+      [registry.geoipAccountId.key]: '123456',
+      [registry.geoipLicenseKey.key]: 'a-licence-key',
+    });
+    const desired = await desiredManagedServices();
+    expect(desired.services.geoipupdate).toBe(true);
+    expect(desired.env.GEOIPUPDATE_ACCOUNT_ID).toBe('123456');
+    expect(desired.env.GEOIPUPDATE_LICENSE_KEY).toBe('a-licence-key');
+  });
+
+  it('reaches every agent, and survives one being down', async () => {
+    await pairBoth();
+    await second.stop();
+    // Never throws, for the same reason pushFleetConfig does not: the operator must still be able
+    // to save a setting that has nothing to do with the host that is down.
+    await expect(applyManagedServices()).resolves.toBeUndefined();
+    expect(first.requests.some((r) => r.path === '/v1/services')).toBe(true);
+  });
+
+  it('does nothing at all when there is no agent', async () => {
+    // A standalone binary, or a stack whose agent has not started. COMPOSE_PROFILES is still the
+    // operator's own lever there, and the settings continue to gate the features themselves.
+    await expect(applyManagedServices()).resolves.toBeUndefined();
   });
 });
 

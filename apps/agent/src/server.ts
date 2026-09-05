@@ -16,6 +16,11 @@ import {
   type CaddyAdminProxyRequest,
   type FleetConfig,
   GEOIP_EDITIONS,
+  MANAGED_SERVICE_ENV_KEYS,
+  MANAGED_SERVICES,
+  type ManagedServiceEnvKey,
+  type ManagedServiceName,
+  type ManagedServicesRequest,
   MAX_CADDY_CONFIG_BYTES,
   type PairRequest,
   type PairResponse,
@@ -61,6 +66,43 @@ const PORT_SPEC = /^\d{1,5}:\d{1,5}(\/(tcp|udp))?$/;
  * build regardless of how the process is spawned.
  */
 const MODULE_SPEC = /^[A-Za-z0-9][A-Za-z0-9._~\-/]*(@[A-Za-z0-9._~\-+/]+)?(=[A-Za-z0-9._~\-/]+)?$/;
+
+/**
+ * Longest value accepted for a compose variable. A MaxMind licence key is 40 characters and a
+ * generated password rarely more; this is well clear of both and still bounded.
+ */
+const MAX_ENV_VALUE_LENGTH = 512;
+
+/**
+ * Pull the allowlisted variables out of a pushed body, refusing anything that could not survive
+ * being written as one line of an env file.
+ *
+ * A newline is the whole risk here: the generated file is parsed by the compose CLI, so a value
+ * carrying one would define a second variable — any variable, including the ones that decide where
+ * this stack's containers mount the host. Rejected rather than escaped, because a credential with a
+ * newline in it is a mistake at the source either way.
+ */
+function extractEnv(value: unknown): Partial<Record<ManagedServiceEnvKey, string>> | string {
+  if (value === null || value === undefined) return {};
+  if (typeof value !== "object" || Array.isArray(value)) {
+    return "The service environment must be an object.";
+  }
+  const source = value as Record<string, unknown>;
+  const out: Partial<Record<ManagedServiceEnvKey, string>> = {};
+
+  for (const key of Object.keys(source)) {
+    if (!(MANAGED_SERVICE_ENV_KEYS as readonly string[]).includes(key)) {
+      return `"${key}" is not a variable this agent will set.`;
+    }
+    const raw = source[key];
+    if (typeof raw !== "string") return `"${key}" must be a string.`;
+    if (raw.length > MAX_ENV_VALUE_LENGTH) return `"${key}" is too long.`;
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: refusing them is the point.
+    if (/[\x00-\x1f\x7f]/.test(raw)) return `"${key}" contains a control character.`;
+    out[key as ManagedServiceEnvKey] = raw;
+  }
+  return out;
+}
 
 function validateStringList(
   value: unknown,
@@ -146,6 +188,13 @@ export function createHandler(services: AgentServices) {
         return request.method === "POST"
           ? handleFleetConfig(body, controllerId)
           : error(405, "BAD_REQUEST", "Use POST to set the fleet configuration.");
+      case AGENT_ROUTES.services:
+        return request.method === "POST"
+          ? handleServices(body)
+          : Response.json({
+              applied: store.appliedManagedServices(),
+              status: store.managedServicesStatus(),
+            });
       default:
         return error(404, "BAD_REQUEST", "No such endpoint.");
     }
@@ -311,6 +360,49 @@ export function createHandler(services: AgentServices) {
     return Response.json({ ok: true });
   }
 
+  /**
+   * Take the set of optional services the controller wants running.
+   *
+   * The only route that can start a container the operator did not ask for on the command line,
+   * which is the whole point: these sit behind compose profiles, and a profile is chosen outside
+   * the stack. Everything it will act on is fixed here — two service names and five variables —
+   * so a controller cannot widen it into a general "run this compose service" primitive.
+   */
+  function handleServices(body: ArrayBuffer): Response {
+    const parsed = parseJson(body) as ManagedServicesRequest | null;
+    if (!parsed || typeof parsed !== "object") {
+      return error(400, "BAD_REQUEST", "The request is not valid JSON.");
+    }
+    if (!parsed.services || typeof parsed.services !== "object") {
+      return error(400, "BAD_REQUEST", "The request must name which services should be running.");
+    }
+
+    const services = {} as Record<ManagedServiceName, boolean>;
+    for (const name of MANAGED_SERVICES) {
+      const wanted = parsed.services[name];
+      if (typeof wanted !== "boolean") {
+        return error(400, "BAD_REQUEST", `"${name}" must be true or false.`);
+      }
+      services[name] = wanted;
+    }
+
+    const env = extractEnv(parsed.env);
+    if (typeof env === "string") return error(400, "BAD_REQUEST", env);
+
+    try {
+      operations.applyManagedServices({ services, env });
+    } catch (busy) {
+      if (busy instanceof OperationBusyError) {
+        return error(409, "BUSY", `The agent is busy: ${busy.running} is already running.`);
+      }
+      throw busy;
+    }
+    return Response.json(
+      { accepted: true, status: store.managedServicesStatus() },
+      { status: 202 },
+    );
+  }
+
   async function buildStatus(): Promise<AgentStatus> {
     return {
       agentId: store.agentId(),
@@ -324,6 +416,10 @@ export function createHandler(services: AgentServices) {
       caddyBuild: {
         applied: store.appliedCaddyModules(),
         status: store.caddyBuildStatus(),
+      },
+      services: {
+        applied: store.appliedManagedServices(),
+        status: store.managedServicesStatus(),
       },
       analytics: {
         enabled: analyticsEnabled(),

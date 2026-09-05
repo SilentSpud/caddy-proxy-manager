@@ -214,3 +214,43 @@ describe('the whole set', () => {
     expect(keys.every((key) => key.startsWith('config:'))).toBe(true);
   });
 });
+
+describe('group gates', () => {
+  it('marks at most one gate per group', () => {
+    // The setup form renders the gate as the group's switch and everything else behind it, so a
+    // second one in the same group would silently not be drawn.
+    const perGroup = new Map<string, number>();
+    for (const definition of registry.SETTING_DEFINITIONS) {
+      if (!definition.gate) continue;
+      perGroup.set(definition.group, (perGroup.get(definition.group) ?? 0) + 1);
+    }
+    expect([...perGroup.values()].every((count) => count === 1)).toBe(true);
+    expect([...perGroup.keys()].sort()).toEqual(['analytics', 'geoip']);
+  });
+
+  it('leaves a gate tri-state so an upgrade infers rather than defaults to off', () => {
+    // Every deployment upgrading into this release has nothing stored. If the default were `false`
+    // rather than `null`, starting the app would read as someone having turned analytics off.
+    for (const definition of registry.SETTING_DEFINITIONS) {
+      if (definition.gate) expect(definition.default).toBeNull();
+    }
+  });
+
+  it('accepts the "on" a switch posts, and the empty string it posts when off', () => {
+    // The setup form writes a definite boolean for a gate, and the Switch wrapper submits "on" or
+    // "". Only the first has to survive parse — the action turns anything else into false itself.
+    expect(registry.analyticsEnabled.parse('on')).toBe(true);
+    expect(registry.analyticsEnabled.parse('')).toBeNull();
+    expect(registry.geoipEnabled.parse('on')).toBe(true);
+  });
+
+  it('stores an explicit false distinctly from an unset gate', async () => {
+    // The difference the whole tri-state exists for: "off, because I said so" has to outrank the
+    // inference, or turning analytics off in setup would be undone by the password still being set.
+    await saveSettings({ [registry.analyticsEnabled.key]: false });
+    await expect(getSetting(registry.analyticsEnabled)).resolves.toBe(false);
+
+    await clearStoredSetting(registry.analyticsEnabled.key);
+    await expect(getSetting(registry.analyticsEnabled)).resolves.toBeNull();
+  });
+});

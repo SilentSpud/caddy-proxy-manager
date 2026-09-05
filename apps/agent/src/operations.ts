@@ -7,7 +7,13 @@
  */
 
 import {
+  MANAGED_SERVICES,
+  type ManagedServiceName,
+  type ManagedServicesRequest,
+} from "@cpm/shared";
+import {
   BUILD_OVERRIDE_FILE,
+  composeEnv,
   type DockerHost,
   L4_OVERRIDE_FILE,
   renderCaddyBuildOverride,
@@ -18,15 +24,17 @@ import {
 import type { AgentConfig } from "./config";
 import type { AgentStore } from "./db";
 
+type OperationKind = "l4-ports" | "caddy-build" | "services";
+
 export class OperationBusyError extends Error {
-  constructor(readonly running: "l4-ports" | "caddy-build") {
+  constructor(readonly running: OperationKind) {
     super(`Another operation is already running: ${running}`);
     this.name = "OperationBusyError";
   }
 }
 
 export class Operations {
-  private running: "l4-ports" | "caddy-build" | null = null;
+  private running: OperationKind | null = null;
 
   constructor(
     private readonly config: AgentConfig,
@@ -56,6 +64,15 @@ export class Operations {
         state: "failed",
         message:
           "The agent restarted while rebuilding Caddy. The image was left unchanged; rebuild to try again.",
+        error: "Interrupted by an agent restart",
+      });
+    }
+    const services = this.store.managedServicesStatus();
+    if (services.state === "applying" || services.state === "pending") {
+      this.store.setManagedServicesStatus({
+        state: "failed",
+        message:
+          "The agent restarted while starting the optional services. Save the settings again to retry.",
         error: "Interrupted by an agent restart",
       });
     }
@@ -93,7 +110,7 @@ export class Operations {
     this.applyL4Ports(recorded);
   }
 
-  private begin(kind: "l4-ports" | "caddy-build"): void {
+  private begin(kind: OperationKind): void {
     if (this.running) throw new OperationBusyError(this.running);
     this.running = kind;
   }
@@ -239,6 +256,101 @@ export class Operations {
       this.store.setCaddyBuildStatus({
         state: "failed",
         message: `The rebuild failed: ${message}`,
+        triggeredAt,
+        error: message,
+      });
+    }
+  }
+
+  // ─── Optional services ─────────────────────────────────────────────────────
+
+  /**
+   * Reconcile which optional compose services are running with what the controller asked for.
+   *
+   * Reconciled every time rather than diffed against what was last applied, for the same reason
+   * restorePublishedPorts exists: after a host reboot the operator's own `docker compose up` brings
+   * the stack back without these profiles, so bookkeeping saying "clickhouse is on" would describe
+   * a container that is not running. `up -d` and `stop` are both no-ops when the service is already
+   * in the requested state, which makes reconciling cheaper than being clever about it.
+   */
+  applyManagedServices(request: ManagedServicesRequest): void {
+    this.begin("services");
+    const triggeredAt = new Date().toISOString();
+    const wanted = MANAGED_SERVICES.filter((name) => request.services[name]);
+    this.store.setManagedServicesStatus({
+      state: "applying",
+      message:
+        wanted.length > 0
+          ? `Starting ${wanted.join(" and ")}. The first start pulls the image, which can take a few minutes.`
+          : "Stopping the optional services.",
+      triggeredAt,
+    });
+
+    void this.runManagedServices(request, triggeredAt).finally(() => {
+      this.running = null;
+    });
+  }
+
+  private async runManagedServices(
+    request: ManagedServicesRequest,
+    triggeredAt: string,
+  ): Promise<void> {
+    try {
+      // Handed to every invocation, `stop` included, so each resolves the project to the identical
+      // configuration. Compose interpolates the whole file before deciding what to act on, so
+      // varying these between calls makes it see a service as changed that nothing has touched.
+      const env = composeEnv(request.env);
+
+      const failures: string[] = [];
+      const applied: Record<ManagedServiceName, boolean> = {
+        clickhouse: false,
+        geoipupdate: false,
+      };
+
+      for (const name of MANAGED_SERVICES) {
+        const enable = request.services[name] === true;
+        const result = enable
+          ? await this.docker.startService(name, env)
+          : await this.docker.stopService(name, env);
+
+        if (result.ok) {
+          applied[name] = enable;
+          continue;
+        }
+        // Each service is independent, so one failing must not leave the other unattempted —
+        // a missing MaxMind subscription should not also take analytics down.
+        const detail = result.timedOut
+          ? `abandoned after ${this.config.serviceTimeoutSeconds}s`
+          : tail(result.output, 4);
+        failures.push(`${name}: ${detail}`);
+      }
+
+      this.store.setAppliedManagedServices(applied);
+
+      if (failures.length > 0) {
+        const detail = failures.join("; ");
+        this.store.setManagedServicesStatus({
+          state: "failed",
+          message: `Could not apply every optional service — ${detail}`,
+          triggeredAt,
+          error: detail,
+        });
+        return;
+      }
+
+      const running = MANAGED_SERVICES.filter((name) => applied[name]);
+      this.store.setManagedServicesStatus({
+        state: "applied",
+        message:
+          running.length > 0 ? `Running: ${running.join(", ")}.` : "The optional services are off.",
+        triggeredAt,
+        appliedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.store.setManagedServicesStatus({
+        state: "failed",
+        message: `Applying the optional services failed: ${message}`,
         triggeredAt,
         error: message,
       });

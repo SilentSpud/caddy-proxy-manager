@@ -65,6 +65,14 @@ function stubDocker(holdBuild: boolean): DockerHost {
     },
     waitForCaddyHealth: async () => "healthy",
     publishedCaddyPorts: async () => [],
+    startService: async (name: string) => {
+      dockerCalls.push(`start:${name}`);
+      return { ok: true, exitCode: 0, output: "", timedOut: false };
+    },
+    stopService: async (name: string) => {
+      dockerCalls.push(`stop:${name}`);
+      return { ok: true, exitCode: 0, output: "", timedOut: false };
+    },
     compose: async () => ({ ok: true, exitCode: 0, output: "", timedOut: false }),
   } as unknown as DockerHost;
 }
@@ -569,5 +577,88 @@ describe("the GeoIP configuration", () => {
       body: { clickhouse: null, geoip: { url: 42, editions: "all" } },
     });
     expect(store.fleetConfig()?.geoip).toBeNull();
+  });
+});
+
+describe("optional services", () => {
+  const ON = { clickhouse: true, geoipupdate: false };
+
+  it("starts and stops what the controller named", async () => {
+    const response = await send(AGENT_ROUTES.services, {
+      method: "POST",
+      body: { services: ON, env: { CLICKHOUSE_PASSWORD: "s3cret" } },
+    });
+
+    expect(response.status).toBe(202);
+    await Bun.sleep(50);
+    expect(dockerCalls).toContain("start:clickhouse");
+    expect(dockerCalls).toContain("stop:geoipupdate");
+  });
+
+  it("reports what it last applied on the status route", async () => {
+    await send(AGENT_ROUTES.services, { method: "POST", body: { services: ON, env: {} } });
+    await Bun.sleep(50);
+
+    const status = (await (await send(AGENT_ROUTES.status)).json()) as AgentStatus;
+    expect(status.services.applied).toEqual(ON);
+  });
+
+  it("distinguishes never-asked from asked-for-nothing", async () => {
+    // Null means the operator's own COMPOSE_PROFILES is still theirs to own; all-false means the
+    // controller asked for them off and got it.
+    const before = (await (await send(AGENT_ROUTES.status)).json()) as AgentStatus;
+    expect(before.services.applied).toBeNull();
+
+    await send(AGENT_ROUTES.services, {
+      method: "POST",
+      body: { services: { clickhouse: false, geoipupdate: false }, env: {} },
+    });
+    await Bun.sleep(50);
+
+    const after = (await (await send(AGENT_ROUTES.status)).json()) as AgentStatus;
+    expect(after.services.applied).toEqual({ clickhouse: false, geoipupdate: false });
+  });
+
+  it("refuses a variable outside the allowlist", async () => {
+    // These reach a child process's environment, so an unconstrained key sets anything the
+    // spawned `docker` reads — DOCKER_HOST and PATH included.
+    const response = await send(AGENT_ROUTES.services, {
+      method: "POST",
+      body: { services: ON, env: { DOCKER_HOST: "tcp://attacker:2375" } },
+    });
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as AgentErrorBody).error).toContain("DOCKER_HOST");
+    expect(dockerCalls).toHaveLength(0);
+  });
+
+  it("refuses a value carrying a control character", async () => {
+    const response = await send(AGENT_ROUTES.services, {
+      method: "POST",
+      body: { services: ON, env: { CLICKHOUSE_PASSWORD: "a\nDOCKER_HOST=tcp://x" } },
+    });
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as AgentErrorBody).error).toContain("control character");
+  });
+
+  it("refuses a request that does not name both services", async () => {
+    const response = await send(AGENT_ROUTES.services, {
+      method: "POST",
+      body: { services: { clickhouse: true }, env: {} },
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it("answers 409 while another operation holds the lock", async () => {
+    build(false, true);
+    await send(AGENT_ROUTES.caddyBuild, { method: "POST", body: { modules: ["mod"] } });
+
+    const response = await send(AGENT_ROUTES.services, {
+      method: "POST",
+      body: { services: ON, env: {} },
+    });
+    expect(response.status).toBe(409);
+    releaseBuild?.();
   });
 });

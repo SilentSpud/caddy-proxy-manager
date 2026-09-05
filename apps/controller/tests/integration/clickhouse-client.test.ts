@@ -1,6 +1,29 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import { fresh } from '@/tests/helpers/fresh';
+import type { SettingDefinition } from '@/src/lib/settings/registry';
+
+/**
+ * The settings layer, minus its database.
+ *
+ * The client resolves its configuration through `getSetting` now rather than reading `process.env`
+ * at module load, so these tests would otherwise need a schema each just to reach the environment
+ * fallback. This reproduces resolve.ts's environment layer exactly — nothing stored, so every
+ * setting falls through to its variable and then its default — which is what `stubEnv` below is
+ * setting up. Whether a *stored* value wins is resolve.ts's own business, and tested there.
+ */
+vi.mock('@/src/lib/settings/resolve', () => ({
+  getSetting: async (definition: SettingDefinition) => {
+    const raw = process.env[definition.env];
+    if (raw === undefined) return definition.default;
+    if (raw.trim() === '' && definition.default !== null) return definition.default;
+    try {
+      return definition.fromEnv(raw);
+    } catch {
+      return definition.default;
+    }
+  },
+}));
 
 describe('clickhouse client analytics enablement', () => {
   afterEach(() => {
@@ -32,7 +55,7 @@ describe('clickhouse client analytics enablement', () => {
       `@/src/lib/clickhouse/client${fresh()}`
     );
 
-    expect(isAnalyticsEnabled()).toBe(true);
+    await expect(isAnalyticsEnabled()).resolves.toBe(true);
 
     await expect(querySummary(0, 60, [])).resolves.toEqual({
       totalRequests: 12,
@@ -64,7 +87,7 @@ describe('clickhouse client analytics enablement', () => {
       `@/src/lib/clickhouse/client${fresh()}`
     );
 
-    expect(isAnalyticsEnabled()).toBe(false);
+    await expect(isAnalyticsEnabled()).resolves.toBe(false);
 
     await expect(querySummary(0, 60, [])).resolves.toEqual({
       totalRequests: 0,
@@ -97,7 +120,7 @@ describe('clickhouse client analytics enablement', () => {
     const { getRetentionDays, initClickHouse } = await import(
       `@/src/lib/clickhouse/client${fresh()}`
     );
-    expect(getRetentionDays()).toBe(30);
+    await expect(getRetentionDays()).resolves.toBe(30);
 
     await initClickHouse();
 
@@ -131,7 +154,7 @@ describe('clickhouse client analytics enablement', () => {
     const { getRetentionDays, initClickHouse } = await import(
       `@/src/lib/clickhouse/client${fresh()}`
     );
-    expect(getRetentionDays()).toBe(7);
+    await expect(getRetentionDays()).resolves.toBe(7);
 
     await initClickHouse();
 
@@ -144,14 +167,17 @@ describe('clickhouse client analytics enablement', () => {
     expect(modifies).toHaveLength(2);
   });
 
-  it('throws when CLICKHOUSE_RETENTION_DAYS is not a positive integer', async () => {
+  // Behaviour change: this used to throw at import and take the process down. Retention is a
+  // registry setting now, and the registry's rule is that an unusable value is ignored with a
+  // warning rather than being fatal — a typo in one environment variable must not be the reason
+  // the proxy stops serving. Falls back to the default, exactly as every other setting does.
+  it('falls back to the default when CLICKHOUSE_RETENTION_DAYS is not a positive integer', async () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
     vi.stubEnv('CLICKHOUSE_RETENTION_DAYS', 'not-a-number');
     vi.mock('@clickhouse/client', () => ({ createClient: vi.fn() }));
 
-    await expect(import('@/src/lib/clickhouse/client')).rejects.toThrow(
-      /CLICKHOUSE_RETENTION_DAYS/,
-    );
+    const { getRetentionDays } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    await expect(getRetentionDays()).resolves.toBe(30);
   });
 
   // The drop step first enumerates matching tables from system.tables, then drops

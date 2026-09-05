@@ -39,6 +39,14 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
   default: T;
   /** Encrypted at rest, and never sent to the browser in full. */
   secret?: boolean;
+  /**
+   * Marks the setting that switches its whole group on and off.
+   *
+   * A group with one of these has a shape the generic field list cannot express: the rest of it
+   * configures a thing that may not be running at all, so the setup form renders this as a switch
+   * and the remaining fields only once it is on. At most one per group.
+   */
+  gate?: boolean;
   /** Read the environment variable's raw string. Throws through `parse` on a bad value. */
   fromEnv: (raw: string) => T;
   /** Validate a value from the API or the setup form. Throws `SettingValidationError`. */
@@ -139,7 +147,7 @@ export function numberSetting(
  * distinction, but until then the shape has to survive the move.
  */
 export function optionalBooleanSetting(
-  spec: Omit<Common<boolean | null>, "default">,
+  spec: Omit<Common<boolean | null>, "default"> & { gate?: boolean },
 ): SettingDefinition<boolean | null> {
   const key = `${KEY_PREFIX}${spec.name}`;
   const parse = (value: unknown): boolean | null => {
@@ -367,6 +375,27 @@ export const loginBlockMs = numberSetting({
 
 // ── Analytics ────────────────────────────────────────────────────────────────
 
+/**
+ * Whether analytics run at all.
+ *
+ * Tri-state, and unset is the important state: before this existed the answer was "yes if a
+ * ClickHouse password is configured", and every deployment upgrading into this release has no
+ * stored value. Leaving it unset therefore has to keep meaning exactly that, or turning the app on
+ * after an upgrade would silently switch analytics off. `analyticsEnabled()` in
+ * ../clickhouse/client.ts is where the inference lives.
+ */
+export const analyticsEnabled = optionalBooleanSetting({
+  name: "analytics_enabled",
+  env: "ANALYTICS_ENABLED",
+  group: "analytics",
+  gate: true,
+  label: "Enable analytics",
+  description:
+    "Collect traffic and WAF events. With an agent running the stack, turning this on also starts " +
+    "the ClickHouse container — no Compose profile needed. Leave unset to decide from whether a " +
+    "password is configured below.",
+});
+
 export const clickhouseUrl = stringSetting({
   name: "clickhouse_url",
   env: "CLICKHOUSE_URL",
@@ -394,7 +423,9 @@ export const clickhousePassword = secretSetting({
   env: "CLICKHOUSE_PASSWORD",
   group: "analytics",
   label: "ClickHouse password",
-  description: "Leave empty to disable analytics entirely.",
+  description:
+    "Required for analytics: the ClickHouse container refuses to start without one, and with it " +
+    "empty there is nothing to authenticate as.",
   default: "",
 });
 
@@ -405,6 +436,10 @@ export const clickhouseDb = stringSetting({
   label: "ClickHouse database",
   description: "The database traffic and WAF events are written to.",
   default: "analytics",
+  // Interpolated into DDL, which has no placeholder for an identifier. Constrained here so the
+  // check happens at the boundary rather than as a throw from whichever query runs first.
+  pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+  patternHint: "must start with a letter or underscore and contain only letters, digits and _",
   maxLength: 128,
 });
 
@@ -422,6 +457,24 @@ export const clickhouseRetentionDays = numberSetting({
 });
 
 // ── GeoIP ────────────────────────────────────────────────────────────────────
+
+/**
+ * Whether GeoIP is in use.
+ *
+ * Tri-state for the same reason as `analyticsEnabled`: the answer used to be "yes if the databases
+ * are on disk", and unset has to keep meaning that. See `geoipEnabled()` in ../agent/geoip.ts.
+ */
+export const geoipEnabled = optionalBooleanSetting({
+  name: "geoip_enabled",
+  env: "GEOIP_ENABLED",
+  group: "geoip",
+  gate: true,
+  label: "Enable GeoIP",
+  description:
+    "Country lookups for analytics and geo blocking. With an agent running the stack, turning " +
+    "this on also starts the geoipupdate container. Leave unset to decide from whether the " +
+    "databases are already present.",
+});
 
 export const geoipAccountId = stringSetting({
   name: "geoipupdate_account_id",
@@ -462,11 +515,13 @@ export const SETTING_DEFINITIONS = [
   loginMaxAttempts,
   loginWindowMs,
   loginBlockMs,
+  analyticsEnabled,
   clickhouseUrl,
   clickhouseUser,
   clickhousePassword,
   clickhouseDb,
   clickhouseRetentionDays,
+  geoipEnabled,
   geoipAccountId,
   geoipLicenseKey,
 ] as const satisfies readonly SettingDefinition[];

@@ -29,7 +29,7 @@ import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/Modul
 
 // ─── GeoIpStatus ─────────────────────────────────────────────────────────────
 
-type GeoIpStatusData = { country: boolean; asn: boolean } | null;
+type GeoIpStatusData = { enabled?: boolean; country: boolean; asn: boolean } | null;
 
 function GeoIpStatus() {
   const [status, setStatus] = useState<GeoIpStatusData>(null);
@@ -47,17 +47,29 @@ function GeoIpStatus() {
     return <Spinner size="sm" label="Checking GeoIP databases" />;
   }
 
+  // `enabled: false` is a deliberate choice rather than a missing file, so it gets its own label
+  // and points at the toggle. Sending someone to look for a database that is on disk and being
+  // ignored is the worst of the possible messages here.
+  const off = status?.enabled === false;
   const allLoaded = status?.country && status?.asn;
   const noneLoaded = !status?.country && !status?.asn;
 
-  const label = allLoaded ? "GeoIP ready" : noneLoaded ? "GeoIP missing" : "GeoIP partial";
-  const tooltip = noneLoaded
-    ? "GeoIP databases not found — country/continent/ASN blocking will not work. Enable the geoipupdate service."
-    : !status?.country
-      ? "GeoLite2-Country database missing — country/continent blocking disabled"
-      : !status?.asn
-        ? "GeoLite2-ASN database missing — ASN blocking disabled"
-        : "GeoLite2-Country and GeoLite2-ASN databases loaded";
+  const label = off
+    ? "GeoIP off"
+    : allLoaded
+      ? "GeoIP ready"
+      : noneLoaded
+        ? "GeoIP missing"
+        : "GeoIP partial";
+  const tooltip = off
+    ? "GeoIP is switched off in Settings → GeoIP Databases — country, continent and ASN blocking will not work."
+    : noneLoaded
+      ? "GeoIP databases not found — country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → GeoIP Databases."
+      : !status?.country
+        ? "GeoLite2-Country database missing — country/continent blocking disabled"
+        : !status?.asn
+          ? "GeoLite2-ASN database missing — ASN blocking disabled"
+          : "GeoLite2-Country and GeoLite2-ASN databases loaded";
 
   return (
     <Tooltip content={tooltip}>

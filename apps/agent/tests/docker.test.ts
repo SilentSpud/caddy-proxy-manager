@@ -7,7 +7,7 @@
  * pulling an image, cascading to dependencies, dropping an override, or recording a build that
  * never finished.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
@@ -22,6 +22,14 @@ let config: AgentConfig;
 let spawned: string[][];
 /** Queue of results for the next spawns; anything unqueued succeeds with empty output. */
 let results: Array<{ exitCode: number; stdout?: string }>;
+/**
+ * What `docker inspect` reports for the working_dir label.
+ *
+ * Answered outside the queue above, unlike the project-name inspect: it is a second question the
+ * agent asks before every compose invocation, and threading it through a positional queue would
+ * make every test's result list depend on how many labels the implementation happens to read.
+ */
+let hostDirLabel: string;
 
 const realSpawn = Bun.spawn;
 
@@ -38,10 +46,18 @@ beforeEach(() => {
 
   spawned = [];
   results = [];
+  hostDirLabel = "";
   // Intercepting the spawn rather than the DockerHost is the point: what matters is the argv that
   // would reach Docker, and a stubbed DockerHost would assert only that the test agrees with itself.
   (Bun as { spawn: unknown }).spawn = ((argv: string[]) => {
     spawned.push(argv);
+    if (argv.some((a) => a.includes("com.docker.compose.project.working_dir"))) {
+      return {
+        stdout: new Response(hostDirLabel).body,
+        stderr: new Response("").body,
+        exited: Promise.resolve(hostDirLabel === "" ? 1 : 0),
+      };
+    }
     const next = results.shift() ?? { exitCode: 0 };
     return {
       stdout: new Response(next.stdout ?? "").body,
@@ -116,11 +132,13 @@ describe("compose invocation", () => {
 
   it("prefers an explicit project name over detection", async () => {
     process.env.COMPOSE_PROJECT_NAME = "pinned";
+    process.env.COMPOSE_HOST_DIR = "/srv/cpm";
     const host = new DockerHost(loadConfig());
     await host.recreateCaddy();
     const argv = lastCompose();
     expect(argv[argv.indexOf("-p") + 1]).toBe("pinned");
-    // And it never asks Docker, so a stopped Caddy container does not stop a recreate.
+    // With both pinned it never asks Docker at all, so a stopped Caddy container does not stop a
+    // recreate. Neither lookup is load-bearing on its own — see the two tests below.
     expect(spawned.some((a) => a[1] === "inspect")).toBe(false);
   });
 
@@ -137,13 +155,28 @@ describe("compose invocation", () => {
     expect(argv).toContain("docker-compose.caddy-build.yml");
   });
 
-  it("adds --project-directory only when COMPOSE_HOST_DIR is set", async () => {
-    // Unconditionally passing it breaks named-volume deployments, where the agent's /compose mount
-    // is the correct project directory.
+  it("detects --project-directory from the host path the operator's compose recorded", async () => {
+    // The daemon resolves a relative bind mount against this. Without it, a service mounting
+    // ./docker/... gets an empty directory Docker silently created at a path that does not exist
+    // on the host — a container that comes up wrong rather than a command that fails.
+    hostDirLabel = "/srv/cpm";
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).recreateCaddy();
+    const argv = lastCompose();
+    expect(argv[argv.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
+  });
+
+  it("omits --project-directory when the label cannot be read", async () => {
+    // Unconditionally passing something breaks named-volume deployments, where the agent's
+    // /compose mount is the correct project directory; a guess would be worse than nothing.
+    hostDirLabel = "";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
     expect(lastCompose()).not.toContain("--project-directory");
+  });
 
+  it("prefers an explicit COMPOSE_HOST_DIR over the detected label", async () => {
+    hostDirLabel = "/detected";
     process.env.COMPOSE_HOST_DIR = "/srv/cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(loadConfig()).recreateCaddy();
@@ -171,7 +204,10 @@ describe("compose invocation", () => {
   it("bounds the build with a timeout so a hung compile cannot wedge the agent", async () => {
     // Without it a wedged xcaddy holds the operation lock forever, and every later port change and
     // rebuild is refused as BUSY until someone restarts the container.
+    // Both pinned so composeArgs asks Docker nothing: the stub below never exits, and this test is
+    // about the build's timeout, not the label lookups'.
     process.env.COMPOSE_PROJECT_NAME = "proj";
+    process.env.COMPOSE_HOST_DIR = "/srv/cpm";
     const host = new DockerHost({ ...loadConfig(), buildTimeoutSeconds: 1 });
     (Bun as { spawn: unknown }).spawn = ((argv: string[], options: { signal?: AbortSignal }) => {
       spawned.push(argv);
@@ -318,5 +354,144 @@ describe("operations", () => {
 
     expect(store.appliedL4Ports()).toEqual(["443:443"]);
     expect(spawned.some((a) => a.includes("--force-recreate"))).toBe(false);
+  });
+});
+
+describe("optional services", () => {
+  let store: AgentStore;
+  let operations: Operations;
+
+  beforeEach(() => {
+    store = new AgentStore(join(dir, "agent.db"));
+    operations = new Operations(config, store, new DockerHost(config));
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  /** Wait for the operation, which returns as soon as the work is accepted. */
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 100 && store.managedServicesStatus().state === "applying"; i++) {
+      await Bun.sleep(10);
+    }
+  }
+
+  it("enables the profile explicitly rather than relying on compose to infer it", async () => {
+    // These services sit behind a profile, so without this compose reports "no such service" —
+    // and on the versions that do infer it, the behaviour arrived partway through v2.
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).startService("clickhouse");
+
+    const argv = lastCompose();
+    expect(argv[argv.indexOf("--profile") + 1]).toBe("clickhouse");
+    // Top-level flag: it has to precede the subcommand or compose rejects it.
+    expect(argv.indexOf("--profile")).toBeLessThan(argv.indexOf("up"));
+    expect(argv.at(-1)).toBe("clickhouse");
+  });
+
+  it("stops rather than removes, so the data volume outlives the toggle", async () => {
+    // Turning analytics off must not be how someone discovers their event history is gone.
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).stopService("clickhouse");
+
+    const argv = lastCompose();
+    expect(argv).toContain("stop");
+    expect(argv).not.toContain("down");
+    expect(argv).not.toContain("rm");
+  });
+
+  it("passes the credentials through the child's environment, not a file on disk", async () => {
+    // Compose reads the process environment at a higher precedence than any env file, so this
+    // overrides a stale value in the project's own .env — which the agent mounts read-only and
+    // cannot rewrite. It also keeps the password off the agent's data volume, and sidesteps the
+    // quoting rules an env file would need.
+    writeFileSync(join(dir, ".env"), "CLICKHOUSE_PASSWORD=stale\n");
+    let seen: Record<string, string> | undefined;
+    (Bun as { spawn: unknown }).spawn = ((
+      argv: string[],
+      opts: { env?: Record<string, string> },
+    ) => {
+      spawned.push(argv);
+      if (argv[1] === "compose") seen = opts.env;
+      return {
+        stdout: new Response("").body,
+        stderr: new Response("").body,
+        exited: Promise.resolve(0),
+      };
+    }) as unknown as typeof Bun.spawn;
+
+    await new DockerHost(config).startService("clickhouse", { CLICKHOUSE_PASSWORD: "pa$$#word'x" });
+
+    expect(seen?.CLICKHOUSE_PASSWORD).toBe("pa$$#word'x");
+    // Inherited too, or `docker` cannot find the socket proxy.
+    expect(seen?.DATA_DIR).toBe(dir);
+    expect(existsSync(join(dir, "fleet.env"))).toBe(false);
+  });
+
+  it("hands the credentials to a stop as well as a start", async () => {
+    // Compose parses the whole file, including the ${...:?} guard on a service it is not touching.
+    let seen: Record<string, string> | undefined;
+    (Bun as { spawn: unknown }).spawn = ((
+      argv: string[],
+      opts: { env?: Record<string, string> },
+    ) => {
+      spawned.push(argv);
+      if (argv[1] === "compose") seen = opts.env;
+      return {
+        stdout: new Response("").body,
+        stderr: new Response("").body,
+        exited: Promise.resolve(0),
+      };
+    }) as unknown as typeof Bun.spawn;
+
+    await new DockerHost(config).stopService("clickhouse", { CLICKHOUSE_PASSWORD: "s3cret" });
+    expect(seen?.CLICKHOUSE_PASSWORD).toBe("s3cret");
+  });
+
+  it("starts what was asked for and stops what was not", async () => {
+    operations.applyManagedServices({
+      services: { clickhouse: true, geoipupdate: false },
+      env: {},
+    });
+    await settle();
+
+    const composeCalls = spawned.filter((a) => a[1] === "compose").map((a) => a.join(" "));
+    expect(composeCalls.some((c) => c.includes("--profile clickhouse") && c.includes(" up "))).toBe(
+      true,
+    );
+    expect(
+      composeCalls.some((c) => c.includes("--profile geoipupdate") && c.includes(" stop ")),
+    ).toBe(true);
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: true, geoipupdate: false });
+  });
+
+  it("attempts every service even when one fails", async () => {
+    // A missing MaxMind subscription must not also take analytics down.
+    results.push({ exitCode: 0, stdout: "proj" }); // project detection
+    results.push({ exitCode: 1, stdout: "no such image" }); // clickhouse up
+    results.push({ exitCode: 0, stdout: "" }); // geoipupdate stop
+
+    operations.applyManagedServices({
+      services: { clickhouse: true, geoipupdate: false },
+      env: {},
+    });
+    await settle();
+
+    const status = store.managedServicesStatus();
+    expect(status.state).toBe("failed");
+    expect(status.message).toContain("clickhouse");
+    // The one that worked is still recorded, so the next reconcile does not undo it.
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, geoipupdate: false });
+  });
+
+  it("refuses to run alongside a rebuild", async () => {
+    operations.applyCaddyBuild(["mod"]);
+    expect(() =>
+      operations.applyManagedServices({
+        services: { clickhouse: true, geoipupdate: false },
+        env: {},
+      }),
+    ).toThrow(/caddy-build/);
   });
 });

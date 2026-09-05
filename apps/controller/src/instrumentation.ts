@@ -116,6 +116,16 @@ export async function register() {
       console.error("Failed to send the fleet configuration to the agents:", error);
     }
 
+    // After the push, not before: an agent that is about to start ClickHouse should already know
+    // where to write. Reconciled on every start because the operator's own `docker compose up`
+    // brings the stack back without these profiles, so a host reboot leaves them stopped.
+    const { applyManagedServices } = await import("./lib/agent/managed-services");
+    try {
+      await applyManagedServices();
+    } catch (error) {
+      console.error("Failed to apply the optional services on the agents:", error);
+    }
+
     process.on("SIGTERM", () => {
       closeClickHouse();
     });

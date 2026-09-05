@@ -56,6 +56,7 @@ import {
 } from "@/src/lib/dns-providers";
 import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
+import { saveAnalyticsSettings, saveGeoipSettings } from "@/src/lib/settings/optional-features";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
 import { PairingError, pairWithAgent } from "@/src/lib/agent/pairing";
 import { deleteAgent } from "@/src/lib/models/agents";
@@ -424,6 +425,86 @@ async function updateAvatarSettingsActionUnlocked(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save avatar settings",
+    };
+  }
+}
+
+async function updateAnalyticsSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const enabled = formData.get("analyticsEnabled") === "on";
+    const password = String(formData.get("clickhousePassword") ?? "");
+
+    // Refused here rather than saved and silently ignored: the ClickHouse container will not start
+    // without a password, so "on with no password" is a state that cannot become true.
+    if (enabled && password.trim().length === 0 && formData.get("hasPassword") !== "yes") {
+      return {
+        success: false,
+        message: "Analytics need a ClickHouse password — the container will not start without one.",
+      };
+    }
+
+    await saveAnalyticsSettings({
+      enabled,
+      url: String(formData.get("clickhouseUrl") ?? ""),
+      user: String(formData.get("clickhouseUser") ?? ""),
+      password,
+      database: String(formData.get("clickhouseDb") ?? ""),
+      retentionDays: Number(formData.get("clickhouseRetentionDays") ?? 30),
+    });
+
+    revalidatePath("/settings");
+    revalidatePath("/analytics");
+    return {
+      success: true,
+      message: enabled
+        ? "Analytics enabled — the agent is starting ClickHouse, which can take a few minutes on first run."
+        : "Analytics disabled. The ClickHouse container is stopped; its data is kept.",
+    };
+  } catch (error) {
+    console.error("Failed to save analytics settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save analytics settings",
+    };
+  }
+}
+
+async function updateGeoipSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const enabled = formData.get("geoipEnabled") === "on";
+    const accountId = String(formData.get("geoipAccountId") ?? "");
+    const licenseKey = String(formData.get("geoipLicenseKey") ?? "");
+    const hasKey = formData.get("hasLicenseKey") === "yes" || licenseKey.trim().length > 0;
+
+    await saveGeoipSettings({ enabled, accountId, licenseKey });
+
+    revalidatePath("/settings");
+    revalidatePath("/proxy-hosts");
+    if (!enabled) {
+      return { success: true, message: "GeoIP disabled. Country matching is no longer offered." };
+    }
+    return {
+      success: true,
+      message:
+        accountId.trim().length > 0 && hasKey
+          ? "GeoIP enabled — the agent is starting geoipupdate to download the databases."
+          : "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
+    };
+  } catch (error) {
+    console.error("Failed to save GeoIP settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save GeoIP settings",
     };
   }
 }
@@ -1326,6 +1407,12 @@ export const updateAvatarSettingsAction = serializedSettingsAction(
 );
 export const updateCaddyBuildSettingsAction = serializedSettingsAction(
   updateCaddyBuildSettingsActionUnlocked,
+);
+export const updateAnalyticsSettingsAction = serializedSettingsAction(
+  updateAnalyticsSettingsActionUnlocked,
+);
+export const updateGeoipSettingsAction = serializedSettingsAction(
+  updateGeoipSettingsActionUnlocked,
 );
 
 // ─── Agents ──────────────────────────────────────────────────────────────────

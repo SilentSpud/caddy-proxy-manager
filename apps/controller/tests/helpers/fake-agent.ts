@@ -19,6 +19,9 @@ import {
   type AgentStatus,
   type CaddyBuildStatus,
   type L4PortsStatus,
+  type ManagedServiceName,
+  type ManagedServicesRequest,
+  type ManagedServicesStatus,
 } from '@cpm/shared';
 
 export type AgentRequestLog = {
@@ -43,6 +46,8 @@ export type FakeAgent = {
     /** What this agent's Caddy answers a /v1/caddy-admin request with. */
     caddyAdmin: { status: number; text: string };
     analytics: { enabled: boolean; accessLogPresent: boolean };
+    appliedServices: Record<ManagedServiceName, boolean> | null;
+    servicesStatus: ManagedServicesStatus;
   };
   /** Finish the port apply the controller last asked for, as the real agent does once Caddy is up. */
   completeL4Ports: () => void;
@@ -76,6 +81,8 @@ export async function startFakeAgent(
     buildStatus: { state: 'idle' },
     caddyAdmin: { status: 200, text: '{}' },
     analytics: { enabled: false, accessLogPresent: true },
+    appliedServices: null,
+    servicesStatus: { state: 'idle' },
     ...overrides,
   };
 
@@ -147,6 +154,7 @@ export async function startFakeAgent(
           composeProject: 'caddy-proxy-manager',
           l4Ports: { applied: state.appliedPorts, status: state.l4Status },
           caddyBuild: { applied: state.appliedModules, status: state.buildStatus },
+          services: { applied: state.appliedServices, status: state.servicesStatus },
           analytics: state.analytics,
         } satisfies AgentStatus);
       }
@@ -170,6 +178,16 @@ export async function startFakeAgent(
         const pushed = JSON.parse(bodyText) as { clickhouse: unknown };
         state.analytics = { ...state.analytics, enabled: pushed.clickhouse !== null };
         return Response.json({ ok: true });
+      }
+
+      if (url.pathname === AGENT_ROUTES.services && request.method === 'POST') {
+        // Applied straight away, unlike ports and builds: the real agent answers 202 and reconciles
+        // in the background, but nothing in the controller waits on the result, so a test asserting
+        // on what was requested reads the logged body rather than this.
+        const pushed = JSON.parse(bodyText) as ManagedServicesRequest;
+        state.appliedServices = pushed.services;
+        state.servicesStatus = { state: 'applying', triggeredAt: new Date().toISOString() };
+        return Response.json({ accepted: true, status: state.servicesStatus }, { status: 202 });
       }
 
       if (url.pathname === AGENT_ROUTES.caddyAdmin && request.method === 'POST') {

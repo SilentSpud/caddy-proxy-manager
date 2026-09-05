@@ -38,6 +38,14 @@ export type AgentConfig = {
   composeSkipOverride: boolean;
   /** Seconds before a Caddy image rebuild is abandoned. */
   buildTimeoutSeconds: number;
+  /**
+   * Seconds before starting an optional service is abandoned.
+   *
+   * Generous because the first start of one pulls its image: a deployment that never ran the
+   * clickhouse profile has nothing cached, and abandoning a half-finished pull leaves the operator
+   * with a failure that a retry over the same slow link would only repeat.
+   */
+  serviceTimeoutSeconds: number;
   /** Seconds to wait for Caddy to report healthy after a recreate. */
   healthTimeoutSeconds: number;
 };
@@ -88,6 +96,7 @@ export function loadConfig(): AgentConfig {
     composeExtraFile: optional("COMPOSE_EXTRA_FILE"),
     composeSkipOverride: optional("COMPOSE_SKIP_OVERRIDE") !== null,
     buildTimeoutSeconds: positiveInteger("CADDY_BUILD_TIMEOUT", 1800),
+    serviceTimeoutSeconds: positiveInteger("SERVICE_START_TIMEOUT", 900),
     healthTimeoutSeconds: positiveInteger("CADDY_HEALTH_TIMEOUT", 60),
   };
 }

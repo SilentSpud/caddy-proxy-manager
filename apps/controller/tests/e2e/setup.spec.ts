@@ -115,6 +115,37 @@ test.describe('First-run setup', () => {
     await expect(page.getByRole('textbox', { name: 'Public URL' })).toHaveValue(SETUP_ORIGIN);
   });
 
+  test('the optional containers are switches, with their settings behind them', async () => {
+    // This instance runs with an empty CLICKHOUSE_PASSWORD, so analytics infer off — and the whole
+    // point of the gate is that the rest of the group is not asked about until it is on.
+    const analytics = page.getByRole('switch', { name: 'Enable analytics' });
+    await expect(analytics).toBeVisible();
+    await expect(analytics).not.toBeChecked();
+    await expect(page.getByRole('textbox', { name: 'ClickHouse URL' })).toBeHidden();
+
+    await analytics.click();
+    await expect(page.getByRole('textbox', { name: 'ClickHouse URL' })).toBeVisible();
+
+    await expect(page.getByRole('switch', { name: 'Enable GeoIP' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'MaxMind account ID' })).toBeHidden();
+  });
+
+  test('enabling analytics without a password is refused rather than half-applied', async () => {
+    // The ClickHouse container will not start without one, so this is a state that cannot become
+    // true. Refusing here is what stops setup finishing with analytics on and nothing recording.
+    await expect(page.getByRole('switch', { name: 'Enable analytics' })).toBeChecked();
+    await page.getByRole('button', { name: 'Save and finish setup' }).click();
+
+    await expect(page.getByText(/need a ClickHouse password/i)).toBeVisible();
+    // Still on the settings step: nothing was saved and setup is not finished.
+    await expect(page).toHaveURL(/\/setup\/settings$/);
+  });
+
+  test('switching analytics back off hides its settings and lets setup finish', async () => {
+    await page.getByRole('switch', { name: 'Enable analytics' }).click();
+    await expect(page.getByRole('textbox', { name: 'ClickHouse URL' })).toBeHidden();
+  });
+
   test('saving the settings finishes setup and opens the dashboard', async () => {
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
     await expect(page).toHaveURL(new RegExp(`^${SETUP_ORIGIN}/?$`), { timeout: 30_000 });

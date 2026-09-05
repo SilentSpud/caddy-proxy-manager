@@ -2,7 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
-import { SETTING_DEFINITIONS, SettingValidationError } from "@/src/lib/settings/registry";
+import {
+  analyticsEnabled,
+  clickhousePassword,
+  SETTING_DEFINITIONS,
+  SettingValidationError,
+} from "@/src/lib/settings/registry";
+import { propagateOptionalFeatureSettings } from "@/src/lib/settings/optional-features";
 import { resolveAllSettings, saveSettings } from "@/src/lib/settings/resolve";
 import { getMigrationSource, isSetupCompleted, markSetupCompleted } from "@/src/lib/setup";
 
@@ -36,7 +42,18 @@ export async function saveSetupSettings(
   for (const definition of SETTING_DEFINITIONS) {
     const raw = formData.get(definition.key);
 
+    // A gate is stored tri-state but rendered as a switch, and setup is where the choice becomes
+    // explicit: write a definite yes or no rather than the null that means "infer it".
+    if (definition.gate) {
+      values[definition.key] = raw === "on";
+      continue;
+    }
+
     if (typeof definition.default === "boolean") {
+      // Nothing posted means the field was not rendered — a gated group whose switch is off. Left
+      // alone rather than written false, which is what keeps a stored credential from being
+      // cleared by turning its feature off.
+      if (raw === null) continue;
       values[definition.key] = raw === "on";
       continue;
     }
@@ -59,6 +76,18 @@ export async function saveSetupSettings(
     values[definition.key] = text;
   }
 
+  // Refused rather than saved and quietly ignored, matching the Settings page: the ClickHouse
+  // container will not start without a password, so "analytics on, no password" cannot become true.
+  // `values` already carries a blank secret's stored value, so this sees what will actually land.
+  if (values[analyticsEnabled.key] === true) {
+    const password = values[clickhousePassword.key] ?? resolved.get(clickhousePassword.key)?.value;
+    if (typeof password !== "string" || password.trim() === "") {
+      return {
+        error: "Analytics need a ClickHouse password, or switch analytics off to continue.",
+      };
+    }
+  }
+
   try {
     await saveSettings(values);
   } catch (error) {
@@ -68,6 +97,11 @@ export async function saveSetupSettings(
     console.error("Setup: failed to save settings", error);
     return { error: "Could not save the configuration. Try again." };
   }
+
+  // Analytics and GeoIP decide whether a container runs, and the operator has just chosen. Without
+  // this, setup would finish with ClickHouse still stopped and the client still holding whatever it
+  // resolved before the form was filled in. Never throws — see the function's own note.
+  await propagateOptionalFeatureSettings();
 
   await markSetupCompleted();
 

@@ -181,18 +181,21 @@ is still honoured as an override until a value is stored.
 | Failed sign-ins before lockout | `LOGIN_MAX_ATTEMPTS` | `5` |
 | Window over which failed sign-ins are counted, in ms | `LOGIN_WINDOW_MS` | `300000` |
 | How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
+| Collect traffic and WAF events. Leave unset to decide from whether a password is set | `ANALYTICS_ENABLED` | Unset |
 | ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
 | ClickHouse user | `CLICKHOUSE_USER` | `cpm` |
-| ClickHouse password. Empty disables analytics entirely. Encrypted at rest | `CLICKHOUSE_PASSWORD` | None |
+| ClickHouse password. Required for analytics — the container will not start without one. Encrypted at rest | `CLICKHOUSE_PASSWORD` | None |
 | ClickHouse database | `CLICKHOUSE_DB` | `analytics` |
 | Days of analytics kept. Lowering it migrates the tables' TTL on the next start | `CLICKHOUSE_RETENTION_DAYS` | `30` |
+| Use GeoIP for country lookups and geo blocking. Leave unset to decide from whether the databases are present | `GEOIP_ENABLED` | Unset |
 | MaxMind account ID, for GeoLite2 downloads | `GEOIPUPDATE_ACCOUNT_ID` | None |
 | MaxMind license key. Encrypted at rest | `GEOIPUPDATE_LICENSE_KEY` | None |
 
-> `CLICKHOUSE_PASSWORD`, `GEOIPUPDATE_ACCOUNT_ID` and `GEOIPUPDATE_LICENSE_KEY` are read by Compose
-> as well, to provision the `clickhouse` and `geoipupdate` containers. Those two services are
-> started by Docker, which cannot read the database, so **keep them in `.env` even after saving
-> them in Settings**.
+> Compose reads `CLICKHOUSE_PASSWORD`, `GEOIPUPDATE_ACCOUNT_ID` and `GEOIPUPDATE_LICENSE_KEY` too,
+> to provision the `clickhouse` and `geoipupdate` containers. **With an agent running the stack you
+> do not need to keep them in `.env`**: the agent starts those containers itself and passes the
+> saved values to Compose. Without an agent, Docker is the only thing that can start them and it
+> cannot read the database — so there they must stay in `.env`.
 
 ### Stays in `.env`
 
@@ -216,7 +219,7 @@ is still honoured as an override until a value is stored.
 | `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (local socket) | No |
 | `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this encrypted in the database instead | None | With `AGENT_URL` |
 | `AGENT_SOCKET` / `AGENT_CONTROLLER_ID` | Override the local agent's socket path, and the identity the controller signs as | `$L4_PORTS_DIR/agent.sock` / built-in | No |
-| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate` | `clickhouse` | No |
+| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this | `clickhouse` | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
 | `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
@@ -238,6 +241,7 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
 | `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
+| `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`, `geoipupdate`) is abandoned. Generous because the first start pulls the image | `900` |
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
 | `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs | Auto-detected |
 | `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` / `GEOIP_DIR` / `GEOIP_DB` | Where the agent reads Caddy's logs and the GeoLite2 databases from | Container paths |
@@ -408,18 +412,22 @@ Geo blocking requires MaxMind GeoLite2 Country and/or ASN databases. Use the bun
 
 1. Register for a free MaxMind account at [maxmind.com](https://www.maxmind.com/)
 2. Generate a license key with `GeoLite2-Country` and `GeoLite2-ASN` permissions
-3. Add to your `.env`:
+3. Open **Settings → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and licence key
 
-   ```env
-   GEOIPUPDATE_ACCOUNT_ID=your-account-id
-   GEOIPUPDATE_LICENSE_KEY=your-license-key
-   ```
+That is the whole setup on a stack with an agent — saving starts the `geoipupdate` container, no
+Compose profile needed. Turning the toggle off stops it again and hides country matching from the
+proxy-host forms.
 
-4. Start with the `geoipupdate` profile:
+Without an agent, put the credentials in `.env` and start the profile by hand instead:
 
-   ```bash
-   docker compose --profile geoipupdate up -d
-   ```
+```env
+GEOIPUPDATE_ACCOUNT_ID=your-account-id
+GEOIPUPDATE_LICENSE_KEY=your-license-key
+```
+
+```bash
+docker compose --profile geoipupdate up -d
+```
 
 The databases are stored in the `geoip-data` Docker volume and shared between the web and Caddy containers.
 
@@ -429,34 +437,43 @@ The databases are stored in the `geoip-data` Docker volume and shared between th
 
 Analytics uses a bundled ClickHouse instance for storing and querying traffic events and WAF events. Data is retained for **30 days** by default via ClickHouse's TTL. Change the window with the `CLICKHOUSE_RETENTION_DAYS` environment variable — on the next startup the existing tables' TTL is migrated to the new value and expired data is purged.
 
-### Enabling analytics (recommended)
+### Enabling and disabling analytics
 
-Analytics is enabled via the `clickhouse` Docker Compose profile. The default `.env.example` has it on:
+Open **Settings → Analytics**, tick **Collect analytics**, and set a ClickHouse password. Saving
+starts the `clickhouse` container; unticking stops it. Nothing needs to change in `.env`, and no
+Compose profile has to be listed — the agent runs `docker compose --profile clickhouse up -d
+clickhouse` on your behalf, passing the saved credentials through.
+
+Three things to expect:
+
+- **The first start pulls the ClickHouse image**, which takes a few minutes on a slow link. The
+  save returns immediately; the agent reports progress under **Settings → Agent**.
+- **Turning analytics off stops the container but keeps `clickhouse-data`.** Your event history
+  survives, and turning it back on picks up where it left off.
+- **Pick one owner.** Once the credentials live in Settings, drop `clickhouse` from
+  `COMPOSE_PROFILES` and delete `CLICKHOUSE_PASSWORD` from `.env`. Leaving both in place means your
+  own `docker compose up -d` also creates the container — from the `.env` values, which are now the
+  stale copy. The controller repairs it on its next start, but the window is avoidable.
+
+Without an agent — a standalone binary, or a stack you assemble yourself — Docker is the only thing
+that can start ClickHouse, so it is the profile as before:
 
 ```env
 COMPOSE_PROFILES=clickhouse
 CLICKHOUSE_PASSWORD=your-clickhouse-password   # openssl rand -base64 32
 ```
 
-Then start (or restart) the stack:
-
 ```bash
 docker compose up -d
 ```
 
-### Disabling analytics
-
-Remove `clickhouse` from `COMPOSE_PROFILES` (or leave the variable empty) and omit `CLICKHOUSE_PASSWORD`:
-
-```env
-COMPOSE_PROFILES=
-```
-
-The web container starts normally without ClickHouse. The Analytics page shows a notice explaining that ClickHouse is not enabled, and no data is collected.
+Leaving `COMPOSE_PROFILES` empty and omitting `CLICKHOUSE_PASSWORD` disables analytics there. The
+web container starts normally without ClickHouse, the Analytics page explains that it is not
+enabled, and no data is collected.
 
 ### Combining profiles
 
-To run both analytics and GeoIP updates simultaneously, list both profiles:
+To run both without an agent, list both:
 
 ```env
 COMPOSE_PROFILES=clickhouse,geoipupdate

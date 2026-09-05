@@ -19,6 +19,8 @@ import {
   Package,
   Server,
   Cpu,
+  BarChart2,
+  Globe2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -66,6 +68,7 @@ import type {
 } from "@/lib/settings";
 import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
 import type { CaddyBuildSettings } from "@/lib/settings";
+import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
 import { useModuleGate } from "@/components/caddy-modules/ModuleGate";
@@ -84,6 +87,8 @@ import {
   updateAcmeSettingsAction,
   updateAuthentikSettingsAction,
   updateMetricsSettingsAction,
+  updateAnalyticsSettingsAction,
+  updateGeoipSettingsAction,
   updateAvatarSettingsAction,
   updatePasswordPolicySettingsAction,
   updateLoggingSettingsAction,
@@ -191,6 +196,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "Security",
     items: [
       {
+        id: "geoip",
+        name: "GeoIP Databases",
+        desc: "MaxMind subscription and whether country lookups run at all",
+        icon: Globe2,
+      },
+      {
         id: "geoblock",
         name: "Global Geoblocking",
         desc: "Default geoblock rules across all hosts",
@@ -221,6 +232,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     id: "observability",
     label: "Observability",
     items: [
+      {
+        id: "analytics",
+        name: "Analytics",
+        desc: "Traffic and WAF event collection, and the ClickHouse it writes to",
+        icon: BarChart2,
+      },
       {
         id: "metrics",
         name: "Metrics & Monitoring",
@@ -419,6 +436,10 @@ type Props = {
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   caddyBuild: CaddyBuildSettings | null;
+  analytics: AnalyticsView;
+  geoip: GeoipView;
+  /** Whether any agent is answering, and can therefore start or stop the optional containers. */
+  canManageServices: boolean;
   baseUrl: string;
   agents: {
     /** Agents paired over the network. Empty on a single-host deployment, which uses the socket. */
@@ -449,6 +470,9 @@ export default function SettingsClient({
   avatars,
   passwordPolicy,
   caddyBuild,
+  analytics,
+  geoip,
+  canManageServices,
   baseUrl,
   agents,
 }: Props) {
@@ -482,6 +506,8 @@ export default function SettingsClient({
   const configuredProviders = dnsProvider?.providers ? Object.keys(dnsProvider.providers) : [];
   const [authentikState, authentikFormAction] = useActionState(updateAuthentikSettingsAction, null);
   const [metricsState, metricsFormAction] = useActionState(updateMetricsSettingsAction, null);
+  const [analyticsState, analyticsFormAction] = useActionState(updateAnalyticsSettingsAction, null);
+  const [geoipState, geoipFormAction] = useActionState(updateGeoipSettingsAction, null);
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
   const [passwordPolicyState, passwordPolicyFormAction] = useActionState(
     updatePasswordPolicySettingsAction,
@@ -645,6 +671,22 @@ export default function SettingsClient({
                     agents={agents}
                     pairState={pairState}
                     pairFormAction={pairFormAction}
+                  />
+                )}
+                {active === "analytics" && (
+                  <AnalyticsSection
+                    analytics={analytics}
+                    canManageServices={canManageServices}
+                    analyticsState={analyticsState}
+                    analyticsFormAction={analyticsFormAction}
+                  />
+                )}
+                {active === "geoip" && (
+                  <GeoipSection
+                    geoip={geoip}
+                    canManageServices={canManageServices}
+                    geoipState={geoipState}
+                    geoipFormAction={geoipFormAction}
                   />
                 )}
                 {active === "metrics" && (
@@ -1533,6 +1575,219 @@ function AvatarsSection({
             isDisabled={avatars.fromEnv}
           />
           <SaveButton label="Save avatar settings" isDisabled={avatars.fromEnv} />
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+// ─── Section: Analytics ──────────────────────────────────────────────────────
+
+/**
+ * Explains where the current answer came from when nothing is stored yet.
+ *
+ * Worth a line of its own: an operator who has never opened this page sees a checkbox already
+ * ticked, and without this it reads as a setting someone else changed rather than as the
+ * deployment's existing configuration being described back to them.
+ */
+function InferredNote({ source, children }: { source: string; children: ReactNode }) {
+  if (source === "environment") {
+    return (
+      <InfoAlert title="Currently set by an environment variable">
+        Saving here stores the value in the database, which takes precedence from then on. The
+        variable can be removed from your <Code>.env</Code> afterwards.
+      </InfoAlert>
+    );
+  }
+  return <InfoAlert title="Not configured here yet">{children}</InfoAlert>;
+}
+
+function AnalyticsSection({
+  analytics,
+  canManageServices,
+  analyticsState,
+  analyticsFormAction,
+}: {
+  analytics: AnalyticsView;
+  canManageServices: boolean;
+  analyticsState: { success: boolean; message?: string } | null;
+  analyticsFormAction: (payload: FormData) => void;
+}) {
+  const [enabled, setEnabled] = useState(analytics.enabled);
+  const [url, setUrl] = useState(analytics.url);
+  const [user, setUser] = useState(analytics.user);
+  const [password, setPassword] = useState("");
+  const [database, setDatabase] = useState(analytics.database);
+  const [retentionDays, setRetentionDays] = useState(analytics.retentionDays);
+
+  return (
+    <FormCard title="Traffic and WAF events">
+      <form action={analyticsFormAction}>
+        <VStack gap={3}>
+          {analytics.inferred && (
+            <InferredNote source={analytics.source}>
+              Analytics are {analytics.enabled ? "on" : "off"} because a ClickHouse password is
+              {analytics.hasPassword ? " " : " not "}set. Saving makes the choice explicit.
+            </InferredNote>
+          )}
+          {analyticsState?.message && (
+            <StatusAlert message={analyticsState.message} success={analyticsState.success} />
+          )}
+          <CheckboxInput
+            label="Collect analytics"
+            description="Record every proxied request and every WAF event, and show them on the Analytics page. With this off, no events are written and the agents stop reading Caddy's logs."
+            htmlName="analyticsEnabled"
+            value={enabled}
+            onChange={setEnabled}
+          />
+          {canManageServices ? (
+            <InfoAlert title="The agent starts and stops ClickHouse for you">
+              No <Code>COMPOSE_PROFILES</Code> entry is needed. The first start pulls the ClickHouse
+              image, which can take several minutes; turning analytics off stops the container and
+              leaves its data volume intact.
+            </InfoAlert>
+          ) : (
+            <WarnAlert title="No agent is answering, so the container cannot be managed from here">
+              These settings still decide whether analytics run. Starting ClickHouse itself needs
+              <Code>clickhouse</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
+            </WarnAlert>
+          )}
+          {/* Tells the action a password already exists, so "enabled with an empty field" is a
+              keep-what-is-stored rather than a misconfiguration to refuse. */}
+          <input type="hidden" name="hasPassword" value={analytics.hasPassword ? "yes" : "no"} />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="ClickHouse URL"
+            description="Where the analytics database is reachable."
+            htmlName="clickhouseUrl"
+            value={url}
+            onChange={setUrl}
+          />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="ClickHouse user"
+            htmlName="clickhouseUser"
+            value={user}
+            onChange={setUser}
+          />
+          <TextInput
+            {...AUTOFILL_NEW_PASSWORD}
+            label="ClickHouse password"
+            type="password"
+            isOptional={analytics.hasPassword}
+            description={
+              analytics.hasPassword
+                ? "A password is stored. Leave this empty to keep it."
+                : "Required — the ClickHouse container refuses to start without one."
+            }
+            htmlName="clickhousePassword"
+            value={password}
+            onChange={setPassword}
+          />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="ClickHouse database"
+            htmlName="clickhouseDb"
+            value={database}
+            onChange={setDatabase}
+          />
+          <NumberInput
+            label="Retention (days)"
+            description="How long events are kept. Lowering it migrates the existing tables' TTL, which rewrites their parts."
+            htmlName="clickhouseRetentionDays"
+            value={retentionDays}
+            onChange={setRetentionDays}
+            isIntegerOnly
+            min={1}
+            max={3650}
+          />
+          <SaveButton label="Save analytics settings" />
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+// ─── Section: GeoIP ──────────────────────────────────────────────────────────
+
+function GeoipSection({
+  geoip,
+  canManageServices,
+  geoipState,
+  geoipFormAction,
+}: {
+  geoip: GeoipView;
+  canManageServices: boolean;
+  geoipState: { success: boolean; message?: string } | null;
+  geoipFormAction: (payload: FormData) => void;
+}) {
+  const [enabled, setEnabled] = useState(geoip.enabled);
+  const [accountId, setAccountId] = useState(geoip.accountId);
+  const [licenseKey, setLicenseKey] = useState("");
+
+  return (
+    <FormCard title="MaxMind GeoLite2">
+      <form action={geoipFormAction}>
+        <VStack gap={3}>
+          {geoip.inferred && (
+            <InferredNote source={geoip.source}>
+              GeoIP is {geoip.enabled ? "on" : "off"} because the databases are
+              {geoip.installedEditions.length > 0 ? " " : " not "}present on disk. Saving makes the
+              choice explicit.
+            </InferredNote>
+          )}
+          {geoipState?.message && (
+            <StatusAlert message={geoipState.message} success={geoipState.success} />
+          )}
+          <CheckboxInput
+            label="Use GeoIP"
+            description="Country lookups for analytics, and the country matching that geo blocking is built on. With this off, geo block fields are not offered and no country is recorded against an event."
+            htmlName="geoipEnabled"
+            value={enabled}
+            onChange={setEnabled}
+          />
+          {canManageServices ? (
+            <InfoAlert title="The agent starts and stops geoipupdate for you">
+              No <Code>COMPOSE_PROFILES</Code> entry is needed. It downloads the databases on a
+              schedule using the credentials below, and agents on other hosts fetch them from this
+              controller rather than each holding a licence key.
+            </InfoAlert>
+          ) : (
+            <WarnAlert title="No agent is answering, so the container cannot be managed from here">
+              These settings still decide whether GeoIP is used. Downloading the databases needs
+              <Code>geoipupdate</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
+            </WarnAlert>
+          )}
+          <Text size="sm" color="secondary">
+            {geoip.installedEditions.length > 0
+              ? `Installed: ${geoip.installedEditions.join(", ")}.`
+              : "No databases are installed yet."}
+          </Text>
+          <input type="hidden" name="hasLicenseKey" value={geoip.hasLicenseKey ? "yes" : "no"} />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="MaxMind account ID"
+            isOptional
+            description="From your MaxMind account. Without a subscription the databases cannot be downloaded, though GeoIP still works if you supply the files another way."
+            htmlName="geoipAccountId"
+            value={accountId}
+            onChange={setAccountId}
+          />
+          <TextInput
+            {...AUTOFILL_NEW_PASSWORD}
+            label="MaxMind licence key"
+            type="password"
+            isOptional
+            description={
+              geoip.hasLicenseKey
+                ? "A licence key is stored. Leave this empty to keep it."
+                : "Issued alongside the account ID at maxmind.com."
+            }
+            htmlName="geoipLicenseKey"
+            value={licenseKey}
+            onChange={setLicenseKey}
+          />
+          <SaveButton label="Save GeoIP settings" />
         </VStack>
       </form>
     </FormCard>

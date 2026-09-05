@@ -29,6 +29,8 @@ export const AGENT_ROUTES = {
   caddyAdmin: "/v1/caddy-admin",
   /** Push the credentials an agent needs to reach the controller's shared services. */
   fleetConfig: "/v1/fleet-config",
+  /** GET what optional compose services are running; POST the set that should be. */
+  services: "/v1/services",
 } as const;
 
 // ─── Authentication ──────────────────────────────────────────────────────────
@@ -99,6 +101,7 @@ export type PairResponse = {
 
 export type L4PortsState = "idle" | "pending" | "applying" | "applied" | "failed";
 export type CaddyBuildState = "idle" | "pending" | "building" | "applied" | "failed";
+export type ManagedServicesState = "idle" | "pending" | "applying" | "applied" | "failed";
 
 /** Shared shape of both operation statuses. `state` narrows per operation. */
 export type AgentOperationStatus<TState extends string> = {
@@ -111,6 +114,33 @@ export type AgentOperationStatus<TState extends string> = {
 
 export type L4PortsStatus = AgentOperationStatus<L4PortsState>;
 export type CaddyBuildStatus = AgentOperationStatus<CaddyBuildState>;
+export type ManagedServicesStatus = AgentOperationStatus<ManagedServicesState>;
+
+/**
+ * The optional compose services the agent may start and stop.
+ *
+ * Both sit behind a compose profile, which is why they need an agent at all: a profile is decided
+ * when the operator runs `docker compose up`, so nothing inside the stack can turn one on. The
+ * agent runs the compose CLI, so it can — see `ManagedServicesRequest`.
+ */
+export const MANAGED_SERVICES = ["clickhouse", "geoipupdate"] as const;
+export type ManagedServiceName = (typeof MANAGED_SERVICES)[number];
+
+/**
+ * Variables the compose file interpolates for those services, which the agent writes to a generated
+ * env file and passes as an extra `--env-file`.
+ *
+ * An allowlist rather than a free-form map: these become lines in a file the compose CLI parses, so
+ * an unconstrained key is a route to setting any variable the project reads.
+ */
+export const MANAGED_SERVICE_ENV_KEYS = [
+  "CLICKHOUSE_USER",
+  "CLICKHOUSE_PASSWORD",
+  "CLICKHOUSE_DB",
+  "GEOIPUPDATE_ACCOUNT_ID",
+  "GEOIPUPDATE_LICENSE_KEY",
+] as const;
+export type ManagedServiceEnvKey = (typeof MANAGED_SERVICE_ENV_KEYS)[number];
 
 export type AgentStatus = {
   agentId: string;
@@ -131,6 +161,17 @@ export type AgentStatus = {
      */
     applied: string[] | null;
     status: CaddyBuildStatus;
+  };
+  services: {
+    /**
+     * What this agent last brought up or took down, or null before it has been asked.
+     *
+     * Recorded rather than probed: `docker compose ps` is a subprocess per service, and this status
+     * is read on every render of several pages. The controller only needs to know whether its last
+     * request landed, which is what this answers.
+     */
+    applied: Record<ManagedServiceName, boolean> | null;
+    status: ManagedServicesStatus;
   };
   analytics: {
     /** Whether the controller has given this agent somewhere to write events. */
@@ -158,6 +199,19 @@ export type ApplyL4PortsRequest = {
 export type ApplyCaddyBuildRequest = {
   /** xcaddy `--with` module specs to compile the new image with. */
   modules: string[];
+};
+
+/**
+ * Which optional services should be running, and what compose needs to interpolate to start them.
+ *
+ * `env` is sent because those services read credentials the controller now holds in its own
+ * settings, while compose reads them from the host `.env` the agent cannot write. Rather than ask
+ * the operator to keep the two in step, the agent writes what it is given to a generated env file
+ * and hands compose an extra `--env-file`.
+ */
+export type ManagedServicesRequest = {
+  services: Record<ManagedServiceName, boolean>;
+  env: Partial<Record<ManagedServiceEnvKey, string>>;
 };
 
 /** Every write returns the status the operation started in, never a bare 204. */

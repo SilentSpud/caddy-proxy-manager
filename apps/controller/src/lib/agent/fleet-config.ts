@@ -13,8 +13,12 @@ import { callOnEveryAgent } from "./client";
 import { geoipFleetConfig } from "./geoip";
 
 /** What every agent should currently be configured with. */
-export function currentFleetConfig(): FleetConfig {
-  return { clickhouse: analyticsCredentialsForAgents(), geoip: geoipFleetConfig() };
+export async function currentFleetConfig(): Promise<FleetConfig> {
+  const [clickhouse, geoip] = await Promise.all([
+    analyticsCredentialsForAgents(),
+    geoipFleetConfig(),
+  ]);
+  return { clickhouse, geoip };
 }
 
 /**
@@ -25,7 +29,7 @@ export function currentFleetConfig(): FleetConfig {
  * than the agent writing nothing until the next push.
  */
 export async function pushFleetConfig(): Promise<void> {
-  const config = currentFleetConfig();
+  const config = await currentFleetConfig();
   try {
     const results = await callOnEveryAgent(AGENT_ROUTES.fleetConfig, {
       method: "POST",

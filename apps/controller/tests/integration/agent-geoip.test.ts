@@ -187,3 +187,58 @@ describe('serving a GeoIP database to an agent', () => {
     expect(response.status).toBe(404);
   });
 });
+
+// The suite's beforeEach puts a GeoLite2-Country.mmdb on disk, so the "databases are present"
+// branch is the starting state for these.
+const geoip = await import('../../src/lib/agent/geoip');
+const registry = await import('../../src/lib/settings/registry');
+const { saveSettings, clearStoredSetting } = await import('../../src/lib/settings/resolve');
+
+describe('the GeoIP toggle', () => {
+  beforeEach(async () => {
+    await clearStoredSetting(registry.geoipEnabled.key);
+    await clearStoredSetting(registry.geoipAccountId.key);
+    await clearStoredSetting(registry.geoipLicenseKey.key);
+  });
+
+  it('infers "on" from the databases being present when nothing is stored', async () => {
+    // The upgrade path. Before the toggle existed this was the whole rule, and a deployment that
+    // has never opened the Settings page must not read as one where someone turned GeoIP off.
+    await expect(geoip.geoipEnabled()).resolves.toBe(true);
+    await expect(geoip.geoipFleetConfig()).resolves.toMatchObject({
+      editions: ['GeoLite2-Country'],
+    });
+  });
+
+  it('infers "on" from a stored subscription before the first download finishes', async () => {
+    process.env.GEOIP_DIR = join(tmpdir(), `geoip-empty-${randomBytes(6).toString('hex')}`);
+    mkdirSync(process.env.GEOIP_DIR, { recursive: true });
+    await saveSettings({
+      [registry.geoipAccountId.key]: '123456',
+      [registry.geoipLicenseKey.key]: 'a-licence-key',
+    });
+
+    await expect(geoip.geoipEnabled()).resolves.toBe(true);
+    // Still nothing to offer an agent, though: naming an edition it cannot fetch would turn its
+    // daily sync into a daily 404.
+    await expect(geoip.geoipFleetConfig()).resolves.toBeNull();
+  });
+
+  it('stops offering the databases once it is switched off', async () => {
+    await saveSettings({ [registry.geoipEnabled.key]: false });
+
+    await expect(geoip.geoipEnabled()).resolves.toBe(false);
+    // The file is still on disk and deliberately ignored: an agent told about it would keep
+    // recording countries for a feature the operator has turned off.
+    expect(geoip.installedGeoipEditions()).toEqual(['GeoLite2-Country']);
+    await expect(geoip.geoipFleetConfig()).resolves.toBeNull();
+  });
+
+  it('lets a stored value override the inference in both directions', async () => {
+    await saveSettings({ [registry.geoipEnabled.key]: true });
+    await expect(geoip.geoipEnabled()).resolves.toBe(true);
+
+    await saveSettings({ [registry.geoipEnabled.key]: false });
+    await expect(geoip.geoipEnabled()).resolves.toBe(false);
+  });
+});
