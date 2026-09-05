@@ -67,8 +67,9 @@ where it left off and the back button cannot desynchronise it. Setup is one-way:
 Two things skip the flow entirely:
 
 - **An existing 3.0 installation.** A pre-3.1 SQLite database found on the host is offered for
-  migration *before* account creation — you want its accounts, not a new one alongside them. See
-  [Upgrading from 3.0](#upgrading-from-30-which-used-sqlite).
+  migration *before* account creation — you want its accounts, not a new one alongside them. You
+  choose which parts to bring; leaving the users out continues to account creation rather than the
+  login page. See [Upgrading from 3.0](#upgrading-from-30-which-used-sqlite).
 - **A deployment that predates the flow.** If `ADMIN_USERNAME`/`ADMIN_PASSWORD` or `OAUTH_ENABLED`
   configure a way in and someone can already sign in, setup is marked complete at startup and never
   shown. Upgrading an existing install changes nothing about how it starts.
@@ -288,10 +289,25 @@ to migrate it. If several candidate files are found, it asks which one; `LEGACY_
 one instead of scanning.
 
 The offer comes **before** account creation — an operator with an old database wants its accounts,
-not a new one alongside them. Migrating copies everything across: proxy hosts, certificates, access
-lists, users and their credentials, groups, tokens, and the settings blobs. You then sign in with
-an account it just imported, using the password you already had, which is what proves the
-credential rows arrived intact.
+not a new one alongside them. By default it copies everything: proxy hosts, certificates, access
+lists, users and their credentials, groups, tokens, agents, the audit log, and the settings blobs.
+You then sign in with an account it just imported, using the password you already had, which is
+what proves the credential rows arrived intact.
+
+Each of those is a checkbox, so an installation changing hands can take the configuration and leave
+the people behind. Two rules keep a partial choice honest:
+
+- A proxy host references a certificate and an access list, and both references are nullable — so
+  importing hosts without them would succeed and quietly publish a host that used to sit behind a
+  password. Those groups come along with proxy hosts, shown ticked and locked.
+- Everything else is resolved from the foreign keys rather than a list. A reference into a group
+  you left behind is emptied when the column allows it (`createdBy`, `ownerUserId` — provenance
+  nothing authorises against) and the row is dropped when it does not (an API token cannot exist
+  without its user).
+
+Leaving the users out means nothing can sign in yet, so the flow continues to account creation
+instead of the login page — the same screen a fresh install sees, offering a first administrator or
+an identity provider, and saying that your data arrived without its accounts.
 
 Your old `.env` is read too. Anything in it that is now a database setting is carried into the
 [settings step](#first-run) pre-filled and marked as having come from the environment, so you can

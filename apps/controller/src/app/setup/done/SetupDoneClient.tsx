@@ -29,8 +29,8 @@ export default function SetupDoneClient({
         <VStack gap={2}>
           <Heading level={1}>Migration complete</Heading>
           <Text color="secondary">
-            Your proxy hosts, certificates, users and settings are now in PostgreSQL, and the
-            application is running from them.
+            Everything you chose to bring across is now in PostgreSQL, and the application is
+            running from it.
           </Text>
         </VStack>
 

@@ -6,6 +6,10 @@
  * The role question comes first and is not persisted anywhere — an agent has no database of its
  * own to record it in, and answering "agent" ends the flow with a pointer to its own instructions
  * rather than continuing. Only a controller has anything further to configure here.
+ *
+ * `migratedFrom` is set when a migration has just run and chose not to bring the old accounts. The
+ * page is otherwise identical to a fresh install's, which would leave the operator reading "nothing
+ * can sign in to this instance yet" and concluding their migration had failed.
  */
 import { useActionState, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -28,7 +32,7 @@ const AGENT_DOCS = "https://github.com/SilentSpud/caddy-proxy-manager/wiki/Agent
 type Role = "controller" | "agent";
 type Method = "local" | "oauth";
 
-export default function SetupAccountClient() {
+export default function SetupAccountClient({ migratedFrom }: { migratedFrom?: string | null }) {
   const [role, setRole] = useState<Role>("controller");
   const [method, setMethod] = useState<Method>("local");
 
@@ -55,6 +59,14 @@ export default function SetupAccountClient() {
             an identity provider.
           </Text>
         </VStack>
+
+        {migratedFrom && (
+          <Banner
+            status="info"
+            title="Your data was migrated, but its accounts were not"
+            description={`Everything you chose from ${migratedFrom} is already in place. You asked to leave the old users behind, so this instance still needs its first administrator.`}
+          />
+        )}
 
         <FormCard title="What is this instance?">
           <VStack gap={3}>

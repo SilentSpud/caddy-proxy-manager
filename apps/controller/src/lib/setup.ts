@@ -107,6 +107,19 @@ export async function isMigrationDeclined(): Promise<boolean> {
   return isFlagSet(MIGRATION_DECLINED_KEY);
 }
 
+/**
+ * Whether the legacy database on this host has already been dealt with, either way.
+ *
+ * Declining is one way. Having migrated is the other, and it has to be checked separately now that
+ * a migration can leave the old accounts behind: the old test was "can anything sign in yet",
+ * which such a migration does not satisfy — so the operator would be offered the same file again
+ * on their way to creating an account, and importing it twice is not something the flow supports.
+ */
+export async function isMigrationSettled(): Promise<boolean> {
+  if (await isMigrationDeclined()) return true;
+  return (await getMigrationSource()) !== null;
+}
+
 export async function isSetupCompleted(): Promise<boolean> {
   return isFlagSet(SETUP_COMPLETED_KEY);
 }
@@ -138,7 +151,7 @@ export async function getSetupState(signedIn: boolean): Promise<SetupState> {
   if (!(await hasAnySignIn())) {
     // Offered before account creation: an operator who has an old database wants its accounts,
     // not a new one alongside them. Scanning the filesystem is only worth doing in this one state.
-    if (!(await isMigrationDeclined()) && (await hasLegacyDatabase())) {
+    if (!(await isMigrationSettled()) && hasLegacyDatabase()) {
       return { stage: "migrate", required: true };
     }
     return { stage: "account", required: true };

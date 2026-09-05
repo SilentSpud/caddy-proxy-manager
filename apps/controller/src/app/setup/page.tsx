@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@/src/lib/auth";
-import { getSetupState, SETUP_PATHS } from "@/src/lib/setup";
+import { getMigrationSource, getSetupState, SETUP_PATHS } from "@/src/lib/setup";
 import SetupAccountClient from "./SetupAccountClient";
 
 export const metadata: Metadata = {
@@ -21,5 +21,7 @@ export default async function SetupPage() {
     redirect(SETUP_PATHS[stage]);
   }
 
-  return <SetupAccountClient />;
+  // A migration that left the old accounts behind lands here, and it looks exactly like a fresh
+  // install unless the page says otherwise — which reads as the migration having done nothing.
+  return <SetupAccountClient migratedFrom={await getMigrationSource()} />;
 }

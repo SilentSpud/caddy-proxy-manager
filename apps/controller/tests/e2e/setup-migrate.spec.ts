@@ -65,6 +65,27 @@ test.describe('Migrating an existing installation', () => {
     await expect(page.getByText(LEGACY_CONTAINER_PATH)).toBeVisible();
   });
 
+  test('what comes across is a choice, and leaving the accounts out says so', async () => {
+    // The default is everything, so an operator who reads none of this gets the migration they
+    // would have got before there was anything to choose.
+    const users = page.getByRole('checkbox', { name: /Users and their sign-in/ });
+    await expect(users).toBeChecked();
+
+    await users.uncheck();
+    await expect(page.getByText('No accounts will be brought across')).toBeVisible();
+
+    // Put it back: the rest of this file is the whole-database migration.
+    await users.check();
+    await expect(page.getByText('No accounts will be brought across')).toHaveCount(0);
+  });
+
+  test('the access lists a proxy host depends on cannot be left behind', async () => {
+    // Both references are nullable, so an import without them would succeed and quietly publish a
+    // host that used to sit behind a password. The checkbox says why it is locked instead.
+    await expect(page.getByRole('checkbox', { name: /^Access lists/ })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: /^Certificates/ })).toBeDisabled();
+  });
+
   test('migrating sends them to sign in with an account it just imported', async () => {
     await page.getByRole('button', { name: 'Migrate this database' }).click();
 
