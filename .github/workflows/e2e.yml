@@ -52,8 +52,16 @@ jobs:
       # whole cache key beyond the browser set. No restore-keys prefix: a partial
       # hit would leave browsers from another release in place and the install step
       # below would skip over them.
+      #
+      # Every playwright step below runs from apps/controller, which is the workspace
+      # that declares @playwright/test, so bunx resolves the pinned CLI. From the repo
+      # root it resolves nothing locally and downloads the latest from npm instead —
+      # which installed 1.63.0's browsers for a suite running 1.62.1, leaving the
+      # tests looking for a revision that was never downloaded. Do not "simplify"
+      # these back to the root.
       - name: Resolve the Playwright browser cache key
         id: playwright
+        working-directory: apps/controller
         run: |
           echo "version=$(bunx playwright --version | awk '{ print $2 }')" >> "$GITHUB_OUTPUT"
           echo "browsers=$(echo "$PLAYWRIGHT_BROWSERS" | tr ' ' '-')" >> "$GITHUB_OUTPUT"
@@ -67,12 +75,14 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: apps/controller
         run: bunx playwright install $PLAYWRIGHT_BROWSERS
 
       # The shared libraries --with-deps pulls in are apt packages outside
       # ~/.cache/ms-playwright, so the cache cannot carry them and this runs on a
       # hit too. It is a no-op once they are present.
       - name: Install Playwright system dependencies
+        working-directory: apps/controller
         run: bunx playwright install-deps $PLAYWRIGHT_BROWSERS
 
       # The default docker driver cannot export build cache, so type=gha in
