@@ -1,22 +1,33 @@
 "use client";
 
 /**
- * The migration offer: which old database, or none.
+ * The migration offer: which old database, how much of it, or none at all.
  *
  * Every candidate is shown with what is actually in it — users, proxy hosts, certificates, and
  * when it was last written — because on a host with a backup beside the live file those counts are
  * the only way to tell them apart, and choosing wrong migrates the wrong data with nothing to
  * signal it afterwards.
+ *
+ * The groups below are the same question at a finer grain. The one people actually come here to
+ * answer is whether to keep the old accounts: an installation being handed to someone else wants
+ * the proxy hosts and none of the users, and before this it was all or nothing.
  */
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Center } from "@astryxdesign/core/Center";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Heading } from "@astryxdesign/core/Heading";
 import { SelectableCard } from "@astryxdesign/core/SelectableCard";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
+import {
+  ALL_MIGRATION_GROUP_IDS,
+  MIGRATION_GROUPS,
+  type MigrationGroupId,
+  withRequiredGroups,
+} from "@/src/lib/migration/selection";
 import { runMigration, skipMigration } from "./actions";
 
 export type Candidate = {
@@ -25,6 +36,7 @@ export type Candidate = {
   users: number;
   proxyHosts: number;
   certificates: number;
+  groupCounts: Record<MigrationGroupId, number>;
   lastUpdatedAt: string | null;
 };
 
@@ -42,7 +54,44 @@ export default function SetupMigrateClient({
   rejected: Array<{ path: string; reason: string }>;
 }) {
   const [selected, setSelected] = useState(candidates[0]?.path ?? "");
+  // Everything, to start: an operator who reads none of this and presses the button gets the
+  // migration they would have got before there was anything to choose.
+  const [picked, setPicked] = useState<MigrationGroupId[]>(ALL_MIGRATION_GROUP_IDS);
   const [state, submit] = useActionState(runMigration, { error: null });
+
+  const candidate = candidates.find((entry) => entry.path === selected);
+
+  /**
+   * What will actually be migrated, and which of it the operator no longer controls.
+   *
+   * A group that something ticked depends on is shown ticked and locked rather than quietly added:
+   * "Certificates" turning itself on the moment proxy hosts are chosen is only confusing if the
+   * checkbox does not say why it happened.
+   */
+  const { effective, lockedBy } = useMemo(() => {
+    const resolved = new Set(withRequiredGroups(picked));
+    const locks = new Map<MigrationGroupId, string[]>();
+    const chosen = new Set(picked);
+
+    for (const group of MIGRATION_GROUPS) {
+      if (!chosen.has(group.id)) continue;
+      for (const required of withRequiredGroups([group.id])) {
+        if (required === group.id) continue;
+        locks.set(required, [...(locks.get(required) ?? []), group.label]);
+      }
+    }
+
+    return { effective: resolved, lockedBy: locks };
+  }, [picked]);
+
+  function toggle(id: MigrationGroupId, checked: boolean): void {
+    setPicked((current) =>
+      checked ? [...new Set([...current, id])] : current.filter((entry) => entry !== id),
+    );
+  }
+
+  const migratingUsers = effective.has("users");
+  const migratingOAuth = effective.has("oauthProviders");
 
   return (
     <Center>
@@ -50,8 +99,8 @@ export default function SetupMigrateClient({
         <VStack gap={2}>
           <Heading level={1}>Migrate an existing installation</Heading>
           <Text color="secondary">
-            A database from a previous version is on this host. Migrating copies its proxy hosts,
-            certificates, users and settings into PostgreSQL. The original file is not modified.
+            A database from a previous version is on this host. Migrating copies the parts you
+            choose into PostgreSQL. The original file is not modified.
           </Text>
         </VStack>
 
@@ -61,39 +110,39 @@ export default function SetupMigrateClient({
           <VStack gap={4}>
             <FormCard title="Databases found">
               <VStack gap={3}>
-                {candidates.map((candidate) => {
-                  const isSelected = selected === candidate.path;
+                {candidates.map((entry) => {
+                  const isSelected = selected === entry.path;
                   return (
                     <SelectableCard
-                      key={candidate.path}
+                      key={entry.path}
                       variant="muted"
                       padding={3}
                       width="100%"
-                      label={candidate.path}
+                      label={entry.path}
                       isSelected={isSelected}
-                      onChange={() => setSelected(candidate.path)}
+                      onChange={() => setSelected(entry.path)}
                     >
                       <VStack gap={1} align="start">
                         <Text size="sm" weight="medium">
-                          {candidate.path}
+                          {entry.path}
                         </Text>
                         <HStack gap={3}>
                           <Text size="xsm" color="secondary">
-                            {candidate.users} user(s)
+                            {entry.users} user(s)
                           </Text>
                           <Text size="xsm" color="secondary">
-                            {candidate.proxyHosts} proxy host(s)
+                            {entry.proxyHosts} proxy host(s)
                           </Text>
                           <Text size="xsm" color="secondary">
-                            {candidate.certificates} certificate(s)
+                            {entry.certificates} certificate(s)
                           </Text>
                           <Text size="xsm" color="secondary">
-                            {formatSize(candidate.sizeBytes)}
+                            {formatSize(entry.sizeBytes)}
                           </Text>
                         </HStack>
-                        {candidate.lastUpdatedAt && (
+                        {entry.lastUpdatedAt && (
                           <Text size="xsm" color="secondary">
-                            Last written {candidate.lastUpdatedAt}
+                            Last written {entry.lastUpdatedAt}
                           </Text>
                         )}
                       </VStack>
@@ -116,13 +165,58 @@ export default function SetupMigrateClient({
               </FormCard>
             )}
 
+            <FormCard title="What to migrate">
+              <VStack gap={3}>
+                <Text size="sm" color="secondary">
+                  Anything left unticked stays in the old file, which is not modified either way.
+                </Text>
+                {MIGRATION_GROUPS.map((group) => {
+                  const requiredBy = lockedBy.get(group.id);
+                  const rows = candidate?.groupCounts?.[group.id];
+                  const suffix = rows === undefined ? "" : ` — ${rows} row(s)`;
+                  return (
+                    <CheckboxInput
+                      key={group.id}
+                      label={`${group.label}${suffix}`}
+                      description={
+                        requiredBy
+                          ? `${group.description} Required by ${requiredBy.join(", ")}.`
+                          : group.description
+                      }
+                      value={effective.has(group.id)}
+                      isDisabled={requiredBy !== undefined}
+                      disabledMessage={
+                        requiredBy && `Untick ${requiredBy.join(", ")} first to leave this behind.`
+                      }
+                      onChange={(checked) => toggle(group.id, checked)}
+                    />
+                  );
+                })}
+                {[...effective].map((id) => (
+                  <input key={id} type="hidden" name="groups" value={id} />
+                ))}
+              </VStack>
+            </FormCard>
+
+            {!migratingUsers && (
+              <Banner
+                status="info"
+                title="No accounts will be brought across"
+                description={
+                  migratingOAuth
+                    ? "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next — unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead."
+                    : "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator, or configure single sign-on, on the next screen."
+                }
+              />
+            )}
+
             <Banner
               status="warning"
               title="Migrate into an empty database"
               description="This copies rows with their original identifiers, so it expects nothing to have been created here yet. Running it against a database that is already in use is not supported."
             />
 
-            <SaveButton label="Migrate this database" />
+            <SaveButton label="Migrate this database" isDisabled={effective.size === 0} />
           </VStack>
         </form>
 

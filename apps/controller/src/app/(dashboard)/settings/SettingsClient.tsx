@@ -22,6 +22,7 @@ import {
   BarChart2,
   Globe2,
   Image,
+  RefreshCw,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -70,6 +71,7 @@ import type {
 import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
 import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
+import type { UpdateStatus } from "@/src/lib/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
 import { useModuleGate } from "@/components/caddy-modules/ModuleGate";
@@ -92,6 +94,8 @@ import {
   updateGeoipSettingsAction,
   updateAvatarSettingsAction,
   updateFaviconAction,
+  updateUpdateSettingsAction,
+  checkForUpdatesAction,
   updatePasswordPolicySettingsAction,
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
@@ -154,6 +158,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Branding",
         desc: "The favicon browsers show for this instance",
         icon: Image,
+      },
+      {
+        id: "updates",
+        name: "Updates",
+        desc: "Whether to check the registry for a newer release, and which one",
+        icon: RefreshCw,
       },
       {
         id: "caddy-build",
@@ -446,6 +456,7 @@ type Props = {
   caddyBuild: CaddyBuildSettings | null;
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
   hasFavicon: boolean;
+  updates: UpdateStatus;
   analytics: AnalyticsView;
   geoip: GeoipView;
   /** Whether any agent is answering, and can therefore start or stop the optional containers. */
@@ -481,6 +492,7 @@ export default function SettingsClient({
   passwordPolicy,
   caddyBuild,
   hasFavicon,
+  updates,
   analytics,
   geoip,
   canManageServices,
@@ -521,6 +533,7 @@ export default function SettingsClient({
   const [geoipState, geoipFormAction] = useActionState(updateGeoipSettingsAction, null);
   const [avatarsState, avatarsFormAction] = useActionState(updateAvatarSettingsAction, null);
   const [faviconState, faviconFormAction] = useActionState(updateFaviconAction, null);
+  const [updatesState, updatesFormAction] = useActionState(updateUpdateSettingsAction, null);
   const [passwordPolicyState, passwordPolicyFormAction] = useActionState(
     updatePasswordPolicySettingsAction,
     null,
@@ -676,6 +689,13 @@ export default function SettingsClient({
                     hasFavicon={hasFavicon}
                     faviconState={faviconState}
                     faviconFormAction={faviconFormAction}
+                  />
+                )}
+                {active === "updates" && (
+                  <UpdatesSection
+                    updates={updates}
+                    updatesState={updatesState}
+                    updatesFormAction={updatesFormAction}
                   />
                 )}
                 {active === "caddy-build" && (
@@ -1689,6 +1709,119 @@ function BrandingSection({
               />
             )}
             <Button type="submit" size="sm" label="Save favicon" isDisabled={!preview} />
+          </HStack>
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+// ─── Section: Updates ────────────────────────────────────────────────────────
+
+/** "3 hours ago", for a timestamp whose exact minute nobody needs. */
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  const units: Array<[number, Intl.RelativeTimeFormatUnit]> = [
+    [60, "second"],
+    [60, "minute"],
+    [24, "hour"],
+    [7, "day"],
+  ];
+  let value = seconds;
+  let unit: Intl.RelativeTimeFormatUnit = "second";
+  for (const [step, next] of units) {
+    if (value < step) break;
+    value = Math.round(value / step);
+    unit = next;
+  }
+  return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(-value, unit);
+}
+
+function UpdatesSection({
+  updates,
+  updatesState,
+  updatesFormAction,
+}: {
+  updates: UpdateStatus;
+  updatesState: { success: boolean; message?: string } | null;
+  updatesFormAction: (payload: FormData) => void;
+}) {
+  const [enabled, setEnabled] = useState(updates.enabled);
+  const [repository, setRepository] = useState(updates.repository);
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<{ success: boolean; message?: string } | null>(
+    null,
+  );
+
+  return (
+    <FormCard title="Release updates">
+      <form action={updatesFormAction}>
+        <VStack gap={3}>
+          {updatesState?.message && (
+            <StatusAlert message={updatesState.message} success={updatesState.success} />
+          )}
+          {checkResult?.message && (
+            <StatusAlert message={checkResult.message} success={checkResult.success} />
+          )}
+
+          {updates.updateAvailable ? (
+            <WarnAlert title={`Version ${updates.latest} has been published`}>
+              You are running {updates.current}. Pull the new images and recreate the stack to move
+              to it.
+            </WarnAlert>
+          ) : (
+            <InfoAlert title={`Running ${updates.current}`}>
+              {updates.error
+                ? `The last check did not complete: ${updates.error}`
+                : updates.latest
+                  ? `${updates.latest} is the newest release published, so this is up to date.`
+                  : updates.enabled
+                    ? "No check has completed yet. Save or check now to run one."
+                    : "Update checks are off, so nothing is known about newer releases."}
+            </InfoAlert>
+          )}
+
+          <CheckboxInput
+            label="Check for updates"
+            description="Ask the registry below, a few times a day, whether a newer release has been published. This is the only request this app makes to the internet on its own."
+            htmlName="updateCheckEnabled"
+            value={enabled}
+            onChange={setEnabled}
+          />
+
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="Image repository"
+            description="Where this deployment's images come from, without the image name. Point it at your own namespace if you run a fork, or it will report releases you cannot pull."
+            placeholder="ghcr.io/owner/name"
+            htmlName="updateImageRepository"
+            value={repository}
+            onChange={setRepository}
+            isDisabled={!enabled}
+          />
+
+          <Text size="xsm" color="secondary">
+            {updates.checkedAt ? `Last checked ${timeAgo(updates.checkedAt)}.` : "Never checked."}
+          </Text>
+
+          <HStack gap={2} justify="end">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              label={checking ? "Checking…" : "Check now"}
+              isDisabled={!enabled || checking}
+              onClick={async () => {
+                setChecking(true);
+                setCheckResult(null);
+                try {
+                  setCheckResult(await checkForUpdatesAction());
+                } finally {
+                  setChecking(false);
+                }
+              }}
+            />
+            <SaveButton label="Save update settings" />
           </HStack>
         </VStack>
       </form>

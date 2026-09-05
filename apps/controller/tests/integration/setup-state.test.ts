@@ -40,6 +40,7 @@ const {
   hasAnySignIn,
   isSetupCompleted,
   markSetupCompleted,
+  recordMigrationSource,
 } = await import('@/src/lib/setup');
 
 const TOUCHED_ENV = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'OAUTH_ENABLED', 'LEGACY_SQLITE_PATH'];
@@ -252,6 +253,19 @@ describe('the migration offer', () => {
     try {
       await addUser('migrated@localhost');
       expect((await getSetupState(false)).stage).toBe('verify');
+    } finally {
+      discard(directory);
+    }
+  });
+
+  it('sends a migration that left the accounts behind on to account creation', async () => {
+    // The old database is still sitting there and nothing can sign in yet, which is exactly the
+    // shape that used to mean "offer the migration". Recording the source is what separates
+    // "not dealt with" from "dealt with, and it brought no users".
+    const directory = pointAtLegacyDatabase();
+    try {
+      await recordMigrationSource(process.env.LEGACY_SQLITE_PATH ?? '');
+      expect((await getSetupState(false)).stage).toBe('account');
     } finally {
       discard(directory);
     }

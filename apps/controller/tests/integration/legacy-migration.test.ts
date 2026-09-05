@@ -75,13 +75,30 @@ function buildLegacyDatabase(): string {
     [NOW, NOW],
   );
 
+  // An API token belongs to a user and has nowhere to record that it does not, so it is the row a
+  // selection that leaves users behind has to drop rather than blank.
+  raw.run(
+    `INSERT INTO api_tokens (id, name, tokenHash, createdBy, createdAt)
+     VALUES (1, 'ci', 'hash-of-a-token', 1, ?)`,
+    [NOW],
+  );
+
+  // The access list is what makes leaving it behind unsafe: the reference from a proxy host is
+  // nullable, so an import could blank it and publish a host that used to want a password.
+  raw.run(
+    `INSERT INTO access_lists (id, name, description, createdBy, createdAt, updatedAt)
+     VALUES (1, 'staff', 'internal only', 1, ?, ?)`,
+    [NOW, NOW],
+  );
+
   // sslForced/hstsEnabled and friends are 0/1 here and boolean in PostgreSQL.
   raw.run(
-    `INSERT INTO proxy_hosts (id, name, domains, upstreams, sslForced, hstsEnabled,
-                              hstsSubdomains, allowWebsocket, preserveHostHeader, enabled,
-                              skipHttpsHostnameValidation, createdAt, updatedAt)
-     VALUES (1, 'app', '["app.example.com"]', '["10.0.0.5:8080"]', 1, 1, 0, 1, 1, 1, 0, ?, ?),
-            (2, 'api', '["api.example.com"]', '["10.0.0.6:8080"]', 0, 0, 0, 1, 1, 0, 1, ?, ?)`,
+    `INSERT INTO proxy_hosts (id, name, domains, upstreams, accessListId, ownerUserId, sslForced,
+                              hstsEnabled, hstsSubdomains, allowWebsocket, preserveHostHeader,
+                              enabled, skipHttpsHostnameValidation, createdAt, updatedAt)
+     VALUES (1, 'app', '["app.example.com"]', '["10.0.0.5:8080"]', 1, 1, 1, 1, 0, 1, 1, 1, 0, ?, ?),
+            (2, 'api', '["api.example.com"]', '["10.0.0.6:8080"]', NULL, NULL, 0, 0, 0, 1, 1, 0, 1,
+             ?, ?)`,
     [NOW, NOW, NOW, NOW],
   );
 
@@ -101,7 +118,9 @@ beforeEach(async () => {
   directory = mkdtempSync(join(tmpdir(), 'cpm-legacy-'));
   for (const table of [
     schemaModule.accounts,
+    schemaModule.apiTokens,
     schemaModule.proxyHosts,
+    schemaModule.accessLists,
     schemaModule.settings,
     schemaModule.users,
   ]) {
@@ -265,6 +284,66 @@ describe('import', () => {
           LEFT JOIN users u ON u.id = a."userId" WHERE u.id IS NULL`,
     );
     expect(orphans).toBe(0);
+  });
+});
+
+describe('choosing what to migrate', () => {
+  it('leaves the old accounts behind but brings the hosts', async () => {
+    // The case this exists for: an installation changing hands wants the configuration and none
+    // of the people who used to sign in to it.
+    await importLegacyDatabase(buildLegacyDatabase(), ['proxyHosts', 'settings']);
+
+    expect(await ctx.db.select().from(schemaModule.users)).toHaveLength(0);
+    expect(await ctx.db.select().from(schemaModule.proxyHosts)).toHaveLength(2);
+  });
+
+  it('drops the rows that cannot exist without the user they belong to', async () => {
+    // api_tokens.createdBy is not nullable. Blanking it is not an option, so the table goes with
+    // the users — and that is derived from the foreign key, not from a list.
+    const report = await importLegacyDatabase(buildLegacyDatabase(), ['proxyHosts', 'settings']);
+
+    expect(await ctx.db.select().from(schemaModule.apiTokens)).toHaveLength(0);
+    expect(report.excludedBySelection).toContain('api_tokens');
+    expect(report.excludedBySelection).toContain('users');
+  });
+
+  it('empties the ownership a migrated host had rather than failing on it', async () => {
+    // ownerUserId is provenance — nothing authorises against it — so a host that loses it is
+    // still the host it was, and refusing the import over it would help nobody.
+    const report = await importLegacyDatabase(buildLegacyDatabase(), ['proxyHosts']);
+
+    const hosts = await ctx.db.select().from(schemaModule.proxyHosts);
+    expect(hosts.every((host) => host.ownerUserId === null)).toBe(true);
+    expect(report.clearedReferences).toContain('proxy_hosts.ownerUserId');
+  });
+
+  it('brings the access list along with the host it was protecting', async () => {
+    // Only proxyHosts was asked for. If access lists were left behind, accessListId would be
+    // blanked and app.example.com would come back publicly reachable.
+    await importLegacyDatabase(buildLegacyDatabase(), ['proxyHosts']);
+
+    expect(await ctx.db.select().from(schemaModule.accessLists)).toHaveLength(1);
+    const [app] = await ctx.db
+      .select()
+      .from(schemaModule.proxyHosts)
+      .where(eq(schemaModule.proxyHosts.name, 'app'));
+    expect(app?.accessListId).toBe(1);
+  });
+
+  it('leaves the settings behind when they were not chosen', async () => {
+    await importLegacyDatabase(buildLegacyDatabase(), ['users']);
+
+    expect(await ctx.db.select().from(schemaModule.settings)).toHaveLength(0);
+    expect(await ctx.db.select().from(schemaModule.users)).toHaveLength(2);
+  });
+
+  it('copies everything when no selection is given', async () => {
+    // The default is the behaviour every caller had before there was anything to choose.
+    const report = await importLegacyDatabase(buildLegacyDatabase());
+
+    expect(report.excludedBySelection).toEqual([]);
+    expect(report.clearedReferences).toEqual([]);
+    expect(await ctx.db.select().from(schemaModule.apiTokens)).toHaveLength(1);
   });
 });
 

@@ -26,6 +26,7 @@ export default async function SetupMigratePage() {
         users: candidate.counts.users,
         proxyHosts: candidate.counts.proxyHosts,
         certificates: candidate.counts.certificates,
+        groupCounts: candidate.groupCounts,
         lastUpdatedAt: candidate.lastUpdatedAt,
       }))}
       rejected={rejected}

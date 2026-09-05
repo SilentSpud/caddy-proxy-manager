@@ -704,6 +704,42 @@ test.describe('Settings — Access Logging', () => {
   });
 });
 
+// ─── Updates section ─────────────────────────────────────────────────────────
+
+test.describe('Settings — Updates', () => {
+  test('shows the running version, the toggle and the repository', async ({ page }) => {
+    await goToSection(page, 'Updates');
+    await expect(page.getByRole('heading', { name: 'Release updates' })).toBeVisible();
+    await expect(page.getByLabel('Check for updates')).toBeVisible();
+
+    // The substitution the setting exists for: a fork points this at its own namespace.
+    await expect(page.locator('input[name="updateImageRepository"]')).toHaveValue(
+      /^[a-z0-9.]+\/[a-z0-9._/-]+$/,
+    );
+    await expect(page.getByRole('button', { name: 'Check now' })).toBeVisible();
+  });
+
+  test('the repository field takes a different namespace', async ({ page }) => {
+    // Typed, not saved: saving would reach the registry, and this suite must not depend on
+    // ghcr.io being up. What the check does with the value is covered by the unit tests.
+    await goToSection(page, 'Updates');
+    const repository = page.locator('input[name="updateImageRepository"]');
+    await repository.fill('ghcr.io/somerandomuser/caddy-proxy-manager');
+    await expect(repository).toHaveValue('ghcr.io/somerandomuser/caddy-proxy-manager');
+  });
+
+  test('turning the check off disables the repository field', async ({ page }) => {
+    // Nothing to point at when no request is going to be made, and it says so rather than
+    // leaving a field that looks live.
+    await goToSection(page, 'Updates');
+    await page.getByLabel('Check for updates').click();
+    // By role, not by name: a disabled Astryx input drops its name attribute, so the selector the
+    // other tests use stops matching at exactly the moment this asserts. That the field submits
+    // nothing while disabled is why the action treats an absent value as "leave it alone".
+    await expect(page.getByRole('textbox', { name: 'Image repository' })).toBeDisabled();
+  });
+});
+
 // ─── Cross-section navigation ────────────────────────────────────────────────
 
 test.describe('Settings — cross-section navigation', () => {

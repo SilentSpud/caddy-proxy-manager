@@ -100,6 +100,11 @@ services:
       OAUTH_DEFAULT_ROLE: ${OAUTH_DEFAULT_ROLE:-}
       OAUTH_SYNC_GROUPS: ${OAUTH_SYNC_GROUPS:-false}
 
+      # Update checking. A Settings toggle, so these are only a first-start default; the repository
+      # is the image namespace this deployment pulls from, which a fork changes to its own.
+      UPDATE_CHECK_ENABLED: ${UPDATE_CHECK_ENABLED:-true}
+      UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/silentspud/caddy-proxy-manager}
+
       # Optional analytics and GeoIP. Both are Settings toggles now: a stored value wins over the
       # variable, and the agent starts or stops the container to match — so neither the profile nor
       # these need setting on a stack with an agent. They remain for a first start, and for a

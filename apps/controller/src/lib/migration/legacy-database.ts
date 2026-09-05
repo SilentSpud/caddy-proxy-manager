@@ -12,6 +12,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
+import { MIGRATION_GROUPS, type MigrationGroupId } from "./selection";
 
 /**
  * Where a 3.0 deployment's database actually sat: the documented Docker path, the repo-relative
@@ -28,6 +29,12 @@ export type LegacyCandidate = {
   sizeBytes: number;
   /** Row counts for the tables an operator would recognise, so they can tell two files apart. */
   counts: { users: number; proxyHosts: number; certificates: number; settings: number };
+  /**
+   * Rows per selectable group, so the setup page can say what ticking one would actually bring
+   * across. A group at zero is still offered — an empty audit log is not an error, and hiding it
+   * would leave the operator wondering where it went.
+   */
+  groupCounts: Record<MigrationGroupId, number>;
   /** When the newest row we can date was written, as a hint at which file is the live one. */
   lastUpdatedAt: string | null;
 };
@@ -52,6 +59,18 @@ function countRows(database: Database, table: string, present: Set<string>): num
   // The table name is from sqlite_master, not from user input, so it cannot be a parameter.
   const row = database.query<{ n: number }, []>(`SELECT COUNT(*) AS n FROM "${table}"`).get();
   return row?.n ?? 0;
+}
+
+/** How many rows each selectable group would bring, across whichever of its tables exist here. */
+function countGroups(database: Database, present: Set<string>): Record<MigrationGroupId, number> {
+  const counts = {} as Record<MigrationGroupId, number>;
+  for (const group of MIGRATION_GROUPS) {
+    counts[group.id] = group.tables.reduce(
+      (total, table) => total + countRows(database, table, present),
+      0,
+    );
+  }
+  return counts;
 }
 
 /** The newest `updatedAt` across the tables that have one. Null when nothing is dated. */
@@ -109,6 +128,7 @@ export function inspectLegacyDatabase(path: string): LegacyCandidate | LegacyRej
         certificates: countRows(database, "certificates", present),
         settings: countRows(database, "settings", present),
       },
+      groupCounts: countGroups(database, present),
       lastUpdatedAt: newestUpdate(database, present),
     };
   } catch (error) {
