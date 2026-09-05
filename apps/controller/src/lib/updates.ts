@@ -151,18 +151,21 @@ export function nextPageUrl(header: string | null, host: string): string | null 
   const match = /<([^>]+)>\s*;\s*rel="next"/i.exec(header ?? "");
   if (!match) return null;
 
-  const base = `https://${host}/`;
+  const expected = new URL(`https://${host}/`);
   let next: URL;
   try {
-    next = new URL(match[1], base);
+    next = new URL(match[1], expected);
   } catch {
     throw new Error("The registry sent a pagination link that is not a URL");
   }
 
   // Origin rather than hostname: a link that downgrades to http, or moves to another port, is as
-  // much a different destination as one that names another host.
-  if (next.origin !== new URL(base).origin) {
-    throw new Error("The registry paginated to a different host, which this check will not follow");
+  // much a different destination as one that names another host. Both origins are named because
+  // this text is what an operator is shown, and "somewhere else" would not tell them where.
+  if (next.origin !== expected.origin) {
+    throw new Error(
+      `The registry paginated to ${next.origin}, not ${expected.origin} — this check will not follow that`,
+    );
   }
   return next.toString();
 }

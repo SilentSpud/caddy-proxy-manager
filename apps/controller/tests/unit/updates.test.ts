@@ -155,7 +155,7 @@ describe('the repository setting', () => {
   });
 });
 
-describe("following the registry's pagination", () => {
+describe('following registry pagination', () => {
   it('follows a relative next link, which is what a registry actually sends', () => {
     expect(nextPageUrl('</v2/owner/name/tags/list?n=100&last=3.0.0>; rel="next"', 'ghcr.io')).toBe(
       'https://ghcr.io/v2/owner/name/tags/list?n=100&last=3.0.0',
@@ -175,19 +175,25 @@ describe("following the registry's pagination", () => {
     // the caller is holding.
     expect(() =>
       nextPageUrl('<http://169.254.169.254/latest/meta-data/>; rel="next"', 'ghcr.io'),
-    ).toThrow(/different host/);
+    ).toThrow(/will not follow/);
+  });
+
+  it('names both origins, since the message is what the operator is shown', () => {
+    expect(() =>
+      nextPageUrl('<http://169.254.169.254/latest/meta-data/>; rel="next"', 'ghcr.io'),
+    ).toThrow('The registry paginated to http://169.254.169.254, not https://ghcr.io');
   });
 
   it('refuses a link that downgrades to http on the same host', () => {
     expect(() =>
       nextPageUrl('<http://ghcr.io/v2/owner/name/tags/list>; rel="next"', 'ghcr.io'),
-    ).toThrow(/different host/);
+    ).toThrow(/will not follow/);
   });
 
   it('refuses a link to a different port on the same host', () => {
     expect(() =>
       nextPageUrl('<https://registry.test:8443/v2/x/tags/list>; rel="next"', 'registry.test'),
-    ).toThrow(/different host/);
+    ).toThrow(/will not follow/);
   });
 
   it('keeps the port when the registry itself has one', () => {
