@@ -266,6 +266,30 @@ test.describe('Settings — General', () => {
     await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
   });
 
+  test('a changed text field still reads as changed after the save', async ({ page }) => {
+    // The text-field half of the form-reset question the toggle test covers, and the answer is that
+    // text is already safe: React re-asserts a controlled input's value on every commit, so the
+    // reset that strands a checkbox is written straight back here. Pinned rather than assumed —
+    // it is the reason ui/FormBooleanControls repairs only the boolean controls, and a change that
+    // made TextInput manage its own value the way the base Switch does would silently break it.
+    // Deliberately no reload before the assertion: the test above reloads, which repopulates from
+    // the database and would hide exactly this.
+    await goToSection(page, 'General');
+    const domain = page.locator('input[name="primaryDomain"]');
+    const save = page.getByRole('button', { name: /save general settings/i });
+    const original = await domain.inputValue();
+
+    await domain.fill('reset-check.local');
+    await save.click();
+    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(domain).toHaveValue('reset-check.local');
+
+    // Put the stored value back, so this leaves the shared stack as it found it.
+    await domain.fill(original);
+    await save.click();
+    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 15_000 });
+  });
+
   test('ACME email field accepts email input', async ({ page }) => {
     await goToSection(page, 'General');
     const emailInput = page.locator('input[name="acmeEmail"]');
@@ -452,6 +476,35 @@ test.describe('Settings — Upstream DNS Pinning', () => {
     await expect(page.getByRole('option', { name: /both/i })).toBeVisible();
     await expect(page.getByRole('option', { name: /ipv6 only/i })).toBeVisible();
     await expect(page.getByRole('option', { name: /ipv4 only/i })).toBeVisible();
+  });
+
+  test('a changed toggle still reads as changed after the save', async ({ page }) => {
+    // React 19 resets the form once the action returns, restoring every control to the value it
+    // mounted with — after the last render, so nothing writes the DOM back. The toggle the operator
+    // just changed snaps visually back to its old position while the new value is what actually
+    // got saved, and the next click then reports the state React already holds, so it appears dead.
+    // See ui/FormBooleanControls. Changing it *before* saving is what makes this reproducible: a
+    // save in the mounted state resets to the same value and hides the bug entirely.
+    await goToSection(page, 'Upstream DNS Pinning');
+    const toggle = page.getByLabel('Enable upstream DNS pinning');
+    const save = page.getByRole('button', { name: /save upstream dns/i });
+
+    const initial = await toggle.isChecked();
+    await toggle.click();
+    await expect(toggle).toBeChecked({ checked: !initial });
+
+    await save.click();
+    await expect(page.getByText(/saved/i).first()).toBeVisible({ timeout: 15_000 });
+    // The assertion the fix exists for: the save must not visually undo what was just saved.
+    await expect(toggle).toBeChecked({ checked: !initial });
+
+    // And one click still moves it, rather than reporting the state React already holds.
+    await toggle.click();
+    await expect(toggle).toBeChecked({ checked: initial });
+
+    // Put the stored value back, so this leaves the shared stack as it found it.
+    await save.click();
+    await expect(page.getByText(/saved/i).first()).toBeVisible({ timeout: 15_000 });
   });
 });
 
