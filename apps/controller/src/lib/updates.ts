@@ -137,6 +137,39 @@ export function parseRepository(repository: string): { host: string; path: strin
   return { host: trimmed.slice(0, separator), path: trimmed.slice(separator + 1) };
 }
 
+/**
+ * The next page's URL, or null when the registry says there is no next page.
+ *
+ * The link is refused unless it stays on the host the check was pointed at. `new URL(value, base)`
+ * ignores the base the moment the value is absolute, so without this a registry could name any
+ * host it liked in a `Link` header and have this server fetch it — carrying the bearer token
+ * `listTags` is holding at the time. A real registry pages with a relative link, which is
+ * unaffected; anything else is reported rather than followed, because a check that quietly stopped
+ * paging could go on reporting "up to date" from half a tag list.
+ */
+export function nextPageUrl(header: string | null, host: string): string | null {
+  const match = /<([^>]+)>\s*;\s*rel="next"/i.exec(header ?? "");
+  if (!match) return null;
+
+  const expected = new URL(`https://${host}/`);
+  let next: URL;
+  try {
+    next = new URL(match[1], expected);
+  } catch {
+    throw new Error("The registry sent a pagination link that is not a URL");
+  }
+
+  // Origin rather than hostname: a link that downgrades to http, or moves to another port, is as
+  // much a different destination as one that names another host. Both origins are named because
+  // this text is what an operator is shown, and "somewhere else" would not tell them where.
+  if (next.origin !== expected.origin) {
+    throw new Error(
+      `The registry paginated to ${next.origin}, not ${expected.origin} — this check will not follow that`,
+    );
+  }
+  return next.toString();
+}
+
 /** The realm/service/scope out of a `WWW-Authenticate: Bearer ...` challenge. */
 function parseChallenge(header: string): Record<string, string> | null {
   if (!/^bearer /i.test(header)) return null;
@@ -197,8 +230,7 @@ async function listTags(host: string, repository: string, signal: AbortSignal): 
     if (Array.isArray(body.tags)) tags.push(...body.tags);
 
     // Registries page with a Link header rather than a cursor in the body.
-    const next = /<([^>]+)>\s*;\s*rel="next"/i.exec(response.headers.get("link") ?? "");
-    url = next ? new URL(next[1], `https://${host}`).toString() : null;
+    url = nextPageUrl(response.headers.get("link"), host);
   }
 
   return tags;
@@ -279,6 +311,24 @@ export async function checkForUpdates(): Promise<CachedCheck> {
  */
 export async function getUpdateStatus(): Promise<UpdateStatus> {
   const { enabled, repository } = await settings();
+
+  // Nothing is known while the check is off, and the cached answer is not an exception. Reporting
+  // it let the Settings page say "3.0.0 is the newest release published, so this is up to date"
+  // from a check that stopped running months ago — with no way to refresh it, since "Check now"
+  // is disabled along with the setting. The cache row is left alone, so re-enabling shows the last
+  // answer again immediately rather than waiting for the first refresh.
+  if (!enabled) {
+    return {
+      enabled: false,
+      current: APP_VERSION,
+      latest: null,
+      updateAvailable: false,
+      checkedAt: null,
+      error: null,
+      repository,
+    };
+  }
+
   const cached = await getSetting<CachedCheck>(CACHE_KEY);
 
   const status: UpdateStatus = {
@@ -290,8 +340,6 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
     error: cached?.repository === repository ? (cached.error ?? null) : null,
     repository,
   };
-
-  if (!enabled) return status;
 
   const age = status.checkedAt
     ? Date.now() - Date.parse(status.checkedAt)

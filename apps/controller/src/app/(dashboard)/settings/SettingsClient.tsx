@@ -1623,6 +1623,26 @@ function AvatarsSection({
 // ─── Section: Branding ───────────────────────────────────────────────────────
 
 /**
+ * An object URL for a file the operator just picked, or null if it is not one.
+ *
+ * `URL.createObjectURL` is specified to return `blob:<this origin>/<uuid>` — a name the browser
+ * mints, carrying no byte of the file's name or contents — so the guard cannot fail at runtime.
+ * It is here because the value still *derives* from a file the user chose, and that is enough for
+ * a scanner tracing it into an attribute to call it attacker-controlled text (js/xss-through-dom
+ * did). Narrowing to the one scheme this may ever be turns the invariant into something both a
+ * reader and an analyser can see, instead of a claim in a comment.
+ *
+ * Null rather than a throw: a preview that cannot be shown is not a reason to break the form, and
+ * the field still submits the file either way.
+ */
+function objectUrlForPreview(file: File): string | null {
+  const url = URL.createObjectURL(file);
+  if (url.startsWith("blob:")) return url;
+  URL.revokeObjectURL(url);
+  return null;
+}
+
+/**
  * Upload or remove the favicon.
  *
  * A plain `<input type="file">` rather than a design-system control: Astryx has no file input, and
@@ -1693,7 +1713,7 @@ function BrandingSection({
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
               setChosen(file?.name ?? null);
-              setPreview(file ? URL.createObjectURL(file) : null);
+              setPreview(file ? objectUrlForPreview(file) : null);
             }}
           />
 
@@ -1801,7 +1821,11 @@ function UpdatesSection({
           />
 
           <Text size="xsm" color="secondary">
-            {updates.checkedAt ? `Last checked ${timeAgo(updates.checkedAt)}.` : "Never checked."}
+            {!updates.enabled
+              ? "Not checking."
+              : updates.checkedAt
+                ? `Last checked ${timeAgo(updates.checkedAt)}.`
+                : "Never checked."}
           </Text>
 
           <HStack gap={2} justify="end">

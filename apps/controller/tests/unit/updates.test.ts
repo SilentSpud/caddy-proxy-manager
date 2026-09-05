@@ -1,23 +1,58 @@
 /**
- * Release comparison and registry-path parsing.
+ * Release comparison, registry-path parsing, and what the check reports.
  *
  * The comparison is the part worth pinning. A wrong answer either hides a release or invents one,
  * and the prerelease rules are the easy half to get backwards: 3.0.0-beta.2 precedes 3.0.0, so a
  * naive string or field comparison announces an "update" to the beta an operator just left.
  */
-import { describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { version as DECLARED_VERSION } from '@/package.json';
 import { vi } from '@/tests/helpers/vi';
 
-// lib/updates imports lib/settings for its cache, which reaches the database at module load. The
-// pure helpers under test never touch it.
-vi.mock('@/src/lib/settings', () => ({
-  getSetting: async () => null,
-  setSetting: async () => {},
+/**
+ * The cached check row and the two settings that drive it, as plain objects the tests set.
+ *
+ * Hoisted so the mock factories below can close over them: a Bun mock factory has to be
+ * synchronous, and it runs before anything a test could assign.
+ */
+const store = vi.hoisted(() => ({
+  cache: null as unknown,
+  enabled: true,
+  repository: 'ghcr.io/owner/name',
 }));
 
-const { compareSemver, isNewer, newestRelease, parseRepository, parseSemver } = await import(
-  '@/src/lib/updates'
-);
+// lib/updates imports lib/settings for its cache, which reaches the database at module load.
+vi.mock('@/src/lib/settings', () => ({
+  getSetting: async () => store.cache,
+  setSetting: async (_key: string, value: unknown) => {
+    store.cache = value;
+  },
+}));
+
+// settings/resolve is the other database reader in the chain. settings/registry is left real, so
+// these tests are answering with the actual setting definitions rather than invented keys.
+vi.mock('@/src/lib/settings/resolve', () => ({
+  // Matched on the definition's `name` rather than its `key`, which carries a namespace prefix the
+  // registry owns and this file has no business restating.
+  getSetting: async (definition: { name: string }) =>
+    definition.name === 'update_check_enabled' ? store.enabled : store.repository,
+}));
+
+const {
+  compareSemver,
+  getUpdateStatus,
+  isNewer,
+  newestRelease,
+  nextPageUrl,
+  parseRepository,
+  parseSemver,
+} = await import('@/src/lib/updates');
+
+beforeEach(() => {
+  store.cache = null;
+  store.enabled = true;
+  store.repository = 'ghcr.io/owner/name';
+});
 
 /** The tag list ghcr.io actually returns for this project, verified against the live registry. */
 const REAL_TAGS = ['3.0.0-beta.1', 'latest', 'sha-c570c7c', '3.0.0-beta.2', 'sha-cab2ee5'];
@@ -86,7 +121,9 @@ describe('deciding whether to tell the operator', () => {
 
   it('is quiet for this build against the registry as it stands', () => {
     // The end-to-end shape of the feature: real tags, the version this package declares, no notice.
-    expect(isNewer('3.0.0-beta.2', newestRelease(REAL_TAGS))).toBe(false);
+    // Read from package.json rather than restated, so a release bump cannot leave this asserting
+    // about a version nothing ships any more.
+    expect(isNewer(DECLARED_VERSION, newestRelease(REAL_TAGS))).toBe(false);
   });
 });
 
@@ -115,5 +152,113 @@ describe('the repository setting', () => {
     for (const bad of ['', 'ghcr.io', 'file:///etc/passwd', 'ghcr.io/UPPER/case', 'a b/c']) {
       expect(parseRepository(bad)).toBeNull();
     }
+  });
+});
+
+describe('following registry pagination', () => {
+  it('follows a relative next link, which is what a registry actually sends', () => {
+    expect(nextPageUrl('</v2/owner/name/tags/list?n=100&last=3.0.0>; rel="next"', 'ghcr.io')).toBe(
+      'https://ghcr.io/v2/owner/name/tags/list?n=100&last=3.0.0',
+    );
+  });
+
+  it('follows an absolute link that stays on the same registry', () => {
+    const header = '<https://ghcr.io/v2/owner/name/tags/list?last=3.0.0>; rel="next"';
+    expect(nextPageUrl(header, 'ghcr.io')).toBe(
+      'https://ghcr.io/v2/owner/name/tags/list?last=3.0.0',
+    );
+  });
+
+  it('refuses a link to another host rather than fetching it', () => {
+    // new URL(value, base) ignores the base as soon as the value is absolute, so this would
+    // otherwise be a server-side fetch of whatever the registry named — carrying the bearer token
+    // the caller is holding.
+    expect(() =>
+      nextPageUrl('<http://169.254.169.254/latest/meta-data/>; rel="next"', 'ghcr.io'),
+    ).toThrow(/will not follow/);
+  });
+
+  it('names both origins, since the message is what the operator is shown', () => {
+    expect(() =>
+      nextPageUrl('<http://169.254.169.254/latest/meta-data/>; rel="next"', 'ghcr.io'),
+    ).toThrow('The registry paginated to http://169.254.169.254, not https://ghcr.io');
+  });
+
+  it('refuses a link that downgrades to http on the same host', () => {
+    expect(() =>
+      nextPageUrl('<http://ghcr.io/v2/owner/name/tags/list>; rel="next"', 'ghcr.io'),
+    ).toThrow(/will not follow/);
+  });
+
+  it('refuses a link to a different port on the same host', () => {
+    expect(() =>
+      nextPageUrl('<https://registry.test:8443/v2/x/tags/list>; rel="next"', 'registry.test'),
+    ).toThrow(/will not follow/);
+  });
+
+  it('keeps the port when the registry itself has one', () => {
+    expect(nextPageUrl('</v2/x/tags/list?last=1>; rel="next"', 'registry.test:5000')).toBe(
+      'https://registry.test:5000/v2/x/tags/list?last=1',
+    );
+  });
+
+  it('stops when there is no next page', () => {
+    expect(nextPageUrl(null, 'ghcr.io')).toBeNull();
+    expect(nextPageUrl('</v2/x/tags/list>; rel="prev"', 'ghcr.io')).toBeNull();
+  });
+});
+
+describe('what the status reports', () => {
+  const CACHED = {
+    checkedAt: '2026-01-01T00:00:00.000Z',
+    latest: '9.9.9',
+    error: null,
+    repository: 'ghcr.io/owner/name',
+  };
+
+  it('serves the cached answer while checks are on', async () => {
+    // updateAvailable stays false here for a reason of its own: APP_VERSION is not baked into a
+    // test build, and an unknown current version never announces anything. See the case above.
+    store.cache = CACHED;
+
+    const status = await getUpdateStatus();
+    expect(status).toMatchObject({
+      enabled: true,
+      latest: '9.9.9',
+      checkedAt: CACHED.checkedAt,
+    });
+  });
+
+  it('knows nothing while checks are off, rather than repeating a stale answer', async () => {
+    // The Settings page reads `latest` as authoritative. Left in, it would go on saying "9.9.9 is
+    // the newest release published" from a check that stopped running — and "Check now" is
+    // disabled along with the setting, so there is no way to refresh it.
+    store.cache = CACHED;
+    store.enabled = false;
+
+    const status = await getUpdateStatus();
+    expect(status).toMatchObject({
+      enabled: false,
+      latest: null,
+      checkedAt: null,
+      error: null,
+      updateAvailable: false,
+    });
+  });
+
+  it('still names the repository while checks are off, since the field shows it', async () => {
+    store.enabled = false;
+    store.repository = 'ghcr.io/fork/name';
+
+    expect((await getUpdateStatus()).repository).toBe('ghcr.io/fork/name');
+  });
+
+  it('ignores a cached answer for a repository that has since been changed', async () => {
+    store.cache = CACHED;
+    store.repository = 'ghcr.io/fork/name';
+
+    const status = await getUpdateStatus();
+    expect(status.latest).toBeNull();
+    expect(status.checkedAt).toBeNull();
   });
 });
