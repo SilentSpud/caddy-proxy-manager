@@ -1,12 +1,12 @@
 name: Tests
 
 on:
-  # develop is where work lands; main is reached only by promoting a develop commit that already
-  # went green here. Both branches run the same suite, so the checks main requires are already
-  # attached to the commit by the time it is promoted.
+  # develop is where work lands, and every commit reaching main does so through a pull request
+  # whose checks ran against the merge result — the same tree that lands. Running them again on
+  # the push to main would re-prove a green commit at full cost, so main is deliberately absent
+  # here. Direct pushes to main are not a hole this leaves open: they are not permitted.
   push:
     branches:
-      - main
       - develop
   pull_request:
     branches:

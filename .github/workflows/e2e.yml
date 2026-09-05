@@ -1,13 +1,11 @@
 name: End-to-end tests
 
 on:
-  # develop is where work lands; main is reached only by promoting a develop commit that already
-  # went green here. Both branches run the same suite, so the checks main requires are already
-  # attached to the commit by the time it is promoted.
-  push:
-    branches:
-      - main
-      - develop
+  # Pull requests only. This suite builds the whole Compose stack and runs single-worker against a
+  # live Caddy, so it is the expensive check by a wide margin — running it on every push to develop
+  # spent that on commits nobody was ready to merge, and running it again on the push to main
+  # re-proved a tree the pull request had already tested. The run against the merge result is the
+  # one that decides whether the code lands, and it is the one kept.
   pull_request:
     branches:
       - main
