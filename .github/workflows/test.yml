@@ -1,9 +1,13 @@
 name: Tests
 
 on:
+  # develop is where work lands; main is reached only by promoting a develop commit that already
+  # went green here. Both branches run the same suite, so the checks main requires are already
+  # attached to the commit by the time it is promoted.
   push:
     branches:
       - main
+      - develop
   pull_request:
     branches:
       - main
