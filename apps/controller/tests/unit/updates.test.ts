@@ -6,6 +6,7 @@
  * naive string or field comparison announces an "update" to the beta an operator just left.
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { version as DECLARED_VERSION } from '@/package.json';
 import { vi } from '@/tests/helpers/vi';
 
 /**
@@ -120,7 +121,9 @@ describe('deciding whether to tell the operator', () => {
 
   it('is quiet for this build against the registry as it stands', () => {
     // The end-to-end shape of the feature: real tags, the version this package declares, no notice.
-    expect(isNewer('3.0.0-beta.2', newestRelease(REAL_TAGS))).toBe(false);
+    // Read from package.json rather than restated, so a release bump cannot leave this asserting
+    // about a version nothing ships any more.
+    expect(isNewer(DECLARED_VERSION, newestRelease(REAL_TAGS))).toBe(false);
   });
 });
 
