@@ -12,6 +12,7 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
@@ -197,9 +198,7 @@ export function CaddyBuildFields({
         <Card key={category} padding={4}>
           <VStack gap={3}>
             <HStack justify="between" align="center">
-              <Text type="label" size="xsm" weight="semibold" color="secondary">
-                {CATEGORY_LABELS[category]}
-              </Text>
+              <Heading level={2}>{CATEGORY_LABELS[category]}</Heading>
               <Badge label={`${group.filter((m) => modules[m.id]).length}/${group.length}`} />
             </HStack>
             <Divider />
@@ -217,9 +216,7 @@ export function CaddyBuildFields({
 
       <Card padding={4}>
         <VStack gap={3}>
-          <Text type="label" size="xsm" weight="semibold" color="secondary">
-            Custom modules
-          </Text>
+          <Heading level={2}>Custom modules</Heading>
           <Divider />
           <Text type="body" size="xsm" color="secondary">
             Any Caddy plugin published as a Go module. Compiled from source at build time, so an
