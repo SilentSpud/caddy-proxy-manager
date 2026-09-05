@@ -1801,7 +1801,11 @@ function UpdatesSection({
           />
 
           <Text size="xsm" color="secondary">
-            {updates.checkedAt ? `Last checked ${timeAgo(updates.checkedAt)}.` : "Never checked."}
+            {!updates.enabled
+              ? "Not checking."
+              : updates.checkedAt
+                ? `Last checked ${timeAgo(updates.checkedAt)}.`
+                : "Never checked."}
           </Text>
 
           <HStack gap={2} justify="end">
