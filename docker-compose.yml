@@ -28,10 +28,21 @@ services:
       # Public URL this instance is reached at.
       BASE_URL: ${BASE_URL:-http://localhost:3000}
 
-      # PostgreSQL only. Points at the postgres service below unless you override it with your
-      # own server; the database must already exist. An existing SQLite file is migrated through
-      # the in-app migration flow, not by pointing this at it.
-      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-cpm}:${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-cpm}}
+      # PostgreSQL only. Passed as discrete fields rather than folded into a URL: the password
+      # arrives here by interpolation and nothing encodes it, so a `/` in it used to end the URL's
+      # authority early and the app would try to connect to a host nobody configured. As fields
+      # there is no delimiter to collide with, and any password works as typed.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-cpm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-cpm}
+
+      # Overrides all of the above when set, for a server that needs something a URL can say and
+      # the fields cannot — an sslmode, a search_path, a connection option. Remember that a
+      # password inside a URL has to be percent-encoded. An existing SQLite file is migrated
+      # through the in-app migration flow, not by pointing this at it.
+      DATABASE_URL: ${DATABASE_URL:-}
 
       # Connections the database pool may open. The real default, not `${VAR:-}`: it is read as
       # Number(), which turns the empty string that form produces into 0.
