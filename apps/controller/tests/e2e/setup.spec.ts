@@ -115,6 +115,42 @@ test.describe('First-run setup', () => {
     await expect(page.getByRole('textbox', { name: 'Public URL' })).toHaveValue(SETUP_ORIGIN);
   });
 
+  test('the defaults a first certificate needs are asked for here, not afterwards', async () => {
+    // The ACME contact is the address Let's Encrypt warns about an expiring certificate at, and it
+    // was previously only reachable once setup had finished — by which time the first certificate
+    // may already have been issued with nobody to tell.
+    await expect(page.getByRole('textbox', { name: 'ACME contact email' })).toBeVisible();
+
+    // Prefilled from the public URL rather than left blank: it is required, and an empty required
+    // field is the one thing that can stop setup finishing.
+    await expect(page.locator('input[name="primaryDomain"]')).toHaveValue(
+      new URL(SETUP_ORIGIN).hostname,
+    );
+  });
+
+  test('an identity provider can be configured here, not only on the account step', async () => {
+    // The account step asks about OAuth only when it is the *only* way in. This instance created a
+    // local administrator, so before this card the OAUTH_ half of a .env had nowhere to go.
+    await expect(page.getByRole('textbox', { name: 'Display name' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Issuer URL' })).toBeVisible();
+
+    // Optional: blank is the ordinary answer, and the tests below finish setup without it.
+    await expect(page.getByRole('textbox', { name: 'Display name' })).toHaveValue('');
+  });
+
+  test('a half-filled provider is refused rather than quietly skipped', async () => {
+    // A name with no secret is a provider that cannot work; skipping it silently would leave the
+    // operator believing they had configured single sign-on.
+    await page.getByRole('textbox', { name: 'Display name' }).fill('Partly');
+    await page.getByRole('button', { name: 'Save and finish setup' }).click();
+
+    await expect(page.getByText(/needs a display name, issuer URL/i)).toBeVisible();
+    await expect(page).toHaveURL(/\/setup\/settings$/);
+
+    // Put it back to blank so the rest of this file finishes setup without a provider.
+    await page.getByRole('textbox', { name: 'Display name' }).fill('');
+  });
+
   test('the optional containers are switches, with their settings behind them', async () => {
     // This instance runs with an empty CLICKHOUSE_PASSWORD, so analytics infer off — and the whole
     // point of the gate is that the rest of the group is not asked about until it is on.

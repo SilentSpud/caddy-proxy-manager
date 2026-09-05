@@ -110,7 +110,10 @@ jobs:
             done
             echo '```'
             echo
-            echo "Published by the image build this release starts; give it a few minutes."
+            echo "Published by the image build this release starts; give it a few minutes. The"
+            echo "\`docker-compose.yml\` in the archive below already names these tags, so what you"
+            echo "deploy from it stays on this release until you choose to move -- but it also means"
+            echo "a \`docker compose pull\` run before the build finishes has nothing to fetch."
             echo
             echo "## Deployment files"
             echo
@@ -129,13 +132,15 @@ jobs:
               echo "First tagged release — take \`docker-compose.yml\` and \`.env.example\` from the archive below."
             fi
             echo
-            # The archive is flat and self-contained; say so, and flag the one difference from the
+            # The archive is flat and self-contained; say so, and flag both differences from the
             # repository so nobody diffs the two and files a bug.
             echo "The archive holds every file at its top level and deploys as it unpacks —"
             echo "extract it into one directory and \`docker compose up -d\` needs nothing moved."
-            echo "Its \`docker-compose.yml\` therefore mounts the ClickHouse override from beside"
-            echo "itself rather than from \`./docker/clickhouse/\`, which is the only way it"
-            echo "differs from the copy in the repository."
+            echo "Its \`docker-compose.yml\` differs from the copy in the repository in exactly two"
+            echo "ways: it mounts the ClickHouse override from beside itself rather than from"
+            echo "\`./docker/clickhouse/\`, and it pins the three images to \`${VERSION}\` rather than"
+            echo "\`latest\`. The repository copy follows \`latest\` on purpose; this one is a snapshot"
+            echo "of one release and says so."
             echo
             echo "## Changes"
             echo
@@ -161,6 +166,7 @@ jobs:
         if: steps.version.outputs.release == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -194,6 +200,40 @@ jobs:
           # Host side only. The container side stays /etc/clickhouse-server/config.d/..., which is
           # where ClickHouse actually reads the override from.
           sed -i 's#\./docker/clickhouse/#./clickhouse-#g' "$staging/docker-compose.yml"
+
+          # Pin this release's own images to this release's version.
+          #
+          # The repository copy tracks `:latest` deliberately -- on main, between releases, that is
+          # the tag which exists. But an archive is a snapshot of one release, and shipping it
+          # alongside a floating tag meant the two drifted the moment the next release published:
+          # someone deploying v3.0.0's files got whatever `latest` had become, and a redeploy months
+          # later silently upgraded the containers under compose files that had not changed.
+          #
+          # Scoped to the three images this project publishes. `tecnativa/docker-socket-proxy:latest`
+          # and `clickhouse/clickhouse-server:latest-alpine` are other people's images on their own
+          # release cadence, and pinning them to our version would name tags that do not exist --
+          # which is what the assertions below are really guarding.
+          sed -i -E \
+            "s#(image: ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
+            "$staging/docker-compose.yml"
+
+          for service in web caddy agent; do
+            if ! grep -qE "image: ghcr\.io/.*/${service}:${VERSION}\$" "$staging/docker-compose.yml"; then
+              echo "::error::staged docker-compose.yml does not pin ${service} to ${VERSION}"
+              grep -n 'image:' "$staging/docker-compose.yml"
+              exit 1
+            fi
+          done
+
+          # A sed that reached too far is the other half of the same worry: the third-party images
+          # must still say what they said.
+          for untouched in 'tecnativa/docker-socket-proxy:latest' 'clickhouse/clickhouse-server:latest-alpine'; do
+            if ! grep -qF "$untouched" "$staging/docker-compose.yml"; then
+              echo "::error::staged docker-compose.yml no longer references ${untouched}"
+              grep -n 'image:' "$staging/docker-compose.yml"
+              exit 1
+            fi
+          done
 
           # A sed that matched nothing is the failure worth catching here: it would ship a compose
           # file pointing at a directory the archive does not contain, and nothing downstream

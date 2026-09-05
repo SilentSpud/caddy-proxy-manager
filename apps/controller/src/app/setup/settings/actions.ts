@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
+import { createOAuthProvider, listOAuthProviders } from "@/src/lib/models/oauth-providers";
+import { isAppRole } from "@/src/lib/oidc-groups";
 import {
   analyticsEnabled,
   clickhousePassword,
@@ -10,6 +12,10 @@ import {
 } from "@/src/lib/settings/registry";
 import { propagateOptionalFeatureSettings } from "@/src/lib/settings/optional-features";
 import { resolveAllSettings, saveSettings } from "@/src/lib/settings/resolve";
+import { type GeneralSettings, saveGeneralSettings } from "@/src/lib/settings";
+// SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
+// JSON groups and one to the registry, and this action now saves through both.
+import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
 import { getMigrationSource, isSetupCompleted, markSetupCompleted } from "@/src/lib/setup";
 
 export type SetupSettingsState = { error: string | null };
@@ -88,8 +94,28 @@ export async function saveSetupSettings(
     }
   }
 
+  // Not a registry setting: `general` is a JSON object older than the registry, and the Settings
+  // page and the v1 API both read it from there. Validated through the same function that API
+  // route uses rather than by hand, so the rules and the wording cannot drift apart.
+  let general: GeneralSettings;
+  try {
+    const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
+    general = validateSettingsGroup("general", {
+      primaryDomain: String(formData.get("primaryDomain") ?? "").trim(),
+      // Omitted rather than empty when blank: the validator treats the key as optional, and
+      // storing "" would hand an empty contact to the ACME issuer instead of leaving it unset.
+      ...(acmeEmail === "" ? {} : { acmeEmail }),
+    }) as GeneralSettings;
+  } catch (error) {
+    if (error instanceof SettingsValidationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+
   try {
     await saveSettings(values);
+    await saveGeneralSettings(general);
   } catch (error) {
     if (error instanceof SettingValidationError) {
       return { error: error.message };
@@ -103,9 +129,83 @@ export async function saveSetupSettings(
   // resolved before the form was filled in. Never throws — see the function's own note.
   await propagateOptionalFeatureSettings();
 
+  const providerError = await createProviderFromForm(formData);
+  if (providerError) return { error: providerError };
+
   await markSetupCompleted();
 
   // A deployment that migrated has one more thing owed to it: its old database back, and a .env it
   // can safely replace. Everyone else is finished here.
   redirect((await getMigrationSource()) ? "/setup/done" : "/");
+}
+
+/**
+ * Create the identity provider the settings step offered, if it was filled in.
+ *
+ * Returns a message rather than throwing, so a mistyped issuer leaves the operator on the form
+ * with the rest of their configuration already saved rather than losing the page.
+ *
+ * Blank is the ordinary answer: a deployment signing in with a local administrator has no provider
+ * to describe, and the card is optional for that reason. Partly filled is not — a name with no
+ * client secret is a provider that cannot work, and silently skipping it would leave the operator
+ * believing they had configured single sign-on.
+ */
+async function createProviderFromForm(formData: FormData): Promise<string | null> {
+  const read = (key: string) => String(formData.get(key) ?? "").trim();
+  const flag = (key: string) => formData.get(key) === "on";
+
+  const name = read("idpName");
+  const clientId = read("idpClientId");
+  const clientSecret = read("idpClientSecret");
+  const issuer = read("idpIssuer");
+
+  const filled = [name, clientId, clientSecret, issuer].filter((value) => value !== "");
+  if (filled.length === 0) return null;
+  if (filled.length < 4) {
+    return "An identity provider needs a display name, issuer URL, client ID and client secret — or leave all four blank to skip it.";
+  }
+  if (!/^https?:\/\/\S+$/.test(issuer)) {
+    return "The issuer must be a URL starting with http:// or https://.";
+  }
+
+  // Re-checked here rather than trusted from the render: the page was drawn before the form was
+  // filled in, and the account step can have created a provider in between.
+  if ((await listOAuthProviders()).length > 0) {
+    return null;
+  }
+
+  // Narrowed rather than cast: this is a posted string that createOAuthProvider stores as a role,
+  // so anything unrecognised falls back instead of being written.
+  const posted = read("idpDefaultRole");
+  const defaultRole = isAppRole(posted) ? posted : "user";
+
+  try {
+    await createOAuthProvider({
+      name,
+      type: "oidc",
+      clientId,
+      clientSecret,
+      issuer,
+      authorizationUrl: read("idpAuthorizationUrl") || null,
+      tokenUrl: read("idpTokenUrl") || null,
+      userinfoUrl: read("idpUserinfoUrl") || null,
+      scopes: read("idpScopes") || "openid email profile",
+      autoLink: flag("idpAutoLink"),
+      enabled: true,
+      source: "ui",
+      roleMappingEnabled: flag("idpRoleMapping"),
+      groupsClaim: read("idpGroupsClaim") || "groups",
+      groupPrefix: read("idpGroupPrefix"),
+      adminGroup: read("idpAdminGroup"),
+      userGroup: read("idpUserGroup"),
+      viewerGroup: read("idpViewerGroup"),
+      defaultRole,
+      syncGroups: flag("idpSyncGroups"),
+    });
+  } catch (error) {
+    console.error("Setup: failed to create the OAuth provider", error);
+    return "The settings were saved, but the identity provider could not be created. Check its values and try again.";
+  }
+
+  return null;
 }

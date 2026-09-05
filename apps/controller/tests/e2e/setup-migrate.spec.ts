@@ -86,11 +86,20 @@ test.describe('Migrating an existing installation', () => {
     await expect(page.getByRole('checkbox', { name: /^Certificates/ })).toBeDisabled();
   });
 
-  test('migrating sends them to sign in with an account it just imported', async () => {
+  test('migrating restarts the app before handing them on', async () => {
+    // The restart is the point of this test, not a detail of it. The process read its
+    // configuration from an empty database at boot, and the import has just replaced that
+    // database underneath it — signing in before it restarts means signing in to the old answers.
     await page.getByRole('button', { name: 'Migrate this database' }).click();
 
-    // The importer copies thirty tables; the redirect is the signal it finished.
-    await expect(page).toHaveURL(/\/login$/, { timeout: 60_000 });
+    // The importer copies thirty tables; the dialog is the signal it finished.
+    await expect(
+      page.getByRole('heading', { name: 'Restarting to finish the migration' }),
+    ).toBeVisible({ timeout: 60_000 });
+
+    // Container down, container up, then the next step. Generous: this is a real restart of a
+    // real container, and the compose healthcheck alone allows 20s of start period.
+    await expect(page).toHaveURL(/\/login$/, { timeout: 180_000 });
   });
 
   test('the migrated administrator can sign in with their old password', async () => {
