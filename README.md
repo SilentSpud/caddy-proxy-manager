@@ -181,6 +181,8 @@ is still honoured as an override until a value is stored.
 | Failed sign-ins before lockout | `LOGIN_MAX_ATTEMPTS` | `5` |
 | Window over which failed sign-ins are counted, in ms | `LOGIN_WINDOW_MS` | `300000` |
 | How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
+| Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
+| Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/silentspud/caddy-proxy-manager` |
 | Collect traffic and WAF events. Leave unset to decide from whether a password is set | `ANALYTICS_ENABLED` | Unset |
 | ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
 | ClickHouse user | `CLICKHOUSE_USER` | `cpm` |

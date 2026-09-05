@@ -4,6 +4,7 @@ import { config } from "@/src/lib/config";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import { getModuleGateState } from "@/src/lib/caddy-build";
+import { getUpdateStatus } from "@/src/lib/updates";
 import { ModuleGateProvider } from "@/components/caddy-modules/ModuleGate";
 import { requiresLegacyPasswordChange } from "@/src/lib/services/legacy-password";
 import { redirect } from "next/navigation";
@@ -30,9 +31,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   // shows a module-backed control needs the same answer, and it only changes
   // when an admin saves Settings → Caddy Build.
   const moduleGate = await getModuleGateState();
+  // A cache read, and a background refresh when it has gone stale — never a network round trip on
+  // the render path. See lib/updates.ts.
+  const updates = await getUpdateStatus();
   return (
     <ModuleGateProvider value={moduleGate}>
-      <DashboardLayoutClient user={session.user} avatar={avatar} appName={config.appName}>
+      <DashboardLayoutClient
+        user={session.user}
+        avatar={avatar}
+        appName={config.appName}
+        updateAvailable={updates.updateAvailable}
+      >
         {children}
       </DashboardLayoutClient>
     </ModuleGateProvider>

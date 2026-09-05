@@ -55,6 +55,7 @@ import {
   isValidDnsDuration,
 } from "@/src/lib/dns-providers";
 import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
+import { checkForUpdates } from "@/src/lib/updates";
 import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { saveAnalyticsSettings, saveGeoipSettings } from "@/src/lib/settings/optional-features";
@@ -547,6 +548,67 @@ async function updateFaviconActionUnlocked(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save the favicon",
+    };
+  }
+}
+
+/**
+ * Save the update-check settings, then check straight away.
+ *
+ * The check runs inline here rather than being left to the background refresh: an operator who has
+ * just corrected the repository wants to know whether it works, and being told "never checked"
+ * after saving reads as the save having failed.
+ */
+async function updateUpdateSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const [registry, { saveSettings }] = await Promise.all([
+      import("@/src/lib/settings/registry"),
+      import("@/src/lib/settings/resolve"),
+    ]);
+
+    const enabled = formData.get("updateCheckEnabled") === "on";
+    await saveSettings({
+      [registry.updateCheckEnabled.key]: enabled,
+      [registry.updateImageRepository.key]: String(formData.get("updateImageRepository") ?? ""),
+    });
+
+    revalidatePath("/", "layout");
+    if (!enabled) {
+      return { success: true, message: "Update checks disabled — no requests will be made." };
+    }
+
+    const result = await checkForUpdates();
+    return result.error
+      ? { success: false, message: `Saved, but the check failed: ${result.error}` }
+      : { success: true, message: `Saved. Newest release published: ${result.latest}` };
+  } catch (error) {
+    console.error("Failed to save update settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save update settings",
+    };
+  }
+}
+
+/** Check now, ignoring how recently the last one ran. */
+async function checkForUpdatesActionUnlocked(): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const result = await checkForUpdates();
+    revalidatePath("/", "layout");
+    return result.error
+      ? { success: false, message: result.error }
+      : { success: true, message: `Newest release published: ${result.latest}` };
+  } catch (error) {
+    console.error("Update check failed:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "The update check failed",
     };
   }
 }
@@ -1451,6 +1513,10 @@ export const updateCaddyBuildSettingsAction = serializedSettingsAction(
   updateCaddyBuildSettingsActionUnlocked,
 );
 export const updateFaviconAction = serializedSettingsAction(updateFaviconActionUnlocked);
+export const updateUpdateSettingsAction = serializedSettingsAction(
+  updateUpdateSettingsActionUnlocked,
+);
+export const checkForUpdatesAction = serializedSettingsAction(checkForUpdatesActionUnlocked);
 export const updateAnalyticsSettingsAction = serializedSettingsAction(
   updateAnalyticsSettingsActionUnlocked,
 );

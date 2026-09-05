@@ -244,6 +244,34 @@ export const caddyBuildTimeout = numberSetting({
   max: 24 * 60 * 60,
 });
 
+export const updateCheckEnabled = booleanSetting({
+  name: "update_check_enabled",
+  env: "UPDATE_CHECK_ENABLED",
+  group: "application",
+  label: "Check for updates",
+  description:
+    "Ask the registry below, a few times a day, whether a newer release has been published. The " +
+    "only request this app makes to the internet on its own; turn it off to make none.",
+  default: true,
+});
+
+export const updateImageRepository = stringSetting({
+  name: "update_image_repository",
+  env: "UPDATE_IMAGE_REPOSITORY",
+  group: "application",
+  label: "Image repository",
+  description:
+    "Where this deployment's images come from, without the image name — the update check reads " +
+    "its tags. Point it at your own namespace if you run a fork, or it will report releases you " +
+    "cannot pull.",
+  default: "ghcr.io/silentspud/caddy-proxy-manager",
+  // A registry reference: host, optional port, then at least one path segment. Lowercase because
+  // that is what the registry API accepts, and no scheme because the check forces https.
+  pattern: /^[a-z0-9][a-z0-9.-]*(:\d{1,5})?(\/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)+$/,
+  patternHint: "must look like ghcr.io/owner/name, with no scheme and no image name",
+  maxLength: 256,
+});
+
 // ── Authentication ───────────────────────────────────────────────────────────
 
 export const allowSelfRegistration = booleanSetting({
@@ -503,6 +531,8 @@ export const SETTING_DEFINITIONS = [
   gravatarEnabled,
   forwardAuthInternalUrl,
   caddyBuildTimeout,
+  updateCheckEnabled,
+  updateImageRepository,
   allowSelfRegistration,
   allowOauthRegistration,
   allowOauthRoleFromClaims,

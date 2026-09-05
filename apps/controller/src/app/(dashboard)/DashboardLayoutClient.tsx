@@ -27,6 +27,7 @@ import { NavIcon } from "@astryxdesign/core/NavIcon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { Badge } from "@astryxdesign/core/Badge";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
@@ -120,11 +121,14 @@ export default function DashboardLayoutClient({
   user,
   avatar,
   appName,
+  updateAvailable,
   children,
 }: {
   user: User;
   avatar: ResolvedAvatar;
   appName: string;
+  /** A newer release exists in the registry. Surfaced beside the version it replaces. */
+  updateAvailable: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -145,6 +149,13 @@ export default function DashboardLayoutClient({
               heading={appName}
               headingHref="/"
               subheading={formatAppVersion()}
+              // Beside the version rather than as a banner: this is the number the notice is
+              // about, and an operator who does not want to act on it should not have to dismiss
+              // anything. The link goes to where it can be acted on or switched off.
+              subheadingHref={updateAvailable ? "/settings" : undefined}
+              headerEndContent={
+                updateAvailable ? <Badge variant="warning" label="Update" /> : undefined
+              }
               icon={
                 <NavIcon
                   icon={
