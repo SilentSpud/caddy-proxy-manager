@@ -572,10 +572,18 @@ async function updateUpdateSettingsActionUnlocked(
     ]);
 
     const enabled = formData.get("updateCheckEnabled") === "on";
-    await saveSettings({
-      [registry.updateCheckEnabled.key]: enabled,
-      [registry.updateImageRepository.key]: String(formData.get("updateImageRepository") ?? ""),
-    });
+    const values: Record<string, unknown> = { [registry.updateCheckEnabled.key]: enabled };
+
+    // The field is disabled while the check is off, and a disabled Astryx input drops its `name`
+    // and so submits nothing — see the note in components/ui/FormBooleanControls. Absent therefore
+    // means "leave it alone": writing the empty string it looks like would wipe the repository the
+    // moment someone turned the check off, and leave it unusable when they turned it back on.
+    const repository = formData.get("updateImageRepository");
+    if (typeof repository === "string" && repository.trim() !== "") {
+      values[registry.updateImageRepository.key] = repository;
+    }
+
+    await saveSettings(values);
 
     revalidatePath("/", "layout");
     if (!enabled) {
