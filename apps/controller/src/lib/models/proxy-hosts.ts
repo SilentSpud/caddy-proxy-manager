@@ -4,7 +4,7 @@ import { validateCaddyfileSnippet } from "../caddy-caddyfile";
 import { logAuditEvent } from "../audit";
 import { proxyHosts } from "../db/schema";
 import { asc, desc, eq, count, like, or } from "drizzle-orm";
-import { type GeoBlockSettings, getDnsProviderSettings } from "../settings";
+import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
 import { ApiValidationError } from "../api-errors";
@@ -13,6 +13,7 @@ import {
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
 } from "../caddy-waf";
+import { normalizeNodeName, validateNodeName } from "../caddy-tailscale";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -445,6 +446,221 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
   return normalized;
 }
 
+// ─── Tailscale ───────────────────────────────────────────────────────────────
+
+/**
+ * How one proxy host uses Tailscale. `serve` puts its routes on a `tailscale/<node>` listener,
+ * `auth` gates them on the caller's tailnet identity, and `upstreamNode` dials the *upstreams*
+ * through a node, for a backend that lives on the tailnet.
+ *
+ * `auth` implies `serve`: the plugin's authenticator finds its tsnet server by walking the
+ * listeners the request arrived on, and with none it falls back to a local tailscaled socket that
+ * does not exist in this image — every request would fail. normalizeTailscaleInput drops it rather
+ * than letting that combination reach config generation, where the failure would be a 500 per
+ * request with nothing in the UI to explain it.
+ */
+export type TailscaleHostConfig = {
+  serve: boolean;
+  /** Tailnet machine name. Empty means the node named in Settings → Tailscale. */
+  node: string;
+  /** Keep the host off the public :80/:443 listener, so it exists only on the tailnet. */
+  tailnetOnly: boolean;
+  auth: boolean;
+  /** Paths the identity gate covers. Null gates the whole host. */
+  protected_paths: string[] | null;
+  /** Paths that bypass the gate. Ignored when protected_paths is set. */
+  excluded_paths: string[] | null;
+  /** Pass the caller's identity upstream as X-Tailscale-* request headers. */
+  forwardIdentity: boolean;
+  /** Node to dial upstreams through. Null leaves upstreams on the container's own network. */
+  upstreamNode: string | null;
+};
+
+export type TailscaleHostInput = {
+  serve?: boolean;
+  node?: string | null;
+  tailnetOnly?: boolean;
+  auth?: boolean;
+  protected_paths?: string[] | null;
+  excluded_paths?: string[] | null;
+  forwardIdentity?: boolean;
+  upstreamNode?: string | null;
+};
+
+type TailscaleMeta = {
+  serve?: boolean;
+  node?: string;
+  tailnet_only?: boolean;
+  auth?: boolean;
+  protected_paths?: string[];
+  excluded_paths?: string[];
+  forward_identity?: boolean;
+  upstream_node?: string;
+};
+
+function assertNodeName(name: string, label: string): void {
+  const error = validateNodeName(name, label);
+  if (error) throw new ApiValidationError(error);
+}
+
+/** Path patterns reach a Caddy matcher verbatim, so they are stripped like every other path list. */
+function sanitizeTailscalePaths(paths: string[]): string[] {
+  return paths
+    .map((path) => stripCaddyPlaceholders(path?.trim() ?? ""))
+    .filter((path): path is string => Boolean(path));
+}
+
+/**
+ * Merge a partial update over what is stored, as the Authentik and load-balancer normalizers do: a
+ * form that only sends the fields it renders must not clear the rest. Everything that depends on
+ * `serve` is dropped when it is off, so the stored blob never describes a combination generation
+ * would have to second-guess.
+ */
+function normalizeTailscaleInput(
+  input: TailscaleHostInput | null | undefined,
+  existing: TailscaleMeta | undefined,
+): TailscaleMeta | undefined {
+  if (input === null) return undefined;
+  if (input === undefined) return existing;
+
+  const serve = input.serve ?? existing?.serve ?? false;
+
+  const node = input.node !== undefined ? normalizeNodeName(input.node) : (existing?.node ?? "");
+  if (node) assertNodeName(node, "Tailscale node name");
+
+  const upstreamNode =
+    input.upstreamNode !== undefined
+      ? normalizeNodeName(input.upstreamNode)
+      : (existing?.upstream_node ?? "");
+  if (upstreamNode) assertNodeName(upstreamNode, "Tailscale upstream node name");
+
+  const next: TailscaleMeta = {};
+  if (serve) {
+    next.serve = true;
+    if (node) next.node = node;
+    // Tailnet-only is the default a new host gets: someone turning this on is asking for a private
+    // service, and the surprising direction to guess wrong in is "also published to the internet".
+    if (input.tailnetOnly ?? existing?.tailnet_only ?? true) next.tailnet_only = true;
+
+    if (input.auth ?? existing?.auth ?? false) {
+      next.auth = true;
+      const protectedPaths = sanitizeTailscalePaths(
+        input.protected_paths !== undefined
+          ? (input.protected_paths ?? [])
+          : (existing?.protected_paths ?? []),
+      );
+      const excludedPaths = sanitizeTailscalePaths(
+        input.excluded_paths !== undefined
+          ? (input.excluded_paths ?? [])
+          : (existing?.excluded_paths ?? []),
+      );
+      if (protectedPaths.length > 0) next.protected_paths = protectedPaths;
+      if (excludedPaths.length > 0) next.excluded_paths = excludedPaths;
+      if (input.forwardIdentity ?? existing?.forward_identity ?? false) {
+        next.forward_identity = true;
+      }
+    }
+  }
+  if (upstreamNode) next.upstream_node = upstreamNode;
+
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+/**
+ * Re-run the normalizer over a stored blob on read, so a hand-edited row cannot put a node name
+ * into a listener address. It must not throw: a read that fails takes the whole proxy-hosts page
+ * with it, so an unusable block is dropped the way an unparseable meta already is.
+ */
+function sanitizeTailscaleMeta(meta: TailscaleMeta | undefined): TailscaleMeta | undefined {
+  if (!meta) return undefined;
+  try {
+    return normalizeTailscaleInput(
+      {
+        serve: meta.serve,
+        node: meta.node ?? "",
+        // Explicitly Boolean, not the raw field: undefined would re-apply the "default to
+        // tailnet-only" rule that belongs to a *new* host, silently pulling a host the operator
+        // published in both places off the public listener on the next read.
+        tailnetOnly: Boolean(meta.tailnet_only),
+        auth: meta.auth,
+        protected_paths: meta.protected_paths ?? null,
+        excluded_paths: meta.excluded_paths ?? null,
+        forwardIdentity: meta.forward_identity,
+        upstreamNode: meta.upstream_node ?? "",
+      },
+      undefined,
+    );
+  } catch (error) {
+    console.warn("Dropping invalid Tailscale host config", error);
+    return undefined;
+  }
+}
+
+/**
+ * Refuse to store a host that uses Tailscale while no auth key is configured.
+ *
+ * A node that cannot register is a listener that never comes up, and Caddy refuses a configuration
+ * it cannot start — so this one host would fail the apply for *every* host on *every* agent, with
+ * an error naming Tailscale rather than whatever was being edited. Blocking the write is the only
+ * place that failure can be turned into a sentence about the thing the operator just did.
+ *
+ * Reads the serialized meta rather than the input so it sees the merged result: a partial update
+ * that only sends `{ tailnetOnly: false }` still leaves `serve` on, and the REST API reaches the
+ * same code. A stored Caddy placeholder counts as a key — whether the environment actually defines
+ * it is only knowable inside the Caddy container.
+ */
+async function assertTailscaleServable(meta: string | null): Promise<void> {
+  if (!meta) return;
+  let parsed: ProxyHostMeta;
+  try {
+    parsed = JSON.parse(meta) as ProxyHostMeta;
+  } catch {
+    return;
+  }
+  const tailscale = parsed.tailscale;
+  if (!tailscale?.serve && !tailscale?.upstream_node) return;
+
+  const settings = await getTailscaleSettings();
+  if (settings?.authKey.trim()) return;
+
+  throw new ApiValidationError(
+    "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node " +
+      "cannot register, and Caddy would reject the whole configuration — every proxy host would " +
+      "stop being updated, not just this one. Add an auth key in Settings → Tailscale first.",
+  );
+}
+
+function hydrateTailscale(meta: TailscaleMeta | undefined): TailscaleHostConfig | null {
+  if (!meta) return null;
+  return {
+    serve: Boolean(meta.serve),
+    node: meta.node ?? "",
+    tailnetOnly: Boolean(meta.tailnet_only),
+    auth: Boolean(meta.auth),
+    protected_paths: meta.protected_paths?.length ? meta.protected_paths : null,
+    excluded_paths: meta.excluded_paths?.length ? meta.excluded_paths : null,
+    forwardIdentity: Boolean(meta.forward_identity),
+    upstreamNode: meta.upstream_node || null,
+  };
+}
+
+function dehydrateTailscale(config: TailscaleHostConfig | null): TailscaleMeta | undefined {
+  if (!config) return undefined;
+  return normalizeTailscaleInput(
+    {
+      serve: config.serve,
+      node: config.node,
+      tailnetOnly: config.tailnetOnly,
+      auth: config.auth,
+      protected_paths: config.protected_paths,
+      excluded_paths: config.excluded_paths,
+      forwardIdentity: config.forwardIdentity,
+      upstreamNode: config.upstreamNode,
+    },
+    undefined,
+  );
+}
+
 export type CpmForwardAuthConfig = {
   enabled: boolean;
   protected_paths: string[] | null;
@@ -480,6 +696,7 @@ type ProxyHostMeta = {
   waf?: WafHostConfig;
   mtls?: MtlsConfig;
   cpm_forward_auth?: CpmForwardAuthMeta;
+  tailscale?: TailscaleMeta;
   redirects?: RedirectRule[];
   rewrite?: RewriteConfig;
   location_rules?: LocationRuleMeta[];
@@ -517,6 +734,7 @@ export type ProxyHost = {
   waf: WafHostConfig | null;
   mtls: MtlsConfig | null;
   cpmForwardAuth: CpmForwardAuthConfig | null;
+  tailscale: TailscaleHostConfig | null;
   redirects: RedirectRule[];
   rewrite: RewriteConfig | null;
   locationRules: LocationRule[];
@@ -551,6 +769,7 @@ export type ProxyHostInput = {
   waf?: WafHostConfig | null;
   mtls?: MtlsConfig | null;
   cpmForwardAuth?: CpmForwardAuthInput | null;
+  tailscale?: TailscaleHostInput | null;
   redirects?: RedirectRule[] | null;
   rewrite?: RewriteConfig | null;
   locationRules?: LocationRuleInput[] | null;
@@ -924,6 +1143,13 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
     }
   }
 
+  if (meta.tailscale) {
+    const tailscale = sanitizeTailscaleMeta(meta.tailscale);
+    if (tailscale) {
+      normalized.tailscale = tailscale;
+    }
+  }
+
   if (meta.redirects && meta.redirects.length > 0) {
     normalized.redirects = meta.redirects;
   }
@@ -1178,6 +1404,7 @@ function parseMeta(value: string | null): ProxyHostMeta {
       waf: parsed.waf,
       mtls: parsed.mtls,
       cpm_forward_auth: sanitizeCpmForwardAuthMeta(parsed.cpm_forward_auth),
+      tailscale: sanitizeTailscaleMeta(parsed.tailscale),
       redirects: sanitizeRedirectRules(parsed.redirects),
       rewrite: sanitizeRewriteConfig(parsed.rewrite) ?? undefined,
       location_rules: sanitizeLocationRuleMetas(parsed.location_rules),
@@ -1711,6 +1938,15 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
     }
   }
 
+  if (input.tailscale !== undefined) {
+    const tailscale = normalizeTailscaleInput(input.tailscale, existing.tailscale);
+    if (tailscale) {
+      next.tailscale = tailscale;
+    } else {
+      delete next.tailscale;
+    }
+  }
+
   if (input.redirects !== undefined) {
     const rules = sanitizeRedirectRules(input.redirects ?? []);
     if (rules.length > 0) {
@@ -2147,6 +2383,7 @@ function parseProxyHost(row: ProxyHostRow): ProxyHost {
           excluded_paths: meta.cpm_forward_auth.excluded_paths ?? null,
         }
       : null,
+    tailscale: hydrateTailscale(meta.tailscale),
     redirects: meta.redirects ?? [],
     rewrite: meta.rewrite ?? null,
     locationRules: hydrateLocationRules(meta.location_rules),
@@ -2234,6 +2471,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
 
   const now = nowIso();
   const meta = buildMeta({}, input);
+  await assertTailscaleServable(meta);
   const [record] = await db
     .insert(proxyHosts)
     .values({
@@ -2329,6 +2567,7 @@ export async function updateProxyHost(
           },
         }
       : {}),
+    tailscale: dehydrateTailscale(existing.tailscale),
     ...(existing.redirects && existing.redirects.length > 0
       ? { redirects: existing.redirects }
       : {}),
@@ -2350,6 +2589,7 @@ export async function updateProxyHost(
       : {}),
   };
   const meta = buildMeta(existingMeta, input);
+  await assertTailscaleServable(meta);
 
   const now = nowIso();
   await db

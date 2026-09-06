@@ -26,6 +26,9 @@ import {
   saveAvatarSettings,
   savePasswordPolicySettings,
   saveCaddyBuildSettings,
+  getTailscaleSettings,
+  saveTailscaleSettings,
+  defaultTailscaleSettings,
 } from "@/src/lib/settings";
 import {
   listProxyHosts,
@@ -55,6 +58,9 @@ import {
   isValidDnsDuration,
 } from "@/src/lib/dns-providers";
 import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
+import { parseCheckbox, parseCsv } from "@/src/lib/form-parse";
+import { checkTailscaleAuthKey } from "@/src/lib/tailscale-api";
+import { decryptSecret } from "@/src/lib/secret";
 import { checkForUpdates } from "@/src/lib/updates";
 import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
@@ -354,6 +360,75 @@ async function updateAuthentikSettingsActionUnlocked(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save Authentik settings",
+    };
+  }
+}
+
+/**
+ * Tailscale node defaults.
+ *
+ * An empty secret field means "keep the stored one", for both the auth key and the API access
+ * token: the form never receives the current value to send back, so without this every unrelated
+ * edit — a tag, the control URL — would wipe the credential and every node would fail to
+ * re-register on the next restart.
+ */
+async function updateTailscaleSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const existing = (await getTailscaleSettings()) ?? defaultTailscaleSettings();
+    const submittedAuthKey = String(formData.get("tailscaleAuthKey") ?? "").trim();
+    const submittedToken = String(formData.get("tailscaleApiAccessToken") ?? "").trim();
+
+    // Already encrypted when it comes from `existing`; encryptSecret leaves such a value alone.
+    const authKey = submittedAuthKey.length > 0 ? submittedAuthKey : existing.authKey;
+    const apiAccessToken = submittedToken.length > 0 ? submittedToken : existing.apiAccessToken;
+    const validateAuthKey = parseCheckbox(formData.get("tailscaleValidateAuthKey"));
+    const apiTailnet = String(formData.get("tailscaleApiTailnet") ?? "").trim() || "-";
+
+    // Checked before the save, not after: the point is to keep a key Caddy will choke on out of
+    // the database in the first place. Whatever was already stored keeps working meanwhile.
+    if (validateAuthKey && authKey) {
+      const check = await checkTailscaleAuthKey({
+        authKey: decryptSecret(authKey, "Tailscale auth key"),
+        apiAccessToken: apiAccessToken
+          ? decryptSecret(apiAccessToken, "Tailscale API access token")
+          : "",
+        tailnet: apiTailnet,
+      });
+      if (check.status === "rejected") {
+        return { success: false, message: `Tailscale did not accept this key. ${check.reason}` };
+      }
+      if (check.status === "unknown") {
+        console.warn(`Tailscale auth key was not checked: ${check.reason}`);
+      }
+    }
+
+    await saveTailscaleSettings({
+      enabled: parseCheckbox(formData.get("tailscaleEnabled")),
+      authKey,
+      controlUrl: String(formData.get("tailscaleControlUrl") ?? "").trim(),
+      ephemeral: parseCheckbox(formData.get("tailscaleEphemeral")),
+      stateDir: String(formData.get("tailscaleStateDir") ?? "").trim(),
+      tags: parseCsv(formData.get("tailscaleTags")),
+      defaultNode: String(formData.get("tailscaleDefaultNode") ?? "").trim(),
+      validateAuthKey,
+      apiAccessToken,
+      apiTailnet,
+    });
+
+    revalidatePath("/settings");
+    // Nodes are registered by the Caddy config, so nothing happens until it is pushed.
+    await applyCaddyConfig();
+    return { success: true, message: "Tailscale settings saved successfully" };
+  } catch (error) {
+    console.error("Failed to save Tailscale settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save Tailscale settings",
     };
   }
 }
@@ -1503,6 +1578,9 @@ export const updateErrorPagesSettingsAction = serializedSettingsAction(
 );
 export const updateDefaultResponseSettingsAction = serializedSettingsAction(
   updateDefaultResponseSettingsActionUnlocked,
+);
+export const updateTailscaleSettingsAction = serializedSettingsAction(
+  updateTailscaleSettingsActionUnlocked,
 );
 export const removeWafRuleGloballyAction = serializedSettingsAction(
   removeWafRuleGloballyActionUnlocked,

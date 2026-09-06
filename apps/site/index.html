@@ -130,9 +130,14 @@
           <p>OAuth2/OIDC authentication with any compliant provider — Authentik, Keycloak, Auth0, and more. Account linking from the Profile page.</p>
         </div>
         <div class="card">
+          <div class="card-icon">🔐</div>
+          <h3>Tailscale</h3>
+          <p>Serve a host privately on your tailnet, gate it on the caller’s Tailscale identity, or proxy to a backend that only exists on the tailnet. Runs inside Caddy — no tailscaled, no TUN device, and <code>*.ts.net</code> certificates without ACME.</p>
+        </div>
+        <div class="card">
           <div class="card-icon">🧩</div>
           <h3>Caddy Build</h3>
-          <p>Choose which plugins your Caddy binary is compiled with — Layer 4, WAF, request blocker, every DNS provider — or add your own Go modules. Rebuild from the UI; settings for disabled modules grey out and say why.</p>
+          <p>Choose which plugins your Caddy binary is compiled with — Layer 4, Tailscale, WAF, request blocker, every DNS provider — or add your own Go modules. Rebuild from the UI; settings for disabled modules grey out and say why.</p>
         </div>
         <div class="card">
           <div class="card-icon">🔄</div>

@@ -122,13 +122,14 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **User Management** - Admin page for managing users: edit roles, status, profiles; disable or delete accounts; search and filter
 - **Groups** - Organize users into groups for forward auth access control. Assign groups to proxy hosts to grant access to all members at once
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
+- **Tailscale** - Serve a proxy host privately on your tailnet, gate it on the caller's Tailscale identity, or reach a backend that only exists on the tailnet. A Tailscale node runs inside the Caddy container — no `tailscaled` on the host, no TUN device, no published ports — and `*.ts.net` certificates come from Tailscale rather than ACME
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
 - **REST API** - Full REST API under `/api/v1/` with Bearer token authentication, covering all resources. Interactive OpenAPI 3.1.0 docs at `/api-docs`
 - **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, and ClouDNS. Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults)
-- **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
+- **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format — plus everything that used to be in `.env`, stored in the database and editable without a restart
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
 - **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported — accounts, hosts, certificates and settings — with a backup of the old file and a trimmed `.env` at the end
@@ -662,7 +663,8 @@ Each supported plugin has a toggle. Turning one off has two effects:
 - Every setting that depends on it is disabled in the UI, with a tooltip naming
   the module. Global geoblocking and per-host geoblock rules follow the Request
   Blocker module; the WAF page and per-host WAF settings follow Coraza; the L4
-  Proxy Hosts page follows caddy-l4; and each DNS provider follows its own
+  Proxy Hosts page follows caddy-l4; the Tailscale settings and every per-host
+  tailnet option follow caddy-tailscale; and each DNS provider follows its own
   `caddy-dns` module, so disabling Cloudflare leaves Route 53 alone.
 
 A module still in use cannot be switched off — the save is refused and names
@@ -689,6 +691,13 @@ there too, as a release tag: `docker/caddy/update-compatibility-pins.sh` derives
 the `cel-go` replacement from that release, which is what keeps the build off a
 floating master commit. A scheduled workflow reruns it and opens a PR when the
 replacement moves.
+
+Every `replace` directive in that `go.mod` is passed through to the build, so a
+plugin can be pointed at a fork carrying a fix its upstream has not merged. Each
+one says why it exists in a comment beside itself, and the resolved list below
+records them, so an image never hides which source a plugin actually came from.
+`caddy-tailscale` is on one now — see [The plugin is on a
+fork](#the-plugin-is-on-a-fork).
 
 You can see exactly what an image was built with, without rebuilding it:
 
@@ -800,6 +809,139 @@ When enabled, hostname upstreams are resolved during config save/reload and writ
 If one reverse proxy handler contains multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those HTTPS upstreams to avoid TLS SNI mismatch. In that case, hostname dials are kept for those HTTPS upstreams.
 
 HTTP upstreams in the same handler are still eligible for pinning.
+
+---
+
+## Tailscale
+
+A proxy host can be served on your [tailnet](https://tailscale.com/) instead of, or as well as, the
+public internet — and it does not need anything else on the host. The
+[caddy-tailscale](https://github.com/tailscale/caddy-tailscale) plugin runs a Tailscale node in
+userspace inside the Caddy process: no `tailscaled`, no `/dev/net/tun`, no extra published ports,
+and no change to `docker-compose.yml`.
+
+Turn it on in **Settings → Tailscale**. The one thing it needs is a reusable auth key from the
+Tailscale admin console. If you would rather not store the key in the database, put a Caddy
+placeholder in the field instead — `{env.TS_AUTHKEY}` is passed through untouched, and Caddy
+resolves it from the container's environment.
+
+| Setting | What it does |
+| --- | --- |
+| **Auth key** | Registers each node. Encrypted at rest and never sent back to the browser. |
+| **Default node name** | The tailnet machine name a host inherits when it names none. Several hosts can share one node. |
+| **Tags** | ACL tags applied at registration. Most reusable auth keys require at least one, e.g. `tag:caddy`. |
+| **Control server URL** | Point at Headscale or another coordination server. Empty uses Tailscale's own. |
+| **State directory** | Where each node keeps its identity, one subdirectory per node. Defaults to `/data/tailscale`, which is on the `caddy-data` volume — keep it on a volume, or every restart registers a new machine. |
+| **Ephemeral** | Nodes leave the tailnet when Caddy stops instead of lingering as offline machines. |
+| **Check the auth key** | Verify the key against the Tailscale API before saving. Off by default; see [Checking the auth key](#checking-the-auth-key). |
+
+### Per host
+
+**Proxy Host → Tailscale** carries three things.
+
+**Serve on tailnet.** The host's routes move to a listener on the chosen node. **Tailnet only** —
+on by default — keeps them off the public `:80`/`:443` listener entirely, so the service exists
+only for devices on your tailnet; turn it off to publish in both places.
+
+Routing is still by `Host` header, so add the node's MagicDNS name (`<node>.<tailnet>.ts.net`) to
+the host's **Domains**. Caddy gets the certificate for that name from Tailscale — no ACME, no DNS
+provider, and nothing to configure. A `.ts.net` domain is never sent to a public CA, which could
+not validate it anyway.
+
+**Require a Tailscale identity.** Only devices signed in to your tailnet may reach the host, and the
+caller is identified by their tailnet login. Supports the same protected/excluded path lists as the
+other authentication integrations, and **Forward the identity upstream** sets these on the proxied
+request:
+
+| Header | Value |
+| --- | --- |
+| `X-Tailscale-User` | Full login, e.g. `alice@example.com` |
+| `X-Tailscale-Login` | Login without the domain |
+| `X-Tailscale-Name` | Display name |
+| `X-Tailscale-Tailnet` | Tailnet name |
+| `X-Tailscale-Profile-Picture` | Profile picture URL |
+
+Any such header sent by the client is stripped before the request is proxied, on every route,
+including ones that bypass the identity check — so an upstream can trust what it receives.
+
+Tagged devices are refused: a tag has no user behind it, so there is no identity to forward.
+Identity authentication needs the host to be served on the tailnet, and is dropped if it is not —
+the authenticator finds its node through the listener the request arrived on.
+
+**Reach upstreams over the tailnet.** Independent of the other two: a host published on the public
+internet can still proxy to a machine that only exists on your tailnet. Name a node to dial through
+and put a MagicDNS name or tailnet IP in **Upstreams**. Upstream DNS pinning and custom DNS
+resolvers do not apply to these — names are resolved by MagicDNS on the far side, which this
+container's resolver knows nothing about.
+
+A node named only here is never listened on: it exists so Caddy has something to dial out through,
+and it stays idle until a request goes through it.
+
+### Checking the auth key
+
+A node that cannot register is a listener that never comes up, and Caddy refuses a configuration it
+cannot start — so a missing or rejected auth key fails the apply for **every** host on **every**
+agent, with an error naming Tailscale rather than whatever was being edited. Two things guard
+against that.
+
+**A host that uses Tailscale will not save while no key is stored.** This is unconditional, and it
+covers the REST API as well as the form. A Caddy placeholder counts as a key: whether the
+environment actually defines `TS_AUTHKEY` is only knowable inside the Caddy container.
+
+**Optionally, the key itself is checked before it is stored.** Turn on *Check the auth key against
+the Tailscale API* in **Settings → Tailscale**. A revoked, expired or mistyped key is then refused
+at the point you paste it, with the reason, instead of surfacing at the next config apply.
+
+This needs a second credential. An auth key (`tskey-auth-…`) authenticates a device registration and
+nothing else — only an API access token (`tskey-api-…`) can call the API — so the check asks for one,
+and is off by default because it is the only thing in this app that reaches Tailscale on its own.
+Read access to keys is enough. The tailnet field is `-` for the token's own tailnet, which is right
+unless you administer several.
+
+> **With the check off, nothing can tell a revoked key from a working one.** The first sign is a
+> failed apply, and until the key is fixed no proxy host on any agent can be updated. That is the
+> trade: an outbound request to Tailscale on save, against discovering a dead key at the worst
+> moment.
+
+Some keys cannot be checked even with it on — an older `tskey-<secret>` key, a Headscale key, or a
+Caddy placeholder — because none of them carries an id the API can address. Those save with a note
+in the log rather than being refused: the format is not a documented contract, and guessing wrong
+would reject a key that works. If the API cannot be reached at all, the save **is** refused, since
+letting it through would quietly defeat the point of turning the check on.
+
+### The plugin is on a fork
+
+`docker/caddy/go.mod` points `caddy-tailscale` at a fork of upstream's own `main` plus the one
+commit proposed in [tailscale/caddy-tailscale#142](https://github.com/tailscale/caddy-tailscale/pull/142),
+for a crash that is not merged yet.
+
+A node is not started until something uses it, and a node named only by the reverse-proxy transport
+is not used until the first request goes through it. Releasing one in that state crashed Caddy from
+inside `tsnet`: `tailscaleNode.Destruct` calls `tsnet.(*Server).Close`, which is documented as unsafe
+before `Start` and dereferences state that only `start()` creates. Caddy releases the previous
+configuration's modules after every reload and again on shutdown, so a single host dialling over the
+tailnet took the admin API down on the apply that stopped using it — reporting failure across the
+fleet when the configuration had in fact been applied — and turned every container stop into a
+crash. `CertDomains` had the same flaw, reached on every TLS handshake, so one idle node would break
+certificates for all of them.
+
+The commit records whether `Start` ever returned successfully and consults that in both places. With
+it, four previously-crashing cases are clean: the reload that stops using a node, shutdown, `caddy
+validate`, and a load that fails on a bad auth key — which now exits 1 with the Tailscale error
+instead of 2 with a stack trace.
+
+Nothing else guards against this, so keep the `replace` directive until the PR merges.
+`docker/caddy/go.mod` says as much beside it.
+
+### What happens if the module is missing
+
+Tailscale is a Caddy plugin, so it has to be in the binary. It is in the default image, but if it is
+switched off in **Settings → Caddy Build** — or switched back on and not rebuilt yet — a host set to
+**tailnet only** is dropped from the configuration entirely rather than published on the public
+listener. Serving something privately-intended to the internet is the one failure mode worth an
+outage; the reason is logged, and everything else keeps serving.
+
+L4 proxy hosts are not on the tailnet — only HTTP proxy hosts are.
 
 ---
 

@@ -871,6 +871,7 @@ const spec = {
                 "waf",
                 "error-pages",
                 "default-response",
+                "tailscale",
               ],
             },
             description: "Settings group name",
@@ -894,6 +895,7 @@ const spec = {
                     { $ref: "#/components/schemas/GeoBlockConfig" },
                     { $ref: "#/components/schemas/WafSettings" },
                     { $ref: "#/components/schemas/DefaultResponseSettings" },
+                    { $ref: "#/components/schemas/TailscaleSettingsStatus" },
                   ],
                 },
               },
@@ -927,6 +929,7 @@ const spec = {
                 "waf",
                 "error-pages",
                 "default-response",
+                "tailscale",
               ],
             },
             description: "Settings group name",
@@ -949,6 +952,7 @@ const spec = {
                   { $ref: "#/components/schemas/GeoBlockConfig" },
                   { $ref: "#/components/schemas/WafSettings" },
                   { $ref: "#/components/schemas/DefaultResponseSettings" },
+                  { $ref: "#/components/schemas/TailscaleSettings" },
                 ],
               },
             },
@@ -2019,6 +2023,114 @@ const spec = {
           },
         },
       },
+      TailscaleHostConfig: {
+        type: "object",
+        description:
+          "How this host uses Tailscale. Requires the Tailscale Caddy module. `auth` is only honoured together with `serve`, because the identity check needs a tailnet listener to ask who is calling.",
+        properties: {
+          serve: {
+            type: "boolean",
+            description: "Serve this host on a tailscale/<node> listener",
+          },
+          node: {
+            type: "string",
+            example: "caddy",
+            description:
+              "Tailnet machine name. Empty inherits the default from Tailscale settings.",
+          },
+          tailnetOnly: {
+            type: "boolean",
+            description: "Keep the host off the public :80/:443 listener entirely",
+          },
+          auth: {
+            type: "boolean",
+            description: "Require a Tailscale identity (tailscale_auth)",
+          },
+          protected_paths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths the identity gate covers (null = the whole host)",
+          },
+          excluded_paths: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Paths that bypass the gate. Ignored when protected_paths is set.",
+          },
+          forwardIdentity: {
+            type: "boolean",
+            description: "Send X-Tailscale-User and friends upstream",
+          },
+          upstreamNode: {
+            type: ["string", "null"],
+            description:
+              "Dial the upstreams through this node, for a backend on the tailnet. The node also gets a listener of its own, which serves nothing.",
+          },
+        },
+      },
+      TailscaleSettings: {
+        type: "object",
+        description: "Tailscale node defaults for the whole deployment",
+        properties: {
+          enabled: { type: "boolean" },
+          authKey: {
+            type: "string",
+            description:
+              "Auth key used to register each node. Stored encrypted and never returned. A Caddy placeholder such as {env.TS_AUTHKEY} is passed through untouched.",
+          },
+          controlUrl: {
+            type: "string",
+            description: "Coordination server URL. Empty uses Tailscale's own.",
+          },
+          ephemeral: { type: "boolean", description: "Register nodes as ephemeral" },
+          stateDir: {
+            type: "string",
+            example: "/data/tailscale",
+            description: "Parent directory for per-node state. Must be on a volume.",
+          },
+          tags: {
+            type: "array",
+            items: { type: "string", example: "tag:caddy" },
+            description: "ACL tags applied at registration",
+          },
+          defaultNode: {
+            type: "string",
+            example: "caddy",
+            description: "Node name for hosts that do not choose one",
+          },
+          validateAuthKey: {
+            type: "boolean",
+            description:
+              "Check the auth key against the Tailscale API before saving. Needs apiAccessToken.",
+          },
+          apiAccessToken: {
+            type: "string",
+            description:
+              "Tailscale API access token (tskey-api-…) used for that check. Stored encrypted and never returned.",
+          },
+          apiTailnet: {
+            type: "string",
+            example: "-",
+            description: 'Tailnet the check addresses. "-" means the token\'s own tailnet.',
+          },
+        },
+        required: ["enabled"],
+      },
+      TailscaleSettingsStatus: {
+        type: "object",
+        description: "Tailscale settings as returned by GET, with the auth key withheld",
+        properties: {
+          enabled: { type: "boolean" },
+          hasAuthKey: { type: "boolean", description: "Whether an auth key is stored" },
+          hasApiAccessToken: { type: "boolean" },
+          controlUrl: { type: "string" },
+          ephemeral: { type: "boolean" },
+          stateDir: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+          defaultNode: { type: "string" },
+          validateAuthKey: { type: "boolean" },
+          apiTailnet: { type: "string" },
+        },
+      },
       RedirectRule: {
         type: "object",
         description: "HTTP redirect rule",
@@ -2226,6 +2338,9 @@ const spec = {
           cpmForwardAuth: {
             oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }],
           },
+          tailscale: {
+            oneOf: [{ $ref: "#/components/schemas/TailscaleHostConfig" }, { type: "null" }],
+          },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },
           locationRules: {
@@ -2288,6 +2403,9 @@ const spec = {
           mtls: { oneOf: [{ $ref: "#/components/schemas/MtlsConfig" }, { type: "null" }] },
           cpmForwardAuth: {
             oneOf: [{ $ref: "#/components/schemas/CpmForwardAuthConfig" }, { type: "null" }],
+          },
+          tailscale: {
+            oneOf: [{ $ref: "#/components/schemas/TailscaleHostConfig" }, { type: "null" }],
           },
           redirects: { type: "array", items: { $ref: "#/components/schemas/RedirectRule" } },
           rewrite: { oneOf: [{ $ref: "#/components/schemas/RewriteConfig" }, { type: "null" }] },

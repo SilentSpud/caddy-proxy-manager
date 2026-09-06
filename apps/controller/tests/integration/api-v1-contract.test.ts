@@ -98,6 +98,9 @@ describe('v1 OpenAPI schemas: no top-level snake_case', () => {
     'MtlsConfig',
     'RewriteConfig',
     'CpmForwardAuthConfig',
+    // protected_paths/excluded_paths, spelled the same as the two auth configs above — they feed
+    // the same path-mode resolver, and one of the three reading differently is worse than snake.
+    'TailscaleHostConfig',
   ]);
   // Properties on otherwise-camelCase schemas that we intentionally keep
   // snake_case because the route handler reads them that way.

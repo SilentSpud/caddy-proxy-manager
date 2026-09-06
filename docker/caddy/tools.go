@@ -38,4 +38,5 @@ import (
 	_ "github.com/corazawaf/coraza-caddy/v2"
 	_ "github.com/fuomag9/caddy-blocker-plugin"
 	_ "github.com/mholt/caddy-l4"
+	_ "github.com/tailscale/caddy-tailscale"
 )

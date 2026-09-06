@@ -302,7 +302,7 @@ export function sanitizeCaddyBuildSettings(input: {
 
 // ─── UI gate ─────────────────────────────────────────────────────────────────
 
-const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "dns01"];
+const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", "dns01"];
 
 /**
  * The serializable snapshot the dashboard hands to client components. Gates on *desired*, not

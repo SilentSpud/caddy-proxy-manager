@@ -16,6 +16,8 @@ export type CaddyFeatureId =
   | "l4"
   | "geoblock"
   | "waf"
+  /** Serving and authenticating over a tailnet — the caddy-tailscale plugin. */
+  | "tailscale"
   /** ACME DNS-01 challenges in general — satisfied by *any* enabled DNS module. */
   | "dns01";
 
@@ -47,6 +49,16 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     docsUrl: "https://github.com/mholt/caddy-l4",
     category: "proxy",
     features: ["l4"],
+  },
+  {
+    id: "caddy-tailscale",
+    name: "Tailscale",
+    modulePath: "github.com/tailscale/caddy-tailscale",
+    description:
+      "Runs Tailscale inside Caddy. Required to serve a proxy host on your tailnet, to gate one on Tailscale identity, and to reach an upstream over the tailnet.",
+    docsUrl: "https://github.com/tailscale/caddy-tailscale",
+    category: "proxy",
+    features: ["tailscale"],
   },
   {
     id: "caddy-blocker",

@@ -29,17 +29,25 @@ import {
   saveDefaultResponseSettings,
   getTrustedProxiesSettings,
   saveTrustedProxiesSettings,
+  getTailscaleSettings,
+  saveTailscaleSettings,
+  defaultTailscaleSettings,
   getSetting,
   setSetting,
   clearSetting,
 } from "@/src/lib/settings";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { DefaultResponseValidationError } from "@/src/lib/caddy-default-response";
+import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
 import {
   redactDnsProviderSettingsForApi,
   redactLegacyCloudflareSettingsForApi,
 } from "@/src/lib/dns-providers";
-import type { CloudflareSettings, DnsProviderSettings } from "@/src/lib/settings";
+import type {
+  CloudflareSettings,
+  DnsProviderSettings,
+  TailscaleSettings,
+} from "@/src/lib/settings";
 import {
   assertSettingsPayloadSize,
   SettingsValidationError,
@@ -139,6 +147,14 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     storageKey: "trusted_proxies",
     applyCaddy: true,
   },
+  tailscale: {
+    // Defaulted rather than null, so a GET before anything is saved still describes the shape a
+    // PUT has to send — the node name in particular, which hosts inherit.
+    get: async () => (await getTailscaleSettings()) ?? defaultTailscaleSettings(),
+    save: saveTailscaleSettings as (data: never) => Promise<void>,
+    storageKey: "tailscale",
+    applyCaddy: true,
+  },
 };
 
 function _unknownKey(input: Record<string, unknown>, allowed: readonly string[]): string | null {
@@ -165,6 +181,11 @@ export async function GET(
         redactLegacyCloudflareSettingsForApi(settings as CloudflareSettings),
         { headers: { "Cache-Control": "no-store" } },
       );
+    }
+    if (group === "tailscale" && settings) {
+      return NextResponse.json(redactTailscaleSettingsForApi(settings as TailscaleSettings), {
+        headers: { "Cache-Control": "no-store" },
+      });
     }
     if (group === "dns-provider" && settings) {
       return NextResponse.json(redactDnsProviderSettingsForApi(settings as DnsProviderSettings), {

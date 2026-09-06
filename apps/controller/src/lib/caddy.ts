@@ -39,6 +39,8 @@ import {
   getErrorPagesSettings,
   getDefaultResponseSettings,
   getTrustedProxiesSettings,
+  getTailscaleSettings,
+  defaultTailscaleSettings,
   type AcmeSettings,
   type DnsProviderSettings,
   type DnsSettings,
@@ -47,8 +49,19 @@ import {
   type GeoBlockSettings,
   type WafSettings,
   type TrustedProxiesSettings,
+  type TailscaleSettings,
 } from "./settings";
 import { buildDefaultResponseRoute } from "./caddy-default-response";
+import {
+  buildTailscaleApp,
+  buildTailscaleAuthSubroute,
+  buildTailscaleAutomationPolicy,
+  buildTailscaleIdentityStripHandler,
+  buildTailscaleTransport,
+  isTailscaleDomain,
+  tailscaleListenAddresses,
+  TAILSCALE_DEFAULT_NODE,
+} from "./caddy-tailscale";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { caddyAdminRequest } from "./caddy-admin";
 import {
@@ -185,6 +198,18 @@ type CpmForwardAuthMeta = {
   excluded_paths?: string[];
 };
 
+/** Mirror of the model's TailscaleMeta; this file reads the stored blob, never the model. */
+type TailscaleMeta = {
+  serve?: boolean;
+  node?: string;
+  tailnet_only?: boolean;
+  auth?: boolean;
+  protected_paths?: string[];
+  excluded_paths?: string[];
+  forward_identity?: boolean;
+  upstream_node?: string;
+};
+
 type MtlsMeta = {
   enabled?: boolean;
   trusted_client_cert_ids?: number[];
@@ -200,6 +225,7 @@ type ProxyHostMeta = {
   custom_caddyfile?: string;
   authentik?: ProxyHostAuthentikMeta;
   cpm_forward_auth?: CpmForwardAuthMeta;
+  tailscale?: TailscaleMeta;
   load_balancer?: LoadBalancerMeta;
   dns_resolver?: DnsResolverMeta;
   upstream_dns_resolution?: UpstreamDnsResolutionMeta;
@@ -816,6 +842,57 @@ export function buildServerTrustedProxies(settings: TrustedProxiesSettings | nul
   return out;
 }
 
+/**
+ * Tailscale as generation sees it. Resolved once per document because every host asks the same two
+ * questions — is the feature on, and is the plugin actually in the running binary — and the answer
+ * decides whether a `tailscale/...` listener may appear at all.
+ */
+type TailscaleRuntime = {
+  settings: TailscaleSettings;
+  /** Decrypted auth key, ready for the app block. Empty when none is stored. */
+  authKey: string;
+  /** Enabled by the operator *and* compiled in. False means emit nothing tailscale-shaped. */
+  usable: boolean;
+};
+
+type TailscaleRouteConfig = {
+  serve: boolean;
+  node: string;
+  tailnetOnly: boolean;
+  auth: boolean;
+  protectedPaths: string[] | null;
+  excludedPaths: string[] | null;
+  forwardIdentity: boolean;
+  upstreamNode: string | null;
+};
+
+/**
+ * What one host's stored Tailscale block means once the global settings are applied. Null whenever
+ * nothing tailscale-shaped may be emitted for it — the feature is off, the plugin is missing, or
+ * the host simply does not use it — so callers have one thing to check rather than three.
+ */
+function parseTailscaleConfig(
+  meta: TailscaleMeta | undefined,
+  runtime: TailscaleRuntime | null,
+): TailscaleRouteConfig | null {
+  if (!meta || !runtime?.usable) return null;
+
+  const serve = Boolean(meta.serve);
+  const upstreamNode = meta.upstream_node || null;
+  if (!serve && !upstreamNode) return null;
+
+  return {
+    serve,
+    node: meta.node || runtime.settings.defaultNode || TAILSCALE_DEFAULT_NODE,
+    tailnetOnly: serve && Boolean(meta.tailnet_only),
+    auth: serve && Boolean(meta.auth),
+    protectedPaths: meta.protected_paths?.length ? meta.protected_paths : null,
+    excludedPaths: meta.excluded_paths?.length ? meta.excluded_paths : null,
+    forwardIdentity: Boolean(meta.forward_identity),
+    upstreamNode,
+  };
+}
+
 type CaddyBuildContext = {
   rows: ProxyHostRow[];
   accessAccounts: Map<number, AccessListEntryRow[]>;
@@ -829,6 +906,8 @@ type CaddyBuildContext = {
    * whole, so one handler naming an uncompiled module takes every host offline.
    */
   moduleAvailability: CaddyModuleAvailability;
+  /** Null outside buildCaddyDocument — callers exercising route shapes have no settings to read. */
+  tailscale?: TailscaleRuntime | null;
   mtlsRbac?: {
     roleFingerprintMap: Map<number, Set<string>>;
     certFingerprintMap: Map<number, string>;
@@ -1186,11 +1265,28 @@ function appendMtlsPathModeRoutes(options: {
   }
 }
 
-async function buildProxyRoutes(
-  context: CaddyBuildContext,
-): Promise<{ routes: CaddyHttpRoute[]; errorRoutes: CaddyHttpRoute[] }> {
+/**
+ * Routes, split by which listener serves them.
+ *
+ * A host on the tailnet is not the same host with an extra address: "tailnet only" means its
+ * routes must not exist on the public server at all, so the split has to happen while each host is
+ * being built rather than by filtering afterwards.
+ */
+type ProxyRouteSet = {
+  /** Routes for the public :80/:443 server. */
+  routes: CaddyHttpRoute[];
+  /** Node name → routes served on that node's tailnet listener. */
+  tailnetRoutes: Map<string, CaddyHttpRoute[]>;
+  /** Every node any host names, whether it serves on it or only dials through it. */
+  tailscaleNodes: Set<string>;
+  errorRoutes: CaddyHttpRoute[];
+};
+
+async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteSet> {
   const { rows, accessAccounts, tlsReadyCertificates } = context;
   const routes: CaddyHttpRoute[] = [];
+  const tailnetRoutes = new Map<string, CaddyHttpRoute[]>();
+  const tailscaleNodes = new Set<string>();
   const errorRoutes: CaddyHttpRoute[] = [];
   const validClientCertExpression = buildValidClientCertCelExpression();
 
@@ -1249,6 +1345,22 @@ async function buildProxyRoutes(
 
     const handlers: Record<string, unknown>[] = [];
     const meta = parseJson<ProxyHostMeta>(row.meta, {});
+    const tailscale = parseTailscaleConfig(meta.tailscale, context.tailscale ?? null);
+
+    // The host was configured to exist only on the tailnet, and it cannot be: Tailscale is off in
+    // settings, or the plugin is not in the running binary yet. Publishing it on the public
+    // listener instead would expose a service deliberately kept private, so it is left out
+    // entirely — the same fail-closed choice mTLS makes when its trust set resolves to nothing.
+    if (!tailscale?.serve && meta.tailscale?.serve && meta.tailscale.tailnet_only) {
+      console.warn(
+        `Skipping proxy host "${row.name}": it is set to serve only on the tailnet, but Tailscale ` +
+          "is not usable. Enable it in Settings → Tailscale and make sure the Tailscale module is " +
+          "in Settings → Caddy Build, then rebuild Caddy.",
+      );
+      continue;
+    }
+    if (tailscale?.upstreamNode) tailscaleNodes.add(tailscale.upstreamNode);
+
     const authentik = parseAuthentikConfig(meta.authentik);
     const cpmForwardAuth = meta.cpm_forward_auth?.enabled ? meta.cpm_forward_auth : null;
     const locationRules = meta.location_rules ?? [];
@@ -1394,10 +1506,15 @@ async function buildProxyRoutes(
     const lbConfig = parseLoadBalancerConfig(meta.load_balancer);
     const dnsConfig = parseDnsResolverConfig(meta.dns_resolver);
     const hostDnsResolutionConfig = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
-    const effectiveDnsResolution = resolveEffectiveUpstreamDnsResolution(
-      context.globalUpstreamDnsResolutionSettings,
-      hostDnsResolutionConfig,
-    );
+    // Pinning resolves the upstream here and writes the address into the config. Through a tailnet
+    // node the name has to be resolved by MagicDNS on the other side, and this container's resolver
+    // knows nothing about it — so the pin is skipped rather than baked in wrong.
+    const effectiveDnsResolution = tailscale?.upstreamNode
+      ? { enabled: false as const, family: "both" as const }
+      : resolveEffectiveUpstreamDnsResolution(
+          context.globalUpstreamDnsResolutionSettings,
+          hostDnsResolutionConfig,
+        );
     const resolvedUpstreams = await resolveUpstreamDials(
       row,
       upstreams,
@@ -1519,6 +1636,25 @@ async function buildProxyRoutes(
           };
         }
       }
+    }
+
+    // Dial the upstreams through a tailnet node. This replaces the http transport rather than
+    // extending it: the plugin's transport brings its own dialer and understands only `tls`, so a
+    // resolver or dial timeout meant for the http one would be an unknown field and Caddy would
+    // reject the whole document. The TLS config carries over untouched, since the plugin treats any
+    // non-nil value as "speak https" and reads nothing out of it.
+    if (tailscale?.upstreamNode) {
+      const httpTransport = reverseProxyHandler.transport as Record<string, unknown> | undefined;
+      if (httpTransport?.resolver) {
+        console.warn(
+          `Ignoring the DNS resolver on host "${row.name}": its upstreams are dialled through the ` +
+            `Tailscale node "${tailscale.upstreamNode}", which resolves names on the tailnet itself.`,
+        );
+      }
+      reverseProxyHandler.transport = buildTailscaleTransport(
+        tailscale.upstreamNode,
+        (httpTransport?.tls as Record<string, unknown> | undefined) ?? null,
+      );
     }
 
     // Security: this field lets admins inject arbitrary Caddy reverse_proxy config, which is
@@ -1816,6 +1952,31 @@ async function buildProxyRoutes(
           protectedModePreRoutePlacement: "before",
         });
       }
+    } else if (tailscale?.auth) {
+      // ── Tailscale identity ──────────────────────────────────────────
+      // Third and last of the mutually exclusive auth integrations: a host configured for
+      // Authentik or CPM forward auth never reaches here, because two of them in one chain would
+      // ask the caller to sign in twice.
+      //
+      // The strip handler goes on the shared chain rather than beside the authenticator, so it
+      // runs on excluded and whitelisted paths too — those authenticate nothing, and without it a
+      // caller could set X-Tailscale-User themselves and the upstream could not tell the
+      // difference. Setting the headers stays inside the auth subroute, where a user exists.
+      const tailscaleHandlers = tailscale.forwardIdentity
+        ? [buildTailscaleIdentityStripHandler(), ...handlers]
+        : handlers;
+
+      appendForwardAuthPathModeRoutes({
+        hostRoutes,
+        domainGroups,
+        authMode: resolvePathAuthMode(tailscale.protectedPaths, tailscale.excludedPaths),
+        baseHandlers: tailscaleHandlers,
+        authHandler: buildTailscaleAuthSubroute(tailscale.forwardIdentity),
+        reverseProxyHandler,
+        locationRules,
+        skipHttpsHostnameValidation: Boolean(row.skipHttpsHostnameValidation),
+        preserveHostHeader: Boolean(row.preserveHostHeader),
+      });
     } else {
       const mtls = meta.mtls?.enabled ? meta.mtls : null;
       const mtlsProtectedPaths = mtls?.protected_paths?.length ? mtls.protected_paths : null;
@@ -1984,7 +2145,17 @@ async function buildProxyRoutes(
       });
     }
 
-    routes.push(...hostRoutes);
+    if (tailscale?.serve) {
+      tailscaleNodes.add(tailscale.node);
+      const nodeRoutes = tailnetRoutes.get(tailscale.node) ?? [];
+      nodeRoutes.push(...hostRoutes);
+      tailnetRoutes.set(tailscale.node, nodeRoutes);
+    }
+    // The same route objects go into both servers when the host is published on the tailnet *and*
+    // publicly; JSON.stringify writes a shared reference out twice, so no clone is needed.
+    if (!tailscale?.tailnetOnly) {
+      routes.push(...hostRoutes);
+    }
 
     // Per-host error pages, scoped to this host's domains. Collected separately so
     // they can be attached to the server-level `errors` block (handle_errors).
@@ -1995,7 +2166,17 @@ async function buildProxyRoutes(
     }
   }
 
-  return { routes: sortRoutesByHostPriority(routes), errorRoutes };
+  return {
+    routes: sortRoutesByHostPriority(routes),
+    tailnetRoutes: new Map(
+      Array.from(tailnetRoutes, ([node, nodeRoutes]) => [
+        node,
+        sortRoutesByHostPriority(nodeRoutes),
+      ]),
+    ),
+    tailscaleNodes,
+    errorRoutes,
+  };
 }
 
 type TlsConnectionPolicyContext = {
@@ -2249,6 +2430,21 @@ export async function buildTlsAutomation(
   const policies: Record<string, unknown>[] = [];
   const managedCertificateIds = new Set<number>();
 
+  /**
+   * Send `.ts.net` subjects to Caddy's own Tailscale certificate manager and return the rest.
+   *
+   * A MagicDNS name resolves only inside a tailnet, so no public CA can validate one and an ACME
+   * policy over it retries forever. Caddy provisions no issuer for a policy whose subjects are all
+   * `.ts.net` and whose managers include this one, which is why the two never share a policy.
+   */
+  const takeTailscaleSubjects = (subjects: string[]): string[] => {
+    const tailscaleSubjects = subjects.filter(isTailscaleDomain);
+    if (tailscaleSubjects.length > 0) {
+      policies.push(buildTailscaleAutomationPolicy(tailscaleSubjects));
+    }
+    return subjects.filter((subject) => !isTailscaleDomain(subject));
+  };
+
   // Custom ACME directory URL + trusted root for internal CAs (OpenBao, Step-CA, etc.).
   // Resolved once per build: syncAcmeCaRootFile touches the filesystem, and the result applies
   // to every issuer across every subject group.
@@ -2267,7 +2463,10 @@ export async function buildTlsAutomation(
 
   // Add policy for auto-managed domains (certificateId = null)
   if (hasAutoManagedDomains) {
-    for (const subjects of groupHostPatternsByPriority(Array.from(autoManagedDomains))) {
+    for (const group of groupHostPatternsByPriority(Array.from(autoManagedDomains))) {
+      const subjects = takeTailscaleSubjects(group);
+      if (subjects.length === 0) continue;
+
       const issuer: Record<string, unknown> = { module: "acme" };
       applyAcmeOverrides(issuer);
 
@@ -2311,7 +2510,10 @@ export async function buildTlsAutomation(
       };
     }
 
-    for (const subjectGroup of groupHostPatternsByPriority(subjects)) {
+    for (const group of groupHostPatternsByPriority(subjects)) {
+      const subjectGroup = takeTailscaleSubjects(group);
+      if (subjectGroup.length === 0) continue;
+
       const issuer: Record<string, unknown> = { module: "acme" };
       applyAcmeOverrides(issuer);
 
@@ -2796,6 +2998,7 @@ export async function buildCaddyDocument() {
     trustedProxiesSettings,
     moduleAvailability,
     defaultResponseSettings,
+    storedTailscaleSettings,
   ] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
@@ -2807,7 +3010,27 @@ export async function buildCaddyDocument() {
     getTrustedProxiesSettings(),
     getCaddyModuleAvailability(),
     getDefaultResponseSettings(),
+    getTailscaleSettings(),
   ]);
+
+  // Resolved before anything reads it, because both the routes and the servers depend on the same
+  // answer. "Enabled but not usable" is worth saying out loud: the operator turned Tailscale on,
+  // every tailnet-only host silently stopped being served, and the only clue is here.
+  const tailscaleSettings = storedTailscaleSettings ?? defaultTailscaleSettings();
+  const tailscaleCompiledIn = isFeatureUsable(moduleAvailability, "tailscale");
+  if (tailscaleSettings.enabled && !tailscaleCompiledIn) {
+    console.warn(
+      "Tailscale is enabled in settings but its Caddy module is not in the running binary. " +
+        "Enable it in Settings → Caddy Build and rebuild Caddy.",
+    );
+  }
+  const tailscaleRuntime: TailscaleRuntime = {
+    settings: tailscaleSettings,
+    authKey: tailscaleSettings.authKey
+      ? decryptSecret(tailscaleSettings.authKey, "Tailscale auth key")
+      : "",
+    usable: tailscaleSettings.enabled && tailscaleCompiledIn,
+  };
 
   // Optionally seed the global geoblock trusted-proxy list from the server-level value so the
   // two can't silently disagree (issue #222). Applied only as a default: an explicit per-scope
@@ -2855,6 +3078,7 @@ export async function buildCaddyDocument() {
     globalGeoBlock: effectiveGlobalGeoBlock,
     globalWaf,
     moduleAvailability,
+    tailscale: tailscaleRuntime,
     mtlsRbac: {
       roleFingerprintMap,
       certFingerprintMap,
@@ -2862,8 +3086,12 @@ export async function buildCaddyDocument() {
     },
   };
 
-  const { routes: httpRoutes, errorRoutes: hostErrorRoutes } =
-    await buildProxyRoutes(caddyBuildContext);
+  const {
+    routes: httpRoutes,
+    tailnetRoutes,
+    tailscaleNodes,
+    errorRoutes: hostErrorRoutes,
+  } = await buildProxyRoutes(caddyBuildContext);
 
   // An administrator-configured matcher-less route replaces Caddy's native
   // unmatched-request behavior and must remain last so it cannot shadow any
@@ -2915,6 +3143,24 @@ export async function buildCaddyDocument() {
     };
   }
 
+  // One server per tailnet node. Separate from `cpm` rather than extra listen addresses on it,
+  // because "tailnet only" has to mean the routes are absent from the public server — sharing one
+  // server would publish every host on every address. The default-response route is deliberately
+  // not repeated here: an unmatched request arriving over the tailnet is a misconfiguration, and
+  // Caddy's own 404 says so more usefully than a catch-all meant for the open internet.
+  for (const [node, nodeRoutes] of tailnetRoutes) {
+    if (nodeRoutes.length === 0) continue;
+    servers[`cpm_tailscale_${node}`] = {
+      listen: tailscaleListenAddresses(node),
+      routes: nodeRoutes,
+      ...(tlsApp ? {} : { automatic_https: { disable: true } }),
+      ...(hasTls ? { tls_connection_policies: tlsConnectionPolicies } : {}),
+      ...(errorRoutes.length > 0 ? { errors: { routes: errorRoutes } } : {}),
+      ...serverTrustedProxies,
+      ...(loggingEnabled ? { logs: { default_logger_name: "http_access" } } : {}),
+    };
+  }
+
   // Metrics server - exposes /metrics endpoint on separate port
   if (metricsEnabled) {
     servers.metrics = {
@@ -2936,6 +3182,14 @@ export async function buildCaddyDocument() {
   }
 
   const httpApp = Object.keys(servers).length > 0 ? { http: { servers } } : {};
+
+  // Only when something actually names a node. The app is what carries the auth key, so emitting
+  // it for a deployment that has Tailscale switched on but no host using it would register nodes
+  // on the tailnet that serve nothing.
+  const tailscaleApp =
+    tailscaleRuntime.usable && tailscaleNodes.size > 0
+      ? { tailscale: buildTailscaleApp(tailscaleRuntime.settings, tailscaleRuntime.authKey) }
+      : {};
 
   // Build logging configuration. Roll settings are spelled out rather than left to Caddy's
   // file-writer defaults — those silently stopped rotating (no compression, no cleanup of old
@@ -2999,6 +3253,7 @@ export async function buildCaddyDocument() {
           }
         : {}),
       ...l4App,
+      ...tailscaleApp,
     },
   };
 }

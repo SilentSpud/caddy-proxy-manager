@@ -1,0 +1,469 @@
+/**
+ * What buildCaddyDocument emits for a host that uses Tailscale.
+ *
+ * The interesting behaviour is not the handler shapes — tests/unit/caddy-tailscale.test.ts covers
+ * those — but which *server* a host's routes land in, and what happens when the plugin is not
+ * available: a host asked to live only on the tailnet must disappear rather than fall back to the
+ * public listener, which is the one failure mode that would quietly publish a private service.
+ */
+import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import type { TestDb } from '../helpers/db';
+
+const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
+
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+// createTestDb is async and a Bun mock factory must be synchronous, so it is hoisted out.
+ctx.db = await createTestDb();
+
+vi.mock('../../src/lib/db', () => {
+  return {
+    default: ctx.db,
+    sqlite: undefined,
+    schema: schemaModule,
+    nowIso: () => new Date().toISOString(),
+    toIso: (value: string | Date | null | undefined): string | null => {
+      if (!value) return null;
+      return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+    },
+  };
+});
+
+vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
+
+import { setCaddyAdminTransport } from '../../src/lib/caddy-admin';
+import { buildCaddyDocument } from '../../src/lib/caddy';
+import { CADDY_MODULES } from '../../src/lib/caddy-modules';
+import { saveCaddyBuildSettings, saveTailscaleSettings } from '../../src/lib/settings';
+import { createProxyHost } from '../../src/lib/models/proxy-hosts';
+import { startFakeAgent } from '../helpers/fake-agent';
+import * as schema from '../../src/lib/db/schema';
+
+type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
+let agent: FakeAgent;
+
+const ALL_MODULE_PATHS = CADDY_MODULES.map((m) => m.modulePath);
+const TAILSCALE_PATH = 'github.com/tailscale/caddy-tailscale';
+
+type CaddyDocument = {
+  apps: {
+    http?: { servers: Record<string, { listen: string[]; routes: unknown[] }> };
+    tls?: { automation?: { policies: Record<string, unknown>[] } };
+    tailscale?: Record<string, unknown>;
+  };
+};
+
+function servers(document: CaddyDocument) {
+  return document.apps.http?.servers ?? {};
+}
+
+/** The distinct `host` matcher values in a server's routes — one host contributes several routes. */
+function matchedHosts(server: { routes: unknown[] } | undefined): string[] {
+  const found = new Set<string>();
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node && typeof node === 'object') {
+      const record = node as Record<string, unknown>;
+      if (Array.isArray(record.host)) for (const host of record.host) found.add(host as string);
+      Object.values(record).forEach(walk);
+    }
+  };
+  walk(server?.routes ?? []);
+  return [...found];
+}
+
+/** Every handler name anywhere in the document. */
+function handlerNames(document: unknown): string[] {
+  const found: string[] = [];
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node && typeof node === 'object') {
+      const record = node as Record<string, unknown>;
+      if (typeof record.handler === 'string') found.push(record.handler);
+      Object.values(record).forEach(walk);
+    }
+  };
+  walk(document);
+  return found;
+}
+
+function setAppliedModules(specs: string[]) {
+  agent.state.appliedModules = specs;
+}
+
+async function selectAllModulesExcept(...disabledIds: string[]) {
+  await saveCaddyBuildSettings({
+    modules: Object.fromEntries(CADDY_MODULES.map((m) => [m.id, !disabledIds.includes(m.id)])),
+    customModules: [],
+  });
+}
+
+const TAILSCALE_SETTINGS = {
+  enabled: true,
+  authKey: 'tskey-auth-abcDEF1CNTRL-secret',
+  controlUrl: '',
+  ephemeral: false,
+  stateDir: '/data/tailscale',
+  tags: ['tag:caddy'],
+  defaultNode: 'caddy',
+  validateAuthKey: false,
+  apiAccessToken: '',
+  apiTailnet: '-',
+};
+
+async function enableTailscale(overrides: Record<string, unknown> = {}) {
+  await saveTailscaleSettings({ ...TAILSCALE_SETTINGS, ...overrides } as never);
+}
+
+beforeEach(async () => {
+  agent = await startFakeAgent();
+  setCaddyAdminTransport(async () => ({ status: 200, text: '{}', headers: {} }));
+  await ctx.db.delete(schema.proxyHosts);
+  await ctx.db.delete(schema.l4ProxyHosts);
+  await ctx.db.delete(schema.settings);
+  await ctx.db.delete(schema.users).catch(() => {});
+  await ctx.db.insert(schema.users).values({
+    id: 1,
+    email: 'admin@example.com',
+    name: 'Admin',
+    role: 'admin',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  setAppliedModules(ALL_MODULE_PATHS);
+  await selectAllModulesExcept();
+});
+
+afterEach(async () => {
+  await agent.stop();
+});
+
+async function createHost(overrides: Record<string, unknown> = {}) {
+  return await createProxyHost(
+    {
+      name: 'app',
+      domains: ['app.example.com'],
+      upstreams: ['backend:8080'],
+      ...overrides,
+    } as never,
+    1,
+  );
+}
+
+describe('serving a host on the tailnet', () => {
+  it('gives the node its own server and keeps a tailnet-only host off the public one', async () => {
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true, tailnetOnly: true } });
+
+    const document = (await buildCaddyDocument()) as CaddyDocument;
+    const all = servers(document);
+
+    expect(all.cpm_tailscale_caddy?.listen).toEqual(['tailscale/caddy:80', 'tailscale/caddy:443']);
+    expect(matchedHosts(all.cpm_tailscale_caddy)).toContain('app.example.com');
+    // The point of "tailnet only": the public server does not carry the host at all.
+    expect(matchedHosts(all.cpm)).not.toContain('app.example.com');
+  });
+
+  it('serves the host in both places when tailnet-only is off', async () => {
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true, tailnetOnly: false } });
+
+    const all = servers((await buildCaddyDocument()) as CaddyDocument);
+    expect(matchedHosts(all.cpm_tailscale_caddy)).toContain('app.example.com');
+    expect(matchedHosts(all.cpm)).toContain('app.example.com');
+  });
+
+  it('groups hosts sharing a node into one server, and separates different nodes', async () => {
+    await enableTailscale();
+    await createHost({ name: 'a', domains: ['a.example.com'], tailscale: { serve: true } });
+    await createHost({
+      name: 'b',
+      domains: ['b.example.com'],
+      tailscale: { serve: true, node: 'edge' },
+    });
+    await createHost({ name: 'c', domains: ['c.example.com'], tailscale: { serve: true } });
+
+    const all = servers((await buildCaddyDocument()) as CaddyDocument);
+    expect(matchedHosts(all.cpm_tailscale_caddy).sort()).toEqual([
+      'a.example.com',
+      'c.example.com',
+    ]);
+    expect(matchedHosts(all.cpm_tailscale_edge)).toEqual(['b.example.com']);
+  });
+
+  it('emits the tailscale app with the decrypted auth key', async () => {
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true } });
+
+    const document = (await buildCaddyDocument()) as CaddyDocument;
+    expect(document.apps.tailscale).toEqual({
+      auth_key: 'tskey-auth-abcDEF1CNTRL-secret',
+      state_dir: '/data/tailscale',
+      tags: ['tag:caddy'],
+    });
+  });
+
+  it('omits the tailscale app when no host names a node', async () => {
+    // Registering a node that serves nothing would put a machine on the tailnet for no reason.
+    await enableTailscale();
+    await createHost();
+
+    expect((await buildCaddyDocument()) as CaddyDocument).not.toHaveProperty('apps.tailscale');
+  });
+});
+
+describe('when Tailscale is not usable', () => {
+  it('drops a tailnet-only host rather than publishing it', async () => {
+    // The fail-closed case: falling back to the public listener would expose a service the
+    // operator deliberately kept private.
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true, tailnetOnly: true } });
+    setAppliedModules(ALL_MODULE_PATHS.filter((path) => path !== TAILSCALE_PATH));
+
+    const all = servers((await buildCaddyDocument()) as CaddyDocument);
+    expect(Object.keys(all)).not.toContain('cpm_tailscale_caddy');
+    expect(matchedHosts(all.cpm)).not.toContain('app.example.com');
+  });
+
+  it('keeps a dual-published host on the public listener', async () => {
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true, tailnetOnly: false } });
+    setAppliedModules(ALL_MODULE_PATHS.filter((path) => path !== TAILSCALE_PATH));
+
+    const all = servers((await buildCaddyDocument()) as CaddyDocument);
+    expect(Object.keys(all)).not.toContain('cpm_tailscale_caddy');
+    expect(matchedHosts(all.cpm)).toContain('app.example.com');
+  });
+
+  it('emits nothing tailscale-shaped while the setting itself is off', async () => {
+    // Configured first, then switched off — a host cannot be stored this way from cold, because
+    // the save-time gate refuses a tailnet host while no auth key exists.
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true, tailnetOnly: false } });
+    await enableTailscale({ enabled: false });
+
+    const document = (await buildCaddyDocument()) as CaddyDocument;
+    expect(document.apps.tailscale).toBeUndefined();
+    expect(Object.keys(servers(document))).not.toContain('cpm_tailscale_caddy');
+    expect(JSON.stringify(document)).not.toContain('tailscale/');
+  });
+});
+
+describe('identity authentication', () => {
+  it('gates the host on the tailscale provider', async () => {
+    await enableTailscale();
+    await createHost({ tailscale: { serve: true, auth: true } });
+
+    const document = await buildCaddyDocument();
+    expect(handlerNames(document)).toContain('authentication');
+    expect(JSON.stringify(document)).toContain('"providers":{"tailscale":{}}');
+  });
+
+  it('strips client-supplied identity headers on every route, gated or not', async () => {
+    // An excluded path authenticates nothing, so without the strip a caller could set
+    // X-Tailscale-User itself and the upstream could not tell that from a header we set.
+    await enableTailscale();
+    await createHost({
+      tailscale: {
+        serve: true,
+        auth: true,
+        forwardIdentity: true,
+        excluded_paths: ['/healthz'],
+      },
+    });
+
+    const server = servers((await buildCaddyDocument()) as CaddyDocument).cpm_tailscale_caddy;
+    const routes = server.routes as { handle: Record<string, unknown>[] }[];
+    // Every route that reaches the upstream, gated or not — the HTTPS redirect route proxies
+    // nothing, so it has no header for an upstream to believe.
+    const proxying = routes.filter((route) =>
+      JSON.stringify(route.handle).includes('"reverse_proxy"'),
+    );
+    expect(proxying.length).toBeGreaterThan(1);
+    for (const route of proxying) {
+      const first = route.handle[0] as { handler: string; request?: { delete?: string[] } };
+      expect(first.handler).toBe('headers');
+      expect(first.request?.delete).toContain('X-Tailscale-User');
+    }
+  });
+
+  it('does not authenticate when the host is not served on the tailnet', async () => {
+    // The authenticator finds its tsnet server through the listener the request arrived on. With
+    // no such listener it would fall back to a local tailscaled that this image does not run.
+    await enableTailscale();
+    await createHost({ tailscale: { serve: false, auth: true } });
+
+    expect(JSON.stringify(await buildCaddyDocument())).not.toContain('"tailscale":{}');
+  });
+});
+
+describe('reaching an upstream over the tailnet', () => {
+  it('replaces the reverse-proxy transport', async () => {
+    await enableTailscale();
+    await createHost({ tailscale: { upstreamNode: 'edge' } });
+
+    expect(JSON.stringify(await buildCaddyDocument())).toContain(
+      '"transport":{"protocol":"tailscale","name":"edge"}',
+    );
+  });
+
+  it('keeps the TLS settings of an https upstream', async () => {
+    await enableTailscale();
+    await createHost({
+      upstreams: ['https://backend.tail1234.ts.net'],
+      skipHttpsHostnameValidation: true,
+      tailscale: { upstreamNode: 'edge' },
+    });
+
+    expect(JSON.stringify(await buildCaddyDocument())).toContain(
+      '"transport":{"protocol":"tailscale","name":"edge","tls":{"insecure_skip_verify":true}}',
+    );
+  });
+
+  it('serves nothing on a node it only dials through', async () => {
+    // The node is registered — the transport needs the app block for its auth key — but nothing
+    // listens on it. It stays unstarted until a request goes through, which the plugin fork makes
+    // safe to release; see the note on the replace directive in docker/caddy/go.mod.
+    await enableTailscale();
+    await createHost({ tailscale: { upstreamNode: 'edge' } });
+
+    const document = (await buildCaddyDocument()) as CaddyDocument;
+    expect(document.apps.tailscale).toBeDefined();
+    expect(Object.keys(servers(document))).not.toContain('cpm_tailscale_edge');
+    expect(JSON.stringify(document)).not.toContain('tailscale/edge');
+  });
+});
+
+describe('the stored host config', () => {
+  it('drops the identity gate when the host is not served on the tailnet', async () => {
+    // Not cosmetic: the authenticator has no tsnet server to ask without a listener, so storing
+    // the combination at all would leave generation deciding what to do about it.
+    const host = await createHost({ tailscale: { serve: false, auth: true } });
+    expect(host.tailscale).toBeNull();
+  });
+
+  it('defaults a newly served host to tailnet only', async () => {
+    await enableTailscale();
+    const host = await createHost({ tailscale: { serve: true } });
+    expect(host.tailscale?.tailnetOnly).toBe(true);
+  });
+
+  it('keeps a dual-published host dual-published across a read', async () => {
+    // The stored blob is re-normalized on every read; re-applying the new-host default here would
+    // quietly pull the host off the public listener.
+    await enableTailscale();
+    const host = await createHost({ tailscale: { serve: true, tailnetOnly: false } });
+    expect(host.tailscale?.tailnetOnly).toBe(false);
+    const { getProxyHost } = await import('../../src/lib/models/proxy-hosts');
+    expect((await getProxyHost(host.id))?.tailscale?.tailnetOnly).toBe(false);
+  });
+
+  it('refuses to store a tailnet host while no auth key is configured', async () => {
+    // The failure this prevents is fleet-wide: a node that cannot register is a listener that never
+    // comes up, and Caddy rejects the whole document — so every host stops being updated, with an
+    // error naming Tailscale rather than whatever was being edited.
+    await saveTailscaleSettings({
+      ...TAILSCALE_SETTINGS,
+      authKey: '',
+    } as never);
+
+    await expect(createHost({ tailscale: { serve: true } })).rejects.toThrow(
+      /no Tailscale auth key is configured/i,
+    );
+    await expect(createHost({ tailscale: { upstreamNode: 'edge' } })).rejects.toThrow(
+      /no Tailscale auth key is configured/i,
+    );
+  });
+
+  it('still stores a host that does not use Tailscale when no key is configured', async () => {
+    await saveTailscaleSettings({ ...TAILSCALE_SETTINGS, authKey: '' } as never);
+    const host = await createHost();
+    expect(host.tailscale).toBeNull();
+  });
+
+  it('counts a Caddy placeholder as a stored key', async () => {
+    // Whether the environment actually defines it is only knowable inside the Caddy container.
+    await saveTailscaleSettings({
+      ...TAILSCALE_SETTINGS,
+      authKey: '{env.TS_AUTHKEY}',
+    } as never);
+    const host = await createHost({ tailscale: { serve: true } });
+    expect(host.tailscale?.serve).toBe(true);
+  });
+
+  it('lets a host turn Tailscale off again after the key is gone', async () => {
+    // Otherwise the gate would trap a host in a state it cannot be edited out of.
+    await enableTailscale();
+    const host = await createHost({ tailscale: { serve: true } });
+    await saveTailscaleSettings({ ...TAILSCALE_SETTINGS, authKey: '' } as never);
+
+    const { updateProxyHost } = await import('../../src/lib/models/proxy-hosts');
+    const updated = await updateProxyHost(host.id, { tailscale: null }, 1);
+    expect(updated.tailscale).toBeNull();
+  });
+
+  it('refuses a node name that would break out of the listener address', async () => {
+    await enableTailscale();
+    await expect(createHost({ tailscale: { serve: true, node: 'caddy/../evil' } })).rejects.toThrow(
+      /not a valid tailnet machine name/,
+    );
+  });
+
+  it('leaves untouched fields alone on a partial update', async () => {
+    await enableTailscale();
+    const { updateProxyHost } = await import('../../src/lib/models/proxy-hosts');
+    const host = await createHost({
+      tailscale: { serve: true, node: 'edge', auth: true, forwardIdentity: true },
+    });
+
+    const updated = await updateProxyHost(host.id, { tailscale: { tailnetOnly: false } }, 1);
+    expect(updated.tailscale).toMatchObject({
+      serve: true,
+      node: 'edge',
+      auth: true,
+      forwardIdentity: true,
+      tailnetOnly: false,
+    });
+  });
+});
+
+describe('certificates for MagicDNS names', () => {
+  it('serves a .ts.net subject from Tailscale instead of ACME', async () => {
+    await enableTailscale();
+    await createHost({
+      domains: ['app.tail1234.ts.net'],
+      tailscale: { serve: true },
+    });
+
+    const policies =
+      ((await buildCaddyDocument()) as CaddyDocument).apps.tls?.automation?.policies ?? [];
+    const tailscalePolicy = policies.find((policy) =>
+      (policy.subjects as string[]).includes('app.tail1234.ts.net'),
+    );
+    expect(tailscalePolicy).toEqual({
+      subjects: ['app.tail1234.ts.net'],
+      get_certificate: [{ via: 'tailscale' }],
+    });
+    expect(tailscalePolicy).not.toHaveProperty('issuers');
+  });
+
+  it('leaves a public domain on ACME, in a policy of its own', async () => {
+    await enableTailscale();
+    await createHost({
+      domains: ['app.tail1234.ts.net', 'app.example.com'],
+      tailscale: { serve: true, tailnetOnly: false },
+    });
+
+    const policies =
+      ((await buildCaddyDocument()) as CaddyDocument).apps.tls?.automation?.policies ?? [];
+    const acmePolicy = policies.find((policy) =>
+      (policy.subjects as string[]).includes('app.example.com'),
+    );
+    // Never in one policy with the .ts.net name: Caddy skips ACME only when *every* subject is a
+    // MagicDNS name, so mixing them would send the tailnet name to a public CA.
+    expect(acmePolicy?.subjects).toEqual(['app.example.com']);
+    expect(acmePolicy?.issuers).toBeDefined();
+  });
+});

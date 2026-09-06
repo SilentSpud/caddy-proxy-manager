@@ -17,6 +17,7 @@ import {
   GitBranch,
   ShieldCheck,
   LogIn,
+  Network,
 } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Card } from "@astryxdesign/core/Card";
@@ -30,6 +31,7 @@ import type { CertificatePickerOption } from "@/lib/certificate-api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { AuthentikSettings } from "@/lib/settings";
+import type { TailscaleHostDefaults } from "@/components/proxy-hosts/TailscaleFields";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { toggleProxyHostAction } from "./actions";
@@ -58,6 +60,7 @@ type Props = {
   accessLists: AccessList[];
   caCertificates: CaCertificate[];
   authentikDefaults: AuthentikSettings | null;
+  tailscaleDefaults: TailscaleHostDefaults | null;
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
@@ -95,6 +98,15 @@ const FEATURES: ReadonlyArray<{
     label: "Forward Auth",
     icon: <LogIn />,
     isOn: (h) => Boolean(h.cpmForwardAuth?.enabled),
+  },
+  {
+    key: "tailscale",
+    // "Tailnet only" is the one worth seeing from the list: it means the host is not reachable
+    // from the public listener at all, which is otherwise invisible until you open it.
+    label: "Tailnet",
+    icon: <Network />,
+    variant: "info",
+    isOn: (h) => Boolean(h.tailscale?.serve),
   },
   { key: "waf", label: "WAF", icon: <Bug />, isOn: (h) => Boolean(h.waf?.enabled) },
   { key: "geo", label: "Geo", icon: <MapPin />, isOn: (h) => Boolean(h.geoblock?.enabled) },
@@ -173,6 +185,7 @@ export default function ProxyHostsClient({
   accessLists,
   caCertificates,
   authentikDefaults,
+  tailscaleDefaults,
   pagination,
   initialSearch,
   initialSort,
@@ -371,6 +384,7 @@ export default function ProxyHostsClient({
         certificates={certificates}
         accessLists={accessLists}
         authentikDefaults={authentikDefaults}
+        tailscaleDefaults={tailscaleDefaults}
         caCertificates={caCertificates}
         mtlsRoles={mtlsRoles ?? []}
         issuedClientCerts={issuedClientCerts ?? []}
@@ -386,6 +400,7 @@ export default function ProxyHostsClient({
           certificates={certificates}
           accessLists={accessLists}
           authentikDefaults={authentikDefaults}
+          tailscaleDefaults={tailscaleDefaults}
           caCertificates={caCertificates}
           mtlsRoles={mtlsRoles ?? []}
           issuedClientCerts={issuedClientCerts ?? []}

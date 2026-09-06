@@ -28,6 +28,7 @@ import { GeoBlockFields } from "./GeoBlockFields";
 import { WafFields } from "./WafFields";
 import { MtlsFields } from "./MtlsConfig";
 import { CpmForwardAuthFields } from "./CpmForwardAuthFields";
+import { TailscaleFields, type TailscaleHostDefaults } from "./TailscaleFields";
 import { RedirectsFields } from "./RedirectsFields";
 import { LocationRulesFields } from "./LocationRulesFields";
 import { RewriteFields } from "./RewriteFields";
@@ -76,12 +77,14 @@ export function CreateHostDialog({
   issuedClientCerts = [],
   forwardAuthUsers = [],
   forwardAuthGroups = [],
+  tailscaleDefaults,
 }: {
   open: boolean;
   onClose: () => void;
   certificates: CertificatePickerOption[];
   accessLists: AccessList[];
   authentikDefaults: AuthentikSettings | null;
+  tailscaleDefaults?: TailscaleHostDefaults | null;
   initialData?: ProxyHost | null;
   caCertificates?: CaCertificate[];
   mtlsRoles?: MtlsRole[];
@@ -170,6 +173,7 @@ export function CreateHostDialog({
             users={forwardAuthUsers}
             groups={forwardAuthGroups}
           />
+          <TailscaleFields tailscale={initialData?.tailscale} defaults={tailscaleDefaults} />
           <LoadBalancerFields loadBalancer={initialData?.loadBalancer} />
           <DnsResolverFields dnsResolver={initialData?.dnsResolver} />
           <UpstreamDnsResolutionFields upstreamDnsResolution={initialData?.upstreamDnsResolution} />
@@ -200,6 +204,7 @@ export function EditHostDialog({
   forwardAuthUsers = [],
   forwardAuthGroups = [],
   forwardAuthAccess,
+  tailscaleDefaults,
 }: {
   open: boolean;
   host: ProxyHost;
@@ -214,6 +219,7 @@ export function EditHostDialog({
   forwardAuthUsers?: ForwardAuthUser[];
   forwardAuthGroups?: ForwardAuthGroup[];
   forwardAuthAccess?: ForwardAuthAccessData | null;
+  tailscaleDefaults?: TailscaleHostDefaults | null;
 }) {
   const [state, formAction] = useActionState(
     updateProxyHostAction.bind(null, host.id),
@@ -289,6 +295,7 @@ export function EditHostDialog({
             groups={forwardAuthGroups}
             currentAccess={forwardAuthAccess}
           />
+          <TailscaleFields tailscale={host.tailscale} defaults={tailscaleDefaults} />
           <LoadBalancerFields loadBalancer={host.loadBalancer} />
           <DnsResolverFields dnsResolver={host.dnsResolver} />
           <UpstreamDnsResolutionFields upstreamDnsResolution={host.upstreamDnsResolution} />
