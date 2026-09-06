@@ -1,53 +1,67 @@
 /**
- * Producing the `.env` a deployment should keep once its settings live in the database.
+ * What to tell a migrated deployment to do with the `.env` it still has.
  *
- * The output is the operator's copy of their own file with the migrated lines removed, not a
- * generated template — comments, ordering and anything we do not recognise are preserved exactly.
- * A file rewritten from a template would silently drop whatever else they had put in it.
+ * The app cannot see that file. Its environment arrives from Compose, from Swarm or Kubernetes
+ * secrets, from a systemd unit — the file, where there is one, sits on the host beside
+ * `docker-compose.yml` and never enters the container. So rather than rewriting it, this produces
+ * the command that does: one `sed` the operator runs where the file actually is, which comments
+ * out exactly the variables that moved into the database.
+ *
+ * Commented rather than deleted, and with a `.bak` alongside: the values are the only copy of some
+ * secrets an operator has, and a cleanup step that erased them would be a poor trade for tidiness.
+ *
+ * The variables Compose reads are held back from that command, because removing them is a two-step
+ * change it cannot make on its own. On a deployment with no agent they cannot go at all: Compose is
+ * the only thing that can start the containers they provision, and it cannot read the database.
+ * With an agent they can, but only alongside dropping those services from `COMPOSE_PROFILES` —
+ * otherwise the operator's own `docker compose up -d` keeps recreating the container from the
+ * values it just commented out. Both cases are explained where they are listed.
  */
 import { SETTINGS_BY_ENV } from "../settings/registry";
 
-/** `KEY=`, `export KEY=` — the same shape the test harness's dotenv reader recognises. */
-const ASSIGNMENT = /^(\s*)(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
-
-export type TrimResult = {
-  /** The file to keep, with migrated assignments commented out. */
-  contents: string;
-  /** The variables that were commented out, for the summary shown alongside it. */
-  removed: string[];
+export type EnvCleanup = {
+  /** Migrated variables that are now dead weight in the file, in registry order. */
+  comment: string[];
+  /** Migrated variables Compose still reads, which have to stay whatever the database holds. */
+  keep: string[];
+  /** A shell command commenting out `comment` in place, or `null` when there is nothing to do. */
+  command: string | null;
 };
 
 /**
- * Comment out every assignment whose setting now lives in the database.
+ * Split the migrated variables into the ones that can go and the ones that cannot, and build the
+ * command for the first group.
  *
- * Commented rather than deleted: the values are the only copy of some secrets an operator has, and
- * a migration that silently erased them from the file it hands back would be a poor trade for
- * tidiness. They can delete the block themselves once they are satisfied.
+ * `stored` is the set of environment variable names whose settings now have a value in the
+ * database — anything else is either still resolving from the environment or was never a setting,
+ * and in both cases the line has to stay.
  */
-export function trimMigratedEnv(contents: string): TrimResult {
-  const removed: string[] = [];
+export function planEnvCleanup(stored: Iterable<string>): EnvCleanup {
+  const migrated = new Set(stored);
+  const comment: string[] = [];
+  const keep: string[] = [];
 
-  const lines = contents.split("\n").map((line) => {
-    const match = ASSIGNMENT.exec(line);
-    if (!match) return line;
-
-    const [, indent, name] = match;
-    if (!SETTINGS_BY_ENV.has(name)) return line;
-
-    removed.push(name);
-    return `${indent}# migrated to the database: ${line.trim()}`;
-  });
-
-  if (removed.length === 0) {
-    return { contents, removed };
+  // Iterated over the registry rather than over `stored` so the order is the one the settings page
+  // uses, and so a name that is not a setting at all cannot reach the generated command.
+  for (const [env, definition] of SETTINGS_BY_ENV) {
+    if (!migrated.has(env)) continue;
+    (definition.composeReads ? keep : comment).push(env);
   }
 
-  const header = [
-    '# The lines below marked "migrated to the database" are now stored in PostgreSQL and are',
-    "# no longer read from this file. They are commented rather than deleted so you keep a copy;",
-    "# remove them once you are satisfied the values came across.",
-    "",
-  ];
+  return { comment, keep, command: comment.length > 0 ? buildCommand(comment) : null };
+}
 
-  return { contents: [...header, ...lines].join("\n"), removed };
+/**
+ * The `sed` itself.
+ *
+ * POSIX ERE and `-i.bak` with the suffix attached, which is the one spelling of in-place editing
+ * that GNU sed and the BSD sed on macOS both accept. `[[:space:]]` rather than `\s` for the same
+ * reason. Matching from the start of the line means an already-commented assignment is left alone,
+ * so running it twice changes nothing the second time.
+ */
+function buildCommand(names: readonly string[]): string {
+  return [
+    `migrated='${names.join("|")}'`,
+    `sed -i.bak -E "s/^([[:space:]]*)((export[[:space:]]+)?(\${migrated})[[:space:]]*=)/\\1# migrated to the database: \\2/" .env`,
+  ].join("\n");
 }
