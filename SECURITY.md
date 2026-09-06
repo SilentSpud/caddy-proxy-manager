@@ -29,15 +29,20 @@ We will respond within 48 hours and provide regular updates on the fix progress.
 
 Our CI/CD pipeline implements multiple security layers:
 
-1. **Fork PR Protection**: Pull requests from forks require manual approval (via `safe-to-build` label) before builds run
-2. **SBOM Generation**: Software Bill of Materials is generated for all builds
-3. **Provenance Attestation**: Build provenance is recorded for supply chain security
-4. **Limited Permissions**: Workflows use minimal required permissions
-5. **No Push from PRs**: Pull requests only build images locally, never push to registry
+1. **Nothing published from a pull request**: images are built and pushed by one workflow
+   (`docker-build-trusted.yml`), which runs only on a `v*` tag or a manual dispatch. A pull request —
+   from a fork or otherwise — runs the test and end-to-end suites and never touches the registry, so
+   there is no build-and-push path for untrusted code to reach.
+2. **The version bump is the gate**: `release.yml` tags a release only when `package.json`'s version
+   changes on `main`, and only that tag triggers an image build.
+3. **SBOM Generation**: Software Bill of Materials is generated for all builds
+4. **Provenance Attestation**: Build provenance is recorded for supply chain security
+5. **Limited Permissions**: Workflows use minimal required permissions. The test workflow declares
+   `permissions: {}`, so its `GITHUB_TOKEN` carries no scopes, and it references no repository secrets
 
 ### Container Security
 
-- Verified amd64 image builds
+- Multi-architecture builds (linux/amd64 and linux/arm64)
 - Regular base image updates
 - Minimal attack surface
 - Non-root user execution where possible
@@ -136,15 +141,15 @@ Our repository includes:
 - **Dependabot** for dependency updates
 - **GitHub Security Advisories** monitoring
 
-## Safe-to-Build Label
+## Reviewing a fork pull request
 
-For maintainers reviewing fork PRs:
+No workflow publishes anything from a pull request, so review is about what merging would let in
+rather than what the run itself can do:
 
 1. Review the PR code thoroughly for malicious content
-2. Check for suspicious file modifications
+2. Check for suspicious file modifications — workflow files and `docker/` especially, since those
+   decide what a later release builds and pushes
 3. Verify no secrets or credentials are exposed
-4. Only add `safe-to-build` label if code is verified safe
-5. Remove label immediately if concerns arise
 
 ## Security Updates
 

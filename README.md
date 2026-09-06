@@ -2,10 +2,10 @@
 
 Web interface for managing [Caddy Server](https://caddyserver.com/) reverse proxies and certificates. This fork is for redoing the original UI in a way that I like and trying to make the application as lightweight as possible.
 
-> **3.1 changes how this is configured.** Most settings now live in the database and are entered
+> **3.0 changes how this is configured.** Most settings now live in the database and are entered
 > through a first-run setup flow in the browser, not in `.env`. PostgreSQL replaces SQLite, and an
-> existing 3.0 installation is migrated in-app rather than by hand. See [First Run](#first-run) and
-> [The Database](#the-database). It is a substantial change and has not been through a release yet —
+> existing pre-3.0 installation is migrated in-app rather than by hand. See [First Run](#first-run)
+> and [The Database](#the-database). It is a substantial change and the 3.0 line is still in beta —
 > take a backup before upgrading.
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://mit-license.org)
@@ -14,11 +14,11 @@ Web interface for managing [Caddy Server](https://caddyserver.com/) reverse prox
 
 [Report Bug](https://github.com/silentspud/caddy-proxy-manager/issues) • [Request Feature](https://github.com/silentspud/caddy-proxy-manager/issues)
 
-<img width="100%" alt="Dashboard" src="site/assets/screenshots/dashboard-main.png" />
+<img width="100%" alt="Dashboard" src="apps/site/assets/screenshots/dashboard-main.png" />
 
 ## Overview
 
-This project provides a web UI for Caddy Server, eliminating the need to manually edit JSON configurations or Caddyfiles. It handles reverse proxies, access lists, and certificate management through a Astryx interface. Built with Vinext version whatever, React 19, Astryx, Tailwind CSS, Drizzle ORM, and TypeScript. Analytics data (traffic events, WAF events) is stored in ClickHouse for fast aggregation queries, with automatic retention via TTL (30 days by default, configurable).
+This project provides a web UI for Caddy Server, eliminating the need to manually edit JSON configurations or Caddyfiles. It handles reverse proxies, access lists, and certificate management through an Astryx interface. Built with Vinext version whatever, React 19, Astryx, Tailwind CSS, Drizzle ORM, and TypeScript. Analytics data (traffic events, WAF events) is stored in ClickHouse for fast aggregation queries, with automatic retention via TTL (30 days by default, configurable).
 
 ---
 
@@ -66,10 +66,10 @@ where it left off and the back button cannot desynchronise it. Setup is one-way:
 
 Two things skip the flow entirely:
 
-- **An existing 3.0 installation.** A pre-3.1 SQLite database found on the host is offered for
+- **An existing pre-3.0 installation.** A SQLite database found on the host is offered for
   migration *before* account creation — you want its accounts, not a new one alongside them. You
   choose which parts to bring; leaving the users out continues to account creation rather than the
-  login page. See [Upgrading from 3.0](#upgrading-from-30-which-used-sqlite).
+  login page. See [Upgrading from a pre-3.0 install](#upgrading-from-a-pre-30-install-which-used-sqlite).
 - **A deployment that predates the flow.** If `ADMIN_USERNAME`/`ADMIN_PASSWORD` or `OAUTH_ENABLED`
   configure a way in and someone can already sign in, setup is marked complete at startup and never
   shown. Upgrading an existing install changes nothing about how it starts.
@@ -96,8 +96,8 @@ embedded-asset filesystem cannot serve, so it cannot be compiled in.
 There is one runtime image, and the end-to-end suite runs that same image rather than a
 variant with extra tooling, so what the tests exercise is what ships. Since the image
 has no interpreter to execute a script with, the suite seeds its fixtures through the
-`db-seed` container in `tests/docker-compose.test.yml` — a throwaway `oven/bun:1-slim`
-that mounts the same data volume. See `tests/helpers/seed.ts`.
+`db-seed` container in `apps/controller/tests/docker-compose.test.yml` — a throwaway `oven/bun:1-slim`
+that mounts the same data volume. See `apps/controller/tests/helpers/seed.ts`.
 
 The container health check is `cpm-server --healthcheck`, which probes `/api/health`
 from inside the image — the runtime has no shell HTTP client to call instead.
@@ -131,8 +131,9 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format — plus everything that used to be in `.env`, stored in the database and editable without a restart
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
-- **In-app Migration** - A pre-3.1 SQLite installation is detected, verified against the expected schema, and imported — accounts, hosts, certificates and settings — with a backup of the old file and a trimmed `.env` at the end
+- **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported — accounts, hosts, certificates and settings — with a backup of the old file and a trimmed `.env` at the end
 - **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. Every apply lands on all of them or none, and names the host that refused
+- **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. The only request the app makes to the internet on its own, and it can be switched off
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
@@ -214,13 +215,13 @@ is still honoured as an override until a value is stored.
 | `NODE_ENV` | Read at module load, before any query. `production` enforces the password policy | `production` in the image | No |
 | `HOST` / `PORT` | The socket binds before anything can be read. `::` is dual-stack and accepts IPv4 too; `0.0.0.0` binds IPv4 only | `::` / `3000` | No |
 | `CPM_APP_ROOT` / `CPM_HEALTHCHECK_URL` | Bootstrap paths for the `cpm-server` binary, used before the app starts | Executable's directory / `http://127.0.0.1:${PORT}/api/health` | No |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.1 did. **Not required** — [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely | None | No |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.0 did. **Not required** — [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely | None | No |
 | `OAUTH_*` | An OAuth provider configured by environment. Synced into the `oauth_providers` table at startup rather than into the settings registry, so there is one source of truth per provider. See [OAuth Authentication](#oauth-authentication) | None | No |
 | `CERTS_DIRECTORY` | Where generated certificates are written | `./data/certs` | No |
 | `ACME_CA_ROOT_DIR` | Directory holding a custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
 | `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
-| `LEGACY_SQLITE_PATH` | Pins which pre-3.1 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
+| `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
 | `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (local socket) | No |
 | `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this encrypted in the database instead | None | With `AGENT_URL` |
 | `AGENT_SOCKET` / `AGENT_CONTROLLER_ID` | Override the local agent's socket path, and the identity the controller signs as | `$L4_PORTS_DIR/agent.sock` / built-in | No |
@@ -257,7 +258,10 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 - Any password you set, whether through setup or `ADMIN_PASSWORD`: 12+ chars with uppercase,
   lowercase, numbers, and special characters — not required when OIDC-only mode is on
 
-Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credentials.
+There is no longer a development default: setting neither variable is not an error in any
+environment, it means the deployment runs [First Run](#first-run) instead of seeding an account.
+The password policy above — including the refusal of `admin` itself — is enforced only when
+`NODE_ENV=production`, so a development instance may set whatever it likes.
 
 ---
 
@@ -301,7 +305,7 @@ MySQL, MariaDB and the rest are rejected by name at startup rather than half-wor
 to some of them, but Drizzle's Bun driver only builds PostgreSQL, and several write paths here
 depend on `RETURNING`.
 
-### Upgrading from 3.0, which used SQLite
+### Upgrading from a pre-3.0 install, which used SQLite
 
 Leave the old `.env` alone and stand up PostgreSQL first, then point `DATABASE_URL` at it. On the
 next start the app finds the old SQLite file, checks it against the schema it expects, and offers
@@ -351,7 +355,7 @@ schema it used to be generated from is gone. After changing it:
 DATABASE_URL=postgres://... bun run db:generate         # emits drizzle/postgres/
 ```
 
-`apps/controller/drizzle/legacy-sqlite/` holds the migrations every pre-3.1 deployment ran. Nothing
+`apps/controller/drizzle/legacy-sqlite/` holds the migrations every pre-3.0 deployment ran. Nothing
 generates into it; it stays so the migration flow's tests can build a realistic old database.
 
 ### Running the tests
@@ -372,7 +376,9 @@ TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:5432/cpm_test bun run test
 
 - Production enforces strong passwords (12+ chars, mixed case, numbers, special characters)
 - 32+ character session secrets required
-- Login rate limiting: 5 attempts per 60 seconds
+- Two independent throttles on the auth endpoints: Better Auth's request limit (5 per 60 seconds)
+  and the login lockout (5 failed sign-ins per 5 minutes, then blocked for 15). Both are Settings
+  fields
 - Audit trail for all configuration changes
 - Supports OAuth2/OIDC for SSO, including group-based roles and an OIDC-only mode with no local accounts
 
@@ -1000,7 +1006,7 @@ Contributions welcome:
 4. Push to branch (`git push origin feature/name`)
 5. Open a Pull Request
 
-- Follow the existing code style (TypeScript, Prettier formatting)
+- Follow the existing code style — `bun run lint` and `bun run format` run Biome, which is the formatter here
 - Add tests for new features when applicable
 - Update documentation for user-facing changes
 - Keep commits focused and write clear commit messages
@@ -1025,7 +1031,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[Caddy Server](https://caddyserver.com/)** - The amazing web server that powers this project
 - **[Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager)** - The original project
 - **[Next.js](https://nextjs.org/)** - React framework for production
-- **[Astryx](https://ui.shadcn.com/)** - Beautifully designed components built on Radix UI and Tailwind CSS
+- **[Astryx](https://www.npmjs.com/package/@astryxdesign/core)** - The component library the dashboard is built from
 - **[Drizzle ORM](https://orm.drizzle.team/)** - Lightweight SQL migrations and type-safe queries
 
 ---

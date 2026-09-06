@@ -1,5 +1,5 @@
 /**
- * Writes a pre-3.1 SQLite database for the migration e2e spec, then exits.
+ * Writes a pre-3.0 SQLite database for the migration e2e spec, then exits.
  *
  * A standalone script rather than a function the spec imports: Playwright runs specs under Node,
  * which cannot load `bun:sqlite` or reach `Bun.password` at all. The spec spawns this with `bun`.

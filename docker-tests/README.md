@@ -34,7 +34,7 @@ else.
 | `dns`        | `172.28.0.5`  | dnsmasq — `*.cpm.test` → Caddy, everything else → Docker DNS |
 | `caddy`      | `172.28.0.10` | **system under test** — the project's Caddy image            |
 | `web`        | `172.28.0.11` | **system under test** — the project's CPM image              |
-| `postgres`   | DHCP          | the controller's database — the only backend since 3.1       |
+| `postgres`   | DHCP          | the controller's database — the only backend since 3.0       |
 | `origin-a`   | `172.28.0.20` | L7 HTTP origin                                               |
 | `origin-b`   | `172.28.0.21` | L7 HTTP origin, second identity for load-balancing tests     |
 | `origin-tls` | `172.28.0.22` | L7 HTTPS origin with a deliberately mismatched certificate   |
@@ -187,7 +187,7 @@ a change to either is deliberate:
   network as Caddy, so it reaches stream listeners directly.
 - **First-run setup and migration** are not reachable: `web` is given
   `ADMIN_USERNAME`/`ADMIN_PASSWORD`, so the setup flow is marked complete at
-  startup, which is what every pre-3.1 deployment does. Those flows are covered
+  startup, which is what every pre-3.0 deployment does. Those flows are covered
   in a browser instead — `apps/controller/tests/e2e/setup.spec.ts` and
   `setup-migrate.spec.ts`, each against its own empty database.
 
@@ -288,7 +288,7 @@ bun run test:coverage
 ```
 
 That writes `coverage/lcov.info` and enforces the ratchet thresholds in
-`scripts/coverage-ratchet.ts`.
+`apps/controller/scripts/coverage-ratchet.ts`.
 
 ## Debugging a failure
 

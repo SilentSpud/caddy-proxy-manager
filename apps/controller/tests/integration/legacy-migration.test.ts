@@ -1,5 +1,5 @@
 /**
- * Migrating a real pre-3.1 SQLite database into PostgreSQL.
+ * Migrating a real pre-3.0 SQLite database into PostgreSQL.
  *
  * The fixture is built by running the SQLite migrations every 3.0 deployment ran, then seeding it
  * the way that release would have — so this exercises the actual shapes an upgrade meets rather
