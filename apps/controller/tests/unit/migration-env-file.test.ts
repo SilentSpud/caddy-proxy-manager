@@ -56,6 +56,13 @@ describe('planEnvCleanup', () => {
     expect(command).toContain('.env');
     expect(command).toContain('# migrated to the database:');
     expect(command).toContain("migrated='APP_NAME|BASE_URL'");
+    // The names reach sed through a shell variable, so the emitted text must carry a live
+    // `${migrated}` for the shell to expand. `\${` in the template literal that builds this is a
+    // JavaScript escape -- it produces `${`, and the backslash never reaches the shell. Pinned
+    // because it reads like a shell escape at a glance, and a reviewer has already read it as one.
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a literal `${` is the assertion
+    expect(command).toContain('(${migrated})');
+    expect(command).not.toContain('\\${');
   });
 
   it('lists variables in the order the settings pages use', () => {
