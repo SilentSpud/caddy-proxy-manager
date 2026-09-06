@@ -36,6 +36,15 @@ function profileEmailVerified(profile: Record<string, unknown>): boolean {
 }
 
 export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
+  // Ownership of an existing CPM account is asserted by the operator through the provider's
+  // auto-link switch, never by the IdP alone. Reporting the claim only for auto-link providers
+  // keeps a provider that merely returns `email_verified: true` from attaching itself to a local
+  // account. Every mapProfileToUser below must report it — better-auth otherwise falls back to
+  // the raw profile's own emailVerified, which is exactly the ungated claim.
+  const mapEmailVerified = (profile: Record<string, unknown>) => ({
+    emailVerified: p.autoLink === true && profileEmailVerified(profile),
+  });
+
   const cfg: GenericOAuthConfig = {
     providerId: p.id,
     clientId: p.clientId,
@@ -49,13 +58,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     // Pin the namespace to trusted application configuration so a provider
     // cannot choose or change its account namespace through profile claims.
     accountIssuer: accountIssuerFor(p.id, p.issuer),
-    // Ownership of an existing CPM account is asserted by the operator through
-    // the provider's auto-link switch, never by the IdP alone. Reporting the
-    // claim only for auto-link providers keeps a provider that merely returns
-    // `email_verified: true` from attaching itself to a local account.
-    mapProfileToUser: (profile) => ({
-      emailVerified: p.autoLink === true && profileEmailVerified(profile),
-    }),
+    mapProfileToUser: (profile) => mapEmailVerified(profile),
   };
   if (p.authorizationUrl) cfg.authorizationUrl = p.authorizationUrl;
   if (p.tokenUrl) cfg.tokenUrl = p.tokenUrl;
@@ -101,8 +104,9 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
         });
       }
       // Privileged fields are never taken from the profile (see enforceSafeUserDefaults); the
-      // role is applied by the sync instead.
-      return {};
+      // role is applied by the sync instead. The auto-link gate still has to be reported, or
+      // enabling group mapping would quietly hand it back to the IdP's own claim.
+      return mapEmailVerified(profile);
     };
   }
 
