@@ -5,6 +5,7 @@ import {
   isValidBodyLimit,
 } from "./caddy-waf";
 import { normalizeDefaultResponseSettings } from "./caddy-default-response";
+import { normalizeTailscaleSettings } from "./caddy-tailscale";
 import { getProviderDefinition, isValidDnsDuration } from "./dns-providers";
 
 export class SettingsValidationError extends Error {
@@ -476,6 +477,34 @@ function validateDefaultResponse(value: Record<string, unknown>): void {
   normalizeDefaultResponseSettings(value);
 }
 
+function validateTailscale(value: Record<string, unknown>): void {
+  onlyKeys(
+    value,
+    [
+      "enabled",
+      "authKey",
+      "controlUrl",
+      "ephemeral",
+      "stateDir",
+      "tags",
+      "defaultNode",
+      "validateAuthKey",
+      "apiAccessToken",
+      "apiTailnet",
+    ],
+    "Tailscale settings",
+  );
+  booleanValue(required(value, "enabled", "Tailscale settings"), "tailscale.enabled");
+  try {
+    // The normalizer is the single source of truth for what a node name, a tag and a state
+    // directory may be — it also runs on every read, so duplicating the rules here would let the
+    // API accept something the next read would silently drop.
+    normalizeTailscaleSettings(value);
+  } catch (error) {
+    invalid(error instanceof Error ? error.message : "Invalid Tailscale settings");
+  }
+}
+
 export function assertSettingsPayloadSize(input: unknown): void {
   let serialized: string;
   try {
@@ -535,6 +564,9 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
       break;
     case "default-response":
       validateDefaultResponse(value);
+      break;
+    case "tailscale":
+      validateTailscale(value);
       break;
     default:
       invalid("Unknown settings group");

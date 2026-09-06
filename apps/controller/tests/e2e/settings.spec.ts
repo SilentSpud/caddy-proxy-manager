@@ -1,10 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+import { goToSettingsSection, SETTINGS_SIDEBAR } from '../helpers/settings-nav';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** The settings page has its own sidebar — an astryx LayoutPanel that renders a <div> carrying
- *  the landmark role and label rather than an <aside>. Use this selector everywhere. */
-const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings navigation"]';
 
 /** Mutating v1 API calls are same-origin checked and 403 without this header. */
 const SETTINGS_ORIGIN = 'http://localhost:3000';
@@ -26,13 +23,7 @@ async function openPaletteWithKeyboard(page: Page) {
 }
 
 /** Navigate to a specific settings section via the sidebar. */
-async function goToSection(page: Page, sectionName: string) {
-  await page.goto('/settings');
-  const sidebar = page.locator(SETTINGS_SIDEBAR);
-  const navButton = sidebar.getByRole('button', { name: sectionName, exact: true });
-  await expect(navButton).toBeVisible({ timeout: 10_000 });
-  await navButton.click();
-}
+const goToSection = goToSettingsSection;
 
 // ─── Page load & layout ──────────────────────────────────────────────────────
 

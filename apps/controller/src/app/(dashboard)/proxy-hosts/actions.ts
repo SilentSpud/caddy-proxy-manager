@@ -27,6 +27,7 @@ import {
   type PathRewriteRule,
   type ErrorPageRule,
   type CpmForwardAuthInput,
+  type TailscaleHostInput,
   PATH_BLOCK_STATUS_CODES,
   sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
@@ -149,6 +150,49 @@ function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInput | un
   }
   if (excludedPaths.length > 0 || formData.has("cpmForwardAuthExcludedPaths")) {
     result.excluded_paths = excludedPaths.length > 0 ? excludedPaths : null;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * The host's Tailscale block.
+ *
+ * Every field is read only when the form actually rendered it, so a dialog that hides the identity
+ * options behind the serve switch does not clear them on save; the model merges what arrives over
+ * what is stored and drops whatever `serve` makes meaningless.
+ */
+function parseTailscaleConfig(formData: FormData): TailscaleHostInput | undefined {
+  if (!formData.has("tailscalePresent")) {
+    return undefined;
+  }
+
+  const result: TailscaleHostInput = {};
+  if (formData.has("tailscaleServe")) {
+    result.serve = parseCheckbox(formData.get("tailscaleServe"));
+  }
+  if (formData.has("tailscaleNode")) {
+    result.node = parseOptionalText(formData.get("tailscaleNode")) ?? "";
+  }
+  if (formData.has("tailscaleTailnetOnly")) {
+    result.tailnetOnly = parseCheckbox(formData.get("tailscaleTailnetOnly"));
+  }
+  if (formData.has("tailscaleAuth")) {
+    result.auth = parseCheckbox(formData.get("tailscaleAuth"));
+  }
+  if (formData.has("tailscaleProtectedPaths")) {
+    const paths = parseCsv(formData.get("tailscaleProtectedPaths"));
+    result.protected_paths = paths.length > 0 ? paths : null;
+  }
+  if (formData.has("tailscaleExcludedPaths")) {
+    const paths = parseCsv(formData.get("tailscaleExcludedPaths"));
+    result.excluded_paths = paths.length > 0 ? paths : null;
+  }
+  if (formData.has("tailscaleForwardIdentity")) {
+    result.forwardIdentity = parseCheckbox(formData.get("tailscaleForwardIdentity"));
+  }
+  if (formData.has("tailscaleUpstreamNode")) {
+    result.upstreamNode = parseOptionalText(formData.get("tailscaleUpstreamNode")) ?? "";
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
@@ -660,6 +704,7 @@ export async function createProxyHostAction(
         customCaddyfile: parseOptionalText(formData.get("customCaddyfile")),
         authentik: parseAuthentikConfig(formData),
         cpmForwardAuth: parseCpmForwardAuthConfig(formData),
+        tailscale: parseTailscaleConfig(formData),
         loadBalancer: parseLoadBalancerConfig(formData),
         dnsResolver: parseDnsResolverConfig(formData),
         upstreamDnsResolution: parseUpstreamDnsResolutionConfig(formData),
@@ -767,6 +812,7 @@ export async function updateProxyHostAction(
           : undefined,
         authentik: parseAuthentikConfig(formData),
         cpmForwardAuth: parseCpmForwardAuthConfig(formData),
+        tailscale: parseTailscaleConfig(formData),
         loadBalancer: parseLoadBalancerConfig(formData),
         dnsResolver: parseDnsResolverConfig(formData),
         upstreamDnsResolution: parseUpstreamDnsResolutionConfig(formData),

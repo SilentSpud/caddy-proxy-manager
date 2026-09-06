@@ -45,6 +45,7 @@ github.com/caddy-dns/acmedns \
 github.com/caddy-dns/infomaniak \
 github.com/caddy-dns/cloudns \
 github.com/mholt/caddy-l4 \
+github.com/tailscale/caddy-tailscale \
 github.com/fuomag9/caddy-blocker-plugin \
 github.com/corazawaf/coraza-caddy/v2"
 

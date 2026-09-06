@@ -14,10 +14,14 @@
 set -eu
 
 # The pinned version of a module, or empty when go.mod does not carry it — which is the normal case
-# for a custom module the operator pasted in. `go list -m` reports a replacement's version when one
-# is in effect, so the cel-go replace below reads back the version actually compiled.
+# for a custom module the operator pasted in.
+#
+# Deliberately the version the module is *required* at, not the one it resolves to: a replaced
+# module resolves to its replacement's version, which is not a version the original path has, so
+# feeding that back as `--with path@version` asks for something that does not exist. The
+# replacements travel separately, below.
 module_version() {
-    go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' "$1" 2>/dev/null || true
+    go list -m -f '{{.Version}}' "$1" 2>/dev/null || true
 }
 
 caddy_version="$(module_version github.com/caddyserver/caddy/v2)"
@@ -52,15 +56,28 @@ for spec in ${CADDY_MODULES:-}; do
     resolved="$resolved $with"
 done
 
-# caddy-blocker-plugin tracks Caddy master and asks for a newer cel-go than the pinned stable Caddy
-# release compiles against. update-compatibility-pins.sh derives the replacement from that release's
-# own go.mod, so this stays a release tag instead of a floating master commit.
-cel_go_version="$(module_version github.com/google/cel-go)"
-if [ -n "$cel_go_version" ]; then
-    set -- "$@" --replace "github.com/google/cel-go=github.com/google/cel-go@$cel_go_version"
-fi
+# Every replacement go.mod declares, passed through as-is.
+#
+# Read from go.mod rather than listed here, because there are two unrelated reasons for one and
+# both have to reach the build: a compatibility pin (cel-go, which caddy-blocker-plugin wants newer
+# than the pinned Caddy release compiles against), and a plugin temporarily pointed at a fork
+# carrying a fix that upstream has not merged. Each says why it exists in go.mod, next to itself.
+#
+# Not a `while read` loop: that runs in a subshell, and the positional arguments it appended would
+# be discarded with it. Replacements to a local directory are skipped — they have no version, and
+# nothing in a reproducible image build should depend on a path outside it.
+replacements="$(go list -m -f '{{if and .Replace .Replace.Version}}{{.Path}}={{.Replace.Path}}@{{.Replace.Version}}{{end}}' all 2>/dev/null | grep . || true)"
+for replacement in $replacements; do
+    set -- "$@" --replace "$replacement"
+done
 
 echo "Building Caddy $caddy_version with:${resolved:- no plugins}"
+if [ -n "$replacements" ]; then
+    echo "Replacements:"
+    for replacement in $replacements; do
+        echo "  $replacement"
+    done
+fi
 if [ -n "$unpinned" ]; then
     echo "WARNING: no pinned version in go.mod for:$unpinned"
 fi
@@ -69,4 +86,12 @@ GOOS="$TARGETOS" GOARCH="$TARGETARCH" xcaddy build "$@" --output /usr/bin/caddy
 
 # The exact versions that went into the binary, so an image can be audited on its own:
 #   docker run --rm <image> cat /etc/caddy/caddy-modules.resolved.txt
-printf '%s\n' "${resolved# }" > /caddy-modules.resolved.txt
+#
+# Replacements are recorded beside them, because "which caddy-tailscale is actually in here" is
+# exactly the question this file exists to answer, and the module list alone would say the wrong one.
+{
+    printf '%s\n' "${resolved# }"
+    for replacement in $replacements; do
+        printf 'replace %s\n' "$replacement"
+    done
+} > /caddy-modules.resolved.txt

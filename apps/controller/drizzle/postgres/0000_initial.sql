@@ -291,6 +291,8 @@ CREATE TABLE "sessions" (
 	"expiresAt" text NOT NULL,
 	"ipAddress" text,
 	"userAgent" text,
+	"oidcProviderId" text,
+	"oidcSid" text,
 	"createdAt" text NOT NULL,
 	"updatedAt" text NOT NULL
 );
@@ -389,4 +391,5 @@ CREATE UNIQUE INDEX "oauth_state_unique" ON "oauth_states" USING btree ("state")
 CREATE UNIQUE INDEX "pending_oauth_user_provider_unique" ON "pending_oauth_links" USING btree ("userId","provider");--> statement-breakpoint
 CREATE UNIQUE INDEX "sessions_token_unique" ON "sessions" USING btree ("token");--> statement-breakpoint
 CREATE INDEX "sessions_user_idx" ON "sessions" USING btree ("userId");--> statement-breakpoint
+CREATE INDEX "sessions_oidc_session_idx" ON "sessions" USING btree ("oidcProviderId","oidcSid");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_email_unique" ON "users" USING btree ("email");

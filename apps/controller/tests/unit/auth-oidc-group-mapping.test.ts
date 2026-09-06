@@ -34,11 +34,14 @@ vi.mock('better-auth/plugins', () => ({
   username: () => ({}),
 }));
 
+import { eq } from 'drizzle-orm';
 import { mapOAuthProvider } from '../../src/lib/auth-server';
+import { accounts, groupMembers, groups, users } from '../../src/lib/db/schema';
 import type { OAuthProvider } from '../../src/lib/models/oauth-providers';
 import {
   clearPendingOidcSyncs,
   consumePendingOidcSync,
+  reconcileOidcUserAfterSignIn,
 } from '../../src/lib/services/oidc-group-sync';
 
 function provider(overrides: Partial<OAuthProvider> = {}): OAuthProvider {
@@ -152,7 +155,31 @@ describe('mapOAuthProvider — group mapping hooks', () => {
       }),
     );
 
-    expect(mapped).toEqual({});
+    expect(mapped).not.toHaveProperty('role');
+    expect(mapped).not.toHaveProperty('status');
+    // The auto-link gate is the one field it does report, so better-auth cannot fall back to the
+    // profile's own emailVerified.
+    expect(mapped).toEqual({ emailVerified: false });
+  });
+
+  it('still gates emailVerified on auto-link once group mapping is on', async () => {
+    const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true, autoLink: true }));
+
+    const mapped = await cfg.mapProfileToUser!(
+      profile({ sub: 'user-1', email: 'dev@example.com', email_verified: true, groups: [] }),
+    );
+
+    expect(mapped).toEqual({ emailVerified: true });
+  });
+
+  it('reports emailVerified false for a non-auto-link provider claiming a verified email', async () => {
+    const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true, autoLink: false }));
+
+    const mapped = await cfg.mapProfileToUser!(
+      profile({ sub: 'user-1', email: 'dev@example.com', email_verified: true, groups: [] }),
+    );
+
+    expect(mapped).toEqual({ emailVerified: false });
   });
 
   it('records the role from custom group names configured without a prefix', async () => {
@@ -193,5 +220,100 @@ describe('mapOAuthProvider — group mapping hooks', () => {
     await cfg.mapProfileToUser!(profile({ email: 'x@example.com', groups: ['CPM_Admin'] }));
 
     expect(consumePendingOidcSync('authentik', 'undefined')).toBeNull();
+  });
+});
+
+/**
+ * The returning user is the case the wiring exists for: better-auth calls `getUserInfo` — and so
+ * `mapProfileToUser` — on every callback, new account or not, so a group change at the IdP takes
+ * effect at the next sign-in rather than being frozen at the role the account was created with.
+ */
+describe('a repeat sign-in re-reads the group claim', () => {
+  const now = '2026-01-01T00:00:00.000Z';
+
+  async function seedReturningUser(role: string): Promise<number> {
+    const [user] = await ctx.db
+      .insert(users)
+      .values({
+        email: 'dev@example.com',
+        name: 'Dev',
+        role,
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    await ctx.db.insert(accounts).values({
+      userId: user.id,
+      accountId: 'user-1',
+      providerId: 'authentik',
+      issuer: 'local:oauth:authentik',
+      createdAt: now,
+      updatedAt: now,
+    });
+    return user.id;
+  }
+
+  async function signIn(
+    cfg: ReturnType<typeof mapOAuthProvider>,
+    groups: string[],
+    userId: number,
+  ) {
+    await cfg.mapProfileToUser!(profile({ sub: 'user-1', email: 'dev@example.com', groups }));
+    await reconcileOidcUserAfterSignIn(userId);
+  }
+
+  async function roleOf(userId: number): Promise<string> {
+    const rows = await ctx.db.select().from(users).where(eq(users.id, userId));
+    return rows[0].role;
+  }
+
+  beforeEach(async () => {
+    await ctx.db.delete(groupMembers);
+    await ctx.db.delete(groups);
+    await ctx.db.delete(accounts);
+    await ctx.db.delete(users);
+  });
+
+  it('promotes an existing account added to the admin group since it last signed in', async () => {
+    const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true }));
+    const userId = await seedReturningUser('user');
+
+    await signIn(cfg, ['CPM_Admin'], userId);
+
+    expect(await roleOf(userId)).toBe('admin');
+  });
+
+  it('demotes an existing account removed from the admin group', async () => {
+    const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true }));
+    // A second admin, so the last-admin safeguard does not hold the demotion back.
+    await ctx.db.insert(users).values({
+      email: 'other-admin@example.com',
+      name: 'Other',
+      role: 'admin',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const userId = await seedReturningUser('admin');
+
+    await signIn(cfg, ['CPM_Devs'], userId);
+
+    expect(await roleOf(userId)).toBe('user');
+  });
+
+  it('reconciles mirrored group membership on the repeat sign-in too', async () => {
+    const cfg = mapOAuthProvider(provider({ roleMappingEnabled: true, syncGroups: true }));
+    const userId = await seedReturningUser('user');
+
+    await signIn(cfg, ['CPM_Devs', 'CPM_Ops'], userId);
+    await signIn(cfg, ['CPM_Ops'], userId);
+
+    const rows = await ctx.db
+      .select({ name: groups.name })
+      .from(groupMembers)
+      .innerJoin(groups, eq(groupMembers.groupId, groups.id))
+      .where(eq(groupMembers.userId, userId));
+    expect(rows.map((r) => r.name)).toEqual(['Ops']);
   });
 });

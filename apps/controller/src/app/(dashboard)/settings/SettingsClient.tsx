@@ -22,6 +22,7 @@ import {
   BarChart2,
   Globe2,
   Image,
+  Network,
   RefreshCw,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -71,10 +72,15 @@ import type {
 import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
 import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
+import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
 import type { UpdateStatus } from "@/src/lib/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
-import { useModuleGate } from "@/components/caddy-modules/ModuleGate";
+import {
+  ModuleGated,
+  useDisabledReason,
+  useModuleGate,
+} from "@/components/caddy-modules/ModuleGate";
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
 import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -105,6 +111,7 @@ import {
   updateTrustedProxiesSettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
+  updateTailscaleSettingsAction,
   pairAgentAction,
   unpairAgentAction,
 } from "./actions";
@@ -206,6 +213,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Trusted Proxies",
         desc: "Resolve real client IP behind an upstream proxy",
         icon: Waypoints,
+      },
+      {
+        id: "tailscale",
+        name: "Tailscale",
+        desc: "Node defaults for hosts served on, or reached over, your tailnet",
+        icon: Network,
       },
     ],
   },
@@ -454,6 +467,8 @@ type Props = {
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   caddyBuild: CaddyBuildSettings | null;
+  /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
+  tailscale: TailscaleSettingsView;
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
   hasFavicon: boolean;
   updates: UpdateStatus;
@@ -491,6 +506,7 @@ export default function SettingsClient({
   avatars,
   passwordPolicy,
   caddyBuild,
+  tailscale,
   hasFavicon,
   updates,
   analytics,
@@ -557,6 +573,7 @@ export default function SettingsClient({
     updateDefaultResponseSettingsAction,
     null,
   );
+  const [tailscaleState, tailscaleFormAction] = useActionState(updateTailscaleSettingsAction, null);
   const [pairState, pairFormAction] = useActionState(pairAgentAction, null);
 
   // The page has two navigations — the sidebar panel and the compact picker in the content column
@@ -640,6 +657,13 @@ export default function SettingsClient({
                     trustedProxies={trustedProxies}
                     trustedProxiesState={trustedProxiesState}
                     trustedProxiesFormAction={trustedProxiesFormAction}
+                  />
+                )}
+                {active === "tailscale" && (
+                  <TailscaleSection
+                    tailscale={tailscale}
+                    tailscaleState={tailscaleState}
+                    tailscaleFormAction={tailscaleFormAction}
                   />
                 )}
                 {active === "geoblock" && (
@@ -1450,6 +1474,168 @@ function ErrorPagesSection({
           </Text>
           <ErrorPagesFields initialData={globalErrorPages?.rules ?? []} />
           <SaveButton label="Save error pages" />
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+// ─── Section: Tailscale ──────────────────────────────────────────────────────
+
+function TailscaleSection({
+  tailscale,
+  tailscaleState,
+  tailscaleFormAction,
+}: {
+  tailscale: TailscaleSettingsView;
+  tailscaleState: { success: boolean; message?: string } | null;
+  tailscaleFormAction: (payload: FormData) => void;
+}) {
+  const [enabled, setEnabled] = useState(tailscale.enabled);
+  const [authKey, setAuthKey] = useState("");
+  const [defaultNode, setDefaultNode] = useState(tailscale.defaultNode);
+  const [controlUrl, setControlUrl] = useState(tailscale.controlUrl);
+  const [stateDir, setStateDir] = useState(tailscale.stateDir);
+  const [tags, setTags] = useState(tailscale.tags.join(", "));
+  const [ephemeral, setEphemeral] = useState(tailscale.ephemeral);
+  const [validateAuthKey, setValidateAuthKey] = useState(tailscale.validateAuthKey);
+  const [apiAccessToken, setApiAccessToken] = useState("");
+  const [apiTailnet, setApiTailnet] = useState(tailscale.apiTailnet);
+  const moduleDisabledReason = useDisabledReason("tailscale");
+
+  return (
+    <FormCard title="Tailscale">
+      <form action={tailscaleFormAction}>
+        <VStack gap={3}>
+          {tailscaleState?.message && (
+            <StatusAlert message={tailscaleState.message} success={tailscaleState.success} />
+          )}
+          {moduleDisabledReason && (
+            <WarnAlert title="The Tailscale module is not enabled">
+              {moduleDisabledReason} These settings still save, but no host is served on the tailnet
+              until the module is compiled in.
+            </WarnAlert>
+          )}
+          <ModuleGated feature="tailscale">
+            <CheckboxInput
+              label="Use Tailscale"
+              description="Runs a Tailscale node inside Caddy. A proxy host can then be served privately on your tailnet, gated on tailnet identity, or proxied to a backend that only exists on the tailnet."
+              htmlName="tailscaleEnabled"
+              value={enabled}
+              onChange={setEnabled}
+              isDisabled={Boolean(moduleDisabledReason)}
+            />
+          </ModuleGated>
+          <InfoAlert title="Nothing else on the host has to change">
+            The node runs in userspace inside the Caddy container — no <Code>tailscaled</Code>, no
+            TUN device, no extra ports published. Its identity is kept in the state directory below,
+            so it survives a container recreate.
+          </InfoAlert>
+          <TextInput
+            {...AUTOFILL_NEW_PASSWORD}
+            label="Auth key"
+            type="password"
+            isOptional
+            description={
+              tailscale.hasAuthKey
+                ? "An auth key is stored. Leave this empty to keep it."
+                : "A reusable auth key from the Tailscale admin console. A Caddy placeholder such as {env.TS_AUTHKEY} works too, and keeps the key out of the database."
+            }
+            htmlName="tailscaleAuthKey"
+            value={authKey}
+            onChange={setAuthKey}
+          />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="Default node name"
+            description="The tailnet machine name used by hosts that do not name one of their own. Lowercase letters, digits and hyphens."
+            htmlName="tailscaleDefaultNode"
+            value={defaultNode}
+            onChange={setDefaultNode}
+            placeholder="caddy"
+          />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="Tags"
+            isOptional
+            description='ACL tags applied when a node registers, comma-separated. Most reusable auth keys require at least one, e.g. "tag:caddy".'
+            htmlName="tailscaleTags"
+            value={tags}
+            onChange={setTags}
+            placeholder="tag:caddy"
+          />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="Control server URL"
+            isOptional
+            description="Point at a Headscale or other coordination server. Empty uses Tailscale's own."
+            htmlName="tailscaleControlUrl"
+            value={controlUrl}
+            onChange={setControlUrl}
+            placeholder="https://headscale.example.com"
+          />
+          <TextInput
+            {...AUTOFILL_OFF}
+            label="State directory"
+            isOptional
+            description="Where each node keeps its identity, one subdirectory per node. Must be on a volume, or every restart registers a new machine."
+            htmlName="tailscaleStateDir"
+            value={stateDir}
+            onChange={setStateDir}
+            placeholder="/data/tailscale"
+          />
+          <CheckboxInput
+            label="Register nodes as ephemeral"
+            description="Ephemeral nodes disappear from the tailnet when Caddy stops, instead of lingering as offline machines. Their identity is not reused, so a restart shows up as a new device."
+            htmlName="tailscaleEphemeral"
+            value={ephemeral}
+            onChange={setEphemeral}
+          />
+          <CheckboxInput
+            label="Check the auth key against the Tailscale API before saving"
+            description="Catches a revoked, expired or mistyped key here instead of at the next config apply. Needs a Tailscale API access token, because an auth key cannot authenticate to the API."
+            htmlName="tailscaleValidateAuthKey"
+            value={validateAuthKey}
+            onChange={setValidateAuthKey}
+          />
+          {validateAuthKey ? (
+            <>
+              <TextInput
+                {...AUTOFILL_NEW_PASSWORD}
+                label="API access token"
+                type="password"
+                isOptional
+                description={
+                  tailscale.hasApiAccessToken
+                    ? "A token is stored. Leave this empty to keep it."
+                    : "A tskey-api-… token from the Tailscale admin console. Read access to keys is enough."
+                }
+                htmlName="tailscaleApiAccessToken"
+                value={apiAccessToken}
+                onChange={setApiAccessToken}
+              />
+              <TextInput
+                {...AUTOFILL_OFF}
+                label="Tailnet"
+                isOptional
+                description={
+                  'Which tailnet to ask. "-" means the token\'s own, which is right unless you administer several.'
+                }
+                htmlName="tailscaleApiTailnet"
+                value={apiTailnet}
+                onChange={setApiTailnet}
+                placeholder="-"
+              />
+            </>
+          ) : (
+            <WarnAlert title="Auth keys are not being checked">
+              Nothing here can tell a revoked or expired key from a working one — that is only
+              discovered when Caddy tries to register the node, and a node that will not come up
+              makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy
+              host on any agent can be updated.
+            </WarnAlert>
+          )}
+          <SaveButton label="Save Tailscale settings" />
         </VStack>
       </form>
     </FormCard>

@@ -1,5 +1,5 @@
 {
-  "id": "b0c3c52b-bc51-4351-bef2-82a690f4e07a",
+  "id": "95979b6d-ab4d-4b31-8e57-5fb3a1d1a14a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2459,6 +2459,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "oidcProviderId": {
+          "name": "oidcProviderId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oidcSid": {
+          "name": "oidcSid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "text",
@@ -2493,6 +2505,27 @@
           "columns": [
             {
               "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sessions_oidc_session_idx": {
+          "name": "sessions_oidc_session_idx",
+          "columns": [
+            {
+              "expression": "oidcProviderId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "oidcSid",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

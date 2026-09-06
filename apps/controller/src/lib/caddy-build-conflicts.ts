@@ -26,6 +26,7 @@ export async function describeModuleConflicts(
 
   const wafOff = !enabled.has("coraza-waf");
   const blockerOff = !enabled.has("caddy-blocker");
+  const tailscaleOff = !enabled.has("caddy-tailscale");
 
   if (!enabled.has("caddy-l4")) {
     const l4Count = await countEnabledL4ProxyHosts();
@@ -52,7 +53,7 @@ export async function describeModuleConflicts(
 
   // Per-host config counts as much as the global switch: WAF and geoblocking can be on per host
   // with the global off. Checking only globals let an operator disable a module a dozen hosts used.
-  if (wafOff || blockerOff) {
+  if (wafOff || blockerOff || tailscaleOff) {
     const hosts = await listProxyHosts();
     if (wafOff) {
       const count = hosts.filter((h) => h.enabled && h.waf?.enabled).length;
@@ -67,6 +68,16 @@ export async function describeModuleConflicts(
       if (count > 0) {
         problems.push(
           `${count} proxy host${count === 1 ? " has" : "s have"} per-host geoblocking enabled and ${count === 1 ? "needs" : "need"} the Request Blocker module`,
+        );
+      }
+    }
+    if (tailscaleOff) {
+      // Worth refusing rather than warning: a tailnet-only host stops being served at all — the
+      // config drops it rather than publishing it, which looks like the host simply vanished.
+      const count = hosts.filter((h) => h.enabled && h.tailscale?.serve).length;
+      if (count > 0) {
+        problems.push(
+          `${count} proxy host${count === 1 ? " is" : "s are"} served on the tailnet and ${count === 1 ? "needs" : "need"} the Tailscale module`,
         );
       }
     }

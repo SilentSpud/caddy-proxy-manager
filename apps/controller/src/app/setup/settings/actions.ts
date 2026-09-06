@@ -16,26 +16,44 @@ import { type GeneralSettings, saveGeneralSettings } from "@/src/lib/settings";
 // SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
 // JSON groups and one to the registry, and this action now saves through both.
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
-import { getMigrationSource, isSetupCompleted, markSetupCompleted } from "@/src/lib/setup";
+import {
+  getMigrationSource,
+  isSetupCompleted,
+  markSetupCompleted,
+  promoteFirstSetupAdmin,
+} from "@/src/lib/setup";
 
 export type SetupSettingsState = { error: string | null };
 
 /**
  * Save the configuration collected by the last setup step, then mark setup finished.
  *
- * Requires an admin session: this step runs after the sign-in that setup insists on, so there is a
- * real user by now and the endpoint should be protected like any other administrative write.
+ * Whoever completes setup is the administrator. A signed-in session is required — this step runs
+ * after the sign-in setup insists on, so there is a real user by now — but demanding that they
+ * already *be* an admin made the OAuth branch of the account step a dead end: it stores a provider
+ * and no user, so the user row is created by Better Auth's callback with `role: "user"`, and the
+ * only place group-to-role mapping can be turned on is this very step. Promoting here rather than
+ * relaxing the check outright matters: finishing setup with nobody an admin would leave a
+ * completed instance with no way to reach Settings at all.
  */
 export async function saveSetupSettings(
   _previous: SetupSettingsState,
   formData: FormData,
 ): Promise<SetupSettingsState> {
   const session = await auth();
-  if (session?.user?.role !== "admin") {
-    return { error: "You need to be signed in as an administrator to finish setup." };
+  if (!session?.user) {
+    return { error: "You need to be signed in to finish setup." };
   }
   if (await isSetupCompleted()) {
     redirect("/");
+  }
+
+  // Before the writes below, so the rest of this action runs as an administrator. A no-op when
+  // the account step already made one, which is every local-account setup — and for a second,
+  // ordinary user reaching this step, which is what the check below still refuses.
+  const promoted = await promoteFirstSetupAdmin(Number(session.user.id));
+  if (!promoted && session.user.role !== "admin") {
+    return { error: "You need to be signed in as an administrator to finish setup." };
   }
 
   // Read from the registry rather than iterating the form, so a setting the form did not post is

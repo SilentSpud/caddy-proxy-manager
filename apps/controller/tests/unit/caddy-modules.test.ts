@@ -129,7 +129,7 @@ describe('caddy module registry', () => {
   });
 
   it('maps each gated feature to at least one module', () => {
-    for (const feature of ['l4', 'geoblock', 'waf', 'dns01'] as const) {
+    for (const feature of ['l4', 'geoblock', 'waf', 'tailscale', 'dns01'] as const) {
       expect(modulesForFeature(feature).length, `no module powers "${feature}"`).toBeGreaterThan(0);
     }
   });
@@ -141,6 +141,9 @@ describe('caddy module registry', () => {
     ]);
     expect(modulesForFeature('waf').map((m) => m.modulePath)).toEqual([
       'github.com/corazawaf/coraza-caddy/v2',
+    ]);
+    expect(modulesForFeature('tailscale').map((m) => m.modulePath)).toEqual([
+      'github.com/tailscale/caddy-tailscale',
     ]);
   });
 });

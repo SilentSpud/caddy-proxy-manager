@@ -7,8 +7,15 @@ import {
   normalizeDefaultResponseSettings,
   type DefaultResponseSettings,
 } from "./caddy-default-response";
+import {
+  DEFAULT_TAILSCALE_SETTINGS,
+  normalizeTailscaleSettings,
+  type TailscaleSettings,
+} from "./caddy-tailscale";
+import { encryptSecret } from "./secret";
 
 export type { DefaultResponseSettings } from "./caddy-default-response";
+export type { TailscaleSettings } from "./caddy-tailscale";
 
 export type SettingValue<T> = T | null;
 
@@ -359,6 +366,42 @@ export async function getErrorPagesSettings(): Promise<ErrorPagesSettings | null
 
 export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<void> {
   await setSetting("error_pages", { rules: sanitizeErrorPageRules(s?.rules) });
+}
+
+// ─── Tailscale ───────────────────────────────────────────────────────────────
+
+/**
+ * Tailscale node defaults. The auth key comes back exactly as stored — encrypted — because this is
+ * also what the Settings page reads; decrypting here would put the key one careless prop away from
+ * the browser. Config generation decrypts it explicitly.
+ */
+export async function getTailscaleSettings(): Promise<TailscaleSettings | null> {
+  const value = await getSetting<unknown>("tailscale");
+  if (value === null) return null;
+
+  try {
+    // The stored blob is normalized on the way in, so a failure here means it was hand-edited or
+    // written by an older shape. Treating that as "not configured" is safer than throwing on every
+    // config apply, which would take every other host down with it.
+    return normalizeTailscaleSettings(value);
+  } catch (error) {
+    console.warn("Ignoring invalid Tailscale settings", error);
+    return null;
+  }
+}
+
+export async function saveTailscaleSettings(value: TailscaleSettings): Promise<void> {
+  const normalized = normalizeTailscaleSettings(value);
+  await setSetting("tailscale", {
+    ...normalized,
+    authKey: normalized.authKey ? encryptSecret(normalized.authKey) : "",
+    apiAccessToken: normalized.apiAccessToken ? encryptSecret(normalized.apiAccessToken) : "",
+  });
+}
+
+/** The effective settings when nothing has been saved yet, so callers need no null branch. */
+export function defaultTailscaleSettings(): TailscaleSettings {
+  return { ...DEFAULT_TAILSCALE_SETTINGS, tags: [] };
 }
 
 // ─── Caddy build ─────────────────────────────────────────────────────────────

@@ -15,6 +15,8 @@ import {
   getAvatarSettings,
   getPasswordPolicySettings,
   getCaddyBuildSettings,
+  getTailscaleSettings,
+  defaultTailscaleSettings,
 } from "@/src/lib/settings";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { listAgents } from "@/src/lib/models/agents";
@@ -23,6 +25,7 @@ import { getFavicon } from "@/src/lib/branding";
 import { getUpdateStatus } from "@/src/lib/updates";
 import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
+import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
 import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
 import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
@@ -52,6 +55,7 @@ export default async function SettingsPage() {
     avatarSettings,
     passwordPolicySettings,
     caddyBuild,
+    tailscale,
     analytics,
     geoip,
     favicon,
@@ -73,6 +77,7 @@ export default async function SettingsPage() {
     getAvatarSettings(),
     getPasswordPolicySettings(),
     getCaddyBuildSettings(),
+    getTailscaleSettings(),
     analyticsView(),
     geoipView(),
     getFavicon(),
@@ -115,6 +120,9 @@ export default async function SettingsPage() {
         fromEnv: config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null,
       }}
       caddyBuild={caddyBuild}
+      // The auth key never leaves the server: the page ships only whether one is stored, so
+      // the form can say "leave blank to keep the current key" without shipping it.
+      tailscale={redactTailscaleSettingsForApi(tailscale ?? defaultTailscaleSettings())}
       // Only whether one exists: the image itself is served by its own route, so shipping it in
       // this page's HTML would be a couple of hundred kilobytes of base64 for nothing.
       hasFavicon={favicon !== null}
