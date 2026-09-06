@@ -37,8 +37,8 @@ Our CI/CD pipeline implements multiple security layers:
    changes on `main`, and only that tag triggers an image build.
 3. **SBOM Generation**: Software Bill of Materials is generated for all builds
 4. **Provenance Attestation**: Build provenance is recorded for supply chain security
-5. **Limited Permissions**: Workflows use minimal required permissions. The test workflow zeroes
-   `GITHUB_TOKEN` outright and references no repository secrets
+5. **Limited Permissions**: Workflows use minimal required permissions. The test workflow declares
+   `permissions: {}`, so its `GITHUB_TOKEN` carries no scopes, and it references no repository secrets
 
 ### Container Security
 

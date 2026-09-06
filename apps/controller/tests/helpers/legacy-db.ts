@@ -1,5 +1,5 @@
 /**
- * Where the migration e2e spec's pre-3.1 database lives, and how it gets there.
+ * Where the migration e2e spec's pre-3.0 database lives, and how it gets there.
  *
  * Node-safe on purpose: Playwright runs specs under Node, which cannot load `bun:sqlite`. Building
  * the file needs Bun, so that half lives in ./build-legacy-db.ts and is spawned rather than

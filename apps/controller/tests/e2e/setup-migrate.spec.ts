@@ -2,7 +2,7 @@
  * Migrating a 3.0 installation, in a browser.
  *
  * Runs against `web-migrate` (port 3005): its own empty PostgreSQL database, no `ADMIN_USERNAME`,
- * and a real pre-3.1 SQLite file bind-mounted where the application scans for one. The database is
+ * and a real pre-3.0 SQLite file bind-mounted where the application scans for one. The database is
  * built from `drizzle/legacy-sqlite` — the migrations every 3.0 deployment actually ran — so what
  * the browser sees is a database the application discovered, not one a test injected.
  *

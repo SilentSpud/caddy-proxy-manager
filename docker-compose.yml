@@ -64,9 +64,11 @@ services:
       # Set false to disable it and lock the Settings toggle.
       AVATAR_GRAVATAR: ${AVATAR_GRAVATAR:-true}
 
-      # Optional. Unset means first-run setup creates the administrator in the browser instead.
-      # Setting both seeds one at startup and skips that flow; in production the password must then
-      # be 12+ chars with upper, lower, digit and special, or the app refuses to start.
+      # Optional. Compose always sets these, to the empty string when .env names neither; the app
+      # trims and reads blank as absent, which means first-run setup creates the administrator in
+      # the browser instead. Setting both seeds one at startup and skips that flow; in production
+      # the password must then be 12+ chars with upper, lower, digit and special, or it refuses to
+      # start.
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
 
