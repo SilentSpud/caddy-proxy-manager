@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * What a migrated deployment is owed once setup finishes: its old database back, and a `.env` it
- * can safely put in place of the one it has.
+ * What a migrated deployment is owed once setup finishes: its old database back, and the command
+ * that clears the migrated variables out of the `.env` it still has.
  */
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -12,16 +12,15 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import type { EnvCleanup } from "@/src/lib/migration/env-file";
 import { FormCard } from "@/src/components/ui/FormLayout";
 
 export default function SetupDoneClient({
   source,
-  trimmedEnv,
-  removed,
+  cleanup,
 }: {
   source: string;
-  trimmedEnv: string | null;
-  removed: string[];
+  cleanup: EnvCleanup;
 }) {
   return (
     <Center>
@@ -49,24 +48,37 @@ export default function SetupDoneClient({
           </VStack>
         </FormCard>
 
-        <FormCard title="Replace your .env">
-          {trimmedEnv ? (
+        <FormCard title="Tidy up your .env">
+          {cleanup.command ? (
             <VStack gap={3}>
               <Text size="sm" color="secondary">
-                Everything below marked as migrated now lives in the database and is no longer read
-                from the file. They are commented rather than removed so you keep a copy.
+                These are stored in the database now and are no longer read from the environment:{" "}
+                <Code>{cleanup.comment.join(" ")}</Code>. Run this beside your{" "}
+                <Code>docker-compose.yml</Code> to comment them out of your <Code>.env</Code>. It
+                edits nothing else, leaves a <Code>.env.bak</Code> next to it, and comments rather
+                than deletes so you keep a copy of the values.
               </Text>
-              <Code>{trimmedEnv}</Code>
+              <Code>{cleanup.command}</Code>
+              <Text size="sm" color="secondary">
+                If this deployment's environment comes from somewhere else — Compose's own{" "}
+                <Code>environment:</Code> block, Swarm or Kubernetes secrets, a systemd unit —
+                remove those variables from wherever you set them instead. Either way it is
+                optional: a variable that is still set is simply ignored now that a value is stored.
+              </Text>
             </VStack>
           ) : (
-            <VStack gap={3}>
-              <Text size="sm" color="secondary">
-                No <Code>.env</Code> file was found beside the application — its environment is
-                probably supplied by Compose. These variables are now stored in the database and can
-                be removed from wherever you set them:
-              </Text>
-              <Code>{removed.length > 0 ? removed.join("\n") : "Nothing to remove."}</Code>
-            </VStack>
+            <Text size="sm" color="secondary">
+              Nothing to remove — none of the settings you migrated were configured by an
+              environment variable.
+            </Text>
+          )}
+
+          {cleanup.keep.length > 0 && (
+            <Banner
+              status="warning"
+              title="Compose reads these too"
+              description={`Docker Compose provisions the clickhouse and geoipupdate containers from ${cleanup.keep.join(", ")}, and it cannot read the database — so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start those containers there. With an agent the saved values are passed to Compose for you, and these lines can go as well — but drop clickhouse and geoipupdate from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the containers from the now-stale values in the file.`}
+            />
           )}
         </FormCard>
 

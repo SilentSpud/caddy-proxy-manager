@@ -1,6 +1,11 @@
 import type { NextRequest } from "next/server";
 import { importLegacyDatabase } from "@/src/lib/migration/import";
 import { scanForLegacyDatabases } from "@/src/lib/migration/legacy-database";
+import {
+  LegacySecretError,
+  probeLegacySecrets,
+  verifyLegacyKey,
+} from "@/src/lib/migration/legacy-secrets";
 import { parseMigrationSelection } from "@/src/lib/migration/selection";
 import { carryOverBlobSettings } from "@/src/lib/migration/settings-carryover";
 import { hasAnySignIn, isSetupCompleted, recordMigrationSource } from "@/src/lib/setup";
@@ -21,7 +26,9 @@ import { hasAnySignIn, isSetupCompleted, recordMigrationSource } from "@/src/lib
 
 export type MigrateResponse =
   | { ok: true; next: string; migratedSignIn: boolean }
-  | { ok: false; error: string };
+  // `code` is what lets the browser tell "ask for the old SESSION_SECRET" apart from an error it
+  // can only report. Everything else carries the message alone.
+  | { ok: false; error: string; code?: "legacy-key-required" | "legacy-key-invalid" };
 
 function json(body: MigrateResponse, status: number): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -32,7 +39,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     return json({ ok: false, error: "Setup has already been completed." }, 409);
   }
 
-  let body: { path?: unknown; groups?: unknown };
+  let body: { path?: unknown; groups?: unknown; legacyKey?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -81,14 +88,62 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
+  // The old database's secrets, and whether this deployment's SESSION_SECRET reads them.
+  //
+  // Checked here rather than left to the importer to discover, so a missing or mistyped key is a
+  // 400 that names the problem before any row is written. The key itself is used and dropped: what
+  // is stored is the re-encrypted ciphertext, under this deployment's own key.
+  const legacyKey = typeof body.legacyKey === "string" ? body.legacyKey.trim() : "";
+  const probe = probeLegacySecrets(chosen.path);
+  if (probe.hasEncryptedValues && !probe.readableWithCurrentKey) {
+    if (!legacyKey) {
+      return json(
+        {
+          ok: false,
+          code: "legacy-key-required",
+          error:
+            "This database's secrets — certificate keys, provider credentials, agent secrets — are " +
+            "encrypted with the SESSION_SECRET the old installation ran with, which is not the one " +
+            "this deployment uses. Enter the old value to bring them across.",
+        },
+        400,
+      );
+    }
+    if (!verifyLegacyKey(probe, legacyKey)) {
+      return json(
+        {
+          ok: false,
+          code: "legacy-key-invalid",
+          error:
+            "That SESSION_SECRET does not decrypt this database's secrets. Take it from the `.env` " +
+            "the old installation ran with, exactly as it appears there.",
+        },
+        400,
+      );
+    }
+  }
+
   try {
-    await importLegacyDatabase(chosen.path, groups);
+    await importLegacyDatabase(chosen.path, groups, { legacyKey: legacyKey || null });
     // The old JSON blobs live in the settings table, so there is nothing to lift when settings
     // were left behind — and writing them anyway would pin values the operator declined to bring.
     if (groups.includes("settings")) await carryOverBlobSettings();
     await recordMigrationSource(chosen.path);
   } catch (error) {
     console.error("Migration failed", error);
+    // Reachable despite the check above only when a value outside the sampled ones is encrypted
+    // under a third key — a database whose secret was rotated more than once. Nothing was written:
+    // every row is converted before any is inserted, so this is a refusal, not a partial import.
+    if (error instanceof LegacySecretError) {
+      return json(
+        {
+          ok: false,
+          code: "legacy-key-invalid",
+          error: `${error.message} Nothing was written — the import stops before writing when a value cannot be read.`,
+        },
+        400,
+      );
+    }
     return json(
       {
         ok: false,

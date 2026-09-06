@@ -40,6 +40,17 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
   /** Encrypted at rest, and never sent to the browser in full. */
   secret?: boolean;
   /**
+   * Docker Compose reads this variable too, to provision `clickhouse` or `geoipupdate`.
+   *
+   * Storing one of these in the database does not free the variable on its own. Compose cannot
+   * read the database, so where there is no agent to hand it the saved values it is still the only
+   * thing that can start those containers, and deleting the line leaves them unprovisionable. With
+   * an agent the line can go, but only together with the service's Compose profile. Either way it
+   * is not a change the migration flow can safely make for the operator, so it lists these
+   * separately instead of commenting them out with the rest.
+   */
+  composeReads?: boolean;
+  /**
    * Marks the setting that switches its whole group on and off.
    *
    * A group with one of these has a shape the generic field list cannot express: the rest of it
@@ -72,6 +83,8 @@ type Common<T extends SettingValue> = {
   label: string;
   description: string;
   default: T;
+  /** See `SettingDefinition.composeReads`. Spread through by every constructor below. */
+  composeReads?: boolean;
 };
 
 function reject(key: string, message: string): never {
@@ -439,6 +452,7 @@ export const clickhouseUrl = stringSetting({
 export const clickhouseUser = stringSetting({
   name: "clickhouse_user",
   env: "CLICKHOUSE_USER",
+  composeReads: true,
   group: "analytics",
   label: "ClickHouse user",
   description: "The account traffic and WAF events are written as.",
@@ -449,6 +463,7 @@ export const clickhouseUser = stringSetting({
 export const clickhousePassword = secretSetting({
   name: "clickhouse_password",
   env: "CLICKHOUSE_PASSWORD",
+  composeReads: true,
   group: "analytics",
   label: "ClickHouse password",
   description:
@@ -460,6 +475,7 @@ export const clickhousePassword = secretSetting({
 export const clickhouseDb = stringSetting({
   name: "clickhouse_db",
   env: "CLICKHOUSE_DB",
+  composeReads: true,
   group: "analytics",
   label: "ClickHouse database",
   description: "The database traffic and WAF events are written to.",
@@ -507,6 +523,7 @@ export const geoipEnabled = optionalBooleanSetting({
 export const geoipAccountId = stringSetting({
   name: "geoipupdate_account_id",
   env: "GEOIPUPDATE_ACCOUNT_ID",
+  composeReads: true,
   group: "geoip",
   label: "MaxMind account ID",
   description: "Needed to download GeoLite2 databases, which geo blocking depends on.",
@@ -517,6 +534,7 @@ export const geoipAccountId = stringSetting({
 export const geoipLicenseKey = secretSetting({
   name: "geoipupdate_license_key",
   env: "GEOIPUPDATE_LICENSE_KEY",
+  composeReads: true,
   group: "geoip",
   label: "MaxMind license key",
   description: "Issued alongside the account ID at maxmind.com.",

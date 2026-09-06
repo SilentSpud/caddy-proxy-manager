@@ -132,7 +132,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format — plus everything that used to be in `.env`, stored in the database and editable without a restart
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
-- **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported — accounts, hosts, certificates and settings — with a backup of the old file and a trimmed `.env` at the end
+- **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported — accounts, hosts, certificates and settings. Secrets encrypted with the old installation's `SESSION_SECRET` are re-encrypted under this deployment's own, so the old key is entered once and never needed again. Ends with a backup of the old file and a paste-ready command to clear the migrated variables out of `.env`
 - **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. Every apply lands on all of them or none, and names the host that refused
 - **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. The only request the app makes to the internet on its own, and it can be switched off
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
@@ -226,7 +226,7 @@ is still honoured as an override until a value is stored.
 | `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (local socket) | No |
 | `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this encrypted in the database instead | None | With `AGENT_URL` |
 | `AGENT_SOCKET` / `AGENT_CONTROLLER_ID` | Override the local agent's socket path, and the identity the controller signs as | `$L4_PORTS_DIR/agent.sock` / built-in | No |
-| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this | `clickhouse` | No |
+| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
 | `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
@@ -334,15 +334,49 @@ Leaving the users out means nothing can sign in yet, so the flow continues to ac
 instead of the login page — the same screen a fresh install sees, offering a first administrator or
 an identity provider, and saying that your data arrived without its accounts.
 
-Your old `.env` is read too. Anything in it that is now a database setting is carried into the
-[settings step](#first-run) pre-filled and marked as having come from the environment, so you can
-see what is being taken over before agreeing to it.
+### If the old installation used a different SESSION_SECRET
+
+Certificate private keys, DNS provider credentials, OAuth client secrets, agent secrets and the
+Tailscale auth key are stored encrypted, with `SESSION_SECRET` as the root key. A new deployment
+generates its own, so the old database's secrets are usually unreadable by it.
+
+The migration screen notices and asks for the old value. Enter it, and every encrypted value is
+decrypted with it and re-encrypted under the secret this deployment already uses, as the rows are
+copied. The old secret is used for that one import and nothing stores it — you do not have to keep
+it, and you do not have to change `SESSION_SECRET` to match the old installation.
+
+The key is checked before anything is written, and the whole database is converted in memory before
+the first row is inserted. A missing or mistyped key is a refusal with nothing written, not a
+half-finished import. A value encrypted with the current secret already is copied across untouched,
+so an upgrade that kept its `SESSION_SECRET` never sees this step.
+
+Migrating without the key is not offered: the ciphertext would arrive intact and unreadable, and
+every affected credential would have to be entered again by hand.
+
+Your existing environment is read too — whatever your `.env` or your Compose file puts there.
+Anything in it that is now a database setting is carried into the [settings step](#first-run)
+pre-filled and marked as having come from the environment, so you can see what is being taken over
+before agreeing to it.
 
 Setup finishes on a summary rather than the dashboard, because a deployment that has just replaced
 its database is owed three things first: a download of the old SQLite file, the path it was read
-from, and a copy of your `.env` with the migrated entries commented out — commented rather than
-deleted, so you keep a record of what they were. The old database file is read, never
+from, and the variables that have moved into the database. The old database file is read, never
 moved or deleted — take the backup before you clean anything up.
+
+Those variables come with a `sed` you can paste, which comments them out of the `.env` beside your
+`docker-compose.yml` and leaves a `.env.bak` next to it. The command is generated rather than the
+file rewritten, because the app cannot see that file: its environment arrives from Compose, and on
+another deployment it might arrive from Swarm or Kubernetes secrets or a systemd unit instead.
+Comments rather than deletes, so you keep the values — some of them are the only copy of a secret
+you have. Cleaning up is optional either way: a variable that is still set is ignored once a value
+is stored.
+
+The variables Compose itself reads — `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DB`,
+`GEOIPUPDATE_ACCOUNT_ID`, `GEOIPUPDATE_LICENSE_KEY` — are held back from that command and listed
+separately, because removing them is a two-step change the command cannot make on its own. Without
+an agent they stay: Docker is the only thing that can start those two containers, and it cannot read
+the database. With an agent they can go too, as long as you drop `clickhouse` and `geoipupdate` from
+`COMPOSE_PROFILES` in the same pass — see [Pick one owner](#enabling-and-disabling-analytics).
 
 Starting with a SQLite `DATABASE_URL` still set fails immediately, with a message saying so. That
 is deliberate: silently starting against an empty database would look like total data loss.
@@ -498,7 +532,8 @@ Three things to expect:
 - **Pick one owner.** Once the credentials live in Settings, drop `clickhouse` from
   `COMPOSE_PROFILES` and delete `CLICKHOUSE_PASSWORD` from `.env`. Leaving both in place means your
   own `docker compose up -d` also creates the container — from the `.env` values, which are now the
-  stale copy. The controller repairs it on its next start, but the window is avoidable.
+  stale copy. The controller repairs it on its next start, but the window is avoidable. A fresh
+  install already starts this way: `.env.example` ships both commented out.
 
 Without an agent — a standalone binary, or a stack you assemble yourself — Docker is the only thing
 that can start ClickHouse, so it is the profile as before:
