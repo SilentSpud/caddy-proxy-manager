@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { importLegacyDatabase } from "@/src/lib/migration/import";
-import { inspectLegacyDatabase } from "@/src/lib/migration/legacy-database";
+import { scanForLegacyDatabases } from "@/src/lib/migration/legacy-database";
 import { parseMigrationSelection } from "@/src/lib/migration/selection";
 import { carryOverBlobSettings } from "@/src/lib/migration/settings-carryover";
 import { hasAnySignIn, isSetupCompleted, recordMigrationSource } from "@/src/lib/setup";
@@ -56,19 +56,37 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Re-inspected rather than trusting the path that was posted: the value reaches this handler
-  // from the browser, and it selects a file to read off the host's filesystem.
-  const inspected = inspectLegacyDatabase(path);
-  if ("reason" in inspected) {
-    return json({ ok: false, error: `That database cannot be migrated: ${inspected.reason}` }, 400);
+  // Matched against the scan rather than used, and this is the whole guard.
+  //
+  // The posted value names a file to open on the host, and this endpoint is unauthenticated by
+  // necessity — nothing can sign in to a deployment that has not been set up yet. Inspecting the
+  // posted path, which is what this did before, proves the file is a database of ours; it does not
+  // prove it is one this host offered. Anything else on the filesystem was still reachable: an
+  // existence check, a size, an error message naming why a file would not open — and, for a real
+  // SQLite file with the right tables, an import of accounts an attacker had written themselves.
+  //
+  // So the browser chooses among what the scan enumerated, and the path that reaches the importer
+  // is the scan's, never the request's. The candidates come from LEGACY_SQLITE_PATH or from
+  // reading the known directories, and each was inspected on the way out.
+  const chosen = scanForLegacyDatabases().candidates.find((candidate) => candidate.path === path);
+  if (!chosen) {
+    return json(
+      {
+        ok: false,
+        error:
+          "That is not one of the databases found on this host. Reload the page and choose one of " +
+          "the files it offers.",
+      },
+      400,
+    );
   }
 
   try {
-    await importLegacyDatabase(inspected.path, groups);
+    await importLegacyDatabase(chosen.path, groups);
     // The old JSON blobs live in the settings table, so there is nothing to lift when settings
     // were left behind — and writing them anyway would pin values the operator declined to bring.
     if (groups.includes("settings")) await carryOverBlobSettings();
-    await recordMigrationSource(inspected.path);
+    await recordMigrationSource(chosen.path);
   } catch (error) {
     console.error("Migration failed", error);
     return json(

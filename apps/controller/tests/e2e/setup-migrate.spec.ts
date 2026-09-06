@@ -65,6 +65,20 @@ test.describe('Migrating an existing installation', () => {
     await expect(page.getByText(LEGACY_CONTAINER_PATH)).toBeVisible();
   });
 
+  test('a path the scan did not offer is refused, not opened', async () => {
+    // This endpoint is unauthenticated by necessity and names a file to open on the host, so the
+    // guard has to be "one of the files this host offered" rather than "a file that parses as one
+    // of our databases". Without it, anything on the filesystem was reachable as an existence
+    // check and an error message — and a planted SQLite file was reachable as an account import.
+    for (const path of ['/etc/passwd', '/etc/hostname', '../../etc/passwd', '/nonexistent.db']) {
+      const response = await page.request.post('/api/setup/migrate', {
+        data: { path, groups: ['users'] },
+      });
+      expect(response.status()).toBe(400);
+      expect(await response.text()).toContain('not one of the databases found on this host');
+    }
+  });
+
   test('what comes across is a choice, and leaving the accounts out says so', async () => {
     // The default is everything, so an operator who reads none of this gets the migration they
     // would have got before there was anything to choose.

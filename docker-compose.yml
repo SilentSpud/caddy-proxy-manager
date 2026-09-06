@@ -32,11 +32,18 @@ services:
       # arrives here by interpolation and nothing encodes it, so a `/` in it used to end the URL's
       # authority early and the app would try to connect to a host nobody configured. As fields
       # there is no delimiter to collide with, and any password works as typed.
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      # Defaulted, not hard-coded: the bundled `postgres` service is what these point at when the
+      # operator sets nothing, and overriding them is how you point the app at a server of your
+      # own. Hard-coding the host and port would have left DATABASE_URL as the only way to do that,
+      # which is exactly the escape hatch these fields exist to avoid needing.
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: ${POSTGRES_USER:-cpm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
+      # Empty rather than `false`: the app reads an unset value as off, and `${VAR:-}` is what
+      # Compose produces for a variable nobody set.
+      POSTGRES_SSL: ${POSTGRES_SSL:-}
 
       # Overrides all of the above when set, for a server that needs something a URL can say and
       # the fields cannot — an sslmode, a search_path, a connection option. Remember that a
