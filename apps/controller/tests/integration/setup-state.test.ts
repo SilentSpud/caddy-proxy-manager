@@ -10,6 +10,7 @@ import { Database } from 'bun:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { vi } from '@/tests/helpers/vi';
@@ -40,6 +41,7 @@ const {
   hasAnySignIn,
   isSetupCompleted,
   markSetupCompleted,
+  promoteFirstSetupAdmin,
   recordMigrationSource,
 } = await import('@/src/lib/setup');
 
@@ -65,6 +67,7 @@ async function addUser(email: string) {
 beforeEach(async () => {
   for (const name of TOUCHED_ENV) delete process.env[name];
   await ctx.db.delete(schemaModule.settings);
+  await ctx.db.delete(schemaModule.accounts);
   await ctx.db.delete(schemaModule.users);
   await ctx.db.delete(schemaModule.oauthProviders);
 });
@@ -274,5 +277,103 @@ describe('the migration offer', () => {
   it('goes straight to account creation when there is nothing to migrate', async () => {
     process.env.LEGACY_SQLITE_PATH = join(tmpdir(), 'definitely-not-here.db');
     expect((await getSetupState(false)).stage).toBe('account');
+  });
+});
+
+/**
+ * The OAuth branch of the account step stores a provider and nothing else: the user row is created
+ * later, by Better Auth's callback, which pins every federated sign-up to `role: "user"`. Without
+ * this promotion an instance set up against an IdP could never finish setup — the settings step
+ * demanded an admin session, and the only place group-to-role mapping can be configured is that
+ * same step. `saveSetupSettings` calls this as it saves, so completing setup is what confers it.
+ */
+describe('promoteFirstSetupAdmin', () => {
+  async function addUserWithAccount(
+    email: string,
+    providerId: string,
+    role: string,
+    status: string,
+  ) {
+    const now = new Date().toISOString();
+    const [row] = await ctx.db
+      .insert(schemaModule.users)
+      .values({
+        email,
+        name: email,
+        role,
+        provider: providerId === 'credential' ? 'credentials' : 'oidc',
+        subject: email,
+        status,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    await ctx.db.insert(schemaModule.accounts).values({
+      userId: row.id,
+      accountId: email,
+      providerId,
+      issuer: `local:oauth:${providerId}`,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return row.id;
+  }
+
+  const addFederatedUser = (email: string, role = 'user', status = 'active') =>
+    addUserWithAccount(email, 'authentik', role, status);
+
+  async function roleOf(userId: number): Promise<string> {
+    const rows = await ctx.db
+      .select()
+      .from(schemaModule.users)
+      .where(eq(schemaModule.users.id, userId));
+    return rows[0].role;
+  }
+
+  it('promotes a federated user when setup is unfinished and nobody is an admin', async () => {
+    const userId = await addFederatedUser('sso@example.com');
+
+    expect(await promoteFirstSetupAdmin(userId)).toBe(true);
+    expect(await roleOf(userId)).toBe('admin');
+  });
+
+  it('refuses a second caller once the first was promoted', async () => {
+    const first = await addFederatedUser('sso@example.com');
+    await promoteFirstSetupAdmin(first);
+
+    const second = await addFederatedUser('colleague@example.com');
+    expect(await promoteFirstSetupAdmin(second)).toBe(false);
+    expect(await roleOf(second)).toBe('user');
+  });
+
+  it('does nothing once setup is complete', async () => {
+    await markSetupCompleted();
+    const userId = await addFederatedUser('late@example.com');
+
+    expect(await promoteFirstSetupAdmin(userId)).toBe(false);
+    expect(await roleOf(userId)).toBe('user');
+  });
+
+  it('does nothing when the local account step already made an admin', async () => {
+    await addUser('admin@localhost');
+    const userId = await addFederatedUser('sso@example.com');
+
+    expect(await promoteFirstSetupAdmin(userId)).toBe(false);
+    expect(await roleOf(userId)).toBe('user');
+  });
+
+  it('never promotes a self-registered local account', async () => {
+    const userId = await addUserWithAccount('signup@example.com', 'credential', 'user', 'active');
+
+    expect(await promoteFirstSetupAdmin(userId)).toBe(false);
+    expect(await roleOf(userId)).toBe('user');
+  });
+
+  it('ignores a suspended admin, which is nobody who can finish setup', async () => {
+    await addFederatedUser('locked-out@example.com', 'admin', 'suspended');
+    const userId = await addFederatedUser('sso@example.com');
+
+    expect(await promoteFirstSetupAdmin(userId)).toBe(true);
+    expect(await roleOf(userId)).toBe('admin');
   });
 });

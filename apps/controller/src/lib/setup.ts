@@ -12,12 +12,13 @@
  * state is the completion flag, because "signed in, settings not saved yet" and "signed in,
  * finished" are otherwise identical.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import db, { nowIso } from "./db";
-import { settings } from "./db/schema";
+import { accounts, settings, users } from "./db/schema";
 import { getUserCount } from "./models/user";
 import { listEnabledOAuthProviders } from "./models/oauth-providers";
 import { scanForLegacyDatabases } from "./migration/legacy-database";
+import { logAuditEvent } from "./audit";
 
 /** Whether anything on this host looks like a database from before the PostgreSQL move. */
 export function hasLegacyDatabase(): boolean {
@@ -137,6 +138,60 @@ export async function markSetupCompleted(): Promise<void> {
 export async function hasAnySignIn(): Promise<boolean> {
   if ((await getUserCount()) > 0) return true;
   return (await listEnabledOAuthProviders()).length > 0;
+}
+
+/**
+ * Make a federated user an administrator if setup is unfinished and nobody else is one yet.
+ *
+ * Called by the settings step as it saves, so the rule is "whoever completes setup is the
+ * administrator" — a deliberate act, rather than a privilege handed out by the act of signing in.
+ *
+ * It exists because the account step has two branches and only one of them produced an admin.
+ * `createFirstAdmin` writes `role: "admin"` outright, but the OAuth branch only stores a provider
+ * — the user row is then created by Better Auth's callback, where `enforceSafeUserDefaults`
+ * (correctly) pins every federated sign-up to `role: "user"`. Group-to-role mapping cannot cover
+ * the gap either: it is configured in the settings step, which is the very step that demanded an
+ * admin session. So an instance set up against an IdP had no way to finish setup at all.
+ *
+ * All three guards matter. Setup being unfinished bounds this to the window the account step
+ * already hands out administrator rights in. Requiring that no admin exists means it fires once —
+ * a second, ordinary user reaching this step is refused rather than promoted, as is anyone at all
+ * once the flow is finished. And requiring a federated account keeps it to the branch that is
+ * actually broken: a credential sign-in during setup can only be the admin `createFirstAdmin`
+ * just made, so a self-registered local account must never be caught by this.
+ */
+export async function promoteFirstSetupAdmin(userId: number): Promise<boolean> {
+  if (!Number.isFinite(userId)) return false;
+  if (await isSetupCompleted()) return false;
+
+  const admins = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.status, "active")));
+  if (admins.length > 0) return false;
+
+  const linked = await db
+    .select({ providerId: accounts.providerId })
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+  if (!linked.some((account) => account.providerId !== "credential")) return false;
+
+  const [promoted] = await db
+    .update(users)
+    .set({ role: "admin", updatedAt: nowIso() })
+    .where(eq(users.id, userId))
+    .returning();
+  if (!promoted) return false;
+
+  await logAuditEvent({
+    userId,
+    action: "setup_first_admin",
+    entityType: "user",
+    entityId: userId,
+    summary: `User ${userId} became the first administrator by signing in during setup`,
+  });
+  console.log(`Setup completed by user ${userId} — promoted to administrator`);
+  return true;
 }
 
 /**
