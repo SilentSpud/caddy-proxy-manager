@@ -7,6 +7,7 @@
  * an image and served as a document.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { goToSettingsSection } from '../helpers/settings-nav';
 
 const FAVICON_URL = '/api/branding/favicon';
 
@@ -17,10 +18,8 @@ const PNG = Buffer.from(
 );
 
 async function goToBranding(page: Page) {
-  await page.goto('/settings');
-  const sidebar = page.locator('[role="navigation"][aria-label="Settings navigation"]');
-  await sidebar.getByRole('button', { name: 'Branding', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Favicon' })).toBeVisible();
+  // Branding's own heading is "Favicon", not its nav label.
+  await goToSettingsSection(page, 'Branding', { expectHeading: 'Favicon' });
 }
 
 async function removeIfPresent(page: Page) {

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickSettingsSection, goToSettingsSection } from '../helpers/settings-nav';
 
 /** Empty geoblock config used to reset state between tests. */
 const EMPTY_GEOBLOCK = {
@@ -58,11 +59,7 @@ test.describe('Geo Blocking — form persistence', () => {
 
   test.beforeEach(async ({ page }) => {
     await resetGeoblock(page);
-    await page.goto('/settings');
-    // Navigate to Global Geoblocking section in the settings sidebar
-    const sidebar = page.locator('[role="navigation"][aria-label="Settings navigation"]');
-    await sidebar.getByRole('button', { name: 'Global Geoblocking', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Global Geoblocking' })).toBeVisible();
+    await goToSettingsSection(page, 'Global Geoblocking');
   });
 
   test.afterEach(async ({ page }) => {
@@ -109,10 +106,7 @@ test.describe('Geo Blocking — form persistence', () => {
     });
 
     await page.reload();
-    await page
-      .locator('[role="navigation"][aria-label="Settings navigation"]')
-      .getByRole('button', { name: 'Global Geoblocking', exact: true })
-      .click();
+    await clickSettingsSection(page, 'Global Geoblocking');
     const fresh = page.locator('form', {
       has: page.getByRole('button', { name: /save geoblocking settings/i }),
     });
@@ -184,10 +178,7 @@ test.describe('Geo Blocking — form persistence', () => {
     await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
 
     await page.reload();
-    await page
-      .locator('[role="navigation"][aria-label="Settings navigation"]')
-      .getByRole('button', { name: 'Global Geoblocking', exact: true })
-      .click();
+    await clickSettingsSection(page, 'Global Geoblocking');
     const fresh = page.locator('form', {
       has: page.getByRole('button', { name: /save geoblocking settings/i }),
     });
@@ -237,10 +228,7 @@ test.describe('Geo Blocking — form persistence', () => {
     await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
 
     await page.reload();
-    await page
-      .locator('[role="navigation"][aria-label="Settings navigation"]')
-      .getByRole('button', { name: 'Global Geoblocking', exact: true })
-      .click();
+    await clickSettingsSection(page, 'Global Geoblocking');
     const fresh = page.locator('form', {
       has: page.getByRole('button', { name: /save geoblocking settings/i }),
     });

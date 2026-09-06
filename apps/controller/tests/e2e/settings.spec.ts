@@ -1,10 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+import { goToSettingsSection, SETTINGS_SIDEBAR } from '../helpers/settings-nav';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** The settings page has its own sidebar — an astryx LayoutPanel that renders a <div> carrying
- *  the landmark role and label rather than an <aside>. Use this selector everywhere. */
-const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings navigation"]';
 
 /** Mutating v1 API calls are same-origin checked and 403 without this header. */
 const SETTINGS_ORIGIN = 'http://localhost:3000';
@@ -26,31 +23,7 @@ async function openPaletteWithKeyboard(page: Page) {
 }
 
 /** Navigate to a specific settings section via the sidebar. */
-/**
- * Open a settings section, retrying the click itself.
- *
- * The sidebar is server-rendered, so the button is visible and clickable before React attaches its
- * handler: a click landing in that window is swallowed and the section never changes, leaving the
- * detail pane on General and the caller waiting for a heading that will never appear. Same race
- * openCreateHostDialog rides out in tests/helpers/proxy-api.ts, and this page has grown enough
- * sections for hydration on a CI runner to be slow enough to hit it.
- *
- * Waiting for the heading rather than an "active" class is deliberate: the heading is what every
- * caller goes on to assert against, so this cannot report success on a section that has not
- * actually rendered.
- */
-async function goToSection(page: Page, sectionName: string) {
-  await page.goto('/settings');
-  const sidebar = page.locator(SETTINGS_SIDEBAR);
-  const navButton = sidebar.getByRole('button', { name: sectionName, exact: true });
-  await expect(navButton).toBeVisible({ timeout: 10_000 });
-  await expect(async () => {
-    await navButton.click();
-    await expect(page.getByRole('heading', { level: 1, name: sectionName })).toBeVisible({
-      timeout: 2_000,
-    });
-  }).toPass({ timeout: 30_000 });
-}
+const goToSection = goToSettingsSection;
 
 // ─── Page load & layout ──────────────────────────────────────────────────────
 

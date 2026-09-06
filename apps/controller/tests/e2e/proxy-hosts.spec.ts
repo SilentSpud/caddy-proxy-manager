@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { goToSettingsSection } from '../helpers/settings-nav';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const API_AUTHENTIK_SETTINGS = 'http://localhost:3000/api/v1/settings/authentik';
@@ -261,11 +262,7 @@ test.describe('Proxy Hosts', () => {
     const originalSettings = (await originalSettingsResp.json()) as Partial<typeof defaultSettings>;
 
     try {
-      await page.goto('/settings');
-      const sidebar = page.locator('[role="navigation"][aria-label="Settings navigation"]');
-      const navBtn = sidebar.getByRole('button', { name: 'Authentik Defaults', exact: true });
-      await expect(navBtn).toBeVisible({ timeout: 10_000 });
-      await navBtn.click();
+      await goToSettingsSection(page, 'Authentik Defaults');
 
       await page.locator('input[name="outpostDomain"]').fill(defaultSettings.outpostDomain);
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);
