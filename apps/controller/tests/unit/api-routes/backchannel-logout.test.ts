@@ -7,6 +7,7 @@
  * but `error_description` to debug against.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { NextRequest } from 'next/server';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { vi } from '@/tests/helpers/vi';
 import { POST, GET } from '@/src/app/api/auth/oidc/backchannel-logout/route';
@@ -68,16 +69,21 @@ async function signLogoutToken(claims: Record<string, unknown> = {}): Promise<st
     .sign(privateKey);
 }
 
-/** The spec posts a form, so that is what the route is exercised with. */
-function postForm(token: string | null, contentType = 'application/x-www-form-urlencoded') {
+/**
+ * The spec posts a form, so that is what the route is exercised with. The handler is typed for a
+ * NextRequest and reads only what a plain Request already provides — headers and a form body.
+ */
+function postForm(
+  token: string | null,
+  contentType = 'application/x-www-form-urlencoded',
+): NextRequest {
   const body = new URLSearchParams();
   if (token !== null) body.set('logout_token', token);
   return new Request('https://cpm.example/api/auth/oidc/backchannel-logout', {
     method: 'POST',
     headers: { 'content-type': contentType },
     body: body.toString(),
-    // biome-ignore lint/suspicious/noExplicitAny: the route takes a NextRequest, which a Request satisfies for these fields
-  }) as any;
+  }) as unknown as NextRequest;
 }
 
 const provider = {

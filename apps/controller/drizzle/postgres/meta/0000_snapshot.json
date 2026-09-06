@@ -67,12 +67,8 @@
           "name": "access_list_entries_accessListId_access_lists_id_fk",
           "tableFrom": "access_list_entries",
           "tableTo": "access_lists",
-          "columnsFrom": [
-            "accessListId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accessListId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -130,12 +126,8 @@
           "name": "access_lists_createdBy_users_id_fk",
           "tableFrom": "access_lists",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -299,12 +291,8 @@
           "name": "accounts_userId_users_id_fk",
           "tableFrom": "accounts",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -474,12 +462,8 @@
           "name": "api_tokens_createdBy_users_id_fk",
           "tableFrom": "api_tokens",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -549,12 +533,8 @@
           "name": "audit_events_userId_users_id_fk",
           "tableFrom": "audit_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -618,12 +598,8 @@
           "name": "ca_certificates_createdBy_users_id_fk",
           "tableFrom": "ca_certificates",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -712,12 +688,8 @@
           "name": "certificates_createdBy_users_id_fk",
           "tableFrom": "certificates",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -827,12 +799,8 @@
           "name": "forward_auth_access_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_access",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -840,12 +808,8 @@
           "name": "forward_auth_access_userId_users_id_fk",
           "tableFrom": "forward_auth_access",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -853,12 +817,8 @@
           "name": "forward_auth_access_groupId_groups_id_fk",
           "tableFrom": "forward_auth_access",
           "tableTo": "groups",
-          "columnsFrom": [
-            "groupId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["groupId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -957,12 +917,8 @@
           "name": "forward_auth_exchanges_sessionId_forward_auth_sessions_id_fk",
           "tableFrom": "forward_auth_exchanges",
           "tableTo": "forward_auth_sessions",
-          "columnsFrom": [
-            "sessionId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sessionId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -970,12 +926,8 @@
           "name": "forward_auth_exchanges_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_exchanges",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1077,12 +1029,8 @@
           "name": "forward_auth_redirect_intents_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_redirect_intents",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1207,12 +1155,8 @@
           "name": "forward_auth_sessions_userId_users_id_fk",
           "tableFrom": "forward_auth_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1220,12 +1164,8 @@
           "name": "forward_auth_sessions_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "forward_auth_sessions",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1308,12 +1248,8 @@
           "name": "group_members_groupId_groups_id_fk",
           "tableFrom": "group_members",
           "tableTo": "groups",
-          "columnsFrom": [
-            "groupId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["groupId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1321,12 +1257,8 @@
           "name": "group_members_userId_users_id_fk",
           "tableFrom": "group_members",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1407,12 +1339,8 @@
           "name": "groups_createdBy_users_id_fk",
           "tableFrom": "groups",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1537,12 +1465,8 @@
           "name": "issued_client_certificates_caCertificateId_ca_certificates_id_fk",
           "tableFrom": "issued_client_certificates",
           "tableTo": "ca_certificates",
-          "columnsFrom": [
-            "caCertificateId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["caCertificateId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1550,12 +1474,8 @@
           "name": "issued_client_certificates_createdBy_users_id_fk",
           "tableFrom": "issued_client_certificates",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1671,12 +1591,8 @@
           "name": "l4_proxy_hosts_ownerUserId_users_id_fk",
           "tableFrom": "l4_proxy_hosts",
           "tableTo": "users",
-          "columnsFrom": [
-            "ownerUserId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ownerUserId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1842,12 +1758,8 @@
           "name": "mtls_access_rules_proxyHostId_proxy_hosts_id_fk",
           "tableFrom": "mtls_access_rules",
           "tableTo": "proxy_hosts",
-          "columnsFrom": [
-            "proxyHostId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proxyHostId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1855,12 +1767,8 @@
           "name": "mtls_access_rules_createdBy_users_id_fk",
           "tableFrom": "mtls_access_rules",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1943,12 +1851,8 @@
           "name": "mtls_certificate_roles_issuedClientCertificateId_issued_client_certificates_id_fk",
           "tableFrom": "mtls_certificate_roles",
           "tableTo": "issued_client_certificates",
-          "columnsFrom": [
-            "issuedClientCertificateId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issuedClientCertificateId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1956,12 +1860,8 @@
           "name": "mtls_certificate_roles_mtlsRoleId_mtls_roles_id_fk",
           "tableFrom": "mtls_certificate_roles",
           "tableTo": "mtls_roles",
-          "columnsFrom": [
-            "mtlsRoleId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mtlsRoleId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2035,12 +1935,8 @@
           "name": "mtls_roles_createdBy_users_id_fk",
           "tableFrom": "mtls_roles",
           "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["createdBy"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2361,12 +2257,8 @@
           "name": "pending_oauth_links_userId_users_id_fk",
           "tableFrom": "pending_oauth_links",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2497,12 +2389,8 @@
           "name": "proxy_hosts_certificateId_certificates_id_fk",
           "tableFrom": "proxy_hosts",
           "tableTo": "certificates",
-          "columnsFrom": [
-            "certificateId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["certificateId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2510,12 +2398,8 @@
           "name": "proxy_hosts_accessListId_access_lists_id_fk",
           "tableFrom": "proxy_hosts",
           "tableTo": "access_lists",
-          "columnsFrom": [
-            "accessListId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accessListId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2523,12 +2407,8 @@
           "name": "proxy_hosts_ownerUserId_users_id_fk",
           "tableFrom": "proxy_hosts",
           "tableTo": "users",
-          "columnsFrom": [
-            "ownerUserId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ownerUserId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2662,12 +2542,8 @@
           "name": "sessions_userId_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
