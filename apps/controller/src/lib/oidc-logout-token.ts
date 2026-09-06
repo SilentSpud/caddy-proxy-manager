@@ -77,7 +77,10 @@ export async function verifyLogoutToken(
   let payload: Record<string, unknown>;
   try {
     const verified = await jwtVerify(token, jwksFor(jwksUri), {
-      issuer: provider.issuer.replace(/\/$/, ""),
+      // Exactly as configured, trailing slash and all. An issuer identifier is compared by simple
+      // string equality (OIDC Core §2), and several providers — Authentik among them — issue an
+      // `iss` that ends in one: trimming it here rejected every token they send.
+      issuer: provider.issuer,
       audience: provider.clientId,
       maxTokenAge: MAX_TOKEN_AGE_SECONDS,
       // Signed, never encrypted, and never unsecured: `alg: "none"` is rejected by `jose` already,

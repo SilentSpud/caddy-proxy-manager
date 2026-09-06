@@ -191,11 +191,26 @@ describe('verifyLogoutToken', () => {
     if (!result.ok) expect(result.reason).toContain('jwks_uri');
   });
 
-  it('tolerates a trailing slash on the configured issuer', async () => {
-    const token = await signLogoutToken({ sub: 'user-1', jti: 'jti-1' });
+  // Authentik and friends issue an `iss` ending in a slash. Trimming it before handing it to
+  // jwtVerify made an exact-match comparison fail against itself, and every token they sent was
+  // refused — so the issuer goes through exactly as the operator configured it.
+  it('accepts a token from an issuer whose identifier ends in a slash', async () => {
+    const slashed = `${ISSUER}/`;
+    const token = await signLogoutToken({ sub: 'user-1', jti: 'jti-1', iss: slashed });
+
+    const result = await verifyLogoutToken(token, { issuer: slashed, clientId: CLIENT_ID });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.claims.issuer).toBe(slashed);
+  });
+
+  it('still refuses a token whose issuer differs from the configured one', async () => {
+    // The two spellings identify the same server to a human and different ones to the spec, so a
+    // provider configured with one and issuing the other is a misconfiguration worth reporting.
+    const token = await signLogoutToken({ sub: 'user-1', jti: 'jti-1', iss: ISSUER });
 
     expect((await verifyLogoutToken(token, { issuer: `${ISSUER}/`, clientId: CLIENT_ID })).ok).toBe(
-      true,
+      false,
     );
   });
 });

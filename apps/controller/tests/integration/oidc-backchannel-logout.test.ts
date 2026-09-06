@@ -197,6 +197,44 @@ describe('revoking what a logout token names', () => {
     expect(phone).not.toBe(laptop);
   });
 
+  it('keeps a sid scoped even when the token names the subject too', async () => {
+    // Most providers send both claims. Acting on the `sub` as well would end every session the
+    // user has, which makes session-scoped logout impossible to ask for.
+    const userId = await createUser('sso@example.com');
+    await linkAccount(userId, 'u-1');
+    await createSession(userId, { providerId: PROVIDER, sid: 'idp-1' });
+    const laptop = await createSession(userId, { providerId: PROVIDER, sid: 'idp-2' });
+
+    const result = await revokeSessionsForLogoutToken({
+      providerId: PROVIDER,
+      subject: 'u-1',
+      sessionId: 'idp-1',
+    });
+
+    expect(result.sessions).toBe(1);
+    expect(await sessionIdsFor(userId)).toEqual([laptop]);
+  });
+
+  it('still drops forward-auth sessions on a sid-scoped logout naming a subject', async () => {
+    const userId = await createUser('sso@example.com');
+    await linkAccount(userId, 'u-1');
+    const proxyHostId = await createProxyHost();
+    await createForwardAuthSession(userId, proxyHostId);
+    await createSession(userId, { providerId: PROVIDER, sid: 'idp-1' });
+
+    await revokeSessionsForLogoutToken({
+      providerId: PROVIDER,
+      subject: 'u-1',
+      sessionId: 'idp-1',
+    });
+
+    const remaining = await ctx.db
+      .select()
+      .from(forwardAuthSessions)
+      .where(eq(forwardAuthSessions.userId, userId));
+    expect(remaining).toEqual([]);
+  });
+
   it('ends every session for a subject when the token names no session', async () => {
     const userId = await createUser('sso@example.com');
     await linkAccount(userId, 'u-1');

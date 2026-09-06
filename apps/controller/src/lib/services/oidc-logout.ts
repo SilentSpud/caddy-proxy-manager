@@ -101,8 +101,11 @@ export type RevocationResult = {
 /**
  * End the sessions a logout token names.
  *
- * A `sid` ends exactly the session it names, which is the whole point of the claim. A token with
- * only a `sub` ends every session that subject has, because there is nothing finer to go on.
+ * A `sid` ends exactly the session it names, which is the whole point of the claim — and it wins
+ * over any `sub` alongside it, which most providers send too. Reading both as "end this session,
+ * and also every other one" would make session-scoped logout impossible to ask for. Only a token
+ * with no `sid` at all ends every session that subject has, because then there is nothing finer to
+ * go on.
  *
  * Forward-auth sessions go either way. They are minted from a CPM session but outlive it, so a
  * proxied host would keep letting the user in after their SSO session ended — and unlike CPM's own
@@ -123,9 +126,7 @@ export async function revokeSessionsForLogoutToken(
       .returning({ userId: sessions.userId });
     deleted += rows.length;
     for (const row of rows) userIds.add(row.userId);
-  }
-
-  if (target.subject) {
+  } else if (target.subject) {
     const owners = await db
       .select({ userId: accounts.userId })
       .from(accounts)
