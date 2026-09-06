@@ -2063,7 +2063,7 @@ const spec = {
           upstreamNode: {
             type: ["string", "null"],
             description:
-              "Dial the upstreams through this node, for a backend on the tailnet. The node also gets a listener of its own, which serves nothing.",
+              "Dial the upstreams through this node, for a backend on the tailnet. The node joins the tailnet so it can dial out, but serves nothing and gets no listener of its own unless a host is served on it (serve: true).",
           },
         },
       },

@@ -98,15 +98,15 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       authentikDefaults={authentikDefaults}
       // Only what the host form needs to warn accurately: whether the feature is on, whether a
       // key exists at all, and the node a host inherits. Never the key itself.
-      tailscaleDefaults={
-        tailscaleSettings
-          ? {
-              enabled: tailscaleSettings.enabled,
-              hasAuthKey: tailscaleSettings.authKey.trim().length > 0,
-              defaultNode: tailscaleSettings.defaultNode,
-            }
-          : null
-      }
+      //
+      // Always a value, never null: settings that have never been saved mean Tailscale is off and
+      // no key is stored, which is exactly when the form's warnings matter most. Passing null
+      // there left the fields unable to tell "off" from "not known" and silenced both.
+      tailscaleDefaults={{
+        enabled: tailscaleSettings?.enabled ?? false,
+        hasAuthKey: (tailscaleSettings?.authKey ?? "").trim().length > 0,
+        defaultNode: tailscaleSettings?.defaultNode ?? "",
+      }}
       pagination={{ total, page, perPage: PER_PAGE }}
       initialSearch={search ?? ""}
       initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}

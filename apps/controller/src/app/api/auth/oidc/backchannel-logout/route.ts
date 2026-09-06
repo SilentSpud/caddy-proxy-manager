@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   // caller worth guessing for.
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().includes("application/x-www-form-urlencoded")) {
-    return bad("expected a application/x-www-form-urlencoded body");
+    return bad("expected an application/x-www-form-urlencoded body");
   }
 
   let token: string;
