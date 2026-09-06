@@ -74,6 +74,30 @@ function matchedHosts(server: { routes: unknown[] } | undefined): string[] {
   return [...found];
 }
 
+/**
+ * A TLS policy's subjects, if it has any.
+ *
+ * Narrowed rather than cast: `policies` is typed as bare records, so `policy.subjects` is
+ * `unknown` and a cast tells the reader — and any analyser — nothing about what is really there.
+ */
+function subjectsOf(policy: Record<string, unknown>): string[] {
+  return Array.isArray(policy.subjects) ? (policy.subjects as string[]) : [];
+}
+
+/**
+ * The policy covering exactly this subject.
+ *
+ * `some(===)` rather than `subjects.includes(...)`: on a value an analyser cannot resolve to an
+ * array, `includes` reads as a substring test over a hostname, which would match
+ * "evil.example.com.attacker.net" as readily as the name meant. Equality says what is meant.
+ */
+function policyForSubject(
+  policies: Record<string, unknown>[],
+  subject: string,
+): Record<string, unknown> | undefined {
+  return policies.find((policy) => subjectsOf(policy).some((value) => value === subject));
+}
+
 /** Every handler name anywhere in the document. */
 function handlerNames(document: unknown): string[] {
   const found: string[] = [];
@@ -439,9 +463,7 @@ describe('certificates for MagicDNS names', () => {
 
     const policies =
       ((await buildCaddyDocument()) as CaddyDocument).apps.tls?.automation?.policies ?? [];
-    const tailscalePolicy = policies.find((policy) =>
-      (policy.subjects as string[]).includes('app.tail1234.ts.net'),
-    );
+    const tailscalePolicy = policyForSubject(policies, 'app.tail1234.ts.net');
     expect(tailscalePolicy).toEqual({
       subjects: ['app.tail1234.ts.net'],
       get_certificate: [{ via: 'tailscale' }],
@@ -458,9 +480,7 @@ describe('certificates for MagicDNS names', () => {
 
     const policies =
       ((await buildCaddyDocument()) as CaddyDocument).apps.tls?.automation?.policies ?? [];
-    const acmePolicy = policies.find((policy) =>
-      (policy.subjects as string[]).includes('app.example.com'),
-    );
+    const acmePolicy = policyForSubject(policies, 'app.example.com');
     // Never in one policy with the .ts.net name: Caddy skips ACME only when *every* subject is a
     // MagicDNS name, so mixing them would send the tailnet name to a public CA.
     expect(acmePolicy?.subjects).toEqual(['app.example.com']);
