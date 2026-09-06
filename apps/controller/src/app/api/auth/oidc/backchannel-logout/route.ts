@@ -41,8 +41,16 @@ function bad(description: string): NextResponse {
   );
 }
 
-function normalizeIssuer(value: string | null): string {
-  return (value ?? "").replace(/\/$/, "");
+/**
+ * Whether a provider row is the one that signed this token.
+ *
+ * Exact equality, the same comparison `jwtVerify` makes — an issuer identifier is compared as a
+ * string (OIDC Core §2), and a trailing slash is part of it. Matching leniently here and strictly
+ * a few lines later would mean two different answers to "is this the right issuer" in one request,
+ * and the operator would see a JOSE error code where the real fault is a mistyped issuer.
+ */
+function issuedBy(provider: { issuer: string | null }, claimedIssuer: string): boolean {
+  return provider.issuer === claimedIssuer;
 }
 
 export async function POST(request: NextRequest) {
@@ -63,13 +71,20 @@ export async function POST(request: NextRequest) {
 
   // The issuer is read unverified only to pick which provider to verify against — every claim is
   // checked again, against that provider's configuration, inside verifyLogoutToken.
-  const claimedIssuer = normalizeIssuer(unverifiedIssuer(token));
+  const claimedIssuer = unverifiedIssuer(token);
   if (!claimedIssuer) return bad("the logout_token is not a JWT with an iss claim");
 
-  const providers = (await listEnabledOAuthProviders()).filter(
-    (provider) => normalizeIssuer(provider.issuer) === claimedIssuer,
-  );
+  const enabled = await listEnabledOAuthProviders();
+  const providers = enabled.filter((provider) => issuedBy(provider, claimedIssuer));
   if (providers.length === 0) {
+    // The mismatch is almost always a configured issuer that differs from the one the IdP sends by
+    // a trailing slash. Name both in the log, where only the operator sees them — the response
+    // stays vague because this endpoint answers anyone who can reach it.
+    console.warn(
+      `[backchannel-logout] No enabled provider has issuer "${claimedIssuer}". Configured: ${
+        enabled.map((provider) => `"${provider.issuer ?? "(none)"}"`).join(", ") || "(none)"
+      }`,
+    );
     return bad("no enabled provider is configured for that issuer");
   }
 

@@ -164,6 +164,28 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
     expect(revokeSessionsForLogoutToken).not.toHaveBeenCalled();
   });
 
+  it('selects a provider by its exact issuer, trailing slash included', async () => {
+    const slashed = `${ISSUER}/`;
+    vi.mocked(listEnabledOAuthProviders).mockResolvedValue([
+      { ...provider, issuer: slashed },
+    ] as never);
+
+    const response = await POST(postForm(await signLogoutToken({ sub: 'u-1', iss: slashed })));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('refuses an issuer that differs from the configured one only by a trailing slash', async () => {
+    // Selection is the same string comparison the signature check makes. Matching leniently here
+    // would find the provider and then fail verification with a JOSE error code, which says
+    // nothing about the mistyped issuer that actually caused it.
+    const response = await POST(postForm(await signLogoutToken({ sub: 'u-1', iss: `${ISSUER}/` })));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error_description).toContain('no enabled provider');
+    expect(revokeSessionsForLogoutToken).not.toHaveBeenCalled();
+  });
+
   it('tries every provider sharing an issuer before giving up', async () => {
     // Two client registrations against one realm: the token is only valid for the second.
     vi.mocked(listEnabledOAuthProviders).mockResolvedValue([
