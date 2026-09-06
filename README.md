@@ -997,6 +997,28 @@ The `BASE_URL` environment variable must match exactly where users access your d
 
 OAuth login appears on the login page alongside credentials.
 
+### Back-channel logout
+
+CPM implements [OIDC Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html), so an identity provider can end a user's CPM sessions when it ends their SSO session — an administrator revoking access, a sign-out at another application, or a disabled account.
+
+Register this as the provider's **back-channel logout URL**:
+
+```text
+{BASE_URL}/api/auth/oidc/backchannel-logout
+```
+
+It is also shown in **Settings → OAuth Providers**, beside the callback URL. One URL serves every configured provider: the logout token names its own issuer, and that selects the provider whose client ID and signing keys it is checked against.
+
+The endpoint is optional — nothing else changes if you do not configure it — and unauthenticated by design, because the caller is the provider's server rather than a browser. The signed token is the whole of the authentication, so it is rejected unless it verifies against the issuer's published JWKS, carries that provider's client ID as its audience, names a back-channel logout in its `events` claim, carries no `nonce`, was issued within the last five minutes, and has a `jti` that has not been seen before.
+
+What gets ended:
+
+- A token carrying a `sid` ends exactly the CPM session that came from that IdP session, leaving the user's other devices signed in. This needs a provider that puts `sid` in its ID tokens; most do.
+- A token carrying only a `sub` ends every CPM session for that identity, because there is nothing finer to go on.
+- Either way, the user's **forward-auth sessions** for proxied hosts are dropped too. Those are minted from a CPM session but outlive it, so a proxied host would otherwise keep letting the user in after their SSO session ended.
+
+Failures answer `400` with an `error_description` naming the check that failed. A token for someone who was never signed in answers `200` — there is nothing to do, and reporting that as an error would have the provider retry indefinitely.
+
 **Account linking:**
 
 Attaching an OAuth identity to an existing CPM user requires **Auto-link accounts** to be enabled for that provider (**Settings → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers). The switch marks the provider as trusted to prove that its identity owns the CPM account carrying the same email address, so leave it off for any IdP where users can register an arbitrary email themselves.

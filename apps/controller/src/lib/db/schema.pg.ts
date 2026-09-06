@@ -48,12 +48,19 @@ export const sessions = pgTable(
     expiresAt: isoTimestamp("expiresAt").notNull(),
     ipAddress: text("ipAddress"),
     userAgent: text("userAgent"),
+    // Which IdP session this one came from, when it came from one at all. OIDC back-channel
+    // logout names the session to end by its `sid`, which is only unique within an issuer — so
+    // the provider is stored beside it rather than matching on `sid` alone. Both stay null for
+    // credential sign-ins and for providers that issue no `sid`.
+    oidcProviderId: text("oidcProviderId"),
+    oidcSid: text("oidcSid"),
     createdAt: isoTimestamp("createdAt").notNull(),
     updatedAt: isoTimestamp("updatedAt").notNull(),
   },
   (table) => ({
     tokenUnique: uniqueIndex("sessions_token_unique").on(table.token),
     userIdx: index("sessions_user_idx").on(table.userId),
+    oidcSessionIdx: index("sessions_oidc_session_idx").on(table.oidcProviderId, table.oidcSid),
   }),
 );
 

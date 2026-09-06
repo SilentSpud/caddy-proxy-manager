@@ -1,0 +1,197 @@
+/**
+ * The back-channel logout endpoint's contract with an identity provider.
+ *
+ * This is the one route in the app that answers an unauthenticated POST by deleting sessions, so
+ * what it refuses matters as much as what it accepts — and the shape of the refusal matters too:
+ * an IdP retries on a 5xx, gives up on a 400, and an operator wiring this up by hand has nothing
+ * but `error_description` to debug against.
+ */
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { SignJWT, exportJWK, generateKeyPair } from 'jose';
+import { vi } from '@/tests/helpers/vi';
+
+vi.mock('@/src/lib/models/oauth-providers', () => ({
+  listEnabledOAuthProviders: vi.fn(),
+}));
+
+vi.mock('@/src/lib/services/oidc-logout', () => ({
+  revokeSessionsForLogoutToken: vi.fn().mockResolvedValue({ sessions: 1, userIds: [7] }),
+}));
+
+import { POST, GET } from '@/src/app/api/auth/oidc/backchannel-logout/route';
+import { listEnabledOAuthProviders } from '@/src/lib/models/oauth-providers';
+import { revokeSessionsForLogoutToken } from '@/src/lib/services/oidc-logout';
+import { clearDiscoveryCache } from '@/src/lib/oidc-claims';
+import { clearJwksCache, clearLogoutJtis } from '@/src/lib/oidc-logout-token';
+
+const ISSUER = 'https://idp.example';
+const CLIENT_ID = 'cpm';
+const LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
+
+const { privateKey, publicKey } = await generateKeyPair('RS256');
+const jwk = { ...(await exportJWK(publicKey)), kid: 'test-key', alg: 'RS256', use: 'sig' };
+
+const originalFetch = globalThis.fetch;
+
+function jsonResponse(body: unknown): Response {
+  return { ok: true, status: 200, json: async () => body } as unknown as Response;
+}
+
+function serveIdp(): void {
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.includes('.well-known/openid-configuration')) {
+      return jsonResponse({ jwks_uri: `${ISSUER}/jwks` });
+    }
+    if (url.includes('/jwks')) return jsonResponse({ keys: [jwk] });
+    throw new Error(`unexpected fetch: ${url}`);
+  }) as unknown as typeof fetch;
+}
+
+let jtiCounter = 0;
+
+async function signLogoutToken(claims: Record<string, unknown> = {}): Promise<string> {
+  jtiCounter += 1;
+  const { iss = ISSUER, aud = CLIENT_ID, ...rest } = claims as Record<string, string>;
+  return new SignJWT({ events: { [LOGOUT_EVENT]: {} }, jti: `jti-${jtiCounter}`, ...rest })
+    .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
+    .setIssuer(iss)
+    .setAudience(aud)
+    .setIssuedAt()
+    .setExpirationTime('2m')
+    .sign(privateKey);
+}
+
+/** The spec posts a form, so that is what the route is exercised with. */
+function postForm(token: string | null, contentType = 'application/x-www-form-urlencoded') {
+  const body = new URLSearchParams();
+  if (token !== null) body.set('logout_token', token);
+  return new Request('https://cpm.example/api/auth/oidc/backchannel-logout', {
+    method: 'POST',
+    headers: { 'content-type': contentType },
+    body: body.toString(),
+    // biome-ignore lint/suspicious/noExplicitAny: the route takes a NextRequest, which a Request satisfies for these fields
+  }) as any;
+}
+
+const provider = {
+  id: 'authentik',
+  name: 'Authentik',
+  issuer: ISSUER,
+  clientId: CLIENT_ID,
+};
+
+beforeEach(() => {
+  clearDiscoveryCache();
+  clearJwksCache();
+  clearLogoutJtis();
+  serveIdp();
+  vi.mocked(listEnabledOAuthProviders).mockResolvedValue([provider] as never);
+  vi.mocked(revokeSessionsForLogoutToken).mockClear();
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
+
+describe('POST /api/auth/oidc/backchannel-logout', () => {
+  it('accepts a valid token and revokes what it names', async () => {
+    const response = await POST(postForm(await signLogoutToken({ sub: 'u-1', sid: 'idp-1' })));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(revokeSessionsForLogoutToken).toHaveBeenCalledWith({
+      providerId: 'authentik',
+      subject: 'u-1',
+      sessionId: 'idp-1',
+    });
+  });
+
+  it('answers 200 when the subject had no sessions here', async () => {
+    vi.mocked(revokeSessionsForLogoutToken).mockResolvedValueOnce({ sessions: 0, userIds: [] });
+
+    // Reporting "nothing to do" as a failure would have the IdP retry forever.
+    expect((await POST(postForm(await signLogoutToken({ sub: 'u-1' })))).status).toBe(200);
+  });
+
+  it('answers a replayed token 200 without revoking twice', async () => {
+    const token = await signLogoutToken({ sub: 'u-1' });
+
+    expect((await POST(postForm(token))).status).toBe(200);
+    expect((await POST(postForm(token))).status).toBe(200);
+    expect(revokeSessionsForLogoutToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a body that is not a form', async () => {
+    const response = await POST(
+      postForm(await signLogoutToken({ sub: 'u-1' }), 'application/json'),
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('invalid_request');
+  });
+
+  it('refuses a request with no logout_token', async () => {
+    const response = await POST(postForm(null));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error_description).toContain('logout_token');
+  });
+
+  it('refuses a logout_token that is not a JWT', async () => {
+    const response = await POST(postForm('not-a-jwt'));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error_description).toContain('iss');
+  });
+
+  it('refuses an issuer no configured provider claims', async () => {
+    const response = await POST(
+      postForm(await signLogoutToken({ sub: 'u-1', iss: 'https://who.example' })),
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error_description).toContain('no enabled provider');
+    expect(revokeSessionsForLogoutToken).not.toHaveBeenCalled();
+  });
+
+  it('refuses a token whose audience is another client of the same issuer', async () => {
+    const response = await POST(
+      postForm(await signLogoutToken({ sub: 'u-1', aud: 'other-client' })),
+    );
+
+    expect(response.status).toBe(400);
+    expect(revokeSessionsForLogoutToken).not.toHaveBeenCalled();
+  });
+
+  it('tries every provider sharing an issuer before giving up', async () => {
+    // Two client registrations against one realm: the token is only valid for the second.
+    vi.mocked(listEnabledOAuthProviders).mockResolvedValue([
+      { ...provider, id: 'first', clientId: 'another-client' },
+      { ...provider, id: 'second' },
+    ] as never);
+
+    const response = await POST(postForm(await signLogoutToken({ sub: 'u-1' })));
+
+    expect(response.status).toBe(200);
+    expect(revokeSessionsForLogoutToken).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: 'second' }),
+    );
+  });
+
+  it('reports the failing check rather than a bare invalid_request', async () => {
+    const response = await POST(postForm(await signLogoutToken({ sub: 'u-1', nonce: 'n-1' })));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error_description).toContain('nonce');
+  });
+});
+
+describe('GET /api/auth/oidc/backchannel-logout', () => {
+  it('says the endpoint is POST-only rather than 404ing', async () => {
+    const response = await GET();
+
+    expect(response.status).toBe(405);
+    expect((await response.json()).error_description).toContain('POST');
+  });
+});

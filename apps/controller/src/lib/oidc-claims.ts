@@ -18,7 +18,14 @@ export type ClaimSourceConfig = {
 
 /** Discovery documents change rarely; cache them briefly to avoid a fetch per sign-in. */
 const DISCOVERY_TTL_MS = 10 * 60 * 1000;
-const discoveryCache = new Map<string, { userinfoUrl: string | null; expiresAt: number }>();
+
+/** The endpoints read out of a discovery document. Absent ones stay null and are cached as such. */
+export type DiscoveredEndpoints = {
+  userinfoUrl: string | null;
+  jwksUri: string | null;
+};
+
+const discoveryCache = new Map<string, { endpoints: DiscoveredEndpoints; expiresAt: number }>();
 
 /** Exposed for tests — discovery results are process-wide state. */
 export function clearDiscoveryCache(): void {
@@ -43,31 +50,43 @@ export function decodeJwtPayload(token: string | null | undefined): Record<strin
 }
 
 /** Decoded, never verified — it came over the back-channel exchange, as better-auth trusts it. */
-async function discoverUserinfoUrl(issuer: string): Promise<string | null> {
+async function discover(issuer: string): Promise<DiscoveredEndpoints> {
   const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
   const cached = discoveryCache.get(discoveryUrl);
-  if (cached && cached.expiresAt > Date.now()) return cached.userinfoUrl;
+  if (cached && cached.expiresAt > Date.now()) return cached.endpoints;
 
-  let userinfoUrl: string | null = null;
+  const endpoints: DiscoveredEndpoints = { userinfoUrl: null, jwksUri: null };
   try {
     const response = await fetch(discoveryUrl, { headers: { Accept: "application/json" } });
     if (response.ok) {
       const doc = (await response.json()) as Record<string, unknown>;
-      const endpoint = doc.userinfo_endpoint;
-      if (typeof endpoint === "string" && endpoint) userinfoUrl = endpoint;
+      const userinfo = doc.userinfo_endpoint;
+      if (typeof userinfo === "string" && userinfo) endpoints.userinfoUrl = userinfo;
+      const jwks = doc.jwks_uri;
+      if (typeof jwks === "string" && jwks) endpoints.jwksUri = jwks;
     }
   } catch (error) {
     console.warn("[oidc-claims] OIDC discovery failed for", discoveryUrl, error);
   }
 
-  discoveryCache.set(discoveryUrl, { userinfoUrl, expiresAt: Date.now() + DISCOVERY_TTL_MS });
-  return userinfoUrl;
+  discoveryCache.set(discoveryUrl, { endpoints, expiresAt: Date.now() + DISCOVERY_TTL_MS });
+  return endpoints;
 }
 
 export async function resolveUserinfoUrl(cfg: ClaimSourceConfig): Promise<string | null> {
   if (cfg.userinfoUrl) return cfg.userinfoUrl;
-  if (cfg.issuer) return discoverUserinfoUrl(cfg.issuer);
+  if (cfg.issuer) return (await discover(cfg.issuer)).userinfoUrl;
   return null;
+}
+
+/**
+ * Where to fetch the issuer's signing keys. Discovery only — unlike userinfo there is no column to
+ * configure it by hand, because a provider that cannot be discovered cannot sign a logout token
+ * this app is able to verify either.
+ */
+export async function resolveJwksUri(issuer: string | null): Promise<string | null> {
+  if (!issuer) return null;
+  return (await discover(issuer)).jwksUri;
 }
 
 async function fetchUserinfoClaims(

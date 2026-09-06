@@ -1,0 +1,120 @@
+/**
+ * OIDC Back-Channel Logout endpoint (OpenID Connect Back-Channel Logout 1.0).
+ *
+ * Register this URL with the identity provider as its `backchannel_logout_uri`:
+ *
+ *   https://<cpm>/api/auth/oidc/backchannel-logout
+ *
+ * One URL serves every configured provider — the token names its issuer, and that is what selects
+ * the provider whose client id and signing keys it is then checked against.
+ *
+ * There is deliberately no CSRF or same-origin check here. The caller is the IdP's own server, not
+ * a browser: there is no cookie to abuse and no origin to compare, and the signed token is the
+ * whole of the authentication. Everything the request claims about itself is checked against the
+ * provider row rather than taken at face value.
+ */
+
+import { type NextRequest, NextResponse } from "next/server";
+import { listEnabledOAuthProviders } from "@/src/lib/models/oauth-providers";
+import { decodeJwtPayload } from "@/src/lib/oidc-claims";
+import { rememberLogoutJti, verifyLogoutToken } from "@/src/lib/oidc-logout-token";
+import { revokeSessionsForLogoutToken } from "@/src/lib/services/oidc-logout";
+
+export const dynamic = "force-dynamic";
+
+/** §2.8 requires `no-store` on both the success and the error response. */
+const NO_STORE = { "Cache-Control": "no-store" } as const;
+
+function ok(): NextResponse {
+  return new NextResponse(null, { status: 200, headers: NO_STORE });
+}
+
+/**
+ * §2.8: a failure is a 400 carrying a JSON `error`/`error_description`. The description names the
+ * check that failed — this endpoint is configured by hand against a provider nobody can debug from
+ * here, and "invalid_request" alone would make every misconfiguration look identical.
+ */
+function bad(description: string): NextResponse {
+  return NextResponse.json(
+    { error: "invalid_request", error_description: description },
+    { status: 400, headers: NO_STORE },
+  );
+}
+
+function normalizeIssuer(value: string | null): string {
+  return (value ?? "").replace(/\/$/, "");
+}
+
+export async function POST(request: NextRequest) {
+  // The spec posts a form, not JSON. Anything else is a misconfigured provider rather than a
+  // caller worth guessing for.
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/x-www-form-urlencoded")) {
+    return bad("expected a application/x-www-form-urlencoded body");
+  }
+
+  let token: string;
+  try {
+    token = String((await request.formData()).get("logout_token") ?? "");
+  } catch {
+    return bad("the request body could not be read as a form");
+  }
+  if (!token) return bad("no logout_token was supplied");
+
+  // The issuer is read unverified only to pick which provider to verify against — every claim is
+  // checked again, against that provider's configuration, inside verifyLogoutToken.
+  const claimedIssuer = normalizeIssuer(unverifiedIssuer(token));
+  if (!claimedIssuer) return bad("the logout_token is not a JWT with an iss claim");
+
+  const providers = (await listEnabledOAuthProviders()).filter(
+    (provider) => normalizeIssuer(provider.issuer) === claimedIssuer,
+  );
+  if (providers.length === 0) {
+    return bad("no enabled provider is configured for that issuer");
+  }
+
+  // More than one provider can share an issuer — two client registrations against the same
+  // Keycloak realm, say — so the token is offered to each until one accepts it by audience.
+  let failure = "the logout_token could not be verified";
+  for (const provider of providers) {
+    const result = await verifyLogoutToken(token, provider);
+    if (!result.ok) {
+      failure = result.reason;
+      continue;
+    }
+
+    if (!rememberLogoutJti(result.claims.issuer, result.claims.jti)) {
+      // Already acted on. A replay is answered 200: the sessions it names are gone, which is what
+      // the provider is asking for, and a 400 would invite it to keep retrying.
+      return ok();
+    }
+
+    const revoked = await revokeSessionsForLogoutToken({
+      providerId: provider.id,
+      subject: result.claims.subject,
+      sessionId: result.claims.sessionId,
+    });
+    console.log(
+      `[backchannel-logout] ${provider.name}: ended ${revoked.sessions} session(s) for ${revoked.userIds.length} user(s)`,
+    );
+    // Zero sessions is still a success. The subject may never have signed in to CPM, or may have
+    // signed out already, and reporting that as a failure would have the IdP retry forever.
+    return ok();
+  }
+
+  return bad(failure);
+}
+
+/** The `iss` from an unverified JWT payload, used only to select a provider. */
+function unverifiedIssuer(token: string): string | null {
+  const iss = decodeJwtPayload(token)?.iss;
+  return typeof iss === "string" && iss ? iss : null;
+}
+
+/** Anything but a POST is a misconfiguration; say so rather than rendering a 404. */
+export async function GET() {
+  return NextResponse.json(
+    { error: "invalid_request", error_description: "this endpoint accepts POST only" },
+    { status: 405, headers: NO_STORE },
+  );
+}

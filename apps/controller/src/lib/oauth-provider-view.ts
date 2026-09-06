@@ -59,6 +59,16 @@ export function oauthCallbackUrl(baseUrl: string, providerId: string): string {
 }
 
 /**
+ * Where an identity provider sends OIDC back-channel logout notifications.
+ *
+ * One URL for every provider, unlike the callback: a logout token names its own issuer, and that
+ * is what selects the provider it is verified against.
+ */
+export function oidcBackchannelLogoutUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/api/auth/oidc/backchannel-logout`;
+}
+
+/**
  * Preserve the stored secret unless the administrator explicitly supplies a
  * replacement. Omitting the property is important: an empty string would
  * otherwise rotate the provider to an unusable credential.

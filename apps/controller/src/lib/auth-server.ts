@@ -17,6 +17,7 @@ import {
 } from "./oidc-groups";
 import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
+import { bindSessionToIdpSession, recordSessionBindingFromIdToken } from "./services/oidc-logout";
 import { hashPassword, verifyPassword } from "./password";
 import { accountIssuerFor } from "./account-issuer";
 
@@ -111,6 +112,29 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
   }
 
   return cfg;
+}
+
+/**
+ * Park the IdP session id from an account row's ID token, ignoring anything that goes wrong.
+ *
+ * Both account hooks call this, and neither may fail over it: a provider that issues no `sid`,
+ * or a token this cannot decode, costs precision on a future logout and nothing else — refusing
+ * the sign-in over it would be far worse.
+ */
+function rememberIdpSession(account: {
+  userId?: unknown;
+  providerId?: unknown;
+  idToken?: unknown;
+}) {
+  try {
+    if (typeof account.providerId !== "string" || account.providerId === "credential") return;
+    if (typeof account.idToken !== "string") return;
+    const userId = typeof account.userId === "string" ? Number(account.userId) : account.userId;
+    if (typeof userId !== "number") return;
+    recordSessionBindingFromIdToken(userId, account.providerId, account.idToken);
+  } catch (error) {
+    console.warn("[auth-server] Could not read the IdP session id from an ID token:", error);
+  }
 }
 
 /** Whether provider load succeeded at least once */
@@ -275,6 +299,11 @@ async function createAuth(): Promise<any> {
             return { data };
           },
           after: async (account) => {
+            // The ID token is in hand here and the session row does not exist yet, so its `sid`
+            // is parked for the session hook below — that is what a back-channel logout naming a
+            // single IdP session has to match against.
+            rememberIdpSession(account);
+
             // Better Auth writes federated identities to the `accounts` table
             // only. Re-derive the informational users.provider/subject columns
             // from it so auto-linking, profile linking, and federated sign-up
@@ -304,6 +333,10 @@ async function createAuth(): Promise<any> {
             return { data };
           },
           after: async (account) => {
+            // A repeat sign-in gets a fresh ID token with a fresh `sid`, and a fresh session row
+            // to stamp with it.
+            rememberIdpSession(account);
+
             // Repeat OAuth sign-ins update the existing account row rather than
             // creating one; keep the projection fresh in that path too.
             try {
@@ -331,6 +364,16 @@ async function createAuth(): Promise<any> {
               await reconcileOidcUserAfterSignIn(userId);
             } catch (error) {
               console.warn("[auth-server] OIDC group sync failed:", error);
+            }
+
+            // Stamp the session with the IdP session it belongs to, so a back-channel logout
+            // naming that `sid` can end this one and leave the user's others alone.
+            try {
+              const sessionId =
+                typeof session.id === "string" ? Number(session.id) : (session.id as number);
+              await bindSessionToIdpSession(userId, sessionId);
+            } catch (error) {
+              console.warn("[auth-server] Binding the session to its IdP session failed:", error);
             }
 
             try {

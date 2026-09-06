@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -19,6 +19,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import { AUTOFILL_NEW_PASSWORD } from "@/components/ui/native-input-attrs";
 import {
   oauthCallbackUrl,
+  oidcBackchannelLogoutUrl,
   withOAuthClientSecretRotation,
   type OAuthProviderView,
 } from "@/src/lib/oauth-provider-view";
@@ -108,6 +109,10 @@ export default function OAuthProvidersSection({
     (providerId: string) => oauthCallbackUrl(baseUrl, providerId),
     [baseUrl],
   );
+
+  // One URL for every provider — the logout token names its own issuer, which is what picks the
+  // provider it gets verified against.
+  const backchannelLogoutUrl = useMemo(() => oidcBackchannelLogoutUrl(baseUrl), [baseUrl]);
 
   function closeDialog() {
     // Clear any newly-entered replacement secret from client memory as soon
@@ -603,6 +608,19 @@ export default function OAuthProvidersSection({
               <CodeBlock code={callbackUrl(editingProvider.id)} width="100%" />
             </VStack>
           )}
+
+          {/* Optional, and only meaningful once the provider is saved — but it belongs beside the
+              callback URL, which is the other value being copied into the IdP's own form. */}
+          <VStack gap={1}>
+            <Text type="label" size="xsm" color="secondary">
+              Back-channel logout URL
+            </Text>
+            <CodeBlock code={backchannelLogoutUrl} width="100%" />
+            <Text type="body" size="xsm" color="secondary">
+              Optional. Set this as the provider&apos;s back-channel logout URL and CPM will end a
+              user&apos;s sessions when the identity provider ends theirs.
+            </Text>
+          </VStack>
         </VStack>
       </AppDialog>
     </VStack>
