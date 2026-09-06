@@ -9,20 +9,26 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { vi } from '@/tests/helpers/vi';
-
-vi.mock('@/src/lib/models/oauth-providers', () => ({
-  listEnabledOAuthProviders: vi.fn(),
-}));
-
-vi.mock('@/src/lib/services/oidc-logout', () => ({
-  revokeSessionsForLogoutToken: vi.fn().mockResolvedValue({ sessions: 1, userIds: [7] }),
-}));
-
 import { POST, GET } from '@/src/app/api/auth/oidc/backchannel-logout/route';
-import { listEnabledOAuthProviders } from '@/src/lib/models/oauth-providers';
-import { revokeSessionsForLogoutToken } from '@/src/lib/services/oidc-logout';
+import * as providerModel from '@/src/lib/models/oauth-providers';
+import * as logoutService from '@/src/lib/services/oidc-logout';
 import { clearDiscoveryCache } from '@/src/lib/oidc-claims';
 import { clearJwksCache, clearLogoutJtis } from '@/src/lib/oidc-logout-token';
+
+/**
+ * `vi.spyOn` on the module namespace rather than `vi.mock` on the module.
+ *
+ * Bun's module mocks are process-wide and permanent: `vi.mock` swaps the registry entry's live
+ * bindings in place and nothing in `bun:test` puts them back, so the stub is inherited by every
+ * file that runs afterwards in the same process. Stubbing the revocation service that way had
+ * tests/integration/oidc-backchannel-logout.test.ts — which exercises the real revocation against
+ * a database — silently asserting against this file's stub, reporting eight failures that said
+ * nothing about the code under test. `--parallel` gives each file its own process and hides it;
+ * an ad-hoc `bun test <file> <file>` does not. A spy is reversible, so `restoreAllMocks` below
+ * leaves the registry exactly as it was found.
+ */
+let listProviders: ReturnType<typeof vi.spyOn<typeof providerModel, 'listEnabledOAuthProviders'>>;
+let revoke: ReturnType<typeof vi.spyOn<typeof logoutService, 'revokeSessionsForLogoutToken'>>;
 
 const ISSUER = 'https://idp.example';
 const CLIENT_ID = 'cpm';
@@ -86,12 +92,17 @@ beforeEach(() => {
   clearJwksCache();
   clearLogoutJtis();
   serveIdp();
-  vi.mocked(listEnabledOAuthProviders).mockResolvedValue([provider] as never);
-  vi.mocked(revokeSessionsForLogoutToken).mockClear();
+  listProviders = vi
+    .spyOn(providerModel, 'listEnabledOAuthProviders')
+    .mockResolvedValue([provider] as never);
+  revoke = vi
+    .spyOn(logoutService, 'revokeSessionsForLogoutToken')
+    .mockResolvedValue({ sessions: 1, userIds: [7] });
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  vi.restoreAllMocks();
 });
 
 describe('POST /api/auth/oidc/backchannel-logout', () => {
@@ -100,7 +111,7 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(revokeSessionsForLogoutToken).toHaveBeenCalledWith({
+    expect(revoke).toHaveBeenCalledWith({
       providerId: 'authentik',
       subject: 'u-1',
       sessionId: 'idp-1',
@@ -108,7 +119,7 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
   });
 
   it('answers 200 when the subject had no sessions here', async () => {
-    vi.mocked(revokeSessionsForLogoutToken).mockResolvedValueOnce({ sessions: 0, userIds: [] });
+    revoke.mockResolvedValueOnce({ sessions: 0, userIds: [] });
 
     // Reporting "nothing to do" as a failure would have the IdP retry forever.
     expect((await POST(postForm(await signLogoutToken({ sub: 'u-1' })))).status).toBe(200);
@@ -119,7 +130,7 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
 
     expect((await POST(postForm(token))).status).toBe(200);
     expect((await POST(postForm(token))).status).toBe(200);
-    expect(revokeSessionsForLogoutToken).toHaveBeenCalledTimes(1);
+    expect(revoke).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a body that is not a form', async () => {
@@ -152,7 +163,7 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
 
     expect(response.status).toBe(400);
     expect((await response.json()).error_description).toContain('no enabled provider');
-    expect(revokeSessionsForLogoutToken).not.toHaveBeenCalled();
+    expect(revoke).not.toHaveBeenCalled();
   });
 
   it('refuses a token whose audience is another client of the same issuer', async () => {
@@ -161,14 +172,12 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(revokeSessionsForLogoutToken).not.toHaveBeenCalled();
+    expect(revoke).not.toHaveBeenCalled();
   });
 
   it('selects a provider by its exact issuer, trailing slash included', async () => {
     const slashed = `${ISSUER}/`;
-    vi.mocked(listEnabledOAuthProviders).mockResolvedValue([
-      { ...provider, issuer: slashed },
-    ] as never);
+    listProviders.mockResolvedValue([{ ...provider, issuer: slashed }] as never);
 
     const response = await POST(postForm(await signLogoutToken({ sub: 'u-1', iss: slashed })));
 
@@ -183,12 +192,12 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
 
     expect(response.status).toBe(400);
     expect((await response.json()).error_description).toContain('no enabled provider');
-    expect(revokeSessionsForLogoutToken).not.toHaveBeenCalled();
+    expect(revoke).not.toHaveBeenCalled();
   });
 
   it('tries every provider sharing an issuer before giving up', async () => {
     // Two client registrations against one realm: the token is only valid for the second.
-    vi.mocked(listEnabledOAuthProviders).mockResolvedValue([
+    listProviders.mockResolvedValue([
       { ...provider, id: 'first', clientId: 'another-client' },
       { ...provider, id: 'second' },
     ] as never);
@@ -196,9 +205,7 @@ describe('POST /api/auth/oidc/backchannel-logout', () => {
     const response = await POST(postForm(await signLogoutToken({ sub: 'u-1' })));
 
     expect(response.status).toBe(200);
-    expect(revokeSessionsForLogoutToken).toHaveBeenCalledWith(
-      expect.objectContaining({ providerId: 'second' }),
-    );
+    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ providerId: 'second' }));
   });
 
   it('reports the failing check rather than a bare invalid_request', async () => {
