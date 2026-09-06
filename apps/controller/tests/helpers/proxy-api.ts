@@ -58,13 +58,28 @@ async function expandCaRow(page: Page, caName: string): Promise<void> {
 }
 
 /**
+ * Click "Create Host" and wait for its dialog, retrying the click itself.
+ *
+ * The button is in the server-rendered HTML before React attaches its handler, so a click that
+ * lands during hydration is swallowed and no dialog ever opens. By the time the later functional
+ * specs run, this page carries every host the earlier ones left behind, which makes hydration slow
+ * enough on a CI runner for that window to be hit -- it never reproduced on a developer machine.
+ * Retrying the click rides out the race without inflating a timeout and calling it fixed.
+ */
+export async function openCreateHostDialog(page: Page): Promise<void> {
+  await expect(async () => {
+    await page.getByRole('button', { name: /create host/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+}
+
+/**
  * Create a proxy host via the browser UI. ssl_forced is always false so functional tests can use
  * plain HTTP.
  */
 export async function createProxyHost(page: Page, config: ProxyHostConfig): Promise<void> {
   await page.goto('/proxy-hosts');
-  await page.getByRole('button', { name: /create host/i }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await openCreateHostDialog(page);
 
   await page.getByLabel('Name').fill(config.name);
   await page.getByLabel(/^domains/i).fill(config.domain);

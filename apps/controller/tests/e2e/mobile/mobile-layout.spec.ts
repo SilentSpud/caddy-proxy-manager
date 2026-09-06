@@ -1,21 +1,5 @@
 import { test, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
-
-/**
- * Click "Create Host" and wait for its dialog, retrying the click itself.
- *
- * The button is in the server-rendered HTML before React attaches its handler, so a click that
- * lands during hydration is swallowed and no dialog ever opens. This page carries every host the
- * earlier functional specs left behind, which makes hydration slow enough on a CI runner for that
- * window to be hit -- it never reproduced on a developer machine. Retrying the click rides out the
- * race without inflating a timeout and calling it fixed.
- */
-async function openCreateHostDialog(page: Page) {
-  await expect(async () => {
-    await page.getByRole('button', { name: /create host/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 30_000 });
-}
+import { openCreateHostDialog } from '../../helpers/proxy-api';
 
 // Force a mobile viewport even under the desktop Chromium project so these
 // checks validate responsive behavior instead of self-skipping.
