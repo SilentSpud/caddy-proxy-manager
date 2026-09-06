@@ -4,14 +4,43 @@ import { config } from "./config";
 const PREFIX = "enc:v1:";
 const IV_LENGTH = 12;
 
-function deriveKey(): Buffer {
+function deriveKey(sessionSecret: string = config.sessionSecret): Buffer {
   return Buffer.from(
-    hkdfSync("sha256", config.sessionSecret, Buffer.alloc(0), "caddy-proxy-manager:secret:v1", 32),
+    hkdfSync("sha256", sessionSecret, Buffer.alloc(0), "caddy-proxy-manager:secret:v1", 32),
   );
 }
 
-function deriveKeyLegacy(): Buffer {
-  return createHash("sha256").update(config.sessionSecret).digest();
+function deriveKeyLegacy(sessionSecret: string = config.sessionSecret): Buffer {
+  return createHash("sha256").update(sessionSecret).digest();
+}
+
+/**
+ * Decrypt with a session secret that is not this deployment's own.
+ *
+ * The migration flow is the only caller: a pre-3.0 database carries its secrets encrypted under
+ * the `SESSION_SECRET` that installation ran with, which is rarely the one the new deployment was
+ * given. Rather than making the operator adopt the old secret forever, the importer asks for it
+ * once and re-encrypts everything under the current key on the way in.
+ *
+ * Both derivations are tried, for the same reason `decryptSecret` tries both: a database old
+ * enough to predate the HKDF change holds values under the SHA-256 key, and one that was upgraded
+ * part-way holds a mixture. No grace-period check here — the cutoff exists to push a running
+ * deployment off the legacy key, and refusing to read a legacy value during the one operation that
+ * would re-encrypt it has it exactly backwards.
+ *
+ * Returns null rather than throwing: every caller is asking "is this the right secret", and a
+ * wrong answer is an expected outcome there, not an error.
+ */
+export function decryptSecretWith(value: string, sessionSecret: string): string | null {
+  if (!isEncryptedSecret(value)) return value;
+  for (const key of [deriveKey(sessionSecret), deriveKeyLegacy(sessionSecret)]) {
+    try {
+      return _decryptWithKey(value, key);
+    } catch {
+      // Try the other derivation before giving up.
+    }
+  }
+  return null;
 }
 
 export function isEncryptedSecret(value: string): boolean {

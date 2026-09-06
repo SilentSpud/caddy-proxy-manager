@@ -22,6 +22,7 @@ import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { is, sql } from "drizzle-orm";
 import db from "../db";
 import * as schema from "../db/schema.pg";
+import { createRekeyer, LegacySecretError, type Rekeyer } from "./legacy-secrets";
 import {
   ALL_MIGRATION_GROUP_IDS,
   MIGRATION_GROUPS,
@@ -164,6 +165,7 @@ function convertRow(
   columns: Described["columns"],
   available: Set<string>,
   cleared: Set<string>,
+  rekey: Rekeyer,
 ): Record<string, unknown> {
   const converted: Record<string, unknown> = {};
   for (const column of columns) {
@@ -173,8 +175,14 @@ function convertRow(
       continue;
     }
     const value = row[column.name];
-    converted[column.name] =
-      column.isBoolean && (value === 0 || value === 1) ? value === 1 : (value ?? null);
+    if (column.isBoolean && (value === 0 || value === 1)) {
+      converted[column.name] = value === 1;
+      continue;
+    }
+    // Ciphertext bound to the old deployment's SESSION_SECRET is re-encrypted under this one's.
+    // Applied to every text column rather than to a named list: `rekey` keys off the `enc:v1:`
+    // marker, so it is a no-op on the columns that hold no secret.
+    converted[column.name] = typeof value === "string" ? rekey(value) : (value ?? null);
   }
   return converted;
 }
@@ -228,8 +236,10 @@ function clearedColumns(table: Described, included: Set<string>): Set<string> {
 export async function importLegacyDatabase(
   sqlitePath: string,
   groups: Iterable<MigrationGroupId> = ALL_MIGRATION_GROUP_IDS,
+  options: { legacyKey?: string | null } = {},
 ): Promise<ImportReport> {
   const source = new Database(sqlitePath, { readonly: true });
+  const rekey = createRekeyer(options.legacyKey ?? null);
 
   try {
     const present = sqliteTables(source);
@@ -250,6 +260,15 @@ export async function importLegacyDatabase(
     const clearedReferences: string[] = [];
     let totalRows = 0;
 
+    // Read and convert everything before writing anything.
+    //
+    // Conversion is where a secret encrypted under the old deployment's SESSION_SECRET is
+    // re-encrypted under this one's, and where a wrong key is discovered. Doing that up front is
+    // the difference between a migration that refuses to start and one that stops halfway with a
+    // partly populated database — which the operator is told never to retry against. A legacy
+    // database is small enough to hold in memory; that is the whole cost of the guarantee.
+    const prepared: Array<{ table: Described; rows: Array<Record<string, unknown>> }> = [];
+
     for (const table of described) {
       if (!included.has(table.name)) {
         excludedBySelection.push(table.name);
@@ -266,11 +285,27 @@ export async function importLegacyDatabase(
       for (const column of cleared) clearedReferences.push(`${table.name}.${column}`);
       const rows = source.query<Record<string, unknown>, []>(`SELECT * FROM "${table.name}"`).all();
 
+      prepared.push({
+        table,
+        rows: rows.map((row) => {
+          try {
+            return convertRow(row, table.columns, available, cleared, rekey);
+          } catch (error) {
+            if (error instanceof LegacySecretError) {
+              // Named, because "which of thirty tables" is the first thing anyone asks. The row is
+              // not identified: its id would say little and its contents are the secret itself.
+              throw new LegacySecretError(`${error.message} (reading ${table.name})`);
+            }
+            throw error;
+          }
+        }),
+      });
+    }
+
+    for (const { table, rows } of prepared) {
       let copied = 0;
       for (let index = 0; index < rows.length; index += BATCH_SIZE) {
-        const batch = rows
-          .slice(index, index + BATCH_SIZE)
-          .map((row) => convertRow(row, table.columns, available, cleared));
+        const batch = rows.slice(index, index + BATCH_SIZE);
         if (batch.length === 0) continue;
 
         // `returning` so the count is rows actually written: onConflictDoNothing silently drops

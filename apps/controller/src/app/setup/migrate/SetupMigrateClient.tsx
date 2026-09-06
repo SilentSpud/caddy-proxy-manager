@@ -21,7 +21,9 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { SelectableCard } from "@astryxdesign/core/SelectableCard";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
+import { AUTOFILL_OFF } from "@/src/components/ui/native-input-attrs";
 import {
   ALL_MIGRATION_GROUP_IDS,
   MIGRATION_GROUPS,
@@ -39,6 +41,11 @@ export type Candidate = {
   certificates: number;
   groupCounts: Record<MigrationGroupId, number>;
   lastUpdatedAt: string | null;
+  /**
+   * Whether this file's secrets are encrypted with a `SESSION_SECRET` this deployment does not
+   * have — decided on the server, which is the only side that can try the key.
+   */
+  needsLegacyKey: boolean;
 };
 
 function formatSize(bytes: number): string {
@@ -60,6 +67,12 @@ export default function SetupMigrateClient({
   const [picked, setPicked] = useState<MigrationGroupId[]>(ALL_MIGRATION_GROUP_IDS);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  // The old deployment's SESSION_SECRET, when this file's secrets need one. Held only long enough
+  // to be posted: the import re-encrypts everything under the current key, so nothing keeps it.
+  const [legacyKey, setLegacyKey] = useState("");
+  // Set when the server asks for the key despite the probe not having done so — a database whose
+  // secret was rotated more than once, where the sample read but something later did not.
+  const [keyDemanded, setKeyDemanded] = useState(false);
   // Set once the import has succeeded, which swaps the page for the restart dialog.
   const [imported, setImported] = useState<{ next: string; migratedSignIn: boolean } | null>(null);
 
@@ -97,14 +110,17 @@ export default function SetupMigrateClient({
       const response = await fetch("/api/setup/migrate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ path: selected, groups: [...effective] }),
+        body: JSON.stringify({ path: selected, groups: [...effective], legacyKey }),
       });
       const body = (await response.json()) as
         | { ok: true; next: string; migratedSignIn: boolean }
-        | { ok: false; error: string };
+        | { ok: false; error: string; code?: "legacy-key-required" | "legacy-key-invalid" };
 
       if (!body.ok) {
         setError(body.error);
+        // Either code means the field belongs on screen: the first because the server found
+        // secrets the probe did not, the second so a mistyped key can be corrected in place.
+        if (body.code) setKeyDemanded(true);
         return;
       }
       setImported({ next: body.next, migratedSignIn: body.migratedSignIn });
@@ -130,6 +146,9 @@ export default function SetupMigrateClient({
 
   const migratingUsers = effective.has("users");
   const migratingOAuth = effective.has("oauthProviders");
+  // The probe answers for the file; `keyDemanded` is the server having asked anyway. Once the field
+  // is on screen it stays, so a wrong key does not make the box the operator is fixing disappear.
+  const needsLegacyKey = (candidate?.needsLegacyKey ?? false) || keyDemanded;
 
   if (imported) {
     return <RestartDialog next={imported.next} migratedSignIn={imported.migratedSignIn} />;
@@ -248,6 +267,35 @@ export default function SetupMigrateClient({
               />
             )}
 
+            {needsLegacyKey && (
+              <FormCard title="This database was encrypted with a different key">
+                <VStack gap={3}>
+                  <Text size="sm" color="secondary">
+                    Certificate private keys, DNS provider credentials, OAuth client secrets and
+                    agent secrets in this file are encrypted with the <code>SESSION_SECRET</code>{" "}
+                    the old installation ran with, and this deployment has a different one. Enter
+                    the old value to bring them across.
+                  </Text>
+                  <TextInput
+                    {...AUTOFILL_OFF}
+                    label="The old SESSION_SECRET"
+                    htmlName="legacyKey"
+                    type="password"
+                    description="From the .env that installation ran with, exactly as it appears there. It is checked before anything is written, used to re-encrypt these values under this deployment's own key, and not stored."
+                    value={legacyKey}
+                    onChange={setLegacyKey}
+                    isRequired
+                    width="100%"
+                  />
+                  <Banner
+                    status="info"
+                    title="You do not have to keep the old secret"
+                    description="Everything is re-encrypted with the SESSION_SECRET this deployment already uses, so the old one is needed for this import and never again. Migrating without it would leave those secrets unreadable, and each would have to be entered again by hand."
+                  />
+                </VStack>
+              </FormCard>
+            )}
+
             <Banner
               status="warning"
               title="Migrate into an empty database"
@@ -256,7 +304,7 @@ export default function SetupMigrateClient({
 
             <SaveButton
               label={running ? "Migrating…" : "Migrate this database"}
-              isDisabled={effective.size === 0 || running}
+              isDisabled={effective.size === 0 || running || (needsLegacyKey && !legacyKey.trim())}
             />
           </VStack>
         </form>

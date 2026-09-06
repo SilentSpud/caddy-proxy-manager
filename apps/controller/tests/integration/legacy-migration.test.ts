@@ -14,6 +14,7 @@ import { Database } from 'bun:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { createCipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { eq, sql } from 'drizzle-orm';
@@ -39,6 +40,7 @@ vi.mock('@/src/lib/db', () => ({
 }));
 
 const { importLegacyDatabase } = await import('@/src/lib/migration/import');
+const { decryptSecret, encryptSecret } = await import('@/src/lib/secret');
 const { carryOverBlobSettings } = await import('@/src/lib/migration/settings-carryover');
 const registry = await import('@/src/lib/settings/registry');
 const { getSetting, invalidateSettingsCache } = await import('@/src/lib/settings/resolve');
@@ -387,5 +389,102 @@ describe('carrying the old JSON settings into the registry', () => {
 
     const applied = await carryOverBlobSettings();
     expect(applied).toEqual([]);
+  });
+});
+
+/**
+ * A database whose secrets were encrypted under a SESSION_SECRET this deployment does not have.
+ *
+ * Before the importer took a key, the only way through was to change SESSION_SECRET to match the
+ * old installation's and keep it forever. Now the old value is asked for once and used to
+ * re-encrypt everything under the key this deployment already has.
+ */
+describe('a database encrypted with a different SESSION_SECRET', () => {
+  const OLD_SECRET = 'the-old-installations-session-secret-4321';
+
+  /** The on-disk envelope, written by hand: nothing in production can encrypt under another key. */
+  function encryptWithOldSecret(value: string): string {
+    const key = Buffer.from(
+      hkdfSync('sha256', OLD_SECRET, Buffer.alloc(0), 'caddy-proxy-manager:secret:v1', 32),
+    );
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+    return [
+      'enc:v1:',
+      iv.toString('base64'),
+      ':',
+      cipher.getAuthTag().toString('base64'),
+      ':',
+      ciphertext.toString('base64'),
+    ].join('');
+  }
+
+  /** The fixture, plus a certificate whose private key only the old secret opens. */
+  function withOldSecrets(): string {
+    const path = buildLegacyDatabase();
+    const raw = new Database(path);
+    raw.run(
+      `INSERT INTO certificates (id, name, type, domainNames, autoRenew, privateKeyPem,
+                                 createdAt, updatedAt)
+       VALUES (1, 'wildcard', 'custom', '["*.example.com"]', 0, ?, ?, ?)`,
+      [encryptWithOldSecret('-----BEGIN PRIVATE KEY-----'), NOW, NOW],
+    );
+    raw.close();
+    return path;
+  }
+
+  it('re-encrypts the old secrets under this deployment key', async () => {
+    await importLegacyDatabase(withOldSecrets(), undefined, { legacyKey: OLD_SECRET });
+
+    const [row] = await ctx.db
+      .select({ privateKeyPem: schemaModule.certificates.privateKeyPem })
+      .from(schemaModule.certificates)
+      .where(eq(schemaModule.certificates.id, 1));
+
+    // Readable with the running deployment's own key, which is what nothing could do before.
+    expect(decryptSecret(row.privateKeyPem as string)).toBe('-----BEGIN PRIVATE KEY-----');
+    // Re-encrypted rather than copied: the old secret is not needed again after this.
+    expect(row.privateKeyPem).not.toBe(encryptWithOldSecret('-----BEGIN PRIVATE KEY-----'));
+  });
+
+  it('refuses without the key, and writes nothing at all', async () => {
+    await expect(importLegacyDatabase(withOldSecrets())).rejects.toThrow(
+      /different SESSION_SECRET/,
+    );
+
+    // The refusal has to be total. A partial import is the one state the operator is told not to
+    // retry against, so a missing key must not leave the users behind that the certificates follow.
+    const users = await ctx.db.select().from(schemaModule.users);
+    expect(users).toEqual([]);
+  });
+
+  it('refuses a wrong key, and writes nothing at all', async () => {
+    await expect(
+      importLegacyDatabase(withOldSecrets(), undefined, { legacyKey: 'not-the-old-secret' }),
+    ).rejects.toThrow(/does not decrypt/);
+
+    const users = await ctx.db.select().from(schemaModule.users);
+    expect(users).toEqual([]);
+  });
+
+  it('names the table the unreadable value was in', async () => {
+    await expect(importLegacyDatabase(withOldSecrets())).rejects.toThrow(/certificates/);
+  });
+
+  it('needs no key when the secret has not changed', async () => {
+    const path = buildLegacyDatabase();
+    const raw = new Database(path);
+    raw.run(
+      `INSERT INTO certificates (id, name, type, domainNames, autoRenew, privateKeyPem,
+                                 createdAt, updatedAt)
+       VALUES (1, 'wildcard', 'custom', '["*.example.com"]', 0, ?, ?, ?)`,
+      [encryptSecret('-----BEGIN PRIVATE KEY-----'), NOW, NOW],
+    );
+    raw.close();
+
+    // The ordinary upgrade: same secret carried over, so the flow never asks for anything.
+    const report = await importLegacyDatabase(path);
+    expect(report.totalRows).toBeGreaterThan(0);
   });
 });
