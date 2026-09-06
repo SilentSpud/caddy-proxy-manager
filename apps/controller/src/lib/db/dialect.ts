@@ -37,7 +37,7 @@ export type DatabaseTarget =
 
 /**
  * Named so an operator pointing at one of these gets a straight answer. `file:`/`sqlite:` is
- * called out separately because every pre-3.1 deployment has one in its .env, and the useful
+ * called out separately because every pre-3.0 deployment has one in its .env, and the useful
  * response is "the app migrates it for you", not "unsupported scheme".
  */
 const UNSUPPORTED_SCHEMES = new Map<string, string>([
@@ -90,7 +90,7 @@ function targetFromUrl(url: string): DatabaseTarget {
     return { kind: "url", url };
   }
 
-  // A bare path is what a pre-3.1 .env carries when it names the file directly.
+  // A bare path is what a pre-3.0 .env carries when it names the file directly.
   if (scheme === null || SQLITE_SCHEMES.has(scheme)) {
     throw new Error(SQLITE_MESSAGE);
   }

@@ -1,5 +1,5 @@
 /**
- * Finding and vetting a pre-3.1 SQLite database.
+ * Finding and vetting a pre-3.0 SQLite database.
  *
  * An upgrading deployment has a file somewhere its `.env` used to point at, and the operator
  * should not have to tell us where — but neither should we open something at a guessed path and

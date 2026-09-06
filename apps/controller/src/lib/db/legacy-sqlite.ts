@@ -1,7 +1,7 @@
 /**
  * Everything that still knows what a SQLite database is.
  *
- * Nothing here runs during normal operation: SQLite stopped being an application backend in 3.1.
+ * Nothing here runs during normal operation: SQLite stopped being an application backend in 3.0.
  * It is staged for the migration flow, which opens an upgrading deployment's old file, reads it,
  * and copies what it finds into PostgreSQL. Kept rather than deleted because the quirks it encodes
  * — which releases wrote which column names — are not recoverable from the current schema.
