@@ -11,8 +11,16 @@ export default async function proxy(req: NextRequest) {
 
   // Everything the setup flow needs before there is an account to authenticate with. The settings
   // step is deliberately absent: it runs after sign-in and is protected like any other page.
+  //
+  // Listed one path at a time rather than as `/api/setup/*`: that prefix also holds
+  // /api/setup/backup, which streams the migrated SQLite file — every account in the deployment —
+  // and is admin-only for that reason. Each route below guards itself as well.
   const isSetupEntry =
-    pathname === "/setup" || pathname === "/setup/migrate" || pathname === "/api/setup";
+    pathname === "/setup" ||
+    pathname === "/setup/migrate" ||
+    pathname === "/api/setup" ||
+    pathname === "/api/setup/migrate" ||
+    pathname === "/api/setup/restart";
 
   /** The sparse header set a page nobody has signed in for still needs. */
   const publicPageResponse = () => {

@@ -72,7 +72,13 @@ services:
       ADMIN_PASSWORD: "TestPassword2026!"
       BASE_URL: http://localhost:3001
       NEXTAUTH_URL: http://localhost:3001
-      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_registration
+      # Fields rather than a URL, matching docker-compose.yml: the password is interpolated in
+      # and a URL would have to encode it. Only the database differs from the base stack's.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: cpm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cpm_registration
       CADDY_API_URL: http://caddy:2019
       AUTH_ALLOW_SELF_REGISTRATION: "true"
       AUTH_RATE_LIMIT_ENABLED: "false"
@@ -145,7 +151,11 @@ services:
       # this instance in the setup flow rather than past it.
       BASE_URL: http://localhost:3004
       NEXTAUTH_URL: http://localhost:3004
-      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_setup
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: cpm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cpm_setup
       CADDY_API_URL: http://127.0.0.1:9
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"
@@ -167,6 +177,10 @@ services:
   web-migrate:
     container_name: caddy-proxy-manager-web-migrate
     image: ghcr.io/silentspud/caddy-proxy-manager/web:latest
+    # The one service in this file that needs a restart policy: finishing a migration stops the
+    # process on purpose, so it runs from the database it just imported. Without this it would stop
+    # and stay stopped, and the rest of the migration spec would have nothing to talk to.
+    restart: unless-stopped
     ports:
       - "3005:3000"
     environment:
@@ -174,7 +188,11 @@ services:
       SESSION_SECRET: "test-migrate-session-secret-32chars!xxYY"
       BASE_URL: http://localhost:3005
       NEXTAUTH_URL: http://localhost:3005
-      DATABASE_URL: postgres://cpm:${POSTGRES_PASSWORD}@postgres:5432/cpm_migrate
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: cpm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cpm_migrate
       CADDY_API_URL: http://127.0.0.1:9
       OAUTH_ENABLED: "false"
       AUTH_RATE_LIMIT_ENABLED: "false"

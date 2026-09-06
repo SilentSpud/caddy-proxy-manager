@@ -7,6 +7,13 @@
  * src/lib/settings/registry.ts puts it on this page and on the migration screen at the same time.
  * A value that came from the environment is labelled as such — that is the operator's cue that
  * saving here is what lets them delete it from their `.env`.
+ *
+ * The Defaults card is the exception, and is written out by hand because it is not a registry
+ * setting: primary domain and ACME contact live together in the `general` JSON object that
+ * predates the registry, and moving them would change where the Settings page and the v1 API read
+ * them from. They are here because the ACME contact is the address Let's Encrypt warns about
+ * expiring certificates at, and an instance that finishes setup without one issues its first
+ * certificate with nobody to tell.
  */
 import { useActionState, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -15,9 +22,12 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-attrs";
 import { FormCard, InfoAlert, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { saveSetupSettings } from "./actions";
 
@@ -35,14 +45,52 @@ export type SettingField = {
   source: "stored" | "environment" | "default";
 };
 
+export type GeneralFields = { primaryDomain: string; acmeEmail: string };
+
+export type OAuthPrefill = {
+  providerName: string;
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  authorizationUrl: string;
+  tokenUrl: string;
+  userinfoUrl: string;
+  scopes: string;
+  autoLink: boolean;
+  roleMappingEnabled: boolean;
+  groupsClaim: string;
+  groupPrefix: string;
+  adminGroup: string;
+  userGroup: string;
+  viewerGroup: string;
+  defaultRole: string;
+  syncGroups: boolean;
+};
+
+export type OAuthCard = {
+  /** Providers already configured. Non-empty means this card has nothing to add. */
+  existing: string[];
+  /** Whether the prefill came from OAUTH_* rather than being blank defaults. */
+  fromEnvironment: boolean;
+  prefill: OAuthPrefill;
+};
+
 export default function SetupSettingsClient({
   fields,
   groups,
+  general,
+  oauth,
 }: {
   fields: SettingField[];
   groups: Array<{ id: string; title: string }>;
+  general: GeneralFields;
+  oauth: OAuthCard;
 }) {
   const [state, submit] = useActionState(saveSetupSettings, { error: null });
+
+  const [primaryDomain, setPrimaryDomain] = useState(general.primaryDomain);
+  const [acmeEmail, setAcmeEmail] = useState(general.acmeEmail);
+  const [idp, setIdp] = useState<OAuthPrefill>(oauth.prefill);
 
   const [values, setValues] = useState<Record<string, string | boolean>>(() =>
     Object.fromEntries(
@@ -89,6 +137,33 @@ export default function SetupSettingsClient({
           <VStack gap={4}>
             {state.error && <StatusAlert message={state.error} success={false} />}
 
+            <FormCard title="Defaults">
+              <VStack gap={3}>
+                <TextInput
+                  // NATIVE_REQUIRED as well as isRequired, matching the Settings page: isRequired
+                  // marks the field, the attribute is what stops an empty one being posted. The
+                  // save refuses it either way; the browser refusing first is a better answer.
+                  {...NATIVE_REQUIRED}
+                  label="Primary domain"
+                  description="Offered first when you create a proxy host, so the one you use most belongs here."
+                  htmlName="primaryDomain"
+                  value={primaryDomain}
+                  onChange={setPrimaryDomain}
+                  isRequired
+                  width="100%"
+                />
+                <TextInput
+                  label="ACME contact email"
+                  description="Where Let's Encrypt sends expiry warnings and account notices. Optional, and worth setting: without it nobody is told when a certificate is about to lapse."
+                  type="email"
+                  htmlName="acmeEmail"
+                  value={acmeEmail}
+                  onChange={setAcmeEmail}
+                  width="100%"
+                />
+              </VStack>
+            </FormCard>
+
             {groups.map((group) => {
               const groupFields = fields.filter((field) => field.group === group.id);
               if (groupFields.length === 0) return null;
@@ -123,6 +198,8 @@ export default function SetupSettingsClient({
                 </FormCard>
               );
             })}
+
+            <IdentityProviderCard card={oauth} value={idp} onChange={setIdp} />
 
             <SaveButton label="Save and finish setup" />
           </VStack>
@@ -237,5 +314,211 @@ function SettingRow({
         width="100%"
       />
     </VStack>
+  );
+}
+
+/**
+ * Configure an identity provider, or say why there is nothing to do.
+ *
+ * Every field is optional and the whole card is skipped when the core three are blank, because a
+ * deployment signing in with a local administrator has no provider to describe. Leaving it out
+ * entirely was the old behaviour, and it meant the OAUTH_* half of a `.env` had no home on this
+ * page at all — the account step asks about OAuth only on the branch where it is the *only* way
+ * in, so an operator who made a local administrator was never asked, and never told they could
+ * stop setting those variables.
+ *
+ * Everything past the core four is behind a disclosure. Sixteen inputs open on a setup screen
+ * reads as sixteen decisions to make; four reads as the four that are actually required.
+ */
+function IdentityProviderCard({
+  card,
+  value,
+  onChange,
+}: {
+  card: OAuthCard;
+  value: OAuthPrefill;
+  onChange: (next: OAuthPrefill) => void;
+}) {
+  const set =
+    <K extends keyof OAuthPrefill>(key: K) =>
+    (next: OAuthPrefill[K]) =>
+      onChange({ ...value, [key]: next });
+
+  if (card.existing.length > 0) {
+    return (
+      <FormCard title="Identity provider">
+        <Banner
+          status="info"
+          title={`Already configured: ${card.existing.join(", ")}`}
+          description="Add or change providers from Settings once setup is finished."
+        />
+      </FormCard>
+    );
+  }
+
+  return (
+    <FormCard title="Identity provider (optional)">
+      <VStack gap={3}>
+        <Text size="sm" color="secondary">
+          Sign in through an OIDC provider, as well as or instead of local accounts. Leave these
+          blank to skip — one can be added from Settings at any time.
+        </Text>
+
+        {card.fromEnvironment && (
+          <Banner
+            status="info"
+            title="Filled in from your OAUTH_ environment variables"
+            description="Saving stores the provider in the database, after which those variables can be removed."
+          />
+        )}
+
+        <TextInput
+          label="Display name"
+          description="Shown on the sign-in button."
+          htmlName="idpName"
+          value={value.providerName}
+          onChange={set("providerName")}
+          width="100%"
+        />
+        <TextInput
+          label="Issuer URL"
+          description="The provider's OIDC issuer. Its endpoints are discovered from here."
+          htmlName="idpIssuer"
+          value={value.issuer}
+          onChange={set("issuer")}
+          width="100%"
+        />
+        <TextInput
+          {...AUTOFILL_OFF}
+          label="Client ID"
+          htmlName="idpClientId"
+          value={value.clientId}
+          onChange={set("clientId")}
+          width="100%"
+        />
+        <TextInput
+          {...AUTOFILL_OFF}
+          label="Client secret"
+          type="password"
+          htmlName="idpClientSecret"
+          value={value.clientSecret}
+          onChange={set("clientSecret")}
+          width="100%"
+        />
+
+        <Collapsible defaultIsOpen={false} trigger={<Text size="sm">More options</Text>}>
+          <VStack gap={3} padding={2}>
+            <Text size="xsm" color="secondary">
+              The three endpoints are only needed for a provider that does not publish OIDC
+              discovery; leave them blank otherwise.
+            </Text>
+            <TextInput
+              label="Authorization URL"
+              htmlName="idpAuthorizationUrl"
+              value={value.authorizationUrl}
+              onChange={set("authorizationUrl")}
+              width="100%"
+            />
+            <TextInput
+              label="Token URL"
+              htmlName="idpTokenUrl"
+              value={value.tokenUrl}
+              onChange={set("tokenUrl")}
+              width="100%"
+            />
+            <TextInput
+              label="Userinfo URL"
+              htmlName="idpUserinfoUrl"
+              value={value.userinfoUrl}
+              onChange={set("userinfoUrl")}
+              width="100%"
+            />
+            <TextInput
+              label="Scopes"
+              description="Space separated. Group claims usually need one more than the default."
+              htmlName="idpScopes"
+              value={value.scopes}
+              onChange={set("scopes")}
+              width="100%"
+            />
+            <Switch
+              label="Link to an existing account with the same email"
+              description="Off means a returning user with a matching local account is refused rather than merged."
+              htmlName="idpAutoLink"
+              value={value.autoLink}
+              onChange={set("autoLink")}
+            />
+
+            <Divider />
+
+            <Switch
+              label="Map roles from the provider's groups"
+              description="Off means everyone arrives with the default role below, whatever groups they are in."
+              htmlName="idpRoleMapping"
+              value={value.roleMappingEnabled}
+              onChange={set("roleMappingEnabled")}
+            />
+            {value.roleMappingEnabled && (
+              <>
+                <TextInput
+                  label="Groups claim"
+                  description="Dot-separated for a nested claim, e.g. resource_access.cpm.roles."
+                  htmlName="idpGroupsClaim"
+                  value={value.groupsClaim}
+                  onChange={set("groupsClaim")}
+                  width="100%"
+                />
+                <TextInput
+                  label="Group prefix"
+                  description="With CPM_, membership of CPM_Admin grants admin. The three fields below override it."
+                  htmlName="idpGroupPrefix"
+                  value={value.groupPrefix}
+                  onChange={set("groupPrefix")}
+                  width="100%"
+                />
+                <TextInput
+                  label="Admin group"
+                  htmlName="idpAdminGroup"
+                  value={value.adminGroup}
+                  onChange={set("adminGroup")}
+                  width="100%"
+                />
+                <TextInput
+                  label="User group"
+                  htmlName="idpUserGroup"
+                  value={value.userGroup}
+                  onChange={set("userGroup")}
+                  width="100%"
+                />
+                <TextInput
+                  label="Viewer group"
+                  htmlName="idpViewerGroup"
+                  value={value.viewerGroup}
+                  onChange={set("viewerGroup")}
+                  width="100%"
+                />
+                <Switch
+                  label="Mirror the remaining prefixed groups into this app's groups"
+                  htmlName="idpSyncGroups"
+                  value={value.syncGroups}
+                  onChange={set("syncGroups")}
+                />
+              </>
+            )}
+            <Selector
+              label="Role when no group matched"
+              htmlName="idpDefaultRole"
+              value={value.defaultRole}
+              onChange={(next: string) => set("defaultRole")(next)}
+              options={[
+                { value: "viewer", label: "Viewer" },
+                { value: "user", label: "User" },
+                { value: "admin", label: "Admin" },
+              ]}
+            />
+          </VStack>
+        </Collapsible>
+      </VStack>
+    </FormCard>
   );
 }

@@ -9,7 +9,7 @@ import { SQL } from "bun";
 import { drizzle, type BunSQLDatabase } from "drizzle-orm/bun-sql";
 import { migrate } from "drizzle-orm/bun-sql/migrator";
 import { resolve as resolvePath } from "node:path";
-import { resolveDatabaseTarget } from "./dialect";
+import { driverOptions, resolveDatabaseTarget } from "./dialect";
 import * as pgSchema from "./schema.pg";
 
 export type Db = BunSQLDatabase<typeof pgSchema> & { $client: unknown };
@@ -22,7 +22,7 @@ type GlobalForDrizzle = typeof globalThis & {
 
 const globalForDrizzle = globalThis as GlobalForDrizzle;
 
-export const target = resolveDatabaseTarget(process.env.DATABASE_URL);
+export const target = resolveDatabaseTarget(process.env);
 
 /**
  * Connections the pool may open. Bun.SQL defaults to 10 and says so nowhere; measured, 30
@@ -39,9 +39,15 @@ const poolMax = Number(process.env.DATABASE_POOL_MAX) || DEFAULT_POOL_MAX;
 /** The tables handed to the driver. ./schema.ts re-exports these rather than importing separately. */
 export const activeSchema = pgSchema;
 
-/** The raw driver handle. Only the migration path should need it. */
+/**
+ * The raw driver handle. Only the migration path should need it.
+ *
+ * Spread from the target rather than assembled here: when the environment gave discrete fields,
+ * they reach the driver as fields, so a password containing `/` or `@` is a password rather than a
+ * URL delimiter. See ./dialect.ts.
+ */
 export const client: SQL =
-  globalForDrizzle.__DB_CLIENT__ ?? new SQL({ url: target.url, max: poolMax });
+  globalForDrizzle.__DB_CLIENT__ ?? new SQL({ ...driverOptions(target), max: poolMax });
 
 export const db: Db =
   globalForDrizzle.__DRIZZLE_DB__ ?? (drizzle(client, { schema: pgSchema }) as unknown as Db);

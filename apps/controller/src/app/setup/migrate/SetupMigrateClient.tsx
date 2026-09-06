@@ -12,7 +12,7 @@
  * answer is whether to keep the old accounts: an installation being handed to someone else wants
  * the proxy hosts and none of the users, and before this it was all or nothing.
  */
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Center } from "@astryxdesign/core/Center";
@@ -28,7 +28,8 @@ import {
   type MigrationGroupId,
   withRequiredGroups,
 } from "@/src/lib/migration/selection";
-import { runMigration, skipMigration } from "./actions";
+import { skipMigration } from "./actions";
+import RestartDialog from "./RestartDialog";
 
 export type Candidate = {
   path: string;
@@ -57,7 +58,10 @@ export default function SetupMigrateClient({
   // Everything, to start: an operator who reads none of this and presses the button gets the
   // migration they would have got before there was anything to choose.
   const [picked, setPicked] = useState<MigrationGroupId[]>(ALL_MIGRATION_GROUP_IDS);
-  const [state, submit] = useActionState(runMigration, { error: null });
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  // Set once the import has succeeded, which swaps the page for the restart dialog.
+  const [imported, setImported] = useState<{ next: string; migratedSignIn: boolean } | null>(null);
 
   const candidate = candidates.find((entry) => entry.path === selected);
 
@@ -84,6 +88,40 @@ export default function SetupMigrateClient({
     return { effective: resolved, lockedBy: locks };
   }, [picked]);
 
+  async function runMigration(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setError(null);
+    setRunning(true);
+
+    try {
+      const response = await fetch("/api/setup/migrate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: selected, groups: [...effective] }),
+      });
+      const body = (await response.json()) as
+        | { ok: true; next: string; migratedSignIn: boolean }
+        | { ok: false; error: string };
+
+      if (!body.ok) {
+        setError(body.error);
+        return;
+      }
+      setImported({ next: body.next, migratedSignIn: body.migratedSignIn });
+    } catch {
+      // The import copies thirty tables and can outlast a proxy's idle timeout. Saying so beats a
+      // bare "failed", because trying again on a half-populated database is the one thing not to
+      // do here.
+      setError(
+        "The connection dropped before the migration reported back. Check whether it completed " +
+          "before running it again: a second run against a partly populated database is not " +
+          "supported.",
+      );
+    } finally {
+      setRunning(false);
+    }
+  }
+
   function toggle(id: MigrationGroupId, checked: boolean): void {
     setPicked((current) =>
       checked ? [...new Set([...current, id])] : current.filter((entry) => entry !== id),
@@ -92,6 +130,10 @@ export default function SetupMigrateClient({
 
   const migratingUsers = effective.has("users");
   const migratingOAuth = effective.has("oauthProviders");
+
+  if (imported) {
+    return <RestartDialog next={imported.next} migratedSignIn={imported.migratedSignIn} />;
+  }
 
   return (
     <Center>
@@ -104,9 +146,9 @@ export default function SetupMigrateClient({
           </Text>
         </VStack>
 
-        {state.error && <StatusAlert message={state.error} success={false} />}
+        {error && <StatusAlert message={error} success={false} />}
 
-        <form action={submit}>
+        <form onSubmit={runMigration}>
           <VStack gap={4}>
             <FormCard title="Databases found">
               <VStack gap={3}>
@@ -149,7 +191,6 @@ export default function SetupMigrateClient({
                     </SelectableCard>
                   );
                 })}
-                <input type="hidden" name="path" value={selected} />
               </VStack>
             </FormCard>
 
@@ -192,9 +233,6 @@ export default function SetupMigrateClient({
                     />
                   );
                 })}
-                {[...effective].map((id) => (
-                  <input key={id} type="hidden" name="groups" value={id} />
-                ))}
               </VStack>
             </FormCard>
 
@@ -216,7 +254,10 @@ export default function SetupMigrateClient({
               description="This copies rows with their original identifiers, so it expects nothing to have been created here yet. Running it against a database that is already in use is not supported."
             />
 
-            <SaveButton label="Migrate this database" isDisabled={effective.size === 0} />
+            <SaveButton
+              label={running ? "Migrating…" : "Migrate this database"}
+              isDisabled={effective.size === 0 || running}
+            />
           </VStack>
         </form>
 

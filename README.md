@@ -205,9 +205,11 @@ is still honoured as an override until a value is stored.
 | Variable | Description | Default | Required |
 | -------- | ----------- | ------- | -------- |
 | `SESSION_SECRET` | Session key, and the HKDF root every stored secret is encrypted with. 32+ chars (`openssl rand -base64 32`). It cannot live inside what it encrypts, and rotating it makes every stored secret unreadable | None | **Yes** |
-| `POSTGRES_PASSWORD` | Password for the bundled `postgres` service. Read by Compose, not the app | None | **Yes** |
-| `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates. Compose-only | `cpm` / `cpm` | No |
-| `DATABASE_URL` | PostgreSQL connection string. Built from the `POSTGRES_*` values when unset, so it only needs setting to reach a server other than the bundled one. See [The Database](#the-database) | `postgres://cpm:$POSTGRES_PASSWORD@postgres:5432/cpm` | No |
+| `POSTGRES_PASSWORD` | Password for the database. Provisions the bundled `postgres` service and is what the app authenticates with. Any characters; it is never put through a URL | None | **Yes** |
+| `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates, and what the app connects as | `cpm` / `cpm` | No |
+| `POSTGRES_HOST` / `POSTGRES_PORT` | Where the app looks for PostgreSQL. Set these to use a server other than the bundled one | `postgres` / `5432` | No |
+| `POSTGRES_SSL` | Whether the app connects with TLS. On/off only — anything finer wants `DATABASE_URL` | `false` | No |
+| `DATABASE_URL` | A full connection string, which overrides every `POSTGRES_*` above. Only needed for what the fields cannot express. A password in it must be percent-encoded. See [The Database](#the-database) | Unset | No |
 | `DATABASE_POOL_MAX` | Connections the pool may open — it sizes what reads the database, so it cannot be read from it. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance | `10` | No |
 | `NODE_ENV` | Read at module load, before any query. `production` enforces the password policy | `production` in the image | No |
 | `HOST` / `PORT` | The socket binds before anything can be read. `::` is dual-stack and accepts IPv4 too; `0.0.0.0` binds IPv4 only | `::` / `3000` | No |
@@ -261,18 +263,36 @@ Development mode (`NODE_ENV=development`) allows default `admin`/`admin` credent
 
 ## The Database
 
-PostgreSQL only. `docker compose up -d` starts a `postgres` service alongside the app and points
-`DATABASE_URL` at it, so a default install needs nothing but a password:
+PostgreSQL only. `docker compose up -d` starts a `postgres` service alongside the app and hands it
+the `POSTGRES_*` values, so a default install needs nothing but a password:
 
 ```bash
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
 ```
 
-To use a server you already run, set `DATABASE_URL` yourself and the bundled service is ignored:
+Those reach the app as discrete fields rather than folded into a connection string, and that is
+deliberate: a password only has to be escaped when it goes into a URL, and Compose interpolates
+without escaping anything. `openssl rand -base64 32` emits a `/` about half the time, and a `/` in
+a URL's password ends the authority early — `postgres://cpm:pa/ss@postgres:5432/cpm` names the host
+`cpm:pa` — so the app would fail to reach a server nobody had configured. As fields there is no
+delimiter to collide with, and any password works as typed.
+
+To use a server you already run, point the same fields at it:
 
 ```bash
-DATABASE_URL=postgres://cpm:secret@db.internal:5432/cpm docker compose up -d
+POSTGRES_HOST=db.internal POSTGRES_USER=cpm POSTGRES_PASSWORD=secret POSTGRES_DB=cpm   docker compose up -d
 ```
+
+`POSTGRES_PORT` (5432) and `POSTGRES_SSL` (off) are there too. `DATABASE_URL` still overrides all
+of them, for a server needing something the fields cannot express — an `sslmode` beyond on/off, a
+`search_path`, a libpq connection option:
+
+```bash
+DATABASE_URL=postgres://cpm:secret@db.internal:5432/cpm?sslmode=verify-full docker compose up -d
+```
+
+A password inside that URL has to be percent-encoded (`/` is `%2F`, `@` is `%40`), which is the
+problem the fields exist to avoid.
 
 The database must already exist; the app creates its own tables but not the database itself.
 Migrations run on boot.
