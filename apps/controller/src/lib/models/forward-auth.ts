@@ -57,7 +57,7 @@ export async function createRedirectIntent(redirectUri: string): Promise<string>
   // match is reduced to the exact origin the browser will visit and the one
   // proxy-host record that authorized it.
   const audience = await resolveForwardAuthAudience(redirectUri);
-  if (!audience) throw domainError("redirectUriIsNotA");
+  if (!audience) throw domainError("invalidForwardAuthRedirectTarget");
 
   const rid = randomBytes(16).toString("hex");
   const ridHash = hashToken(rid);
@@ -169,7 +169,7 @@ export async function createForwardAuthSession(
     })
     .returning();
 
-  if (!row) throw domainError("failedToCreateForwardAuth");
+  if (!row) throw domainError("forwardAuthSessionCreationFailed");
 
   return {
     rawToken,

@@ -60,7 +60,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
         <EmptyState
           icon={<ShieldCheck />}
           title={search ? "No roles match your search." : "No mTLS roles yet."}
-          description={t("rolesGroupClientCertificates")}
+          description={t("pageDescription")}
         />
       )}
 
@@ -122,7 +122,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
             size="sm"
             value={name}
             onChange={setName}
-            placeholder={t("eGAdmin")}
+            placeholder={t("namePlaceholder")}
             hasAutoFocus
           />
           <TextInput
@@ -299,7 +299,7 @@ function RoleCard({
               {t("loading")}
             </Text>
           ) : activeCerts.length === 0 ? (
-            <EmptyState icon={<UserPlus />} title={t("noClientCertificatesIssued")} isCompact />
+            <EmptyState icon={<UserPlus />} title={t("certificatesEmptyTitle")} isCompact />
           ) : (
             <List hasDividers>
               {activeCerts.map((cert) => (

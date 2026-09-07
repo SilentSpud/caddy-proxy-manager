@@ -20,7 +20,7 @@ export function RewriteFields({ initialData }: Props) {
       value={pathPrefix}
       onChange={setPathPrefix}
       placeholder="/recipes"
-      description={t("prependThisPrefixTo")}
+      description={t("pathPrefixRewriteHelp")}
     />
   );
 }

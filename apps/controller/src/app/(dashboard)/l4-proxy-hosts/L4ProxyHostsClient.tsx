@@ -260,7 +260,7 @@ export default function L4ProxyHostsClient({
       {l4DisabledReason && (
         <Banner
           status="warning"
-          title={t("layer4ProxyingIs")}
+          title={t("l4DisabledTitle")}
           description={`${l4DisabledReason} Hosts below are saved but are not being served.`}
         />
       )}
@@ -269,7 +269,7 @@ export default function L4ProxyHostsClient({
 
       <PageHeader
         title={t("l4ProxyHosts")}
-        description={t("defineTcpUdpStream")}
+        description={t("pageDescription")}
         action={{
           label: "Create L4 Host",
           onClick: openCreate,

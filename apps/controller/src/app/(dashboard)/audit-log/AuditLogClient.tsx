@@ -105,7 +105,7 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
 
   return (
     <VStack gap={6}>
-      <PageHeader title={t("auditLog")} description={t("reviewConfigurationChangesAnd")} />
+      <PageHeader title={t("auditLog")} description={t("pageDescription")} />
 
       <HStack gap={2} vAlign="center">
         <SearchField

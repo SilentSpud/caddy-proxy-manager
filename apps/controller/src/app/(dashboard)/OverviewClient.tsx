@@ -114,7 +114,7 @@ export default function OverviewClient({
       <VStack gap={1}>
         <Heading level={1}>Welcome back, {userName}</Heading>
         <Text type="body" size="sm" color="secondary">
-          {t("everythingYouNeedTo")}
+          {t("pageDescription")}
         </Text>
       </VStack>
 
@@ -136,7 +136,7 @@ export default function OverviewClient({
         ))}
 
         {isAdmin && (
-          <ClickableCard label={t("trafficInTheLast")} href="/analytics" variant="cyan" padding={5}>
+          <ClickableCard label={t("trafficCardLabel")} href="/analytics" variant="cyan" padding={5}>
             <StatTile
               icon={<Icon icon={BarChart2} />}
               value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "—"}
@@ -167,7 +167,7 @@ export default function OverviewClient({
           <Card padding={0}>
             {recentEvents.length === 0 ? (
               <Text type="body" size="sm" color="secondary">
-                {t("noActivityRecordedYet")}
+                {t("activityEmptyMessage")}
               </Text>
             ) : (
               <List hasDividers>

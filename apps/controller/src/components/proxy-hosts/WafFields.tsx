@@ -97,7 +97,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                 {t("webApplicationFirewall")}
               </Text>
               <Text type="body" size="sm" color="secondary">
-                {t("inspectAndBlockMalicious")}
+                {t("wafDescription")}
               </Text>
             </VStack>
           </HStack>
@@ -157,8 +157,8 @@ export function WafFields({ value, showModeSelector = true }: Props) {
             <Divider />
 
             <CheckboxInput
-              label={t("loadOwaspCoreRule")}
-              description={t("coversSqliXssLfi")}
+              label={t("owaspCrsLabel")}
+              description={t("owaspCrsHelp")}
               value={loadCrs}
               onChange={setLoadCrs}
             />
@@ -170,7 +170,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                 {t("requestBodyLimits")}
               </Text>
               <Text type="body" size="xsm" color="secondary">
-                {t("corazaBuffersRequestBodies")}
+                {t("wafBodyLimitsDescription")}
               </Text>
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
@@ -206,7 +206,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                 <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
               </SegmentedControl>
               <Text type="body" size="xsm" color="secondary">
-                {t("rejectReturns413Partial")}
+                {t("wafOverLimitActionHelp")}
               </Text>
             </VStack>
 
@@ -221,7 +221,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               value={customDirectives}
               onChange={setCustomDirectives}
               height="sm"
-              description={t("modsecuritySeclangSyntaxAppended")}
+              description={t("customWafDirectivesHelp")}
             />
 
             <Collapsible trigger="Quick Templates">

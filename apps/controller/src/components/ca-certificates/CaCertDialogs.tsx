@@ -168,10 +168,10 @@ export function IssueClientCertDialog({
           <Banner
             status="success"
             title={t("clientCertificateIssued")}
-            description={t("downloadTheP12Bundle")}
+            description={t("certificateDownloadWarning")}
           />
           <Text type="body" size="sm" color="secondary">
-            {t("exportFormatAes256")}
+            {t("exportFormatHelp")}
           </Text>
           <Button
             variant="secondary"
@@ -186,7 +186,7 @@ export function IssueClientCertDialog({
           />
           {issued.passwordProtected && (
             <Text type="body" size="sm" color="secondary">
-              {t("importItUsingThe")}
+              {t("certificateImportHelp")}
             </Text>
           )}
         </VStack>
@@ -202,7 +202,7 @@ export function IssueClientCertDialog({
               isRequired
               hasAutoFocus
               placeholder="alice"
-              description={t("identifiesThisClientE")}
+              description={t("commonNameHelp")}
             />
             <NumberInput
               label={t("validity")}
@@ -295,7 +295,7 @@ export function ManageIssuedClientCertsDialog({
       <VStack gap={4}>
         <Banner
           status="info"
-          title={t("revokingRemovesTrust")}
+          title={t("revokeWarningTitle")}
           description={`Revoking a client certificate removes it from the trusted mTLS client certificate pool for hosts using ${cert.name}.`}
         />
         {error && (

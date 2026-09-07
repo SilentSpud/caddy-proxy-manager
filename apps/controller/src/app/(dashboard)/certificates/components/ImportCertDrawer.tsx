@@ -108,7 +108,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
             onChange={setName}
             isRequired
             hasAutoFocus
-            description={t("descriptiveNameToIdentify")}
+            description={t("importedCertificateNameHelp")}
           />
 
           <TextArea
@@ -117,7 +117,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
             value={domains}
             onChange={setDomains}
             rows={3}
-            description={t("domainsCoveredByThis")}
+            description={t("certificateDomainsHelp")}
           />
 
           <VStack gap={2}>
@@ -128,7 +128,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
               rows={6}
               value={certPem}
               onChange={setCertPem}
-              description={t("fullChainRecommendedCert")}
+              description={t("certificateChainHelp")}
             />
             <FileInput
               label={t("loadCertificateFromFile")}
@@ -157,7 +157,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
                   onChange={setKeyPem}
                   hasSpellCheck={false}
                   width="100%"
-                  description={t("keepThisSecureNever")}
+                  description={t("privateKeyWarning")}
                 />
               </div>
               <IconButton
@@ -169,7 +169,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
               />
             </HStack>
             <FileInput
-              label={t("loadPrivateKeyFrom")}
+              label={t("loadPrivateKeyLabel")}
               isLabelHidden
               accept=".pem,.key,.txt"
               value={null}

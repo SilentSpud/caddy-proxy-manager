@@ -148,7 +148,7 @@ export default function PortalLoginForm({
     return (
       <PortalCard
         title={t("authenticationRequired")}
-        description={t("noRedirectDestinationSpecified")}
+        description={t("missingDestinationDescription")}
         hasShield={false}
       />
     );
@@ -199,7 +199,11 @@ export default function PortalLoginForm({
       )}
 
       {!localLoginEnabled && enabledProviders.length === 0 && (
-        <Banner status="error" title={t("noSignInMethod")} description={t("singleSignOnIs")} />
+        <Banner
+          status="error"
+          title={t("signInUnavailableTitle")}
+          description={t("missingProviderDescription")}
+        />
       )}
 
       {localLoginEnabled && (

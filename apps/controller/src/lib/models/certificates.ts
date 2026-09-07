@@ -67,11 +67,11 @@ export async function getCertificate(id: number): Promise<Certificate | null> {
 
 function validateCertificateInput(input: CertificateInput) {
   if (!input.domainNames || input.domainNames.length === 0) {
-    throw domainError("atLeastOneDomainIs");
+    throw domainError("certificateDomainsRequired");
   }
   if (input.type === "imported") {
     if (!input.certificatePem || !input.privateKeyPem) {
-      throw domainError("importedCertificatesRequireCertificateAnd");
+      throw domainError("importedCertificatePemRequired");
     }
   }
 }

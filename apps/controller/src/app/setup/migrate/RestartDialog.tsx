@@ -154,17 +154,17 @@ export default function RestartDialog({
     <Center>
       <VStack gap={2} padding={5}>
         <Heading level={1}>Migration complete</Heading>
-        <Text color="secondary">{t("theOldDatabaseHas")}</Text>
+        <Text color="secondary">{t("migrationCopiedDescription")}</Text>
       </VStack>
 
       <Dialog isOpen onOpenChange={() => {}} width={560} purpose="required">
         <Layout
-          header={<DialogHeader title={t("restartingToFinishThe")} />}
+          header={<DialogHeader title={t("migrationRestartTitle")} />}
           content={
             <LayoutContent>
               <VStack gap={4}>
                 <Text size="sm" color="secondary">
-                  {t("yourDataIsIn")}
+                  {t("migrationRestartDescription")}
                 </Text>
 
                 {waiting ? (
@@ -182,7 +182,7 @@ export default function RestartDialog({
                   <VStack gap={3}>
                     <Banner
                       status="warning"
-                      title={t("theApplicationDidNot")}
+                      title={t("restartFailedTitle")}
                       description={
                         detail
                           ? `${detail} Restart it yourself, then continue — the migration itself is finished and does not need repeating.`
@@ -190,7 +190,7 @@ export default function RestartDialog({
                       }
                     />
                     <Text size="sm" color="secondary">
-                      {t("underDockerComposeThat")}
+                      {t("composeRestartHelp")}
                     </Text>
                     <Code>docker compose restart web</Code>
                   </VStack>

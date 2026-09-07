@@ -324,8 +324,8 @@ function HostsCombobox({
       />
       {hasUnconfigured && (
         <CheckboxInput
-          label={t("includeUnconfiguredHosts")}
-          description={t("hostsThatReceivedTraffic")}
+          label={t("includeUnconfiguredHostsLabel")}
+          description={t("unconfiguredHostsHelp")}
           value={includeUnconfigured}
           onChange={setFilter}
         />
@@ -450,7 +450,7 @@ export default function AnalyticsClient() {
         setUserAgents([]);
         setBlocked(null);
         setWafStats(null);
-        toast.error(t("failedToLoadAnalytics2"));
+        toast.error(t("loadErrorToast"));
       })
       .finally(() => setLoading(false));
   }, [buildParams, interval, customFrom, customTo, t]);
@@ -459,7 +459,7 @@ export default function AnalyticsClient() {
     (page: number) => {
       fetchJson(`/api/analytics/blocked${buildParams(`&page=${page}`)}`)
         .then((b) => setBlocked(b as BlockedPage))
-        .catch(() => toast.error(t("failedToLoadBlocked")));
+        .catch(() => toast.error(t("blockedRequestsLoadError")));
     },
     [buildParams, t],
   );
@@ -861,7 +861,7 @@ export default function AnalyticsClient() {
           Rendered instead of crashing the page, so the rest of the UI stays usable. */}
       {loadError && (
         <div data-testid="analytics-load-error">
-          <Banner status="error" title={t("failedToLoadAnalytics")} description={loadError} />
+          <Banner status="error" title={t("loadErrorTitle")} description={loadError} />
         </div>
       )}
 
@@ -869,8 +869,8 @@ export default function AnalyticsClient() {
       {summary?.analyticsDisabled && (
         <Banner
           status="info"
-          title={t("clickhouseAnalyticsIsNot")}
-          description={t("trafficAndWafData")}
+          title={t("analyticsDisabledTitle")}
+          description={t("analyticsDisabledDescription")}
         />
       )}
 
@@ -878,7 +878,7 @@ export default function AnalyticsClient() {
       {summary?.loggingDisabled && !summary?.analyticsDisabled && (
         <Banner
           status="warning"
-          title={t("caddyAccessLoggingIs")}
+          title={t("accessLoggingDisabledTitle")}
           description={
             <Text type="body" size="sm">
               No traffic data is being collected.{" "}
@@ -936,7 +936,7 @@ export default function AnalyticsClient() {
                 {t("requestsOverTime")}
               </Text>
               {timeline.length === 0 ? (
-                <EmptyState title={t("noDataForThis")} isCompact />
+                <EmptyState title={t("periodEmptyTitle")} isCompact />
               ) : (
                 <div style={{ overflowX: "auto", width: "100%" }}>
                   <ReactApexChart
@@ -966,7 +966,7 @@ export default function AnalyticsClient() {
                   {t("topCountries")}
                 </Text>
                 {countries.length === 0 ? (
-                  <EmptyState title={t("noGeoDataAvailable")} isCompact />
+                  <EmptyState title={t("geoDataEmptyTitle")} isCompact />
                 ) : (
                   <Table
                     data={countryRows}
@@ -1032,7 +1032,7 @@ export default function AnalyticsClient() {
                 {t("recentBlockedRequests")}
               </Text>
               {!blocked || blocked.events.length === 0 ? (
-                <EmptyState title={t("noBlockedRequestsIn")} isCompact />
+                <EmptyState title={t("blockedRequestsEmptyTitle")} isCompact />
               ) : (
                 <>
                   <Table data={blockedRows} columns={blockedColumns} idKey="id" hasHover />

@@ -97,7 +97,7 @@ export function AuthentikFields({
               {t("authentikForwardAuth")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              {t("proxyAuthenticationViaAuthentik")}
+              {t("authentikDescription")}
             </Text>
           </VStack>
           <Switch
@@ -159,7 +159,7 @@ export function AuthentikFields({
               value={protectedPaths}
               onChange={setProtectedPaths}
               rows={2}
-              description={t("leaveEmptyToProtect")}
+              description={t("forwardAuthProtectedPathsHelp")}
             />
             <TextArea
               label={t("excludedPaths")}
@@ -169,13 +169,13 @@ export function AuthentikFields({
               value={excludedPaths}
               onChange={setExcludedPaths}
               rows={2}
-              description={t("pathsToExcludeFrom")}
+              description={t("forwardAuthExcludedPathsHelp")}
             />
 
             <VStack gap={1}>
               <CheckboxInput
-                label={t("setHostHeaderFor")}
-                description={t("recommendedKeepEnabledOnly")}
+                label={t("authentikHostHeaderLabel")}
+                description={t("authentikHostHeaderHelp")}
                 htmlName="authentikSetHostHeader"
                 value={setHostHeader}
                 onChange={setSetHostHeader}

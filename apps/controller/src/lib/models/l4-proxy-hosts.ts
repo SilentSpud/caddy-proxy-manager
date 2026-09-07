@@ -407,16 +407,16 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
 function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, isCreate: boolean) {
   if (isCreate) {
     if (!input.name?.trim()) {
-      throw domainError("nameIsRequired");
+      throw domainError("nameRequired");
     }
     if (!input.protocol || !VALID_PROTOCOLS.includes(input.protocol)) {
-      throw domainError("protocolMustBeTcpOr");
+      throw domainError("invalidL4Protocol");
     }
     if (!input.listenAddress?.trim()) {
-      throw domainError("listenAddressIsRequired");
+      throw domainError("listenAddressRequired");
     }
     if (!input.upstreams || input.upstreams.length === 0) {
-      throw domainError("atLeastOneUpstreamMust");
+      throw domainError("upstreamsRequired");
     }
   }
 
@@ -432,7 +432,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
   }
 
   if (input.protocol !== undefined && !VALID_PROTOCOLS.includes(input.protocol)) {
-    throw domainError("protocolMustBeTcpOr");
+    throw domainError("invalidL4Protocol");
   }
 
   if (input.matcherType !== undefined && !VALID_MATCHER_TYPES.includes(input.matcherType)) {
@@ -441,17 +441,17 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
 
   if (input.matcherType === "tls_sni" || input.matcherType === "http_host") {
     if (!input.matcherValue || input.matcherValue.length === 0) {
-      throw domainError("matcherValueIsRequiredFor");
+      throw domainError("matcherHostnamesRequired");
     }
   }
 
   if (input.tlsTermination && input.protocol === "udp") {
-    throw domainError("tlsTerminationIsOnlySupported");
+    throw domainError("udpTlsTerminationUnsupported");
   }
 
   if (input.proxyProtocolVersion !== undefined && input.proxyProtocolVersion !== null) {
     if (!VALID_PROXY_PROTOCOL_VERSIONS.includes(input.proxyProtocolVersion)) {
-      throw domainError("proxyProtocolVersionMustBe");
+      throw domainError("invalidProxyProtocolVersion");
     }
   }
 
@@ -570,7 +570,7 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     .returning();
 
   if (!record) {
-    throw domainError("failedToCreateL4Proxy");
+    throw domainError("l4ProxyHostCreationFailed");
   }
 
   await logAuditEvent({
@@ -611,13 +611,13 @@ export async function updateL4ProxyHost(
     matcherValue: input.matcherValue ?? existing.matcherValue,
   };
   if (merged.tlsTermination && merged.protocol === "udp") {
-    throw domainError("tlsTerminationIsOnlySupported");
+    throw domainError("udpTlsTerminationUnsupported");
   }
   if (
     (merged.matcherType === "tls_sni" || merged.matcherType === "http_host") &&
     merged.matcherValue.length === 0
   ) {
-    throw domainError("matcherValueIsRequiredFor");
+    throw domainError("matcherHostnamesRequired");
   }
 
   validateL4Input(input, false);

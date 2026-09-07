@@ -83,11 +83,11 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
               {t("loadBalancer")}
             </Text>
             <Text type="body" size="xsm" color="secondary">
-              {t("healthChecksAndBalancing")}
+              {t("locationLoadBalancerDescription")}
             </Text>
           </VStack>
           <Switch
-            label={t("enableLoadBalancingFor")}
+            label={t("locationLoadBalancerLabel")}
             isLabelHidden
             value={enabled}
             onChange={(on) =>
@@ -110,7 +110,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
               <TextInput
                 label={t("headerFieldName")}
                 size="sm"
-                placeholder={t("xCustomHeader")}
+                placeholder={t("loadBalancerHeaderPlaceholder")}
                 value={lb?.policyHeaderField ?? ""}
                 onChange={(next) => patch({ policyHeaderField: str(next) })}
               />

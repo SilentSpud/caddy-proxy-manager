@@ -161,7 +161,7 @@ export default function SetupMigrateClient({
       <VStack gap={5} padding={5}>
         <VStack gap={2}>
           <Heading level={1}>Migrate an existing installation</Heading>
-          <Text color="secondary">{t("aDatabaseFromA")}</Text>
+          <Text color="secondary">{t("migrationDescription")}</Text>
         </VStack>
 
         {error && <StatusAlert message={error} success={false} />}
@@ -213,7 +213,7 @@ export default function SetupMigrateClient({
             </FormCard>
 
             {rejected.length > 0 && (
-              <FormCard title={t("filesThatWereSkipped")}>
+              <FormCard title={t("skippedFilesTitle")}>
                 <VStack gap={2}>
                   {rejected.map((entry) => (
                     <Text key={entry.path} size="xsm" color="secondary">
@@ -227,7 +227,7 @@ export default function SetupMigrateClient({
             <FormCard title={t("whatToMigrate")}>
               <VStack gap={3}>
                 <Text size="sm" color="secondary">
-                  {t("anythingLeftUntickedStays")}
+                  {t("migrationSelectionHelp")}
                 </Text>
                 {MIGRATION_GROUPS.map((group) => {
                   const requiredBy = lockedBy.get(group.id);
@@ -257,7 +257,7 @@ export default function SetupMigrateClient({
             {!migratingUsers && (
               <Banner
                 status="info"
-                title={t("noAccountsWillBe")}
+                title={t("accountsExcludedTitle")}
                 description={
                   migratingOAuth
                     ? "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next — unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead."
@@ -267,7 +267,7 @@ export default function SetupMigrateClient({
             )}
 
             {needsLegacyKey && (
-              <FormCard title={t("thisDatabaseWasEncrypted")}>
+              <FormCard title={t("legacySecretRequiredTitle")}>
                 <VStack gap={3}>
                   <Text size="sm" color="secondary">
                     Certificate private keys, DNS provider credentials, OAuth client secrets and
@@ -277,10 +277,10 @@ export default function SetupMigrateClient({
                   </Text>
                   <TextInput
                     {...AUTOFILL_OFF}
-                    label={t("theOldSessionSecret")}
+                    label={t("legacySecretLabel")}
                     htmlName="legacyKey"
                     type="password"
-                    description={t("fromTheEnvThat")}
+                    description={t("legacySecretHelp")}
                     value={legacyKey}
                     onChange={setLegacyKey}
                     isRequired
@@ -288,8 +288,8 @@ export default function SetupMigrateClient({
                   />
                   <Banner
                     status="info"
-                    title={t("youDoNotHave")}
-                    description={t("everythingIsReEncrypted")}
+                    title={t("secretReencryptionTitle")}
+                    description={t("secretReencryptionDescription")}
                   />
                 </VStack>
               </FormCard>
@@ -297,8 +297,8 @@ export default function SetupMigrateClient({
 
             <Banner
               status="warning"
-              title={t("migrateIntoAnEmpty")}
-              description={t("thisCopiesRowsWith")}
+              title={t("emptyDatabaseRequiredTitle")}
+              description={t("emptyDatabaseRequiredDescription")}
             />
 
             <SaveButton
@@ -311,10 +311,10 @@ export default function SetupMigrateClient({
         <FormCard title={t("orStartFresh")}>
           <VStack gap={3}>
             <Text size="sm" color="secondary">
-              {t("skipTheMigrationAnd")}
+              {t("skipMigrationDescription")}
             </Text>
             <form action={skipMigration}>
-              <Button type="submit" variant="secondary" size="sm" label={t("skipAndSetUp")} />
+              <Button type="submit" variant="secondary" size="sm" label={t("skipMigrationLabel")} />
             </form>
           </VStack>
         </FormCard>

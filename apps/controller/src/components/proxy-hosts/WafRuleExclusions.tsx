@@ -33,7 +33,7 @@ export function WafRuleExclusions({ value }: Props) {
           {t("excludedRuleIds")}
         </Text>
         <Text type="body" size="xsm" color="secondary">
-          {t("rulesListedHereAre")}
+          {t("wafRuleExclusionsHelp")}
         </Text>
       </VStack>
 

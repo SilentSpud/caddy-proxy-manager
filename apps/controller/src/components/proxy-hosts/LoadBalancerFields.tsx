@@ -104,7 +104,7 @@ export function LoadBalancerFields({
               {t("loadBalancer")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              {t("configureLoadBalancingAnd")}
+              {t("loadBalancerDescription")}
             </Text>
           </VStack>
           <Switch
@@ -130,10 +130,10 @@ export function LoadBalancerFields({
               <TextInput
                 label={t("headerFieldName")}
                 htmlName="lbPolicyHeaderField"
-                placeholder={t("xCustomHeader")}
+                placeholder={t("loadBalancerHeaderPlaceholder")}
                 value={text.policyHeaderField}
                 onChange={setTextField("policyHeaderField")}
-                description={t("theRequestHeaderTo")}
+                description={t("loadBalancerHeaderHelp")}
               />
             )}
 
@@ -145,7 +145,7 @@ export function LoadBalancerFields({
                   placeholder="server_id"
                   value={text.policyCookieName}
                   onChange={setTextField("policyCookieName")}
-                  description={t("nameOfTheCookie")}
+                  description={t("stickyCookieNameHelp")}
                 />
                 <TextInput
                   label={t("cookieSecret")}
@@ -154,7 +154,7 @@ export function LoadBalancerFields({
                   placeholder="your-secret-key"
                   value={text.policyCookieSecret}
                   onChange={setTextField("policyCookieSecret")}
-                  description={t("secretKeyForHmac")}
+                  description={t("stickyCookieSecretHelp")}
                 />
               </VStack>
             )}
@@ -170,7 +170,7 @@ export function LoadBalancerFields({
                   placeholder="5s"
                   value={text.tryDuration}
                   onChange={setTextField("tryDuration")}
-                  description={t("howLongToTry")}
+                  description={t("tryDurationHelp")}
                 />
                 <TextInput
                   label={t("tryInterval")}
@@ -178,7 +178,7 @@ export function LoadBalancerFields({
                   placeholder="250ms"
                   value={text.tryInterval}
                   onChange={setTextField("tryInterval")}
-                  description={t("waitBetweenAttempts")}
+                  description={t("tryIntervalHelp")}
                 />
                 <NumberInput
                   label={t("maxRetries")}
@@ -187,7 +187,7 @@ export function LoadBalancerFields({
                   isIntegerOnly
                   value={numbers.retries}
                   onChange={setNumberField("retries")}
-                  description={t("maximumRetryAttempts")}
+                  description={t("maxRetriesHelp")}
                 />
               </Grid>
             </VStack>
@@ -197,7 +197,7 @@ export function LoadBalancerFields({
               <VStack gap={4}>
                 <Switch
                   label={t("activeHealthChecks")}
-                  description={t("periodicallyProbeUpstreamsTo")}
+                  description={t("activeHealthChecksHelp")}
                   htmlName="lbActiveHealthEnabled"
                   value={activeHealthEnabled}
                   onChange={setActiveHealthEnabled}
@@ -210,7 +210,7 @@ export function LoadBalancerFields({
                       placeholder="/health"
                       value={text.activeHealthUri}
                       onChange={setTextField("activeHealthUri")}
-                      description={t("pathToProbeFor")}
+                      description={t("healthCheckUriHelp")}
                     />
                     <NumberInput
                       label={t("healthCheckPort")}
@@ -228,7 +228,7 @@ export function LoadBalancerFields({
                       placeholder="30s"
                       value={text.activeHealthInterval}
                       onChange={setTextField("activeHealthInterval")}
-                      description={t("howOftenToCheck")}
+                      description={t("healthCheckIntervalHelp")}
                     />
                     <TextInput
                       label={t("checkTimeout")}
@@ -236,7 +236,7 @@ export function LoadBalancerFields({
                       placeholder="5s"
                       value={text.activeHealthTimeout}
                       onChange={setTextField("activeHealthTimeout")}
-                      description={t("timeoutForHealthProbe")}
+                      description={t("healthCheckTimeoutHelp")}
                     />
                     <NumberInput
                       label={t("expectedStatusCode")}
@@ -266,7 +266,7 @@ export function LoadBalancerFields({
               <VStack gap={4}>
                 <Switch
                   label={t("passiveHealthChecks")}
-                  description={t("markUpstreamsUnhealthyBased")}
+                  description={t("passiveHealthChecksHelp")}
                   htmlName="lbPassiveHealthEnabled"
                   value={passiveHealthEnabled}
                   onChange={setPassiveHealthEnabled}
@@ -279,7 +279,7 @@ export function LoadBalancerFields({
                       placeholder="30s"
                       value={text.passiveHealthFailDuration}
                       onChange={setTextField("passiveHealthFailDuration")}
-                      description={t("howLongToRemember")}
+                      description={t("failDurationHelp")}
                     />
                     <NumberInput
                       label={t("maxFailures")}
@@ -288,7 +288,7 @@ export function LoadBalancerFields({
                       isIntegerOnly
                       value={numbers.passiveHealthMaxFails}
                       onChange={setNumberField("passiveHealthMaxFails")}
-                      description={t("failuresBeforeMarkingUnhealthy")}
+                      description={t("maxFailuresHelp")}
                     />
                     <TextInput
                       label={t("unhealthyStatusCodes")}
@@ -296,7 +296,7 @@ export function LoadBalancerFields({
                       placeholder="500, 502, 503"
                       value={text.passiveHealthUnhealthyStatus}
                       onChange={setTextField("passiveHealthUnhealthyStatus")}
-                      description={t("commaSeparatedStatusCodes")}
+                      description={t("unhealthyStatusCodesHelp")}
                     />
                     <TextInput
                       label={t("unhealthyLatency")}
@@ -304,7 +304,7 @@ export function LoadBalancerFields({
                       placeholder="5s"
                       value={text.passiveHealthUnhealthyLatency}
                       onChange={setTextField("passiveHealthUnhealthyLatency")}
-                      description={t("latencyThresholdForUnhealthy")}
+                      description={t("unhealthyLatencyHelp")}
                     />
                   </Grid>
                 )}

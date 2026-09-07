@@ -29,10 +29,10 @@ export default function SetupDoneClient({
       <VStack gap={5} padding={5}>
         <VStack gap={2}>
           <Heading level={1}>Migration complete</Heading>
-          <Text color="secondary">{t("everythingYouChoseTo")}</Text>
+          <Text color="secondary">{t("migrationCompleteDescription")}</Text>
         </VStack>
 
-        <FormCard title={t("keepACopyOf")}>
+        <FormCard title={t("legacyDatabaseBackupTitle")}>
           <VStack gap={3}>
             <Text size="sm" color="secondary">
               The file at <Code>{source}</Code> was read, not modified. Download it now if you want
@@ -40,14 +40,14 @@ export default function SetupDoneClient({
             </Text>
             <Banner
               status="warning"
-              title={t("nothingReadsThisFile")}
-              description={t("theApplicationNoLonger")}
+              title={t("legacyDatabaseUnusedTitle")}
+              description={t("legacyDatabaseUnusedDescription")}
             />
             <Link href="/api/setup/backup">Download the old database</Link>
           </VStack>
         </FormCard>
 
-        <FormCard title={t("tidyUpYourEnv")}>
+        <FormCard title={t("environmentCleanupTitle")}>
           {cleanup.command ? (
             <VStack gap={3}>
               <Text size="sm" color="secondary">
@@ -67,14 +67,14 @@ export default function SetupDoneClient({
             </VStack>
           ) : (
             <Text size="sm" color="secondary">
-              {t("nothingToRemoveNone")}
+              {t("environmentCleanupEmptyDescription")}
             </Text>
           )}
 
           {cleanup.keep.length > 0 && (
             <Banner
               status="warning"
-              title={t("composeReadsTheseToo")}
+              title={t("composeSettingsTitle")}
               description={`Docker Compose provisions the clickhouse and geoipupdate containers from ${cleanup.keep.join(", ")}, and it cannot read the database — so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start those containers there. With an agent the saved values are passed to Compose for you, and these lines can go as well — but drop clickhouse and geoipupdate from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the containers from the now-stale values in the file.`}
             />
           )}
@@ -82,7 +82,7 @@ export default function SetupDoneClient({
 
         <Button
           variant="primary"
-          label={t("goToTheDashboard")}
+          label={t("dashboardLinkLabel")}
           onClick={() => window.location.assign("/")}
         />
       </VStack>

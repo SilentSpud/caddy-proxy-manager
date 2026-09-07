@@ -45,10 +45,10 @@ describe('domain error codes', () => {
   });
 
   it('carries the English sentence for callers with no locale', () => {
-    const error = domainError('nameIsRequired');
+    const error = domainError('nameRequired');
     expect(error).toBeInstanceOf(DomainError);
-    expect(error.message).toBe(CODES.nameIsRequired);
-    expect(error.code).toBe('nameIsRequired');
+    expect(error.message).toBe(CODES.nameRequired);
+    expect(error.code).toBe('nameRequired');
   });
 
   it('is an Error, so existing catch blocks and the REST layer keep working', () => {
@@ -58,7 +58,7 @@ describe('domain error codes', () => {
 
   it('interpolates params into the English wording', () => {
     // No code takes params today; this pins the mechanism so the first one that does is covered.
-    const error = domainError('nameIsRequired', { unused: 1 });
+    const error = domainError('nameRequired', { unused: 1 });
     expect(error.message).not.toContain('{');
   });
 });

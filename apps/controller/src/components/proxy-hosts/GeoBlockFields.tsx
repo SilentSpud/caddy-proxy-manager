@@ -249,7 +249,7 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
 
       {rows.length === 0 ? (
         <Text type="body" size="xsm" color="secondary">
-          {t("noCustomHeadersUse")}
+          {t("responseHeadersEmptyDescription")}
         </Text>
       ) : (
         <VStack gap={2}>
@@ -460,7 +460,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                 <GeoIpStatus />
               </HStack>
               <Text type="body" size="sm" color="secondary">
-                {t("blockOrAllowTraffic")}
+                {t("geoblockDescription")}
               </Text>
             </VStack>
           </HStack>
@@ -537,7 +537,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               <div hidden={activeTab !== "allow"}>
                 <VStack gap={3}>
                   <Text type="body" size="xsm" color="secondary">
-                    {t("allowRulesTakePrecedence")}
+                    {t("geoblockAllowPrecedenceHelp")}
                   </Text>
                   <RulesPanel prefix="allow" initial={initial} resetKey={resetKey} />
                 </VStack>
@@ -551,13 +551,13 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                   name="geoblockTrustedProxies"
                   label={t("trustedProxies")}
                   initialValues={initial?.trusted_proxies ?? []}
-                  placeholder={t("privateRanges100")}
+                  placeholder={t("trustedProxiesPlaceholder")}
                   helperText="Used to parse X-Forwarded-For. Use private_ranges for all RFC-1918 ranges."
                 />
 
                 <CheckboxInput
-                  label={t("failClosedBlockIndeterminate")}
-                  description={t("blocksRequestsWhereThe")}
+                  label={t("geoblockFailClosedLabel")}
+                  description={t("geoblockFailClosedHelp")}
                   htmlName="geoblockFailClosed"
                   value={failClosed}
                   onChange={setFailClosed}
@@ -574,14 +574,14 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                     isIntegerOnly
                     value={responseStatus}
                     onChange={setResponseStatus}
-                    description={t("httpStatusWhenBlocked")}
+                    description={t("geoblockStatusCodeHelp")}
                   />
                   <TextInput
                     label={t("responseBody")}
                     htmlName="geoblockResponseBody"
                     value={responseBody}
                     onChange={setResponseBody}
-                    description={t("bodyTextReturnedTo")}
+                    description={t("geoblockResponseBodyHelp")}
                   />
                   <TextInput
                     label={t("redirectUrl")}
@@ -589,7 +589,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                     value={redirectUrl}
                     onChange={setRedirectUrl}
                     placeholder="https://example.com/blocked"
-                    description={t("ifSetSendsA")}
+                    description={t("geoblockRedirectHelp")}
                   />
                 </Grid>
 

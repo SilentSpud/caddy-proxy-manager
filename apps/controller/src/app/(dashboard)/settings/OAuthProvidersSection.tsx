@@ -269,7 +269,7 @@ export default function OAuthProvidersSection({
       {localUsersDisabled && (
         <Banner
           status={anyEnabled ? "info" : "error"}
-          title={t("localUserManagementIs")}
+          title={t("localUsersDisabledTitle")}
           description={
             anyEnabled
               ? "All accounts are provisioned by the providers below."
@@ -282,7 +282,7 @@ export default function OAuthProvidersSection({
         <Banner
           status="info"
           title={t("noOauthProvidersConfigured")}
-          description={t("addAProviderTo")}
+          description={t("providersEmptyDescription")}
         />
       )}
 
@@ -389,7 +389,7 @@ export default function OAuthProvidersSection({
             size="sm"
             value={form.name}
             onChange={(v) => updateField("name", v)}
-            placeholder={t("eGGoogleKeycloak")}
+            placeholder={t("providerNamePlaceholder")}
           />
 
           <Selector
@@ -415,7 +415,7 @@ export default function OAuthProvidersSection({
                   {t("secretLabel")}
                 </Text>
                 <Text type="body" size="xsm" color="secondary">
-                  {t("aSecretIsConfigured")}
+                  {t("storedSecretHelp")}
                 </Text>
               </VStack>
               <Button
@@ -463,7 +463,7 @@ export default function OAuthProvidersSection({
             value={form.issuer}
             onChange={(v) => updateField("issuer", v)}
             placeholder="https://accounts.google.com"
-            description={t("forOidcProvidersThe")}
+            description={t("issuerUrlHelp")}
           />
 
           <TextInput
@@ -498,14 +498,14 @@ export default function OAuthProvidersSection({
             size="sm"
             value={form.scopes}
             onChange={(v) => updateField("scopes", v)}
-            placeholder={t("openidEmailProfile")}
+            placeholder={t("scopesPlaceholder")}
           />
 
           <Switch
             label={t("autoLinkAccounts")}
             value={form.autoLink}
             onChange={(v) => updateField("autoLink", v)}
-            description={t("automaticallyLinkOauthAccounts")}
+            description={t("oauthAutoLinkHelp")}
           />
 
           <Card variant="muted" padding={3}>
@@ -515,7 +515,7 @@ export default function OAuthProvidersSection({
                   {t("groupMapping")}
                 </Text>
                 <Text type="body" size="xsm" color="secondary">
-                  {t("deriveCpmRolesAnd")}
+                  {t("groupMappingHelp")}
                 </Text>
               </VStack>
 
@@ -529,7 +529,7 @@ export default function OAuthProvidersSection({
                 value={form.groupsClaim}
                 onChange={(v) => updateField("groupsClaim", v)}
                 placeholder="groups"
-                description={t("claimHoldingTheUser")}
+                description={t("groupsClaimHelp")}
               />
 
               <TextInput
@@ -539,14 +539,14 @@ export default function OAuthProvidersSection({
                 value={form.groupPrefix}
                 onChange={(v) => updateField("groupPrefix", v)}
                 placeholder="CPM_"
-                description={t("shorthandForNamingThe")}
+                description={t("groupPrefixHelp")}
               />
 
               <Switch
                 label={t("assignRolesFromGroups")}
                 value={form.roleMappingEnabled}
                 onChange={(v) => updateField("roleMappingEnabled", v)}
-                description={t("theProviderBecomesAuthoritative")}
+                description={t("roleMappingAuthorityHelp")}
               />
 
               {form.roleMappingEnabled && (
@@ -577,11 +577,11 @@ export default function OAuthProvidersSection({
                     />
                   </Grid>
                   <Text type="body" size="xsm" color="secondary">
-                    {t("nameTheGroupsExactly")}
+                    {t("roleGroupNamesHelp")}
                   </Text>
 
                   <Selector
-                    label={t("roleWhenNoGroup")}
+                    label={t("defaultRoleLabel")}
                     size="sm"
                     options={ROLE_OPTIONS}
                     value={form.defaultRole}
@@ -594,7 +594,7 @@ export default function OAuthProvidersSection({
                 label={t("mirrorGroupsIntoCpm")}
                 value={form.syncGroups}
                 onChange={(v) => updateField("syncGroups", v)}
-                description={t("createsCpmGroupsFrom")}
+                description={t("groupSyncHelp")}
               />
             </VStack>
           </Card>
@@ -616,7 +616,7 @@ export default function OAuthProvidersSection({
             </Text>
             <CodeBlock code={backchannelLogoutUrl} width="100%" />
             <Text type="body" size="xsm" color="secondary">
-              {t("optionalSetThisAs")}
+              {t("backChannelLogoutHelp")}
             </Text>
           </VStack>
         </VStack>

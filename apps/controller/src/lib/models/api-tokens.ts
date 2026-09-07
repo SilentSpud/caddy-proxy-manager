@@ -58,10 +58,10 @@ export async function createApiToken(
   if (expiresAt) {
     const parsed = new Date(expiresAt);
     if (Number.isNaN(parsed.getTime())) {
-      throw domainError("expiresAtMustBeA");
+      throw domainError("tokenExpiryInvalid");
     }
     if (parsed <= new Date()) {
-      throw domainError("expiresAtMustBeIn");
+      throw domainError("tokenExpiryInPast");
     }
     validatedExpiresAt = parsed.toISOString();
   }

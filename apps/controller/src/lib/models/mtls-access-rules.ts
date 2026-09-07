@@ -99,7 +99,7 @@ export async function createMtlsAccessRule(
     })
     .returning();
 
-  if (!record) throw domainError("failedToCreateMtlsAccess");
+  if (!record) throw domainError("mtlsAccessRuleCreationFailed");
 
   await logAuditEvent({
     userId: actorUserId,

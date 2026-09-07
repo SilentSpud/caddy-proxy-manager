@@ -330,7 +330,7 @@ function SettingsCmdK({
     <CommandPalette
       isOpen={open}
       onOpenChange={onOpenChange}
-      label={t("jumpToASetting")}
+      label={t("settingsSearchLabel")}
       searchSource={PALETTE_SOURCE}
       emptySearchText="No settings match your search."
       onValueChange={(id) => {
@@ -370,7 +370,7 @@ function SettingsSidebar({
         size="sm"
         width="100%"
         icon={<Search />}
-        label={t("jumpToSetting")}
+        label={t("settingsSearchButtonLabel")}
         endContent={<Kbd keys="mod+K" />}
         onClick={onSearchClick}
       />
@@ -411,7 +411,7 @@ function MobileSettingsNav({
         size="sm"
         width="100%"
         icon={<Search />}
-        label={t("jumpToSetting")}
+        label={t("settingsSearchButtonLabel")}
         onClick={onSearchClick}
       />
       <Selector
@@ -809,7 +809,7 @@ function GeneralSection({
           <TextInput
             {...NATIVE_REQUIRED}
             label={t("primaryDomain")}
-            description={t("defaultDomainShownWhen")}
+            description={t("primaryDomainHelp")}
             htmlName="primaryDomain"
             value={primaryDomain}
             onChange={setPrimaryDomain}
@@ -817,7 +817,7 @@ function GeneralSection({
           />
           <TextInput
             label={t("acmeContactEmail")}
-            description={t("usedByLetS")}
+            description={t("acmeEmailHelp")}
             type="email"
             htmlName="acmeEmail"
             value={acmeEmail}
@@ -896,7 +896,7 @@ function DefaultResponseSection({
             )}
             <Selector
               label={t("behavior")}
-              description={t("appliedOnlyWhenNo")}
+              description={t("defaultResponseBehaviorHelp")}
               htmlName="mode"
               options={DEFAULT_RESPONSE_MODES}
               value={mode}
@@ -907,7 +907,7 @@ function DefaultResponseSection({
               <>
                 <NumberInput
                   label={t("statusCode")}
-                  description={t("anyFinalHttpStatus")}
+                  description={t("defaultResponseStatusHelp")}
                   htmlName="status"
                   min={200}
                   max={599}
@@ -918,7 +918,7 @@ function DefaultResponseSection({
                 <TextArea
                   label={t("responseBody")}
                   isOptional
-                  description={t("plainTextJsonOr")}
+                  description={t("defaultResponseBodyHelp")}
                   htmlName="body"
                   value={body}
                   onChange={setBody}
@@ -932,7 +932,7 @@ function DefaultResponseSection({
               <>
                 <Selector
                   label={t("redirectStatus")}
-                  description={t("n307And308Preserve")}
+                  description={t("defaultRedirectStatusHelp")}
                   htmlName="status"
                   options={REDIRECT_STATUS_OPTIONS}
                   value={redirectStatus}
@@ -941,7 +941,7 @@ function DefaultResponseSection({
                 <TextInput
                   label={t("redirectUrl")}
                   isRequired
-                  description={t("absoluteRelativeAndCaddy")}
+                  description={t("defaultRedirectUrlHelp")}
                   htmlName="redirectUrl"
                   value={redirectUrl}
                   onChange={setRedirectUrl}
@@ -954,7 +954,7 @@ function DefaultResponseSection({
               <TextArea
                 label={t("responseHeaders")}
                 isOptional
-                description={t("optionalNameValuePairs")}
+                description={t("defaultResponseHeadersHelp")}
                 htmlName="headers"
                 value={headers}
                 onChange={setHeaders}
@@ -964,16 +964,16 @@ function DefaultResponseSection({
             )}
 
             {mode === "abort" && (
-              <WarnAlert title={t("unmatchedConnectionsAreClosed")}>
-                {t("caddyWritesNoStatus")}
-              </WarnAlert>
+              <WarnAlert title={t("abortResponseTitle")}>{t("abortResponseDescription")}</WarnAlert>
             )}
 
             <SaveButton label={t("saveDefaultResponse")} />
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title={t("configuredHostsAlwaysRun")}>{t("forHttpsTheResponse")}</InfoAlert>
+      <InfoAlert title={t("defaultResponsePriorityTitle")}>
+        {t("defaultResponseTlsDescription")}
+      </InfoAlert>
     </VStack>
   );
 }
@@ -1003,7 +1003,7 @@ function AcmeSection({
           <TextInput
             label={t("acmeDirectoryUrl")}
             isOptional
-            description={t("leaveEmptyToUse")}
+            description={t("acmeDirectoryHelp")}
             htmlName="caUrl"
             value={caUrl}
             onChange={setCaUrl}
@@ -1012,7 +1012,7 @@ function AcmeSection({
           <TextArea
             label={t("caRootCertificatePem")}
             isOptional
-            description={t("ifTheAcmeEndpoint")}
+            description={t("acmeRootCertificateHelp")}
             htmlName="caRootPem"
             value={caRootPem}
             onChange={setCaRootPem}
@@ -1188,12 +1188,14 @@ function DnsProvidersSection({
               options={providerOptions}
               value={selectedProvider}
               onChange={setSelectedProvider}
-              placeholder={t("selectADnsProvider")}
+              placeholder={t("dnsProviderPlaceholder")}
               hasSearch
             />
 
             {selectedUnavailable && (
-              <WarnAlert title={t("thisProviderSCaddy")}>{t("enableItUnderSettings")}</WarnAlert>
+              <WarnAlert title={t("dnsProviderModuleDisabledTitle")}>
+                {t("dnsProviderModuleDisabledDescription")}
+              </WarnAlert>
             )}
 
             {hasProvider && providerDef && (
@@ -1201,7 +1203,7 @@ function DnsProvidersSection({
                 <DnsProviderCredentialFields key={providerDef.name} providerDef={providerDef} />
                 {isUpdate && (
                   <InfoAlert title={t("credentialsAreAlreadyConfigured")}>
-                    {t("leaveFieldsBlankTo")}
+                    {t("storedCredentialsHelp")}
                   </InfoAlert>
                 )}
                 {providerDef.docsUrl && (
@@ -1270,7 +1272,7 @@ function DnsResolversSection({
             <TextInput
               label={t("queryTimeout")}
               isOptional
-              description={t("eG5s10s")}
+              description={t("dnsQueryTimeoutHelp")}
               htmlName="timeout"
               value={timeout}
               onChange={setTimeoutValue}
@@ -1281,7 +1283,7 @@ function DnsResolversSection({
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title={t("whenToUseCustom")}>{t("usefulWhenYourDns")}</InfoAlert>
+      <InfoAlert title={t("dnsResolversInfoTitle")}>{t("dnsResolversInfoDescription")}</InfoAlert>
     </>
   );
 }
@@ -1320,14 +1322,14 @@ function UpstreamDnsSection({
             )}
             <CheckboxInput
               label={t("enableUpstreamDnsPinning")}
-              description={t("resolvesUpstreamHostnamesAt")}
+              description={t("dnsPinningHelp")}
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
             />
             <Selector
               label={t("addressFamily")}
-              description={t("bothResolvesAaaaA")}
+              description={t("dnsAddressFamilyHelp")}
               htmlName="family"
               options={FAMILY_OPTIONS}
               value={family}
@@ -1338,7 +1340,7 @@ function UpstreamDnsSection({
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title={t("hostLevelSettingsCan")}>{t("resolutionHappensAtConfig")}</InfoAlert>
+      <InfoAlert title={t("authentikDefaultsHelp")}>{t("dnsPinningInfoDescription")}</InfoAlert>
     </>
   );
 }
@@ -1376,7 +1378,7 @@ function TrustedProxiesSection({
             <TextArea
               label={t("trustedProxyRanges")}
               isOptional
-              description={t("cidrsIpsOrThe")}
+              description={t("trustedProxyRangesHelp")}
               htmlName="ranges"
               value={ranges}
               onChange={setRanges}
@@ -1386,23 +1388,23 @@ function TrustedProxiesSection({
             <TextArea
               label={t("clientIpHeaders")}
               isOptional
-              description={t("headersCaddyReadsThe")}
+              description={t("clientIpHeadersHelp")}
               htmlName="clientIpHeaders"
               value={clientIpHeaders}
               onChange={setClientIpHeaders}
               rows={2}
-              placeholder={t("xForwardedFor")}
+              placeholder={t("clientIpHeadersPlaceholder")}
             />
             <CheckboxInput
               label={t("enableStrictTrustedProxies")}
-              description={t("onlyTrustTheClient")}
+              description={t("strictTrustedProxiesHelp")}
               htmlName="strict"
               value={strict}
               onChange={setStrict}
             />
             <CheckboxInput
               label={t("defaultGeoblockTrustedProxies")}
-              description={t("useTheseRangesAs")}
+              description={t("geoblockTrustedProxiesHelp")}
               htmlName="defaultGeoblock"
               value={defaultGeoblock}
               onChange={setDefaultGeoblock}
@@ -1411,7 +1413,9 @@ function TrustedProxiesSection({
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title={t("appliedToTheMain")}>{t("thisFixesClientIp")}</InfoAlert>
+      <InfoAlert title={t("trustedProxiesScopeDescription")}>
+        {t("trustedProxiesInfoDescription")}
+      </InfoAlert>
     </>
   );
 }
@@ -1466,7 +1470,7 @@ function ErrorPagesSection({
             <StatusAlert message={errorPagesState.message} success={errorPagesState.success} />
           )}
           <Text type="body" size="sm" color="secondary">
-            {t("theseErrorPagesApply")}
+            {t("globalErrorPagesHelp")}
           </Text>
           <ErrorPagesFields initialData={globalErrorPages?.rules ?? []} />
           <SaveButton label={t("saveErrorPages")} />
@@ -1508,7 +1512,7 @@ function TailscaleSection({
             <StatusAlert message={tailscaleState.message} success={tailscaleState.success} />
           )}
           {moduleDisabledReason && (
-            <WarnAlert title={t("theTailscaleModuleIs")}>
+            <WarnAlert title={t("tailscaleModuleDisabledTitle")}>
               {moduleDisabledReason} These settings still save, but no host is served on the tailnet
               until the module is compiled in.
             </WarnAlert>
@@ -1516,14 +1520,14 @@ function TailscaleSection({
           <ModuleGated feature="tailscale">
             <CheckboxInput
               label={t("useTailscale")}
-              description={t("runsATailscaleNode")}
+              description={t("tailscaleHelp")}
               htmlName="tailscaleEnabled"
               value={enabled}
               onChange={setEnabled}
               isDisabled={Boolean(moduleDisabledReason)}
             />
           </ModuleGated>
-          <InfoAlert title={t("nothingElseOnThe")}>
+          <InfoAlert title={t("trustedProxiesInfoTitle")}>
             The node runs in userspace inside the Caddy container — no <Code>tailscaled</Code>, no
             TUN device, no extra ports published. Its identity is kept in the state directory below,
             so it survives a container recreate.
@@ -1545,7 +1549,7 @@ function TailscaleSection({
           <TextInput
             {...AUTOFILL_OFF}
             label={t("defaultNodeName")}
-            description={t("theTailnetMachineName")}
+            description={t("tailscaleDefaultNodeHelp")}
             htmlName="tailscaleDefaultNode"
             value={defaultNode}
             onChange={setDefaultNode}
@@ -1565,7 +1569,7 @@ function TailscaleSection({
             {...AUTOFILL_OFF}
             label={t("controlServerUrl")}
             isOptional
-            description={t("pointAtAHeadscale")}
+            description={t("tailscaleControlServerHelp")}
             htmlName="tailscaleControlUrl"
             value={controlUrl}
             onChange={setControlUrl}
@@ -1575,7 +1579,7 @@ function TailscaleSection({
             {...AUTOFILL_OFF}
             label={t("stateDirectory")}
             isOptional
-            description={t("whereEachNodeKeeps")}
+            description={t("tailscaleStateDirectoryHelp")}
             htmlName="tailscaleStateDir"
             value={stateDir}
             onChange={setStateDir}
@@ -1583,14 +1587,14 @@ function TailscaleSection({
           />
           <CheckboxInput
             label={t("registerNodesAsEphemeral")}
-            description={t("ephemeralNodesDisappearFrom")}
+            description={t("ephemeralNodesHelp")}
             htmlName="tailscaleEphemeral"
             value={ephemeral}
             onChange={setEphemeral}
           />
           <CheckboxInput
-            label={t("checkTheAuthKey")}
-            description={t("catchesARevokedExpired")}
+            label={t("tailscaleKeyValidationLabel")}
+            description={t("tailscaleKeyValidationHelp")}
             htmlName="tailscaleValidateAuthKey"
             value={validateAuthKey}
             onChange={setValidateAuthKey}
@@ -1625,7 +1629,7 @@ function TailscaleSection({
               />
             </>
           ) : (
-            <WarnAlert title={t("authKeysAreNot")}>
+            <WarnAlert title={t("tailscaleKeyValidationDisabledTitle")}>
               Nothing here can tell a revoked or expired key from a working one — that is only
               discovered when Caddy tries to register the node, and a node that will not come up
               makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy
@@ -1740,7 +1744,9 @@ function PasswordPolicySection({
       <form action={passwordPolicyFormAction}>
         <VStack gap={3}>
           {passwordPolicy.fromEnv && (
-            <InfoAlert title={t("thisPolicyIsSet")}>{t("itCannotBeChanged")}</InfoAlert>
+            <InfoAlert title={t("passwordPolicyEnvironmentOverrideTitle")}>
+              {t("environmentOverrideDescription")}
+            </InfoAlert>
           )}
           {passwordPolicyState?.message && (
             <StatusAlert
@@ -1749,8 +1755,8 @@ function PasswordPolicySection({
             />
           )}
           <CheckboxInput
-            label={t("requireAPasswordChange")}
-            description={t("newPasswordsAreHashed")}
+            label={t("legacyPasswordResetLabel")}
+            description={t("legacyPasswordResetHelp")}
             htmlName="requireChangeOnLegacyHash"
             value={requireChange}
             onChange={setRequireChange}
@@ -1782,14 +1788,16 @@ function AvatarsSection({
       <form action={avatarsFormAction}>
         <VStack gap={3}>
           {avatars.fromEnv && (
-            <InfoAlert title={t("gravatarIsSetBy")}>{t("itCannotBeChanged")}</InfoAlert>
+            <InfoAlert title={t("gravatarEnvironmentOverrideTitle")}>
+              {t("environmentOverrideDescription")}
+            </InfoAlert>
           )}
           {avatarsState?.message && (
             <StatusAlert message={avatarsState.message} success={avatarsState.success} />
           )}
           <CheckboxInput
-            label={t("useGravatarWhenA")}
-            description={t("forUsersWithNo")}
+            label={t("gravatarLabel")}
+            description={t("gravatarHelp")}
             htmlName="gravatarEnabled"
             value={gravatarEnabled}
             onChange={setGravatarEnabled}
@@ -1863,7 +1871,7 @@ function BrandingSection({
           {faviconState?.message && (
             <StatusAlert message={faviconState.message} success={faviconState.success} />
           )}
-          <InfoAlert title={t("shownInTheBrowser")}>{t("pngIcoSvgWebp")}</InfoAlert>
+          <InfoAlert title={t("faviconDescription")}>{t("faviconUploadHelp")}</InfoAlert>
 
           <HStack gap={3} align="center">
             {(preview || hasFavicon) && (
@@ -1984,7 +1992,7 @@ function UpdatesSection({
 
           <CheckboxInput
             label={t("checkForUpdates")}
-            description={t("askTheRegistryBelow")}
+            description={t("updateCheckHelp")}
             htmlName="updateCheckEnabled"
             value={enabled}
             onChange={setEnabled}
@@ -1993,8 +2001,8 @@ function UpdatesSection({
           <TextInput
             {...AUTOFILL_OFF}
             label={t("imageRepository")}
-            description={t("whereThisDeploymentS")}
-            placeholder={t("ghcrIoOwnerName")}
+            description={t("imageRepositoryHelp")}
+            placeholder={t("imageRepositoryPlaceholder")}
             htmlName="updateImageRepository"
             value={repository}
             onChange={setRepository}
@@ -2047,13 +2055,13 @@ function InferredNote({ source, children }: { source: string; children: ReactNod
   const t = useTranslations("settings");
   if (source === "environment") {
     return (
-      <InfoAlert title={t("currentlySetByAn")}>
+      <InfoAlert title={t("environmentOverrideTitle")}>
         Saving here stores the value in the database, which takes precedence from then on. The
         variable can be removed from your <Code>.env</Code> afterwards.
       </InfoAlert>
     );
   }
-  return <InfoAlert title={t("notConfiguredHereYet")}>{children}</InfoAlert>;
+  return <InfoAlert title={t("credentialsMissingStatus")}>{children}</InfoAlert>;
 }
 
 function AnalyticsSection({
@@ -2090,19 +2098,19 @@ function AnalyticsSection({
           )}
           <CheckboxInput
             label={t("collectAnalytics")}
-            description={t("recordEveryProxiedRequest")}
+            description={t("analyticsCollectionHelp")}
             htmlName="analyticsEnabled"
             value={enabled}
             onChange={setEnabled}
           />
           {canManageServices ? (
-            <InfoAlert title={t("theAgentStartsAnd")}>
+            <InfoAlert title={t("managedAnalyticsTitle")}>
               No <Code>COMPOSE_PROFILES</Code> entry is needed. The first start pulls the ClickHouse
               image, which can take several minutes; turning analytics off stops the container and
               leaves its data volume intact.
             </InfoAlert>
           ) : (
-            <WarnAlert title={t("noAgentIsAnswering")}>
+            <WarnAlert title={t("agentManagementUnavailableTitle")}>
               These settings still decide whether analytics run. Starting ClickHouse itself needs
               <Code>clickhouse</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
             </WarnAlert>
@@ -2113,7 +2121,7 @@ function AnalyticsSection({
           <TextInput
             {...AUTOFILL_OFF}
             label={t("clickhouseUrl")}
-            description={t("whereTheAnalyticsDatabase")}
+            description={t("clickhouseUrlHelp")}
             htmlName="clickhouseUrl"
             value={url}
             onChange={setUrl}
@@ -2148,7 +2156,7 @@ function AnalyticsSection({
           />
           <NumberInput
             label={t("retentionDays")}
-            description={t("howLongEventsAre")}
+            description={t("analyticsRetentionHelp")}
             htmlName="clickhouseRetentionDays"
             value={retentionDays}
             onChange={setRetentionDays}
@@ -2197,19 +2205,19 @@ function GeoipSection({
           )}
           <CheckboxInput
             label={t("useGeoip")}
-            description={t("countryLookupsForAnalytics")}
+            description={t("geoipHelp")}
             htmlName="geoipEnabled"
             value={enabled}
             onChange={setEnabled}
           />
           {canManageServices ? (
-            <InfoAlert title={t("theAgentStartsAnd2")}>
+            <InfoAlert title={t("managedGeoipTitle")}>
               No <Code>COMPOSE_PROFILES</Code> entry is needed. It downloads the databases on a
               schedule using the credentials below, and agents on other hosts fetch them from this
               controller rather than each holding a licence key.
             </InfoAlert>
           ) : (
-            <WarnAlert title={t("noAgentIsAnswering")}>
+            <WarnAlert title={t("agentManagementUnavailableTitle")}>
               These settings still decide whether GeoIP is used. Downloading the databases needs
               <Code>geoipupdate</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
             </WarnAlert>
@@ -2224,7 +2232,7 @@ function GeoipSection({
             {...AUTOFILL_OFF}
             label={t("maxmindAccountId")}
             isOptional
-            description={t("fromYourMaxmindAccount")}
+            description={t("maxmindCredentialsHelp")}
             htmlName="geoipAccountId"
             value={accountId}
             onChange={setAccountId}
@@ -2333,11 +2341,11 @@ function AgentSection({
       <FormCard title={usingPaired ? "Agents" : "Current agent"}>
         <VStack gap={3}>
           <Text size="sm" color="secondary">
-            {t("anAgentRecreatesRebuilds")}
+            {t("agentsDescription")}
           </Text>
 
           {usingPaired && paired.length > 1 && (
-            <InfoAlert title={t("everyAgentRunsThe")}>
+            <InfoAlert title={t("sharedAgentConfigTitle")}>
               Proxy hosts, certificates and published ports belong to this controller, not to a
               host. A change is applied to all {paired.length} agents or to none of them, so the
               fleet cannot drift apart.
@@ -2345,7 +2353,7 @@ function AgentSection({
           )}
 
           {statuses.length === 0 ? (
-            <WarnAlert title={t("noAgentIsAnswering2")}>
+            <WarnAlert title={t("agentsUnavailableTitle")}>
               {usingPaired
                 ? "Nothing was reached. Layer-4 ports, Caddy rebuilds and config changes will all fail until an agent answers."
                 : "Start the agent container, or pair a remote one below. Everything else keeps working without it."}
@@ -2354,7 +2362,7 @@ function AgentSection({
             <VStack gap={3}>
               {!usingPaired && (
                 <>
-                  <InfoAlert title={t("thisIsTheLocal")}>{t("itIsReachedOver")}</InfoAlert>
+                  <InfoAlert title={t("localAgentTitle")}>{t("localAgentDescription")}</InfoAlert>
                   <AgentRow
                     name="Local agent"
                     address={null}
@@ -2412,7 +2420,7 @@ function AgentSection({
             <TextInput
               {...NATIVE_REQUIRED}
               label={t("agentAddress")}
-              description={t("hostAndPortE")}
+              description={t("agentAddressHelp")}
               htmlName="address"
               value={address}
               onChange={setAddress}
@@ -2423,7 +2431,7 @@ function AgentSection({
               {...NATIVE_REQUIRED}
               {...AUTOFILL_OFF}
               label={t("pairingCode")}
-              description={t("sixLettersFromThe")}
+              description={t("pairingCodeHelp")}
               htmlName="code"
               value={code}
               onChange={setCode}
@@ -2432,7 +2440,7 @@ function AgentSection({
             />
             <TextInput
               label={t("name")}
-              description={t("whatToCallThis")}
+              description={t("agentNameHelp")}
               htmlName="name"
               value={name}
               onChange={setName}
@@ -2506,14 +2514,14 @@ function MetricsSection({
             )}
             <CheckboxInput
               label={t("enableMetricsEndpoint")}
-              description={t("prometheusCompatibleScrapeEndpoint")}
+              description={t("metricsEndpointHelp")}
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
             />
             <NumberInput
               label={t("port")}
-              description={t("separateFromAdminApi")}
+              description={t("metricsPortHelp")}
               htmlName="port"
               value={port}
               onChange={setPort}
@@ -2526,7 +2534,7 @@ function MetricsSection({
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title={t("pointYourMonitoringTool")}>
+      <InfoAlert title={t("metricsInfoTitle")}>
         {`Scrape http://caddy-proxy-manager-caddy:${metrics?.port ?? 9090}/metrics from within the Docker network.`}
       </InfoAlert>
     </>
@@ -2579,7 +2587,7 @@ function LoggingSection({
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title={t("accessLogsLiveIn")}>{t("viewWithDockerExec")}</InfoAlert>
+      <InfoAlert title={t("accessLogsInfoTitle")}>{t("accessLogsCommand")}</InfoAlert>
     </>
   );
 }

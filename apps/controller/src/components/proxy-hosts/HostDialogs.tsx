@@ -131,7 +131,7 @@ export function CreateHostDialog({
           <TextInput
             label={t("name")}
             htmlName="name"
-            placeholder={t("myService")}
+            placeholder={t("namePlaceholder")}
             value={name}
             onChange={setName}
             isRequired
@@ -144,7 +144,7 @@ export function CreateHostDialog({
             onChange={setDomains}
             isRequired
             rows={2}
-            description={t("onePerLineOr")}
+            description={t("domainsHelp")}
           />
           <UpstreamInput defaultUpstreams={initialData?.upstreams} />
           <Selector
@@ -266,7 +266,7 @@ export function EditHostDialog({
             value={domains}
             onChange={setDomains}
             rows={2}
-            description={t("onePerLineOr")}
+            description={t("domainsHelp")}
           />
           <UpstreamInput defaultUpstreams={host.upstreams} />
           <Selector
@@ -362,7 +362,7 @@ export function DeleteHostDialog({
           </Text>
           <VStack gap={1}>
             <Text type="body" size="sm" color="secondary">
-              {t("thisWillRemoveThe")}
+              {t("deleteDescription")}
             </Text>
             <Text type="body" size="sm" color="secondary">
               • Domains: {host.domains.join(", ")}
@@ -371,7 +371,7 @@ export function DeleteHostDialog({
               • Upstreams: {host.upstreams.join(", ")}
             </Text>
           </VStack>
-          <Banner status="warning" title={t("thisActionCannotBe")} />
+          <Banner status="warning" title={t("deleteWarning")} />
         </VStack>
       </form>
     </AppDialog>

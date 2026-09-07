@@ -346,7 +346,7 @@ export default function ProxyHostsClient({
     <VStack gap={6}>
       <PageHeader
         title={t("proxyHosts")}
-        description={t("defineHttpSReverse")}
+        description={t("pageDescription")}
         action={{
           label: "Create Host",
           onClick: () => {

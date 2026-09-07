@@ -41,7 +41,7 @@ export function AdvancedConfigFields({
         onChange={setCaddyfile}
         placeholder={CADDYFILE_PLACEHOLDER}
         height="md"
-        description={t("caddyfileDirectivesForThis")}
+        description={t("customCaddyfileHelp")}
       />
       <CodeEditor
         label={t("customPreHandlersJson")}
@@ -51,7 +51,7 @@ export function AdvancedConfigFields({
         onChange={setPreHandlers}
         placeholder='[{"handler": "headers", "response": {"set": {"X-Example": ["1"]}}}]'
         height="sm"
-        description={t("jsonArrayOfCaddy")}
+        description={t("customPreHandlersHelp")}
       />
       <CodeEditor
         label={t("customReverseProxyJson")}
@@ -61,7 +61,7 @@ export function AdvancedConfigFields({
         onChange={setReverseProxy}
         placeholder='{"headers": {"request": {"set": {"X-Example": ["1"]}}}}'
         height="sm"
-        description={t("deepMergedIntoThe")}
+        description={t("customReverseProxyHelp")}
       />
     </VStack>
   );

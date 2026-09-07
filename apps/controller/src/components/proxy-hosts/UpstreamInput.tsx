@@ -88,7 +88,7 @@ export function UpstreamInput({
     <VStack gap={2}>
       <input type="hidden" name={name} value={serializedValue} />
       <Text type="body" size="sm" weight="semibold">
-        {t("upstreams2")}{" "}
+        {t("upstreamsInputLabel")}{" "}
       </Text>
 
       <VStack gap={3}>
@@ -136,7 +136,7 @@ export function UpstreamInput({
       </VStack>
 
       <Text type="body" size="xsm" color="secondary">
-        {t("backendServersToProxy")}
+        {t("upstreamsHelp")}
       </Text>
     </VStack>
   );

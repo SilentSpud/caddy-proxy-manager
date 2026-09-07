@@ -226,8 +226,8 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
           <Banner
             status="warning"
             icon={<AlertTriangle />}
-            title={t("legacyManagedCertificateEntries")}
-            description={t("theseAreRedundantCaddy")}
+            title={t("legacyCertificatesTitle")}
+            description={t("legacyCertificatesDescription")}
           />
           <LegacyManagedTable managedCerts={managedCerts} />
         </VStack>

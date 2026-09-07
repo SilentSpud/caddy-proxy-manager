@@ -158,9 +158,9 @@ function MembersTab({
     if (updated) onListUpdated(updated);
     try {
       await navigator.clipboard.writeText(pw);
-      toast.success(t("newPasswordGeneratedAnd"));
+      toast.success(t("passwordCopiedToast"));
     } catch {
-      toast.success(t("newPasswordGenerated"));
+      toast.success(t("passwordGeneratedToast"));
     }
   };
 
@@ -235,7 +235,7 @@ function MembersTab({
             variant="ghost"
             size="sm"
             label={`Regenerate password for ${row.username}`}
-            tooltip={t("regeneratePasswordCopiesThe")}
+            tooltip={t("regeneratePasswordTooltip")}
             icon={<RefreshCw />}
             onClick={() => regen(row.id)}
           />
@@ -325,14 +325,14 @@ function MembersTab({
                   size="sm"
                   value={draft.password}
                   onChange={(v) => setDraft({ ...draft, password: v })}
-                  placeholder={t("autoGenerateOrPaste")}
+                  placeholder={t("passwordPlaceholder")}
                   width="100%"
                 />
                 <IconButton
                   variant="secondary"
                   size="sm"
-                  label={t("generateAStrongPassword")}
-                  tooltip={t("generateStrongPassword")}
+                  label={t("generatePasswordLabel")}
+                  tooltip={t("generatePasswordTooltip")}
                   icon={<Sparkles />}
                   onClick={() => setDraft((d) => ({ ...d, password: genPassword() }))}
                 />
@@ -374,13 +374,13 @@ function MembersTab({
       {list.entries.length === 0 ? (
         <EmptyState
           icon={<Users />}
-          title={t("noMembersYet")}
-          description={t("addTheFirstCredentials")}
+          title={t("membersEmptyTitle")}
+          description={t("membersEmptyDescription")}
           actions={
             <Button
               size="sm"
               icon={<Plus />}
-              label={t("addTheFirstMember")}
+              label={t("membersEmptyAction")}
               onClick={() => setAdding(true)}
             />
           }
@@ -461,7 +461,7 @@ function SettingsTab({
           value={desc}
           onChange={setDesc}
           rows={3}
-          placeholder={t("whatIsThisList")}
+          placeholder={t("descriptionPlaceholder")}
         />
         <HStack gap={2} vAlign="center">
           <Button
@@ -503,7 +503,7 @@ function SettingsTab({
         status="error"
         icon={<AlertTriangle />}
         title={t("dangerZone")}
-        description={t("deleteThisAccessList")}
+        description={t("deleteListDescription")}
         collapsible={{ defaultIsOpen: true }}
       >
         <VStack gap={3}>
@@ -547,8 +547,8 @@ function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
     return (
       <EmptyState
         icon={<Globe />}
-        title={t("notUsedByAny")}
-        description={t("thisListIsCurrently")}
+        title={t("unusedListTitle")}
+        description={t("unusedListDescription")}
       />
     );
   }
@@ -605,8 +605,8 @@ function DetailPane({
     return (
       <EmptyState
         icon={<KeyRound />}
-        title={t("selectAnAccessList")}
-        description={t("pickOneFromThe")}
+        title={t("selectionEmptyTitle")}
+        description={t("selectionEmptyDescription")}
       />
     );
   }
@@ -732,7 +732,7 @@ function NewListDialog({
     >
       <VStack gap={4}>
         <Text type="body" size="sm" color="secondary">
-          {t("defineASetOf")}
+          {t("createListDescription")}
         </Text>
 
         <TextInput
@@ -741,7 +741,7 @@ function NewListDialog({
           size="sm"
           value={name}
           onChange={setName}
-          placeholder={t("eGInternalEngineering")}
+          placeholder={t("listNamePlaceholder")}
           hasAutoFocus
         />
         <TextInput
@@ -750,7 +750,7 @@ function NewListDialog({
           size="sm"
           value={desc}
           onChange={setDesc}
-          placeholder={t("whatIsThisList2")}
+          placeholder={t("newListDescriptionPlaceholder")}
         />
 
         <VStack gap={2}>
@@ -895,7 +895,7 @@ function ListsRail({
         <SearchField
           value={query}
           onChange={setQuery}
-          placeholder={t("searchListsOrMembers")}
+          placeholder={t("searchPlaceholder")}
           label={t("searchAccessLists")}
           width="100%"
         />

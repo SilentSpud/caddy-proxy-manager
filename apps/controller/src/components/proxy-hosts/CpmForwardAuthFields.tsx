@@ -75,7 +75,7 @@ export function CpmForwardAuthFields({
               {t("cpmForwardAuth")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              {t("requireUsersToAuthenticate")}
+              {t("cpmForwardAuthDescription")}
             </Text>
           </VStack>
           <Switch
@@ -97,7 +97,7 @@ export function CpmForwardAuthFields({
               value={protectedPaths}
               onChange={setProtectedPaths}
               rows={2}
-              description={t("leaveEmptyToProtect")}
+              description={t("forwardAuthProtectedPathsHelp")}
             />
             <TextArea
               label={t("excludedPaths")}
@@ -107,7 +107,7 @@ export function CpmForwardAuthFields({
               value={excludedPaths}
               onChange={setExcludedPaths}
               rows={2}
-              description={t("pathsToExcludeFrom")}
+              description={t("forwardAuthExcludedPathsHelp")}
             />
 
             {groups.length > 0 && (
@@ -153,8 +153,8 @@ export function CpmForwardAuthFields({
 
             {hasNoTargets && (
               <EmptyState
-                title={t("noGroupsOrUsers")}
-                description={t("createGroupsOnThe")}
+                title={t("forwardAuthSubjectsEmptyTitle")}
+                description={t("forwardAuthGroupsEmptyDescription")}
                 isCompact
               />
             )}
@@ -162,8 +162,8 @@ export function CpmForwardAuthFields({
             {hasNothingSelected && (
               <Banner
                 status="warning"
-                title={t("nobodyCanAccessThis")}
-                description={t("noUsersOrGroups")}
+                title={t("forwardAuthAccessDeniedTitle")}
+                description={t("forwardAuthAccessDeniedDescription")}
               />
             )}
           </VStack>

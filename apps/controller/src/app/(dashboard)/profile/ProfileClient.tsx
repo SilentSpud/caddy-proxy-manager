@@ -410,7 +410,7 @@ export default function ProfileClient({
       {error && (
         <Banner
           status="error"
-          title={t("somethingWentWrong")}
+          title={t("errorTitle")}
           description={error}
           isDismissable
           onDismiss={() => setError(null)}
@@ -446,7 +446,7 @@ export default function ProfileClient({
                     value={null}
                     onChange={handleAvatarUpload}
                     isDisabled={loading}
-                    description={t("recommendedSquareImageMax")}
+                    description={t("avatarUploadHelp")}
                   />
                   {avatarUrl && (
                     <IconButton
@@ -490,7 +490,7 @@ export default function ProfileClient({
             {hasPassword ? (
               <VStack gap={2}>
                 <Text type="body" size="sm" color="secondary">
-                  {t("changeYourPasswordTo")}
+                  {t("passwordManagementDescription")}
                 </Text>
                 <HStack>
                   <Button
@@ -504,8 +504,8 @@ export default function ProfileClient({
               <VStack gap={3}>
                 <Banner
                   status="warning"
-                  title={t("youAreUsingOauth")}
-                  description={t("settingAPasswordWill")}
+                  title={t("oauthOnlyTitle")}
+                  description={t("oauthPasswordDescription")}
                 />
                 <HStack>
                   <Button label={t("setPassword")} onClick={() => setPasswordDialogOpen(true)} />
@@ -526,7 +526,7 @@ export default function ProfileClient({
                   variant="destructive"
                   size="sm"
                   icon={<LogOut />}
-                  label={t("signOutAllOther")}
+                  label={t("revokeOtherSessionsLabel")}
                 />
               </form>
             ) : undefined
@@ -534,7 +534,7 @@ export default function ProfileClient({
         >
           <VStack gap={4}>
             <Text type="body" size="sm" color="secondary">
-              {t("devicesCurrentlySignedIn")}
+              {t("sessionsDescription")}
             </Text>
 
             <List hasDividers>
@@ -593,8 +593,8 @@ export default function ProfileClient({
                 {!localPasswordsEnabled ? (
                   <Banner
                     status="info"
-                    title={t("thisConnectionCannotBe")}
-                    description={t("singleSignOnIs")}
+                    title={t("unlinkDisabledTitle")}
+                    description={t("oauthOnlyDescription")}
                   />
                 ) : hasPassword ? (
                   <HStack>
@@ -608,15 +608,15 @@ export default function ProfileClient({
                 ) : (
                   <Banner
                     status="info"
-                    title={t("setAPasswordFirst")}
-                    description={t("toUnlinkOauthYou")}
+                    title={t("unlinkPasswordRequiredTitle")}
+                    description={t("unlinkPasswordRequiredDescription")}
                   />
                 )}
               </VStack>
             ) : (
               <VStack gap={3}>
                 <Text type="body" size="sm" color="secondary">
-                  {t("linkAnOauthProvider")}
+                  {t("oauthLinkDescription")}
                 </Text>
                 <VStack gap={2}>
                   {enabledProviders.map((provider) => (
@@ -638,13 +638,13 @@ export default function ProfileClient({
         <ProfileSection icon={Key} title={t("apiTokens")}>
           <VStack gap={4}>
             <Text type="body" size="sm" color="secondary">
-              {t("createTokensForProgrammatic")}
+              {t("apiTokensDescription")}
             </Text>
 
             {newToken && (
               <VStack gap={2}>
                 <Text type="body" size="sm" weight="semibold">
-                  {t("copyThisTokenNow")}
+                  {t("tokenCopyWarning")}
                 </Text>
                 {/* CodeBlock owns the copy button, replacing the hand-built one
                     and its two-second "Copied" flag. */}
@@ -701,7 +701,7 @@ export default function ProfileClient({
               <EmptyState
                 icon={<Key />}
                 title={t("noApiTokensYet")}
-                description={t("createOneBelow")}
+                description={t("tokensEmptyDescription")}
                 isCompact
               />
             )}
@@ -716,7 +716,7 @@ export default function ProfileClient({
                     htmlName="name"
                     value={tokenName}
                     onChange={setTokenName}
-                    placeholder={t("eGCiCd")}
+                    placeholder={t("tokenNamePlaceholder")}
                   />
                   <VStack gap={0}>
                     <DateTimeInput

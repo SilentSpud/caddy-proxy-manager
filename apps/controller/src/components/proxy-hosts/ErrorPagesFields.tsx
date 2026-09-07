@@ -89,7 +89,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                   <TextInput
                     label={t("statusCodes")}
                     size="sm"
-                    placeholder={t("n502503504Blank")}
+                    placeholder={t("errorPageStatusCodesPlaceholder")}
                     value={rule.statuses}
                     onChange={(next) => updateRule(rule.rowId, "statuses", next)}
                   />
@@ -97,7 +97,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                     label={t("contentType")}
                     isOptional
                     size="sm"
-                    placeholder={t("textHtmlCharsetUtf")}
+                    placeholder={t("errorPageContentTypePlaceholder")}
                     value={rule.contentType}
                     onChange={(next) => updateRule(rule.rowId, "contentType", next)}
                   />
@@ -115,7 +115,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                   label={t("responseBody")}
                   language="html"
                   height="sm"
-                  placeholder={t("h1ServiceTemporarilyUnavailable")}
+                  placeholder={t("errorPageBodyPlaceholder")}
                   value={rule.body}
                   onChange={(next) => updateRule(rule.rowId, "body", next)}
                 />
@@ -136,7 +136,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">
-        {t("serveACustomResponse")}
+        {t("errorPagesHelp")}
       </Text>
     </VStack>
   );

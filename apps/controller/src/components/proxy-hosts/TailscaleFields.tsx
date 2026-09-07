@@ -65,7 +65,7 @@ export function TailscaleFields({
               {t("tailscale")}{" "}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              {t("serveThisHostOn")}
+              {t("tailscaleDescription")}
             </Text>
           </VStack>
           <ModuleGated feature="tailscale">
@@ -85,16 +85,16 @@ export function TailscaleFields({
         {usesTailscale && settingsOff && (
           <Banner
             status="warning"
-            title={t("tailscaleIsSwitchedOff")}
-            description={t("thisHostWillNot")}
+            title={t("tailscaleDisabledTitle")}
+            description={t("tailscaleDisabledDescription")}
           />
         )}
 
         {usesTailscale && noAuthKey && (
           <Banner
             status="error"
-            title={t("noTailscaleAuthKey")}
-            description={t("savingWillBeRefused")}
+            title={t("tailscaleAuthKeyMissingTitle")}
+            description={t("tailscaleAuthKeyMissingDescription")}
           />
         )}
 
@@ -111,19 +111,19 @@ export function TailscaleFields({
             />
             <Banner
               status="info"
-              title={t("addTheNodeS")}
+              title={t("tailscaleDomainRequirementTitle")}
               description={`Routing is still by Host header, so a request to https://${node || placeholderNode}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale — no ACME, no DNS provider.`}
             />
             <CheckboxInput
               label={t("tailnetOnly")}
-              description={t("keepThisHostOff")}
+              description={t("tailnetOnlyHelp")}
               htmlName="tailscaleTailnetOnly"
               value={tailnetOnly}
               onChange={setTailnetOnly}
             />
             <CheckboxInput
               label={t("requireATailscaleIdentity")}
-              description={t("onlyDevicesSignedIn")}
+              description={t("tailscaleIdentityHelp")}
               htmlName="tailscaleAuth"
               value={auth}
               onChange={setAuth}
@@ -138,7 +138,7 @@ export function TailscaleFields({
                   value={protectedPaths}
                   onChange={setProtectedPaths}
                   rows={2}
-                  description={t("leaveEmptyToRequire")}
+                  description={t("identityProtectedPathsHelp")}
                 />
                 <TextArea
                   label={t("excludedPaths")}
@@ -148,11 +148,11 @@ export function TailscaleFields({
                   value={excludedPaths}
                   onChange={setExcludedPaths}
                   rows={2}
-                  description={t("pathsThatBypassThe")}
+                  description={t("tailscaleExcludedPathsHelp")}
                 />
                 <CheckboxInput
                   label={t("forwardTheIdentityUpstream")}
-                  description={t("setsXTailscaleUser")}
+                  description={t("tailscaleForwardIdentityHelp")}
                   htmlName="tailscaleForwardIdentity"
                   value={forwardIdentity}
                   onChange={setForwardIdentity}
@@ -164,14 +164,14 @@ export function TailscaleFields({
 
         <ModuleGated feature="tailscale">
           <TextInput
-            label={t("reachUpstreamsOverThe")}
+            label={t("tailscaleUpstreamNodeLabel")}
             isOptional
             htmlName="tailscaleUpstreamNode"
             value={upstreamNode}
             onChange={setUpstreamNode}
             placeholder={placeholderNode}
             isDisabled={Boolean(moduleDisabledReason)}
-            description={t("nodeToDialThe")}
+            description={t("tailscaleUpstreamNodeHelp")}
           />
         </ModuleGated>
 

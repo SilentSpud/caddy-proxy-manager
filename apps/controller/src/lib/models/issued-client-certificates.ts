@@ -86,7 +86,7 @@ export async function createIssuedClientCertificate(
     .returning();
 
   if (!record) {
-    throw domainError("failedToStoreIssuedClient");
+    throw domainError("issuedClientCertificateStorageFailed");
   }
 
   await logAuditEvent({
@@ -113,7 +113,7 @@ export async function revokeIssuedClientCertificate(
     throw domainError("issuedClientCertificateNotFound");
   }
   if (existing.revokedAt) {
-    throw domainError("issuedClientCertificateIsAlready");
+    throw domainError("issuedClientCertificateAlreadyRevoked");
   }
 
   const revokedAt = nowIso();

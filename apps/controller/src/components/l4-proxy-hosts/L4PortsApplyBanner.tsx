@@ -121,7 +121,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
           {diff.needsApply && (
             <>
               <Text type="body" size="sm">
-                {t("theCaddyContainerNeeds")}
+                {t("portsApplyDescription")}
               </Text>
               {diff.requiredPorts.length > 0 && (
                 <HStack gap={1} wrap="wrap" vAlign="center">

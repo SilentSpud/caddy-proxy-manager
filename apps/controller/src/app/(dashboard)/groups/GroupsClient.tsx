@@ -76,7 +76,7 @@ export default function GroupsClient({ groups, users }: Props) {
 
   return (
     <VStack gap={6}>
-      <PageHeader title={t("groups")} description={t("organizeUsersIntoGroups")} />
+      <PageHeader title={t("groups")} description={t("pageDescription")} />
 
       <HStack justify="end">
         <Button
@@ -107,7 +107,7 @@ export default function GroupsClient({ groups, users }: Props) {
                   htmlName="name"
                   value={name}
                   onChange={setName}
-                  placeholder={t("eGDevelopers")}
+                  placeholder={t("namePlaceholder")}
                   isRequired
                 />
                 <TextInput
@@ -139,7 +139,7 @@ export default function GroupsClient({ groups, users }: Props) {
           <EmptyState
             icon={<Users />}
             title={t("noGroupsYet")}
-            description={t("createOneToOrganize")}
+            description={t("emptyDescription")}
           />
         </Card>
       )}
@@ -158,7 +158,7 @@ export default function GroupsClient({ groups, users }: Props) {
                     </HStack>
                     {group.source === "oidc" && (
                       <Text type="body" size="xsm" color="secondary">
-                        {t("membershipIsReconciledFrom")}
+                        {t("idpMembershipHelp")}
                       </Text>
                     )}
                     {group.description && (
@@ -195,11 +195,11 @@ export default function GroupsClient({ groups, users }: Props) {
                 {addMemberGroupId === group.id && (
                   <VStack gap={2}>
                     <Text type="body" size="sm" weight="medium">
-                      {t("addAUserTo")}
+                      {t("memberPickerLabel")}
                     </Text>
                     {available.length === 0 ? (
                       <Text type="body" size="sm" color="secondary">
-                        {t("allUsersAreAlready")}
+                        {t("membersExhaustedMessage")}
                       </Text>
                     ) : (
                       /* Scroll cap kept from the original: neither List nor

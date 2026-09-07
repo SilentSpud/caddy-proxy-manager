@@ -77,7 +77,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
 
       {active.length === 0 ? (
         <Text type="body" size="sm" color="secondary">
-          {t("noActiveClientCertificates")}
+          {t("clientCertificatesEmptyTitle")}
         </Text>
       ) : (
         <List hasDividers>

@@ -213,7 +213,7 @@ export async function deleteOAuthProvider(id: string): Promise<void> {
   }
 
   if (row.source === "env") {
-    throw domainError("cannotDeleteAnEnvironmentSourced");
+    throw domainError("environmentOAuthProviderDeletionForbidden");
   }
 
   await db.delete(oauthProviders).where(eq(oauthProviders.id, id));

@@ -112,7 +112,7 @@ export function PathBlocksFields({ initialData = [] }: Props) {
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">
-        {t("returnAStaticResponse")}
+        {t("pathBlocksHelp")}
       </Text>
     </VStack>
   );

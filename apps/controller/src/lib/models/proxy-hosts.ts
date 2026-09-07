@@ -2464,7 +2464,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   const domains = normalizeProxyHostDomains(input.domains ?? []);
 
   if (!input.upstreams || input.upstreams.length === 0) {
-    throw domainError("atLeastOneUpstreamMust");
+    throw domainError("upstreamsRequired");
   }
   input.upstreams.forEach(validateUpstreamProtocol);
   await assertWildcardIssuable(domains, input.certificateId ?? null);

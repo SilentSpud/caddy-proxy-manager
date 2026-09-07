@@ -261,7 +261,7 @@ function L4HostForm({
               </Text>
             </VStack>
             <Switch
-              label={t("enableThisL4Host")}
+              label={t("enableHostLabel")}
               isLabelHidden
               value={enabled}
               onChange={setEnabled}
@@ -273,7 +273,7 @@ function L4HostForm({
           {...NATIVE_REQUIRED}
           label={t("name")}
           htmlName="name"
-          placeholder={t("postgresqlProxy")}
+          placeholder={t("namePlaceholder")}
           value={text.name}
           onChange={set("name")}
           isRequired
@@ -295,7 +295,7 @@ function L4HostForm({
           value={text.listenAddress}
           onChange={set("listenAddress")}
           isRequired
-          description={t("formatPortHostPort")}
+          description={t("listenAddressHelp")}
         />
 
         <TextArea
@@ -307,7 +307,7 @@ function L4HostForm({
           onChange={set("upstreams")}
           rows={2}
           isRequired
-          description={t("onePerLineIn")}
+          description={t("upstreamsHelp")}
         />
 
         <Selector
@@ -316,7 +316,7 @@ function L4HostForm({
           options={MATCHER_OPTIONS}
           value={matcherType}
           onChange={(v) => setMatcherType(v as "none" | "tls_sni" | "http_host" | "proxy_protocol")}
-          description={t("matchIncomingConnectionsBefore")}
+          description={t("matcherHelp")}
         />
 
         {(matcherType === "tls_sni" || matcherType === "http_host") && (
@@ -324,11 +324,11 @@ function L4HostForm({
             {...NATIVE_REQUIRED}
             label={matcherType === "tls_sni" ? "SNI Hostnames" : "HTTP Hostnames"}
             htmlName="matcherValue"
-            placeholder={t("dbExampleComApi")}
+            placeholder={t("matcherHostnamesPlaceholder")}
             value={text.matcherValue}
             onChange={set("matcherValue")}
             isRequired
-            description={t("commaSeparatedListOf")}
+            description={t("matcherHostnamesHelp")}
           />
         )}
 
@@ -349,7 +349,7 @@ function L4HostForm({
         />
 
         <Selector
-          label={t("sendProxyProtocolTo")}
+          label={t("upstreamProxyProtocolLabel")}
           htmlName="proxyProtocolVersion"
           options={PROXY_PROTOCOL_OPTIONS}
           value={proxyProtocolVersion}
@@ -490,7 +490,7 @@ function L4HostForm({
             value={text.dnsResolvers}
             onChange={set("dnsResolvers")}
             rows={2}
-            description={t("onePerLineUsed")}
+            description={t("dnsResolversHelp")}
           />
           <TextArea
             label={t("fallbackResolvers")}
@@ -500,7 +500,7 @@ function L4HostForm({
             value={text.dnsFallbacks}
             onChange={set("dnsFallbacks")}
             rows={1}
-            description={t("fallbackDnsServersOne")}
+            description={t("fallbackResolversHelp")}
           />
           <TextInput
             label={t("timeout")}
@@ -539,19 +539,19 @@ function L4HostForm({
             label={t("blockCountries")}
             isOptional
             htmlName="geoblockBlockCountries"
-            placeholder={t("cnRuKp")}
+            placeholder={t("blockedCountriesPlaceholder")}
             value={text.geoblockBlockCountries}
             onChange={set("geoblockBlockCountries")}
-            description={t("iso31661Alpha")}
+            description={t("countryCodesHelp")}
           />
           <TextInput
             label={t("blockContinents")}
             isOptional
             htmlName="geoblockBlockContinents"
-            placeholder={t("afAs")}
+            placeholder={t("blockedContinentsPlaceholder")}
             value={text.geoblockBlockContinents}
             onChange={set("geoblockBlockContinents")}
-            description={t("afAnAsEu")}
+            description={t("continentCodesHelp")}
           />
           <TextInput
             label={t("blockAsns")}
@@ -585,7 +585,7 @@ function L4HostForm({
             label={t("allowCountries")}
             isOptional
             htmlName="geoblockAllowCountries"
-            placeholder={t("usDe")}
+            placeholder={t("allowedCountriesPlaceholder")}
             value={text.geoblockAllowCountries}
             onChange={set("geoblockAllowCountries")}
           />
@@ -593,7 +593,7 @@ function L4HostForm({
             label={t("allowContinents")}
             isOptional
             htmlName="geoblockAllowContinents"
-            placeholder={t("euNa")}
+            placeholder={t("allowedContinentsPlaceholder")}
             value={text.geoblockAllowContinents}
             onChange={set("geoblockAllowContinents")}
           />
@@ -622,7 +622,11 @@ function L4HostForm({
             onChange={set("geoblockAllowIps")}
           />
 
-          <Banner status="info" title={t("geoBlockingUsesThe")} description={t("thereIsNoX")} />
+          <Banner
+            status="info"
+            title={t("geoblockClientIpTitle")}
+            description={t("geoblockClientIpDescription")}
+          />
         </Section>
 
         <Section
@@ -632,7 +636,7 @@ function L4HostForm({
         >
           <input type="hidden" name="upstreamDnsResolutionPresent" value="1" />
           <Text type="body" size="sm" color="secondary">
-            {t("whenEnabledUpstreamHostnames")}
+            {t("dnsPinningDescription")}
           </Text>
           <Selector
             label={t("resolutionMode")}
@@ -784,7 +788,7 @@ export function DeleteL4HostDialog({
             </MetadataList>
           </Card>
           <Text type="body" size="sm" weight="medium">
-            {t("thisActionCannotBe")}
+            {t("deleteWarning")}
           </Text>
         </VStack>
       </form>

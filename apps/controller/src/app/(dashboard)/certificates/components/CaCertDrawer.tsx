@@ -142,7 +142,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
               onChange={setEditPem}
               isRequired
               rows={8}
-              description={t("pemEncodedX509")}
+              description={t("caCertificatePemHelp")}
             />
           </VStack>
         </form>
@@ -169,16 +169,16 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
                   onChange={setGenName}
                   isRequired
                   hasAutoFocus
-                  placeholder={t("myClientCa")}
-                  description={t("displayNameInThis")}
+                  placeholder={t("caNamePlaceholder")}
+                  description={t("caNameHelp")}
                 />
                 <TextInput
                   label={t("commonNameCn")}
                   htmlName="common_name"
                   value={genCommonName}
                   onChange={setGenCommonName}
-                  placeholder={t("myClientCa")}
-                  description={t("cnFieldInThe")}
+                  placeholder={t("caNamePlaceholder")}
+                  description={t("commonNameHelp")}
                 />
                 <NumberInput
                   label={t("validity")}
@@ -205,7 +205,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
                   onChange={setImpName}
                   isRequired
                   hasAutoFocus
-                  placeholder={t("myClientCa")}
+                  placeholder={t("caNamePlaceholder")}
                 />
                 <TextArea
                   {...NATIVE_REQUIRED}
@@ -216,7 +216,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
                   isRequired
                   rows={8}
                   placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-                  description={t("pemEncodedX5092")}
+                  description={t("caCertificateHelp")}
                 />
               </VStack>
             </form>

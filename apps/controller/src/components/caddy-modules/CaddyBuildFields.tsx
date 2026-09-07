@@ -192,8 +192,8 @@ export function CaddyBuildFields({
 
       <Banner
         status="info"
-        title={t("pluginsAreCompiledInto")}
-        description={t("turningAModuleOff")}
+        title={t("rebuildRequiredTitle")}
+        description={t("rebuildRequiredDescription")}
       />
 
       {groupModules().map(([category, group]) => (
@@ -221,7 +221,7 @@ export function CaddyBuildFields({
           <Heading level={2}>Custom modules</Heading>
           <Divider />
           <Text type="body" size="xsm" color="secondary">
-            {t("anyCaddyPluginPublished")}
+            {t("customModuleHelp")}
           </Text>
 
           {customModules.length === 0 && (
@@ -240,7 +240,7 @@ export function CaddyBuildFields({
                       label={t("modulePath")}
                       value={entry.modulePath}
                       onChange={(next) => updateCustomModule(entry.uid, { modulePath: next })}
-                      placeholder={t("githubComGreenpauCaddy")}
+                      placeholder={t("modulePathPlaceholder")}
                       status={error ? { type: "error", message: error } : undefined}
                     />
                     <TextInput
@@ -248,7 +248,7 @@ export function CaddyBuildFields({
                       value={entry.version ?? ""}
                       onChange={(next) => updateCustomModule(entry.uid, { version: next })}
                       placeholder="latest"
-                      description={t("tagBranchOrCommit")}
+                      description={t("moduleVersionHelp")}
                     />
                     <Button
                       variant="ghost"
@@ -260,7 +260,7 @@ export function CaddyBuildFields({
                     />
                   </HStack>
                   <Switch
-                    label={t("includeInTheBuild")}
+                    label={t("includeModuleLabel")}
                     value={entry.enabled}
                     onChange={(next) => updateCustomModule(entry.uid, { enabled: next })}
                   />
@@ -354,7 +354,7 @@ function RebuildBanner({
     return (
       <Banner
         status="success"
-        title={t("caddyIsRunningThe")}
+        title={t("modulesCurrentStatus")}
         description={`${diff.appliedSpecs.length} module(s) compiled in.`}
       />
     );
@@ -402,7 +402,7 @@ function RebuildBanner({
           )}
           {!inFlight && (
             <Text type="body" size="xsm" color="secondary">
-              {t("compilingCaddyTakesSeveral")}
+              {t("rebuildDescription")}
             </Text>
           )}
         </VStack>

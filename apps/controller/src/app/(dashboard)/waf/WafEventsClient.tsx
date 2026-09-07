@@ -317,7 +317,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   }, [rawData]);
 
   if (!data) {
-    return <EmptyState title={t("noAuditDataAvailable")} isCompact />;
+    return <EmptyState title={t("auditDataEmptyTitle")} isCompact />;
   }
 
   const tx = data.transaction ?? null;
@@ -754,13 +754,13 @@ function GlobalSuppressedRules({
       <VStack gap={2}>
         <Heading level={2}>Global WAF Rule Exclusions</Heading>
         <Text type="body" size="sm" color="secondary">
-          {t("rulesListedHereAre")}
+          {t("globalExclusionsHelp")}
         </Text>
         {!wafEnabled && (
           <Banner
             status="warning"
-            title={t("globalWafIsCurrently")}
-            description={t("exclusionsAreSavedBut")}
+            title={t("exclusionsDisabledTitle")}
+            description={t("exclusionsDisabledDescription")}
           />
         )}
       </VStack>
@@ -828,7 +828,7 @@ function GlobalSuppressedRules({
         <SearchField
           value={search}
           onChange={setSearch}
-          placeholder={t("searchByRuleId")}
+          placeholder={t("suppressedRulesSearchPlaceholder")}
           label={t("searchSuppressedRules")}
           width={400}
         />
@@ -842,7 +842,7 @@ function GlobalSuppressedRules({
         />
       ) : filtered.length === 0 ? (
         <Text type="body" size="sm" color="secondary">
-          {t("noRulesMatchYour")}
+          {t("suppressedRulesSearchEmptyMessage")}
         </Text>
       ) : (
         <VStack gap={2}>
@@ -1007,7 +1007,7 @@ export default function WafEventsClient({
         const fromTs = parseDateTimeLocalUtc(nextFrom ?? "");
         const toTs = parseDateTimeLocalUtc(nextTo ?? "");
         if (fromTs == null || toTs == null || fromTs >= toTs) {
-          toast.error(t("chooseAValidCustom"));
+          toast.error(t("invalidTimeRangeError"));
           return;
         }
         params.set("from", String(fromTs));
@@ -1158,7 +1158,7 @@ export default function WafEventsClient({
       <VStack gap={1}>
         <Heading level={1}>WAF</Heading>
         <Text type="body" color="secondary">
-          {t("webApplicationFirewallEvents")}
+          {t("pageDescription")}
         </Text>
       </VStack>
 
@@ -1218,7 +1218,7 @@ export default function WafEventsClient({
                 setSearchTerm(v);
                 updateSearch(v);
               }}
-              placeholder={t("searchByHostIp")}
+              placeholder={t("eventsSearchPlaceholder")}
               label={t("searchWafEvents")}
               width={480}
             />
@@ -1227,7 +1227,7 @@ export default function WafEventsClient({
             columns={columns}
             data={events}
             keyField="id"
-            emptyMessage={t("noWafEventsFound")}
+            emptyMessage={t("eventsEmptyDescription")}
             pagination={pagination}
             onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
             rowStatus={(row) =>
@@ -1277,7 +1277,7 @@ export default function WafEventsClient({
           <VStack gap={1}>
             <Heading level={2}>WAF Settings</Heading>
             <Text type="body" size="sm" color="secondary">
-              {t("configureTheGlobalWeb")}
+              {t("globalSettingsDescription")}
             </Text>
           </VStack>
           <form action={wafFormAction}>
@@ -1290,7 +1290,7 @@ export default function WafEventsClient({
               {wafModuleDisabledReason && (
                 <Banner
                   status="warning"
-                  title={t("theCorazaWafModule")}
+                  title={t("moduleDisabledTitle")}
                   description={wafModuleDisabledReason}
                 />
               )}
@@ -1305,8 +1305,8 @@ export default function WafEventsClient({
                 />
               </ModuleGated>
               <CheckboxInput
-                label={t("loadOwaspCoreRule")}
-                description={t("coversSqliXssLfi")}
+                label={t("owaspCrsLabel")}
+                description={t("owaspCrsHelp")}
                 value={wafLoadOwaspCrs}
                 onChange={setWafLoadOwaspCrs}
               />
@@ -1322,7 +1322,7 @@ export default function WafEventsClient({
                   isIntegerOnly
                   hasClear
                   placeholder={t("corazaDefault")}
-                  description={t("largestRequestBodyThe")}
+                  description={t("bodySizeLimitHelp")}
                 />
                 <NumberInput
                   label={t("bufferedInMemoryMib")}
@@ -1335,7 +1335,7 @@ export default function WafEventsClient({
                   isIntegerOnly
                   hasClear
                   placeholder={t("corazaDefault")}
-                  description={t("mustNotExceedThe")}
+                  description={t("memoryBodyLimitHelp")}
                 />
               </HStack>
               <input type="hidden" name="wafRequestBodyLimitAction" value={wafLimitAction} />
@@ -1350,7 +1350,7 @@ export default function WafEventsClient({
                 ))}
               </SegmentedControl>
               <Text type="body" size="xsm" color="secondary">
-                {t("rejectReturns413Partial")}
+                {t("wafOverLimitActionHelp")}
               </Text>
               <CodeEditor
                 label={t("customSeclangDirectives")}
@@ -1364,7 +1364,7 @@ export default function WafEventsClient({
                 // erase the stored directives.
                 isReadOnly={Boolean(wafModuleDisabledReason)}
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
-                description={t("modsecuritySeclangSyntaxApplied")}
+                description={t("customDirectivesHelp")}
               />
               <Collapsible
                 defaultIsOpen={false}
@@ -1392,7 +1392,7 @@ export default function WafEventsClient({
                   ))}
                 </VStack>
               </Collapsible>
-              <Banner status="info" title={t("ruleExclusionsLiveOn")} />
+              <Banner status="info" title={t("exclusionsTabHelp")} />
               <HStack justify="end">
                 <Button type="submit" label={t("saveWafSettings")} />
               </HStack>

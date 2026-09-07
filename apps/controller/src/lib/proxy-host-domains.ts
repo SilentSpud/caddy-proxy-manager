@@ -37,7 +37,7 @@ export function normalizeProxyHostDomains(domains: string[]) {
   );
 
   if (normalizedDomains.length === 0) {
-    throw domainError("atLeastOneDomainMust");
+    throw domainError("proxyHostDomainsRequired");
   }
 
   const invalidDomain = normalizedDomains.find((domain) => !isValidProxyHostDomain(domain));

@@ -83,7 +83,7 @@ export function UpstreamDnsResolutionFields({
             options={MODE_OPTIONS}
             value={currentMode}
             onChange={(next) => setCurrentMode(next as ResolutionMode)}
-            description={t("inheritUsesTheGlobal")}
+            description={t("dnsPinningModeHelp")}
           />
 
           <input type="hidden" name="upstreamDnsResolutionFamily" value={currentFamily} />
@@ -92,13 +92,13 @@ export function UpstreamDnsResolutionFields({
             options={FAMILY_OPTIONS}
             value={currentFamily}
             onChange={(next) => setCurrentFamily(next as FamilyMode)}
-            description={t("bothResolvesAaaaA")}
+            description={t("dnsAddressFamilyHelp")}
           />
 
           <Banner
             status="info"
-            title={t("hostnameUpstreamsAreResolved")}
-            description={t("whenEnabledHostnameUpstreams")}
+            title={t("dnsPinningInfoTitle")}
+            description={t("dnsPinningInfoDescription")}
           />
         </VStack>
       </Collapsible>

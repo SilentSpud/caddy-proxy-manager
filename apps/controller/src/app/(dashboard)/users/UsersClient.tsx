@@ -93,14 +93,14 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
 
   return (
     <VStack gap={6}>
-      <PageHeader title={t("users")} description={t("manageUserAccountsRoles")} />
+      <PageHeader title={t("users")} description={t("pageDescription")} />
 
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
         <SearchField
           value={search}
           onChange={setSearch}
-          placeholder={t("searchUsers")}
-          label={t("searchUsers2")}
+          placeholder={t("searchPlaceholder")}
+          label={t("searchLabel")}
         />
         <HStack gap={3} vAlign="center">
           <Text type="body" size="sm" color="secondary">
@@ -143,7 +143,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
                   htmlName="email"
                   value={createEmail}
                   onChange={setCreateEmail}
-                  placeholder={t("userExampleCom")}
+                  placeholder={t("emailPlaceholder")}
                   isRequired
                 />
                 <TextInput
@@ -172,7 +172,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
                   htmlName="password"
                   value={createPassword}
                   onChange={setCreatePassword}
-                  placeholder={t("min8Characters")}
+                  placeholder={t("passwordPlaceholder")}
                   isRequired
                 />
               </Grid>

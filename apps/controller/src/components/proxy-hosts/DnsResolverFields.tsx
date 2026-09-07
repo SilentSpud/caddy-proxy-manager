@@ -35,7 +35,7 @@ export function DnsResolverFields({
               {t("customDnsResolvers")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              {t("configurePerHostDns")}
+              {t("dnsResolversDescription")}
             </Text>
           </VStack>
           <Switch
@@ -58,7 +58,7 @@ export function DnsResolverFields({
               value={resolvers}
               onChange={setResolvers}
               rows={2}
-              description={t("oneResolverPerLine")}
+              description={t("dnsResolversHelp")}
             />
             <TextArea
               label={t("fallbackDnsResolvers")}
@@ -68,7 +68,7 @@ export function DnsResolverFields({
               value={fallbacks}
               onChange={setFallbacks}
               rows={2}
-              description={t("fallbackResolversIfPrimary")}
+              description={t("fallbackResolversHelp")}
             />
             <TextInput
               label={t("dnsQueryTimeout")}
@@ -76,12 +76,12 @@ export function DnsResolverFields({
               placeholder="5s"
               value={timeout}
               onChange={setTimeout}
-              description={t("timeoutForDnsQueries")}
+              description={t("dnsQueryTimeoutHelp")}
             />
             <Banner
               status="info"
-              title={t("perHostResolversOverride")}
-              description={t("usefulForUpstreamServices")}
+              title={t("dnsResolverOverrideTitle")}
+              description={t("dnsResolverOverrideDescription")}
             />
           </VStack>
         )}

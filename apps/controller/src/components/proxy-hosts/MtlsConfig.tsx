@@ -134,7 +134,7 @@ export function MtlsFields({
                 {t("mutualTlsMtls")}
               </Text>
               <Text type="body" size="sm" color="secondary">
-                {t("requireClientsToPresent")}
+                {t("mtlsDescription")}
               </Text>
             </VStack>
           </HStack>
@@ -145,8 +145,8 @@ export function MtlsFields({
           <VStack gap={4}>
             <Banner
               status="info"
-              title={t("mtlsRequiresTlsOn")}
-              description={t("aCertificateMustBe")}
+              title={t("mtlsTlsRequiredTitle")}
+              description={t("mtlsCertificateSelectionHelp")}
             />
 
             <TextArea
@@ -157,7 +157,7 @@ export function MtlsFields({
               value={protectedPaths}
               onChange={setProtectedPaths}
               rows={2}
-              description={t("leaveEmptyToRequire")}
+              description={t("identityProtectedPathsHelp")}
             />
             <TextArea
               label={t("excludedPaths")}
@@ -167,7 +167,7 @@ export function MtlsFields({
               value={excludedPaths}
               onChange={setExcludedPaths}
               rows={2}
-              description={t("pathsToExcludeFrom")}
+              description={t("mtlsExcludedPathsHelp")}
             />
 
             {mtlsRoles.length > 0 && (
@@ -196,8 +196,8 @@ export function MtlsFields({
 
               {activeCerts.length === 0 ? (
                 <EmptyState
-                  title={t("noClientCertificatesIssued")}
-                  description={t("issueCertificatesFromA")}
+                  title={t("certificatesEmptyTitle")}
+                  description={t("mtlsCertificatesEmptyDescription")}
                   isCompact
                 />
               ) : (
@@ -266,8 +266,8 @@ export function MtlsFields({
             {!hasTrust && activeCerts.length > 0 && (
               <Banner
                 status="error"
-                title={t("mtlsWillBlockAll")}
-                description={t("noRolesOrCertificates")}
+                title={t("mtlsAccessDeniedTitle")}
+                description={t("mtlsSubjectsEmptyDescription")}
               />
             )}
 
@@ -280,7 +280,7 @@ export function MtlsFields({
                       {t("pathBasedAccessRules")}
                     </Text>
                     <Text type="body" size="xsm" color="secondary">
-                      {t("restrictSpecificPathsTo")}
+                      {t("mtlsPathRulesHelp")}
                     </Text>
                   </VStack>
                   <Button
@@ -299,7 +299,7 @@ export function MtlsFields({
                 ) : rules.length === 0 ? (
                   <EmptyState
                     title={t("noAccessRulesConfigured")}
-                    description={t("allTrustedCertificatesAnd")}
+                    description={t("mtlsDefaultAccessHelp")}
                     isCompact
                   />
                 ) : (
@@ -330,7 +330,7 @@ export function MtlsFields({
                               {rule.allowedRoleIds.length === 0 &&
                                 rule.allowedCertIds.length === 0 && (
                                   <Text type="body" size="xsm" color="secondary">
-                                    {t("noRolesCertsEffectively")}
+                                    {t("mtlsRuleDeniedSummary")}
                                   </Text>
                                 )}
                             </HStack>
@@ -476,7 +476,7 @@ function RuleDialog({
             value={pathPattern}
             onChange={setPathPattern}
             placeholder="*"
-            description={t("useForAllPaths")}
+            description={t("mtlsPathPatternHelp")}
           />
           <NumberInput
             label={t("priority")}
@@ -494,7 +494,7 @@ function RuleDialog({
           onChange={setDescription}
         />
 
-        <Switch label={t("denyAllAccessTo")} value={denyAll} onChange={setDenyAll} />
+        <Switch label={t("mtlsDenyPathLabel")} value={denyAll} onChange={setDenyAll} />
 
         {/* Unmounted rather than dimmed to 30% opacity, so these are not
             reachable while the rule denies everything. */}
@@ -502,7 +502,7 @@ function RuleDialog({
           <VStack gap={4}>
             {roles.length === 0 ? (
               <Text type="body" size="sm" color="secondary">
-                {t("noMtlsRolesYet")}
+                {t("mtlsRolesEmptyDescription")}
               </Text>
             ) : (
               <CheckboxList
@@ -523,12 +523,12 @@ function RuleDialog({
 
             {activeCerts.length === 0 ? (
               <Text type="body" size="sm" color="secondary">
-                {t("noActiveClientCertificates")}
+                {t("activeCertificatesEmptyTitle")}
               </Text>
             ) : (
               <CheckboxList
                 label={t("allowedSpecificCertificates")}
-                description={t("theseBypassRoleChecks")}
+                description={t("mtlsCertificateBypassHelp")}
                 value={selectedCertIds.map(String)}
                 onChange={(values) => setSelectedCertIds(values.map(Number))}
               >

@@ -82,10 +82,7 @@ export default function CertificatesClient({
 
   return (
     <VStack gap={6}>
-      <PageHeader
-        title={t("sslTlsCertificates")}
-        description={t("caddyAutomaticallyHandlesHttps")}
-      />
+      <PageHeader title={t("sslTlsCertificates")} description={t("automaticHttpsDescription")} />
 
       {/* Status summary filter chips */}
       <StatusSummaryBar

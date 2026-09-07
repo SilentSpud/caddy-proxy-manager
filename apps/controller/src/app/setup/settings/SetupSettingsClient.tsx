@@ -122,12 +122,12 @@ export default function SetupSettingsClient({
       <VStack gap={5} padding={5}>
         <VStack gap={2}>
           <Heading level={1}>Finish setting up</Heading>
-          <Text color="secondary">{t("theseAreStoredIn")}</Text>
+          <Text color="secondary">{t("databaseSettingsDescription")}</Text>
         </VStack>
 
         {migratedCount > 0 && (
           <InfoAlert title={`${migratedCount} value(s) came from your .env file`}>
-            {t("theyAreFilledIn")}
+            {t("environmentMigrationDescription")}
           </InfoAlert>
         )}
 
@@ -143,7 +143,7 @@ export default function SetupSettingsClient({
                   // save refuses it either way; the browser refusing first is a better answer.
                   {...NATIVE_REQUIRED}
                   label={t("primaryDomain")}
-                  description={t("offeredFirstWhenYou")}
+                  description={t("primaryDomainHelp")}
                   htmlName="primaryDomain"
                   value={primaryDomain}
                   onChange={setPrimaryDomain}
@@ -152,7 +152,7 @@ export default function SetupSettingsClient({
                 />
                 <TextInput
                   label={t("acmeContactEmail")}
-                  description={t("whereLetSEncrypt")}
+                  description={t("acmeEmailHelp")}
                   type="email"
                   htmlName="acmeEmail"
                   value={acmeEmail}
@@ -349,7 +349,7 @@ function IdentityProviderCard({
         <Banner
           status="info"
           title={`Already configured: ${card.existing.join(", ")}`}
-          description={t("addOrChangeProviders")}
+          description={t("providerManagementHelp")}
         />
       </FormCard>
     );
@@ -359,20 +359,20 @@ function IdentityProviderCard({
     <FormCard title={t("identityProviderOptional")}>
       <VStack gap={3}>
         <Text size="sm" color="secondary">
-          {t("signInThroughAn")}
+          {t("identityProviderDescription")}
         </Text>
 
         {card.fromEnvironment && (
           <Banner
             status="info"
-            title={t("filledInFromYour")}
-            description={t("savingStoresTheProvider")}
+            title={t("oauthEnvironmentTitle")}
+            description={t("oauthEnvironmentDescription")}
           />
         )}
 
         <TextInput
           label={t("displayName")}
-          description={t("shownOnTheSign")}
+          description={t("providerNameHelp")}
           htmlName="idpName"
           value={value.providerName}
           onChange={set("providerName")}
@@ -380,7 +380,7 @@ function IdentityProviderCard({
         />
         <TextInput
           label={t("issuerUrl")}
-          description={t("theProviderSOidc")}
+          description={t("issuerUrlHelp")}
           htmlName="idpIssuer"
           value={value.issuer}
           onChange={set("issuer")}
@@ -407,7 +407,7 @@ function IdentityProviderCard({
         <Collapsible defaultIsOpen={false} trigger={<Text size="sm">More options</Text>}>
           <VStack gap={3} padding={2}>
             <Text size="xsm" color="secondary">
-              {t("theThreeEndpointsAre")}
+              {t("manualEndpointsHelp")}
             </Text>
             <TextInput
               label={t("authorizationUrl")}
@@ -432,15 +432,15 @@ function IdentityProviderCard({
             />
             <TextInput
               label={t("scopes")}
-              description={t("spaceSeparatedGroupClaims")}
+              description={t("scopesHelp")}
               htmlName="idpScopes"
               value={value.scopes}
               onChange={set("scopes")}
               width="100%"
             />
             <Switch
-              label={t("linkToAnExisting")}
-              description={t("offMeansAReturning")}
+              label={t("oauthAutoLinkLabel")}
+              description={t("oauthAutoLinkHelp")}
               htmlName="idpAutoLink"
               value={value.autoLink}
               onChange={set("autoLink")}
@@ -449,8 +449,8 @@ function IdentityProviderCard({
             <Divider />
 
             <Switch
-              label={t("mapRolesFromThe")}
-              description={t("offMeansEveryoneArrives")}
+              label={t("groupRoleMappingLabel")}
+              description={t("groupRoleMappingHelp")}
               htmlName="idpRoleMapping"
               value={value.roleMappingEnabled}
               onChange={set("roleMappingEnabled")}
@@ -459,7 +459,7 @@ function IdentityProviderCard({
               <>
                 <TextInput
                   label={t("groupsClaim")}
-                  description={t("dotSeparatedForA")}
+                  description={t("groupsClaimHelp")}
                   htmlName="idpGroupsClaim"
                   value={value.groupsClaim}
                   onChange={set("groupsClaim")}
@@ -467,7 +467,7 @@ function IdentityProviderCard({
                 />
                 <TextInput
                   label={t("groupPrefix")}
-                  description={t("withCpmMembershipOf")}
+                  description={t("groupPrefixHelp")}
                   htmlName="idpGroupPrefix"
                   value={value.groupPrefix}
                   onChange={set("groupPrefix")}
@@ -495,7 +495,7 @@ function IdentityProviderCard({
                   width="100%"
                 />
                 <Switch
-                  label={t("mirrorTheRemainingPrefixed")}
+                  label={t("groupSyncLabel")}
                   htmlName="idpSyncGroups"
                   value={value.syncGroups}
                   onChange={set("syncGroups")}
@@ -503,7 +503,7 @@ function IdentityProviderCard({
               </>
             )}
             <Selector
-              label={t("roleWhenNoGroup")}
+              label={t("defaultRoleLabel")}
               htmlName="idpDefaultRole"
               value={value.defaultRole}
               onChange={(next: string) => set("defaultRole")(next)}
