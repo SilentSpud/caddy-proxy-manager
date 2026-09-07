@@ -14,6 +14,10 @@
   "dependencies": {
     "@clickhouse/client": "^1.23.1",
     "@cpm/shared": "workspace:*",
-    "maxmind": "^5.0.7"
+    "maxmind": "^5.0.7",
+    "yargs": "^18.1.0"
+  },
+  "devDependencies": {
+    "@types/yargs": "^17.0.35"
   }
 }

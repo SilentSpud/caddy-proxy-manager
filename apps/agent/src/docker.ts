@@ -176,6 +176,45 @@ export class DockerHost {
     return this.compose(["up", "-d", "--no-deps", "--pull", "never", "--force-recreate", "caddy"]);
   }
 
+  /**
+   * Bring Caddy up, enabling its profile for this invocation.
+   *
+   * Caddy sits behind a compose profile so that `docker compose up` does not start it: an agent
+   * with no controller has no configuration to serve, and a Caddy answering on 80 and 443 with a
+   * default page is worse than one that is not listening at all. This is the only thing that
+   * starts it, which is what makes "paired" and "serving traffic" the same state.
+   *
+   * `--profile` explicitly rather than relying on compose to infer it from the service name, for
+   * the same reason startService does: that inference is a "no such service" error on older v2.
+   */
+  async startCaddy(): Promise<CommandResult> {
+    return this.compose(["--profile", "caddy", "up", "-d", "--no-deps", "caddy"], {
+      timeoutSeconds: this.config.serviceTimeoutSeconds,
+    });
+  }
+
+  /**
+   * Stop Caddy, leaving its container, certificates and config volumes in place.
+   *
+   * `stop`, never `down`: an agent that was unpaired must not be how someone discovers their ACME
+   * account and issued certificates are gone.
+   */
+  async stopCaddy(): Promise<CommandResult> {
+    return this.compose(["--profile", "caddy", "stop", "caddy"], { timeoutSeconds: 120 });
+  }
+
+  /** Whether Caddy's container exists and is running. False for both "stopped" and "never created". */
+  async caddyRunning(): Promise<boolean> {
+    const result = await run([
+      "docker",
+      "inspect",
+      "--format",
+      "{{.State.Running}}",
+      this.config.caddyContainerName,
+    ]);
+    return result.ok && result.output.trim() === "true";
+  }
+
   async buildCaddy(): Promise<CommandResult> {
     return this.compose(["build", "caddy"], {
       timeoutSeconds: this.config.buildTimeoutSeconds,

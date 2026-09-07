@@ -6,11 +6,9 @@
  */
 import { dirname, join } from "node:path";
 import { startProdServer } from "vinext/server/prod-server";
-
-const port = Number.parseInt(process.env.PORT ?? "3000", 10);
-// `::` rather than `0.0.0.0`: a dual-stack socket accepts IPv4 too, so this binds both families,
-// while 0.0.0.0 binds only one and leaves an IPv6-only client with nothing to connect to.
-const host = process.env.HOST ?? "::";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
+import pkg from "../package.json";
 
 /** Directory holding the build output (`dist/`) and its runtime dependencies. */
 function resolveAppRoot(): string {
@@ -18,17 +16,63 @@ function resolveAppRoot(): string {
 }
 
 /** `--healthcheck` for the container HEALTHCHECK — no curl in the image, so it self-probes. */
-function runHealthCheck(): void {
+function runHealthCheck(port: number): void {
   const url = process.env.CPM_HEALTHCHECK_URL ?? `http://127.0.0.1:${port}/api/health`;
   fetch(url, { signal: AbortSignal.timeout(5_000) })
     .then((response) => process.exit(response.ok ? 0 : 1))
     .catch(() => process.exit(1));
 }
 
-if (process.argv.includes("--healthcheck")) {
-  runHealthCheck();
+/**
+ * `hideBin` is correct for the compiled binary too: `bun build --compile` keeps argv's two-element
+ * prefix. The version is the workspace manifest's, bundled at compile time — a release image's tag
+ * reaches the UI through a Vite `define` that never runs over this file, so the two can differ on a
+ * tagged build.
+ */
+const argv = yargs(hideBin(process.argv))
+  .scriptName("cpm-server")
+  .usage("$0 [options]\n\nRuns the Caddy Proxy Manager web server.")
+  .option("host", {
+    type: "string",
+    // `::` rather than `0.0.0.0`: a dual-stack socket accepts IPv4 too, so this binds both
+    // families, while 0.0.0.0 binds only one and leaves an IPv6-only client with nothing to
+    // connect to.
+    default: process.env.HOST ?? "::",
+    defaultDescription: "$HOST, else :: (dual-stack)",
+    describe: "Address to bind",
+  })
+  .option("port", {
+    type: "number",
+    default: Number.parseInt(process.env.PORT ?? "3000", 10),
+    defaultDescription: "$PORT, else 3000",
+    describe: "Port to listen on",
+  })
+  .option("healthcheck", {
+    type: "boolean",
+    default: false,
+    describe: "Probe the running server's /api/health, then exit 0 if it answered",
+  })
+  .version(pkg.version)
+  // A mistyped flag in the container's HEALTHCHECK would otherwise fall through and start a second
+  // server, which binds nothing and reports healthy.
+  .strict()
+  .help()
+  .parseSync();
+
+if (!Number.isInteger(argv.port) || argv.port < 1 || argv.port > 65535) {
+  console.error(`[cpm] --port must be a number between 1 and 65535, got "${argv.port}"`);
+  process.exit(2);
+}
+
+if (argv.healthcheck) {
+  // The resolved port, so probing a server started with --port still reaches it.
+  runHealthCheck(argv.port);
 } else {
-  startProdServer({ port, host, outDir: join(resolveAppRoot(), "dist") }).catch((error) => {
+  startProdServer({
+    port: argv.port,
+    host: argv.host,
+    outDir: join(resolveAppRoot(), "dist"),
+  }).catch((error) => {
     console.error("[cpm] Failed to start the server");
     console.error(error);
     process.exit(1);

@@ -153,10 +153,10 @@ services:
       # generates the log configuration and an operator reaching for them expects them present.
       - caddy-logs:/logs
       - acme-ca:/acme-ca
+    # Not on Caddy: the agent starts Caddy once it is paired, so waiting for it here would hold the
+    # controller down until an agent that needs the controller to pair had somehow paired.
     depends_on:
       postgres:
-        condition: service_healthy
-      caddy:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
@@ -180,6 +180,11 @@ services:
         # Match your host user to avoid permission issues: id -u / id -g
         PUID: ${PUID:-10000}
         PGID: ${PGID:-10000}
+    # Behind a profile so `docker compose up` does not start it. The agent does, once it is paired
+    # and the controller has a configuration to serve — an unpaired host must not answer 80 and 443
+    # with a default page. `restart: unless-stopped` still applies once the agent has started it,
+    # so a reboot brings it back without waiting for the agent to notice.
+    profiles: ["caddy"]
     restart: unless-stopped
     ports:
       - "80:80"
@@ -243,11 +248,11 @@ services:
     environment:
       DATA_DIR: /data
       COMPOSE_DIR: /compose
-      # standalone listens on a socket on the shared volume, which is how the controller in this
-      # same stack reaches it. `managed` listens on AGENT_PORT and prints a pairing code instead —
-      # for an agent on a different host from its controller.
       AGENT_MODE: ${AGENT_MODE:-standalone}
-      AGENT_PORT: ${AGENT_PORT:-3100}
+      # Where the agent dials to reach its controller. The compose service name works for an agent
+      # in this stack; an agent on another host needs the controller's reachable address instead,
+      # and pairs with `cpm-agent --pair --host <that address> --code <code>`.
+      CONTROLLER_URL: ${CONTROLLER_URL:-http://web:3000}
       # Every Caddy admin call the controller makes is proxied through the agent, because the
       # agent is the only thing that knows where its Caddy is. This is that address.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
@@ -269,9 +274,9 @@ services:
       # from the controller. Writable, unlike everywhere else this volume is mounted: on a host
       # that has no geoipupdate of its own, the agent is what puts the files here for Caddy.
       - geoip-data:/usr/share/GeoIP:z
+    # No longer waits on Caddy: the agent is what starts Caddy, so depending on it was a deadlock
+    # the moment Caddy stopped being started by compose.
     depends_on:
-      caddy:
-        condition: service_healthy
       docker-socket-proxy:
         condition: service_started
     networks:

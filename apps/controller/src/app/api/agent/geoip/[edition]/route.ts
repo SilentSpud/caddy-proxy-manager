@@ -1,9 +1,9 @@
 /**
  * GET /api/agent/geoip/:edition — a MaxMind database, for a paired agent.
  *
- * The one route that runs agent-to-controller. The controller holds the subscription and the
- * files; an agent on another host reaches them through here rather than each host needing a
- * licence key of its own. The local agent never uses this — it shares the volume the files are on.
+ * The controller holds the subscription and the files; an agent reaches them through here rather
+ * than each host needing a licence key of its own. An agent sharing the controller's volume has the
+ * files mounted already and never asks.
  *
  * Authenticated by the agent signing with its pairing secret, which is symmetric. An unsigned or
  * unrecognised caller gets 404, not 401: nothing should be able to learn that this route exists,
@@ -13,7 +13,7 @@
 import { existsSync, statSync } from "node:fs";
 import { GEOIP_EDITIONS, type GeoipEdition } from "@cpm/shared";
 import type { NextRequest } from "next/server";
-import { agentFromRequest } from "@/src/lib/agent/verify-agent";
+import { verifyAgentRequest } from "@/src/lib/agent/verify";
 import { geoipDatabasePath, geoipEtag } from "@/src/lib/agent/geoip";
 
 const notFound = () => new Response("Not found", { status: 404 });
@@ -27,7 +27,9 @@ export async function GET(
   // verify: every failure below this point looks identical from outside.
   if (!(GEOIP_EDITIONS as readonly string[]).includes(edition)) return notFound();
 
-  const agent = await agentFromRequest(request, new URL(request.url).pathname);
+  // GET, so the signed body is the empty string — the same value the agent hashed.
+  const verified = await verifyAgentRequest(request, "");
+  const agent = verified.ok ? verified.agent : null;
   if (!agent) return notFound();
 
   const path = geoipDatabasePath(edition as GeoipEdition);

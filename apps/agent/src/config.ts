@@ -8,10 +8,24 @@
 
 import { resolve } from "node:path";
 import type { AgentMode } from "@cpm/shared";
+import {
+  ControllerAddressError,
+  normalizeControllerUrl,
+  normalizePairingCode,
+} from "./controller-url";
 
 export type { AgentMode };
 
 export type AgentConfig = {
+  /**
+   * Controller origin this agent polls, or null when it has never been given one.
+   *
+   * Null is the idle state the whole pairing flow exists to leave: the agent runs, answers
+   * `cpm-agent --pair`, and holds Caddy down until it has somewhere to fetch a config from.
+   */
+  controllerUrl: string | null;
+  /** One-time code to pair with at startup, when the operator supplied one up front. */
+  pairingCode: string | null;
   /**
    * `standalone` listens on a Unix socket in the shared data volume: the controller is on the same
    * host and reaches it through the filesystem. `managed` listens on TCP and requires an operator
@@ -22,9 +36,8 @@ export type AgentConfig = {
   dataDir: string;
   /** Where the compose project files are mounted, read-only. */
   composeDir: string;
+  /** The local control socket. The agent's only listener, and it faces the host. */
   socketPath: string;
-  host: string;
-  port: number;
   caddyContainerName: string;
   /** Where this host's Caddy admin API listens. The controller reaches it only through here. */
   caddyApiUrl: string;
@@ -76,19 +89,48 @@ function resolveMode(): AgentMode {
   );
 }
 
-export function loadConfig(): AgentConfig {
+/**
+ * CLI values that win over the environment.
+ *
+ * Flags beat variables because a flag is typed for one invocation while a variable is baked into
+ * the container: an operator repairing a bad `CONTROLLER_URL` must not have to edit compose first.
+ */
+export type ConfigOverrides = {
+  controllerHost?: string | null;
+  controllerPort?: number | null;
+  pairingCode?: string | null;
+};
+
+function resolveControllerUrl(overrides: ConfigOverrides): string | null {
+  if (overrides.controllerHost) {
+    return normalizeControllerUrl(overrides.controllerHost, overrides.controllerPort ?? null);
+  }
+  const fromEnv = optional("CONTROLLER_URL");
+  if (fromEnv) return normalizeControllerUrl(fromEnv, overrides.controllerPort ?? null);
+  // A port with nothing to attach it to is a half-configured agent, and silently idling on it
+  // would look identical to never having been configured at all.
+  if (overrides.controllerPort != null) {
+    throw new ControllerAddressError("--port needs --host (or CONTROLLER_URL) alongside it.");
+  }
+  return null;
+}
+
+function resolvePairingCode(overrides: ConfigOverrides): string | null {
+  const raw = overrides.pairingCode ?? optional("PAIRING_CODE");
+  return raw === null || raw === undefined ? null : normalizePairingCode(raw);
+}
+
+export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
   const mode = resolveMode();
   const dataDir = resolve(optional("DATA_DIR") ?? "/data");
 
   return {
+    controllerUrl: resolveControllerUrl(overrides),
+    pairingCode: resolvePairingCode(overrides),
     mode,
     dataDir,
     composeDir: resolve(optional("COMPOSE_DIR") ?? "/compose"),
     socketPath: optional("AGENT_SOCKET") ?? resolve(dataDir, "agent.sock"),
-    // Binds every interface, v6 and v4 alike, rather than 0.0.0.0. Reachability is the operator's
-    // to decide with Docker's port publishing; refusing v6 here would only make it undecidable.
-    host: optional("AGENT_HOST") ?? "::",
-    port: positiveInteger("AGENT_PORT", 3100),
     caddyContainerName: optional("CADDY_CONTAINER_NAME") ?? "caddy-proxy-manager-caddy",
     caddyApiUrl: optional("CADDY_API_URL") ?? "http://caddy:2019",
     composeProject: optional("COMPOSE_PROJECT_NAME"),

@@ -1,253 +1,225 @@
 /**
- * A stand-in agent for the controller's tests.
+ * An agent, as the controller now sees one: an entry in the connection registry holding a stream.
  *
- * It is deliberately not a mock of the client: it is a real HTTP server speaking the real wire
- * protocol and verifying the real signature, so a test that passes here proves the controller signs
- * correctly and sends what it claims. Mocking `agent/client` would have left the signing path — the
- * only part of this seam that can fail silently — untested on both sides.
- *
- * The agent's own behaviour (Docker, compose, health) is covered by `apps/agent/tests`.
+ * This used to be a real HTTP server the controller dialled. It cannot be any more — the controller
+ * does not dial — so the fake attaches itself the way a real agent does, reads the frames the
+ * controller pushes, and answers commands. Which makes it a smaller lie than the old one: there is
+ * no transport to simulate, only the protocol.
  */
 
-import { createHmac, randomBytes } from 'node:crypto';
-import {
-  AGENT_CONTROLLER_HEADER,
-  AGENT_ROUTES,
-  AGENT_SIGNATURE_HEADER,
-  AGENT_TIMESTAMP_HEADER,
-  signatureBase,
-  type AgentStatus,
-  type CaddyBuildStatus,
-  type L4PortsStatus,
-  type ManagedServiceName,
-  type ManagedServicesRequest,
-  type ManagedServicesStatus,
+import { randomBytes } from 'node:crypto';
+import type {
+  AgentCommand,
+  AgentDesiredState,
+  AgentStatus,
+  CaddyBuildStatus,
+  L4PortsStatus,
+  ManagedServiceName,
+  ManagedServicesStatus,
 } from '@cpm/shared';
 
+const { attach, detach, recordStatus, settleResults, resetRegistry } = await import(
+  '../../src/lib/agent/registry'
+);
+
+/** One thing the controller pushed to this agent. */
 export type AgentRequestLog = {
-  method: string;
-  path: string;
-  body: unknown;
-  /** Whether the signature the controller sent verified against the shared secret. */
-  signed: boolean;
+  kind: 'hello' | 'desired-state' | 'command';
+  state?: AgentDesiredState;
+  command?: AgentCommand;
 };
 
 export type FakeAgent = {
-  url: string;
-  secret: string;
-  /** The code `POST /v1/pair` will accept, and the secret it hands back. Null refuses to pair. */
-  pairing: { code: string | null; issued: string };
+  agentId: string;
+  name: string;
+  /** Everything the controller has pushed, oldest first. */
   requests: AgentRequestLog[];
+  /** The desired state most recently pushed, or null before the first frame. */
+  desired: AgentDesiredState | null;
   state: {
     appliedPorts: string[];
     appliedModules: string[] | null;
     l4Status: L4PortsStatus;
     buildStatus: CaddyBuildStatus;
-    /** What this agent's Caddy answers a /v1/caddy-admin request with. */
+    /** What this agent's Caddy answers a dispatched admin command with. */
     caddyAdmin: { status: number; text: string };
     analytics: { enabled: boolean; accessLogPresent: boolean };
     appliedServices: Record<ManagedServiceName, boolean> | null;
     servicesStatus: ManagedServicesStatus;
   };
+  /** Re-report status from `state`. Call after mutating it, as the real agent does on change. */
+  report: () => void;
   /** Finish the port apply the controller last asked for, as the real agent does once Caddy is up. */
   completeL4Ports: () => void;
-  /** Finish the rebuild the controller last asked for, as the real agent does once Caddy is healthy. */
+  /** Finish the rebuild the controller last asked for, once Caddy is healthy. */
   completeBuild: () => void;
   stop: () => Promise<void>;
 };
 
-/**
- * Start a fake agent on a loopback port and return the environment the controller needs.
- *
- * TCP rather than a Unix socket: the socket is the production transport, but binding one is not
- * portable across the platforms this suite runs on, and the transport is not what these tests are
- * about — the protocol is. The client treats both identically once a transport is resolved.
- */
-export async function startFakeAgent(
-  overrides: Partial<FakeAgent['state']> = {},
-): Promise<FakeAgent> {
-  const secret = randomBytes(32).toString('hex');
-  const pairing = { code: null as string | null, issued: randomBytes(32).toString('hex') };
-  // Which secret belongs to which controller, exactly as the real agent stores it. `local` is the
-  // one AGENT_URL/AGENT_SECRET uses; pairing adds a row under whatever id the controller sent.
-  const secrets = new Map<string, string>([['local', secret]]);
-  const requests: AgentRequestLog[] = [];
-  let pendingPorts: string[] | null = null;
-  let pendingModules: string[] | null = null;
-  const state: FakeAgent['state'] = {
+function defaultState(overrides: Partial<FakeAgent['state']>): FakeAgent['state'] {
+  return {
     appliedPorts: [],
     appliedModules: null,
     l4Status: { state: 'idle' },
     buildStatus: { state: 'idle' },
     caddyAdmin: { status: 200, text: '{}' },
-    analytics: { enabled: false, accessLogPresent: true },
+    analytics: { enabled: false, accessLogPresent: false },
     appliedServices: null,
     servicesStatus: { state: 'idle' },
     ...overrides,
   };
+}
 
-  const server = Bun.serve({
-    port: 0,
-    hostname: '127.0.0.1',
-    async fetch(request) {
-      const url = new URL(request.url);
-      const raw = await request.arrayBuffer();
-      const bodyText = new TextDecoder().decode(raw);
+/**
+ * Attach a fake agent and start reading what the controller pushes it.
+ *
+ * The stream is drained in the background, exactly as the real agent's reader loop does. Frames are
+ * logged, and a command is answered immediately from `state.caddyAdmin` — a real agent would take a
+ * network round trip, but nothing here is testing latency.
+ */
+export async function startFakeAgent(
+  overrides: Partial<FakeAgent['state']> = {},
+): Promise<FakeAgent> {
+  const agentId = randomBytes(16).toString('hex');
+  const name = 'fake-agent';
+  const raw = defaultState(overrides);
+  const requests: AgentRequestLog[] = [];
 
-      // Pairing is the one unauthenticated route, since it is what establishes the secret.
-      if (url.pathname === AGENT_ROUTES.pair) {
-        const body = bodyText.length > 0 ? (JSON.parse(bodyText) as Record<string, unknown>) : {};
-        requests.push({ method: request.method, path: url.pathname, body, signed: false });
-        if (pairing.code === null) {
-          return Response.json(
-            { error: 'This agent runs in standalone mode.', code: 'PAIRING_DISABLED' },
-            { status: 403 },
-          );
-        }
-        if (body.code !== pairing.code) {
-          return Response.json(
-            { error: 'That pairing code is not valid.', code: 'PAIRING_CODE_INVALID' },
-            { status: 401 },
-          );
-        }
-        // One-time, exactly as the real agent treats it.
-        pairing.code = null;
-        secrets.set(String(body.controllerId), pairing.issued);
-        return Response.json({
-          secret: pairing.issued,
-          agentId: 'fake-agent',
-          agentVersion: 'test',
-        });
-      }
-
-      const controllerId = request.headers.get(AGENT_CONTROLLER_HEADER) ?? '';
-      const controllerSecret = secrets.get(controllerId);
-      const timestamp = Number(request.headers.get(AGENT_TIMESTAMP_HEADER) ?? '0');
-      const hasher = new Bun.CryptoHasher('sha256');
-      hasher.update(bodyText);
-      const expected = controllerSecret
-        ? createHmac('sha256', controllerSecret)
-            .update(signatureBase(request.method, url.pathname, timestamp, hasher.digest('hex')))
-            .digest('hex')
-        : null;
-      const signed = expected !== null && request.headers.get(AGENT_SIGNATURE_HEADER) === expected;
-
-      requests.push({
-        method: request.method,
-        path: url.pathname,
-        body: bodyText.length > 0 ? JSON.parse(bodyText) : null,
-        signed,
-      });
-
-      if (!signed) {
-        return Response.json(
-          { error: 'The request is not signed by a paired controller.', code: 'UNAUTHENTICATED' },
-          { status: 401 },
-        );
-      }
-
-      if (url.pathname === AGENT_ROUTES.status) {
-        return Response.json({
-          agentId: 'fake-agent',
-          version: 'test',
-          mode: 'standalone',
-          composeProject: 'caddy-proxy-manager',
-          l4Ports: { applied: state.appliedPorts, status: state.l4Status },
-          caddyBuild: { applied: state.appliedModules, status: state.buildStatus },
-          services: { applied: state.appliedServices, status: state.servicesStatus },
-          analytics: state.analytics,
-        } satisfies AgentStatus);
-      }
-
-      // Both writes are accepted, not completed. The real agent recreates a container or compiles
-      // Caddy from source, so it answers 202 with an in-progress status and updates the applied
-      // set only once that work has finished — which is exactly the window in which the controller
-      // must not claim the change has landed. Use completeL4Ports/completeBuild to close it.
-      if (url.pathname === AGENT_ROUTES.l4Ports && request.method === 'POST') {
-        const ports = (JSON.parse(bodyText) as { ports: string[] }).ports;
-        pendingPorts = ports;
-        state.l4Status = {
-          state: 'applying',
-          message: `Recreating Caddy with ${ports.length} published port(s).`,
-          triggeredAt: new Date().toISOString(),
-        };
-        return Response.json({ accepted: true, status: state.l4Status }, { status: 202 });
-      }
-
-      if (url.pathname === AGENT_ROUTES.fleetConfig && request.method === 'POST') {
-        const pushed = JSON.parse(bodyText) as { clickhouse: unknown };
-        state.analytics = { ...state.analytics, enabled: pushed.clickhouse !== null };
-        return Response.json({ ok: true });
-      }
-
-      if (url.pathname === AGENT_ROUTES.services && request.method === 'POST') {
-        // Applied straight away, unlike ports and builds: the real agent answers 202 and reconciles
-        // in the background, but nothing in the controller waits on the result, so a test asserting
-        // on what was requested reads the logged body rather than this.
-        const pushed = JSON.parse(bodyText) as ManagedServicesRequest;
-        state.appliedServices = pushed.services;
-        state.servicesStatus = { state: 'applying', triggeredAt: new Date().toISOString() };
-        return Response.json({ accepted: true, status: state.servicesStatus }, { status: 202 });
-      }
-
-      if (url.pathname === AGENT_ROUTES.caddyAdmin && request.method === 'POST') {
-        return Response.json({ ...state.caddyAdmin, headers: {} });
-      }
-
-      if (url.pathname === AGENT_ROUTES.caddyBuild && request.method === 'POST') {
-        pendingModules = (JSON.parse(bodyText) as { modules: string[] }).modules;
-        state.buildStatus = {
-          state: 'building',
-          message: 'Rebuilding the Caddy image with the selected modules.',
-          triggeredAt: new Date().toISOString(),
-        };
-        return Response.json({ accepted: true, status: state.buildStatus }, { status: 202 });
-      }
-
-      return Response.json({ error: 'No such endpoint.', code: 'BAD_REQUEST' }, { status: 404 });
+  /**
+   * Mutating `state` re-reports, so a test can write `agent.state.l4Status = …` and the controller
+   * sees it — which is how the old fake behaved when the controller polled it over HTTP. Status is
+   * pushed now, so without this every such assignment would land in an object nothing reads again.
+   */
+  const state = new Proxy(raw, {
+    set(target, key, value) {
+      Reflect.set(target, key, value);
+      recordStatus(agentId, buildStatus());
+      return true;
     },
   });
 
-  const url = `http://127.0.0.1:${server.port}`;
-  process.env.AGENT_URL = url;
-  process.env.AGENT_SECRET = secret;
-
-  return {
-    url,
-    secret,
-    pairing,
+  const agent: FakeAgent = {
+    agentId,
+    name,
     requests,
+    desired: null,
     state,
+    report: () => recordStatus(agentId, buildStatus()),
     completeL4Ports: () => {
-      if (pendingPorts === null) throw new Error('No port apply is in flight.');
-      state.appliedPorts = pendingPorts;
-      state.l4Status = {
-        state: 'applied',
-        message: `Caddy recreated with ${pendingPorts.length} published port(s).`,
-        appliedAt: new Date().toISOString(),
-      };
-      pendingPorts = null;
+      state.appliedPorts = agent.desired?.l4Ports ?? [];
+      state.l4Status = { state: 'applied', appliedAt: new Date().toISOString() };
     },
     completeBuild: () => {
-      if (pendingModules === null) throw new Error('No rebuild is in flight.');
-      state.appliedModules = pendingModules;
-      state.buildStatus = {
-        state: 'applied',
-        message: 'Caddy was rebuilt with the selected modules and is healthy.',
-        appliedAt: new Date().toISOString(),
-      };
-      pendingModules = null;
+      state.appliedModules = agent.desired?.caddyModules ?? [];
+      state.buildStatus = { state: 'applied', appliedAt: new Date().toISOString() };
     },
     stop: async () => {
-      delete process.env.AGENT_URL;
-      delete process.env.AGENT_SECRET;
-      await server.stop(true);
+      reading = false;
+      detach(agentId);
     },
   };
+
+  // Reads the raw object, never the proxy: buildStatus runs inside the proxy's own setter, and
+  // going back through it would be a needless second hop on every mutation.
+  function buildStatus(): AgentStatus {
+    return {
+      agentId,
+      version: 'test',
+      mode: 'standalone',
+      composeProject: 'cpm-test',
+      l4Ports: { applied: raw.appliedPorts, status: raw.l4Status },
+      caddyBuild: { applied: raw.appliedModules, status: raw.buildStatus },
+      services: { applied: raw.appliedServices, status: raw.servicesStatus },
+      analytics: raw.analytics,
+    };
+  }
+
+  const { stream } = attach({
+    agentId,
+    agentRowId: 1,
+    name,
+    controllerId: 'test-controller',
+    controllerName: 'Test',
+    initialState: {
+      l4Ports: [],
+      caddyModules: [],
+      services: { services: { clickhouse: false, geoipupdate: false }, env: {} },
+      fleetConfig: { clickhouse: null, geoip: null },
+      caddyEnabled: true,
+    },
+  });
+
+  let reading = true;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+
+  void (async () => {
+    let buffer = '';
+    while (reading) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true });
+
+      let split = buffer.indexOf('\n\n');
+      while (split !== -1) {
+        const frame = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        handleFrame(frame);
+        split = buffer.indexOf('\n\n');
+      }
+    }
+  })().catch(() => {
+    // The registry closed the stream; the test is over or the agent was detached.
+  });
+
+  function handleFrame(frame: string): void {
+    const data = frame
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n');
+    // A keepalive comment carries no data lines.
+    if (data.length === 0) return;
+
+    const event = JSON.parse(data) as
+      | { type: 'hello' }
+      | { type: 'desired-state'; state: AgentDesiredState }
+      | { type: 'command'; command: AgentCommand };
+
+    if (event.type === 'hello') {
+      requests.push({ kind: 'hello' });
+      return;
+    }
+    if (event.type === 'desired-state') {
+      agent.desired = event.state;
+      requests.push({ kind: 'desired-state', state: event.state });
+      return;
+    }
+
+    requests.push({ kind: 'command', command: event.command });
+    settleResults(agentId, [
+      {
+        id: event.command.id,
+        ok: true,
+        response: {
+          status: raw.caddyAdmin.status,
+          text: raw.caddyAdmin.text,
+          headers: { 'content-type': 'application/json' },
+        },
+      },
+    ]);
+  }
+
+  // Report once immediately: the controller treats a connected agent that has never reported as
+  // present-but-unusable, which is not the state most of these tests are about.
+  agent.report();
+
+  // Let the initial hello and desired-state frames land before the test asserts on them.
+  await Bun.sleep(5);
+  return agent;
 }
 
-/** Point the controller at nothing, for the "no agent is running" cases. */
+/** Drop every attached agent, so one suite's registry cannot leak into the next. */
 export function clearAgentEnv(): void {
-  delete process.env.AGENT_URL;
-  delete process.env.AGENT_SECRET;
+  resetRegistry();
 }

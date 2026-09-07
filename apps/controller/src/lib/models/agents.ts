@@ -19,8 +19,7 @@ const CONTROLLER_ID_KEY = "controller_id";
 export type PairedAgent = {
   id: number;
   name: string;
-  address: string;
-  agentId: string | null;
+  agentId: string;
   enabled: boolean;
   lastSeenAt: string | null;
   lastError: string | null;
@@ -38,7 +37,6 @@ function toView(row: Row): PairedAgent {
   return {
     id: row.id,
     name: row.name,
-    address: row.address,
     agentId: row.agentId,
     enabled: row.enabled,
     lastSeenAt: row.lastSeenAt,
@@ -97,8 +95,7 @@ export async function getActiveAgent(): Promise<AgentCredentials | null> {
 
 export async function saveAgent(input: {
   name: string;
-  address: string;
-  agentId: string | null;
+  agentId: string;
   secret: string;
 }): Promise<PairedAgent> {
   const now = nowIso();
@@ -106,20 +103,18 @@ export async function saveAgent(input: {
     .insert(agents)
     .values({
       name: input.name,
-      address: input.address,
       agentId: input.agentId,
       secret: encryptSecret(input.secret),
       enabled: true,
       createdAt: now,
       updatedAt: now,
     })
-    // Pairing the same address again replaces its secret. That is the recovery path for a
-    // controller whose copy is gone, and refusing it would leave the operator editing the database.
+    // The same host pairing again replaces its secret. That is the recovery path for an agent whose
+    // database was rebuilt, and refusing it would leave the operator editing this table by hand.
     .onConflictDoUpdate({
-      target: agents.address,
+      target: agents.agentId,
       set: {
         name: input.name,
-        agentId: input.agentId,
         secret: encryptSecret(input.secret),
         enabled: true,
         lastError: null,
@@ -129,6 +124,20 @@ export async function saveAgent(input: {
     .returning();
 
   return toView(row);
+}
+
+/** The stored row for an agent asserting this id, secret included, or null if it is unknown. */
+export async function findAgentByAgentId(agentId: string): Promise<AgentCredentials | null> {
+  const [row] = await db.select().from(agents).where(eq(agents.agentId, agentId)).limit(1);
+  if (!row?.enabled) return null;
+  try {
+    return { ...toView(row), secret: decryptSecret(row.secret) };
+  } catch (error) {
+    // Encrypted under a SESSION_SECRET this process no longer has. Re-pairing is the only fix, and
+    // it is the same answer as "unknown agent" from the caller's point of view.
+    console.error(`Failed to decrypt the secret for agent "${row.name}":`, error);
+    return null;
+  }
 }
 
 export async function deleteAgent(id: number): Promise<void> {

@@ -224,9 +224,6 @@ is still honoured as an override until a value is stored.
 | `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
 | `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
-| `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (local socket) | No |
-| `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this encrypted in the database instead | None | With `AGENT_URL` |
-| `AGENT_SOCKET` / `AGENT_CONTROLLER_ID` | Override the local agent's socket path, and the identity the controller signs as | `$L4_PORTS_DIR/agent.sock` / built-in | No |
 | `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
@@ -240,10 +237,11 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
-| `AGENT_MODE` | `standalone` binds a Unix socket on the shared volume; `managed` binds TCP and prints a pairing code. Startup fails on any other value rather than guessing | `standalone` |
-| `AGENT_HOST` / `AGENT_PORT` | Listen address in `managed` mode | `::` / `3100` |
-| `AGENT_SOCKET` | Socket path in `standalone` mode | `$DATA_DIR/agent.sock` |
-| `DATA_DIR` | Where the agent's SQLite state, socket and secret live. Must be writable | `/data` |
+| `CONTROLLER_URL` | Where the agent dials to reach its controller. Overridden by `--host`/`--port` | Unset (idle until paired) |
+| `PAIRING_CODE` | Pair on first start instead of idling. Overridden by `--code` | Unset |
+| `AGENT_MODE` | `standalone` or `managed`. Startup fails on any other value rather than guessing | `standalone` |
+| `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
+| `DATA_DIR` | Where the agent's SQLite state and control socket live. Must be writable | `/data` |
 | `COMPOSE_DIR` | Where the compose project files are mounted, read-only | `/compose` |
 | `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy:2019` |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
@@ -653,30 +651,58 @@ Two consequences worth knowing:
 - **Ports are published everywhere.** A layer-4 host's port is opened on every agent, since any of
   them may be the one a client reaches.
 
-### Same host — nothing to configure
+### How an agent connects
 
-The default. The agent listens on a Unix socket on the shared data volume and writes its secret
-beside it, rotating that secret on every start. A controller that mounts the same volume finds both.
-This is what `docker-compose.yml` sets up, and there is nothing to enter anywhere.
+The agent dials the controller, never the other way round. It opens one long-lived event stream and
+holds it open; the controller pushes desired state and Caddy admin calls down it, and the agent
+posts status and results back. So an agent on a NAT'd or firewalled host needs **no inbound port** —
+only outbound reach to the controller.
+
+An agent that has never been paired does nothing, and **leaves Caddy stopped**. Caddy sits behind a
+Compose profile precisely so that `docker compose up` will not start it: a host nobody has finished
+installing must not answer on 80 and 443 with a default page. Pairing is what starts it.
+
+### Same host — nothing to enter
+
+The bundled stack pairs itself. The controller leaves a single-use token on the shared data volume
+both containers already mount, and an idle agent that finds one pairs with it — so `docker compose
+up` gives you a working install with no code typed anywhere.
+
+The boundary is the volume: reaching that file already means being inside the stack. It is the same
+boundary the pre-3.1 design used, which kept a long-lived shared secret there; this token is
+single-use and is rotated the moment it is redeemed, so a copy someone else read stops working.
+
+Caddy still waits for first-run setup to finish, because until then there is no configuration to
+serve. Reach the dashboard on `:3000` to complete it, and Caddy starts on its own.
 
 ### A different host — pairing
 
-Run the agent with `AGENT_MODE=managed` and publish its port (3100 by default). It prints a
-six-letter code to its logs:
+An agent on another host cannot mount that volume, so it pairs with a code you carry.
+
+Generate one under **Settings → Agents**. It is six letters, valid for five minutes, works once,
+and is refused after ten wrong guesses. Then, on the agent's host:
 
 ```bash
-docker logs caddy-proxy-manager-agent
+docker exec caddy-proxy-manager-agent cpm-agent --pair --host 10.0.0.5 --code ABCDEF
 ```
 
-The code is valid for five minutes, works once, and is refused after ten wrong guesses. Enter it
-with the agent's address under **Settings → Agent**; the two exchange a secret, which is stored
-encrypted and is the only thing used from then on. The code is never needed again.
+`--host` is the controller's address as the agent can reach it; add `--port` if it is not 3000. The
+two exchange a secret, which is stored encrypted on the controller and in the agent's own database,
+and the code is never used again. The agent then pulls its configuration and starts Caddy.
 
-Unpairing forgets this side only. The agent keeps the secret until it is restarted or paired again,
-so restart it too if you are removing an agent you no longer trust.
+`--pair` talks to the agent already running on that host rather than doing the work itself — the
+running process is the one holding the database the secret lands in and the stream it will open.
+Start the agent first; pairing a stopped one is an error, not a wait.
 
-`AGENT_URL` and `AGENT_SECRET` do the same thing without the UI, for a deployment that configures
-everything through the environment. An agent paired through Settings takes precedence over them.
+`CONTROLLER_URL` and `PAIRING_CODE` do the same thing without a terminal, for a deployment that
+configures everything through the environment. A stored pairing wins over both, so a code left in
+place after a successful pair is ignored rather than burned again on every restart.
+
+### Unpairing
+
+Unpairing revokes the secret. The agent's next call is refused, it drops back to idle, and **it
+stops Caddy** — so unpairing takes that host out of service. Pair it again with a fresh code to
+bring it back.
 
 ---
 

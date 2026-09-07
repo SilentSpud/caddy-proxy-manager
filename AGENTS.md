@@ -28,6 +28,29 @@ the root `node_modules` holds the store (`.bun/`) plus the root's own devDepende
 workspace member gets a `node_modules` of relative symlinks into it. `docker/web/Dockerfile` copies
 both trees for that reason.
 
+## The agent connects inwards
+
+The agent dials the controller and holds one SSE stream open (`/api/agent/v1/events`); the
+controller never dials the agent. Three consequences worth knowing before touching either side:
+
+- **`lib/agent/registry.ts` is the only way to reach an agent.** It is in-memory, because a
+  connection is a property of *this* process. "Configured" and "reachable" are therefore the same
+  question, and a second controller replica would each hold half the fleet — that file is where a
+  broker would go, not the callers.
+- **Everything is desired state except Caddy admin.** The controller pushes the full desired state
+  and the agent diffs it against what it has applied, so a dropped stream costs only a reconnect.
+  The one exception is a Caddy admin call, which the controller blocks on: it goes down the stream
+  with a correlation id and comes back via `POST /api/agent/v1/command-results`.
+- **The bundled agent pairs itself.** The controller writes a single-use token to the shared data
+  volume at startup (`lib/agent/bootstrap.ts`); an idle agent that finds one pairs with it, so the
+  default stack needs no code typed anywhere. A remote agent has no such file and uses a six-letter
+  code. Both land in the same route and the same registry — only where the credential came from
+  differs.
+- **Caddy is behind a Compose profile and the agent starts it.** `docker compose up` deliberately
+  does not. An unpaired agent leaves Caddy stopped, so a host nobody has finished installing does
+  not answer on 80 and 443. Never add a `depends_on: caddy` — the agent is what starts it, so
+  waiting on it deadlocks.
+
 ## Comments
 
 Terse. One line is the median here and three is already long — match that, in every language,

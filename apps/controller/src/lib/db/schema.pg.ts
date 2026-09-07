@@ -185,20 +185,21 @@ export const settings = pgTable("settings", {
 /**
  * Agents this controller has paired with.
  *
- * The local agent is not in here: it is found by its socket on the shared volume and proves itself
- * with a secret it rotates on every start, so a stored row would go stale on every restart. This
- * table is for agents reached over the network, whose secret was agreed once during pairing and is
- * the only way back to them.
+ * No address, because the controller never dials one: agents connect inbound and hold an event
+ * stream open, so whether an agent is reachable is a question about `lib/agent/registry.ts` and
+ * this table cannot answer it. What lives here is the half that must outlive a restart — who the
+ * agent is, and the secret it signs with.
+ *
+ * `agentId` is the identity the agent asserts on every request and the key pairing upserts on, so
+ * an agent that re-pairs replaces its row rather than accumulating one per attempt.
  */
 export const agents = pgTable(
   "agents",
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
-    /** Origin the agent listens on, e.g. `https://agent.example.com:3100`. No trailing slash. */
-    address: text("address").notNull(),
-    /** The agent's own stable id, as it reported at pairing. Detects a replaced host. */
-    agentId: text("agentId"),
+    /** The agent's own stable id, minted once on its host and reported at pairing. */
+    agentId: text("agentId").notNull(),
     /** Shared secret, encrypted at rest. Never leaves the server. */
     secret: text("secret").notNull(),
     enabled: boolean("enabled").notNull().default(true),
@@ -208,7 +209,7 @@ export const agents = pgTable(
     updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    addressUnique: uniqueIndex("agents_address_unique").on(table.address),
+    agentIdUnique: uniqueIndex("agents_agentId_unique").on(table.agentId),
   }),
 );
 

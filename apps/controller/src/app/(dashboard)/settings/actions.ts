@@ -66,7 +66,7 @@ import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { saveAnalyticsSettings, saveGeoipSettings } from "@/src/lib/settings/optional-features";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
-import { PairingError, pairWithAgent } from "@/src/lib/agent/pairing";
+import { ensurePairingCode, revokePairingCode } from "@/src/lib/agent/pairing-codes";
 import { deleteAgent } from "@/src/lib/models/agents";
 
 type ActionResult = {
@@ -1613,39 +1613,32 @@ export const updateGeoipSettingsAction = serializedSettingsAction(
 // ─── Agents ──────────────────────────────────────────────────────────────────
 
 /**
- * Pair with an agent using the one-time code it printed to its logs.
+ * Mint (or re-read) the code an operator carries to a new agent.
  *
- * The secret the exchange produces never comes back through this result: a server action's return
- * value is serialized to the browser, so putting it here would publish the credential the whole
- * exchange exists to keep on the server.
+ * The controller issues it now, where the agent used to and the operator had to read the new host's
+ * container logs to find it. The code is all that comes back — the secret it is exchanged for is
+ * minted at `/api/agent/v1/pair` and never leaves the server, because a server action's return
+ * value is serialized to the browser.
  */
-export async function pairAgentAction(
-  _prevState: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    await requireAdmin();
-    const agent = await pairWithAgent({
-      address: String(formData.get("address") ?? ""),
-      code: String(formData.get("code") ?? ""),
-      name: formData.get("name") ? String(formData.get("name")) : undefined,
-    });
-    revalidatePath("/settings");
-    return { success: true, message: `Paired with ${agent.name} at ${agent.address}.` };
-  } catch (error) {
-    if (error instanceof PairingError) {
-      return { success: false, message: error.message };
-    }
-    console.error("Failed to pair with the agent:", error);
-    return { success: false, message: "Pairing failed." };
-  }
+export async function pairingCodeAction(): Promise<{ code: string; expiresAt: number }> {
+  await requireAdmin();
+  const { code, expiresAt } = ensurePairingCode();
+  return { code, expiresAt };
+}
+
+/** Throw the live code away, so the next read mints a fresh one. */
+export async function revokePairingCodeAction(): Promise<void> {
+  await requireAdmin();
+  revokePairingCode();
+  revalidatePath("/settings");
 }
 
 /**
  * Forget a paired agent.
  *
- * Only removes this controller's side. The agent keeps the secret until it is re-paired or
- * restarted, which is why the UI says so rather than implying the grant has been revoked.
+ * Removes this controller's side and, because the agent's next signed call is then refused, drops
+ * it back to idle on its own host — which stops its Caddy. Unpairing takes a host out of service,
+ * so the UI says so.
  */
 export async function unpairAgentAction(formData: FormData): Promise<void> {
   await requireAdmin();

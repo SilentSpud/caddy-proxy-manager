@@ -114,7 +114,7 @@ import {
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
   updateTailscaleSettingsAction,
-  pairAgentAction,
+  pairingCodeAction,
   unpairAgentAction,
 } from "./actions";
 
@@ -580,7 +580,6 @@ export default function SettingsClient({
     null,
   );
   const [tailscaleState, tailscaleFormAction] = useActionState(updateTailscaleSettingsAction, null);
-  const [pairState, pairFormAction] = useActionState(pairAgentAction, null);
 
   // The page has two navigations — the sidebar panel and the compact picker in the content column
   // — and neither carried a media gate, so both rendered at every width. Same breakpoint DataTable
@@ -735,13 +734,7 @@ export default function SettingsClient({
                     caddyBuildFormAction={caddyBuildFormAction}
                   />
                 )}
-                {active === "agent" && (
-                  <AgentSection
-                    agents={agents}
-                    pairState={pairState}
-                    pairFormAction={pairFormAction}
-                  />
-                )}
+                {active === "agent" && <AgentSection agents={agents} />}
                 {active === "analytics" && (
                   <AnalyticsSection
                     analytics={analytics}
@@ -2269,14 +2262,12 @@ function whenText(iso: string | null): string {
 /** One agent's line in the fleet list: what it is, and whether it is answering. */
 function AgentRow({
   name,
-  address,
   status,
   error,
   lastSeenAt,
   onRemove,
 }: {
   name: string;
-  address: string | null;
   status: AgentStatus | null;
   error: string | null;
   lastSeenAt: string | null;
@@ -2300,7 +2291,7 @@ function AgentRow({
             )}
           </HStack>
           <Text size="xsm" color="secondary">
-            {address ? `${address} — ` : ""}last reached {whenText(lastSeenAt)}
+            last reported {whenText(lastSeenAt)}
           </Text>
           {status && (
             <Text size="xsm" color="secondary">
@@ -2316,19 +2307,10 @@ function AgentRow({
   );
 }
 
-function AgentSection({
-  agents,
-  pairState,
-  pairFormAction,
-}: {
-  agents: Props["agents"];
-  pairState: { success: boolean; message?: string } | null;
-  pairFormAction: (payload: FormData) => void;
-}) {
+function AgentSection({ agents }: { agents: Props["agents"] }) {
   const t = useTranslations("settings");
-  const [address, setAddress] = useState("");
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
+  const [code, setCode] = useState<{ code: string; expiresAt: number } | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const { paired, statuses } = agents;
   const usingPaired = paired.length > 0;
@@ -2364,7 +2346,6 @@ function AgentSection({
                   <InfoAlert title={t("localAgentTitle")}>{t("localAgentDescription")}</InfoAlert>
                   <AgentRow
                     name="Local agent"
-                    address={null}
                     status={statuses[0]?.ok ? statuses[0].value : null}
                     error={statuses[0]?.ok ? null : (statuses[0]?.error ?? null)}
                     lastSeenAt={null}
@@ -2379,7 +2360,6 @@ function AgentSection({
                   <AgentRow
                     key={agent.id}
                     name={agent.name}
-                    address={agent.address}
                     status={entry?.ok ? entry.value : null}
                     error={entry && !entry.ok ? entry.error : agent.lastError}
                     lastSeenAt={agent.lastSeenAt}
@@ -2406,48 +2386,40 @@ function AgentSection({
       </FormCard>
 
       <FormCard title={t("pairAnAgent")}>
-        <form action={pairFormAction}>
-          <VStack gap={3}>
-            <Text size="sm" color="secondary">
-              Start the agent with <Code>AGENT_MODE=managed</Code>. It prints a six-letter code to
-              its logs — <Code>docker logs caddy-proxy-manager-agent</Code> — which is valid for
-              five minutes and works once. The two exchange a secret; the code is never used again.
-            </Text>
-            {pairState?.message && (
-              <StatusAlert message={pairState.message} success={pairState.success} />
-            )}
-            <TextInput
-              {...NATIVE_REQUIRED}
-              label={t("agentAddress")}
-              description={t("agentAddressHelp")}
-              htmlName="address"
-              value={address}
-              onChange={setAddress}
-              placeholder="agent.example.com:3100"
-              isRequired
+        <VStack gap={3}>
+          <Text size="sm" color="secondary">
+            {t("pairingCodeHelp")}
+          </Text>
+          {codeError && <StatusAlert message={codeError} success={false} />}
+          {code ? (
+            <VStack gap={2}>
+              <Text size="xl" weight="semibold">
+                {code.code}
+              </Text>
+              <Text size="xsm" color="secondary">
+                {t("pairingCodeExpires", {
+                  minutes: Math.max(1, Math.round((code.expiresAt - Date.now()) / 60000)),
+                })}
+              </Text>
+              <Text size="sm" color="secondary">
+                {t("pairingCodeRun")}
+              </Text>
+              <Code>{`cpm-agent --pair --host <this-controller> --code ${code.code}`}</Code>
+            </VStack>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              label={t("generatePairingCode")}
+              onClick={() => {
+                setCodeError(null);
+                pairingCodeAction()
+                  .then(setCode)
+                  .catch(() => setCodeError(t("pairingCodeFailed")));
+              }}
             />
-            <TextInput
-              {...NATIVE_REQUIRED}
-              {...AUTOFILL_OFF}
-              label={t("pairingCode")}
-              description={t("pairingCodeHelp")}
-              htmlName="code"
-              value={code}
-              onChange={setCode}
-              placeholder="ABCDEF"
-              isRequired
-            />
-            <TextInput
-              label={t("name")}
-              description={t("agentNameHelp")}
-              htmlName="name"
-              value={name}
-              onChange={setName}
-              isOptional
-            />
-            <SaveButton label={t("pairAgent")} />
-          </VStack>
-        </form>
+          )}
+        </VStack>
       </FormCard>
     </>
   );

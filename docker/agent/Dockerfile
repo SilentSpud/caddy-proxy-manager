@@ -57,6 +57,18 @@ COPY --from=builder /app/apps/agent/dist/cpm-agent /app/cpm-agent
 # the controller container owns under a different uid. Reach to the daemon is narrowed by the
 # docker-socket-proxy service rather than by this container's user.
 
+# Image identity, so a pulled image describes itself without the compose file beside it. Static
+# facts only: the version, revision and build timestamp are supplied by docker/metadata-action in
+# .github/workflows/docker-build-trusted.yml, whose --label flags override anything set here.
+LABEL org.opencontainers.image.title="Caddy Proxy Manager Builder Agent" \
+      org.opencontainers.image.description="Host-side agent that rebuilds the Caddy image and recreates its container on behalf of Caddy Proxy Manager." \
+      org.opencontainers.image.vendor="SilentSpud" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
+      org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
+      org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
+      org.opencontainers.image.base.name="docker.io/library/debian:bookworm-slim"
+
 ENV DATA_DIR=/data
 ENV COMPOSE_DIR=/compose
 ENV AGENT_MODE=standalone

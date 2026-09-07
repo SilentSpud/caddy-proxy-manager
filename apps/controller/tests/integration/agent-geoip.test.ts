@@ -98,7 +98,6 @@ beforeEach(async () => {
   const now = new Date().toISOString();
   await ctx.db.insert(schema.agents).values({
     name: 'edge',
-    address: 'http://edge.example:3100',
     agentId: AGENT_ID,
     secret: encryptSecret(SECRET),
     enabled: true,

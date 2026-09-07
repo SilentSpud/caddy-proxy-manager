@@ -37,14 +37,20 @@ jobs:
             service: web
             dockerfile: docker/web/Dockerfile
             context: .
+            title: Caddy Proxy Manager Web Dashboard
+            description: Web UI and API for managing Caddy reverse proxies, certificates and routes.
           - name: Caddy Handler
             service: caddy
             dockerfile: docker/caddy/Dockerfile
             context: .
+            title: Caddy Proxy Manager Caddy Handler
+            description: Caddy built with xcaddy, bundling the DNS, layer-4 and WAF plugins Caddy Proxy Manager configures.
           - name: Builder Agent
             service: agent
             dockerfile: docker/agent/Dockerfile
             context: .
+            title: Caddy Proxy Manager Builder Agent
+            description: Host-side agent that rebuilds the Caddy image and recreates its container on behalf of Caddy Proxy Manager.
 
     steps:
       - name: Checkout repository
@@ -63,8 +69,27 @@ jobs:
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v6
+        env:
+          # Default is `manifest` alone, which annotates the per-arch manifests and leaves the
+          # multi-arch index bare — and the index is what GHCR reads for the package page's
+          # description and "linked repository". Both levels, so the two agree.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          # Per-image identity. Without these the action derives title and description from the
+          # repository, so all three images would claim to be the same thing; the Dockerfiles carry
+          # the same values for local `docker compose build`. Everything else — version, revision,
+          # created, source, licenses — the action fills in from the tag and the repo.
+          labels: |
+            org.opencontainers.image.title=${{ matrix.title }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.vendor=SilentSpud
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
+          annotations: |
+            org.opencontainers.image.title=${{ matrix.title }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.vendor=SilentSpud
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -97,6 +122,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           build-args: |
             APP_VERSION=${{ steps.app-version.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.service }}

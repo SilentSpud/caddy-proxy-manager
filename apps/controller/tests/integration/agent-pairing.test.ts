@@ -1,12 +1,13 @@
 /**
- * Pairing, and the standing grant it creates.
+ * Pairing, and the standing grant it creates — now minted here rather than by the agent.
  *
- * A row in `agents` lets whoever reads it recreate containers on another host, so the properties
- * worth pinning are about what the exchange refuses and what it never lets out: the secret must
- * not reach the browser, must not be stored in the clear, and must not be accepted from something
- * that is not an agent.
+ * A row in `agents` lets whoever holds its secret run Caddy admin calls on another host, so the
+ * properties worth pinning are about what the exchange refuses and what it never lets out: the
+ * secret must not be stored in the clear, the code must work exactly once, and guessing must be
+ * bounded.
  *
- * The agent here is a real HTTP server speaking the real protocol — see tests/helpers/fake-agent.ts.
+ * The route is exercised directly. There is no agent to stand up any more — the agent's side of
+ * pairing is one unsigned POST — which is most of why this file is a third of its old length.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -32,246 +33,243 @@ vi.mock('../../src/lib/db', () => ({
 }));
 
 import * as schema from '../../src/lib/db/schema';
-const { normalizeAgentAddress, normalizePairingCode, pairWithAgent, PairingError } = await import(
-  '../../src/lib/agent/pairing'
+const { ensurePairingCode, redeemPairingCode, resetPairingCodes } = await import(
+  '../../src/lib/agent/pairing-codes'
 );
-const { getActiveAgent, getControllerId, listAgents, deleteAgent } = await import(
-  '../../src/lib/models/agents'
-);
-const { getAgentStatus, tryGetAgentStatus } = await import('../../src/lib/agent/client');
-const { startFakeAgent, clearAgentEnv } = await import('../helpers/fake-agent');
+const { listAgents, findAgentByAgentId } = await import('../../src/lib/models/agents');
+const { POST } = await import('../../src/app/api/agent/v1/pair/route');
 
-type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
-let agent: FakeAgent;
+const AGENT_ID = 'a'.repeat(32);
+
+function pairRequest(body: unknown): Request {
+  return new Request('http://controller.test/api/agent/v1/pair', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
 
 beforeEach(async () => {
+  resetPairingCodes();
   await ctx.db.delete(schema.agents);
-  await ctx.db.delete(schema.settings);
-  agent = await startFakeAgent();
-  // The fake sets AGENT_URL/AGENT_SECRET so the l4-ports tests can use it directly. Pairing has to
-  // be tested without that shortcut, or the stored row would never be the thing under test.
-  clearAgentEnv();
-  agent.pairing.code = 'ABCDEF';
 });
 
-afterEach(async () => {
-  await agent.stop();
+afterEach(() => {
+  resetPairingCodes();
 });
 
-// ─── Input handling ──────────────────────────────────────────────────────────
-
-describe('normalizeAgentAddress', () => {
-  it('accepts a bare host and port', () => {
-    expect(normalizeAgentAddress('agent.example.com:3100')).toBe('http://agent.example.com:3100');
+describe('pairing codes', () => {
+  it('mints a six-letter code and keeps returning the same one until it expires', () => {
+    const first = ensurePairingCode();
+    expect(first.code).toMatch(/^[A-Z]{6}$/);
+    expect(ensurePairingCode().code).toBe(first.code);
   });
 
-  it('defaults to the agent port rather than 80', () => {
-    // Nothing about a bare hostname suggests port 80, and silently dialling it would send a
-    // pairing code to whatever is listening there.
-    expect(normalizeAgentAddress('agent.example.com')).toBe('http://agent.example.com:3100');
-  });
-
-  it('keeps an explicit https scheme', () => {
-    expect(normalizeAgentAddress('https://agent.example.com:9000')).toBe(
-      'https://agent.example.com:9000',
-    );
-  });
-
-  it('trims surrounding whitespace', () => {
-    expect(normalizeAgentAddress('  agent.example.com:3100  ')).toBe(
-      'http://agent.example.com:3100',
-    );
-  });
-
-  it('refuses a scheme that is not http or https', () => {
-    expect(() => normalizeAgentAddress('ftp://agent.example.com')).toThrow(PairingError);
-    expect(() => normalizeAgentAddress('file:///etc/passwd')).toThrow(PairingError);
-  });
-
-  it('refuses an address carrying a path or a query', () => {
-    // An address with a path is a sign the operator pasted something else. Trimming it quietly
-    // would send the code somewhere they did not mean.
-    expect(() => normalizeAgentAddress('http://agent.example.com/admin')).toThrow(PairingError);
-    expect(() => normalizeAgentAddress('http://agent.example.com?x=1')).toThrow(PairingError);
-  });
-
-  it('refuses an empty address', () => {
-    expect(() => normalizeAgentAddress('   ')).toThrow(PairingError);
-  });
-});
-
-describe('normalizePairingCode', () => {
-  it('accepts the code as printed', () => {
-    expect(normalizePairingCode('ABCDEF')).toBe('ABCDEF');
-  });
-
-  it('accepts it typed in lower case or with spaces', () => {
-    expect(normalizePairingCode(' abc def ')).toBe('ABCDEF');
-  });
-
-  it('refuses anything that is not six letters', () => {
-    for (const bad of ['ABCDE', 'ABCDEFG', 'ABC123', '', 'ABCD-EF']) {
-      expect(() => normalizePairingCode(bad)).toThrow(PairingError);
+  it('draws only from an alphabet with no I or O, so a code can be read aloud', () => {
+    for (let i = 0; i < 50; i += 1) {
+      resetPairingCodes();
+      expect(ensurePairingCode().code).not.toMatch(/[IO]/);
     }
   });
-});
 
-// ─── The exchange ────────────────────────────────────────────────────────────
-
-describe('pairWithAgent', () => {
-  it('stores the agent the exchange returns', async () => {
-    const paired = await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-
-    expect(paired.address).toBe(agent.url);
-    expect(paired.agentId).toBe('fake-agent');
-    expect(await listAgents()).toHaveLength(1);
+  it('burns the code on success, so it cannot be used twice', () => {
+    const { code } = ensurePairingCode();
+    expect(redeemPairingCode(code).ok).toBe(true);
+    expect(redeemPairingCode(code).ok).toBe(false);
   });
 
-  it('never returns the secret to its caller', async () => {
-    // This value crosses a server action's boundary into the browser. The secret authenticates
-    // every later request, so it must not be anywhere in what comes back.
-    const paired = await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    expect(JSON.stringify(paired)).not.toContain(agent.pairing.issued);
+  it('refuses an expired code and does not resurrect it', () => {
+    const { code } = ensurePairingCode();
+    const later = Date.now() + 6 * 60_000;
+    expect(redeemPairingCode(code, later).ok).toBe(false);
+    expect(redeemPairingCode(code).ok).toBe(false);
+  });
+
+  it('burns the code after ten wrong guesses, bounding a five-minute guessing window', () => {
+    const { code } = ensurePairingCode();
+    for (let i = 0; i < 10; i += 1) expect(redeemPairingCode('ZZZZZZ').ok).toBe(false);
+    expect(redeemPairingCode(code).ok).toBe(false);
+  });
+
+  it('accepts a code typed in lower case with stray spaces', () => {
+    const { code } = ensurePairingCode();
+    expect(redeemPairingCode(`  ${code.toLowerCase()} `).ok).toBe(true);
+  });
+});
+
+describe('POST /api/agent/v1/pair', () => {
+  it('stores the agent and returns a secret it did not receive', async () => {
+    const { code } = ensurePairingCode();
+    const response = await POST(
+      pairRequest({ code, agentId: AGENT_ID, agentName: 'edge', agentVersion: '3.0.0' }),
+    );
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as { secret: string; controllerId: string };
+    expect(body.secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.controllerId).toBeTruthy();
+
+    const agents = await listAgents();
+    expect(agents).toHaveLength(1);
+    expect(agents[0].agentId).toBe(AGENT_ID);
+    expect(agents[0].name).toBe('edge');
   });
 
   it('never stores the secret in the clear', async () => {
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
+    const { code } = ensurePairingCode();
+    const response = await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
+    const { secret } = (await response.json()) as { secret: string };
+
     const [row] = await ctx.db.select().from(schema.agents);
-    expect(row.secret).not.toBe(agent.pairing.issued);
-    expect(row.secret.startsWith('enc:v1:')).toBe(true);
+    expect(row.secret).not.toBe(secret);
+    // …and it must still decrypt back to what the agent was given, or the agent can never sign.
+    expect((await findAgentByAgentId(AGENT_ID))?.secret).toBe(secret);
   });
 
-  it("sends this controller's stable id, so the agent can key the secret on it", async () => {
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    const request = agent.requests.find((r) => r.path === '/v1/pair');
-    const body = request?.body as { controllerId: string } | undefined;
-    expect(body?.controllerId).toBe(await getControllerId());
-  });
-
-  it('names the agent after its host when no name is given', async () => {
-    const paired = await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    expect(paired.name).toBe('127.0.0.1');
-  });
-
-  it('uses the name it is given', async () => {
-    const paired = await pairWithAgent({ address: agent.url, code: 'ABCDEF', name: '  Edge  ' });
-    expect(paired.name).toBe('Edge');
-  });
-
-  it("passes the agent's own refusal through", async () => {
-    // The operator has one code and five minutes. "Pairing failed" would tell them nothing about
-    // whether to retype the code or check the address.
-    await expect(pairWithAgent({ address: agent.url, code: 'ZZZZZZ' })).rejects.toThrow(
-      /not valid/i,
+  it('refuses a wrong code with 401 and stores nothing', async () => {
+    ensurePairingCode();
+    const response = await POST(
+      pairRequest({ code: 'ZZZZZZ', agentId: AGENT_ID, agentVersion: '3.0.0' }),
     );
+    expect(response.status).toBe(401);
     expect(await listAgents()).toHaveLength(0);
   });
 
-  it('reports an unreachable address as such', async () => {
-    const dead = agent.url;
-    await agent.stop();
-    await expect(pairWithAgent({ address: dead, code: 'ABCDEF' })).rejects.toThrow(
-      /nothing answered/i,
+  it('refuses a code that was already redeemed', async () => {
+    const { code } = ensurePairingCode();
+    await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
+    const second = await POST(
+      pairRequest({ code, agentId: 'b'.repeat(32), agentVersion: '3.0.0' }),
     );
-  });
-
-  it("refuses a reply that is not an agent's", async () => {
-    // Something answered, but a short secret means either not an agent or a reply rewritten in
-    // transit. Storing it would leave a pairing that looks complete and authenticates nothing.
-    const impostor = Bun.serve({
-      port: 0,
-      hostname: '127.0.0.1',
-      fetch: () => Response.json({ secret: 'short', agentId: 'x' }),
-    });
-    try {
-      await expect(
-        pairWithAgent({ address: `http://127.0.0.1:${impostor.port}`, code: 'ABCDEF' }),
-      ).rejects.toThrow(/not like an agent/i);
-      expect(await listAgents()).toHaveLength(0);
-    } finally {
-      await impostor.stop(true);
-    }
-  });
-
-  it('replaces the secret when the same address pairs again', async () => {
-    // The recovery path for a controller whose copy is gone. Refusing would leave the operator
-    // editing the database by hand.
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    const first = (await getActiveAgent())?.secret;
-
-    agent.pairing.code = 'GHJKLM';
-    agent.pairing.issued = 'b'.repeat(64);
-    await pairWithAgent({ address: agent.url, code: 'GHJKLM' });
-
+    expect(second.status).toBe(401);
     expect(await listAgents()).toHaveLength(1);
-    expect((await getActiveAgent())?.secret).toBe('b'.repeat(64));
-    expect((await getActiveAgent())?.secret).not.toBe(first as string);
   });
 
-  it('cannot reuse a code the agent has already burned', async () => {
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    await expect(pairWithAgent({ address: agent.url, code: 'ABCDEF' })).rejects.toThrow(
-      PairingError,
+  it('rejects an agent id that is not one, before touching the code', async () => {
+    const { code } = ensurePairingCode();
+    const response = await POST(pairRequest({ code, agentId: '../etc', agentVersion: '3.0.0' }));
+    expect(response.status).toBe(400);
+    // The code survives: a malformed request must not burn the operator's code for them.
+    expect(redeemPairingCode(code).ok).toBe(true);
+  });
+
+  it('re-pairing the same host replaces its secret rather than adding a row', async () => {
+    const first = ensurePairingCode();
+    const a = await POST(
+      pairRequest({ code: first.code, agentId: AGENT_ID, agentVersion: '3.0.0' }),
     );
+    const secretA = ((await a.json()) as { secret: string }).secret;
+
+    resetPairingCodes();
+    const second = ensurePairingCode();
+    const b = await POST(
+      pairRequest({ code: second.code, agentId: AGENT_ID, agentVersion: '3.0.0' }),
+    );
+    const secretB = ((await b.json()) as { secret: string }).secret;
+
+    expect(secretB).not.toBe(secretA);
+    expect(await listAgents()).toHaveLength(1);
+    expect((await findAgentByAgentId(AGENT_ID))?.secret).toBe(secretB);
+  });
+
+  it('names an agent that did not name itself', async () => {
+    const { code } = ensurePairingCode();
+    await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
+    expect((await listAgents())[0].name).toBe(`Agent ${AGENT_ID.slice(0, 8)}`);
+  });
+
+  it('refuses a body that is not JSON', async () => {
+    ensurePairingCode();
+    const response = await POST(
+      new Request('http://controller.test/api/agent/v1/pair', { method: 'POST', body: 'nonsense' }),
+    );
+    expect(response.status).toBe(400);
   });
 });
 
-// ─── What the paired agent is then used for ──────────────────────────────────
+describe('bootstrap token', () => {
+  // Its own directory per test: the token is a file, and a leaked one between tests would let a
+  // stale value pair when the test believed there was none.
+  let dir: string;
 
-describe('the paired agent', () => {
-  it('is the one the client talks to', async () => {
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    // The fake verifies the signature against the secret it issued, so a status that comes back at
-    // all proves the controller signed with the stored secret and the right controller id.
-    const status = await getAgentStatus();
-    expect(status.agentId).toBe('fake-agent');
+  beforeEach(async () => {
+    const { mkdtempSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    dir = mkdtempSync(join(tmpdir(), 'cpm-bootstrap-'));
+    process.env.L4_PORTS_DIR = dir;
   });
 
-  it('beats AGENT_URL, which pairing is meant to replace', async () => {
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    // A leftover variable must not silently override an operator's explicit pairing.
-    process.env.AGENT_URL = 'http://127.0.0.1:1';
-    process.env.AGENT_SECRET = 'c'.repeat(64);
-    try {
-      expect((await getAgentStatus()).agentId).toBe('fake-agent');
-    } finally {
-      clearAgentEnv();
-    }
+  afterEach(() => {
+    process.env.L4_PORTS_DIR = undefined;
   });
 
-  it('records when it was last reached', async () => {
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    await getAgentStatus();
-    const [row] = await ctx.db.select().from(schema.agents);
-    expect(row.lastSeenAt).not.toBeNull();
-    expect(row.lastError).toBeNull();
+  it('writes a token once and leaves it alone on the next start', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { ensureBootstrapToken, bootstrapPath } = await import('../../src/lib/agent/bootstrap');
+
+    expect(ensureBootstrapToken()).toBe(true);
+    const first = readFileSync(bootstrapPath(), 'utf-8');
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+
+    // A restart must not invalidate a token an agent has already read but not yet redeemed.
+    ensureBootstrapToken();
+    expect(readFileSync(bootstrapPath(), 'utf-8')).toBe(first);
   });
 
-  it('records why it could not be reached', async () => {
-    await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    await agent.stop();
+  it('pairs an agent that presents it, and rotates it so it cannot be replayed', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { ensureBootstrapToken, bootstrapPath } = await import('../../src/lib/agent/bootstrap');
+    ensureBootstrapToken();
+    const token = readFileSync(bootstrapPath(), 'utf-8').trim();
 
-    expect(await tryGetAgentStatus()).toBeNull();
-    const [row] = await ctx.db.select().from(schema.agents);
-    expect(row.lastError).toBe('Unreachable');
+    const response = await POST(
+      pairRequest({ code: token, agentId: AGENT_ID, agentVersion: '3.0.0' }),
+    );
+    expect(response.status).toBe(200);
+    expect(await listAgents()).toHaveLength(1);
+
+    // Rotated, not deleted: the next agent to come up needs one of its own.
+    const rotated = readFileSync(bootstrapPath(), 'utf-8').trim();
+    expect(rotated).toMatch(/^[0-9a-f]{64}$/);
+    expect(rotated).not.toBe(token);
+
+    // And the one just used is dead.
+    const replay = await POST(
+      pairRequest({ code: token, agentId: 'c'.repeat(32), agentVersion: '3.0.0' }),
+    );
+    expect(replay.status).toBe(401);
+    expect(await listAgents()).toHaveLength(1);
   });
 
-  it('stops being used once it is unpaired', async () => {
-    const paired = await pairWithAgent({ address: agent.url, code: 'ABCDEF' });
-    await deleteAgent(paired.id);
+  it('refuses a token that is the right shape but not the stored one', async () => {
+    const { ensureBootstrapToken } = await import('../../src/lib/agent/bootstrap');
+    ensureBootstrapToken();
 
-    expect(await getActiveAgent()).toBeNull();
-    // No local socket either, so there is nothing left to fall back to.
-    expect(await tryGetAgentStatus()).toBeNull();
+    const response = await POST(
+      pairRequest({ code: 'd'.repeat(64), agentId: AGENT_ID, agentVersion: '3.0.0' }),
+    );
+    expect(response.status).toBe(401);
+    expect(await listAgents()).toHaveLength(0);
   });
-});
 
-describe('getControllerId', () => {
-  it('is stable across calls', async () => {
-    // Agents key their stored secrets on it. A new id would make every paired agent refuse this
-    // controller, with no way back but re-pairing each one by hand.
-    const first = await getControllerId();
-    expect(await getControllerId()).toBe(first);
-    expect(first).toMatch(/^[0-9a-f]{32}$/);
+  it('does not let a bootstrap token stand in for a typed code when none was written', async () => {
+    // No ensureBootstrapToken() here: a controller with no shared volume must refuse this outright
+    // rather than falling through to the six-letter path and comparing against a live code.
+    ensurePairingCode();
+    const response = await POST(
+      pairRequest({ code: 'e'.repeat(64), agentId: AGENT_ID, agentVersion: '3.0.0' }),
+    );
+    expect(response.status).toBe(401);
+    expect(await listAgents()).toHaveLength(0);
+  });
+
+  it('leaves the typed-code path working alongside it', async () => {
+    const { ensureBootstrapToken } = await import('../../src/lib/agent/bootstrap');
+    ensureBootstrapToken();
+
+    const { code } = ensurePairingCode();
+    const response = await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
+    expect(response.status).toBe(200);
   });
 });

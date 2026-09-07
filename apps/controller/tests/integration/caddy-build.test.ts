@@ -53,9 +53,21 @@ import * as schema from '../../src/lib/db/schema';
 type FakeAgent = Awaited<ReturnType<typeof startFakeAgent>>;
 let agent: FakeAgent;
 
-/** Whether the controller has asked the agent to rebuild. */
+/**
+ * Desired-state frames seen at the start of the test, so `rebuildRequested` measures what the test
+ * did rather than the frame every agent gets when it attaches.
+ */
+let pushBaseline = 0;
+
+/**
+ * Whether the controller pushed new desired state during this test.
+ *
+ * Asking for a rebuild is a push now, not a POST to a rebuild endpoint. Saving the build settings
+ * does not push — only applying does — so a frame appearing after the baseline is the rebuild
+ * request, and its absence is the controller declining to ask for one.
+ */
 function rebuildRequested(): boolean {
-  return agent.requests.some((r) => r.method === 'POST' && r.path === '/v1/caddy-build');
+  return agent.requests.filter((r) => r.kind === 'desired-state').length > pushBaseline;
 }
 
 const L4 = 'github.com/mholt/caddy-l4';
@@ -73,6 +85,7 @@ function setAppliedModules(specs: string[]) {
 
 beforeEach(async () => {
   agent = await startFakeAgent();
+  pushBaseline = agent.requests.filter((r) => r.kind === 'desired-state').length;
   await ctx.db.delete(schema.settings);
 });
 
@@ -314,12 +327,11 @@ describe('applyCaddyBuild', () => {
     await saveCaddyBuildSettings({ modules: { 'caddy-l4': false }, customModules: [] });
 
     const status = await applyCaddyBuild();
-    // Accepted, not finished: xcaddy compiles from source and can take minutes.
-    expect(status.state).toBe('building');
+    // Pending, not finished: the controller pushes the module list and the agent reconciles, and
+    // xcaddy compiles from source for minutes after that.
+    expect(status.state).toBe('pending');
 
-    const posted = agent.requests.find((r) => r.method === 'POST');
-    expect(posted?.path).toBe('/v1/caddy-build');
-    const modules = (posted as { body: { modules: string[] } }).body.modules;
+    const modules = agent.desired?.caddyModules ?? [];
     expect(modules).not.toContain(L4);
     expect(modules).toContain(CORAZA);
   });
