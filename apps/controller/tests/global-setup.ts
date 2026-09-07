@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPOSE_ARGS, COMPOSE_CWD } from './helpers/compose';
+import { waitForHydration } from './helpers/hydration';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
@@ -92,6 +93,10 @@ async function seedAuthState(): Promise<void> {
 
   try {
     await page.goto('http://localhost:3000/login');
+    // Wait for React before touching the form: until it hydrates the click runs the browser's
+    // native submit, which GETs /login with the credentials in the query string and never reaches
+    // the auth API. Seeding is the whole suite's prerequisite, so a miss here fails every spec.
+    await waitForHydration(page);
     await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
     await page.getByRole('textbox', { name: /password/i }).fill('TestPassword2026!');
     await page.getByRole('button', { name: /sign in/i }).click();

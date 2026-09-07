@@ -10,6 +10,7 @@ import {
   setSettingRow,
   clearSettingRow,
 } from '../../helpers/seed';
+import { waitForHydration } from '../../helpers/hydration';
 
 const USERNAME = 'legacyhashuser';
 const EMAIL = `${USERNAME}@localhost`;
@@ -22,6 +23,10 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 async function signIn(page: import('@playwright/test').Page, password: string) {
   await page.goto('/login');
+  // The sign-in form submits natively until React attaches its onSubmit, so a fill or a click that
+  // lands first is either dropped or turned into a GET to /login?username=...&password=... — the
+  // shape CI caught this helper failing in, on the second sign-in below.
+  await waitForHydration(page);
   await page.getByRole('textbox', { name: /username/i }).fill(USERNAME);
   await page.getByRole('textbox', { name: /password/i }).fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();

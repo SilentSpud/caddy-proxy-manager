@@ -15,6 +15,7 @@
  * account is the one they then sign in with, and their data is there at the end.
  */
 import { type Page, expect, test } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 import {
   LEGACY_CONTAINER_PATH,
   LEGACY_FIXTURE,
@@ -120,6 +121,9 @@ test.describe('Migrating an existing installation', () => {
     // The whole point of migrating rather than starting fresh. A user row without its credential
     // account row would leave this account existing and unusable.
     await page.goto('/login');
+    // The container restarted moments ago, so this is the coldest /login in the suite — the widest
+    // window between the form being painted and React attaching its onSubmit.
+    await waitForHydration(page);
     await field('username').fill(LEGACY_FIXTURE.adminUsername);
     await field('password').fill(LEGACY_PASSWORD);
     await page.getByRole('button', { name: /sign in/i }).click();

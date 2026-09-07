@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 // Auth tests run WITHOUT pre-authenticated state
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -23,6 +24,9 @@ test.describe('Authentication', () => {
 
   test('/login with wrong password shows an error message', async ({ page }) => {
     await page.goto('/login');
+    // This test asserts the page STAYS on /login, and a pre-hydration native submit does that on
+    // its own — without the gate it would go green whether or not the password was ever checked.
+    await waitForHydration(page);
     await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
     await page.getByRole('textbox', { name: /password/i }).fill('WrongPassword!');
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -33,6 +37,7 @@ test.describe('Authentication', () => {
 
   test('/login with correct credentials lands on dashboard', async ({ page }) => {
     await page.goto('/login');
+    await waitForHydration(page);
     await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
     await page.getByRole('textbox', { name: /password/i }).fill('TestPassword2026!');
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -44,6 +49,7 @@ test.describe('Authentication', () => {
     // Regression test: logout used request.url as redirect base, which inside
     // Docker resolves to 0.0.0.0 instead of the configured BASE_URL.
     await page.goto('/login');
+    await waitForHydration(page);
     await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
     await page.getByRole('textbox', { name: /password/i }).fill('TestPassword2026!');
     await page.getByRole('button', { name: /sign in/i }).click();

@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 /**
  * Active session management (profile "Active sessions"): list sessions, mark the
@@ -22,6 +23,9 @@ interface SessionRow {
 async function loginViaUi(context: BrowserContext): Promise<void> {
   const page = await context.newPage();
   await page.goto(`${BASE_URL}/login`);
+  // The form submits natively until React attaches its onSubmit, so a fill or click landing first
+  // is dropped or turned into a GET to /login with the credentials in the query string.
+  await waitForHydration(page);
   await page.getByRole('textbox', { name: /username/i }).fill(ADMIN.username);
   await page.getByRole('textbox', { name: /password/i }).fill(ADMIN.password);
   await page.getByRole('button', { name: /sign in/i }).click();

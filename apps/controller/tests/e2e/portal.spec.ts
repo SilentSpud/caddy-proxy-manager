@@ -3,6 +3,7 @@
  * without pre-authenticated state, since this is a login page.
  */
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -26,6 +27,9 @@ test.describe('Portal login page', () => {
 
   test('shows error with invalid credentials', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
+    // The portal's credential form is the same shape as /login's — onSubmit with preventDefault,
+    // so it submits natively until React attaches.
+    await waitForHydration(page);
 
     await page.getByLabel('Username').fill('wronguser');
     await page.getByLabel('Password').fill('wrongpass');
