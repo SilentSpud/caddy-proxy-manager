@@ -17,6 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function LinkAccountPage({ searchParams }: LinkAccountPageProps) {
+  const t = await getTranslations("auth.linkAccount");
   const session = await auth();
 
   // Already authenticated - redirect
@@ -28,7 +29,7 @@ export default async function LinkAccountPage({ searchParams }: LinkAccountPageP
   const errorParam = (await searchParams).error || "";
 
   if (!errorParam.startsWith("LINKING_REQUIRED:")) {
-    redirect("/login?error=Invalid linking request");
+    redirect(`/login?error=${encodeURIComponent(t("invalidRequest"))}`);
   }
 
   const linkingId = errorParam.replace("LINKING_REQUIRED:", "");
@@ -38,14 +39,14 @@ export default async function LinkAccountPage({ searchParams }: LinkAccountPageP
   const rawToken = await peekLinkingToken(linkingId);
 
   if (!rawToken) {
-    redirect("/login?error=Linking token expired or invalid");
+    redirect(`/login?error=${encodeURIComponent(t("tokenExpired"))}`);
   }
 
   // Verify token and decode for display purposes only
   const tokenPayload = await verifyLinkingToken(rawToken);
 
   if (!tokenPayload) {
-    redirect("/login?error=Linking token expired or invalid");
+    redirect(`/login?error=${encodeURIComponent(t("tokenExpired"))}`);
   }
 
   // Pass only the opaque linkingId to the client — the raw JWT never leaves the server
