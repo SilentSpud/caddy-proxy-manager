@@ -86,7 +86,11 @@ export class SettingValidationError extends Error {
   constructor(
     readonly settingKey: string,
     readonly code: SettingValidationCode,
-    /** ICU arguments for the message, excluding `label`, which the renderer looks up. */
+    /**
+     * ICU arguments for the message, `label` included — that one is the English label, which is
+     * what builds the fallback `message` below. A renderer with a locale replaces it with the
+     * translated label before formatting; see `settingValidationMessage`.
+     */
     readonly params: Record<string, string | number>,
     message: string,
   ) {

@@ -18,7 +18,7 @@ export function actionSuccess(message?: string): ActionState {
 type Translator = ReturnType<typeof useTranslations>;
 
 /** Which error code failed is only known at runtime; `tests/unit/domain-error.test.ts` covers it. */
-type DynamicTranslate = (key: string) => string;
+type DynamicTranslate = (key: string, values?: Record<string, string | number>) => string;
 
 /**
  * The message to show for a failed action.
@@ -40,7 +40,8 @@ export function extractErrorMessage(
   fallbackMessage: string,
 ): string {
   if (error instanceof DomainError) {
-    return (t as unknown as DynamicTranslate)(`errors.${error.code}`);
+    // `params` has to come along: without it a code carrying placeholders renders them raw.
+    return (t as unknown as DynamicTranslate)(`errors.${error.code}`, error.params);
   }
   return error instanceof Error ? error.message : fallbackMessage;
 }
