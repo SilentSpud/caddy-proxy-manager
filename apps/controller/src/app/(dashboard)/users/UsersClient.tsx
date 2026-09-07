@@ -16,12 +16,8 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
-import {
-  AUTOFILL_EMAIL,
-  AUTOFILL_NEW_PASSWORD,
-  NATIVE_REQUIRED,
-  nativeAttrs,
-} from "@/components/ui/native-input-attrs";
+import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
+import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { useRouter } from "next/navigation";
@@ -162,18 +158,15 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
                   value={createRole}
                   onChange={(v) => setCreateRole(v as UserEntry["role"])}
                 />
-                <TextInput
-                  {...NATIVE_REQUIRED}
-                  {...AUTOFILL_NEW_PASSWORD}
-                  {...nativeAttrs({ minLength: 8 })}
+                <GeneratedPasswordField
                   data-testid="create-password"
                   label={t("password")}
-                  type="password"
                   htmlName="password"
                   value={createPassword}
                   onChange={setCreatePassword}
                   placeholder={t("passwordPlaceholder")}
                   isRequired
+                  minLength={8}
                 />
               </Grid>
               <HStack gap={2}>

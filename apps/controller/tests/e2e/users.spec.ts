@@ -110,6 +110,44 @@ test.describe('Users page', () => {
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
   });
 
+  test('the generate button fills the password with a usable value', async ({ page }) => {
+    // Generating writes into a masked field, so it also reveals: a value nobody can read is no
+    // use for a credential an administrator has to pass on.
+    await page.getByRole('button', { name: /create user/i }).click();
+    const password = page.getByTestId('create-password');
+    await expect(password).toHaveValue('');
+
+    await page.getByRole('button', { name: /generate a strong password/i }).click();
+
+    await expect(password).toHaveAttribute('type', 'text');
+    const generated = await password.inputValue();
+    // The policy the server enforces: 12+, both cases, a digit and a symbol.
+    expect(generated.length).toBeGreaterThanOrEqual(12);
+    expect(generated).toMatch(/[a-z]/);
+    expect(generated).toMatch(/[A-Z]/);
+    expect(generated).toMatch(/[0-9]/);
+    expect(generated).toMatch(/[^A-Za-z0-9]/);
+
+    // Twice running does not hand out the same password.
+    await page.getByRole('button', { name: /generate a strong password/i }).click();
+    expect(await password.inputValue()).not.toBe(generated);
+  });
+
+  test('a generated password is accepted when the user is created', async ({ page }) => {
+    const email = `generated-${Date.now()}@localhost`;
+    await page.getByRole('button', { name: /create user/i }).click();
+    await page.getByTestId('create-email').fill(email);
+    await page.getByTestId('create-name').fill('Generated Password User');
+    await page.getByRole('button', { name: /generate a strong password/i }).click();
+
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+
+    // The real assertion: what the generator produces satisfies the policy the server applies,
+    // so the form does not bounce it.
+    await expect(page.getByTestId('create-email')).not.toBeVisible();
+    await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
+  });
+
   test('clicking Cancel hides the create form', async ({ page }) => {
     await page.getByRole('button', { name: /create user/i }).click();
     await expect(page.getByTestId('create-email')).toBeVisible();

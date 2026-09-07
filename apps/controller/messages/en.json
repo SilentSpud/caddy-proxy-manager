@@ -1270,6 +1270,14 @@
   },
   "ui": {
     "cancel": "Cancel",
+    "passwordField": {
+      "copiedLabel": "Copied",
+      "copyLabel": "Copy password",
+      "generateLabel": "Generate a strong password",
+      "generateTooltip": "Generate strong password",
+      "hideLabel": "Hide password",
+      "revealLabel": "Show password"
+    },
     "viewDetails": "View details"
   },
   "users": {

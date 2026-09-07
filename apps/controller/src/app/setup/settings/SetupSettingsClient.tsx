@@ -31,6 +31,7 @@ import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-
 import { FormCard, InfoAlert, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { saveSetupSettings } from "./actions";
 import { useTranslations } from "next-intl";
+import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 
 export type SettingField = {
   key: string;
@@ -40,6 +41,7 @@ export type SettingField = {
   description: string;
   kind: "string" | "number" | "boolean" | "tristate";
   secret: boolean;
+  generatable: boolean;
   /** Switches its whole group on and off. At most one per group; see the registry's `gate`. */
   gate: boolean;
   value: string | number | boolean | null;
@@ -294,6 +296,28 @@ function SettingRow({
     );
   }
 
+  const description =
+    field.secret && field.source !== "default"
+      ? `${field.description} Leave blank to keep the current value.`
+      : field.description;
+
+  // Only a secret this deployment gets to choose; a licence key or a client secret is issued
+  // elsewhere, and generating one there would just produce a value that does not work.
+  if (field.secret && field.generatable) {
+    return (
+      <VStack gap={1}>
+        {label}
+        <GeneratedPasswordField
+          label={field.label}
+          htmlName={field.key}
+          description={description}
+          value={typeof value === "string" ? value : ""}
+          onChange={(next: string) => onChange(next)}
+        />
+      </VStack>
+    );
+  }
+
   return (
     <VStack gap={1}>
       {label}
@@ -302,11 +326,7 @@ function SettingRow({
         isLabelHidden
         htmlName={field.key}
         type={field.secret ? "password" : "text"}
-        description={
-          field.secret && field.source !== "default"
-            ? `${field.description} Leave blank to keep the current value.`
-            : field.description
-        }
+        description={description}
         value={typeof value === "string" ? value : ""}
         onChange={(next: string) => onChange(next)}
         width="100%"

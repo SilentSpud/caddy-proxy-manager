@@ -35,6 +35,7 @@ import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/action
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
 import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import { useTranslations } from "next-intl";
+import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 
 interface ActiveSession {
   id: number;
@@ -759,12 +760,16 @@ export default function ProfileClient({
               onChange={setCurrentPassword}
             />
           )}
-          <TextInput
-            {...AUTOFILL_NEW_PASSWORD}
+          <GeneratedPasswordField
             label={t("newPassword")}
-            type="password"
             value={newPassword}
             onChange={setNewPassword}
+            // Fill the confirmation too: a generated value nobody typed cannot be retyped from
+            // memory, and leaving it blank only blocks the dialog.
+            onGenerate={(generated) => {
+              setNewPassword(generated);
+              setConfirmPassword(generated);
+            }}
             description={passwordPolicyHint(tRoot)}
           />
           <TextInput

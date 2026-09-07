@@ -86,6 +86,7 @@ import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import OAuthProvidersSection from "./OAuthProvidersSection";
 import { CheckboxInput } from "@/src/components/ui/FormBooleanControls";
+import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import type { AgentStatus } from "@cpm/shared";
 import type { AgentResult } from "@/src/lib/agent/client";
@@ -2133,10 +2134,8 @@ function AnalyticsSection({
             value={user}
             onChange={setUser}
           />
-          <TextInput
-            {...AUTOFILL_NEW_PASSWORD}
+          <GeneratedPasswordField
             label={t("clickhousePassword")}
-            type="password"
             isOptional={analytics.hasPassword}
             description={
               analytics.hasPassword
