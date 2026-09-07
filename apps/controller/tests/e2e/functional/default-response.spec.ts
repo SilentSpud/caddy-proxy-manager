@@ -8,8 +8,19 @@ import {
   test,
   type APIRequestContext,
 } from '@playwright/test';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { httpGet, waitForBody, type HttpResponse } from '../../helpers/http';
+
+/**
+ * The signed-in state global-setup seeds, and what playwright.config.ts hands every test by
+ * default. These hooks build their own APIRequestContext, so they resolve it themselves — through
+ * import.meta.url, because the spec is an ES module and has no __dirname.
+ */
+const ADMIN_STORAGE_STATE = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../.auth/admin.json',
+);
 
 const API = 'http://localhost:3000/api/v1';
 const ORIGIN = 'http://localhost:3000';
@@ -74,7 +85,7 @@ test.describe
 
     test.beforeAll(async () => {
       const request = await playwrightRequest.newContext({
-        storageState: resolve(__dirname, '../../.auth/admin.json'),
+        storageState: ADMIN_STORAGE_STATE,
       });
       const current = await request.get(`${API}/settings/default-response`, {
         headers: { Origin: ORIGIN },
@@ -102,7 +113,7 @@ test.describe
 
     test.afterAll(async () => {
       const request = await playwrightRequest.newContext({
-        storageState: resolve(__dirname, '../../.auth/admin.json'),
+        storageState: ADMIN_STORAGE_STATE,
       });
       await setDefaultResponse(request, originalSettings);
       if (hostId !== null) {
