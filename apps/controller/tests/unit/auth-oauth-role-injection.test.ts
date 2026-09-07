@@ -139,15 +139,14 @@ describe('mapOAuthProvider — OAuth self-registration gating (M2)', () => {
     expect(cfg.disableImplicitSignUp).toBe(true);
   });
 
-  it('uses a trusted stable account issuer and the Better Auth 1.7 config shape', () => {
+  it('turns a configured issuer into a discovery URL, and passes no issuer of its own', () => {
     const cfg = mapOAuthProvider(sampleProvider);
 
-    expect(cfg.accountIssuer).toBe('https://idp.example/');
     expect(cfg.discoveryUrl).toBe('https://idp.example/.well-known/openid-configuration');
     expect(cfg).not.toHaveProperty('issuer');
   });
 
-  it('isolates issuerless OAuth providers in an encoded synthetic namespace', () => {
+  it('uses the explicit endpoints when a provider declares no issuer', () => {
     const cfg = mapOAuthProvider({
       ...sampleProvider,
       id: 'team/provider',
@@ -156,6 +155,8 @@ describe('mapOAuthProvider — OAuth self-registration gating (M2)', () => {
       tokenUrl: 'https://idp.example/token',
     });
 
-    expect(cfg.accountIssuer).toBe('local:oauth:team%2Fprovider');
+    expect(cfg.authorizationUrl).toBe('https://idp.example/authorize');
+    expect(cfg.tokenUrl).toBe('https://idp.example/token');
+    expect(cfg.discoveryUrl).toBeUndefined();
   });
 });

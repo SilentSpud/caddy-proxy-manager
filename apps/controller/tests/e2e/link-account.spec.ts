@@ -3,6 +3,7 @@
  * token, and redirects to /login without one. Covers that redirect and the password fallback.
  */
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -25,6 +26,7 @@ test.describe('Link Account page', () => {
   test('redirects authenticated users to /', async ({ page }) => {
     // First log in
     await page.goto('http://localhost:3000/login');
+    await waitForHydration(page);
     await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
     await page.getByRole('textbox', { name: /password/i }).fill('TestPassword2026!');
     await page.getByRole('button', { name: /sign in/i }).click();

@@ -9,7 +9,6 @@
  */
 import { eq, ne, and, isNull, desc } from "drizzle-orm";
 import * as schema from "./db/schema";
-import { CREDENTIAL_ISSUER, accountIssuerFor } from "./account-issuer";
 import { db, isEphemeral, runSchemaMigrations } from "./db/connection";
 
 export { db, client, runInTransaction } from "./db/connection";
@@ -36,7 +35,7 @@ try {
 async function runBetterAuthDataMigration() {
   if (isEphemeral) return;
 
-  const { settings, users, accounts, oauthProviders } = schema;
+  const { settings, users, accounts } = schema;
 
   const [flag] = await db
     .select()
@@ -46,14 +45,6 @@ async function runBetterAuthDataMigration() {
   if (flag) return;
 
   const now = new Date().toISOString();
-  // Providers declaring an issuer key their accounts by it; the rest use the synthetic local
-  // namespace. Read once rather than per user.
-  const providerIssuers = new Map(
-    (
-      await db.select({ id: oauthProviders.id, issuer: oauthProviders.issuer }).from(oauthProviders)
-    ).map((row) => [row.id, row.issuer] as const),
-  );
-
   // Migrate OAuth users: create account rows from users.provider/subject
   const oauthUsers = await db.select().from(users).where(ne(users.provider, "credentials"));
   for (const user of oauthUsers) {
@@ -74,7 +65,6 @@ async function runBetterAuthDataMigration() {
         userId: user.id,
         accountId: user.subject,
         providerId: user.provider,
-        issuer: accountIssuerFor(user.provider, providerIssuers.get(user.provider)),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       });
@@ -94,7 +84,6 @@ async function runBetterAuthDataMigration() {
         userId: user.id,
         accountId: user.id.toString(),
         providerId: "credential",
-        issuer: CREDENTIAL_ISSUER,
         password: user.passwordHash,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,

@@ -39,6 +39,8 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
   default: T;
   /** Encrypted at rest, and never sent to the browser in full. */
   secret?: boolean;
+  /** A secret this deployment chooses for itself, so the UI may offer to generate one. */
+  generatable?: boolean;
   /**
    * Docker Compose reads this variable too, to provision `clickhouse` or `geoipupdate`.
    *
@@ -179,8 +181,19 @@ export function stringSetting(
   return { ...spec, key, parse, fromEnv: parse };
 }
 
-export function secretSetting(spec: Common<string> & { maxLength?: number }) {
-  return { ...stringSetting({ ...spec, maxLength: spec.maxLength ?? 16 * 1024 }), secret: true };
+/**
+ * `generatable` says the value is the deployment's to choose, so the UI may offer to generate one.
+ * A secret that has to match something outside this app — a licence key, an OAuth client secret —
+ * leaves it off, because there a generated value is simply wrong.
+ */
+export function secretSetting(
+  spec: Common<string> & { maxLength?: number; generatable?: boolean },
+) {
+  return {
+    ...stringSetting({ ...spec, maxLength: spec.maxLength ?? 16 * 1024 }),
+    secret: true,
+    generatable: spec.generatable === true,
+  };
 }
 
 export function numberSetting(
@@ -511,6 +524,9 @@ export const clickhouseUser = stringSetting({
 export const clickhousePassword = secretSetting({
   name: "clickhouse_password",
   env: "CLICKHOUSE_PASSWORD",
+  // Nothing outside this deployment knows it: the container is handed the same value the app
+  // connects with, so any strong string will do.
+  generatable: true,
   composeReads: true,
   group: "analytics",
   label: "ClickHouse password",

@@ -17,6 +17,7 @@ import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-po
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { useTranslations } from "next-intl";
 import {
   deleteCaCertificateAction,
@@ -214,10 +215,8 @@ export function IssueClientCertDialog({
               isIntegerOnly
               units="days"
             />
-            <TextInput
-              {...NATIVE_REQUIRED}
+            <GeneratedPasswordField
               label={t("exportPassword")}
-              type="password"
               htmlName="export_password"
               value={exportPassword}
               onChange={setExportPassword}

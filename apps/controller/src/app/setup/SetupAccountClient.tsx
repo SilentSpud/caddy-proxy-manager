@@ -27,6 +27,7 @@ import { passwordPolicyHint } from "@/src/lib/password-policy-message";
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/native-input-attrs";
 import { configureFirstOAuthProvider, createFirstAdmin } from "./actions";
+import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 
 const AGENT_DOCS = "https://github.com/SilentSpud/caddy-proxy-manager/wiki/Agent-setup";
 
@@ -126,16 +127,19 @@ export default function SetupAccountClient({ migratedFrom }: { migratedFrom?: st
                       isRequired
                       width="100%"
                     />
-                    <TextInput
-                      {...AUTOFILL_NEW_PASSWORD}
+                    <GeneratedPasswordField
                       label={ta("password")}
                       htmlName="password"
-                      type="password"
                       description={passwordPolicyHint(t)}
                       value={password}
                       onChange={setPassword}
+                      // Fill the confirmation too: a generated value nobody typed cannot be
+                      // retyped from memory, and leaving it blank only blocks the form.
+                      onGenerate={(generated) => {
+                        setPassword(generated);
+                        setPasswordConfirmation(generated);
+                      }}
                       isRequired
-                      width="100%"
                     />
                     <TextInput
                       {...AUTOFILL_NEW_PASSWORD}

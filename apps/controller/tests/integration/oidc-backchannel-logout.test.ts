@@ -67,7 +67,6 @@ async function linkAccount(userId: number, subject: string, providerId = PROVIDE
     userId,
     accountId: subject,
     providerId,
-    issuer: `local:oauth:${providerId}`,
     createdAt: now,
     updatedAt: now,
   });

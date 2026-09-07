@@ -4,6 +4,7 @@
  */
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { ensureTestUser } from '../helpers/seed';
+import { waitForHydration } from '../helpers/hydration';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,6 +43,9 @@ async function loginAs(
   const page = await context.newPage();
 
   await page.goto('http://localhost:3000/login');
+  // The form submits natively until React attaches its onSubmit, so a fill or click landing first
+  // is dropped or turned into a GET to /login with the credentials in the query string.
+  await waitForHydration(page);
   await page.getByLabel('Username').fill(username);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();

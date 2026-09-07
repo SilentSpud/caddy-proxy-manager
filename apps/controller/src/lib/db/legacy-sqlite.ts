@@ -17,7 +17,6 @@
  * pre-rename history to fix up.
  */
 import type { Database } from "bun:sqlite";
-import { CREDENTIAL_ISSUER, accountIssuerFor } from "../account-issuer";
 
 /**
  * A `file:` URL exposes its path with a leading slash, so a Windows absolute path arrives as
@@ -112,6 +111,23 @@ function fixSessionsSchema(client: Database) {
   }
 }
 
+/** The columns the rebuild below writes; kept beside it so the readiness check cannot drift. */
+const REBUILT_ACCOUNT_COLUMNS = [
+  "id",
+  "userId",
+  "accountId",
+  "providerId",
+  "accessToken",
+  "refreshToken",
+  "idToken",
+  "accessTokenExpiresAt",
+  "refreshTokenExpiresAt",
+  "scope",
+  "password",
+  "createdAt",
+  "updatedAt",
+] as const;
+
 /**
  * Ensure `accounts.id` is INTEGER PRIMARY KEY AUTOINCREMENT — some upgraded deployments have a
  * NOT NULL non-rowid column, failing inserts that omit it. Accounts are durable, so preserve rows.
@@ -127,36 +143,44 @@ function fixAccountsSchema(client: Database) {
     if (cols.length === 0) return;
     const idCol = cols.find((c) => c.name === "id");
     if (!idCol) return;
-    const issuerCol = cols.find((c) => c.name === "issuer");
+    const idIsCorrect = idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1;
+
+    // The whole shape the rebuild below produces, not just `id`: a table can have a sound id and
+    // still be missing a column or the identity index, and returning early on `id` alone would
+    // leave it that way. `accounts_provider_account_idx` is the one that matters most — without it
+    // nothing stops two rows claiming the same (providerId, accountId).
+    const columnNames = new Set(cols.map((c) => c.name));
+    const hasAllColumns = REBUILT_ACCOUNT_COLUMNS.every((name) => columnNames.has(name));
+
     const indexes = client.prepare('PRAGMA index_list("accounts")').all() as Array<{
       name: string;
       unique: number;
     }>;
-    const issuerIndex = indexes.find(
-      (index) => index.name === "accounts_issuer_account_idx" && index.unique === 1,
-    );
-    const issuerIndexColumns = issuerIndex
-      ? (client.prepare('PRAGMA index_info("accounts_issuer_account_idx")').all() as Array<{
+    const indexColumns = (name: string) =>
+      (
+        client.prepare(`PRAGMA index_info("${name}")`).all() as Array<{
           name: string;
           seqno: number;
-        }>)
-      : [];
-    const hasCorrectIssuerIndex =
-      issuerIndexColumns
+        }>
+      )
         .sort((left, right) => left.seqno - right.seqno)
         .map((column) => column.name)
-        .join(",") === "issuer,accountId";
-    const idIsCorrect = idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1;
-    const issuerIsCorrect = issuerCol?.notnull === 1;
+        .join(",");
+    const providerIndex = indexes.find(
+      (index) => index.name === "accounts_provider_account_idx" && index.unique === 1,
+    );
+    const userIndex = indexes.find((index) => index.name === "accounts_user_idx");
+    const hasProviderIndex =
+      providerIndex !== undefined && indexColumns(providerIndex.name) === "providerId,accountId";
+    const hasUserIndex = userIndex !== undefined && indexColumns(userIndex.name) === "userId";
 
-    if (idIsCorrect && issuerIsCorrect && hasCorrectIssuerIndex) {
+    if (idIsCorrect && hasAllColumns && hasProviderIndex && hasUserIndex) {
       return;
     }
 
     type LegacyAccountRow = {
       id: number | string;
       userId: number;
-      issuer?: string | null;
       accountId: string;
       providerId: string;
       accessToken: string | null;
@@ -173,41 +197,16 @@ function fixAccountsSchema(client: Database) {
     const accountRows = client
       .prepare('SELECT * FROM "accounts" ORDER BY "id"')
       .all() as LegacyAccountRow[];
-    const providerIssuers = new Map<string, string | null>();
-    const hasProviderTable = client
-      .prepare(
-        "SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'oauth_providers'",
-      )
-      .get();
-    if (hasProviderTable) {
-      const providers = client
-        .prepare('SELECT "id", "issuer" FROM "oauth_providers"')
-        .all() as Array<{ id: string; issuer: string | null }>;
-      for (const provider of providers) {
-        providerIssuers.set(provider.id, provider.issuer);
-      }
-    }
-
-    const normalizedRows = accountRows.map((row) => {
-      const existingIssuer = row.issuer?.trim();
-      const issuer =
-        existingIssuer ||
-        (row.providerId === "credential"
-          ? CREDENTIAL_ISSUER
-          : accountIssuerFor(row.providerId, providerIssuers.get(row.providerId)));
-      return { ...row, issuer };
-    });
-
-    // Better Auth 1.7 keys external identities by (issuer, accountId). Never
+    // Better Auth keys external identities by (providerId, accountId). Never
     // merge a collision implicitly: two legacy rows may belong to different
     // users, and choosing either one could turn a migration into account takeover.
     const identityOwners = new Map<string, number | string>();
-    for (const row of normalizedRows) {
-      const key = JSON.stringify([row.issuer, row.accountId]);
+    for (const row of accountRows) {
+      const key = JSON.stringify([row.providerId, row.accountId]);
       const existingOwner = identityOwners.get(key);
       if (existingOwner !== undefined) {
         throw new Error(
-          `account identity collision for issuer "${row.issuer}" and accountId "${row.accountId}"`,
+          `account identity collision for providerId "${row.providerId}" and accountId "${row.accountId}"`,
         );
       }
       identityOwners.set(key, row.id);
@@ -219,7 +218,6 @@ function fixAccountsSchema(client: Database) {
         .prepare(`CREATE TABLE "accounts_patch" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "userId" INTEGER NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
-        "issuer" TEXT NOT NULL,
         "accountId" TEXT NOT NULL,
         "providerId" TEXT NOT NULL,
         "accessToken" TEXT,
@@ -234,10 +232,10 @@ function fixAccountsSchema(client: Database) {
       )`)
         .run();
       const insert = client.prepare(`INSERT INTO "accounts_patch" (
-        "id", "userId", "issuer", "accountId", "providerId", "accessToken", "refreshToken", "idToken",
+        "id", "userId", "accountId", "providerId", "accessToken", "refreshToken", "idToken",
         "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope", "password", "createdAt", "updatedAt"
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      for (const row of normalizedRows) {
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const row of accountRows) {
         // A table old enough to need this repair may hold non-numeric TEXT ids, which the
         // rebuilt INTEGER PRIMARY KEY rejects. Nothing references accounts.id, so let
         // AUTOINCREMENT assign a fresh one rather than failing the repair.
@@ -245,7 +243,6 @@ function fixAccountsSchema(client: Database) {
         insert.run(
           id,
           row.userId,
-          row.issuer,
           row.accountId,
           row.providerId,
           row.accessToken,
@@ -264,11 +261,6 @@ function fixAccountsSchema(client: Database) {
       client
         .prepare(
           'CREATE UNIQUE INDEX "accounts_provider_account_idx" ON "accounts" ("providerId", "accountId")',
-        )
-        .run();
-      client
-        .prepare(
-          'CREATE UNIQUE INDEX "accounts_issuer_account_idx" ON "accounts" ("issuer", "accountId")',
         )
         .run();
       client.prepare('CREATE INDEX "accounts_user_idx" ON "accounts" ("userId")').run();

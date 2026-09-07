@@ -123,9 +123,9 @@ describe.if(IDP_AVAILABLE)('OAuth sign-in against a real IdP', () => {
     const linked = accounts.find((account) => account.accountId === MOCK_IDP_CLAIMS.sub);
     expect(linked, 'the OAuth identity should be linked to an account row').toBeDefined();
     expect(linked?.providerId).toBe(PROVIDER_ID);
-    // better-auth 1.7 keys external identities by (issuer, accountId), so a blank issuer here
+    // better-auth keys external identities by (providerId, accountId), so a blank accountId here
     // means the account exists but will never resolve at the next sign-in.
-    expect(linked?.issuer).toBeTruthy();
+    expect(linked?.accountId).toBeTruthy();
   });
 
   it('ignores a role claim from the IdP', async () => {

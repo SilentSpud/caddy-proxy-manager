@@ -73,10 +73,6 @@ export const accounts = pgTable(
       .notNull(),
     accountId: text("accountId").notNull(),
     providerId: text("providerId").notNull(),
-    // better-auth 1.7 scopes account identity by issuer, not providerId: `local:credential` for
-    // passwords, the provider's issuer URL for OIDC, `local:oauth:<id>` otherwise. Set on write;
-    // migration 0024 backfilled existing rows.
-    issuer: text("issuer").notNull(),
     accessToken: text("accessToken"),
     refreshToken: text("refreshToken"),
     idToken: text("idToken"),
@@ -92,7 +88,6 @@ export const accounts = pgTable(
       table.providerId,
       table.accountId,
     ),
-    issuerAccountIdx: uniqueIndex("accounts_issuer_account_idx").on(table.issuer, table.accountId),
     userIdx: index("accounts_user_idx").on(table.userId),
   }),
 );

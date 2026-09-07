@@ -4,25 +4,11 @@ import { SignJWT, jwtVerify } from "jose";
 import { config } from "../config";
 import { findUserByEmail, getUserById } from "../models/user";
 import db from "../db";
-import { users, linkingTokens, accounts, oauthProviders } from "../db/schema";
+import { users, linkingTokens, accounts } from "../db/schema";
 import { and, eq, lt } from "drizzle-orm";
 import { nowIso } from "../db";
-import { accountIssuerFor } from "../account-issuer";
 
 const LINKING_TOKEN_EXPIRY = 5 * 60; // 5 minutes in seconds
-
-/**
- * The issuer to stamp on a linked OAuth account row. better-auth 1.7 keys accounts by
- * (issuer, accountId), so a mismatch means the link exists but never resolves.
- */
-async function issuerForProvider(providerId: string): Promise<string> {
-  const [row] = await db
-    .select({ issuer: oauthProviders.issuer })
-    .from(oauthProviders)
-    .where(eq(oauthProviders.id, providerId))
-    .limit(1);
-  return accountIssuerFor(providerId, row?.issuer);
-}
 
 export type LinkingDecision = {
   action: "auto_link" | "require_manual_link" | "create_new" | "signin_existing";
@@ -44,12 +30,11 @@ export async function decideLinkingStrategy(
   providerAccountId: string,
   email: string,
 ): Promise<LinkingDecision> {
-  const issuer = await issuerForProvider(provider);
   // Check accounts table for existing OAuth connection
   const existingAccount = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.issuer, issuer), eq(accounts.accountId, providerAccountId)))
+    .where(and(eq(accounts.providerId, provider), eq(accounts.accountId, providerAccountId)))
     .limit(1);
 
   if (existingAccount.length > 0) {
@@ -199,10 +184,8 @@ export async function verifyAndLinkOAuth(
   }
 
   // Insert OAuth account link
-  const issuer = await issuerForProvider(provider);
   await db.insert(accounts).values({
     userId,
-    issuer,
     accountId: providerAccountId,
     providerId: provider,
     createdAt: nowIso(),
@@ -230,10 +213,8 @@ export async function autoLinkOAuth(
   }
 
   // Insert OAuth account link
-  const issuer = await issuerForProvider(provider);
   await db.insert(accounts).values({
     userId,
-    issuer,
     accountId: providerAccountId,
     providerId: provider,
     createdAt: nowIso(),
@@ -263,10 +244,8 @@ export async function linkOAuthAuthenticated(
   }
 
   // Insert OAuth account link
-  const issuer = await issuerForProvider(provider);
   await db.insert(accounts).values({
     userId,
-    issuer,
     accountId: providerAccountId,
     providerId: provider,
     createdAt: nowIso(),

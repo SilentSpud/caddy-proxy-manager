@@ -13,6 +13,7 @@
  * redirects land, the forms submit, and each step leads to the next.
  */
 import { type Page, expect, test } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 const SETUP_ORIGIN = 'http://localhost:3004';
 const USERNAME = 'setupadmin';
@@ -58,6 +59,9 @@ test.describe('First-run setup', () => {
 
   test('choosing the agent role explains that agents are set up elsewhere', async () => {
     await page.goto('/setup');
+    // Every interaction below a fresh `goto` waits for React first: the setup screens are
+    // server-rendered, so a radio click or a fill that lands before hydration is simply lost.
+    await waitForHydration(page);
     await page.getByRole('radio', { name: 'Agent' }).click();
 
     await expect(page.getByText('Agents are set up separately')).toBeVisible();
@@ -68,6 +72,7 @@ test.describe('First-run setup', () => {
 
   test('the OAuth option offers a provider form instead of an account form', async () => {
     await page.goto('/setup');
+    await waitForHydration(page);
     await page.getByRole('radio', { name: 'OAuth provider' }).click();
 
     await expect(field('issuer')).toBeVisible();
@@ -77,6 +82,7 @@ test.describe('First-run setup', () => {
 
   test('a mismatched confirmation is refused without creating anything', async () => {
     await page.goto('/setup');
+    await waitForHydration(page);
     await field('username').fill(USERNAME);
     await field('password').fill(PASSWORD);
     await field('passwordConfirmation').fill('SomethingElse2026!');
@@ -89,6 +95,7 @@ test.describe('First-run setup', () => {
 
   test('creating the first administrator sends them to prove the password works', async () => {
     await page.goto('/setup');
+    await waitForHydration(page);
     await field('username').fill(USERNAME);
     await field('password').fill(PASSWORD);
     await field('passwordConfirmation').fill(PASSWORD);
@@ -101,6 +108,7 @@ test.describe('First-run setup', () => {
 
   test('signing in with the new account carries on into the settings step', async () => {
     await page.goto('/login');
+    await waitForHydration(page);
     await field('username').fill(USERNAME);
     await field('password').fill(PASSWORD);
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -205,6 +213,7 @@ test.describe('First-run setup', () => {
     const fresh = await context.newPage();
     try {
       await fresh.goto('/login');
+      await waitForHydration(fresh);
       await fresh.locator('input[name="username"]').fill(USERNAME);
       await fresh.locator('input[name="password"]').fill(PASSWORD);
       await fresh.getByRole('button', { name: /sign in/i }).click();

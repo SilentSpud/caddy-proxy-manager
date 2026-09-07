@@ -51,6 +51,7 @@ export default async function SetupSettingsPage() {
               ? "tristate"
               : "string",
       secret: definition.secret === true,
+      generatable: definition.generatable === true,
       gate: definition.gate === true,
       // A gate is stored tri-state but rendered as a switch, so an unset one has to arrive as the
       // answer the app is currently acting on rather than as `null` — which a switch would show as

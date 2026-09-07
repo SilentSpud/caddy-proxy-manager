@@ -57,7 +57,6 @@ import {
   listUserOAuthProviders,
 } from '../../src/lib/models/user';
 import { accounts, oauthProviders, users } from '../../src/lib/db/schema';
-import { CREDENTIAL_ISSUER, accountIssuerFor } from '../../src/lib/account-issuer';
 import { auth } from '@/src/lib/auth';
 import { eq } from 'drizzle-orm';
 
@@ -98,29 +97,20 @@ async function seedProvider(id: string, issuer: string) {
  * in `accounts`, nothing else. The account.create.after hook under test is the
  * seam CPM uses to keep users.provider/subject in step.
  */
-async function createAccountLikeBetterAuth(
-  userId: number,
-  providerId: string,
-  issuer: string,
-  accountId: string,
-) {
-  await db()
-    .insert(accounts)
-    .values({
-      userId,
-      issuer: accountIssuerFor(providerId, issuer),
-      accountId,
-      providerId,
-      createdAt: NOW,
-      updatedAt: NOW,
-    });
+async function createAccountLikeBetterAuth(userId: number, providerId: string, accountId: string) {
+  await db().insert(accounts).values({
+    userId,
+    accountId,
+    providerId,
+    createdAt: NOW,
+    updatedAt: NOW,
+  });
 
   const options = ((await getAuth()) as any).options;
   expect(typeof options.databaseHooks?.account?.create?.after).toBe('function');
   await options.databaseHooks.account.create.after({
     userId: String(userId),
     providerId,
-    issuer: accountIssuerFor(providerId, issuer),
     accountId,
   });
 }
@@ -140,7 +130,7 @@ describe('#261 — account.create.after keeps users.provider/subject in sync', (
       passwordHash: 'x'.repeat(60),
     });
 
-    await createAccountLikeBetterAuth(user.id, 'prov-a', 'https://a.example', 'sub-a-1');
+    await createAccountLikeBetterAuth(user.id, 'prov-a', 'sub-a-1');
 
     const fresh = await getUserById(user.id);
     expect(fresh?.provider).toBe('prov-a');
@@ -157,7 +147,7 @@ describe('#261 — account.create.after keeps users.provider/subject in sync', (
       subject: '',
     });
 
-    await createAccountLikeBetterAuth(user.id, 'prov-b', 'https://b.example', 'sub-b-1');
+    await createAccountLikeBetterAuth(user.id, 'prov-b', 'sub-b-1');
 
     const fresh = await getUserById(user.id);
     expect(fresh?.provider).toBe('prov-b');
@@ -171,23 +161,19 @@ describe('#261 — account.create.after keeps users.provider/subject in sync', (
       provider: '',
       subject: '',
     });
-    await db()
-      .insert(accounts)
-      .values({
-        userId: user.id,
-        issuer: accountIssuerFor('prov-a', 'https://a.example'),
-        accountId: 'sub-a-resignin',
-        providerId: 'prov-a',
-        createdAt: NOW,
-        updatedAt: NOW,
-      });
+    await db().insert(accounts).values({
+      userId: user.id,
+      accountId: 'sub-a-resignin',
+      providerId: 'prov-a',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
 
     // Simulate a repeat sign-in: Better Auth updates the existing account row.
     const options = ((await getAuth()) as any).options;
     await options.databaseHooks.account.update.after({
       userId: String(user.id),
       providerId: 'prov-a',
-      issuer: accountIssuerFor('prov-a', 'https://a.example'),
       accountId: 'sub-a-resignin',
     });
 
@@ -208,7 +194,6 @@ describe('#261 — account.create.after keeps users.provider/subject in sync', (
       .insert(accounts)
       .values({
         userId: user.id,
-        issuer: CREDENTIAL_ISSUER,
         accountId: String(user.id),
         providerId: 'credential',
         password: 'y'.repeat(60),
@@ -220,7 +205,6 @@ describe('#261 — account.create.after keeps users.provider/subject in sync', (
     await options.databaseHooks.account.create.after({
       userId: String(user.id),
       providerId: 'credential',
-      issuer: CREDENTIAL_ISSUER,
       accountId: String(user.id),
     });
 
@@ -244,7 +228,6 @@ describe('#261 — syncUserOAuthIdentity', () => {
       .values([
         {
           userId: user.id,
-          issuer: accountIssuerFor('prov-a', 'https://a.example'),
           accountId: 'sub-a-9',
           providerId: 'prov-a',
           createdAt: NOW,
@@ -252,7 +235,6 @@ describe('#261 — syncUserOAuthIdentity', () => {
         },
         {
           userId: user.id,
-          issuer: accountIssuerFor('prov-b', 'https://b.example'),
           accountId: 'sub-b-9',
           providerId: 'prov-b',
           createdAt: NOW,
@@ -275,16 +257,13 @@ describe('#261 — syncUserOAuthIdentity', () => {
       subject: 'sub-a-fallback',
       passwordHash: 'x'.repeat(60),
     });
-    await db()
-      .insert(accounts)
-      .values({
-        userId: user.id,
-        issuer: accountIssuerFor('prov-a', 'https://a.example'),
-        accountId: 'sub-a-fallback',
-        providerId: 'prov-a',
-        createdAt: NOW,
-        updatedAt: NOW,
-      });
+    await db().insert(accounts).values({
+      userId: user.id,
+      accountId: 'sub-a-fallback',
+      providerId: 'prov-a',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
 
     // Simulate unlink: delete the OAuth account rows, then re-derive.
     await db().delete(accounts).where(eq(accounts.userId, user.id));
@@ -324,7 +303,7 @@ describe('#261 — unlink API re-derives identity from the accounts table', () =
       passwordHash: 'x'.repeat(60),
     });
     ctx.unlinkUserId = user.id;
-    await createAccountLikeBetterAuth(user.id, 'prov-a', 'https://a.example', 'sub-a-unlink');
+    await createAccountLikeBetterAuth(user.id, 'prov-a', 'sub-a-unlink');
     expect((await getUserById(user.id))?.provider).toBe('prov-a');
 
     const request = {
@@ -356,7 +335,7 @@ describe('#261 — profile connection state is derived from the accounts table',
       subject: '',
       passwordHash: 'x'.repeat(60),
     });
-    await createAccountLikeBetterAuth(user.id, 'prov-a', 'https://a.example', 'sub-a-derived');
+    await createAccountLikeBetterAuth(user.id, 'prov-a', 'sub-a-derived');
 
     // Even if users.provider were stale, the profile must see the link.
     await db().update(users).set({ provider: '', subject: '' }).where(eq(users.id, user.id));

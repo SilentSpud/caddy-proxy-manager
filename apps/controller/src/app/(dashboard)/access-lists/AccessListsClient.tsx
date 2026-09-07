@@ -48,6 +48,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
+import { generatePassword } from "@/src/lib/password-generator";
 import {
   createAccessListAction,
   updateAccessListAction,
@@ -106,13 +107,6 @@ function pwStrength(pw: string): { score: number; label: string; variant: Streng
   return { score: s, ...map[s] };
 }
 
-function genPassword(len = 18): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#%&*";
-  const buf = new Uint32Array(len);
-  crypto.getRandomValues(buf);
-  return Array.from(buf, (v) => chars[v % chars.length]).join("");
-}
-
 type SortKey = "recent" | "name" | "members" | "usage";
 
 type MemberRow = {
@@ -153,7 +147,7 @@ function MembersTab({
   };
 
   const regen = async (id: number) => {
-    const pw = genPassword();
+    const pw = generatePassword();
     const updated = await regeneratePasswordAction(list.id, id, pw);
     if (updated) onListUpdated(updated);
     try {
@@ -334,7 +328,7 @@ function MembersTab({
                   label={t("generatePasswordLabel")}
                   tooltip={t("generatePasswordTooltip")}
                   icon={<Sparkles />}
-                  onClick={() => setDraft((d) => ({ ...d, password: genPassword() }))}
+                  onClick={() => setDraft((d) => ({ ...d, password: generatePassword() }))}
                 />
               </HStack>
               {draft.password && (
@@ -791,7 +785,9 @@ function NewListDialog({
                 icon={<Sparkles />}
                 onClick={() =>
                   setSeed(
-                    seed.map((x) => (x.rowId === s.rowId ? { ...x, password: genPassword() } : x)),
+                    seed.map((x) =>
+                      x.rowId === s.rowId ? { ...x, password: generatePassword() } : x,
+                    ),
                   )
                 }
               />
