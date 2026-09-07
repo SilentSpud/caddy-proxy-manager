@@ -312,7 +312,6 @@ describe('promoteFirstSetupAdmin', () => {
       userId: row.id,
       accountId: email,
       providerId,
-      issuer: `local:oauth:${providerId}`,
       createdAt: now,
       updatedAt: now,
     });

@@ -19,7 +19,6 @@ import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 import { bindSessionToIdpSession, recordSessionBindingFromIdToken } from "./services/oidc-logout";
 import { hashPassword, verifyPassword } from "./password";
-import { accountIssuerFor } from "./account-issuer";
 
 // biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
 let cachedAuth: any = null;
@@ -55,10 +54,6 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     // Security: an OAuth sign-in must not implicitly create an account unless OAuth
     // self-registration is on. Only first-time auto-provisioning is gated; linking still works.
     disableImplicitSignUp: !config.auth.allowOauthRegistration,
-    // Better Auth 1.7 scopes external identities by (issuer, accountId).
-    // Pin the namespace to trusted application configuration so a provider
-    // cannot choose or change its account namespace through profile claims.
-    accountIssuer: accountIssuerFor(p.id, p.issuer),
     mapProfileToUser: (profile) => mapEmailVerified(profile),
   };
   if (p.authorizationUrl) cfg.authorizationUrl = p.authorizationUrl;

@@ -217,7 +217,6 @@ describe('import', () => {
     expect(accounts).toHaveLength(1);
     expect(accounts[0]).toMatchObject({
       providerId: 'credential',
-      issuer: 'local:credential',
       accountId: '1',
     });
     expect(accounts[0]?.password).toBeTruthy();

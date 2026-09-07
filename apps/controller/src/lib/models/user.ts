@@ -1,8 +1,7 @@
 import db, { nowIso, toIso } from "../db";
-import { users, accounts, oauthProviders } from "../db/schema";
+import { users, accounts } from "../db/schema";
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
-import { CREDENTIAL_ISSUER, accountIssuerFor } from "../account-issuer";
 
 export type User = {
   id: number;
@@ -52,16 +51,10 @@ export async function findUserByProviderSubject(
   provider: string,
   subject: string,
 ): Promise<User | null> {
-  const [configuredProvider] = await db
-    .select({ issuer: oauthProviders.issuer })
-    .from(oauthProviders)
-    .where(eq(oauthProviders.id, provider))
-    .limit(1);
-  const issuer = accountIssuerFor(provider, configuredProvider?.issuer);
   const account = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.issuer, issuer), eq(accounts.accountId, subject)))
+    .where(and(eq(accounts.providerId, provider), eq(accounts.accountId, subject)))
     .limit(1);
 
   if (account.length === 0) return null;
@@ -121,7 +114,6 @@ export async function createUser(data: {
       userId: user.id,
       accountId: user.id.toString(),
       providerId: "credential",
-      issuer: CREDENTIAL_ISSUER,
       password: data.passwordHash,
       createdAt: now,
       updatedAt: now,
@@ -175,13 +167,7 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
       password: passwordHash,
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(accounts.userId, userId),
-        eq(accounts.providerId, "credential"),
-        eq(accounts.issuer, CREDENTIAL_ISSUER),
-      ),
-    );
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
 }
 
 /**

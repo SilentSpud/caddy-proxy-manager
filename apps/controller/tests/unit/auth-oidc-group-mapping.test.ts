@@ -247,7 +247,6 @@ describe('a repeat sign-in re-reads the group claim', () => {
       userId: user.id,
       accountId: 'user-1',
       providerId: 'authentik',
-      issuer: 'local:oauth:authentik',
       createdAt: now,
       updatedAt: now,
     });

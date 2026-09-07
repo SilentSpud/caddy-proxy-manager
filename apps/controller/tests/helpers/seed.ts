@@ -49,8 +49,8 @@ export function ensureTestUser(username: string, password: string, role: string)
       if (acc) {
         await sql\`UPDATE accounts SET password = \${hash}, "updatedAt" = \${now} WHERE id = \${acc.id}\`;
       } else {
-        await sql\`INSERT INTO accounts ("userId", "accountId", "providerId", issuer, password, "createdAt", "updatedAt")
-                   VALUES (\${existing.id}, \${String(existing.id)}, 'credential', 'local:credential', \${hash}, \${now}, \${now})\`;
+        await sql\`INSERT INTO accounts ("userId", "accountId", "providerId", password, "createdAt", "updatedAt")
+                   VALUES (\${existing.id}, \${String(existing.id)}, 'credential', \${hash}, \${now}, \${now})\`;
       }
     } else {
       const [user] = await sql\`
@@ -58,8 +58,8 @@ export function ensureTestUser(username: string, password: string, role: string)
         VALUES (\${email}, \${${JSON.stringify(username)}}, \${hash}, \${${JSON.stringify(role)}}, 'credentials',
                 \${${JSON.stringify(username)}}, \${${JSON.stringify(username)}}, 'active', \${now}, \${now})
         RETURNING id\`;
-      await sql\`INSERT INTO accounts ("userId", "accountId", "providerId", issuer, password, "createdAt", "updatedAt")
-                 VALUES (\${user.id}, \${String(user.id)}, 'credential', 'local:credential', \${hash}, \${now}, \${now})\`;
+      await sql\`INSERT INTO accounts ("userId", "accountId", "providerId", password, "createdAt", "updatedAt")
+                 VALUES (\${user.id}, \${String(user.id)}, 'credential', \${hash}, \${now}, \${now})\`;
     }
     await sql.close();
   `);

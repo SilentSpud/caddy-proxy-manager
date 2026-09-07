@@ -1,6 +1,5 @@
 import { hashPassword } from "./password";
 import db, { nowIso } from "./db";
-import { CREDENTIAL_ISSUER } from "./account-issuer";
 import { config } from "./config";
 import { users, accounts } from "./db/schema";
 import { and, eq, sql } from "drizzle-orm";
@@ -109,13 +108,7 @@ async function ensureCredentialAccount(userId: number, passwordHash: string): Pr
   const [existing] = await db
     .select()
     .from(accounts)
-    .where(
-      and(
-        eq(accounts.userId, userId),
-        eq(accounts.providerId, "credential"),
-        eq(accounts.issuer, CREDENTIAL_ISSUER),
-      ),
-    )
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
     .limit(1);
 
   if (existing) {
@@ -132,7 +125,6 @@ async function ensureCredentialAccount(userId: number, passwordHash: string): Pr
       userId,
       accountId: userId.toString(),
       providerId: "credential",
-      issuer: CREDENTIAL_ISSUER,
       password: passwordHash,
       createdAt: now,
       updatedAt: now,

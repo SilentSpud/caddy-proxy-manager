@@ -205,7 +205,6 @@ describe('reconcileOidcUserAfterSignIn', () => {
       userId,
       accountId: 'sub-1',
       providerId: 'authentik',
-      issuer: 'local:oauth:authentik',
       createdAt: now,
       updatedAt: now,
     });
@@ -223,7 +222,6 @@ describe('reconcileOidcUserAfterSignIn', () => {
       userId,
       accountId: 'other-sub',
       providerId: 'authentik',
-      issuer: 'local:oauth:authentik',
       createdAt: now,
       updatedAt: now,
     });

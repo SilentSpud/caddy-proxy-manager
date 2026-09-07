@@ -14,7 +14,7 @@ import * as schema from '../../src/lib/db/schema.pg';
  * optional: a test file creates a database per test, and leaking them exhausts max_connections
  * long before the suite ends.
  */
-const MIGRATION_SQL = resolve(import.meta.dir, '../../drizzle/postgres/0000_initial.sql');
+const MIGRATIONS_DIR = resolve(import.meta.dir, '../../drizzle/postgres');
 
 /**
  * Set by scripts/with-test-db.ts, which starts the throwaway server. Absent means the suite was
@@ -32,11 +32,27 @@ function adminUrl(): string {
 }
 
 /**
+ * Every migration, in the order drizzle's journal records — not just the initial one. The journal
+ * is the source of truth rather than a directory glob, so a test schema is built exactly the way a
+ * deployment is. Reading the one file was correct while `0000_initial` was the only migration, and
+ * silently wrong the moment a second one existed.
+ */
+function migrationSql(): string {
+  const journal = JSON.parse(
+    readFileSync(resolve(MIGRATIONS_DIR, 'meta/_journal.json'), 'utf8'),
+  ) as { entries: Array<{ idx: number; tag: string }> };
+  return [...journal.entries]
+    .sort((left, right) => left.idx - right.idx)
+    .map((entry) => readFileSync(resolve(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8'))
+    .join('\n');
+}
+
+/**
  * The DDL, rewritten to build inside one schema. drizzle-kit emits its foreign keys as
  * `REFERENCES "public"."users"`, which would point every schema's tables back at public.
  */
 function ddlFor(schemaName: string): string {
-  const raw = readFileSync(MIGRATION_SQL, 'utf8').split('--> statement-breakpoint').join('\n');
+  const raw = migrationSql().split('--> statement-breakpoint').join('\n');
   const scoped = raw.replaceAll('"public".', `"${schemaName}".`);
   // Guard against drizzle changing how it qualifies names: an unrewritten reference would silently
   // wire this schema's foreign keys to another test's tables.
