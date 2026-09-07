@@ -37,12 +37,33 @@ const VALID_MATCHER_TYPES: L4MatcherType[] = ["none", "tls_sni", "http_host", "p
 const VALID_PP_VERSIONS: L4ProxyProtocolVersion[] = ["v1", "v2"];
 const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
   "first",
 ];
 const VALID_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
+
+/**
+ * Weights for `weighted_round_robin`, typed as a comma-separated list in upstream order.
+ *
+ * All or nothing: a list with one unparseable entry is rejected rather than partially applied,
+ * because a weight silently dropped to 0 takes a backend out of rotation with nothing on screen
+ * to say why.
+ */
+function parseWeights(value: FormDataEntryValue | null): number[] | null {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+
+  const weights = parts.map((part) => Number.parseInt(part, 10));
+  return weights.every((w) => Number.isInteger(w) && w >= 0 && w <= 1000) ? weights : null;
+}
 
 function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerConfig> | undefined {
   if (!formData.has("lbPresent")) return undefined;
@@ -64,6 +85,10 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
   if (tryInterval !== null) result.tryInterval = tryInterval;
   const retries = parseOptionalNumber(formData.get("lbRetries"));
   if (retries !== null) result.retries = retries;
+  const choose = parseOptionalNumber(formData.get("lbPolicyChoose"));
+  if (choose !== null) result.policyChoose = choose;
+  const weights = parseWeights(formData.get("lbPolicyWeights"));
+  if (weights !== null) result.policyWeights = weights;
 
   // Active health check
   if (formData.has("lbActiveHealthEnabledPresent")) {

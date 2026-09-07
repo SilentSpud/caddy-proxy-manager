@@ -214,14 +214,36 @@ function parseRedirectUrl(raw: FormDataEntryValue | null): string {
 
 const VALID_LB_POLICIES: LoadBalancingPolicy[] = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
+  "client_ip_hash",
   "first",
   "header",
   "cookie",
   "uri_hash",
+  "query",
 ];
+
+/**
+ * Weights for `weighted_round_robin`, typed as a comma-separated list in upstream order.
+ *
+ * All or nothing: a list with one unparseable entry is rejected rather than partially applied,
+ * because a weight silently dropped to 0 takes a backend out of rotation with nothing on screen
+ * to say why.
+ */
+function parseWeightList(value: FormDataEntryValue | null): number[] | null {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+  const weights = parts.map((part) => Number.parseInt(part, 10));
+  return weights.every((w) => Number.isInteger(w) && w >= 0 && w <= 1000) ? weights : null;
+}
 const VALID_UPSTREAM_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
 function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefined {
@@ -245,6 +267,9 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
   const policyHeaderField = parseOptionalText(formData.get("lbPolicyHeaderField"));
   const policyCookieName = parseOptionalText(formData.get("lbPolicyCookieName"));
   const policyCookieSecret = parseOptionalText(formData.get("lbPolicyCookieSecret"));
+  const policyQueryKey = parseOptionalText(formData.get("lbPolicyQueryKey"));
+  const policyChoose = parseOptionalNumber(formData.get("lbPolicyChoose"));
+  const policyWeights = parseWeightList(formData.get("lbPolicyWeights"));
   const tryDuration = parseOptionalText(formData.get("lbTryDuration"));
   const tryInterval = parseOptionalText(formData.get("lbTryInterval"));
   const retries = parseOptionalNumber(formData.get("lbRetries"));
@@ -266,6 +291,13 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       timeout: parseOptionalText(formData.get("lbActiveHealthTimeout")),
       status: parseOptionalNumber(formData.get("lbActiveHealthStatus")),
       body: parseOptionalText(formData.get("lbActiveHealthBody")),
+      passes: parseOptionalNumber(formData.get("lbActiveHealthPasses")),
+      fails: parseOptionalNumber(formData.get("lbActiveHealthFails")),
+      method: parseOptionalText(formData.get("lbActiveHealthMethod")),
+      requestBody: parseOptionalText(formData.get("lbActiveHealthRequestBody")),
+      followRedirects: formData.has("lbActiveHealthFollowRedirectsPresent")
+        ? parseCheckbox(formData.get("lbActiveHealthFollowRedirects"))
+        : undefined,
     };
   }
 
@@ -297,6 +329,9 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       maxFails: parseOptionalNumber(formData.get("lbPassiveHealthMaxFails")),
       unhealthyStatus,
       unhealthyLatency: parseOptionalText(formData.get("lbPassiveHealthUnhealthyLatency")),
+      unhealthyRequestCount: parseOptionalNumber(
+        formData.get("lbPassiveHealthUnhealthyRequestCount"),
+      ),
     };
   }
 
@@ -315,6 +350,15 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
   }
   if (policyCookieSecret !== null) {
     result.policyCookieSecret = policyCookieSecret;
+  }
+  if (policyQueryKey !== null) {
+    result.policyQueryKey = policyQueryKey;
+  }
+  if (policyChoose !== null) {
+    result.policyChoose = policyChoose;
+  }
+  if (policyWeights !== null) {
+    result.policyWeights = policyWeights;
   }
   if (tryDuration !== null) {
     result.tryDuration = tryDuration;

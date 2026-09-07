@@ -60,9 +60,17 @@ const PROXY_PROTOCOL_OPTIONS = [
   { value: "v2", label: "v2" },
 ];
 
+/**
+ * What `layer4.proxy.selection_policies.*` registers — a strict subset of the HTTP list.
+ *
+ * No header, cookie, uri_hash, query or client_ip_hash: each needs a request to read, and layer 4
+ * has a connection. Checked against the shipped binary, not assumed from the HTTP side.
+ */
 const LB_POLICY_OPTIONS = [
   { value: "random", label: "Random" },
+  { value: "random_choose", label: "Random (choose N)" },
   { value: "round_robin", label: "Round Robin" },
+  { value: "weighted_round_robin", label: "Weighted Round Robin" },
   { value: "least_conn", label: "Least Connections" },
   { value: "ip_hash", label: "IP Hash" },
   { value: "first", label: "First Available" },
@@ -123,15 +131,13 @@ type TextFields = {
   listenAddress: string;
   upstreams: string;
   matcherValue: string;
-  lbTryDuration: string;
-  lbTryInterval: string;
-  lbRetries: string;
+  lbPolicyChoose: string;
+  lbPolicyWeights: string;
   lbActiveHealthPort: string;
   lbActiveHealthInterval: string;
   lbActiveHealthTimeout: string;
   lbPassiveHealthFailDuration: string;
   lbPassiveHealthMaxFails: string;
-  lbPassiveHealthUnhealthyLatency: string;
   dnsResolvers: string;
   dnsFallbacks: string;
   dnsTimeout: string;
@@ -155,9 +161,8 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     listenAddress: initialData?.listenAddress ?? "",
     upstreams: initialData?.upstreams.join("\n") ?? "",
     matcherValue: initialData?.matcherValue?.join(", ") ?? "",
-    lbTryDuration: lb?.tryDuration ?? "",
-    lbTryInterval: lb?.tryInterval ?? "",
-    lbRetries: lb?.retries != null ? String(lb.retries) : "",
+    lbPolicyChoose: lb?.policyChoose != null ? String(lb.policyChoose) : "",
+    lbPolicyWeights: lb?.policyWeights?.join(", ") ?? "",
     lbActiveHealthPort:
       lb?.activeHealthCheck?.port != null ? String(lb.activeHealthCheck.port) : "",
     lbActiveHealthInterval: lb?.activeHealthCheck?.interval ?? "",
@@ -165,7 +170,6 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     lbPassiveHealthFailDuration: lb?.passiveHealthCheck?.failDuration ?? "",
     lbPassiveHealthMaxFails:
       lb?.passiveHealthCheck?.maxFails != null ? String(lb.passiveHealthCheck.maxFails) : "",
-    lbPassiveHealthUnhealthyLatency: lb?.passiveHealthCheck?.unhealthyLatency ?? "",
     dnsResolvers: initialData?.dnsResolver?.resolvers?.join("\n") ?? "",
     dnsFallbacks: initialData?.dnsResolver?.fallbacks?.join("\n") ?? "",
     dnsTimeout: initialData?.dnsResolver?.timeout ?? "",
@@ -376,29 +380,26 @@ function L4HostForm({
             value={lbPolicy}
             onChange={setLbPolicy}
           />
-          <TextInput
-            label={t("tryDuration")}
-            isOptional
-            htmlName="lbTryDuration"
-            placeholder="5s"
-            value={text.lbTryDuration}
-            onChange={set("lbTryDuration")}
-          />
-          <TextInput
-            label={t("tryInterval")}
-            isOptional
-            htmlName="lbTryInterval"
-            placeholder="250ms"
-            value={text.lbTryInterval}
-            onChange={set("lbTryInterval")}
-          />
-          <TextInput
-            label={t("retries")}
-            isOptional
-            htmlName="lbRetries"
-            value={text.lbRetries}
-            onChange={set("lbRetries")}
-          />
+          {lbPolicy === "random_choose" && (
+            <TextInput
+              label={t("lbChoose")}
+              isOptional
+              htmlName="lbPolicyChoose"
+              placeholder="2"
+              value={text.lbPolicyChoose}
+              onChange={set("lbPolicyChoose")}
+            />
+          )}
+          {lbPolicy === "weighted_round_robin" && (
+            <TextInput
+              label={t("lbWeights")}
+              isOptional
+              htmlName="lbPolicyWeights"
+              placeholder="3, 2, 1"
+              value={text.lbPolicyWeights}
+              onChange={set("lbPolicyWeights")}
+            />
+          )}
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
             {t("activeHealthCheck")}
@@ -458,14 +459,6 @@ function L4HostForm({
             htmlName="lbPassiveHealthMaxFails"
             value={text.lbPassiveHealthMaxFails}
             onChange={set("lbPassiveHealthMaxFails")}
-          />
-          <TextInput
-            label={t("unhealthyLatency")}
-            isOptional
-            htmlName="lbPassiveHealthUnhealthyLatency"
-            placeholder="5s"
-            value={text.lbPassiveHealthUnhealthyLatency}
-            onChange={set("lbPassiveHealthUnhealthyLatency")}
           />
         </Section>
 

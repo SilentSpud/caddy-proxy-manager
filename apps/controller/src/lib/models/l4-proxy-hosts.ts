@@ -10,7 +10,21 @@ export type L4Protocol = "tcp" | "udp";
 export type L4MatcherType = "none" | "tls_sni" | "http_host" | "proxy_protocol";
 export type L4ProxyProtocolVersion = "v1" | "v2";
 
-export type L4LoadBalancingPolicy = "random" | "round_robin" | "least_conn" | "ip_hash" | "first";
+/**
+ * What `layer4.proxy.selection_policies.*` actually registers in the shipped image.
+ *
+ * Deliberately shorter than the HTTP list: header, cookie, uri_hash, query and client_ip_hash all
+ * need a request to read, and layer 4 has a connection. Confirmed against `caddy list-modules`
+ * rather than assumed — caddy-l4 has no client_ip_hash even though reverse_proxy does.
+ */
+export type L4LoadBalancingPolicy =
+  | "random"
+  | "random_choose"
+  | "round_robin"
+  | "weighted_round_robin"
+  | "least_conn"
+  | "ip_hash"
+  | "first";
 
 export type L4LoadBalancerActiveHealthCheck = {
   enabled: boolean;
@@ -29,6 +43,10 @@ export type L4LoadBalancerPassiveHealthCheck = {
 export type L4LoadBalancerConfig = {
   enabled: boolean;
   policy: L4LoadBalancingPolicy;
+  /** How many upstreams `random_choose` picks between. */
+  policyChoose: number | null;
+  /** Weights for `weighted_round_robin`, positional against the upstream list. */
+  policyWeights: number[] | null;
   tryDuration: string | null;
   tryInterval: string | null;
   retries: number | null;
@@ -65,6 +83,8 @@ type L4LoadBalancerPassiveHealthCheckMeta = {
 type L4LoadBalancerMeta = {
   enabled?: boolean;
   policy?: string;
+  policy_choose?: number;
+  policy_weights?: number[];
   try_duration?: string;
   try_interval?: string;
   retries?: number;
@@ -110,7 +130,9 @@ export type L4ProxyHostMeta = {
 
 const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
   "first",
@@ -181,6 +203,11 @@ function normalizeMetaValue(value: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/** A positive whole count off the stored meta, or null. */
+function l4Count(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
 function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBalancerConfig | null {
   if (!meta) return null;
 
@@ -230,6 +257,11 @@ function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBala
   return {
     enabled,
     policy,
+    policyChoose: l4Count(meta.policy_choose),
+    policyWeights:
+      Array.isArray(meta.policy_weights) && meta.policy_weights.length > 0
+        ? meta.policy_weights
+        : null,
     tryDuration,
     tryInterval,
     retries,
@@ -249,6 +281,12 @@ function dehydrateL4LoadBalancer(
 
   if (config.policy) {
     meta.policy = config.policy;
+  }
+  if (config.policyChoose !== undefined && config.policyChoose !== null) {
+    meta.policy_choose = config.policyChoose;
+  }
+  if (config.policyWeights && config.policyWeights.length > 0) {
+    meta.policy_weights = config.policyWeights;
   }
   if (config.tryDuration) {
     meta.try_duration = config.tryDuration;

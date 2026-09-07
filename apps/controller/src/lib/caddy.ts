@@ -282,6 +282,12 @@ type LoadBalancerActiveHealthCheckMeta = {
   timeout?: string;
   status?: number;
   body?: string;
+  passes?: number;
+  fails?: number;
+  method?: string;
+  request_body?: string;
+  follow_redirects?: boolean;
+  headers?: Record<string, string>;
 };
 
 type LoadBalancerPassiveHealthCheckMeta = {
@@ -290,6 +296,7 @@ type LoadBalancerPassiveHealthCheckMeta = {
   max_fails?: number;
   unhealthy_status?: number[];
   unhealthy_latency?: string;
+  unhealthy_request_count?: number;
 };
 
 type LoadBalancerMeta = {
@@ -298,6 +305,9 @@ type LoadBalancerMeta = {
   policy_header_field?: string;
   policy_cookie_name?: string;
   policy_cookie_secret?: string;
+  policy_query_key?: string;
+  policy_choose?: number;
+  policy_weights?: number[];
   try_duration?: string;
   try_interval?: string;
   retries?: number;
@@ -311,6 +321,9 @@ type LoadBalancerRouteConfig = {
   policyHeaderField: string | null;
   policyCookieName: string | null;
   policyCookieSecret: string | null;
+  policyQueryKey: string | null;
+  policyChoose: number | null;
+  policyWeights: number[] | null;
   tryDuration: string | null;
   tryInterval: string | null;
   retries: number | null;
@@ -322,6 +335,12 @@ type LoadBalancerRouteConfig = {
     timeout: string | null;
     status: number | null;
     body: string | null;
+    passes: number | null;
+    fails: number | null;
+    method: string | null;
+    requestBody: string | null;
+    followRedirects: boolean;
+    headers: Record<string, string> | null;
   } | null;
   passiveHealthCheck: {
     enabled: boolean;
@@ -329,6 +348,7 @@ type LoadBalancerRouteConfig = {
     maxFails: number | null;
     unhealthyStatus: number[] | null;
     unhealthyLatency: string | null;
+    unhealthyRequestCount: number | null;
   } | null;
 };
 
@@ -947,7 +967,7 @@ export function buildLocationReverseProxy(
   // Per-rule load balancing / health checks (mirrors the host-level config).
   const lbConfig = parseLoadBalancerConfig(rule.load_balancer);
   if (lbConfig) {
-    const loadBalancing = buildLoadBalancingConfig(lbConfig);
+    const loadBalancing = buildLoadBalancingConfig(lbConfig, parsedTargets.length);
     if (loadBalancing) {
       reverseProxyHandler.load_balancing = loadBalancing;
     }
@@ -1604,9 +1624,10 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       };
     }
 
-    // Configure load balancing and health checks
+    // Configure load balancing and health checks. Counted against the *resolved* upstreams, since
+    // DNS pinning can expand one hostname into several dials and the weights must match what ships.
     if (lbConfig) {
-      const loadBalancing = buildLoadBalancingConfig(lbConfig);
+      const loadBalancing = buildLoadBalancingConfig(lbConfig, resolvedUpstreams.upstreams.length);
       if (loadBalancing) {
         reverseProxyHandler.load_balancing = loadBalancing;
       }
@@ -2617,6 +2638,11 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
           policyHeaderField: null,
           policyCookieName: null,
           policyCookieSecret: null,
+          // Layer 4 has no request to read: the HTTP-shaped policies (header, cookie, uri_hash,
+          // query) have nothing to hash, so only the connection-level ones are wired here.
+          policyQueryKey: null,
+          policyChoose: lbMeta.policy_choose ?? null,
+          policyWeights: lbMeta.policy_weights ?? null,
           tryDuration: lbMeta.try_duration ?? null,
           tryInterval: lbMeta.try_interval ?? null,
           retries: lbMeta.retries ?? null,
@@ -2629,6 +2655,14 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
                 timeout: lbMeta.active_health_check.timeout ?? null,
                 status: null,
                 body: null,
+                passes: lbMeta.active_health_check.passes ?? null,
+                fails: lbMeta.active_health_check.fails ?? null,
+                // No HTTP probe at layer 4 — the check is a dial, so there is no method, body,
+                // redirect to follow or header to send.
+                method: null,
+                requestBody: null,
+                followRedirects: false,
+                headers: null,
               }
             : null,
           passiveHealthCheck: lbMeta.passive_health_check?.enabled
@@ -2638,6 +2672,7 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
                 maxFails: lbMeta.passive_health_check.max_fails ?? null,
                 unhealthyStatus: null,
                 unhealthyLatency: lbMeta.passive_health_check.unhealthy_latency ?? null,
+                unhealthyRequestCount: lbMeta.passive_health_check.unhealthy_request_count ?? null,
               }
             : null,
         };
@@ -2723,9 +2758,9 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
         proxyHandler.proxy_protocol = host.proxyProtocolVersion;
       }
       if (lbConfig) {
-        const loadBalancing = buildLoadBalancingConfig(lbConfig);
+        const loadBalancing = buildL4LoadBalancingConfig(lbConfig, resolvedDials.length);
         if (loadBalancing) proxyHandler.load_balancing = loadBalancing;
-        const healthChecks = buildHealthChecksConfig(lbConfig);
+        const healthChecks = buildL4HealthChecksConfig(lbConfig);
         if (healthChecks) proxyHandler.health_checks = healthChecks;
       }
       handlers.push(proxyHandler);
@@ -3429,15 +3464,25 @@ function parseAuthentikConfig(
   };
 }
 
+/**
+ * Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped build.
+ *
+ * Anything outside this falls back to `random` rather than reaching Caddy: an unregistered policy
+ * name is refused at load time, and Caddy refuses the whole document rather than the one route.
+ */
 const VALID_LB_POLICIES = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
+  "client_ip_hash",
   "first",
   "header",
   "cookie",
   "uri_hash",
+  "query",
 ];
 
 function parseLoadBalancerConfig(
@@ -3454,6 +3499,17 @@ function parseLoadBalancerConfig(
     typeof meta.policy_cookie_name === "string" ? meta.policy_cookie_name.trim() || null : null;
   const policyCookieSecret =
     typeof meta.policy_cookie_secret === "string" ? meta.policy_cookie_secret.trim() || null : null;
+  const policyQueryKey =
+    typeof meta.policy_query_key === "string" ? meta.policy_query_key.trim() || null : null;
+  const policyChoose =
+    typeof meta.policy_choose === "number" && Number.isInteger(meta.policy_choose)
+      ? meta.policy_choose
+      : null;
+  const policyWeights =
+    Array.isArray(meta.policy_weights) &&
+    meta.policy_weights.every((w) => typeof w === "number" && Number.isInteger(w))
+      ? meta.policy_weights
+      : null;
   const tryDuration =
     typeof meta.try_duration === "string" ? meta.try_duration.trim() || null : null;
   const tryInterval =
@@ -3495,6 +3551,23 @@ function parseLoadBalancerConfig(
         typeof meta.active_health_check.body === "string"
           ? meta.active_health_check.body.trim() || null
           : null,
+      passes: activeCount(meta.active_health_check.passes),
+      fails: activeCount(meta.active_health_check.fails),
+      method:
+        typeof meta.active_health_check.method === "string"
+          ? meta.active_health_check.method.trim().toUpperCase() || null
+          : null,
+      requestBody:
+        typeof meta.active_health_check.request_body === "string"
+          ? meta.active_health_check.request_body.trim() || null
+          : null,
+      followRedirects: Boolean(meta.active_health_check.follow_redirects),
+      headers:
+        meta.active_health_check.headers &&
+        typeof meta.active_health_check.headers === "object" &&
+        Object.keys(meta.active_health_check.headers).length > 0
+          ? meta.active_health_check.headers
+          : null,
     };
   }
 
@@ -3523,6 +3596,7 @@ function parseLoadBalancerConfig(
         typeof meta.passive_health_check.unhealthy_latency === "string"
           ? meta.passive_health_check.unhealthy_latency.trim() || null
           : null,
+      unhealthyRequestCount: activeCount(meta.passive_health_check.unhealthy_request_count),
     };
   }
 
@@ -3532,6 +3606,9 @@ function parseLoadBalancerConfig(
     policyHeaderField,
     policyCookieName,
     policyCookieSecret,
+    policyQueryKey,
+    policyChoose,
+    policyWeights,
     tryDuration,
     tryInterval,
     retries,
@@ -3540,7 +3617,83 @@ function parseLoadBalancerConfig(
   };
 }
 
-function buildLoadBalancingConfig(config: LoadBalancerRouteConfig): Record<string, unknown> | null {
+/** A positive whole count off the stored meta, or null. */
+function activeCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+/**
+ * Layer 4's load balancing, which is a strict subset of the HTTP one.
+ *
+ * caddy-l4 accepts `selection_policy` and nothing else here — no retries, no try_duration, no
+ * try_interval. Emitting one is not ignored: Caddy refuses the whole document with `unknown field`,
+ * so a single L4 host with retries set would take down every route in the config, not just its own.
+ * Verified against `caddy validate` on the shipped image rather than inferred from the HTTP shape.
+ */
+function buildL4LoadBalancingConfig(
+  config: LoadBalancerRouteConfig,
+  upstreamCount?: number,
+): Record<string, unknown> | null {
+  const selectionPolicy: Record<string, unknown> = { policy: config.policy };
+
+  if (config.policy === "random_choose" && config.policyChoose !== null) {
+    selectionPolicy.choose = config.policyChoose;
+  } else if (config.policy === "weighted_round_robin") {
+    const weights = config.policyWeights;
+    if (weights && (upstreamCount === undefined || weights.length === upstreamCount)) {
+      selectionPolicy.weights = weights;
+    } else {
+      selectionPolicy.policy = "round_robin";
+    }
+  }
+
+  return { selection_policy: selectionPolicy };
+}
+
+/**
+ * Layer 4's health checks: `port`/`interval`/`timeout` active, `fail_duration`/`max_fails` passive.
+ *
+ * Everything else the HTTP checks carry — uri, expected status and body, passes, fails,
+ * unhealthy_latency, unhealthy_request_count — is an HTTP concept caddy-l4 does not define, and
+ * would be rejected the same way. There is no request at layer 4, only a dial.
+ */
+function buildL4HealthChecksConfig(
+  config: LoadBalancerRouteConfig,
+): Record<string, unknown> | null {
+  const healthChecks: Record<string, unknown> = {};
+
+  if (config.activeHealthCheck?.enabled) {
+    const active: Record<string, unknown> = {};
+    if (config.activeHealthCheck.port !== null) active.port = config.activeHealthCheck.port;
+    if (config.activeHealthCheck.interval) active.interval = config.activeHealthCheck.interval;
+    if (config.activeHealthCheck.timeout) active.timeout = config.activeHealthCheck.timeout;
+    if (Object.keys(active).length > 0) healthChecks.active = active;
+  }
+
+  if (config.passiveHealthCheck?.enabled) {
+    const passive: Record<string, unknown> = {};
+    if (config.passiveHealthCheck.failDuration) {
+      passive.fail_duration = config.passiveHealthCheck.failDuration;
+    }
+    if (config.passiveHealthCheck.maxFails !== null) {
+      passive.max_fails = config.passiveHealthCheck.maxFails;
+    }
+    if (Object.keys(passive).length > 0) healthChecks.passive = passive;
+  }
+
+  return Object.keys(healthChecks).length > 0 ? healthChecks : null;
+}
+
+/**
+ * `upstreamCount` is only read by `weighted_round_robin`, whose weights are positional against the
+ * upstream list. A list that has drifted — an upstream added without a weight beside it — is
+ * dropped rather than padded, because a backend silently reweighted to 0 stops receiving traffic
+ * and nothing in the UI would say so.
+ */
+function buildLoadBalancingConfig(
+  config: LoadBalancerRouteConfig,
+  upstreamCount?: number,
+): Record<string, unknown> | null {
   const loadBalancing: Record<string, unknown> = {};
 
   // Build selection policy
@@ -3554,6 +3707,19 @@ function buildLoadBalancingConfig(config: LoadBalancerRouteConfig): Record<strin
     selectionPolicy.name = config.policyCookieName;
     if (config.policyCookieSecret) {
       selectionPolicy.secret = config.policyCookieSecret;
+    }
+  } else if (config.policy === "query" && config.policyQueryKey) {
+    selectionPolicy.key = config.policyQueryKey;
+  } else if (config.policy === "random_choose" && config.policyChoose !== null) {
+    selectionPolicy.choose = config.policyChoose;
+  } else if (config.policy === "weighted_round_robin") {
+    const weights = config.policyWeights;
+    if (weights && (upstreamCount === undefined || weights.length === upstreamCount)) {
+      selectionPolicy.weights = weights;
+    } else {
+      // Without usable weights this policy is not configurable at all, so fall back to the
+      // unweighted rotation rather than emitting a policy Caddy would reject outright.
+      selectionPolicy.policy = "round_robin";
     }
   }
 
@@ -3596,6 +3762,28 @@ function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string
     if (config.activeHealthCheck.interval) {
       active.interval = config.activeHealthCheck.interval;
     }
+    if (config.activeHealthCheck.passes !== null) {
+      active.passes = config.activeHealthCheck.passes;
+    }
+    if (config.activeHealthCheck.fails !== null) {
+      active.fails = config.activeHealthCheck.fails;
+    }
+    if (config.activeHealthCheck.method) {
+      active.method = config.activeHealthCheck.method;
+    }
+    // `body` is what the probe *sends*; the expected response body is `expect_body` below. Caddy
+    // names them that way round, and confusing the two makes every check fail closed.
+    if (config.activeHealthCheck.requestBody) {
+      active.body = config.activeHealthCheck.requestBody;
+    }
+    if (config.activeHealthCheck.followRedirects) {
+      active.follow_redirects = true;
+    }
+    if (config.activeHealthCheck.headers) {
+      active.headers = Object.fromEntries(
+        Object.entries(config.activeHealthCheck.headers).map(([field, value]) => [field, [value]]),
+      );
+    }
     if (config.activeHealthCheck.timeout) {
       active.timeout = config.activeHealthCheck.timeout;
     }
@@ -3629,6 +3817,9 @@ function buildHealthChecksConfig(config: LoadBalancerRouteConfig): Record<string
     }
     if (config.passiveHealthCheck.unhealthyLatency) {
       passive.unhealthy_latency = config.passiveHealthCheck.unhealthyLatency;
+    }
+    if (config.passiveHealthCheck.unhealthyRequestCount !== null) {
+      passive.unhealthy_request_count = config.passiveHealthCheck.unhealthyRequestCount;
     }
 
     if (Object.keys(passive).length > 0) {
