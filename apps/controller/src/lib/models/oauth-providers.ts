@@ -14,6 +14,7 @@ export type OAuthGroupMapping = {
   groupPrefix: string | null;
   roleMappingEnabled: boolean;
   adminGroup: string | null;
+  operatorGroup: string | null;
   userGroup: string | null;
   viewerGroup: string | null;
   defaultRole: AppRole;
@@ -59,6 +60,7 @@ function parseDbProvider(row: DbProvider): OAuthProvider {
     groupPrefix: row.groupPrefix,
     roleMappingEnabled: row.roleMappingEnabled,
     adminGroup: row.adminGroup,
+    operatorGroup: row.operatorGroup,
     userGroup: row.userGroup,
     viewerGroup: row.viewerGroup,
     defaultRole: isAppRole(row.defaultRole) ? row.defaultRole : "user",
@@ -107,6 +109,7 @@ export async function createOAuthProvider(
       groupPrefix: data.groupPrefix?.trim() || null,
       roleMappingEnabled: data.roleMappingEnabled ?? false,
       adminGroup: data.adminGroup?.trim() || null,
+      operatorGroup: data.operatorGroup?.trim() || null,
       userGroup: data.userGroup?.trim() || null,
       viewerGroup: data.viewerGroup?.trim() || null,
       defaultRole: isAppRole(data.defaultRole) ? data.defaultRole : "user",
@@ -188,6 +191,7 @@ export async function updateOAuthProvider(
   if (data.groupPrefix !== undefined) updates.groupPrefix = data.groupPrefix?.trim() || null;
   if (data.roleMappingEnabled !== undefined) updates.roleMappingEnabled = data.roleMappingEnabled;
   if (data.adminGroup !== undefined) updates.adminGroup = data.adminGroup?.trim() || null;
+  if (data.operatorGroup !== undefined) updates.operatorGroup = data.operatorGroup?.trim() || null;
   if (data.userGroup !== undefined) updates.userGroup = data.userGroup?.trim() || null;
   if (data.viewerGroup !== undefined) updates.viewerGroup = data.viewerGroup?.trim() || null;
   if (data.defaultRole !== undefined)

@@ -9,7 +9,8 @@ import { and, eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { accounts, groupMembers, groups, users } from "../db/schema";
 import { logAuditEvent } from "../audit";
-import type { AppRole } from "../oidc-groups";
+import { type AppRole, normalizeGroupName } from "../oidc-groups";
+import { mappedExternalKeys, mappedGroupNames } from "../models/group-idp-mappings";
 
 export type PendingOidcSync = {
   providerId: string;
@@ -19,6 +20,14 @@ export type PendingOidcSync = {
   role: AppRole | null;
   /** CPM group names mirrored from the claim, empty when group sync is off. */
   localGroups: string[];
+  /**
+   * The claimed group names, verbatim.
+   *
+   * Carried as well as the mirrored list because the explicit IdP→group mappings live in the
+   * database and `mapProfileToUser` is synchronous — it cannot read them. They are resolved in
+   * `applyGroups`, which is already async and already the only writer of memberships.
+   */
+  claimedGroups: string[];
   syncGroups: boolean;
 };
 
@@ -107,7 +116,18 @@ async function applyRole(userId: number, entry: PendingOidcSync): Promise<void> 
 async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void> {
   if (!entry.syncGroups) return;
 
-  const desired = new Map(entry.localGroups.map((name) => [name.toLowerCase(), name]));
+  // Explicit mappings first, and they win: a claimed group named in one lands in the CPM group it
+  // names, and is then kept out of the prefix mirroring below — otherwise one claim would put the
+  // user in two groups, the mapped one and a mirror of its raw IdP name.
+  const [explicit, explicitKeys] = await Promise.all([
+    mappedGroupNames(entry.claimedGroups, entry.providerId),
+    mappedExternalKeys(entry.providerId),
+  ]);
+  const mirrored = entry.localGroups.filter(
+    (name) => !explicitKeys.has(normalizeGroupName(name).toLowerCase()),
+  );
+
+  const desired = new Map([...explicit, ...mirrored].map((name) => [name.toLowerCase(), name]));
 
   const existingGroups = await db.select().from(groups);
   const groupsByName = new Map(existingGroups.map((group) => [group.name.toLowerCase(), group]));

@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { APP_ROLES, type AppRole } from "../oidc-groups";
 import {
   getOAuthProviderByName,
   createOAuthProvider,
@@ -14,7 +15,7 @@ export async function syncEnvOAuthProviders(): Promise<void> {
   const name = config.oauth.providerName;
   const existing = await getOAuthProviderByName(name);
 
-  const validRoles = new Set(["admin", "user", "viewer"]);
+  const validRoles = new Set(APP_ROLES as readonly string[]);
   const data = {
     type: "oidc" as const,
     clientId: config.oauth.clientId,
@@ -29,11 +30,12 @@ export async function syncEnvOAuthProviders(): Promise<void> {
     groupPrefix: config.oauth.groupPrefix ?? null,
     roleMappingEnabled: config.oauth.roleMappingEnabled,
     adminGroup: config.oauth.adminGroup ?? null,
+    operatorGroup: config.oauth.operatorGroup ?? null,
     userGroup: config.oauth.userGroup ?? null,
     viewerGroup: config.oauth.viewerGroup ?? null,
     defaultRole: (config.oauth.defaultRole && validRoles.has(config.oauth.defaultRole)
       ? config.oauth.defaultRole
-      : "user") as "admin" | "user" | "viewer",
+      : "user") as AppRole,
     syncGroups: config.oauth.syncGroups,
   };
 

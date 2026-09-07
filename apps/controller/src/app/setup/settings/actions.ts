@@ -215,6 +215,7 @@ async function createProviderFromForm(formData: FormData): Promise<string | null
       groupsClaim: read("idpGroupsClaim") || "groups",
       groupPrefix: read("idpGroupPrefix"),
       adminGroup: read("idpAdminGroup"),
+      operatorGroup: read("idpOperatorGroup"),
       userGroup: read("idpUserGroup"),
       viewerGroup: read("idpViewerGroup"),
       defaultRole,

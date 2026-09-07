@@ -3,7 +3,7 @@ import { applyCaddyConfig } from "../caddy";
 import { validateCaddyfileSnippet } from "../caddy-caddyfile";
 import { logAuditEvent } from "../audit";
 import { proxyHosts } from "../db/schema";
-import { asc, desc, eq, count, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
@@ -2616,15 +2616,39 @@ export async function listProxyHosts(): Promise<ProxyHost[]> {
   return hosts.map(parseProxyHost);
 }
 
-export async function countProxyHosts(search?: string): Promise<number> {
-  const where = search
-    ? or(
+/**
+ * The list filter shared by the paginated read and its count.
+ *
+ * `visibleIds` narrows the list to what the viewer may see — null means no restriction, which is
+ * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
+ * viewer may see nothing, and turning that into an unfiltered query would list the whole fleet.
+ */
+function proxyHostListFilter(search?: string, visibleIds?: number[] | null) {
+  const clauses = [];
+  if (search) {
+    clauses.push(
+      or(
         like(proxyHosts.name, `%${search}%`),
         like(proxyHosts.domains, `%${search}%`),
         like(proxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
-  const [row] = await db.select({ value: count() }).from(proxyHosts).where(where);
+      ),
+    );
+  }
+  if (visibleIds != null) {
+    clauses.push(visibleIds.length > 0 ? inArray(proxyHosts.id, visibleIds) : sql`false`);
+  }
+  if (clauses.length === 0) return undefined;
+  return clauses.length === 1 ? clauses[0] : and(...clauses);
+}
+
+export async function countProxyHosts(
+  search?: string,
+  visibleIds?: number[] | null,
+): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(proxyHosts)
+    .where(proxyHostListFilter(search, visibleIds));
   return row?.value ?? 0;
 }
 
@@ -2643,14 +2667,9 @@ export async function listProxyHostsPaginated(
   search?: string,
   sortBy?: string,
   sortDir?: "asc" | "desc",
+  visibleIds?: number[] | null,
 ): Promise<ProxyHost[]> {
-  const where = search
-    ? or(
-        like(proxyHosts.name, `%${search}%`),
-        like(proxyHosts.domains, `%${search}%`),
-        like(proxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
+  const where = proxyHostListFilter(search, visibleIds);
   const col = (sortBy && PROXY_HOST_SORT_COLUMNS[sortBy]) || proxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db

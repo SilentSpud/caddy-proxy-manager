@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { assertCanManage, requireAccess } from "@/src/lib/permissions";
 import { getTranslations } from "next-intl/server";
 import {
   actionError,
@@ -276,8 +277,11 @@ export async function updateL4ProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
+    // An operator may edit a host their groups were granted; creating one stays with admins,
+    // because a grant names a host that already exists.
+    const access = await requireAccess();
+    assertCanManage(access, "l4ProxyHost", id);
+    const userId = access.userId;
 
     const matcherType = parseMatcherType(formData);
     const matcherValue =
@@ -323,9 +327,9 @@ export async function deleteL4ProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await deleteL4ProxyHost(id, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "l4ProxyHost", id);
+    await deleteL4ProxyHost(id, access.userId);
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess("L4 proxy host deleted.");
   } catch (error) {
@@ -337,9 +341,9 @@ export async function deleteL4ProxyHostAction(
 
 export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await updateL4ProxyHost(id, { enabled }, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "l4ProxyHost", id);
+    await updateL4ProxyHost(id, { enabled }, access.userId);
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess(`L4 proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {

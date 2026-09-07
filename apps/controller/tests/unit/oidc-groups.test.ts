@@ -29,6 +29,7 @@ describe('toGroupMappingConfig', () => {
       groupPrefix: null,
       roleMappingEnabled: false,
       adminGroup: null,
+      operatorGroup: null,
       userGroup: null,
       viewerGroup: null,
       defaultRole: 'user',
@@ -139,20 +140,23 @@ describe('resolveRoleGroups', () => {
   it('derives role groups from the prefix', () => {
     expect(resolveRoleGroups(base)).toEqual({
       admin: ['CPM_Admin'],
+      operator: ['CPM_Operator'],
       user: ['CPM_User'],
       viewer: ['CPM_Viewer'],
     });
   });
 
-  it('lets custom names be given for all three roles, with no prefix at all', () => {
+  it('lets custom names be given for every role, with no prefix at all', () => {
     const cfg = toGroupMappingConfig({
       roleMappingEnabled: true,
       adminGroup: 'platform-owners',
+      operatorGroup: 'proxy-ops',
       userGroup: 'staff',
       viewerGroup: 'auditors',
     });
     expect(resolveRoleGroups(cfg)).toEqual({
       admin: ['platform-owners'],
+      operator: ['proxy-ops'],
       user: ['staff'],
       viewer: ['auditors'],
     });
@@ -173,6 +177,7 @@ describe('resolveRoleGroups', () => {
   it('resolves to nothing without a prefix or a custom name', () => {
     expect(resolveRoleGroups(toGroupMappingConfig({}))).toEqual({
       admin: [],
+      operator: [],
       user: [],
       viewer: [],
     });
@@ -190,6 +195,15 @@ describe('mapGroupsToRole', () => {
 
   it('takes the most privileged matching group', () => {
     expect(mapGroupsToRole(['CPM_Viewer', 'CPM_Admin', 'CPM_User'], base)).toBe('admin');
+  });
+
+  it('ranks operator above user and viewer, and below admin', () => {
+    // An operator manages whatever their groups were granted; a user and a viewer manage nothing
+    // at all. So an account in both groups is an operator, and one that is also an admin is an
+    // admin — losing the admin group demotes it to operator rather than all the way to user.
+    expect(mapGroupsToRole(['CPM_User', 'CPM_Operator'], base)).toBe('operator');
+    expect(mapGroupsToRole(['CPM_Viewer', 'CPM_Operator'], base)).toBe('operator');
+    expect(mapGroupsToRole(['CPM_Operator', 'CPM_Admin'], base)).toBe('admin');
   });
 
   it('falls back to the configured default when nothing matches', () => {
@@ -213,6 +227,7 @@ describe('mapGroupsToRole', () => {
     const custom = toGroupMappingConfig({
       roleMappingEnabled: true,
       adminGroup: 'platform-owners, sre-oncall',
+      operatorGroup: 'platform-owners, sre-oncall',
       userGroup: 'staff',
       viewerGroup: 'auditors, contractors',
     });
@@ -273,6 +288,7 @@ describe('mapGroupsToLocalGroups', () => {
       roleMappingEnabled: true,
       syncGroups: true,
       adminGroup: 'platform-owners, sre-oncall',
+      operatorGroup: 'platform-owners, sre-oncall',
       viewerGroup: 'auditors',
     });
     expect(

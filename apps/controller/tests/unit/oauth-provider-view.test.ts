@@ -24,6 +24,7 @@ const provider = {
   groupPrefix: null,
   roleMappingEnabled: false,
   adminGroup: null,
+  operatorGroup: null,
   userGroup: null,
   viewerGroup: null,
   defaultRole: 'user' as const,

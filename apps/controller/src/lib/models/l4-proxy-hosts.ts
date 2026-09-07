@@ -3,7 +3,7 @@ import { splitHostPort } from "../caddy-utils";
 import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
-import { asc, desc, eq, count, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
 import { setHostAgents } from "./host-agents";
 
@@ -516,15 +516,39 @@ export async function listL4ProxyHosts(): Promise<L4ProxyHost[]> {
   return hosts.map(parseL4ProxyHost);
 }
 
-export async function countL4ProxyHosts(search?: string): Promise<number> {
-  const where = search
-    ? or(
+/**
+ * The list filter shared by the paginated read and its count.
+ *
+ * `visibleIds` narrows the list to what the viewer may see — null means no restriction, which is
+ * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
+ * viewer may see nothing, and turning that into an unfiltered query would list every host.
+ */
+function l4ListFilter(search?: string, visibleIds?: number[] | null) {
+  const clauses = [];
+  if (search) {
+    clauses.push(
+      or(
         like(l4ProxyHosts.name, `%${search}%`),
         like(l4ProxyHosts.listenAddress, `%${search}%`),
         like(l4ProxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
-  const [row] = await db.select({ value: count() }).from(l4ProxyHosts).where(where);
+      ),
+    );
+  }
+  if (visibleIds != null) {
+    clauses.push(visibleIds.length > 0 ? inArray(l4ProxyHosts.id, visibleIds) : sql`false`);
+  }
+  if (clauses.length === 0) return undefined;
+  return clauses.length === 1 ? clauses[0] : and(...clauses);
+}
+
+export async function countL4ProxyHosts(
+  search?: string,
+  visibleIds?: number[] | null,
+): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(l4ProxyHosts)
+    .where(l4ListFilter(search, visibleIds));
   return row?.value ?? 0;
 }
 
@@ -557,14 +581,9 @@ export async function listL4ProxyHostsPaginated(
   search?: string,
   sortBy?: string,
   sortDir?: "asc" | "desc",
+  visibleIds?: number[] | null,
 ): Promise<L4ProxyHost[]> {
-  const where = search
-    ? or(
-        like(l4ProxyHosts.name, `%${search}%`),
-        like(l4ProxyHosts.listenAddress, `%${search}%`),
-        like(l4ProxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
+  const where = l4ListFilter(search, visibleIds);
   const col = (sortBy && L4_SORT_COLUMNS[sortBy]) || l4ProxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db

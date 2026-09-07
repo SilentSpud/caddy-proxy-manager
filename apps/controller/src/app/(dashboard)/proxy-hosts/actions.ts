@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { assertCanManage, requireAccess } from "@/src/lib/permissions";
 import {
   actionError,
   actionSuccess,
@@ -807,8 +808,11 @@ export async function updateProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
+    // An operator may edit a host their groups were granted; creating one stays with admins,
+    // because a grant names a host that already exists.
+    const access = await requireAccess();
+    assertCanManage(access, "proxyHost", id);
+    const userId = access.userId;
     const boolField = (key: string) =>
       formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
 
@@ -925,9 +929,9 @@ export async function deleteProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await deleteProxyHost(id, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "proxyHost", id);
+    await deleteProxyHost(id, access.userId);
     revalidatePath("/proxy-hosts");
     return actionSuccess("Proxy host deleted.");
   } catch (error) {
@@ -939,9 +943,9 @@ export async function deleteProxyHostAction(
 
 export async function toggleProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await updateProxyHost(id, { enabled }, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "proxyHost", id);
+    await updateProxyHost(id, { enabled }, access.userId);
     revalidatePath("/proxy-hosts");
     return actionSuccess(`Proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {

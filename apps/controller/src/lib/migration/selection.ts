@@ -55,6 +55,12 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "api_tokens",
       "groups",
       "group_members",
+      // The two tables that say what a group is mapped from and what it may manage. Here rather
+      // than with the hosts because they belong to the group: leaving the hosts behind clears the
+      // resource column (see clearedColumns in migration/import.ts), and a grant naming nothing
+      // grants nothing — which is the safe direction for a privilege that lost its subject.
+      "group_idp_mappings",
+      "group_grants",
       "forward_auth_access",
       "forward_auth_sessions",
       "forward_auth_exchanges",

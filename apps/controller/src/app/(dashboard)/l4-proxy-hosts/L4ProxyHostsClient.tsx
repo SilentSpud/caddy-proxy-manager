@@ -35,6 +35,8 @@ type Props = {
   agents?: AgentOption[];
   /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
+  /** False for an operator — see ProxyHostsClient. */
+  canCreate?: boolean;
 };
 
 function formatMatcher(host: L4ProxyHost): string {
@@ -69,12 +71,15 @@ function HostActions({
   onEdit,
   onDuplicate,
   onDelete,
+  canCreate,
 }: {
   host: L4ProxyHost;
   onToggle: (enabled: boolean) => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
+  canCreate: boolean;
 }) {
   return (
     <HStack gap={2} vAlign="center" justify="end">
@@ -90,7 +95,7 @@ function HostActions({
         alignment="end"
         items={[
           { label: "Edit", onClick: onEdit },
-          { label: "Duplicate", onClick: onDuplicate },
+          ...(canCreate ? [{ label: "Duplicate", onClick: onDuplicate }] : []),
           { type: "divider" },
           { label: "Delete", variant: "destructive", onClick: onDelete },
         ]}
@@ -106,6 +111,7 @@ export default function L4ProxyHostsClient({
   initialSort,
   agents,
   agentAssignments,
+  canCreate = true,
 }: Props) {
   const t = useTranslations("l4ProxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
@@ -171,6 +177,7 @@ export default function L4ProxyHostsClient({
       onEdit={() => setEditHost(host)}
       onDuplicate={() => openDuplicate(host)}
       onDelete={() => setDeleteHost(host)}
+      canCreate={canCreate}
     />
   );
 
@@ -276,11 +283,15 @@ export default function L4ProxyHostsClient({
       <PageHeader
         title={t("l4ProxyHosts")}
         description={t("pageDescription")}
-        action={{
-          label: "Create L4 Host",
-          onClick: openCreate,
-          isDisabled: Boolean(l4DisabledReason),
-        }}
+        action={
+          canCreate
+            ? {
+                label: "Create L4 Host",
+                onClick: openCreate,
+                isDisabled: Boolean(l4DisabledReason),
+              }
+            : undefined
+        }
       />
 
       <HStack gap={2} vAlign="center">

@@ -34,7 +34,7 @@ type UserEntry = {
   id: number;
   email: string;
   name: string | null;
-  role: "admin" | "user" | "viewer";
+  role: "admin" | "operator" | "user" | "viewer";
   provider: string | null;
   subject: string | null;
   avatarUrl: string | null;
@@ -52,6 +52,7 @@ type Props = {
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
+  { value: "operator", label: "Operator" },
   { value: "user", label: "User" },
   { value: "viewer", label: "Viewer" },
 ];
@@ -59,6 +60,8 @@ const ROLE_OPTIONS = [
 /** Role tint. Admin reads as elevated privilege, the rest are informational. */
 const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
   admin: "red",
+  // Elevated, but only over what their groups were granted — not the whole instance.
+  operator: "blue",
   user: "blue",
   viewer: "neutral",
 };

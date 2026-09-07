@@ -69,6 +69,7 @@ import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
 import { ensurePairingCode, revokePairingCode } from "@/src/lib/agent/pairing-codes";
 import { deleteAgent, setAgentBuildSettings } from "@/src/lib/models/agents";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
+import type { AppRole } from "@/src/lib/oidc-groups";
 
 type ActionResult = {
   success: boolean;
@@ -1239,9 +1240,10 @@ export async function createOAuthProviderAction(data: {
   groupPrefix?: string | null;
   roleMappingEnabled?: boolean;
   adminGroup?: string | null;
+  operatorGroup?: string | null;
   userGroup?: string | null;
   viewerGroup?: string | null;
-  defaultRole?: "admin" | "user" | "viewer";
+  defaultRole?: AppRole;
   syncGroups?: boolean;
 }) {
   const session = await requireAdmin();
@@ -1280,9 +1282,10 @@ export async function updateOAuthProviderAction(
     groupPrefix: string | null;
     roleMappingEnabled: boolean;
     adminGroup: string | null;
+    operatorGroup: string | null;
     userGroup: string | null;
     viewerGroup: string | null;
-    defaultRole: "admin" | "user" | "viewer";
+    defaultRole: AppRole;
     syncGroups: boolean;
   }>,
 ) {

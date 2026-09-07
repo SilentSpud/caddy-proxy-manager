@@ -117,6 +117,7 @@ const baseProvider: OAuthProvider = {
   groupPrefix: null,
   roleMappingEnabled: false,
   adminGroup: null,
+  operatorGroup: null,
   userGroup: null,
   viewerGroup: null,
   defaultRole: 'user',

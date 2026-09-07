@@ -11,7 +11,7 @@ import { listGroups } from "@/src/lib/models/groups";
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { requireAdmin } from "@/src/lib/auth";
+import { canCreate, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
 import type { Metadata } from "next";
 import { toCertificatePickerOption } from "@/src/lib/certificate-api";
 import { getTranslations } from "next-intl/server";
@@ -28,7 +28,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  // An operator reaches this page too; what they see on it is decided per host. Null from
+  // visibleIdFilter is an admin — no restriction — which is why it is not `?? []`.
+  const access = await requireAccess();
+  const visible = visibleIdFilter(access, "proxyHost");
+  const visibleIds = visible === null ? null : [...visible];
   const {
     page: pageParam,
     search: searchParam,
@@ -50,8 +54,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     authentikDefaults,
     tailscaleSettings,
   ] = await Promise.all([
-    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir),
-    countProxyHosts(search),
+    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds),
+    countProxyHosts(search, visibleIds),
     listCertificates(),
     listCaCertificates(),
     listAccessLists(),
@@ -132,6 +136,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       forwardAuthAccessMap={forwardAuthAccessMap}
       agents={agents}
       agentAssignments={agentAssignments}
+      canCreate={canCreate(access)}
     />
   );
 }

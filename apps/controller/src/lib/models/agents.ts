@@ -143,6 +143,14 @@ export async function findAgentByAgentId(agentId: string): Promise<AgentCredenti
   }
 }
 
+/** Rename an agent. Operator-facing only: routing is by agentId, which this never touches. */
+export async function renameAgent(id: number, name: string): Promise<void> {
+  await db
+    .update(agents)
+    .set({ name: name.trim().slice(0, 128), updatedAt: nowIso() })
+    .where(eq(agents.id, id));
+}
+
 export async function deleteAgent(id: number): Promise<void> {
   await db.delete(agents).where(eq(agents.id, id));
 }

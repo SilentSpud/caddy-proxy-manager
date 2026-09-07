@@ -96,6 +96,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
           providerName: p.name,
           role: mapGroupsToRole(claimedGroups, mapping),
           localGroups: mapGroupsToLocalGroups(claimedGroups, mapping),
+          claimedGroups,
           syncGroups: mapping.syncGroups,
         });
       }
@@ -163,6 +164,7 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
       groupPrefix: row.groupPrefix,
       roleMappingEnabled: row.roleMappingEnabled,
       adminGroup: row.adminGroup,
+      operatorGroup: row.operatorGroup,
       userGroup: row.userGroup,
       viewerGroup: row.viewerGroup,
       defaultRole:

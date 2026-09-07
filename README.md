@@ -435,26 +435,84 @@ Then create the administrator through [First Run](#first-run). Nothing needs a p
 
 ## User Roles
 
-CPM has three roles with increasing privileges:
+CPM has four roles:
 
-| Capability | Viewer | User | Admin |
-| ---------- | ------ | ---- | ----- |
-| Log in to the dashboard | Yes | Yes | Yes |
-| View own profile | Yes | Yes | Yes |
-| Access forward-auth-protected apps (when granted) | Yes | Yes | Yes |
-| Manage proxy hosts, certificates, access lists | No | No | Yes |
-| Manage users, groups, and settings | No | No | Yes |
-| View analytics, audit log, and API docs | No | No | Yes |
-| Create and manage own API tokens | Yes | Yes | Yes |
-| Access role-appropriate REST API endpoints (`/api/v1/`) | Yes | Yes | Yes |
+| Capability | Viewer | User | Operator | Admin |
+| ---------- | ------ | ---- | -------- | ----- |
+| Log in to the dashboard | Yes | Yes | Yes | Yes |
+| View own profile | Yes | Yes | Yes | Yes |
+| Access forward-auth-protected apps (when granted) | Yes | Yes | Yes | Yes |
+| Manage proxy hosts, L4 hosts and agents | No | No | Only what their groups were granted | Yes |
+| Create or delete hosts | No | No | No | Yes |
+| Manage certificates and access lists | No | No | No | Yes |
+| Manage users, groups, and settings | No | No | No | Yes |
+| View analytics, audit log, and API docs | No | No | No | Yes |
+| Create and manage own API tokens | Yes | Yes | Yes | Yes |
+| Access role-appropriate REST API endpoints (`/api/v1/`) | Yes | Yes | Yes | Yes |
 
 New users default to the **user** role. The first administrator is created in [First Run](#first-run), or imported from a migrated 3.0 database. `ADMIN_USERNAME` / `ADMIN_PASSWORD` still seed one at startup for deployments that predate the setup flow.
+
+**Operator** is the delegating role: its baseline is nothing, and it reaches exactly what
+[group grants](#groups-and-delegated-management) name. Viewer and user are unchanged and gain
+nothing from a grant, so adding one never widens an existing account — someone has to be given the
+operator role deliberately.
+
+The management endpoints under `/api/v1/` remain **admin-only**. Grants apply to the dashboard;
+an operator's API token gets the same user-scoped endpoints a user's does.
 
 API tokens can only be created from an authenticated dashboard session; an
 existing bearer token cannot mint replacement credentials. Viewer and user
 tokens are restricted to the same user-scoped API capabilities as their owner.
 
 > **Forward Auth access** is separate from role — all roles must be explicitly granted access to each protected host via the forward auth access list.
+
+---
+
+## Groups and delegated management
+
+Groups are lists of users. They do two jobs: they gate access to forward-auth-protected apps, and —
+with the **Access** button on a group — they decide what an **Operator** may manage.
+
+### Granting management
+
+Open **Groups → Access** on a group and tick the proxy hosts, layer-4 hosts and agents it should
+reach, then choose the capability:
+
+- **Manage** — edit, enable, disable and delete those resources.
+- **View only** — see them in the lists, change nothing.
+
+The rules, stated once:
+
+- Grants **only** reach users whose role is Operator. An admin already has everything and ignores
+  them; a user and a viewer manage nothing and gain nothing from one.
+- An operator sees empty lists until something is granted, and the pages stay in their navigation
+  so the emptiness is explainable.
+- **Creating** a host is not grantable — a grant names a resource that already exists. Operators
+  ask an admin for a new host, and can then be granted it.
+- Two groups reaching the same host give the more permissive of the two capabilities.
+- A grant disappears with the resource it named: deleting a host takes its grants with it.
+
+Agents work the same way. An operator granted an agent can rename it and trigger a Caddy rebuild
+from the **Agents** page; pairing, unpairing and disabling stay in Settings with the admins,
+because they decide whether the controller talks to that host at all.
+
+### Mapping IdP groups onto CPM groups
+
+An OIDC provider's `groupPrefix` convention mirrors claimed groups by name, which stops being
+useful when the IdP's name is not the one you want to see. **Groups → Access → Identity provider
+groups** is that mapping written down: list the names this group is known by in your IdP, one per
+line, optionally scoped to one provider.
+
+- Matching is case-insensitive, and a Keycloak-style path (`/company/Infra`) is reduced to its last
+  segment.
+- A name mapped here is **not** also mirrored under its raw IdP name, so one claim never puts a
+  user in two groups.
+- Mappings are applied at sign-in when the provider has **Sync groups** switched on, which is the
+  same switch that governs the prefix convention.
+
+Role mapping is separate and unchanged: the provider's group settings decide whether a claim makes
+someone an admin, operator, user or viewer, and group membership then decides what an operator can
+reach.
 
 ---
 
@@ -1124,6 +1182,7 @@ OAUTH_SCOPES="openid email profile groups"   # ask the IdP for the claim
 OAUTH_GROUPS_CLAIM=groups                    # dots address nested claims
 OAUTH_ROLE_MAPPING=true
 OAUTH_ADMIN_GROUP="platform-owners, sre-oncall"
+OAUTH_OPERATOR_GROUP="proxy-ops"
 OAUTH_USER_GROUP="staff"
 OAUTH_VIEWER_GROUP="auditors, contractors"
 OAUTH_DEFAULT_ROLE=user
@@ -1132,12 +1191,13 @@ OAUTH_DEFAULT_ROLE=user
 Membership of *any one* of a role's groups grants it, so several unrelated groups can
 map to the same role.
 
-**Or use a prefix**, if your groups already share one. CPM then derives all three
+**Or use a prefix**, if your groups already share one. CPM then derives all four
 names for you:
 
 | Group (prefix `CPM_`) | CPM role |
 | --------------------- | -------- |
 | `CPM_Admin` | admin |
+| `CPM_Operator` | operator |
 | `CPM_User` | user |
 | `CPM_Viewer` | viewer |
 
@@ -1149,7 +1209,11 @@ OAUTH_ROLE_MAPPING=true
 The two mix freely: a role with its own group names ignores the prefix, and a role
 left unset falls back to it. So `OAUTH_GROUP_PREFIX=CPM_` together with
 `OAUTH_ADMIN_GROUP=platform-owners` means admins come from `platform-owners` while
-users and viewers still come from `CPM_User` and `CPM_Viewer`.
+the rest still come from `CPM_Operator`, `CPM_User` and `CPM_Viewer`.
+
+Where two of a user's groups map to different roles the more privileged one wins, in the order
+admin, operator, user, viewer — so losing the admin group demotes an account to operator rather
+than all the way down.
 
 `OAUTH_DEFAULT_ROLE` decides the role for users in none of the role groups.
 

@@ -2,7 +2,7 @@ import L4ProxyHostsClient from "./L4ProxyHostsClient";
 import { listL4ProxyHostsPaginated, countL4ProxyHosts } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import { requireAdmin } from "@/src/lib/auth";
+import { canCreate, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -18,7 +18,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  const access = await requireAccess();
+  const visible = visibleIdFilter(access, "l4ProxyHost");
+  const visibleIds = visible === null ? null : [...visible];
   const {
     page: pageParam,
     search: searchParam,
@@ -32,8 +34,8 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
 
   const [hosts, total] = await Promise.all([
-    listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir),
-    countL4ProxyHosts(search),
+    listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds),
+    countL4ProxyHosts(search, visibleIds),
   ]);
 
   // Only the hosts on this page — the map is for the edit dialog.
@@ -53,6 +55,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
       initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
       agents={agents}
       agentAssignments={Object.fromEntries(assignments)}
+      canCreate={canCreate(access)}
     />
   );
 }

@@ -126,6 +126,7 @@ export const oauthProviders = pgTable(
     roleMappingEnabled: boolean("roleMappingEnabled").notNull().default(false),
     // Explicit overrides; when unset they are derived from groupPrefix.
     adminGroup: text("adminGroup"),
+    operatorGroup: text("operatorGroup"),
     userGroup: text("userGroup"),
     viewerGroup: text("viewerGroup"),
     // Role assigned when no role group matched.
@@ -607,5 +608,77 @@ export const l4ProxyHostAgents = pgTable(
   (table) => ({
     pairUnique: uniqueIndex("l4_proxy_host_agents_unique").on(table.l4ProxyHostId, table.agentId),
     agentIdx: index("l4_proxy_host_agents_agent_idx").on(table.agentId),
+  }),
+);
+
+/**
+ * IdP group names that resolve to a CPM group.
+ *
+ * The prefix convention on `oauth_providers` mirrors claimed groups by name, which works right up
+ * until the IdP's name is not the one an operator wants to see — "AD-Infra-Proxy-Admins" against a
+ * CPM group called "Networking". This table is that mapping written down: a CPM group can claim as
+ * many external names as it likes, and the prefix convention keeps working for everything not
+ * named here.
+ *
+ * `providerId` is nullable and means "any provider", for the deployment with one IdP that does not
+ * want to restate it. Uniqueness is enforced in the model rather than by an index, because
+ * PostgreSQL treats NULLs as distinct and a partial index per case would be two indexes saying one
+ * thing.
+ */
+export const groupIdpMappings = pgTable(
+  "group_idp_mappings",
+  {
+    id: serial("id").primaryKey(),
+    groupId: integer("groupId")
+      .references(() => groups.id, { onDelete: "cascade" })
+      .notNull(),
+    providerId: text("providerId").references(() => oauthProviders.id, { onDelete: "cascade" }),
+    /** As the operator typed it, for display. */
+    externalName: text("externalName").notNull(),
+    /** Lower-cased and path-stripped, which is what claims are compared against. */
+    externalKey: text("externalKey").notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    groupIdx: index("group_idp_mappings_group_idx").on(table.groupId),
+    keyIdx: index("group_idp_mappings_key_idx").on(table.externalKey),
+  }),
+);
+
+/**
+ * What a group is allowed to manage.
+ *
+ * Additive, never subtractive: a grant widens what an `operator` can reach and does nothing at all
+ * to an `admin`, a `user` or a `viewer`. That is what makes this safe to ship — no existing user's
+ * access changes until someone is deliberately moved to the operator role.
+ *
+ * One nullable column per resource kind rather than a polymorphic (type, id) pair, matching
+ * `forward_auth_access`: it buys real foreign keys, so deleting a host takes its grants with it
+ * instead of leaving a row pointing at an id something else will later reuse.
+ */
+export const groupGrants = pgTable(
+  "group_grants",
+  {
+    id: serial("id").primaryKey(),
+    groupId: integer("groupId")
+      .references(() => groups.id, { onDelete: "cascade" })
+      .notNull(),
+    proxyHostId: integer("proxyHostId").references(() => proxyHosts.id, { onDelete: "cascade" }),
+    l4ProxyHostId: integer("l4ProxyHostId").references(() => l4ProxyHosts.id, {
+      onDelete: "cascade",
+    }),
+    agentId: integer("agentId").references(() => agents.id, { onDelete: "cascade" }),
+    /** "view" or "manage". A manage grant implies view. */
+    capability: text("capability").notNull().default("manage"),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    groupIdx: index("group_grants_group_idx").on(table.groupId),
+    proxyHostUnique: uniqueIndex("group_grants_proxy_host_unique").on(
+      table.groupId,
+      table.proxyHostId,
+    ),
+    l4HostUnique: uniqueIndex("group_grants_l4_host_unique").on(table.groupId, table.l4ProxyHostId),
+    agentUnique: uniqueIndex("group_grants_agent_unique").on(table.groupId, table.agentId),
   }),
 );

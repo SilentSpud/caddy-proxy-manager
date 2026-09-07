@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       groupPrefix: body.groupPrefix ?? null,
       roleMappingEnabled: body.roleMappingEnabled ?? false,
       adminGroup: body.adminGroup ?? null,
+      operatorGroup: body.operatorGroup ?? null,
       userGroup: body.userGroup ?? null,
       viewerGroup: body.viewerGroup ?? null,
       defaultRole: body.defaultRole ?? undefined,

@@ -46,6 +46,7 @@ function entry(overrides: Partial<PendingOidcSync> = {}): PendingOidcSync {
     providerName: 'Authentik',
     role: null,
     localGroups: [],
+    claimedGroups: [],
     syncGroups: false,
     ...overrides,
   };
