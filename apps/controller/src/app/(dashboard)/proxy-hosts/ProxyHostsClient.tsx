@@ -45,6 +45,7 @@ import {
   EditHostDialog,
   DeleteHostDialog,
 } from "@/components/proxy-hosts/HostDialogs";
+import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -70,6 +71,9 @@ type Props = {
   forwardAuthUsers?: ForwardAuthUser[];
   forwardAuthGroups?: ForwardAuthGroup[];
   forwardAuthAccessMap?: ForwardAuthAccessMap;
+  agents?: AgentOption[];
+  /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
+  agentAssignments?: Record<number, number[]>;
 };
 
 /** The feature badges as data. `variant` marks the two meaning "traffic is being restricted". */
@@ -195,6 +199,8 @@ export default function ProxyHostsClient({
   forwardAuthUsers,
   forwardAuthGroups,
   forwardAuthAccessMap,
+  agents,
+  agentAssignments,
 }: Props) {
   const t = useTranslations("proxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
@@ -392,6 +398,7 @@ export default function ProxyHostsClient({
         issuedClientCerts={issuedClientCerts ?? []}
         forwardAuthUsers={forwardAuthUsers ?? []}
         forwardAuthGroups={forwardAuthGroups ?? []}
+        agents={agents ?? []}
       />
 
       {editHost && (
@@ -409,6 +416,8 @@ export default function ProxyHostsClient({
           forwardAuthUsers={forwardAuthUsers ?? []}
           forwardAuthGroups={forwardAuthGroups ?? []}
           forwardAuthAccess={forwardAuthAccessMap?.[editHost.id] ?? null}
+          agents={agents ?? []}
+          assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
         />
       )}
 

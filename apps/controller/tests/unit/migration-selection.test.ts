@@ -57,13 +57,15 @@ describe('group coverage', () => {
 });
 
 describe('dependencies', () => {
-  it('brings certificates and access lists along with proxy hosts', () => {
-    // Both references are nullable, so importing hosts alone would succeed — and publish a host
-    // that used to sit behind an access list with nothing in front of it.
+  it('brings certificates, access lists and agents along with proxy hosts', () => {
+    // All three references are nullable or absent-tolerant, so importing hosts alone would
+    // succeed — and publish a host that used to sit behind an access list with nothing in front
+    // of it, or one pinned to a single agent as served by every agent in the fleet.
     expect(withRequiredGroups(['proxyHosts'])).toEqual([
       'proxyHosts',
       'certificates',
       'accessLists',
+      'agents',
     ]);
   });
 
@@ -87,6 +89,7 @@ describe('parsing what the form posted', () => {
       'proxyHosts',
       'certificates',
       'accessLists',
+      'agents',
     ]);
   });
 

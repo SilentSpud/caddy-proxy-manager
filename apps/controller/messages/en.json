@@ -50,6 +50,16 @@
     "username": "Username",
     "usernameAlreadyExists": "Username already exists"
   },
+  "agents": {
+    "assignment": "Agents",
+    "assignmentDescription": "Choose which agents serve this host. Leave every box unticked to serve it on all of them.",
+    "assignedAgents": "Assigned agents",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "ownBuildBadge": "Own Caddy build",
+    "assignedToAll": "Served by every agent",
+    "assignedToAllHelp": "No agent is selected, so this host is included in the configuration sent to all of them."
+  },
   "analytics": {
     "accessLoggingDisabledTitle": "Caddy access logging is not enabled",
     "allHosts": "All hosts",
@@ -195,7 +205,12 @@
     "addModule": "Add module",
     "adding": "Adding:",
     "buildCommandPreview": "Build command preview",
+    "buildTarget": "Module selection for",
+    "buildTargetHelp": "Agents without a selection of their own follow the fleet default.",
     "customModuleHelp": "Any Caddy plugin published as a Go module. Compiled from source at build time, so an unreachable or non-building module fails the rebuild — the running container is left untouched when that happens.",
+    "fleetDefault": "Fleet default (all agents)",
+    "followFleetDefault": "Follow the fleet default",
+    "followFleetDefaultHelp": "Clear this agent's own selection so it tracks the fleet default again.",
     "includeModuleLabel": "Include in the build",
     "modulePath": "Module path",
     "modulePathPlaceholder": "github.com/greenpau/caddy-security",

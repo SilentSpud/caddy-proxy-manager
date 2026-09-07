@@ -9,6 +9,8 @@ import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-cer
 import { listUsers } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
+import { listAgentOptions } from "@/src/lib/agent/client";
+import { agentIdsForHosts } from "@/src/lib/models/host-agents";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
 import { toCertificatePickerOption } from "@/src/lib/certificate-api";
@@ -64,6 +66,17 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     listGroups().catch(() => []),
   ]);
 
+  // Only the hosts on this page: the map is for the edit dialog, and loading the fleet's whole
+  // assignment table to fill in twenty-five rows would grow with the deployment for no gain.
+  const [agents, assignments] = await Promise.all([
+    listAgentOptions().catch(() => []),
+    agentIdsForHosts(
+      "http",
+      hosts.map((host) => host.id),
+    ).catch(() => new Map<number, number[]>()),
+  ]);
+  const agentAssignments = Object.fromEntries(assignments);
+
   // Build forward auth access map for hosts that have CPM forward auth enabled
   const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
   const faAccessEntries = await Promise.all(
@@ -117,6 +130,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       forwardAuthUsers={forwardAuthUsers}
       forwardAuthGroups={forwardAuthGroups}
       forwardAuthAccessMap={forwardAuthAccessMap}
+      agents={agents}
+      agentAssignments={agentAssignments}
     />
   );
 }

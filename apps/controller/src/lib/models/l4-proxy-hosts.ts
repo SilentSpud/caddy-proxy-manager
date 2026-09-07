@@ -5,6 +5,7 @@ import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
 import { asc, desc, eq, count, like, or } from "drizzle-orm";
 import { domainError } from "../domain-error";
+import { setHostAgents } from "./host-agents";
 
 export type L4Protocol = "tcp" | "udp";
 export type L4MatcherType = "none" | "tls_sni" | "http_host" | "proxy_protocol";
@@ -170,6 +171,12 @@ export type L4ProxyHostInput = {
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
+  /**
+   * The `agents.id` rows that serve this host. Empty — and, on update, undefined — means every
+   * agent. Note that the port still has to be published with the usual apply: assigning a host to
+   * an agent tells it what to serve, not to recreate its Caddy container on the spot.
+   */
+  agentIds?: number[];
   matcherType?: L4MatcherType;
   matcherValue?: string[];
   tlsTermination?: boolean;
@@ -525,12 +532,13 @@ export async function countL4ProxyHosts(search?: string): Promise<number> {
  * Enabled hosts only — used to refuse switching caddy-l4 off while something still listens.
  * Disabled hosts emit no config, so they do not block the change.
  */
-export async function countEnabledL4ProxyHosts(): Promise<number> {
-  const [row] = await db
-    .select({ value: count() })
+/** The enabled hosts' ids, for callers that then narrow them to one agent's assignments. */
+export async function listEnabledL4ProxyHostIds(): Promise<number[]> {
+  const rows = await db
+    .select({ id: l4ProxyHosts.id })
     .from(l4ProxyHosts)
     .where(eq(l4ProxyHosts.enabled, true));
-  return row?.value ?? 0;
+  return rows.map((row) => row.id);
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
@@ -609,6 +617,10 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
 
   if (!record) {
     throw domainError("l4ProxyHostCreationFailed");
+  }
+
+  if (input.agentIds !== undefined) {
+    await setHostAgents("l4", record.id, input.agentIds);
   }
 
   await logAuditEvent({
@@ -760,6 +772,10 @@ export async function updateL4ProxyHost(
       updatedAt: now,
     })
     .where(eq(l4ProxyHosts.id, id));
+
+  if (input.agentIds !== undefined) {
+    await setHostAgents("l4", id, input.agentIds);
+  }
 
   await logAuditEvent({
     userId: actorUserId,

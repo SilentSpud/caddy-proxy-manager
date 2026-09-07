@@ -1,5 +1,7 @@
 import L4ProxyHostsClient from "./L4ProxyHostsClient";
 import { listL4ProxyHostsPaginated, countL4ProxyHosts } from "@/src/lib/models/l4-proxy-hosts";
+import { listAgentOptions } from "@/src/lib/agent/client";
+import { agentIdsForHosts } from "@/src/lib/models/host-agents";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -34,12 +36,23 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     countL4ProxyHosts(search),
   ]);
 
+  // Only the hosts on this page — the map is for the edit dialog.
+  const [agents, assignments] = await Promise.all([
+    listAgentOptions().catch(() => []),
+    agentIdsForHosts(
+      "l4",
+      hosts.map((host) => host.id),
+    ).catch(() => new Map<number, number[]>()),
+  ]);
+
   return (
     <L4ProxyHostsClient
       hosts={hosts}
       pagination={{ total, page, perPage: PER_PAGE }}
       initialSearch={search ?? ""}
       initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
+      agents={agents}
+      agentAssignments={Object.fromEntries(assignments)}
     />
   );
 }

@@ -634,22 +634,37 @@ This is the only request that runs agent-to-controller, and it is signed with th
 secret — no extra credential. It does mean a remote agent has to be able to reach `BASE_URL`. An
 agent that cannot keeps using whatever database it already has.
 
-### One controller, one configuration
+### One controller, many configurations
 
 Everything a proxy serves — hosts, certificates, access lists, published ports, compiled-in
-plugins — belongs to this controller's database, not to any host. Every agent's Caddy is loaded
-with the identical document. A change is applied to all of them or to none: if one agent rejects
-the config or cannot be reached, the whole apply fails and names that agent, rather than leaving
-one proxy serving the new configuration and another serving the old.
+plugins — belongs to this controller's database, not to any host. What each agent runs is computed
+from that database and sent to it: **a document per agent**, not one for the fleet. A change is
+applied to every agent or to none — if one rejects the config or cannot be reached, the whole apply
+fails and names that agent, rather than leaving one proxy serving the new configuration and another
+serving the old.
+
+**Assigning hosts to agents.** Each proxy host and layer-4 host has an *Agents* section listing
+every paired agent. Tick none and the host is served by all of them, which is what every host did
+before assignment existed and what a new host defaults to. Tick one or more and only those agents
+receive it — useful for a host that only one site can reach, or a pair of edge nodes sharing a
+domain.
+
+**Per-agent Caddy builds.** Settings → Caddy Build has a *Module selection for* picker: the fleet
+default, or one named agent. An agent with no selection of its own follows the fleet default, so
+enabling a module for everyone still reaches the agents nobody configured separately. Give an agent
+its own selection when it needs a plugin the rest do not — a DNS provider only it can reach — and
+switch *Follow the fleet default* back on to put it back on the shared list.
 
 Two consequences worth knowing:
 
-- **Plugins are the intersection.** A handler is only emitted if *every* agent's Caddy was built
-  with the module behind it, because one document goes to all of them and Caddy rejects a document
-  naming a module it lacks — wholesale, taking every host on that instance down with it. Rebuild
-  the fleet before a newly enabled module takes effect.
-- **Ports are published everywhere.** A layer-4 host's port is opened on every agent, since any of
-  them may be the one a client reaches.
+- **Plugins are per agent, and a document only names what that agent has.** Caddy rejects a
+  document naming a module it lacks — wholesale, taking every host on that instance down with it —
+  so generation is gated on what each agent reports having actually built. Rebuild an agent before
+  a newly enabled module takes effect on it.
+- **Ports follow the assignment.** A layer-4 host's port is opened on the agents that serve it, and
+  on all of them when it is unassigned. Publishing a port still needs the usual apply from the
+  layer-4 page: assigning a host tells an agent what to serve, not to recreate its container on the
+  spot.
 
 ### How an agent connects
 

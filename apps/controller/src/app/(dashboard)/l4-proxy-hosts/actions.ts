@@ -24,6 +24,7 @@ import {
   type L4GeoBlockConfig,
   type L4GeoBlockMode,
 } from "@/src/lib/models/l4-proxy-hosts";
+import { parseAgentIds } from "@/src/lib/models/host-agents";
 import {
   parseCheckbox,
   parseCsv,
@@ -251,6 +252,7 @@ export async function createL4ProxyHostAction(
       proxyProtocolVersion: parseProxyProtocolVersion(formData),
       proxyProtocolReceive: parseCheckbox(formData.get("proxyProtocolReceive")),
       enabled: parseCheckbox(formData.get("enabled")),
+      agentIds: parseAgentIds(formData.getAll("agentId")),
       loadBalancer: parseL4LoadBalancerConfig(formData),
       dnsResolver: parseL4DnsResolverConfig(formData),
       upstreamDnsResolution: parseL4UpstreamDnsResolutionConfig(formData),
@@ -296,6 +298,9 @@ export async function updateL4ProxyHostAction(
       proxyProtocolVersion: parseProxyProtocolVersion(formData),
       proxyProtocolReceive: parseCheckbox(formData.get("proxyProtocolReceive")),
       enabled: formData.has("enabledPresent") ? parseCheckbox(formData.get("enabled")) : undefined,
+      agentIds: formData.has("agentAssignmentPresent")
+        ? parseAgentIds(formData.getAll("agentId"))
+        : undefined,
       loadBalancer: parseL4LoadBalancerConfig(formData),
       dnsResolver: parseL4DnsResolverConfig(formData),
       upstreamDnsResolution: parseL4UpstreamDnsResolutionConfig(formData),

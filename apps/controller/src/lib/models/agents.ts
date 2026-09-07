@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { agents } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../secret";
-import { getSetting, setSetting } from "../settings";
+import { type CaddyBuildSettings, getSetting, setSetting } from "../settings";
 
 /** Setting holding this controller's stable id, as agents know it. */
 const CONTROLLER_ID_KEY = "controller_id";
@@ -21,6 +21,8 @@ export type PairedAgent = {
   name: string;
   agentId: string;
   enabled: boolean;
+  /** True when this agent has a Caddy build selection of its own rather than the fleet default. */
+  hasOwnBuildSettings: boolean;
   lastSeenAt: string | null;
   lastError: string | null;
   createdAt: string;
@@ -39,6 +41,7 @@ function toView(row: Row): PairedAgent {
     name: row.name,
     agentId: row.agentId,
     enabled: row.enabled,
+    hasOwnBuildSettings: row.buildSettings !== null,
     lastSeenAt: row.lastSeenAt,
     lastError: row.lastError,
     createdAt: row.createdAt,
@@ -170,4 +173,59 @@ export async function recordAgentContact(
   } catch (error) {
     console.warn("Failed to record agent contact:", error);
   }
+}
+
+// ─── Per-agent Caddy build settings ──────────────────────────────────────────
+
+/**
+ * This agent's own module selection, or null when it follows the fleet default.
+ *
+ * Unparseable JSON reads as null rather than throwing. The column is written by this module alone,
+ * so bad content means someone edited the row by hand — and falling back to the fleet selection
+ * keeps that agent building something, which is better than a page that will not render.
+ */
+export async function getAgentBuildSettings(id: number): Promise<CaddyBuildSettings | null> {
+  const [row] = await db
+    .select({ raw: agents.buildSettings })
+    .from(agents)
+    .where(eq(agents.id, id));
+  if (!row?.raw) return null;
+  try {
+    return JSON.parse(row.raw) as CaddyBuildSettings;
+  } catch (error) {
+    console.warn(
+      `[cpm] agent ${id} has unparseable build settings; using the fleet default:`,
+      error,
+    );
+    return null;
+  }
+}
+
+/** Every agent's own selection, keyed by row id. Absent means "follows the fleet default". */
+export async function getAllAgentBuildSettings(): Promise<Map<number, CaddyBuildSettings>> {
+  const rows = await db.select({ id: agents.id, raw: agents.buildSettings }).from(agents);
+  const result = new Map<number, CaddyBuildSettings>();
+  for (const row of rows) {
+    if (!row.raw) continue;
+    try {
+      result.set(row.id, JSON.parse(row.raw) as CaddyBuildSettings);
+    } catch {
+      // Same reasoning as above: fall through to the fleet default for this one agent.
+    }
+  }
+  return result;
+}
+
+/** Give an agent its own selection, or pass null to put it back on the fleet default. */
+export async function setAgentBuildSettings(
+  id: number,
+  settings: CaddyBuildSettings | null,
+): Promise<void> {
+  await db
+    .update(agents)
+    .set({
+      buildSettings: settings === null ? null : JSON.stringify(settings),
+      updatedAt: nowIso(),
+    })
+    .where(eq(agents.id, id));
 }

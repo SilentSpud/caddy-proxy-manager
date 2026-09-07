@@ -220,9 +220,27 @@ export function recordStatus(agentId: string, status: AgentStatus): void {
 
 // ─── Desired state ───────────────────────────────────────────────────────────
 
-/** Push the same desired state to every attached agent. */
-export function broadcastDesiredState(state: AgentDesiredState): void {
-  for (const connection of connections.values()) {
+/**
+ * Push desired state to every attached agent, computed for each one.
+ *
+ * A builder rather than a state, because two agents no longer want the same thing: the hosts
+ * pinned to each decide its ports, and its own module selection decides its build. Returning null
+ * skips that agent — a state that could not be computed must leave the agent on the last one it
+ * had rather than replacing it with a guess.
+ *
+ * Sequential on purpose. Each build runs several queries, and a fleet of twenty agents all
+ * recomputing at once on every host save is a thundering herd against the controller's own
+ * database for work nothing is waiting on.
+ */
+export async function broadcastDesiredState(
+  build: (agent: ConnectedAgent) => Promise<AgentDesiredState | null>,
+): Promise<void> {
+  for (const agent of connectedAgents()) {
+    const state = await build(agent);
+    if (state === null) continue;
+    const connection = connections.get(agent.agentId);
+    // It may have hung up while its state was being computed.
+    if (!connection) continue;
     if (!connection.send({ type: "desired-state", state })) detach(connection.agentId);
   }
 }

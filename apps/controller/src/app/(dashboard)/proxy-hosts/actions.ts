@@ -31,6 +31,7 @@ import {
   PATH_BLOCK_STATUS_CODES,
   sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
+import { parseAgentIds } from "@/src/lib/models/host-agents";
 import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { setForwardAuthAccess } from "@/src/lib/models/forward-auth";
@@ -736,6 +737,9 @@ export async function createProxyHostAction(
         name: String(formData.get("name") ?? "Untitled"),
         domains: parseCsv(formData.get("domains")),
         upstreams: parseUpstreams(formData.get("upstreams")),
+        // No checkboxes ticked is the empty list, which means every agent — the same thing the
+        // field being absent means, so a client that predates assignments keeps working.
+        agentIds: parseAgentIds(formData.getAll("agentId")),
         certificateId: certificateId,
         accessListId: parseAccessListId(formData.get("accessListId")),
         sslForced: formData.has("sslForcedPresent")
@@ -839,6 +843,12 @@ export async function updateProxyHostAction(
         domains: formData.get("domains") ? parseCsv(formData.get("domains")) : undefined,
         upstreams: formData.get("upstreams")
           ? parseUpstreams(formData.get("upstreams"))
+          : undefined,
+        // Gated on the marker, not on the values: an empty list is a real edit ("serve this
+        // everywhere"), and reading it as "field absent" would make clearing the selection
+        // impossible.
+        agentIds: formData.has("agentAssignmentPresent")
+          ? parseAgentIds(formData.getAll("agentId"))
           : undefined,
         certificateId: certificateId,
         accessListId: formData.has("accessListId")

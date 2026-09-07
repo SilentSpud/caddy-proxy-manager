@@ -24,6 +24,7 @@ import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
 
 /**
@@ -191,11 +192,15 @@ function L4HostForm({
   formAction,
   state,
   initialData,
+  agents = [],
+  assignedAgentIds = [],
 }: {
   formId: string;
   formAction: (formData: FormData) => void;
   state: { status: string; message?: string };
   initialData?: L4ProxyHost | null;
+  agents?: AgentOption[];
+  assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [enabled, setEnabled] = useState(initialData?.enabled ?? true);
@@ -301,6 +306,8 @@ function L4HostForm({
           isRequired
           description={t("listenAddressHelp")}
         />
+
+        <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
 
         <TextArea
           {...NATIVE_REQUIRED}
@@ -655,10 +662,12 @@ export function CreateL4HostDialog({
   open,
   onClose,
   initialData,
+  agents = [],
 }: {
   open: boolean;
   onClose: () => void;
   initialData?: L4ProxyHost | null;
+  agents?: AgentOption[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(createL4ProxyHostAction, INITIAL_ACTION_STATE);
@@ -681,6 +690,7 @@ export function CreateL4HostDialog({
         formAction={formAction}
         state={state}
         initialData={initialData ? { ...initialData, name: `${initialData.name} (Copy)` } : null}
+        agents={agents}
       />
     </AppDialog>
   );
@@ -690,10 +700,14 @@ export function EditL4HostDialog({
   open,
   host,
   onClose,
+  agents = [],
+  assignedAgentIds = [],
 }: {
   open: boolean;
   host: L4ProxyHost;
   onClose: () => void;
+  agents?: AgentOption[];
+  assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(
@@ -719,6 +733,8 @@ export function EditL4HostDialog({
         formAction={formAction}
         state={state}
         initialData={host}
+        agents={agents}
+        assignedAgentIds={assignedAgentIds}
       />
     </AppDialog>
   );

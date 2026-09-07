@@ -15,6 +15,7 @@ import {
 } from "../caddy-waf";
 import { normalizeNodeName, validateNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
+import { setHostAgents } from "./host-agents";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -801,6 +802,11 @@ export type ProxyHostInput = {
   name: string;
   domains: string[];
   upstreams: string[];
+  /**
+   * The `agents.id` rows that serve this host. Empty — and, on update, undefined — means every
+   * agent, which is what a host had before it could be assigned at all.
+   */
+  agentIds?: number[];
   certificateId?: number | null;
   accessListId?: number | null;
   sslForced?: boolean;
@@ -2709,6 +2715,11 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     throw domainError("failedToCreateProxyHost");
   }
 
+  // Before the apply, so the first document each agent is sent already reflects the placement.
+  if (input.agentIds !== undefined) {
+    await setHostAgents("http", record.id, input.agentIds);
+  }
+
   await logAuditEvent({
     userId: actorUserId,
     action: "create",
@@ -2823,6 +2834,10 @@ export async function updateProxyHost(
       updatedAt: now,
     })
     .where(eq(proxyHosts.id, id));
+
+  if (input.agentIds !== undefined) {
+    await setHostAgents("http", id, input.agentIds);
+  }
 
   await logAuditEvent({
     userId: actorUserId,

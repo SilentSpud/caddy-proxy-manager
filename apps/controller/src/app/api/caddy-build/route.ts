@@ -9,9 +9,12 @@ import { applyCaddyBuild, getCaddyBuildDiff, getCaddyBuildStatus } from "@/src/l
 export async function GET(request: NextRequest) {
   try {
     await requireApiAdmin(request);
+    // `?agent=<row id>` narrows both to one agent, which is what the settings panel polls with
+    // once an agent is being edited separately. Absent is the fleet-wide answer.
+    const agentRowId = parseAgentRowId(request.nextUrl.searchParams.get("agent"));
     const [diff, status] = await Promise.all([
-      getCaddyBuildDiff(),
-      Promise.resolve(getCaddyBuildStatus()),
+      getCaddyBuildDiff(agentRowId),
+      getCaddyBuildStatus(agentRowId),
     ]);
     return NextResponse.json({ diff, status });
   } catch (error) {
@@ -19,11 +22,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function parseAgentRowId(raw: string | null): number | undefined {
+  const parsed = Number.parseInt(raw ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 /** POST /api/caddy-build — write the build override and trigger the agent. */
 export async function POST(request: NextRequest) {
   try {
     await requireApiAdmin(request);
-    const status = await applyCaddyBuild();
+    const status = await applyCaddyBuild(
+      parseAgentRowId(request.nextUrl.searchParams.get("agent")),
+    );
     return NextResponse.json({ status });
   } catch (error) {
     return apiErrorResponse(error);

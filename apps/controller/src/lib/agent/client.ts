@@ -70,6 +70,27 @@ export async function listAgentTargets(): Promise<ConnectedAgent[]> {
   return connectedAgents();
 }
 
+/**
+ * Every paired agent, connected or not, for the pickers that assign work to one.
+ *
+ * Deliberately not `listAgentTargets`: a host is pinned to an agent that exists, not to one that
+ * happens to be holding a stream right now. An agent that is down still has hosts placed on it and
+ * still appears here — with `connected` false, so the form can say so rather than hiding it and
+ * losing the assignment on the next save.
+ */
+export async function listAgentOptions(): Promise<
+  { id: number; name: string; connected: boolean; hasOwnBuildSettings: boolean }[]
+> {
+  const { listAgents } = await import("../models/agents");
+  const live = new Set(connectedAgents().map((agent) => agent.agentId));
+  return (await listAgents()).map((agent) => ({
+    id: agent.id,
+    name: agent.name,
+    connected: live.has(agent.agentId),
+    hasOwnBuildSettings: agent.hasOwnBuildSettings,
+  }));
+}
+
 function primary(): ConnectedAgent | null {
   return connectedAgents()[0] ?? null;
 }
@@ -105,6 +126,17 @@ export async function getAgentStatus(): Promise<AgentStatus> {
  */
 export async function tryGetAgentStatus(): Promise<AgentStatus | null> {
   return primary()?.status ?? null;
+}
+
+/**
+ * One agent's state by its `agents` row id, or null when it is not connected.
+ *
+ * Row id rather than the self-asserted `agentId`, because everything that configures an agent
+ * separately — its module selection, the hosts pinned to it — is keyed on the row an operator
+ * picked from a list.
+ */
+export async function getAgentStatusFor(agentRowId: number): Promise<AgentStatus | null> {
+  return connectedAgents().find((agent) => agent.agentRowId === agentRowId)?.status ?? null;
 }
 
 /** Every agent's state, for the screen that lists them. Never throws. */
@@ -173,18 +205,25 @@ export async function caddyAdminViaAgent(
  *
  * Aggregating this into one response would hide the case that matters: a config that loaded on one
  * host and was rejected on another, leaving the fleet serving two different things.
+ *
+ * `request` may be a function, which is how the config apply sends each agent a document built for
+ * it. A function that throws fails only its own agent: building one agent's config badly must not
+ * stop the rest of the fleet from being configured.
  */
 export async function broadcastCaddyAdmin(
-  request: CaddyAdminProxyRequest,
+  request:
+    | CaddyAdminProxyRequest
+    | ((agent: ConnectedAgent) => CaddyAdminProxyRequest | Promise<CaddyAdminProxyRequest>),
 ): Promise<AgentResult<CaddyAdminProxyResponse>[]> {
   const agents = connectedAgents();
   return Promise.all(
     agents.map(async (agent): Promise<AgentResult<CaddyAdminProxyResponse>> => {
       try {
+        const forAgent = typeof request === "function" ? await request(agent) : request;
         return {
           agent: agent.name,
           ok: true,
-          value: await dispatchCaddyAdmin(agent.agentId, request),
+          value: await dispatchCaddyAdmin(agent.agentId, forAgent),
         };
       } catch (error) {
         return { agent: agent.name, ok: false, error: describe(error) };

@@ -24,6 +24,7 @@ import {
 import { L4PortsApplyBanner } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
 import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { Banner } from "@astryxdesign/core/Banner";
+import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -31,6 +32,9 @@ type Props = {
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
+  agents?: AgentOption[];
+  /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
+  agentAssignments?: Record<number, number[]>;
 };
 
 function formatMatcher(host: L4ProxyHost): string {
@@ -100,6 +104,8 @@ export default function L4ProxyHostsClient({
   pagination,
   initialSearch,
   initialSort,
+  agents,
+  agentAssignments,
 }: Props) {
   const t = useTranslations("l4ProxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
@@ -306,6 +312,7 @@ export default function L4ProxyHostsClient({
           router.refresh();
         }}
         initialData={duplicateHost}
+        agents={agents ?? []}
       />
 
       {editHost && (
@@ -317,6 +324,8 @@ export default function L4ProxyHostsClient({
             signalBannerRefresh();
             router.refresh();
           }}
+          agents={agents ?? []}
+          assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
         />
       )}
 

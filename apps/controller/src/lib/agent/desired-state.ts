@@ -15,10 +15,14 @@ import { getCaddyBuildDiff } from "../caddy-build";
 import { isSetupCompleted } from "../setup";
 import { broadcastDesiredState } from "./registry";
 
-export async function buildDesiredState(): Promise<AgentDesiredState> {
+/**
+ * `agentRowId` scopes the ports and the module set to one agent. Omitted gives the fleet-wide
+ * answer, which is what a caller with no agent in hand — a test, a status page — is asking for.
+ */
+export async function buildDesiredState(agentRowId?: number): Promise<AgentDesiredState> {
   const [l4Ports, buildDiff, services, fleetConfig, setupDone] = await Promise.all([
-    getRequiredL4Ports(),
-    getCaddyBuildDiff(),
+    getRequiredL4Ports(agentRowId),
+    getCaddyBuildDiff(agentRowId),
     desiredManagedServices(),
     currentFleetConfig(),
     isSetupCompleted(),
@@ -39,14 +43,18 @@ export async function buildDesiredState(): Promise<AgentDesiredState> {
 /**
  * Recompute and push to every attached agent.
  *
- * Call after anything that changes what an agent should have. Fire-and-forget by design: a caller
- * saving a proxy host must not fail because one agent's stream had just dropped — the agent gets
- * the full state again the moment it reconnects.
+ * One computation per agent now, because two agents can want different ports and different
+ * modules. Fire-and-forget by design: a caller saving a proxy host must not fail because one
+ * agent's stream had just dropped — the agent gets the full state again the moment it reconnects.
+ * A failure computing one agent's state is caught per agent for the same reason.
  */
 export async function pushDesiredState(): Promise<void> {
-  try {
-    broadcastDesiredState(await buildDesiredState());
-  } catch (error) {
-    console.warn("[cpm] could not push desired state to agents:", error);
-  }
+  await broadcastDesiredState(async (agent) => {
+    try {
+      return await buildDesiredState(agent.agentRowId);
+    } catch (error) {
+      console.warn(`[cpm] could not build desired state for agent "${agent.name}":`, error);
+      return null;
+    }
+  });
 }

@@ -107,6 +107,7 @@ import {
   isDnsProviderUsable,
   isFeatureUsable,
 } from "./caddy-build";
+import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
 import { decryptSecret } from "./secret";
 import { CaddyApplyError, describeCaddyRejection, logCaddyApplyFailure } from "./caddy-apply-error";
@@ -2585,12 +2586,22 @@ type L4BuildContext = Pick<
   | "moduleAvailability"
 >;
 
-async function buildL4Servers(context: L4BuildContext): Promise<Record<string, unknown> | null> {
+async function buildL4Servers(
+  context: L4BuildContext,
+  agentRowId?: number,
+): Promise<Record<string, unknown> | null> {
   // The entire layer4 app comes from caddy-l4. Without it there is no `layer4` key to
   // unmarshal, so emitting one would fail the whole config — HTTP hosts included.
   if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
 
-  const l4Hosts = await db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true));
+  const allL4Hosts = await db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true));
+  const l4Hosts =
+    agentRowId === undefined
+      ? allL4Hosts
+      : await (async () => {
+          const assignments = await listHostAssignments("l4");
+          return allL4Hosts.filter((host) => servedByAgent(assignments, host.id, agentRowId));
+        })();
 
   if (l4Hosts.length === 0) return null;
 
@@ -2806,7 +2817,16 @@ async function buildL4Servers(context: L4BuildContext): Promise<Record<string, u
   return servers;
 }
 
-export async function buildCaddyDocument() {
+/**
+ * Build the configuration for one agent, or for the fleet.
+ *
+ * `agentRowId` scopes the document to what that agent should serve: the hosts pinned to it plus
+ * every unpinned host, and the modules its own binary carries. Omitted — which is what every unit
+ * test and the single-agent path do — nothing is filtered and the module gate falls back to the
+ * fleet-wide intersection, which is exactly the document this function produced before hosts could
+ * be assigned at all.
+ */
+export async function buildCaddyDocument(agentRowId?: number) {
   const [
     proxyHostRecords,
     certRows,
@@ -2873,7 +2893,18 @@ export async function buildCaddyDocument() {
       .from(issuedClientCertificates),
   ]);
 
-  const proxyHostRows: ProxyHostRow[] = proxyHostRecords.map((h) => ({
+  // Pinned elsewhere, so this agent must not serve it. Filtered here rather than in the query so
+  // the fleet-wide path stays a plain select, and so "no assignments means everywhere" is decided
+  // by one function instead of by which side a join was written on.
+  const servedRecords =
+    agentRowId === undefined
+      ? proxyHostRecords
+      : await (async () => {
+          const assignments = await listHostAssignments("http");
+          return proxyHostRecords.filter((h) => servedByAgent(assignments, h.id, agentRowId));
+        })();
+
+  const proxyHostRows: ProxyHostRow[] = servedRecords.map((h) => ({
     id: h.id,
     name: h.name,
     domains: h.domains,
@@ -3043,7 +3074,7 @@ export async function buildCaddyDocument() {
     getGeoBlockSettings(),
     getWafSettings(),
     getTrustedProxiesSettings(),
-    getCaddyModuleAvailability(),
+    getCaddyModuleAvailability(agentRowId),
     getDefaultResponseSettings(),
     getTailscaleSettings(),
   ]);
@@ -3257,12 +3288,15 @@ export async function buildCaddyDocument() {
   const loggingApp = { logging: { logs: loggingLogs } };
 
   // Build L4 (TCP/UDP) proxy servers
-  const l4Servers = await buildL4Servers({
-    globalDnsSettings: dnsSettings,
-    globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
-    globalGeoBlock: effectiveGlobalGeoBlock,
-    moduleAvailability,
-  });
+  const l4Servers = await buildL4Servers(
+    {
+      globalDnsSettings: dnsSettings,
+      globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
+      globalGeoBlock: effectiveGlobalGeoBlock,
+      moduleAvailability,
+    },
+    agentRowId,
+  );
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 
   return {
@@ -3320,21 +3354,21 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
 /**
  * Build the configuration and load it onto every agent's Caddy.
  *
- * One document, every host: the controller's database is the single source of truth for the whole
- * fleet, and an agent that ends up with a different config is a proxy quietly serving something
- * nobody asked for. A rejection anywhere fails the whole apply and says which host rejected it —
- * a partial apply is a state to report, not to succeed at.
+ * A document per agent, not one for the fleet. The controller's database is still the single
+ * source of truth, but what any given agent should be running is now a question with a different
+ * answer per agent — the hosts pinned to it, and the modules its own binary was built with — so
+ * each one gets the document computed for it. A rejection anywhere fails the whole apply and says
+ * which host rejected it: a partial apply is a state to report, not to succeed at.
  */
 export async function applyCaddyConfig() {
-  const document = await buildCaddyDocument();
-  const payload = JSON.stringify(document);
-
   const { broadcastCaddyAdmin, listAgentTargets } = await import("./agent/client");
+  const targets = await listAgentTargets();
 
   // One agent, or none, goes through the single transport seam: its production adapter already
   // routes to that one agent, and broadcasting to it would be the same call with extra steps.
   // Keeping the common case on one seam is also what lets a test install one in-memory Caddy.
-  if ((await listAgentTargets()).length <= 1) {
+  if (targets.length <= 1) {
+    const payload = JSON.stringify(await buildCaddyDocument(targets[0]?.agentRowId));
     let response: { status: number; text: string };
     try {
       response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
@@ -3349,7 +3383,11 @@ export async function applyCaddyConfig() {
     return;
   }
 
-  const results = await broadcastCaddyAdmin({ path: "/load", method: "POST", body: payload });
+  const results = await broadcastCaddyAdmin(async (agent) => ({
+    path: "/load",
+    method: "POST",
+    body: JSON.stringify(await buildCaddyDocument(agent.agentRowId)),
+  }));
   const unreachable = results.filter((result) => !result.ok);
   if (unreachable.length > 0) {
     logCaddyApplyFailure("Caddy admin request failed", undefined, {

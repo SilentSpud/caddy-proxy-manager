@@ -5,7 +5,8 @@
 
 import { resolveEnabledModuleIds } from "./caddy-build";
 import { CADDY_MODULES, dnsModuleId } from "./caddy-modules";
-import { countEnabledL4ProxyHosts } from "./models/l4-proxy-hosts";
+import { listEnabledL4ProxyHostIds } from "./models/l4-proxy-hosts";
+import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { listProxyHosts } from "./models/proxy-hosts";
 import {
   type CaddyBuildSettings,
@@ -20,16 +21,29 @@ import {
  */
 export async function describeModuleConflicts(
   settings: CaddyBuildSettings,
+  agentRowId?: number,
 ): Promise<string | null> {
   const enabled = new Set(resolveEnabledModuleIds(settings));
   const problems: string[] = [];
+
+  // Scoped to what this agent actually serves. A host pinned to a different agent has no bearing
+  // on whether *this* binary needs a module, and counting it would refuse a legitimate selection
+  // with a reason the operator cannot act on — the host is not on this agent to turn off.
+  const [httpAssignments, l4Assignments] =
+    agentRowId === undefined
+      ? [null, null]
+      : await Promise.all([listHostAssignments("http"), listHostAssignments("l4")]);
+  const servesHttp = (hostId: number) =>
+    httpAssignments === null || servedByAgent(httpAssignments, hostId, agentRowId ?? null);
+  const servesL4 = (hostId: number) =>
+    l4Assignments === null || servedByAgent(l4Assignments, hostId, agentRowId ?? null);
 
   const wafOff = !enabled.has("coraza-waf");
   const blockerOff = !enabled.has("caddy-blocker");
   const tailscaleOff = !enabled.has("caddy-tailscale");
 
   if (!enabled.has("caddy-l4")) {
-    const l4Count = await countEnabledL4ProxyHosts();
+    const l4Count = (await listEnabledL4ProxyHostIds()).filter(servesL4).length;
     if (l4Count > 0) {
       problems.push(
         `${l4Count} enabled L4 proxy host${l4Count === 1 ? " needs" : "s need"} the Layer 4 Proxy module`,
@@ -54,7 +68,7 @@ export async function describeModuleConflicts(
   // Per-host config counts as much as the global switch: WAF and geoblocking can be on per host
   // with the global off. Checking only globals let an operator disable a module a dozen hosts used.
   if (wafOff || blockerOff || tailscaleOff) {
-    const hosts = await listProxyHosts();
+    const hosts = (await listProxyHosts()).filter((host) => servesHttp(host.id));
     if (wafOff) {
       const count = hosts.filter((h) => h.enabled && h.waf?.enabled).length;
       if (count > 0) {

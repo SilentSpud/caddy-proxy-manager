@@ -106,7 +106,7 @@ describe('attaching', () => {
     // One entry, and the *new* stream is the live one — a second connection after a partition must
     // not leave the old one attached, or every command would be sent twice.
     expect(connectedAgents()).toHaveLength(1);
-    broadcastDesiredState({ ...STATE, caddyEnabled: false });
+    await broadcastDesiredState(async () => ({ ...STATE, caddyEnabled: false }));
     await Bun.sleep(5);
     expect(second.frames.at(-1)).toEqual({
       type: 'desired-state',
@@ -221,10 +221,30 @@ describe('broadcast', () => {
     await Bun.sleep(5);
 
     const next = { ...STATE, l4Ports: ['3306:3306'] };
-    broadcastDesiredState(next);
+    await broadcastDesiredState(async () => next);
     await Bun.sleep(5);
 
     expect(a.frames.at(-1)).toEqual({ type: 'desired-state', state: next });
     expect(b.frames.at(-1)).toEqual({ type: 'desired-state', state: next });
+  });
+
+  it('builds a separate state for each agent, and skips the ones that would not build', async () => {
+    // The whole point of the per-agent push: two agents can want different ports, and one whose
+    // state cannot be computed must be left on the last one it had rather than handed a guess.
+    const a = connect('a1');
+    const b = connect('a2');
+    await Bun.sleep(5);
+    const bBefore = b.frames.at(-1);
+
+    await broadcastDesiredState(async (agent) =>
+      agent.agentId === 'a1' ? { ...STATE, l4Ports: ['3306:3306'] } : null,
+    );
+    await Bun.sleep(5);
+
+    expect(a.frames.at(-1)).toEqual({
+      type: 'desired-state',
+      state: { ...STATE, l4Ports: ['3306:3306'] },
+    });
+    expect(b.frames.at(-1)).toEqual(bBefore);
   });
 });

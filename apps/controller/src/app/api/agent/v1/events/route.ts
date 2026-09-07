@@ -32,7 +32,8 @@ export async function GET(request: Request) {
     name: verified.agent.name,
     controllerId: await getControllerId(),
     controllerName,
-    initialState: await buildDesiredState(),
+    // Built for this agent: the ports its own hosts need, and its own module selection.
+    initialState: await buildDesiredState(verified.agent.id),
   });
 
   return new Response(stream, {

@@ -203,6 +203,14 @@ export const agents = pgTable(
     /** Shared secret, encrypted at rest. Never leaves the server. */
     secret: text("secret").notNull(),
     enabled: boolean("enabled").notNull().default(true),
+    /**
+     * This agent's own Caddy build selection, as JSON, or null to follow the fleet default.
+     *
+     * Null rather than a copy of the default: an agent that has never been configured separately
+     * must keep tracking the fleet selection, so enabling a module for everyone does not silently
+     * skip the hosts nobody thought to open.
+     */
+    buildSettings: text("buildSettings"),
     lastSeenAt: text("lastSeenAt"),
     lastError: text("lastError"),
     createdAt: text("createdAt").notNull(),
@@ -556,3 +564,48 @@ export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
 });
+
+/**
+ * Which agents serve a host.
+ *
+ * No rows for a host means every agent serves it, which is what the whole fleet did before this
+ * table existed — so an upgrade changes nothing and an operator opts in per host. Many-to-many
+ * rather than a column, because two edge nodes serving one host is an ordinary HA arrangement and
+ * a single-valued assignment would forbid what the fleet-wide broadcast already allowed.
+ */
+export const proxyHostAgents = pgTable(
+  "proxy_host_agents",
+  {
+    id: serial("id").primaryKey(),
+    proxyHostId: integer("proxyHostId")
+      .references(() => proxyHosts.id, { onDelete: "cascade" })
+      .notNull(),
+    agentId: integer("agentId")
+      .references(() => agents.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    pairUnique: uniqueIndex("proxy_host_agents_unique").on(table.proxyHostId, table.agentId),
+    agentIdx: index("proxy_host_agents_agent_idx").on(table.agentId),
+  }),
+);
+
+/** The same, for layer-4 hosts. Separate table because the two host tables are separate. */
+export const l4ProxyHostAgents = pgTable(
+  "l4_proxy_host_agents",
+  {
+    id: serial("id").primaryKey(),
+    l4ProxyHostId: integer("l4ProxyHostId")
+      .references(() => l4ProxyHosts.id, { onDelete: "cascade" })
+      .notNull(),
+    agentId: integer("agentId")
+      .references(() => agents.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    pairUnique: uniqueIndex("l4_proxy_host_agents_unique").on(table.l4ProxyHostId, table.agentId),
+    agentIdx: index("l4_proxy_host_agents_agent_idx").on(table.agentId),
+  }),
+);

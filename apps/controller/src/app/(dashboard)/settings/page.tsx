@@ -19,8 +19,8 @@ import {
   defaultTailscaleSettings,
 } from "@/src/lib/settings";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
-import { listAgents } from "@/src/lib/models/agents";
-import { getAllAgentStatuses } from "@/src/lib/agent/client";
+import { getAllAgentBuildSettings, listAgents } from "@/src/lib/models/agents";
+import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { getFavicon } from "@/src/lib/branding";
 import { getUpdateStatus } from "@/src/lib/updates";
 import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
@@ -89,7 +89,14 @@ export default async function SettingsPage() {
   // Separate from the settings reads above: these go out over the network to each agent, so a slow
   // or absent one must not hold up the rest of the page. getAllAgentStatuses reports per agent and
   // never throws, for exactly that reason.
-  const [pairedAgents, agentStatuses] = await Promise.all([listAgents(), getAllAgentStatuses()]);
+  const [pairedAgents, agentStatuses, agentBuildSelections] = await Promise.all([
+    listAgents(),
+    getAllAgentStatuses(),
+    getAllAgentBuildSettings(),
+  ]);
+  const connectedAgentIds = new Set(
+    (await listAgentOptions().catch(() => [])).filter((a) => a.connected).map((a) => a.id),
+  );
 
   return (
     <SettingsClient
@@ -122,6 +129,13 @@ export default async function SettingsPage() {
         fromEnv: config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null,
       }}
       caddyBuild={caddyBuild}
+      agentBuildTargets={pairedAgents.map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        connected: connectedAgentIds.has(agent.id),
+      }))}
+      // A Map does not survive the server/client boundary as one; the client reads it by id.
+      agentBuildSelections={Object.fromEntries(agentBuildSelections)}
       // The auth key never leaves the server: the page ships only whether one is stored, so
       // the form can say "leave blank to keep the current key" without shipping it.
       tailscale={redactTailscaleSettingsForApi(tailscale ?? defaultTailscaleSettings())}

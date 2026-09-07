@@ -472,6 +472,8 @@ type Props = {
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
   caddyBuild: CaddyBuildSettings | null;
+  agentBuildTargets?: { id: number; name: string; connected: boolean }[];
+  agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
   /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
   tailscale: TailscaleSettingsView;
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
@@ -511,6 +513,8 @@ export default function SettingsClient({
   avatars,
   passwordPolicy,
   caddyBuild,
+  agentBuildTargets,
+  agentBuildSelections,
   tailscale,
   hasFavicon,
   updates,
@@ -732,6 +736,8 @@ export default function SettingsClient({
                     caddyBuild={caddyBuild}
                     caddyBuildState={caddyBuildState}
                     caddyBuildFormAction={caddyBuildFormAction}
+                    agents={agentBuildTargets}
+                    agentBuildSelections={agentBuildSelections}
                   />
                 )}
                 {active === "agent" && <AgentSection agents={agents} />}
@@ -2428,17 +2434,25 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
 // ─── Section: Caddy Build ────────────────────────────────────────────────────
 
 /**
- * Not offered as an agent override: the module list describes a binary built on this host, so
- * inheriting a controller's would tell an agent its Caddy has plugins it never compiled.
+ * One selection per agent, on top of a fleet default the rest follow.
+ *
+ * The module list describes a binary built on a particular host, so an agent that needs a plugin
+ * the others do not — a DNS provider only it can reach — should not force that plugin into every
+ * other image. What an agent without its own selection follows is the fleet default, which is what
+ * this page edited before and what every agent starts on.
  */
 function CaddyBuildSection({
   caddyBuild,
   caddyBuildState,
   caddyBuildFormAction,
+  agents,
+  agentBuildSelections,
 }: {
   caddyBuild: CaddyBuildSettings | null;
   caddyBuildState: { success: boolean; message?: string } | null;
   caddyBuildFormAction: (formData: FormData) => void;
+  agents?: { id: number; name: string; connected: boolean }[];
+  agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
 }) {
   const t = useTranslations("settings");
   return (
@@ -2453,6 +2467,8 @@ function CaddyBuildSection({
         <CaddyBuildFields
           initialModules={caddyBuild?.modules ?? {}}
           initialCustomModules={caddyBuild?.customModules ?? []}
+          agents={agents ?? []}
+          agentSelections={agentBuildSelections ?? {}}
         />
         <SaveButton label={t("saveModuleSelection")} />
       </VStack>
