@@ -14,6 +14,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
 import { AUTOFILL_CURRENT_PASSWORD, AUTOFILL_USERNAME } from "@/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
+import { useTranslations } from "next-intl";
 
 interface PortalLoginFormProps {
   rid: string;
@@ -63,6 +64,7 @@ export default function PortalLoginForm({
   localLoginEnabled = true,
   existingSession,
 }: PortalLoginFormProps) {
+  const t = useTranslations("auth");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
@@ -145,8 +147,8 @@ export default function PortalLoginForm({
   if (!hasRedirect) {
     return (
       <PortalCard
-        title="Authentication Required"
-        description="No redirect destination specified."
+        title={t("authenticationRequired")}
+        description={t("missingDestinationDescription")}
         hasShield={false}
       />
     );
@@ -156,7 +158,7 @@ export default function PortalLoginForm({
   if (existingSession && pending && !error) {
     return (
       <PortalCard
-        title="Authorizing..."
+        title={t("authorizing")}
         description={`Signing in as ${existingSession.name ?? existingSession.email}`}
       />
     );
@@ -164,7 +166,7 @@ export default function PortalLoginForm({
 
   return (
     <PortalCard
-      title="Authentication Required"
+      title={t("authenticationRequired")}
       description={
         targetDomain ? (
           <>
@@ -175,7 +177,7 @@ export default function PortalLoginForm({
         )
       }
     >
-      {error && <Banner status="error" title="Could not sign in" description={error} />}
+      {error && <Banner status="error" title={t("couldNotSignIn")} description={error} />}
 
       {enabledProviders.length > 0 && (
         <>
@@ -199,8 +201,8 @@ export default function PortalLoginForm({
       {!localLoginEnabled && enabledProviders.length === 0 && (
         <Banner
           status="error"
-          title="No sign-in method available"
-          description="Single sign-on is the only way to sign in, but no provider is configured."
+          title={t("signInUnavailableTitle")}
+          description={t("missingProviderDescription")}
         />
       )}
 
@@ -209,7 +211,7 @@ export default function PortalLoginForm({
           <VStack gap={4}>
             <TextInput
               {...AUTOFILL_USERNAME}
-              label="Username"
+              label={t("username")}
               htmlName="username"
               value={username}
               onChange={setUsername}
@@ -220,7 +222,7 @@ export default function PortalLoginForm({
             />
             <TextInput
               {...AUTOFILL_CURRENT_PASSWORD}
-              label="Password"
+              label={t("password")}
               type="password"
               htmlName="password"
               value={password}

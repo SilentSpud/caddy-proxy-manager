@@ -4,6 +4,7 @@ import { applyCaddyConfig } from "../caddy";
 import { certificates } from "../db/schema";
 import { desc, eq } from "drizzle-orm";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secret";
+import { domainError } from "../domain-error";
 import {
   normalizeCertificateProviderOptions,
   parseStoredCertificateProviderOptions,
@@ -66,11 +67,11 @@ export async function getCertificate(id: number): Promise<Certificate | null> {
 
 function validateCertificateInput(input: CertificateInput) {
   if (!input.domainNames || input.domainNames.length === 0) {
-    throw new Error("At least one domain is required for a certificate");
+    throw domainError("certificateDomainsRequired");
   }
   if (input.type === "imported") {
     if (!input.certificatePem || !input.privateKeyPem) {
-      throw new Error("Imported certificates require certificate and key PEM data");
+      throw domainError("importedCertificatePemRequired");
     }
   }
 }
@@ -98,7 +99,7 @@ export async function createCertificate(input: CertificateInput, actorUserId: nu
     .returning();
 
   if (!record) {
-    throw new Error("Failed to create certificate");
+    throw domainError("failedToCreateCertificate");
   }
 
   await logAuditEvent({
@@ -119,7 +120,7 @@ export async function updateCertificate(
 ) {
   const existing = await getCertificate(id);
   if (!existing) {
-    throw new Error("Certificate not found");
+    throw domainError("certificateNotFound");
   }
 
   const merged: CertificateInput = {
@@ -164,7 +165,7 @@ export async function updateCertificate(
 export async function deleteCertificate(id: number, actorUserId: number) {
   const existing = await getCertificate(id);
   if (!existing) {
-    throw new Error("Certificate not found");
+    throw domainError("certificateNotFound");
   }
 
   await db.delete(certificates).where(eq(certificates.id, id));

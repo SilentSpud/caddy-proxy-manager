@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -20,6 +21,7 @@ interface LinkAccountClientProps {
 }
 
 export default function LinkAccountClient({ provider, email, linkingId }: LinkAccountClientProps) {
+  const t = useTranslations("auth.linkAccount");
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,14 +42,14 @@ export default function LinkAccountClient({ provider, email, linkingId }: LinkAc
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to link account");
+        setError(data.error || t("failed"));
         setLoading(false);
         return;
       }
 
       await authClient.signIn.social({ provider, callbackURL: "/" });
     } catch {
-      setError("An error occurred while linking your account");
+      setError(t("unexpectedError"));
       setLoading(false);
     }
   };
@@ -63,24 +65,29 @@ export default function LinkAccountClient({ provider, email, linkingId }: LinkAc
       <Card width={400}>
         <VStack gap={4}>
           <VStack gap={1} hAlign="center">
-            <Heading level={1}>Link Your Account</Heading>
+            <Heading level={1}>{t("heading")}</Heading>
             <Text type="body" size="sm" color="secondary">
-              An account with <strong>{email}</strong> already exists
+              {t.rich("existingAccount", {
+                email,
+                email_: (chunks) => <strong>{chunks}</strong>,
+              })}
             </Text>
           </VStack>
 
           <Text type="body" size="sm" color="secondary" justify="center">
-            Would you like to link your <strong>{providerName}</strong> account to your existing
-            account? Enter your password to confirm.
+            {t.rich("prompt", {
+              provider: providerName,
+              provider_: (chunks) => <strong>{chunks}</strong>,
+            })}
           </Text>
 
-          {error && <Banner status="error" title="Could not link account" description={error} />}
+          {error && <Banner status="error" title={t("errorTitle")} description={error} />}
 
           <form onSubmit={handleLinkAccount}>
             <VStack gap={3}>
               <TextInput
                 {...AUTOFILL_CURRENT_PASSWORD}
-                label="Password"
+                label={t("password")}
                 type="password"
                 value={password}
                 onChange={setPassword}
@@ -92,7 +99,7 @@ export default function LinkAccountClient({ provider, email, linkingId }: LinkAc
 
               <Button
                 type="submit"
-                label={loading ? "Linking Account…" : "Link Account"}
+                label={loading ? t("submitPending") : t("submit")}
                 isLoading={loading}
                 isDisabled={loading}
                 width="100%"
@@ -101,7 +108,7 @@ export default function LinkAccountClient({ provider, email, linkingId }: LinkAc
               <Button
                 type="button"
                 variant="secondary"
-                label="Sign in with Password Instead"
+                label={t("usePasswordInstead")}
                 onClick={handleUsePassword}
                 isDisabled={loading}
                 width="100%"

@@ -25,6 +25,7 @@ import {
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   createUserAction,
   updateUserRoleAction,
@@ -71,6 +72,7 @@ function userLabel(user: UserEntry) {
 }
 
 export default function UsersClient({ users, localUsersEnabled = true }: Props) {
+  const t = useTranslations("users");
   const router = useRouter();
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -91,14 +93,14 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
 
   return (
     <VStack gap={6}>
-      <PageHeader title="Users" description="Manage user accounts, roles, and access." />
+      <PageHeader title={t("users")} description={t("pageDescription")} />
 
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
         <SearchField
           value={search}
           onChange={setSearch}
-          placeholder="Search users..."
-          label="Search users"
+          placeholder={t("searchPlaceholder")}
+          label={t("searchLabel")}
         />
         <HStack gap={3} vAlign="center">
           <Text type="body" size="sm" color="secondary">
@@ -109,7 +111,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
               variant="secondary"
               size="sm"
               icon={<Plus />}
-              label="Create User"
+              label={t("createUser")}
               onClick={() => setShowCreate(!showCreate)}
             />
           )}
@@ -136,26 +138,26 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
                   {...NATIVE_REQUIRED}
                   {...AUTOFILL_EMAIL}
                   data-testid="create-email"
-                  label="Email"
+                  label={t("email")}
                   type="email"
                   htmlName="email"
                   value={createEmail}
                   onChange={setCreateEmail}
-                  placeholder="user@example.com"
+                  placeholder={t("emailPlaceholder")}
                   isRequired
                 />
                 <TextInput
                   data-testid="create-name"
-                  label="Name"
+                  label={t("name")}
                   isOptional
                   htmlName="name"
                   value={createName}
                   onChange={setCreateName}
-                  placeholder="Display name"
+                  placeholder={t("displayName")}
                 />
                 <Selector
                   data-testid="create-role"
-                  label="Role"
+                  label={t("role")}
                   options={ROLE_OPTIONS}
                   value={createRole}
                   onChange={(v) => setCreateRole(v as UserEntry["role"])}
@@ -165,22 +167,22 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
                   {...AUTOFILL_NEW_PASSWORD}
                   {...nativeAttrs({ minLength: 8 })}
                   data-testid="create-password"
-                  label="Password"
+                  label={t("password")}
                   type="password"
                   htmlName="password"
                   value={createPassword}
                   onChange={setCreatePassword}
-                  placeholder="Min 8 characters"
+                  placeholder={t("passwordPlaceholder")}
                   isRequired
                 />
               </Grid>
               <HStack gap={2}>
-                <Button type="submit" size="sm" label="Create" />
+                <Button type="submit" size="sm" label={t("create")} />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  label="Cancel"
+                  label={t("cancel")}
                   onClick={() => setShowCreate(false)}
                 />
               </HStack>
@@ -191,7 +193,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
 
       {filtered.length === 0 && (
         <Card>
-          <EmptyState icon={<UserCog />} title="No users found." />
+          <EmptyState icon={<UserCog />} title={t("noUsersFound")} />
         </Card>
       )}
 
@@ -230,6 +232,7 @@ function UserRow({
   onEdit: () => void;
   onRefresh: () => void;
 }) {
+  const t = useTranslations("users");
   const isDisabled = user.status !== "active";
   const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | null>(null);
 
@@ -258,7 +261,7 @@ function UserRow({
               variant="ghost"
               size="sm"
               label={`Disable user ${userLabel(user)}`}
-              tooltip="Disable user"
+              tooltip={t("disableUser")}
               icon={<Ban />}
               onClick={() => setConfirmKind("disable")}
             />
@@ -267,7 +270,7 @@ function UserRow({
               variant="ghost"
               size="sm"
               label={`Enable user ${userLabel(user)}`}
-              tooltip="Enable user"
+              tooltip={t("enableUser")}
               icon={<CheckCircle2 />}
               onClick={async () => {
                 await updateUserStatusAction(user.id, "active");
@@ -279,7 +282,7 @@ function UserRow({
             variant="ghost"
             size="sm"
             label={`Edit user ${userLabel(user)}`}
-            tooltip="Edit user"
+            tooltip={t("editUser")}
             icon={<Pencil />}
             onClick={onEdit}
           />
@@ -287,7 +290,7 @@ function UserRow({
             variant="ghost"
             size="sm"
             label={`Delete user ${userLabel(user)}`}
-            tooltip="Delete user"
+            tooltip={t("deleteUser")}
             icon={<Trash2 />}
             onClick={() => setConfirmKind("delete")}
           />
@@ -329,6 +332,7 @@ function EditUserRow({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const t = useTranslations("users");
   const [role, setRole] = useState(user.role);
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
@@ -353,30 +357,30 @@ function EditUserRow({
         <VStack gap={3}>
           <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
             <TextInput
-              label="Name"
+              label={t("name")}
               htmlName="name"
               value={name}
               onChange={setName}
-              placeholder="Display name"
+              placeholder={t("displayName")}
             />
             <TextInput
               {...AUTOFILL_EMAIL}
-              label="Email"
+              label={t("email")}
               htmlName="email"
               value={email}
               onChange={setEmail}
-              placeholder="Email address"
+              placeholder={t("emailAddress")}
             />
             <Selector
-              label="Role"
+              label={t("role")}
               options={ROLE_OPTIONS}
               value={role}
               onChange={(v) => setRole(v as UserEntry["role"])}
             />
           </Grid>
           <HStack gap={2}>
-            <Button type="submit" size="sm" label="Save" />
-            <Button type="button" variant="ghost" size="sm" label="Cancel" onClick={onClose} />
+            <Button type="submit" size="sm" label={t("save")} />
+            <Button type="button" variant="ghost" size="sm" label={t("cancel")} onClick={onClose} />
           </HStack>
         </VStack>
       </form>

@@ -39,6 +39,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
+import { useTranslations } from "next-intl";
 import {
   CreateHostDialog,
   EditHostDialog,
@@ -195,6 +196,7 @@ export default function ProxyHostsClient({
   forwardAuthGroups,
   forwardAuthAccessMap,
 }: Props) {
+  const t = useTranslations("proxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<ProxyHost | null>(null);
@@ -326,7 +328,7 @@ export default function ProxyHostsClient({
           </Text>
           <HStack gap={2} vAlign="center">
             <StatusChip status={host.enabled ? "active" : "inactive"} />
-            {host.certificateId && <Badge variant="info" label="TLS" />}
+            {host.certificateId && <Badge variant="info" label={t("tls")} />}
           </HStack>
         </VStack>
         <HostActions
@@ -343,8 +345,8 @@ export default function ProxyHostsClient({
   return (
     <VStack gap={6}>
       <PageHeader
-        title="Proxy Hosts"
-        description="Define HTTP(S) reverse proxies orchestrated by Caddy with automated certificates."
+        title={t("proxyHosts")}
+        description={t("pageDescription")}
         action={{
           label: "Create Host",
           onClick: () => {
@@ -358,7 +360,7 @@ export default function ProxyHostsClient({
         <SearchField
           value={searchTerm}
           onChange={handleSearchChange}
-          placeholder="Search hosts..."
+          placeholder={t("searchHosts")}
         />
       </HStack>
 

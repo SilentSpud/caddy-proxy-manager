@@ -14,6 +14,7 @@ import {
   isValidBodyLimit,
 } from "../caddy-waf";
 import { normalizeNodeName, validateNodeName } from "../caddy-tailscale";
+import { domainError } from "../domain-error";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -2463,7 +2464,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   const domains = normalizeProxyHostDomains(input.domains ?? []);
 
   if (!input.upstreams || input.upstreams.length === 0) {
-    throw new Error("At least one upstream must be specified");
+    throw domainError("upstreamsRequired");
   }
   input.upstreams.forEach(validateUpstreamProtocol);
   await assertWildcardIssuable(domains, input.certificateId ?? null);
@@ -2495,7 +2496,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     .returning();
 
   if (!record) {
-    throw new Error("Failed to create proxy host");
+    throw domainError("failedToCreateProxyHost");
   }
 
   await logAuditEvent({
@@ -2525,7 +2526,7 @@ export async function updateProxyHost(
 ) {
   const existing = await getProxyHost(id);
   if (!existing) {
-    throw new Error("Proxy host not found");
+    throw domainError("proxyHostNotFound");
   }
 
   const domainList = input.domains ? normalizeProxyHostDomains(input.domains) : existing.domains;
@@ -2629,7 +2630,7 @@ export async function updateProxyHost(
 export async function deleteProxyHost(id: number, actorUserId: number) {
   const existing = await getProxyHost(id);
   if (!existing) {
-    throw new Error("Proxy host not found");
+    throw domainError("proxyHostNotFound");
   }
 
   await db.delete(proxyHosts).where(eq(proxyHosts.id, id));

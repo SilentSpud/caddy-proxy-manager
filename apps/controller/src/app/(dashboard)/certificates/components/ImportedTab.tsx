@@ -17,6 +17,7 @@ import { deleteCertificateAction } from "../actions";
 import type { CertExpiryStatus, ImportedCertView, ManagedCertView } from "../page";
 import { RelativeTime } from "./RelativeTime";
 import { ImportCertDrawer } from "./ImportCertDrawer";
+import { useTranslations } from "next-intl";
 
 type Props = {
   importedCerts: ImportedCertView[];
@@ -50,6 +51,7 @@ function DomainsCell({ domains }: { domains: string[] }) {
 }
 
 function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => void }) {
+  const t = useTranslations("certificates");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -94,13 +96,13 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
           setDeleteOpen(open);
           if (!open) setError(null);
         }}
-        title="Delete Imported Certificate"
+        title={t("deleteImportedCertificate")}
         description={
           error
             ? `Delete imported certificate ${cert.name}? This cannot be undone. ${error}`
             : `Delete imported certificate ${cert.name}? This cannot be undone.`
         }
-        actionLabel="Delete Certificate"
+        actionLabel={t("deleteCertificate")}
         onAction={handleDelete}
         isActionLoading={isPending}
       />
@@ -132,6 +134,7 @@ function importedMobileCard(c: ImportedCertView, onEdit: () => void) {
 }
 
 export function ImportedTab({ importedCerts, managedCerts, search, statusFilter }: Props) {
+  const t = useTranslations("certificates");
   const [drawerCert, setDrawerCert] = useState<ImportedCertView | null | false>(false);
   const mobileCardRenderer = (c: ImportedCertView) => importedMobileCard(c, () => setDrawerCert(c));
 
@@ -197,7 +200,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
         <Button
           variant="secondary"
           size="sm"
-          label="Import Certificate"
+          label={t("importCertificate")}
           icon={<Plus />}
           onClick={() => setDrawerCert(null)}
         />
@@ -207,7 +210,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
         columns={columns}
         data={filtered}
         keyField="id"
-        emptyMessage="No imported certificates match"
+        emptyMessage={t("noImportedCertificatesMatch")}
         mobileCard={mobileCardRenderer}
         rowStatus={(c) =>
           c.expiryStatus === "expired"
@@ -223,8 +226,8 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
           <Banner
             status="warning"
             icon={<AlertTriangle />}
-            title="Legacy managed certificate entries detected"
-            description="These are redundant. Caddy handles HTTPS automatically, so consider deleting them."
+            title={t("legacyCertificatesTitle")}
+            description={t("legacyCertificatesDescription")}
           />
           <LegacyManagedTable managedCerts={managedCerts} />
         </VStack>
@@ -240,6 +243,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
 }
 
 function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] }) {
+  const t = useTranslations("certificates");
   const [isPending, startTransition] = useTransition();
 
   const columns = [
@@ -269,7 +273,7 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
         <Button
           size="sm"
           variant="destructive"
-          label="Delete"
+          label={t("delete")}
           isDisabled={isPending}
           onClick={() =>
             startTransition(async () => {
@@ -286,7 +290,7 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
       columns={columns}
       data={managedCerts}
       keyField="id"
-      emptyMessage="No legacy managed certificates"
+      emptyMessage={t("noLegacyManagedCertificates")}
     />
   );
 }

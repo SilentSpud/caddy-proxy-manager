@@ -13,10 +13,11 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
-import { PASSWORD_POLICY_HINT, passwordPolicyError } from "@/src/lib/password-policy";
+import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { useTranslations } from "next-intl";
 import {
   deleteCaCertificateAction,
   issueClientCertificateAction,
@@ -69,6 +70,9 @@ export function IssueClientCertDialog({
   cert: CaCertificate;
   onClose: () => void;
 }) {
+  const t = useTranslations("caCertificates");
+  // Unscoped as well, for the password rule — it is shared with every other password field.
+  const tRoot = useTranslations();
   const router = useRouter();
   // One dialog per CA row, and a closed native <dialog> stays in the DOM, so a shared form id would
   // resolve `form={id}` to the first (empty) form and block submission. useId per instance.
@@ -107,7 +111,11 @@ export function IssueClientCertDialog({
 
     // The server enforces this too; checking here just avoids a round trip and
     // a 4096-bit keygen for a password that was never going to be accepted.
-    const policyError = passwordPolicyError(exportPassword, "Export password");
+    const policyError = passwordPolicyMessage(
+      tRoot,
+      exportPassword,
+      tRoot("passwordPolicy.subject.exportPassword"),
+    );
     if (policyError) {
       setError(policyError);
       return;
@@ -128,14 +136,19 @@ export function IssueClientCertDialog({
   }
 
   const actions = issued ? (
-    <Button label="Done" onClick={handleClose} />
+    <Button label={t("done")} onClick={handleClose} />
   ) : (
     <>
-      <Button variant="secondary" label="Cancel" onClick={handleClose} isDisabled={isPending} />
+      <Button
+        variant="secondary"
+        label={t("cancel")}
+        onClick={handleClose}
+        isDisabled={isPending}
+      />
       <Button
         type="submit"
         form={issueFormId}
-        label="Issue Certificate"
+        label={t("issueCertificate")}
         isLoading={isPending}
         isDisabled={isPending}
       />
@@ -146,7 +159,7 @@ export function IssueClientCertDialog({
     <AppDialog
       open={open}
       onClose={handleClose}
-      title="Issue Client Certificate"
+      title={t("issueClientCertificate")}
       maxWidth="sm"
       actions={actions}
     >
@@ -154,16 +167,16 @@ export function IssueClientCertDialog({
         <VStack gap={4}>
           <Banner
             status="success"
-            title="Client certificate issued"
-            description="Download the .p12 bundle now. It contains the client certificate, private key, and CA chain, and the private key will not be stored."
+            title={t("clientCertificateIssued")}
+            description={t("certificateDownloadWarning")}
           />
           <Text type="body" size="sm" color="secondary">
-            Export format: AES-256.
+            {t("exportFormatHelp")}
           </Text>
           <Button
             variant="secondary"
             icon={<Download />}
-            label="Download Client Certificate (.p12)"
+            label={t("downloadClientCertificateP12")}
             onClick={() =>
               downloadFile(
                 `${issued.name}.p12`,
@@ -173,7 +186,7 @@ export function IssueClientCertDialog({
           />
           {issued.passwordProtected && (
             <Text type="body" size="sm" color="secondary">
-              Import it using the export password you entered during issuance.
+              {t("certificateImportHelp")}
             </Text>
           )}
         </VStack>
@@ -182,17 +195,17 @@ export function IssueClientCertDialog({
           <VStack gap={4}>
             <TextInput
               {...NATIVE_REQUIRED}
-              label="Common Name (CN)"
+              label={t("commonNameCn")}
               htmlName="common_name"
               value={commonName}
               onChange={setCommonName}
               isRequired
               hasAutoFocus
               placeholder="alice"
-              description="Identifies this client (e.g. a username or device name)"
+              description={t("commonNameHelp")}
             />
             <NumberInput
-              label="Validity"
+              label={t("validity")}
               htmlName="validity_days"
               value={validityDays}
               onChange={setValidityDays}
@@ -203,16 +216,16 @@ export function IssueClientCertDialog({
             />
             <TextInput
               {...NATIVE_REQUIRED}
-              label="Export Password"
+              label={t("exportPassword")}
               type="password"
               htmlName="export_password"
               value={exportPassword}
               onChange={setExportPassword}
               isRequired
-              description={`Protects the .p12 when importing it into an OS or browser. ${PASSWORD_POLICY_HINT}.`}
+              description={t("p12PasswordHelp", { policy: passwordPolicyHint(tRoot) })}
             />
             {error && (
-              <Banner status="error" title="Could not issue certificate" description={error} />
+              <Banner status="error" title={t("couldNotIssueCertificate")} description={error} />
             )}
           </VStack>
         </form>
@@ -232,6 +245,7 @@ export function ManageIssuedClientCertsDialog({
   issuedCerts: IssuedClientCertificate[];
   onClose: () => void;
 }) {
+  const t = useTranslations("caCertificates");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [items, setItems] = useState<IssuedClientCertificate[]>(issuedCerts);
@@ -272,20 +286,20 @@ export function ManageIssuedClientCertsDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title="Issued Client Certificates"
+      title={t("issuedClientCertificates")}
       maxWidth="md"
       actions={
-        <Button variant="secondary" label="Close" onClick={onClose} isDisabled={isPending} />
+        <Button variant="secondary" label={t("close")} onClick={onClose} isDisabled={isPending} />
       }
     >
       <VStack gap={4}>
         <Banner
           status="info"
-          title="Revoking removes trust"
+          title={t("revokeWarningTitle")}
           description={`Revoking a client certificate removes it from the trusted mTLS client certificate pool for hosts using ${cert.name}.`}
         />
         {error && (
-          <Banner status="error" title="Could not revoke certificate" description={error} />
+          <Banner status="error" title={t("couldNotRevokeCertificate")} description={error} />
         )}
         {revokedCount > 0 && (
           <Switch
@@ -344,7 +358,7 @@ export function ManageIssuedClientCertsDialog({
                     <HStack justify="end">
                       <Button
                         variant="destructive"
-                        label="Revoke"
+                        label={t("revoke")}
                         isLoading={isPending}
                         isDisabled={isPending}
                         onClick={() => handleRevoke(item.id)}
@@ -370,6 +384,7 @@ export function DeleteCaCertDialog({
   cert: CaCertificate;
   onClose: () => void;
 }) {
+  const t = useTranslations("caCertificates");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -389,14 +404,19 @@ export function DeleteCaCertDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title="Delete CA Certificate"
+      title={t("deleteCaCertificate")}
       maxWidth="sm"
       actions={
         <>
-          <Button variant="secondary" label="Cancel" onClick={onClose} isDisabled={isPending} />
+          <Button
+            variant="secondary"
+            label={t("cancel")}
+            onClick={onClose}
+            isDisabled={isPending}
+          />
           <Button
             variant="destructive"
-            label="Delete"
+            label={t("delete")}
             onClick={handleDelete}
             isLoading={isPending}
             isDisabled={isPending}
@@ -410,7 +430,7 @@ export function DeleteCaCertDialog({
           using this CA for mTLS will stop requiring client certificates.
         </Text>
         {error && (
-          <Banner status="error" title="Could not delete certificate" description={error} />
+          <Banner status="error" title={t("couldNotDeleteCertificate")} description={error} />
         )}
       </VStack>
     </AppDialog>

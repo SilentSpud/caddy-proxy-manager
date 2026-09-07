@@ -2,6 +2,7 @@ import db, { nowIso, toIso } from "../db";
 import { logAuditEvent } from "../audit";
 import { groups, groupMembers, users } from "../db/schema";
 import { asc, eq, inArray, count } from "drizzle-orm";
+import { domainError } from "../domain-error";
 
 export type Group = {
   id: number;
@@ -122,7 +123,7 @@ export async function createGroup(input: GroupInput, actorUserId: number): Promi
     })
     .returning();
 
-  if (!row) throw new Error("Failed to create group");
+  if (!row) throw domainError("failedToCreateGroup");
 
   await logAuditEvent({
     userId: actorUserId,
@@ -143,7 +144,7 @@ export async function updateGroup(
   const existing = await db.query.groups.findFirst({
     where: (table, operators) => operators.eq(table.id, id),
   });
-  if (!existing) throw new Error("Group not found");
+  if (!existing) throw domainError("groupNotFound");
 
   await db
     .update(groups)
@@ -169,7 +170,7 @@ export async function deleteGroup(id: number, actorUserId: number): Promise<void
   const existing = await db.query.groups.findFirst({
     where: (table, operators) => operators.eq(table.id, id),
   });
-  if (!existing) throw new Error("Group not found");
+  if (!existing) throw domainError("groupNotFound");
 
   await db.delete(groups).where(eq(groups.id, id));
 
@@ -190,7 +191,7 @@ export async function addGroupMember(
   const group = await db.query.groups.findFirst({
     where: (table, operators) => operators.eq(table.id, groupId),
   });
-  if (!group) throw new Error("Group not found");
+  if (!group) throw domainError("groupNotFound");
 
   await db.insert(groupMembers).values({
     groupId,
@@ -217,13 +218,13 @@ export async function removeGroupMember(
   const group = await db.query.groups.findFirst({
     where: (table, operators) => operators.eq(table.id, groupId),
   });
-  if (!group) throw new Error("Group not found");
+  if (!group) throw domainError("groupNotFound");
 
   const member = await db.query.groupMembers.findFirst({
     where: (table, operators) =>
       operators.and(operators.eq(table.groupId, groupId), operators.eq(table.userId, userId)),
   });
-  if (!member) throw new Error("Member not found in group");
+  if (!member) throw domainError("memberNotFoundInGroup");
 
   await db.delete(groupMembers).where(eq(groupMembers.id, member.id));
 

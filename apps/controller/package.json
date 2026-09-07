@@ -1,6 +1,6 @@
 {
   "name": "@cpm/controller",
-  "version": "3.0.0-beta.6",
+  "version": "3.0.0-beta.7",
   "description": "Caddy Proxy Manager controller — the web UI and REST API",
   "type": "module",
   "private": true,
@@ -36,6 +36,7 @@
     "maxmind": "^5.0.7",
     "monaco-editor": "^0.56.0",
     "next": "^16.3.4",
+    "next-intl": "^4.14.2",
     "node-forge": "^1.4.0",
     "react": "^19.2.8",
     "react-apexcharts": "^2.1.1",
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@better-auth/core": "^1.7.2",
+    "@eloqnt/cli": "^0.6.29",
     "@maplibre/maplibre-gl-style-spec": "^26.4.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.3.3",

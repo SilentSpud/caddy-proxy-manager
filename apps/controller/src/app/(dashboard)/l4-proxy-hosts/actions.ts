@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { getTranslations } from "next-intl/server";
 import {
   actionError,
   actionSuccess,
@@ -235,8 +236,9 @@ export async function createL4ProxyHostAction(
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess("L4 proxy host created and queued for Caddy reload.");
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to create L4 proxy host:", error);
-    return actionError(error, "Failed to create L4 proxy host.");
+    return actionError(t, error, t("errors.createL4HostFailed"));
   }
 }
 
@@ -279,8 +281,9 @@ export async function updateL4ProxyHostAction(
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess("L4 proxy host updated.");
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to update L4 proxy host:", id, error);
-    return actionError(error, "Failed to update L4 proxy host.");
+    return actionError(t, error, t("errors.updateL4HostFailed"));
   }
 }
 
@@ -296,8 +299,9 @@ export async function deleteL4ProxyHostAction(
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess("L4 proxy host deleted.");
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to delete L4 proxy host:", id, error);
-    return actionError(error, "Failed to delete L4 proxy host.");
+    return actionError(t, error, t("errors.deleteL4HostFailed"));
   }
 }
 
@@ -309,7 +313,8 @@ export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Pro
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess(`L4 proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to toggle L4 proxy host:", id, error);
-    return actionError(error, "Failed to toggle L4 proxy host.");
+    return actionError(t, error, t("errors.toggleL4HostFailed"));
   }
 }

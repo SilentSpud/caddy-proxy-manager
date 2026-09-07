@@ -1,14 +1,16 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { scanForLegacyDatabases } from "@/src/lib/migration/legacy-database";
 import { probeLegacySecrets } from "@/src/lib/migration/legacy-secrets";
 import { getSetupState, SETUP_PATHS } from "@/src/lib/setup";
 import SetupMigrateClient from "./SetupMigrateClient";
 
-export const metadata: Metadata = {
-  title: { absolute: "Migrate an existing installation" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("setup.migrate");
+  return { title: { absolute: t("metaTitle") } };
+}
 
 export default async function SetupMigratePage() {
   const session = await auth();

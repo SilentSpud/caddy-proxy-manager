@@ -9,10 +9,12 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { PathAllowRule } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { useTranslations } from "next-intl";
 
 type Props = { initialData?: PathAllowRule[] };
 
 export function PathAllowsFields({ initialData = [] }: Props) {
+  const t = useTranslations("proxyHosts");
   const [rules, setRules] = useState<WithRowId<PathAllowRule>[]>(() => withRowIds(initialData));
 
   const addRule = () => setRules((r) => [...r, withRowId({ path: "" })]);
@@ -23,7 +25,7 @@ export function PathAllowsFields({ initialData = [] }: Props) {
   return (
     <VStack gap={2}>
       <Text type="body" size="sm" weight="semibold">
-        Path Allows
+        {t("pathAllows")}
       </Text>
       <input
         type="hidden"
@@ -61,17 +63,14 @@ export function PathAllowsFields({ initialData = [] }: Props) {
         <Button
           variant="ghost"
           size="sm"
-          label="Add Path Allow"
+          label={t("addPathAllow")}
           icon={<Plus />}
           onClick={addRule}
         />
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">
-        Paths that bypass any matching Path Block and reach the upstream. Allows are folded into
-        every block&apos;s matcher: a block fires only for requests that match its pattern and do
-        not match any allow. Example: allow /secret + block /* means only /secret reaches the
-        upstream; everything else returns the block status. Allows do not affect Path Rewrites.
+        {t("pathAllowsHelp")}
       </Text>
     </VStack>
   );

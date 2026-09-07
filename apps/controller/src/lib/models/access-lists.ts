@@ -10,6 +10,7 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { accessListEntries, accessLists, proxyHosts } from "../db/schema";
 import { asc, eq, inArray, count } from "drizzle-orm";
+import { domainError } from "../domain-error";
 
 export type AccessListEntry = {
   id: number;
@@ -147,7 +148,7 @@ export async function createAccessList(input: AccessListInput, actorUserId: numb
     .returning();
 
   if (!accessList) {
-    throw new Error("Failed to create access list");
+    throw domainError("failedToCreateAccessList");
   }
 
   if (input.users && input.users.length > 0) {
@@ -182,7 +183,7 @@ export async function updateAccessList(
 ) {
   const existing = await getAccessList(id);
   if (!existing) {
-    throw new Error("Access list not found");
+    throw domainError("accessListNotFound");
   }
 
   const now = nowIso();
@@ -216,7 +217,7 @@ export async function addAccessListEntry(
     where: (table, operators) => operators.eq(table.id, accessListId),
   });
   if (!list) {
-    throw new Error("Access list not found");
+    throw domainError("accessListNotFound");
   }
 
   const now = nowIso();
@@ -249,7 +250,7 @@ export async function removeAccessListEntry(
     where: (table, operators) => operators.eq(table.id, accessListId),
   });
   if (!list) {
-    throw new Error("Access list not found");
+    throw domainError("accessListNotFound");
   }
 
   await db.delete(accessListEntries).where(eq(accessListEntries.id, entryId));
@@ -270,7 +271,7 @@ export async function deleteAccessList(id: number, actorUserId: number) {
     where: (table, operators) => operators.eq(table.id, id),
   });
   if (!existing) {
-    throw new Error("Access list not found");
+    throw domainError("accessListNotFound");
   }
 
   await db.delete(accessLists).where(eq(accessLists.id, id));

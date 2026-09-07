@@ -79,6 +79,49 @@ Two consequences to keep in mind when touching either:
   invocation naming the project — including ones for unrelated services — on a deployment that
   keeps the value in the database instead of `.env`.
 
+## User-facing text
+
+Every string a person reads comes from `apps/controller/messages/en.json` through next-intl. English
+is the source catalog; adding a language is one more file there plus an entry in `LOCALES`
+(`src/lib/locale.ts`), and nothing else.
+
+- Client components: `const t = useTranslations("<namespace>")`. Server components and route
+  handlers: `const t = await getTranslations("<namespace>")` — the hook throws outside a component.
+- Namespaces mirror the route or component folder (`waf`, `proxyHosts`, `settings`), with `common`,
+  `nav`, `ui` and `passwordPolicy` shared across screens.
+- `src/types/next-intl.d.ts` types the keys off `en.json`, so a typo is a build error rather than a
+  key rendered to a user. That only works for literal keys — where a key is composed at runtime
+  (a setting name, a validation code) a test asserts the catalog covers it instead. See
+  `tests/unit/settings-messages.test.ts`.
+- **Never build a sentence by concatenation.** `` `${label} must be a number` `` cannot be
+  translated, because not every language puts the subject first. Return a code and let the catalog
+  hold the whole sentence — `password-policy.ts`, the settings registry and `domain-error.ts` all
+  do this, and their headers explain the shape.
+- Models raise `domainError("code")` rather than `new Error("sentence")`. They run for a server
+  action, for `/api/v1/*` and for the agent's sync, and only the first has a reader with a language:
+  the code is rendered by `actionError`, and the English `message` the error still carries is what
+  the REST layer keeps returning.
+
+The locale is a cookie (`cpm-locale`), not a URL segment: `src/proxy.ts` authorizes on path
+prefixes, forward auth serves the portal on someone else's domain, and the REST API is versioned by
+path. With no cookie the locale is negotiated from `Accept-Language`, then refined on the client
+from `navigator.languages` — Chrome trims the header to one language, so the client sees choices the
+server cannot.
+
+Two things that are not obvious and will cost an afternoon:
+
+- **`createNextIntlPlugin` must not be used.** It reads `next/package.json` and throws under Vite.
+  vinext finds `src/i18n/request.ts` by path and registers the alias itself, so moving or renaming
+  that file disables next-intl silently.
+- **`<NextIntlClientProvider>` is given `locale` and `messages` explicitly.** next-intl documents
+  them as optional in the App Router, but vinext runs RSC and SSR as separate Vite environments and
+  the request config does not cross that boundary. Left to infer, the SSR pass throws and the page
+  500s with the RSC payload already correct — which makes it look like anything but the provider.
+
+What stays in English: messages thrown before a request exists (`config.ts` validating
+`ADMIN_PASSWORD` at startup goes to the container log), and `/api/v1/*` responses, which are a
+machine contract rather than UI copy.
+
 ## Tests
 
 `bun run test` from the root runs everything. It starts a throwaway PostgreSQL container, gives

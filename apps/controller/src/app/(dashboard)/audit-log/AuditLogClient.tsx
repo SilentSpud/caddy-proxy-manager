@@ -10,6 +10,7 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { formatDateTimeUtc } from "@/src/lib/date-format";
+import { useTranslations } from "next-intl";
 
 type EventRow = {
   id: number;
@@ -25,6 +26,7 @@ type Props = {
 };
 
 export default function AuditLogClient({ events, pagination, initialSearch }: Props) {
+  const t = useTranslations("auditLog");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -103,7 +105,7 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
 
   return (
     <VStack gap={6}>
-      <PageHeader title="Audit Log" description="Review configuration changes and user activity." />
+      <PageHeader title={t("auditLog")} description={t("pageDescription")} />
 
       <HStack gap={2} vAlign="center">
         <SearchField
@@ -112,7 +114,7 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
             setSearchTerm(next);
             updateSearch(next);
           }}
-          placeholder="Search audit log..."
+          placeholder={t("searchAuditLog")}
         />
       </HStack>
 
@@ -120,7 +122,7 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
         columns={columns}
         data={events}
         keyField="id"
-        emptyMessage="No audit events found"
+        emptyMessage={t("noAuditEventsFound")}
         pagination={pagination}
         mobileCard={mobileCard}
       />

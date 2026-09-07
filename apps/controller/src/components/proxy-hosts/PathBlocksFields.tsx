@@ -10,6 +10,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { PathBlockRule, PathBlockStatusCode } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { useTranslations } from "next-intl";
 
 // Mirrors PATH_BLOCK_STATUS_CODES in src/lib/models/proxy-hosts.ts. Kept inline so this
 // client component does not pull the server-only model module into the bundle.
@@ -39,6 +40,7 @@ function toJson(rules: RuleState[]): string {
 type Props = { initialData?: PathBlockRule[] };
 
 export function PathBlocksFields({ initialData = [] }: Props) {
+  const t = useTranslations("proxyHosts");
   const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
   const addRule = () =>
@@ -53,7 +55,7 @@ export function PathBlocksFields({ initialData = [] }: Props) {
   return (
     <VStack gap={2}>
       <Text type="body" size="sm" weight="semibold">
-        Path Blocks
+        {t("pathBlocks")}
       </Text>
       <input type="hidden" name="pathBlocksJson" value={toJson(rules)} />
 
@@ -62,7 +64,7 @@ export function PathBlocksFields({ initialData = [] }: Props) {
           {rules.map((rule, i) => (
             <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
-                label="Path"
+                label={t("path")}
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/dns-query"
@@ -70,7 +72,7 @@ export function PathBlocksFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "path", next)}
               />
               <Selector
-                label="Status"
+                label={t("status")}
                 isLabelHidden={i > 0}
                 size="sm"
                 width={120}
@@ -79,11 +81,11 @@ export function PathBlocksFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "status", Number(next))}
               />
               <TextInput
-                label="Body"
+                label={t("body")}
                 isOptional
                 isLabelHidden={i > 0}
                 size="sm"
-                placeholder="Forbidden"
+                placeholder={t("forbidden")}
                 value={rule.body}
                 onChange={(next) => updateRule(rule.rowId, "body", next)}
               />
@@ -103,15 +105,14 @@ export function PathBlocksFields({ initialData = [] }: Props) {
         <Button
           variant="ghost"
           size="sm"
-          label="Add Path Block"
+          label={t("addPathBlock")}
           icon={<Plus />}
           onClick={addRule}
         />
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">
-        Return a static response (no proxying) for matching paths. Supports Caddy path patterns like
-        /dns-query or /admin/*.
+        {t("pathBlocksHelp")}
       </Text>
     </VStack>
   );

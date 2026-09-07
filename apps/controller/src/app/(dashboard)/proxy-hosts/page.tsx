@@ -12,6 +12,7 @@ import { getForwardAuthAccessForHost } from "@/src/lib/models/forward-auth";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
 import { toCertificatePickerOption } from "@/src/lib/certificate-api";
+import { getTranslations } from "next-intl/server";
 
 const PER_PAGE = 25;
 
@@ -19,9 +20,10 @@ interface PageProps {
   searchParams: Promise<{ page?: string; search?: string; sortBy?: string; sortDir?: string }>;
 }
 
-export const metadata: Metadata = {
-  title: "Proxy Hosts",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("proxyHosts") };
+}
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
   await requireAdmin();

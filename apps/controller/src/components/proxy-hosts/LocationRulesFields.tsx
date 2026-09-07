@@ -12,6 +12,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { LocationRule, LoadBalancerConfig } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { LocationLoadBalancerFields } from "./LocationLoadBalancerFields";
+import { useTranslations } from "next-intl";
 
 type UpstreamEntry = { protocol: string; address: string };
 
@@ -69,6 +70,7 @@ function toJson(rules: RuleState[]): string {
 type Props = { initialData?: LocationRule[] };
 
 export function LocationRulesFields({ initialData = [] }: Props) {
+  const t = useTranslations("proxyHosts");
   const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
   // Applies a change to the one rule with this id, leaving the others by reference.
@@ -123,7 +125,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
   return (
     <VStack gap={2}>
       <Text type="body" size="sm" weight="semibold">
-        Location Rules
+        {t("locationRules")}
       </Text>
       <input type="hidden" name="locationRulesJson" value={toJson(rules)} />
 
@@ -134,7 +136,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
               <VStack gap={3}>
                 <HStack gap={2} vAlign="end">
                   <TextInput
-                    label="Path Pattern"
+                    label={t("pathPattern")}
                     size="sm"
                     placeholder="/ws/*"
                     value={rule.path}
@@ -151,14 +153,14 @@ export function LocationRulesFields({ initialData = [] }: Props) {
 
                 <VStack gap={2}>
                   <Text type="body" size="xsm" color="secondary" weight="medium">
-                    Upstreams
+                    {t("upstreams")}{" "}
                   </Text>
                   {rule.upstreams.map((up, j) => {
                     const isOnlyUpstream = rule.upstreams.length === 1;
                     return (
                       <HStack key={up.rowId} gap={2} vAlign="end">
                         <Selector
-                          label="Protocol"
+                          label={t("protocol")}
                           isLabelHidden
                           size="sm"
                           width={120}
@@ -194,7 +196,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      label="Add Upstream"
+                      label={t("addUpstream")}
                       icon={<Plus />}
                       onClick={() => addUpstream(rule.rowId)}
                     />
@@ -215,7 +217,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
         <Button
           variant="ghost"
           size="sm"
-          label="Add Location Rule"
+          label={t("addLocationRule")}
           icon={<Plus />}
           onClick={addRule}
         />

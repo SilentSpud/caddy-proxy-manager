@@ -11,6 +11,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { useTranslations } from "next-intl";
 
 type UserEntry = {
   id: number;
@@ -42,6 +43,7 @@ export function CpmForwardAuthFields({
   groups?: GroupEntry[];
   currentAccess?: ForwardAuthAccessData | null;
 }) {
+  const t = useTranslations("proxyHosts");
   const initial = cpmForwardAuth ?? null;
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>(currentAccess?.userIds ?? []);
@@ -70,14 +72,14 @@ export function CpmForwardAuthFields({
         <HStack justify="between" vAlign="center" gap={4}>
           <VStack gap={1}>
             <Text type="body" size="sm" weight="semibold">
-              CPM Forward Auth
+              {t("cpmForwardAuth")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              Require users to authenticate via Caddy Proxy Manager before accessing this host
+              {t("cpmForwardAuthDescription")}
             </Text>
           </VStack>
           <Switch
-            label="Enable CPM forward auth"
+            label={t("enableCpmForwardAuth")}
             isLabelHidden
             htmlName="cpmForwardAuthEnabled"
             value={enabled}
@@ -88,29 +90,29 @@ export function CpmForwardAuthFields({
         {enabled && (
           <VStack gap={4}>
             <TextArea
-              label="Protected Paths"
+              label={t("protectedPaths")}
               isOptional
               htmlName="cpmForwardAuthProtectedPaths"
               placeholder="/secret/*, /admin/*"
               value={protectedPaths}
               onChange={setProtectedPaths}
               rows={2}
-              description="Leave empty to protect entire domain. Comma-separated paths to protect specific routes only."
+              description={t("forwardAuthProtectedPathsHelp")}
             />
             <TextArea
-              label="Excluded Paths"
+              label={t("excludedPaths")}
               isOptional
               htmlName="cpmForwardAuthExcludedPaths"
               placeholder="/share/*, /rest/*"
               value={excludedPaths}
               onChange={setExcludedPaths}
               rows={2}
-              description="Paths to exclude from authentication. These paths bypass forward auth while all other paths remain protected. Ignored if Protected Paths is set."
+              description={t("forwardAuthExcludedPathsHelp")}
             />
 
             {groups.length > 0 && (
               <CheckboxList
-                label="Allowed Groups"
+                label={t("allowedGroups")}
                 hasDividers
                 value={selectedGroupIds.map(String)}
                 onChange={(values) => setSelectedGroupIds(values.map(Number))}
@@ -133,7 +135,7 @@ export function CpmForwardAuthFields({
 
             {users.length > 0 && (
               <CheckboxList
-                label="Allowed Users"
+                label={t("allowedUsers")}
                 hasDividers
                 value={selectedUserIds.map(String)}
                 onChange={(values) => setSelectedUserIds(values.map(Number))}
@@ -151,8 +153,8 @@ export function CpmForwardAuthFields({
 
             {hasNoTargets && (
               <EmptyState
-                title="No groups or users yet"
-                description="Create groups on the Groups page."
+                title={t("forwardAuthSubjectsEmptyTitle")}
+                description={t("forwardAuthGroupsEmptyDescription")}
                 isCompact
               />
             )}
@@ -160,8 +162,8 @@ export function CpmForwardAuthFields({
             {hasNothingSelected && (
               <Banner
                 status="warning"
-                title="Nobody can access this host"
-                description="No users or groups are selected, so forward auth will reject every request."
+                title={t("forwardAuthAccessDeniedTitle")}
+                description={t("forwardAuthAccessDeniedDescription")}
               />
             )}
           </VStack>

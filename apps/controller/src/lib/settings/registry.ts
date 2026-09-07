@@ -64,9 +64,34 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
   parse: (value: unknown) => T;
 };
 
+/** Why a value was refused. Rendered by `settings.validation.<code>` in the message catalog. */
+export type SettingValidationCode =
+  | "boolean"
+  | "tristate"
+  | "text"
+  | "tooLong"
+  | "controlCharacter"
+  | "pattern"
+  | "wholeNumber"
+  | "range"
+  | "unknown";
+
+/**
+ * Carries a code rather than only a sentence, because a translated one cannot be built by pasting
+ * the field's name in front of a predicate — see the note on `password-policy.ts`. `message` stays
+ * English for logs and for the paths that validate before any request exists (environment parsing
+ * at startup); a caller that has a locale renders `code` instead.
+ */
 export class SettingValidationError extends Error {
   constructor(
     readonly settingKey: string,
+    readonly code: SettingValidationCode,
+    /**
+     * ICU arguments for the message, `label` included — that one is the English label, which is
+     * what builds the fallback `message` below. A renderer with a locale replaces it with the
+     * translated label before formatting; see `settingValidationMessage`.
+     */
+    readonly params: Record<string, string | number>,
     message: string,
   ) {
     super(message);
@@ -87,8 +112,28 @@ type Common<T extends SettingValue> = {
   composeReads?: boolean;
 };
 
-function reject(key: string, message: string): never {
-  throw new SettingValidationError(key, message);
+/** The English wording, also the source the `settings.validation.*` messages were written from. */
+const VALIDATION_WORDING: Record<SettingValidationCode, string> = {
+  boolean: "{label} must be true or false",
+  tristate: "{label} must be true, false, or left unset",
+  text: "{label} must be text",
+  tooLong: "{label} must be {max} characters or fewer",
+  controlCharacter: "{label} contains a control character",
+  pattern: "{label} {hint}",
+  wholeNumber: "{label} must be a whole number",
+  range: "{label} must be between {min} and {max}",
+  unknown: 'Unknown setting "{label}"',
+};
+
+function reject(
+  key: string,
+  code: SettingValidationCode,
+  params: Record<string, string | number>,
+): never {
+  const message = VALIDATION_WORDING[code].replace(/\{(\w+)\}/g, (whole, name) =>
+    name in params ? String(params[name]) : whole,
+  );
+  throw new SettingValidationError(key, code, params, message);
 }
 
 export function booleanSetting(spec: Common<boolean>): SettingDefinition<boolean> {
@@ -101,7 +146,7 @@ export function booleanSetting(spec: Common<boolean>): SettingDefinition<boolean
       if (["true", "1", "yes", "on"].includes(normalized)) return true;
       if (["false", "0", "no", "off", ""].includes(normalized)) return false;
     }
-    return reject(key, `${spec.label} must be true or false`);
+    return reject(key, "boolean", { label: spec.label });
   };
   return { ...spec, key, parse, fromEnv: parse };
 }
@@ -113,18 +158,21 @@ export function stringSetting(
   const maxLength = spec.maxLength ?? 2048;
   const parse = (value: unknown): string => {
     if (value === null || value === undefined) return spec.default;
-    if (typeof value !== "string") return reject(key, `${spec.label} must be text`);
+    if (typeof value !== "string") return reject(key, "text", { label: spec.label });
     const trimmed = value.trim();
     if (trimmed.length > maxLength) {
-      return reject(key, `${spec.label} must be ${maxLength} characters or fewer`);
+      return reject(key, "tooLong", { label: spec.label, max: maxLength });
     }
     // A control character reaches a Caddy config or an HTTP header intact, so it is refused here
     // rather than wherever it lands.
     if (hasForbiddenControlCharacter(trimmed)) {
-      return reject(key, `${spec.label} contains a control character`);
+      return reject(key, "controlCharacter", { label: spec.label });
     }
     if (trimmed !== "" && spec.pattern && !spec.pattern.test(trimmed)) {
-      return reject(key, `${spec.label} ${spec.patternHint ?? "is not valid"}`);
+      return reject(key, "pattern", {
+        label: spec.label,
+        hint: spec.patternHint ?? "is not valid",
+      });
     }
     return trimmed;
   };
@@ -142,10 +190,10 @@ export function numberSetting(
   const parse = (value: unknown): number => {
     const numeric = typeof value === "string" ? Number(value.trim()) : value;
     if (typeof numeric !== "number" || !Number.isFinite(numeric) || !Number.isInteger(numeric)) {
-      return reject(key, `${spec.label} must be a whole number`);
+      return reject(key, "wholeNumber", { label: spec.label });
     }
     if (numeric < spec.min || numeric > spec.max) {
-      return reject(key, `${spec.label} must be between ${spec.min} and ${spec.max}`);
+      return reject(key, "range", { label: spec.label, min: spec.min, max: spec.max });
     }
     return numeric;
   };
@@ -172,7 +220,7 @@ export function optionalBooleanSetting(
       if (["true", "1", "yes", "on"].includes(normalized)) return true;
       if (["false", "0", "no", "off"].includes(normalized)) return false;
     }
-    return reject(key, `${spec.label} must be true, false, or left unset`);
+    return reject(key, "tristate", { label: spec.label });
   };
   return { ...spec, key, default: null, parse, fromEnv: parse };
 }

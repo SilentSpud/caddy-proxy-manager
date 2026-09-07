@@ -21,6 +21,7 @@ import { ImportedTab } from "./components/ImportedTab";
 import { CaTab } from "./components/CaTab";
 import { MtlsRolesTab } from "@/components/mtls-roles/MtlsRolesTab";
 import { countExpiry } from "./certificate-summary";
+import { useTranslations } from "next-intl";
 
 type TabId = "acme" | "imported" | "ca" | "roles";
 
@@ -45,6 +46,7 @@ export default function CertificatesClient({
   mtlsRoles,
   issuedClientCerts,
 }: Props) {
+  const t = useTranslations("certificates");
   const [activeTab, setActiveTab] = useState<TabId>("acme");
   const [searchAcme, setSearchAcme] = useState("");
   const [searchImported, setSearchImported] = useState("");
@@ -80,10 +82,7 @@ export default function CertificatesClient({
 
   return (
     <VStack gap={6}>
-      <PageHeader
-        title="SSL/TLS Certificates"
-        description="Caddy automatically handles HTTPS certificates via Let's Encrypt. Import custom certificates only when needed."
-      />
+      <PageHeader title={t("sslTlsCertificates")} description={t("automaticHttpsDescription")} />
 
       {/* Status summary filter chips */}
       <StatusSummaryBar
@@ -97,18 +96,22 @@ export default function CertificatesClient({
       <VStack gap={4}>
         <HStack gap={4} vAlign="center" wrap="wrap" justify="between">
           <TabList value={activeTab} onChange={handleTabChange}>
-            <Tab value="acme" label="ACME" endContent={<Badge label={acmePagination.total} />} />
+            <Tab
+              value="acme"
+              label={t("acme")}
+              endContent={<Badge label={acmePagination.total} />}
+            />
             <Tab
               value="imported"
-              label="Imported"
+              label={t("imported")}
               endContent={<Badge label={importedCerts.length} />}
             />
             <Tab
               value="ca"
-              label="CA / mTLS"
+              label={t("caMtls")}
               endContent={<Badge label={caCertificates.length} />}
             />
-            <Tab value="roles" label="Roles" endContent={<Badge label={mtlsRoles.length} />} />
+            <Tab value="roles" label={t("roles")} endContent={<Badge label={mtlsRoles.length} />} />
           </TabList>
 
           <SearchField
@@ -121,7 +124,7 @@ export default function CertificatesClient({
                   ? "Search by name or domain…"
                   : "Search by name…"
             }
-            label="Search certificates"
+            label={t("searchCertificates")}
           />
         </HStack>
 

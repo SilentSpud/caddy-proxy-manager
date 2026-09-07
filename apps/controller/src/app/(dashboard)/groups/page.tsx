@@ -3,10 +3,12 @@ import { listGroups } from "@/src/lib/models/groups";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Groups",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("groups") };
+}
 
 export default async function GroupsPage() {
   await requireAdmin();

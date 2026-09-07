@@ -4,6 +4,7 @@ import { logAuditEvent } from "../audit";
 import { mtlsRoles, mtlsCertificateRoles, issuedClientCertificates } from "../db/schema";
 import { asc, eq, inArray, count, and, isNull } from "drizzle-orm";
 import { normalizeFingerprint } from "../caddy-mtls";
+import { domainError } from "../domain-error";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -100,7 +101,7 @@ export async function createMtlsRole(input: MtlsRoleInput, actorUserId: number):
     })
     .returning();
 
-  if (!record) throw new Error("Failed to create mTLS role");
+  if (!record) throw domainError("failedToCreateMtlsRole");
 
   await logAuditEvent({
     userId: actorUserId,
@@ -121,7 +122,7 @@ export async function updateMtlsRole(
   const existing = await db.query.mtlsRoles.findFirst({
     where: (table, { eq: cmpEq }) => cmpEq(table.id, id),
   });
-  if (!existing) throw new Error("mTLS role not found");
+  if (!existing) throw domainError("mtlsRoleNotFound");
 
   const now = nowIso();
   await db
@@ -154,7 +155,7 @@ export async function deleteMtlsRole(id: number, actorUserId: number): Promise<v
   const existing = await db.query.mtlsRoles.findFirst({
     where: (table, { eq: cmpEq }) => cmpEq(table.id, id),
   });
-  if (!existing) throw new Error("mTLS role not found");
+  if (!existing) throw domainError("mtlsRoleNotFound");
 
   await db.delete(mtlsRoles).where(eq(mtlsRoles.id, id));
 
@@ -179,12 +180,12 @@ export async function assignRoleToCertificate(
   const role = await db.query.mtlsRoles.findFirst({
     where: (t, { eq: cmpEq }) => cmpEq(t.id, roleId),
   });
-  if (!role) throw new Error("mTLS role not found");
+  if (!role) throw domainError("mtlsRoleNotFound");
 
   const cert = await db.query.issuedClientCertificates.findFirst({
     where: (t, { eq: cmpEq }) => cmpEq(t.id, certId),
   });
-  if (!cert) throw new Error("Issued client certificate not found");
+  if (!cert) throw domainError("issuedClientCertificateNotFound");
 
   const now = nowIso();
   await db.insert(mtlsCertificateRoles).values({
@@ -213,7 +214,7 @@ export async function removeRoleFromCertificate(
   const role = await db.query.mtlsRoles.findFirst({
     where: (t, { eq: cmpEq }) => cmpEq(t.id, roleId),
   });
-  if (!role) throw new Error("mTLS role not found");
+  if (!role) throw domainError("mtlsRoleNotFound");
 
   await db
     .delete(mtlsCertificateRoles)

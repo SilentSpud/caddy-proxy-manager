@@ -40,6 +40,7 @@ import { AdvancedConfigFields } from "./AdvancedConfigFields";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
+import { useTranslations } from "next-intl";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -92,6 +93,7 @@ export function CreateHostDialog({
   forwardAuthUsers?: ForwardAuthUser[];
   forwardAuthGroups?: ForwardAuthGroup[];
 }) {
+  const t = useTranslations("proxyHosts");
   const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
 
   const [name, setName] = useState(initialData ? `${initialData.name} (Copy)` : "");
@@ -113,7 +115,7 @@ export function CreateHostDialog({
       onClose={onClose}
       title={initialData ? "Duplicate Proxy Host" : "Create Proxy Host"}
       maxWidth="lg"
-      submitLabel="Create"
+      submitLabel={t("create")}
       onSubmit={() => {
         (document.getElementById("create-host-form") as HTMLFormElement)?.requestSubmit();
       }}
@@ -127,33 +129,33 @@ export function CreateHostDialog({
             enabled={true}
           />
           <TextInput
-            label="Name"
+            label={t("name")}
             htmlName="name"
-            placeholder="My Service"
+            placeholder={t("namePlaceholder")}
             value={name}
             onChange={setName}
             isRequired
           />
           <TextArea
-            label="Domains"
+            label={t("domains")}
             htmlName="domains"
             placeholder="app.example.com"
             value={domains}
             onChange={setDomains}
             isRequired
             rows={2}
-            description="One per line or comma-separated. Wildcards like *.example.com are supported."
+            description={t("domainsHelp")}
           />
           <UpstreamInput defaultUpstreams={initialData?.upstreams} />
           <Selector
-            label="Certificate"
+            label={t("certificate")}
             htmlName="certificateId"
             options={toOptions(certificates, "Managed by Caddy (Auto)")}
             value={certificateId}
             onChange={(next) => setCertificateId(next as string)}
           />
           <Selector
-            label="Access List"
+            label={t("accessList")}
             htmlName="accessListId"
             options={toOptions(accessLists, "None")}
             value={accessListId}
@@ -221,6 +223,7 @@ export function EditHostDialog({
   forwardAuthAccess?: ForwardAuthAccessData | null;
   tailscaleDefaults?: TailscaleHostDefaults | null;
 }) {
+  const t = useTranslations("proxyHosts");
   const [state, formAction] = useActionState(
     updateProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -241,9 +244,9 @@ export function EditHostDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title="Edit Proxy Host"
+      title={t("editProxyHost")}
       maxWidth="lg"
-      submitLabel="Save Changes"
+      submitLabel={t("saveChanges")}
       onSubmit={() => {
         (document.getElementById("edit-host-form") as HTMLFormElement)?.requestSubmit();
       }}
@@ -256,25 +259,25 @@ export function EditHostDialog({
             skipHttpsValidation={host.skipHttpsHostnameValidation}
             enabled={host.enabled}
           />
-          <TextInput label="Name" htmlName="name" value={name} onChange={setName} isRequired />
+          <TextInput label={t("name")} htmlName="name" value={name} onChange={setName} isRequired />
           <TextArea
-            label="Domains"
+            label={t("domains")}
             htmlName="domains"
             value={domains}
             onChange={setDomains}
             rows={2}
-            description="One per line or comma-separated. Wildcards like *.example.com are supported."
+            description={t("domainsHelp")}
           />
           <UpstreamInput defaultUpstreams={host.upstreams} />
           <Selector
-            label="Certificate"
+            label={t("certificate")}
             htmlName="certificateId"
             options={toOptions(certificates, "Managed by Caddy (Auto)")}
             value={certificateId}
             onChange={(next) => setCertificateId(next as string)}
           />
           <Selector
-            label="Access List"
+            label={t("accessList")}
             htmlName="accessListId"
             options={toOptions(accessLists, "None")}
             value={accessListId}
@@ -328,6 +331,7 @@ export function DeleteHostDialog({
   host: ProxyHost;
   onClose: () => void;
 }) {
+  const t = useTranslations("proxyHosts");
   const [state, formAction] = useActionState(
     deleteProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -343,9 +347,9 @@ export function DeleteHostDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title="Delete Proxy Host"
+      title={t("deleteProxyHost")}
       maxWidth="sm"
-      submitLabel="Delete"
+      submitLabel={t("delete")}
       onSubmit={() => {
         (document.getElementById("delete-host-form") as HTMLFormElement)?.requestSubmit();
       }}
@@ -358,7 +362,7 @@ export function DeleteHostDialog({
           </Text>
           <VStack gap={1}>
             <Text type="body" size="sm" color="secondary">
-              This will remove the configuration for:
+              {t("deleteDescription")}
             </Text>
             <Text type="body" size="sm" color="secondary">
               • Domains: {host.domains.join(", ")}
@@ -367,7 +371,7 @@ export function DeleteHostDialog({
               • Upstreams: {host.upstreams.join(", ")}
             </Text>
           </VStack>
-          <Banner status="warning" title="This action cannot be undone" />
+          <Banner status="warning" title={t("deleteWarning")} />
         </VStack>
       </form>
     </AppDialog>

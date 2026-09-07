@@ -3,11 +3,13 @@ import { auth } from "@/src/lib/auth";
 import { getProviderDisplayList } from "@/src/lib/models/oauth-providers";
 import { config } from "@/src/lib/config";
 import LoginClient from "@/src/components/auth/LoginClient";
+import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Sign In",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("auth.login");
+  return { title: t("metaTitle") };
+}
 
 export default async function LoginPage() {
   const session = await auth();

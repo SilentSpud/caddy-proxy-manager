@@ -3,6 +3,7 @@ import { logAuditEvent } from "../audit";
 import { applyCaddyConfig } from "../caddy";
 import { issuedClientCertificates } from "../db/schema";
 import { desc, eq } from "drizzle-orm";
+import { domainError } from "../domain-error";
 
 export type IssuedClientCertificate = {
   id: number;
@@ -85,7 +86,7 @@ export async function createIssuedClientCertificate(
     .returning();
 
   if (!record) {
-    throw new Error("Failed to store issued client certificate");
+    throw domainError("issuedClientCertificateStorageFailed");
   }
 
   await logAuditEvent({
@@ -109,10 +110,10 @@ export async function revokeIssuedClientCertificate(
 ): Promise<IssuedClientCertificate> {
   const existing = await getIssuedClientCertificate(id);
   if (!existing) {
-    throw new Error("Issued client certificate not found");
+    throw domainError("issuedClientCertificateNotFound");
   }
   if (existing.revokedAt) {
-    throw new Error("Issued client certificate is already revoked");
+    throw domainError("issuedClientCertificateAlreadyRevoked");
   }
 
   const revokedAt = nowIso();

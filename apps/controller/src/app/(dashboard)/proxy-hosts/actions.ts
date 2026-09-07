@@ -35,6 +35,7 @@ import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { setForwardAuthAccess } from "@/src/lib/models/forward-auth";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
+import { getTranslations } from "next-intl/server";
 import {
   parseCsv,
   parseUpstreams,
@@ -745,8 +746,9 @@ export async function createProxyHostAction(
     }
     return actionSuccess("Proxy host created and queued for Caddy reload.");
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to create proxy host:", error);
-    return actionError(error, "Failed to create proxy host. Please check the logs for details.");
+    return actionError(t, error, t("errors.createProxyHostFailed"));
   }
 }
 
@@ -857,8 +859,9 @@ export async function updateProxyHostAction(
     }
     return actionSuccess("Proxy host updated.");
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to update proxy host:", id, error);
-    return actionError(error, "Failed to update proxy host. Please check the logs for details.");
+    return actionError(t, error, t("errors.updateProxyHostFailed"));
   }
 }
 
@@ -874,8 +877,9 @@ export async function deleteProxyHostAction(
     revalidatePath("/proxy-hosts");
     return actionSuccess("Proxy host deleted.");
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to delete proxy host:", id, error);
-    return actionError(error, "Failed to delete proxy host. Please check the logs for details.");
+    return actionError(t, error, t("errors.deleteProxyHostFailed"));
   }
 }
 
@@ -887,7 +891,8 @@ export async function toggleProxyHostAction(id: number, enabled: boolean): Promi
     revalidatePath("/proxy-hosts");
     return actionSuccess(`Proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to toggle proxy host:", id, error);
-    return actionError(error, "Failed to toggle proxy host. Please check the logs for details.");
+    return actionError(t, error, t("errors.toggleProxyHostFailed"));
   }
 }

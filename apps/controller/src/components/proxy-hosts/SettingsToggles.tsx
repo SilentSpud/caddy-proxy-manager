@@ -7,6 +7,7 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { useTranslations } from "next-intl";
 
 type ToggleSetting = {
   stateKey: "hstsSubdomains" | "skipHttpsHostnameValidation";
@@ -41,6 +42,7 @@ export function SettingsToggles({
   skipHttpsValidation = false,
   enabled = true,
 }: SettingsTogglesProps) {
+  const t = useTranslations("proxyHosts");
   const [values, setValues] = useState({
     hstsSubdomains,
     skipHttpsHostnameValidation: skipHttpsValidation,
@@ -67,7 +69,7 @@ export function SettingsToggles({
         }
         endContent={
           <Switch
-            label="Proxy host enabled"
+            label={t("proxyHostEnabled")}
             isLabelHidden
             value={values.enabled}
             onChange={handleChange("enabled")}
@@ -78,7 +80,7 @@ export function SettingsToggles({
       <Card>
         <VStack gap={3}>
           <Text type="body" size="sm" weight="semibold">
-            Advanced Options
+            {t("advancedOptions")}
           </Text>
           <Divider />
           {SETTINGS.map((setting, index) => (

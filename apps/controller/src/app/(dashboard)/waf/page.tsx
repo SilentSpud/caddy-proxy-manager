@@ -11,6 +11,7 @@ import { getWafSettings } from "@/src/lib/settings";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 const PER_PAGE = 50;
 const RANGE_SECONDS = {
@@ -54,9 +55,10 @@ interface PageProps {
   }>;
 }
 
-export const metadata: Metadata = {
-  title: "WAF",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("waf") };
+}
 
 export default async function WafPage({ searchParams }: PageProps) {
   await requireAdmin();

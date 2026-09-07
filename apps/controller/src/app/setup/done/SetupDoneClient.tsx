@@ -14,6 +14,7 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import type { EnvCleanup } from "@/src/lib/migration/env-file";
 import { FormCard } from "@/src/components/ui/FormLayout";
+import { useTranslations } from "next-intl";
 
 export default function SetupDoneClient({
   source,
@@ -22,18 +23,16 @@ export default function SetupDoneClient({
   source: string;
   cleanup: EnvCleanup;
 }) {
+  const t = useTranslations("setup");
   return (
     <Center>
       <VStack gap={5} padding={5}>
         <VStack gap={2}>
           <Heading level={1}>Migration complete</Heading>
-          <Text color="secondary">
-            Everything you chose to bring across is now in PostgreSQL, and the application is
-            running from it.
-          </Text>
+          <Text color="secondary">{t("migrationCompleteDescription")}</Text>
         </VStack>
 
-        <FormCard title="Keep a copy of the old database">
+        <FormCard title={t("legacyDatabaseBackupTitle")}>
           <VStack gap={3}>
             <Text size="sm" color="secondary">
               The file at <Code>{source}</Code> was read, not modified. Download it now if you want
@@ -41,14 +40,14 @@ export default function SetupDoneClient({
             </Text>
             <Banner
               status="warning"
-              title="Nothing reads this file any more"
-              description="The application no longer opens it, so any change made there from now on is invisible to it."
+              title={t("legacyDatabaseUnusedTitle")}
+              description={t("legacyDatabaseUnusedDescription")}
             />
             <Link href="/api/setup/backup">Download the old database</Link>
           </VStack>
         </FormCard>
 
-        <FormCard title="Tidy up your .env">
+        <FormCard title={t("environmentCleanupTitle")}>
           {cleanup.command ? (
             <VStack gap={3}>
               <Text size="sm" color="secondary">
@@ -68,15 +67,14 @@ export default function SetupDoneClient({
             </VStack>
           ) : (
             <Text size="sm" color="secondary">
-              Nothing to remove — none of the settings you migrated were configured by an
-              environment variable.
+              {t("environmentCleanupEmptyDescription")}
             </Text>
           )}
 
           {cleanup.keep.length > 0 && (
             <Banner
               status="warning"
-              title="Compose reads these too"
+              title={t("composeSettingsTitle")}
               description={`Docker Compose provisions the clickhouse and geoipupdate containers from ${cleanup.keep.join(", ")}, and it cannot read the database — so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start those containers there. With an agent the saved values are passed to Compose for you, and these lines can go as well — but drop clickhouse and geoipupdate from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the containers from the now-stale values in the file.`}
             />
           )}
@@ -84,7 +82,7 @@ export default function SetupDoneClient({
 
         <Button
           variant="primary"
-          label="Go to the dashboard"
+          label={t("dashboardLinkLabel")}
           onClick={() => window.location.assign("/")}
         />
       </VStack>

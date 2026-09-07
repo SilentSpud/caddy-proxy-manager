@@ -24,6 +24,7 @@ import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { useTranslations } from "next-intl";
 
 /**
  * Schedule onClose after a successful action exactly once. Without the ref guard the effect
@@ -192,6 +193,7 @@ function L4HostForm({
   state: { status: string; message?: string };
   initialData?: L4ProxyHost | null;
 }) {
+  const t = useTranslations("l4ProxyHosts");
   const [enabled, setEnabled] = useState(initialData?.enabled ?? true);
   const [protocol, setProtocol] = useState(initialData?.protocol ?? "tcp");
   const [matcherType, setMatcherType] = useState(initialData?.matcherType ?? "none");
@@ -259,7 +261,7 @@ function L4HostForm({
               </Text>
             </VStack>
             <Switch
-              label="Enable this L4 host"
+              label={t("enableHostLabel")}
               isLabelHidden
               value={enabled}
               onChange={setEnabled}
@@ -269,16 +271,16 @@ function L4HostForm({
 
         <TextInput
           {...NATIVE_REQUIRED}
-          label="Name"
+          label={t("name")}
           htmlName="name"
-          placeholder="PostgreSQL Proxy"
+          placeholder={t("namePlaceholder")}
           value={text.name}
           onChange={set("name")}
           isRequired
         />
 
         <Selector
-          label="Protocol"
+          label={t("protocol")}
           htmlName="protocol"
           options={PROTOCOL_OPTIONS}
           value={protocol}
@@ -287,34 +289,34 @@ function L4HostForm({
 
         <TextInput
           {...NATIVE_REQUIRED}
-          label="Listen Address"
+          label={t("listenAddress")}
           htmlName="listenAddress"
           placeholder=":5432"
           value={text.listenAddress}
           onChange={set("listenAddress")}
           isRequired
-          description="Format: :PORT, HOST:PORT, or [IPv6]:PORT — an IPv6 address must be bracketed. The agent publishes the port on the Caddy container for you."
+          description={t("listenAddressHelp")}
         />
 
         <TextArea
           {...NATIVE_REQUIRED}
-          label="Upstreams"
+          label={t("upstreams")}
           htmlName="upstreams"
           placeholder={"10.0.0.1:5432\n10.0.0.2:5432"}
           value={text.upstreams}
           onChange={set("upstreams")}
           rows={2}
           isRequired
-          description="One per line in host:port format."
+          description={t("upstreamsHelp")}
         />
 
         <Selector
-          label="Matcher"
+          label={t("matcher")}
           htmlName="matcherType"
           options={MATCHER_OPTIONS}
           value={matcherType}
           onChange={(v) => setMatcherType(v as "none" | "tls_sni" | "http_host" | "proxy_protocol")}
-          description="Match incoming connections before proxying. 'None' matches all connections on this port."
+          description={t("matcherHelp")}
         />
 
         {(matcherType === "tls_sni" || matcherType === "http_host") && (
@@ -322,17 +324,17 @@ function L4HostForm({
             {...NATIVE_REQUIRED}
             label={matcherType === "tls_sni" ? "SNI Hostnames" : "HTTP Hostnames"}
             htmlName="matcherValue"
-            placeholder="db.example.com, api.example.com"
+            placeholder={t("matcherHostnamesPlaceholder")}
             value={text.matcherValue}
             onChange={set("matcherValue")}
             isRequired
-            description="Comma-separated list of hostnames to match."
+            description={t("matcherHostnamesHelp")}
           />
         )}
 
         {protocol === "tcp" && (
           <Switch
-            label="TLS Termination"
+            label={t("tlsTermination")}
             htmlName="tlsTermination"
             value={tlsTermination}
             onChange={setTlsTermination}
@@ -340,14 +342,14 @@ function L4HostForm({
         )}
 
         <Switch
-          label="Accept inbound PROXY protocol"
+          label={t("acceptInboundProxyProtocol")}
           htmlName="proxyProtocolReceive"
           value={proxyProtocolReceive}
           onChange={setProxyProtocolReceive}
         />
 
         <Selector
-          label="Send PROXY protocol to upstream"
+          label={t("upstreamProxyProtocolLabel")}
           htmlName="proxyProtocolVersion"
           options={PROXY_PROTOCOL_OPTIONS}
           value={proxyProtocolVersion}
@@ -356,26 +358,26 @@ function L4HostForm({
 
         <Section
           icon={Layers}
-          title="Load Balancer"
+          title={t("loadBalancer")}
           defaultIsOpen={initialData?.loadBalancer?.enabled ?? false}
         >
           <input type="hidden" name="lbPresent" value="1" />
           <input type="hidden" name="lbEnabledPresent" value="1" />
           <Switch
-            label="Enable Load Balancing"
+            label={t("enableLoadBalancing")}
             htmlName="lbEnabled"
             value={lbEnabled}
             onChange={setLbEnabled}
           />
           <Selector
-            label="Policy"
+            label={t("policy")}
             htmlName="lbPolicy"
             options={LB_POLICY_OPTIONS}
             value={lbPolicy}
             onChange={setLbPolicy}
           />
           <TextInput
-            label="Try Duration"
+            label={t("tryDuration")}
             isOptional
             htmlName="lbTryDuration"
             placeholder="5s"
@@ -383,7 +385,7 @@ function L4HostForm({
             onChange={set("lbTryDuration")}
           />
           <TextInput
-            label="Try Interval"
+            label={t("tryInterval")}
             isOptional
             htmlName="lbTryInterval"
             placeholder="250ms"
@@ -391,7 +393,7 @@ function L4HostForm({
             onChange={set("lbTryInterval")}
           />
           <TextInput
-            label="Retries"
+            label={t("retries")}
             isOptional
             htmlName="lbRetries"
             value={text.lbRetries}
@@ -399,24 +401,24 @@ function L4HostForm({
           />
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
-            Active Health Check
+            {t("activeHealthCheck")}
           </Text>
           <input type="hidden" name="lbActiveHealthEnabledPresent" value="1" />
           <Switch
-            label="Enable Active Health Check"
+            label={t("enableActiveHealthCheck")}
             htmlName="lbActiveHealthEnabled"
             value={lbActiveHealthEnabled}
             onChange={setLbActiveHealthEnabled}
           />
           <TextInput
-            label="Health Check Port"
+            label={t("healthCheckPort")}
             isOptional
             htmlName="lbActiveHealthPort"
             value={text.lbActiveHealthPort}
             onChange={set("lbActiveHealthPort")}
           />
           <TextInput
-            label="Interval"
+            label={t("interval")}
             isOptional
             htmlName="lbActiveHealthInterval"
             placeholder="30s"
@@ -424,7 +426,7 @@ function L4HostForm({
             onChange={set("lbActiveHealthInterval")}
           />
           <TextInput
-            label="Timeout"
+            label={t("timeout")}
             isOptional
             htmlName="lbActiveHealthTimeout"
             placeholder="5s"
@@ -433,17 +435,17 @@ function L4HostForm({
           />
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
-            Passive Health Check
+            {t("passiveHealthCheck")}
           </Text>
           <input type="hidden" name="lbPassiveHealthEnabledPresent" value="1" />
           <Switch
-            label="Enable Passive Health Check"
+            label={t("enablePassiveHealthCheck")}
             htmlName="lbPassiveHealthEnabled"
             value={lbPassiveHealthEnabled}
             onChange={setLbPassiveHealthEnabled}
           />
           <TextInput
-            label="Fail Duration"
+            label={t("failDuration")}
             isOptional
             htmlName="lbPassiveHealthFailDuration"
             placeholder="30s"
@@ -451,14 +453,14 @@ function L4HostForm({
             onChange={set("lbPassiveHealthFailDuration")}
           />
           <TextInput
-            label="Max Fails"
+            label={t("maxFails")}
             isOptional
             htmlName="lbPassiveHealthMaxFails"
             value={text.lbPassiveHealthMaxFails}
             onChange={set("lbPassiveHealthMaxFails")}
           />
           <TextInput
-            label="Unhealthy Latency"
+            label={t("unhealthyLatency")}
             isOptional
             htmlName="lbPassiveHealthUnhealthyLatency"
             placeholder="5s"
@@ -469,39 +471,39 @@ function L4HostForm({
 
         <Section
           icon={Globe}
-          title="Custom DNS Resolvers"
+          title={t("customDnsResolvers")}
           defaultIsOpen={initialData?.dnsResolver?.enabled ?? false}
         >
           <input type="hidden" name="dnsPresent" value="1" />
           <input type="hidden" name="dnsEnabledPresent" value="1" />
           <Switch
-            label="Enable Custom DNS"
+            label={t("enableCustomDns")}
             htmlName="dnsEnabled"
             value={dnsEnabled}
             onChange={setDnsEnabled}
           />
           <TextArea
-            label="DNS Resolvers"
+            label={t("dnsResolvers")}
             isOptional
             htmlName="dnsResolvers"
             placeholder={"1.1.1.1\n9.9.9.9"}
             value={text.dnsResolvers}
             onChange={set("dnsResolvers")}
             rows={2}
-            description="One per line. Used for upstream hostname resolution."
+            description={t("dnsResolversHelp")}
           />
           <TextArea
-            label="Fallback Resolvers"
+            label={t("fallbackResolvers")}
             isOptional
             htmlName="dnsFallbacks"
             placeholder={"1.0.0.1\n149.112.112.112"}
             value={text.dnsFallbacks}
             onChange={set("dnsFallbacks")}
             rows={1}
-            description="Fallback DNS servers (one per line)."
+            description={t("fallbackResolversHelp")}
           />
           <TextInput
-            label="Timeout"
+            label={t("timeout")}
             isOptional
             htmlName="dnsTimeout"
             placeholder="5s"
@@ -512,18 +514,18 @@ function L4HostForm({
 
         <Section
           icon={MapPin}
-          title="Geo Blocking"
+          title={t("geoBlocking")}
           defaultIsOpen={initialData?.geoblock?.enabled ?? false}
         >
           <input type="hidden" name="geoblockPresent" value="1" />
           <Switch
-            label="Enable Geo Blocking"
+            label={t("enableGeoBlocking")}
             htmlName="geoblockEnabled"
             value={geoblockEnabled}
             onChange={setGeoblockEnabled}
           />
           <Selector
-            label="Mode"
+            label={t("mode")}
             htmlName="geoblockMode"
             options={GEOBLOCK_MODE_OPTIONS}
             value={geoblockMode}
@@ -531,28 +533,28 @@ function L4HostForm({
           />
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
-            Block Rules
+            {t("blockRules")}
           </Text>
           <TextInput
-            label="Block Countries"
+            label={t("blockCountries")}
             isOptional
             htmlName="geoblockBlockCountries"
-            placeholder="CN, RU, KP"
+            placeholder={t("blockedCountriesPlaceholder")}
             value={text.geoblockBlockCountries}
             onChange={set("geoblockBlockCountries")}
-            description="ISO 3166-1 alpha-2 codes, comma-separated"
+            description={t("countryCodesHelp")}
           />
           <TextInput
-            label="Block Continents"
+            label={t("blockContinents")}
             isOptional
             htmlName="geoblockBlockContinents"
-            placeholder="AF, AS"
+            placeholder={t("blockedContinentsPlaceholder")}
             value={text.geoblockBlockContinents}
             onChange={set("geoblockBlockContinents")}
-            description="AF, AN, AS, EU, NA, OC, SA"
+            description={t("continentCodesHelp")}
           />
           <TextInput
-            label="Block ASNs"
+            label={t("blockAsns")}
             isOptional
             htmlName="geoblockBlockAsns"
             placeholder="12345, 67890"
@@ -560,7 +562,7 @@ function L4HostForm({
             onChange={set("geoblockBlockAsns")}
           />
           <TextInput
-            label="Block CIDRs"
+            label={t("blockCidrs")}
             isOptional
             htmlName="geoblockBlockCidrs"
             placeholder="192.0.2.0/24"
@@ -568,7 +570,7 @@ function L4HostForm({
             onChange={set("geoblockBlockCidrs")}
           />
           <TextInput
-            label="Block IPs"
+            label={t("blockIps")}
             isOptional
             htmlName="geoblockBlockIps"
             placeholder="203.0.113.1"
@@ -577,26 +579,26 @@ function L4HostForm({
           />
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
-            Allow Rules (override blocks)
+            {t("allowRulesOverrideBlocks")}
           </Text>
           <TextInput
-            label="Allow Countries"
+            label={t("allowCountries")}
             isOptional
             htmlName="geoblockAllowCountries"
-            placeholder="US, DE"
+            placeholder={t("allowedCountriesPlaceholder")}
             value={text.geoblockAllowCountries}
             onChange={set("geoblockAllowCountries")}
           />
           <TextInput
-            label="Allow Continents"
+            label={t("allowContinents")}
             isOptional
             htmlName="geoblockAllowContinents"
-            placeholder="EU, NA"
+            placeholder={t("allowedContinentsPlaceholder")}
             value={text.geoblockAllowContinents}
             onChange={set("geoblockAllowContinents")}
           />
           <TextInput
-            label="Allow ASNs"
+            label={t("allowAsns")}
             isOptional
             htmlName="geoblockAllowAsns"
             placeholder="11111"
@@ -604,7 +606,7 @@ function L4HostForm({
             onChange={set("geoblockAllowAsns")}
           />
           <TextInput
-            label="Allow CIDRs"
+            label={t("allowCidrs")}
             isOptional
             htmlName="geoblockAllowCidrs"
             placeholder="10.0.0.0/8"
@@ -612,7 +614,7 @@ function L4HostForm({
             onChange={set("geoblockAllowCidrs")}
           />
           <TextInput
-            label="Allow IPs"
+            label={t("allowIps")}
             isOptional
             htmlName="geoblockAllowIps"
             placeholder="1.2.3.4"
@@ -622,30 +624,29 @@ function L4HostForm({
 
           <Banner
             status="info"
-            title="Geo blocking uses the client's direct IP at L4"
-            description="There is no X-Forwarded-For support here. Blocked connections are immediately closed."
+            title={t("geoblockClientIpTitle")}
+            description={t("geoblockClientIpDescription")}
           />
         </Section>
 
         <Section
           icon={Pin}
-          title="Upstream DNS Pinning"
+          title={t("upstreamDnsPinning")}
           defaultIsOpen={initialData?.upstreamDnsResolution?.enabled === true}
         >
           <input type="hidden" name="upstreamDnsResolutionPresent" value="1" />
           <Text type="body" size="sm" color="secondary">
-            When enabled, upstream hostnames are resolved to IP addresses at config time, pinning
-            DNS resolution.
+            {t("dnsPinningDescription")}
           </Text>
           <Selector
-            label="Resolution Mode"
+            label={t("resolutionMode")}
             htmlName="upstreamDnsResolutionMode"
             options={UPSTREAM_DNS_MODE_OPTIONS}
             value={upstreamDnsMode}
             onChange={setUpstreamDnsMode}
           />
           <Selector
-            label="Address Family Preference"
+            label={t("addressFamilyPreference")}
             htmlName="upstreamDnsResolutionFamily"
             options={UPSTREAM_DNS_FAMILY_OPTIONS}
             value={upstreamDnsFamily}
@@ -666,6 +667,7 @@ export function CreateL4HostDialog({
   onClose: () => void;
   initialData?: L4ProxyHost | null;
 }) {
+  const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(createL4ProxyHostAction, INITIAL_ACTION_STATE);
 
   useCloseOnSuccess(state, onClose);
@@ -676,7 +678,7 @@ export function CreateL4HostDialog({
       onClose={onClose}
       title={initialData ? "Duplicate L4 Proxy Host" : "Create L4 Proxy Host"}
       maxWidth="lg"
-      submitLabel="Create"
+      submitLabel={t("create")}
       onSubmit={() => {
         (document.getElementById("create-l4-host-form") as HTMLFormElement)?.requestSubmit();
       }}
@@ -700,6 +702,7 @@ export function EditL4HostDialog({
   host: L4ProxyHost;
   onClose: () => void;
 }) {
+  const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(
     updateL4ProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -711,9 +714,9 @@ export function EditL4HostDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title="Edit L4 Proxy Host"
+      title={t("editL4ProxyHost")}
       maxWidth="lg"
-      submitLabel="Save Changes"
+      submitLabel={t("saveChanges")}
       onSubmit={() => {
         (document.getElementById("edit-l4-host-form") as HTMLFormElement)?.requestSubmit();
       }}
@@ -737,6 +740,7 @@ export function DeleteL4HostDialog({
   host: L4ProxyHost;
   onClose: () => void;
 }) {
+  const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(
     deleteL4ProxyHostAction.bind(null, host.id),
     INITIAL_ACTION_STATE,
@@ -748,9 +752,9 @@ export function DeleteL4HostDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title="Delete L4 Proxy Host"
+      title={t("deleteL4ProxyHost")}
       maxWidth="lg"
-      submitLabel="Delete"
+      submitLabel={t("delete")}
       onSubmit={() => {
         (document.getElementById("delete-l4-host-form") as HTMLFormElement)?.requestSubmit();
       }}
@@ -765,18 +769,18 @@ export function DeleteL4HostDialog({
           </Text>
           <Card variant="muted" padding={3}>
             <MetadataList>
-              <MetadataListItem label="Protocol">
+              <MetadataListItem label={t("protocol")}>
                 <Badge
                   variant={host.protocol === "tcp" ? "info" : "warning"}
                   label={host.protocol.toUpperCase()}
                 />
               </MetadataListItem>
-              <MetadataListItem label="Listen">
+              <MetadataListItem label={t("listen")}>
                 <Text type="code" size="xsm">
                   {host.listenAddress}
                 </Text>
               </MetadataListItem>
-              <MetadataListItem label="Upstreams">
+              <MetadataListItem label={t("upstreams")}>
                 <Text type="code" size="xsm">
                   {host.upstreams.join(", ")}
                 </Text>
@@ -784,7 +788,7 @@ export function DeleteL4HostDialog({
             </MetadataList>
           </Card>
           <Text type="body" size="sm" weight="medium">
-            This action cannot be undone.
+            {t("deleteWarning")}
           </Text>
         </VStack>
       </form>

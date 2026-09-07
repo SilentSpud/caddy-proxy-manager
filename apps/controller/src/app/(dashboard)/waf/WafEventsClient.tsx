@@ -48,6 +48,7 @@ import { formatDateTimeUtc } from "@/src/lib/date-format";
 import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
 import { withRowIds } from "@/lib/row-id";
+import { useTranslations } from "next-intl";
 import {
   suppressWafRuleGloballyAction,
   suppressWafRuleForHostAction,
@@ -205,10 +206,11 @@ function SeverityChip({ severity }: { severity: string | null }) {
 }
 
 function BlockedChip({ blocked }: { blocked: boolean }) {
+  const t = useTranslations("waf");
   return blocked ? (
-    <Badge variant="error" label="Blocked" />
+    <Badge variant="error" label={t("blocked")} />
   ) : (
-    <Badge variant="warning" label="Detected" />
+    <Badge variant="warning" label={t("detected")} />
   );
 }
 
@@ -294,6 +296,7 @@ function MatchTags({ tags }: { tags: string[] }) {
 }
 
 function AuditPanel({ rawData }: { rawData: string | null }) {
+  const t = useTranslations("waf");
   const [innerTab, setInnerTab] = useState("overview");
 
   // Parsed once per event instead of on every render. The matched rules get their row ids here, so
@@ -314,7 +317,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   }, [rawData]);
 
   if (!data) {
-    return <EmptyState title="No audit data available for this event." isCompact />;
+    return <EmptyState title={t("auditDataEmptyTitle")} isCompact />;
   }
 
   const tx = data.transaction ?? null;
@@ -324,9 +327,9 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   return (
     <VStack gap={3}>
       <TabList value={innerTab} onChange={setInnerTab} size="sm">
-        <Tab value="overview" label="Overview" />
-        <Tab value="request" label="Request" />
-        <Tab value="response" label="Response" />
+        <Tab value="overview" label={t("overview")} />
+        <Tab value="request" label={t("request")} />
+        <Tab value="response" label={t("response")} />
         {msgs.length > 0 && <Tab value="matches" label={`Matches (${msgs.length})`} />}
       </TabList>
 
@@ -335,22 +338,22 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
           {innerTab === "overview" && tx && (
             <>
               <MetadataList columns="multi">
-                <MetadataListItem label="Transaction ID">
+                <MetadataListItem label={t("transactionId")}>
                   <Text type="code" size="xsm">
                     {tx.id ?? "—"}
                   </Text>
                 </MetadataListItem>
-                <MetadataListItem label="Timestamp">
+                <MetadataListItem label={t("timestamp")}>
                   <Text type="body" size="sm">
                     {tx.timestamp ?? "—"}
                   </Text>
                 </MetadataListItem>
-                <MetadataListItem label="Client">
+                <MetadataListItem label={t("client")}>
                   <Text type="code" size="xsm">
                     {tx.client_ip ?? "—"}:{tx.client_port ?? 0}
                   </Text>
                 </MetadataListItem>
-                <MetadataListItem label="Server">
+                <MetadataListItem label={t("server")}>
                   <Text type="code" size="xsm">
                     {tx.server_id ?? "—"}:{tx.host_port ?? 0}
                   </Text>
@@ -361,7 +364,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                   <Divider />
                   <VStack gap={2}>
                     <Text type="label" size="3xs" weight="bold" color="secondary">
-                      Matched Rules
+                      {t("matchedRules")}
                     </Text>
                     {msgs.map((m) => (
                       <Card key={m.rowId} variant="red" padding={3}>
@@ -409,20 +412,20 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                   </Text>
                 </HStack>
               </Card>
-              <DetailRow label="Headers">
+              <DetailRow label={t("headers")}>
                 <HeadersGrid headers={req.headers} />
               </DetailRow>
               {req.args && Object.keys(req.args).length > 0 && (
-                <DetailRow label="Query Args">
+                <DetailRow label={t("queryArgs")}>
                   <HeadersGrid headers={req.args as Record<string, string>} />
                 </DetailRow>
               )}
               {req.body && (
-                <DetailRow label="Body">
+                <DetailRow label={t("body")}>
                   <CodeBlock {...bodyCode(req.body)} width="100%" isCollapsible />
                 </DetailRow>
               )}
-              <DetailRow label="Content Length">
+              <DetailRow label={t("contentLength")}>
                 <Text type="code" size="xsm">
                   {req.length ?? 0} bytes
                 </Text>
@@ -449,11 +452,11 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                   </Text>
                 </HStack>
               </Card>
-              <DetailRow label="Response Headers">
+              <DetailRow label={t("responseHeaders")}>
                 <HeadersGrid headers={res.headers} />
               </DetailRow>
               {res.body && (
-                <DetailRow label="Body">
+                <DetailRow label={t("body")}>
                   <CodeBlock {...bodyCode(res.body)} width="100%" isCollapsible />
                 </DetailRow>
               )}
@@ -465,37 +468,37 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
               {msgs.map((m) => (
                 <VStack key={m.rowId} gap={2}>
                   <MetadataList columns="multi">
-                    <MetadataListItem label="Rule ID">
+                    <MetadataListItem label={t("ruleId")}>
                       <Text type="code" size="xsm" weight="semibold">
                         {m.details?.ruleId ?? "—"}
                       </Text>
                     </MetadataListItem>
-                    <MetadataListItem label="Severity">
+                    <MetadataListItem label={t("severity")}>
                       <SeverityChip severity={m.details?.severity ?? null} />
                     </MetadataListItem>
-                    <MetadataListItem label="Message">
+                    <MetadataListItem label={t("message")}>
                       <Text type="body" size="xsm">
                         {m.message}
                       </Text>
                     </MetadataListItem>
-                    <MetadataListItem label="Log Data">
+                    <MetadataListItem label={t("logData")}>
                       <Text type="code" size="xsm">
                         {m.details?.logdata ?? "—"}
                       </Text>
                     </MetadataListItem>
-                    <MetadataListItem label="File">
+                    <MetadataListItem label={t("file")}>
                       <Text type="code" size="xsm" color="secondary">
                         {m.details?.file ?? "—"}:{m.details?.lineNumber ?? ""}
                       </Text>
                     </MetadataListItem>
-                    <MetadataListItem label="Reference">
+                    <MetadataListItem label={t("reference")}>
                       <Text type="code" size="xsm" color="secondary">
                         {m.details?.reference ?? "—"}
                       </Text>
                     </MetadataListItem>
                   </MetadataList>
                   {(m.details?.tags?.length ?? 0) > 0 && (
-                    <DetailRow label="Tags">
+                    <DetailRow label={t("tags")}>
                       <MatchTags tags={m.details!.tags!} />
                     </DetailRow>
                   )}
@@ -510,7 +513,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
         defaultIsOpen={false}
         trigger={
           <Text type="body" size="xsm">
-            Raw JSON
+            {t("rawJson")}
           </Text>
         }
       >
@@ -541,6 +544,7 @@ function EventDetailPanel({
   onSuppressGlobal: (ruleId: number) => void;
   onSuppressHost: (ruleId: number, host: string) => void;
 }) {
+  const t = useTranslations("waf");
   const [pending, startTransition] = useTransition();
 
   const eventHostBare = event.host ? event.host.replace(/:\d+$/, "") : "";
@@ -579,9 +583,9 @@ function EventDetailPanel({
     <AppDialog
       open
       onClose={onClose}
-      title="WAF Event"
+      title={t("wafEvent")}
       maxWidth="lg"
-      actions={<Button variant="secondary" label="Close" onClick={onClose} />}
+      actions={<Button variant="secondary" label={t("close")} onClick={onClose} />}
     >
       <VStack gap={4}>
         <HStack gap={2} vAlign="center">
@@ -591,17 +595,17 @@ function EventDetailPanel({
 
         <Card variant="muted" padding={4}>
           <MetadataList columns="multi">
-            <MetadataListItem label="Time (UTC)">
+            <MetadataListItem label={t("timeUtc")}>
               <Text type="body" size="sm">
                 {formatDateTimeUtc(event.ts * 1000)}
               </Text>
             </MetadataListItem>
-            <MetadataListItem label="Host">
+            <MetadataListItem label={t("host")}>
               <Text type="code" size="sm">
                 {event.host || "—"}
               </Text>
             </MetadataListItem>
-            <MetadataListItem label="Client IP">
+            <MetadataListItem label={t("clientIp")}>
               <HStack gap={2} vAlign="center" wrap="wrap">
                 <Text type="code" size="sm">
                   {event.clientIp}
@@ -609,22 +613,22 @@ function EventDetailPanel({
                 {event.countryCode && <Badge label={event.countryCode} />}
               </HStack>
             </MetadataListItem>
-            <MetadataListItem label="Method">
+            <MetadataListItem label={t("method")}>
               <Text type="code" size="sm" weight="semibold" color="accent">
                 {event.method}
               </Text>
             </MetadataListItem>
-            <MetadataListItem label="URI">
+            <MetadataListItem label={t("uri")}>
               <Text type="code" size="xsm" color="secondary">
                 {event.uri || "—"}
               </Text>
             </MetadataListItem>
-            <MetadataListItem label="Rule ID">
+            <MetadataListItem label={t("ruleId")}>
               <Text type="code" size="sm" weight="semibold">
                 {event.ruleId ?? "—"}
               </Text>
             </MetadataListItem>
-            <MetadataListItem label="Rule Message">
+            <MetadataListItem label={t("ruleMessage")}>
               <Text type="body" size="sm">
                 {event.ruleMessage ?? "—"}
               </Text>
@@ -661,7 +665,7 @@ function EventDetailPanel({
 
         <VStack gap={2}>
           <Text type="label" size="3xs" weight="bold" color="secondary">
-            Audit Data
+            {t("auditData")}
           </Text>
           <AuditPanel rawData={event.rawData} />
         </VStack>
@@ -684,6 +688,7 @@ function GlobalSuppressedRules({
   onRemove: (ruleId: number) => void;
   onAdd: (ruleId: number, message: string | null) => void;
 }) {
+  const t = useTranslations("waf");
   const [pending, startTransition] = useTransition();
   const [messages, setMessages] = useState(initialMessages);
 
@@ -749,14 +754,13 @@ function GlobalSuppressedRules({
       <VStack gap={2}>
         <Heading level={2}>Global WAF Rule Exclusions</Heading>
         <Text type="body" size="sm" color="secondary">
-          Rules listed here are suppressed globally via SecRuleRemoveById for all proxy hosts using
-          global WAF settings.
+          {t("globalExclusionsHelp")}
         </Text>
         {!wafEnabled && (
           <Banner
             status="warning"
-            title="Global WAF is currently disabled"
-            description="Exclusions are saved but have no effect until WAF is enabled."
+            title={t("exclusionsDisabledTitle")}
+            description={t("exclusionsDisabledDescription")}
           />
         )}
       </VStack>
@@ -765,7 +769,7 @@ function GlobalSuppressedRules({
         <HStack gap={2} vAlign="end" maxWidth={360}>
           <TextInput
             {...nativeAttrs({ pattern: "[0-9]*" })}
-            label="Add Rule by ID"
+            label={t("addRuleById")}
             size="sm"
             value={addInput}
             onChange={(v) => {
@@ -773,14 +777,14 @@ function GlobalSuppressedRules({
               setPendingRule(null);
             }}
             onEnter={handleLookup}
-            placeholder="Rule ID"
+            placeholder={t("ruleId")}
             isDisabled={lookupPending || pending}
             width="100%"
           />
           <Button
             variant="secondary"
             size="sm"
-            label="Look up"
+            label={t("lookUp")}
             isLoading={lookupPending}
             isDisabled={!addInput.trim() || lookupPending || pending}
             onClick={handleLookup}
@@ -799,7 +803,7 @@ function GlobalSuppressedRules({
                 <Button
                   size="sm"
                   variant="destructive"
-                  label="Suppress Globally"
+                  label={t("suppressGlobally")}
                   isLoading={pending}
                   isDisabled={pending}
                   onClick={handleConfirmAdd}
@@ -807,7 +811,7 @@ function GlobalSuppressedRules({
                 <Button
                   size="sm"
                   variant="secondary"
-                  label="Cancel"
+                  label={t("cancel")}
                   isDisabled={pending}
                   onClick={() => {
                     setPendingRule(null);
@@ -824,8 +828,8 @@ function GlobalSuppressedRules({
         <SearchField
           value={search}
           onChange={setSearch}
-          placeholder="Search by rule ID or message…"
-          label="Search suppressed rules"
+          placeholder={t("suppressedRulesSearchPlaceholder")}
+          label={t("searchSuppressedRules")}
           width={400}
         />
       )}
@@ -833,12 +837,12 @@ function GlobalSuppressedRules({
       {excluded.length === 0 ? (
         <EmptyState
           icon={<ShieldOff />}
-          title="No globally suppressed rules."
+          title={t("noGloballySuppressedRules")}
           description='Add a rule above or open a WAF event and click "Suppress Globally".'
         />
       ) : filtered.length === 0 ? (
         <Text type="body" size="sm" color="secondary">
-          No rules match your search.
+          {t("suppressedRulesSearchEmptyMessage")}
         </Text>
       ) : (
         <VStack gap={2}>
@@ -856,7 +860,7 @@ function GlobalSuppressedRules({
                 <IconButton
                   variant="ghost"
                   label={`Remove suppression for rule ${id}`}
-                  tooltip="Remove suppression"
+                  tooltip={t("removeSuppression")}
                   icon={<Trash2 />}
                   isDisabled={pending}
                   onClick={() => handleRemove(id)}
@@ -921,6 +925,7 @@ export default function WafEventsClient({
   hostWafMap,
   globalWaf,
 }: Props) {
+  const t = useTranslations("waf");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -1002,7 +1007,7 @@ export default function WafEventsClient({
         const fromTs = parseDateTimeLocalUtc(nextFrom ?? "");
         const toTs = parseDateTimeLocalUtc(nextTo ?? "");
         if (fromTs == null || toTs == null || fromTs >= toTs) {
-          toast.error("Choose a valid custom time range");
+          toast.error(t("invalidTimeRangeError"));
           return;
         }
         params.set("from", String(fromTs));
@@ -1014,7 +1019,7 @@ export default function WafEventsClient({
 
       router.push(`${pathname}?${params.toString()}`);
     },
-    [pathname, router, searchParams],
+    [pathname, router, searchParams, t],
   );
 
   const activateCustom = useCallback(() => {
@@ -1153,7 +1158,7 @@ export default function WafEventsClient({
       <VStack gap={1}>
         <Heading level={1}>WAF</Heading>
         <Text type="body" color="secondary">
-          Web Application Firewall events and rule management.
+          {t("pageDescription")}
         </Text>
       </VStack>
 
@@ -1165,9 +1170,9 @@ export default function WafEventsClient({
         }}
         hasDivider
       >
-        <Tab value="events" label="Events" />
-        <Tab value="suppressed" label="Suppressed Rules" />
-        <Tab value="settings" label="Settings" />
+        <Tab value="events" label={t("events")} />
+        <Tab value="suppressed" label={t("suppressedRules")} />
+        <Tab value="settings" label={t("settings")} />
       </TabList>
 
       {tab === "events" && (
@@ -1177,7 +1182,7 @@ export default function WafEventsClient({
             {/* Was five buttons whose "selected" state read only as a filled
                 variant; SegmentedControl exposes the choice as a radio group. */}
             <SegmentedControl
-              label="Time range"
+              label={t("timeRange")}
               size="sm"
               value={range}
               onChange={handleRangeChange}
@@ -1189,20 +1194,20 @@ export default function WafEventsClient({
             {range === "custom" && (
               <HStack gap={2} vAlign="end" wrap="wrap">
                 <DateTimeInput
-                  label="From (UTC)"
+                  label={t("fromUtc")}
                   size="sm"
                   value={(customFrom || undefined) as ISODateTimeString | undefined}
                   onChange={(v) => setCustomFrom(v ?? "")}
                 />
                 <DateTimeInput
-                  label="To (UTC)"
+                  label={t("toUtc")}
                   size="sm"
                   value={(customTo || undefined) as ISODateTimeString | undefined}
                   onChange={(v) => setCustomTo(v ?? "")}
                 />
                 <Button
                   size="sm"
-                  label="Apply range"
+                  label={t("applyRange")}
                   onClick={() => pushRange("custom", customFrom, customTo)}
                 />
               </HStack>
@@ -1213,8 +1218,8 @@ export default function WafEventsClient({
                 setSearchTerm(v);
                 updateSearch(v);
               }}
-              placeholder="Search by host, IP, URI, or rule message..."
-              label="Search WAF events"
+              placeholder={t("eventsSearchPlaceholder")}
+              label={t("searchWafEvents")}
               width={480}
             />
           </VStack>
@@ -1222,7 +1227,7 @@ export default function WafEventsClient({
             columns={columns}
             data={events}
             keyField="id"
-            emptyMessage="No WAF events found. Enable the WAF in Settings and send some traffic to see events here."
+            emptyMessage={t("eventsEmptyDescription")}
             pagination={pagination}
             onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
             rowStatus={(row) =>
@@ -1272,8 +1277,7 @@ export default function WafEventsClient({
           <VStack gap={1}>
             <Heading level={2}>WAF Settings</Heading>
             <Text type="body" size="sm" color="secondary">
-              Configure the global Web Application Firewall. Per-host settings can merge with or
-              override these defaults. Powered by Coraza with optional OWASP Core Rule Set.
+              {t("globalSettingsDescription")}
             </Text>
           </VStack>
           <form action={wafFormAction}>
@@ -1286,7 +1290,7 @@ export default function WafEventsClient({
               {wafModuleDisabledReason && (
                 <Banner
                   status="warning"
-                  title="The Coraza WAF module is disabled"
+                  title={t("moduleDisabledTitle")}
                   description={wafModuleDisabledReason}
                 />
               )}
@@ -1294,21 +1298,21 @@ export default function WafEventsClient({
                   attached by wrapping. */}
               <ModuleGated feature="waf">
                 <Switch
-                  label="Enable WAF globally (blocking)"
+                  label={t("enableWafGloballyBlocking")}
                   value={wafEnabled}
                   onChange={setWafEnabled}
                   isDisabled={Boolean(wafModuleDisabledReason)}
                 />
               </ModuleGated>
               <CheckboxInput
-                label="Load OWASP Core Rule Set"
-                description="Covers SQLi, XSS, LFI, RCE — recommended."
+                label={t("owaspCrsLabel")}
+                description={t("owaspCrsHelp")}
                 value={wafLoadOwaspCrs}
                 onChange={setWafLoadOwaspCrs}
               />
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
-                  label="Max body size (MiB)"
+                  label={t("maxBodySizeMib")}
                   htmlName="wafRequestBodyLimitMb"
                   value={wafBodyLimitMb}
                   onChange={setWafBodyLimitMb}
@@ -1317,11 +1321,11 @@ export default function WafEventsClient({
                   step={1}
                   isIntegerOnly
                   hasClear
-                  placeholder="Coraza default"
-                  description="Largest request body the WAF will inspect."
+                  placeholder={t("corazaDefault")}
+                  description={t("bodySizeLimitHelp")}
                 />
                 <NumberInput
-                  label="Buffered in memory (MiB)"
+                  label={t("bufferedInMemoryMib")}
                   htmlName="wafRequestBodyInMemoryLimitMb"
                   value={wafInMemoryLimitMb}
                   onChange={setWafInMemoryLimitMb}
@@ -1330,13 +1334,13 @@ export default function WafEventsClient({
                   step={1}
                   isIntegerOnly
                   hasClear
-                  placeholder="Coraza default"
-                  description="Must not exceed the request body limit."
+                  placeholder={t("corazaDefault")}
+                  description={t("memoryBodyLimitHelp")}
                 />
               </HStack>
               <input type="hidden" name="wafRequestBodyLimitAction" value={wafLimitAction} />
               <SegmentedControl
-                label="Over-limit action"
+                label={t("overLimitAction")}
                 size="sm"
                 value={wafLimitAction}
                 onChange={setWafLimitAction}
@@ -1346,10 +1350,10 @@ export default function WafEventsClient({
                 ))}
               </SegmentedControl>
               <Text type="body" size="xsm" color="secondary">
-                Reject returns 413; Partial inspects what fits and forwards the rest.
+                {t("wafOverLimitActionHelp")}
               </Text>
               <CodeEditor
-                label="Custom SecLang Directives"
+                label={t("customSeclangDirectives")}
                 language="ini"
                 htmlName="wafCustomDirectives"
                 height="sm"
@@ -1360,13 +1364,13 @@ export default function WafEventsClient({
                 // erase the stored directives.
                 isReadOnly={Boolean(wafModuleDisabledReason)}
                 placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
-                description="ModSecurity SecLang syntax. Applied after OWASP CRS if enabled."
+                description={t("customDirectivesHelp")}
               />
               <Collapsible
                 defaultIsOpen={false}
                 trigger={
                   <Text type="body" size="sm">
-                    Quick Templates
+                    {t("quickTemplates")}
                   </Text>
                 }
               >
@@ -1388,9 +1392,9 @@ export default function WafEventsClient({
                   ))}
                 </VStack>
               </Collapsible>
-              <Banner status="info" title="Rule exclusions live on the Suppressed Rules tab" />
+              <Banner status="info" title={t("exclusionsTabHelp")} />
               <HStack justify="end">
-                <Button type="submit" label="Save WAF settings" />
+                <Button type="submit" label={t("saveWafSettings")} />
               </HStack>
             </VStack>
           </form>

@@ -1,14 +1,22 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { getLocale, getMessages } from "next-intl/server";
+import { getLocaleDirection } from "@astryxdesign/core/i18n";
 import "./globals.css";
 import Providers from "./providers";
 import { config } from "@/src/lib/config";
+import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
 import { THEME_COOKIE, parseThemeMode, themeAttr } from "@/src/lib/theme-mode";
 
 // Each page sets its own `title`; the template appends APP_NAME. A page opts out with
 // `title: { absolute: "..." }` — the forward auth portal does, since it runs on someone else's
 // domain and should not name the product guarding the app.
+//
+// Static, and the description is not translated: making this an async generateMetadata moves the
+// whole document's metadata out of <head> and into the streamed body, where `<title>` becomes part
+// of the page text. That is a change to every page's DOM, and it is not worth it for a meta
+// description behind a login that no reader sees in any language.
 export const metadata: Metadata = {
   title: {
     default: config.appName,
@@ -22,15 +30,34 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const themeMode = parseThemeMode((await cookies()).get(THEME_COOKIE)?.value);
+  const cookieStore = await cookies();
+  const themeMode = parseThemeMode(cookieStore.get(THEME_COOKIE)?.value);
+  // getLocale() resolves through src/i18n/request.ts, so the cookie and Accept-Language
+  // negotiation happen in exactly one place. The preference itself is read separately: the
+  // switcher has to tell "chose English" from "we guessed English".
+  const locale = await getLocale();
+  const messages = await getMessages();
+  const localePreference = parsePreference(cookieStore.get(LOCALE_COOKIE)?.value);
 
   return (
     // data-theme is rendered from the cookie so the first paint is already in the right mode;
     // omitted for "system", which Astryx's reset.css reads as `color-scheme: light dark`.
     // suppressHydrationWarning stays — Astryx's Theme writes data-theme itself once mounted.
-    <html lang="en" data-theme={themeAttr(themeMode)} suppressHydrationWarning>
+    <html
+      lang={locale}
+      dir={getLocaleDirection(locale)}
+      data-theme={themeAttr(themeMode)}
+      suppressHydrationWarning
+    >
       <body>
-        <Providers initialThemeMode={themeMode}>{children}</Providers>
+        <Providers
+          initialThemeMode={themeMode}
+          locale={locale}
+          localePreference={localePreference}
+          messages={messages}
+        >
+          {children}
+        </Providers>
       </body>
     </html>
   );

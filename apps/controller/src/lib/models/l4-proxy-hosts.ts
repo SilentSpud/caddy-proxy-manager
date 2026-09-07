@@ -4,6 +4,7 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
 import { asc, desc, eq, count, like, or } from "drizzle-orm";
+import { domainError } from "../domain-error";
 
 export type L4Protocol = "tcp" | "udp";
 export type L4MatcherType = "none" | "tls_sni" | "http_host" | "proxy_protocol";
@@ -406,16 +407,16 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
 function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, isCreate: boolean) {
   if (isCreate) {
     if (!input.name?.trim()) {
-      throw new Error("Name is required");
+      throw domainError("nameRequired");
     }
     if (!input.protocol || !VALID_PROTOCOLS.includes(input.protocol)) {
-      throw new Error("Protocol must be 'tcp' or 'udp'");
+      throw domainError("invalidL4Protocol");
     }
     if (!input.listenAddress?.trim()) {
-      throw new Error("Listen address is required");
+      throw domainError("listenAddressRequired");
     }
     if (!input.upstreams || input.upstreams.length === 0) {
-      throw new Error("At least one upstream must be specified");
+      throw domainError("upstreamsRequired");
     }
   }
 
@@ -431,7 +432,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
   }
 
   if (input.protocol !== undefined && !VALID_PROTOCOLS.includes(input.protocol)) {
-    throw new Error("Protocol must be 'tcp' or 'udp'");
+    throw domainError("invalidL4Protocol");
   }
 
   if (input.matcherType !== undefined && !VALID_MATCHER_TYPES.includes(input.matcherType)) {
@@ -440,17 +441,17 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
 
   if (input.matcherType === "tls_sni" || input.matcherType === "http_host") {
     if (!input.matcherValue || input.matcherValue.length === 0) {
-      throw new Error("Matcher value is required for TLS SNI and HTTP Host matchers");
+      throw domainError("matcherHostnamesRequired");
     }
   }
 
   if (input.tlsTermination && input.protocol === "udp") {
-    throw new Error("TLS termination is only supported with TCP protocol");
+    throw domainError("udpTlsTerminationUnsupported");
   }
 
   if (input.proxyProtocolVersion !== undefined && input.proxyProtocolVersion !== null) {
     if (!VALID_PROXY_PROTOCOL_VERSIONS.includes(input.proxyProtocolVersion)) {
-      throw new Error("Proxy protocol version must be 'v1' or 'v2'");
+      throw domainError("invalidProxyProtocolVersion");
     }
   }
 
@@ -569,7 +570,7 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
     .returning();
 
   if (!record) {
-    throw new Error("Failed to create L4 proxy host");
+    throw domainError("l4ProxyHostCreationFailed");
   }
 
   await logAuditEvent({
@@ -599,7 +600,7 @@ export async function updateL4ProxyHost(
 ) {
   const existing = await getL4ProxyHost(id);
   if (!existing) {
-    throw new Error("L4 proxy host not found");
+    throw domainError("l4ProxyHostNotFound");
   }
 
   // For validation, merge with existing to check cross-field constraints
@@ -610,13 +611,13 @@ export async function updateL4ProxyHost(
     matcherValue: input.matcherValue ?? existing.matcherValue,
   };
   if (merged.tlsTermination && merged.protocol === "udp") {
-    throw new Error("TLS termination is only supported with TCP protocol");
+    throw domainError("udpTlsTerminationUnsupported");
   }
   if (
     (merged.matcherType === "tls_sni" || merged.matcherType === "http_host") &&
     merged.matcherValue.length === 0
   ) {
-    throw new Error("Matcher value is required for TLS SNI and HTTP Host matchers");
+    throw domainError("matcherHostnamesRequired");
   }
 
   validateL4Input(input, false);
@@ -738,7 +739,7 @@ export async function updateL4ProxyHost(
 export async function deleteL4ProxyHost(id: number, actorUserId: number) {
   const existing = await getL4ProxyHost(id);
   if (!existing) {
-    throw new Error("L4 proxy host not found");
+    throw domainError("l4ProxyHostNotFound");
   }
 
   await db.delete(l4ProxyHosts).where(eq(l4ProxyHosts.id, id));

@@ -3,6 +3,7 @@ import { listAuditEvents, countAuditEvents } from "@/src/lib/models/audit";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 const PER_PAGE = 50;
 
@@ -10,9 +11,10 @@ interface PageProps {
   searchParams: Promise<{ page?: string; search?: string }>;
 }
 
-export const metadata: Metadata = {
-  title: "Audit Log",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("auditLog") };
+}
 
 export default async function AuditLogPage({ searchParams }: PageProps) {
   await requireAdmin();

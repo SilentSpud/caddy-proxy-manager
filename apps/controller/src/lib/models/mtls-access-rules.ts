@@ -3,6 +3,7 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { mtlsAccessRules } from "../db/schema";
 import { asc, desc, eq, inArray } from "drizzle-orm";
+import { domainError } from "../domain-error";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export async function createMtlsAccessRule(
     })
     .returning();
 
-  if (!record) throw new Error("Failed to create mTLS access rule");
+  if (!record) throw domainError("mtlsAccessRuleCreationFailed");
 
   await logAuditEvent({
     userId: actorUserId,
@@ -120,7 +121,7 @@ export async function updateMtlsAccessRule(
   const existing = await db.query.mtlsAccessRules.findFirst({
     where: (table, { eq: cmpEq }) => cmpEq(table.id, id),
   });
-  if (!existing) throw new Error("mTLS access rule not found");
+  if (!existing) throw domainError("mtlsAccessRuleNotFound");
 
   const now = nowIso();
   const updates: Partial<typeof mtlsAccessRules.$inferInsert> = { updatedAt: now };
@@ -152,7 +153,7 @@ export async function deleteMtlsAccessRule(id: number, actorUserId: number): Pro
   const existing = await db.query.mtlsAccessRules.findFirst({
     where: (table, { eq: cmpEq }) => cmpEq(table.id, id),
   });
-  if (!existing) throw new Error("mTLS access rule not found");
+  if (!existing) throw domainError("mtlsAccessRuleNotFound");
 
   await db.delete(mtlsAccessRules).where(eq(mtlsAccessRules.id, id));
 

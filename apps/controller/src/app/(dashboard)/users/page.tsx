@@ -5,10 +5,12 @@ import { config } from "@/src/lib/config";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Users",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("users") };
+}
 
 export default async function UsersPage() {
   await requireAdmin();

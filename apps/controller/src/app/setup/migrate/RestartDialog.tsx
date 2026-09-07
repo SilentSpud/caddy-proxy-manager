@@ -30,6 +30,7 @@ import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { useTranslations } from "next-intl";
 
 /** How often to ask whether the app is there. Frequent enough to feel immediate, not a flood. */
 const POLL_INTERVAL_MS = 1000;
@@ -71,6 +72,7 @@ export default function RestartDialog({
   /** Whether the migration brought something that can sign in, which changes what comes next. */
   migratedSignIn: boolean;
 }) {
+  const t = useTranslations("setup");
   const [phase, setPhase] = useState<Phase>("stopping");
   const [detail, setDetail] = useState<string | null>(null);
   // Strict Mode mounts effects twice in development, and asking a process to exit twice is not
@@ -152,21 +154,17 @@ export default function RestartDialog({
     <Center>
       <VStack gap={2} padding={5}>
         <Heading level={1}>Migration complete</Heading>
-        <Text color="secondary">
-          The old database has been copied. One more step before you sign in.
-        </Text>
+        <Text color="secondary">{t("migrationCopiedDescription")}</Text>
       </VStack>
 
       <Dialog isOpen onOpenChange={() => {}} width={560} purpose="required">
         <Layout
-          header={<DialogHeader title="Restarting to finish the migration" />}
+          header={<DialogHeader title={t("migrationRestartTitle")} />}
           content={
             <LayoutContent>
               <VStack gap={4}>
                 <Text size="sm" color="secondary">
-                  Your data is in PostgreSQL. The application is restarting so it runs from it: this
-                  process started against an empty database and is still working from what it read
-                  then.
+                  {t("migrationRestartDescription")}
                 </Text>
 
                 {waiting ? (
@@ -184,7 +182,7 @@ export default function RestartDialog({
                   <VStack gap={3}>
                     <Banner
                       status="warning"
-                      title="The application did not restart on its own"
+                      title={t("restartFailedTitle")}
                       description={
                         detail
                           ? `${detail} Restart it yourself, then continue — the migration itself is finished and does not need repeating.`
@@ -192,7 +190,7 @@ export default function RestartDialog({
                       }
                     />
                     <Text size="sm" color="secondary">
-                      Under Docker Compose that is:
+                      {t("composeRestartHelp")}
                     </Text>
                     <Code>docker compose restart web</Code>
                   </VStack>

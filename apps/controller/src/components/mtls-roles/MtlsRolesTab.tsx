@@ -18,6 +18,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { MtlsRole, MtlsRoleWithCertificates } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
+import { useTranslations } from "next-intl";
 
 /** Per-position card tints. Decorative only, so they use the theme's non-semantic variants. */
 const CARD_VARIANTS = ["orange", "cyan", "purple", "green", "red"] as const;
@@ -29,6 +30,7 @@ type Props = {
 };
 
 export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
+  const t = useTranslations("mtlsRoles");
   const [createOpen, setCreateOpen] = useState(false);
   const activeCerts = issuedCerts.filter((c) => !c.revokedAt);
 
@@ -49,7 +51,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
           variant="secondary"
           width="100%"
           icon={<Plus />}
-          label="Create New Role"
+          label={t("createNewRole")}
           onClick={() => setCreateOpen(true)}
         />
       )}
@@ -58,7 +60,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
         <EmptyState
           icon={<ShieldCheck />}
           title={search ? "No roles match your search." : "No mTLS roles yet."}
-          description="Roles group client certificates for access control on proxy hosts."
+          description={t("pageDescription")}
         />
       )}
 
@@ -77,6 +79,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
 /* ── Create role inline card ── */
 
 function CreateRoleCard({ onClose }: { onClose: () => void }) {
+  const t = useTranslations("mtlsRoles");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -112,30 +115,30 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
   return (
     <Card padding={5}>
       <VStack gap={3}>
-        {error && <Banner status="error" title="Could not create role" description={error} />}
+        {error && <Banner status="error" title={t("couldNotCreateRole")} description={error} />}
         <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
           <TextInput
-            label="Name"
+            label={t("name")}
             size="sm"
             value={name}
             onChange={setName}
-            placeholder="e.g. admin"
+            placeholder={t("namePlaceholder")}
             hasAutoFocus
           />
           <TextInput
-            label="Description"
+            label={t("description")}
             isOptional
             size="sm"
             value={description}
             onChange={setDescription}
-            placeholder="Optional"
+            placeholder={t("optional")}
           />
         </Grid>
         <HStack justify="end" gap={2}>
-          <Button variant="ghost" size="sm" label="Cancel" onClick={onClose} />
+          <Button variant="ghost" size="sm" label={t("cancel")} onClick={onClose} />
           <Button
             size="sm"
-            label="Create Role"
+            label={t("createRole")}
             onClick={handleCreate}
             isLoading={submitting}
             isDisabled={submitting}
@@ -157,6 +160,7 @@ function RoleCard({
   variant: (typeof CARD_VARIANTS)[number];
   activeCerts: IssuedClientCertificate[];
 }) {
+  const t = useTranslations("mtlsRoles");
   const [assignedIds, setAssignedIds] = useState<Set<number>>(new Set());
   const [loaded, setLoaded] = useState(false);
   const [toggling, setToggling] = useState<number | null>(null);
@@ -245,28 +249,38 @@ function RoleCard({
         {editing ? (
           <VStack gap={3}>
             <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
-              <TextInput label="Name" size="sm" value={name} onChange={setName} />
+              <TextInput label={t("name")} size="sm" value={name} onChange={setName} />
               <TextInput
-                label="Description"
+                label={t("description")}
                 isOptional
                 size="sm"
                 value={description}
                 onChange={setDescription}
-                placeholder="Optional"
+                placeholder={t("optional")}
               />
             </Grid>
             <HStack justify="end" gap={2}>
-              <Button variant="ghost" size="sm" label="Cancel" onClick={() => setEditing(false)} />
-              <Button variant="secondary" size="sm" label="Save" onClick={handleSave} />
+              <Button
+                variant="ghost"
+                size="sm"
+                label={t("cancel")}
+                onClick={() => setEditing(false)}
+              />
+              <Button variant="secondary" size="sm" label={t("save")} onClick={handleSave} />
             </HStack>
           </VStack>
         ) : (
           <HStack justify="end" gap={2}>
-            <Button variant="secondary" size="sm" label="Edit" onClick={() => setEditing(true)} />
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("edit")}
+              onClick={() => setEditing(true)}
+            />
             <Button
               variant="ghost"
               size="sm"
-              label="Delete role"
+              label={t("deleteRole")}
               onClick={() => setDeleteOpen(true)}
             />
           </HStack>
@@ -277,15 +291,15 @@ function RoleCard({
         {/* Certificates */}
         <VStack gap={2}>
           <Text type="label" size="xsm" weight="semibold" color="secondary">
-            Certificates
+            {t("certificates")}{" "}
           </Text>
 
           {!loaded ? (
             <Text type="body" size="sm" color="secondary">
-              Loading...
+              {t("loading")}
             </Text>
           ) : activeCerts.length === 0 ? (
-            <EmptyState icon={<UserPlus />} title="No client certificates issued yet." isCompact />
+            <EmptyState icon={<UserPlus />} title={t("certificatesEmptyTitle")} isCompact />
           ) : (
             <List hasDividers>
               {activeCerts.map((cert) => (
@@ -307,9 +321,9 @@ function RoleCard({
       <AlertDialog
         isOpen={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="Delete role"
+        title={t("deleteRole")}
         description={`Delete role "${role.name}"? Proxy hosts referencing it will lose this grouping.`}
-        actionLabel="Delete role"
+        actionLabel={t("deleteRole")}
         onAction={handleDelete}
       />
     </Card>
@@ -327,6 +341,7 @@ function CertAssignmentRow({
   isLoading: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations("mtlsRoles");
   const checkboxRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -346,7 +361,7 @@ function CertAssignmentRow({
       }
       label={cert.commonName}
       description={`expires ${new Date(cert.validTo).toLocaleDateString()}`}
-      endContent={isAssigned ? <Badge label="Assigned" /> : undefined}
+      endContent={isAssigned ? <Badge label={t("assigned")} /> : undefined}
       isDisabled={isLoading}
     />
   );

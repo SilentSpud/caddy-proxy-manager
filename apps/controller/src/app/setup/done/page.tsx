@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { planEnvCleanup } from "@/src/lib/migration/env-file";
 import { SETTING_DEFINITIONS } from "@/src/lib/settings/registry";
@@ -7,9 +8,10 @@ import { resolveAllSettings } from "@/src/lib/settings/resolve";
 import { getMigrationSource, isSetupCompleted } from "@/src/lib/setup";
 import SetupDoneClient from "./SetupDoneClient";
 
-export const metadata: Metadata = {
-  title: { absolute: "Migration complete" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("setup.done");
+  return { title: { absolute: t("metaTitle") } };
+}
 
 /**
  * The summary a migrated deployment sees once setup finishes: its old database to keep, and the

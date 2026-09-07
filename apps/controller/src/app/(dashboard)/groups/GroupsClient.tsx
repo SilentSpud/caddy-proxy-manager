@@ -19,6 +19,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   createGroupAction,
   deleteGroupAction,
@@ -60,6 +61,7 @@ function displayName(entry: { name: string | null; email: string }) {
 }
 
 export default function GroupsClient({ groups, users }: Props) {
+  const t = useTranslations("groups");
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [addMemberGroupId, setAddMemberGroupId] = useState<number | null>(null);
@@ -74,17 +76,14 @@ export default function GroupsClient({ groups, users }: Props) {
 
   return (
     <VStack gap={6}>
-      <PageHeader
-        title="Groups"
-        description="Organize users into groups for forward auth access control."
-      />
+      <PageHeader title={t("groups")} description={t("pageDescription")} />
 
       <HStack justify="end">
         <Button
           variant="secondary"
           size="sm"
           icon={<Plus />}
-          label="New Group"
+          label={t("newGroup")}
           onClick={() => setShowCreate(!showCreate)}
         />
       </HStack>
@@ -104,29 +103,29 @@ export default function GroupsClient({ groups, users }: Props) {
               <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
                 <TextInput
                   {...NATIVE_REQUIRED}
-                  label="Name"
+                  label={t("name")}
                   htmlName="name"
                   value={name}
                   onChange={setName}
-                  placeholder="e.g. Developers"
+                  placeholder={t("namePlaceholder")}
                   isRequired
                 />
                 <TextInput
-                  label="Description"
+                  label={t("description")}
                   isOptional
                   htmlName="description"
                   value={description}
                   onChange={setDescription}
-                  placeholder="Optional description"
+                  placeholder={t("optionalDescription")}
                 />
               </Grid>
               <HStack gap={2}>
-                <Button type="submit" size="sm" label="Create" />
+                <Button type="submit" size="sm" label={t("create")} />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  label="Cancel"
+                  label={t("cancel")}
                   onClick={() => setShowCreate(false)}
                 />
               </HStack>
@@ -139,8 +138,8 @@ export default function GroupsClient({ groups, users }: Props) {
         <Card>
           <EmptyState
             icon={<Users />}
-            title="No groups yet"
-            description="Create one to organize user access."
+            title={t("noGroupsYet")}
+            description={t("emptyDescription")}
           />
         </Card>
       )}
@@ -155,11 +154,11 @@ export default function GroupsClient({ groups, users }: Props) {
                   <VStack gap={0}>
                     <HStack gap={2} vAlign="center">
                       <Heading level={3}>{group.name}</Heading>
-                      {group.source === "oidc" && <Badge variant="info" label="IdP-managed" />}
+                      {group.source === "oidc" && <Badge variant="info" label={t("idpManaged")} />}
                     </HStack>
                     {group.source === "oidc" && (
                       <Text type="body" size="xsm" color="secondary">
-                        Membership is reconciled from the identity provider on every sign-in.
+                        {t("idpMembershipHelp")}
                       </Text>
                     )}
                     {group.description && (
@@ -175,8 +174,8 @@ export default function GroupsClient({ groups, users }: Props) {
                     <IconButton
                       variant="ghost"
                       size="sm"
-                      label="Add member"
-                      tooltip="Add member"
+                      label={t("addMember")}
+                      tooltip={t("addMember")}
                       icon={<UserPlus />}
                       onClick={() =>
                         setAddMemberGroupId(addMemberGroupId === group.id ? null : group.id)
@@ -186,7 +185,7 @@ export default function GroupsClient({ groups, users }: Props) {
                       variant="ghost"
                       size="sm"
                       label={`Delete group ${group.name}`}
-                      tooltip="Delete group"
+                      tooltip={t("deleteGroup")}
                       icon={<Trash2 />}
                       onClick={() => setDeleteGroup(group)}
                     />
@@ -196,11 +195,11 @@ export default function GroupsClient({ groups, users }: Props) {
                 {addMemberGroupId === group.id && (
                   <VStack gap={2}>
                     <Text type="body" size="sm" weight="medium">
-                      Add a user to this group
+                      {t("memberPickerLabel")}
                     </Text>
                     {available.length === 0 ? (
                       <Text type="body" size="sm" color="secondary">
-                        All users are already in this group.
+                        {t("membersExhaustedMessage")}
                       </Text>
                     ) : (
                       /* Scroll cap kept from the original: neither List nor
@@ -234,7 +233,7 @@ export default function GroupsClient({ groups, users }: Props) {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        label="Cancel"
+                        label={t("cancel")}
                         onClick={() => setAddMemberGroupId(null)}
                       />
                     </HStack>
@@ -256,7 +255,7 @@ export default function GroupsClient({ groups, users }: Props) {
                               variant="ghost"
                               size="sm"
                               label={`Remove ${displayName(member)} from ${group.name}`}
-                              tooltip="Remove member"
+                              tooltip={t("removeMember")}
                               icon={<UserMinus />}
                               onClick={async () => {
                                 await removeGroupMemberAction(group.id, member.userId);
@@ -280,7 +279,7 @@ export default function GroupsClient({ groups, users }: Props) {
       <AlertDialog
         isOpen={deleteGroup !== null}
         onOpenChange={(open) => !open && setDeleteGroup(null)}
-        title="Delete group"
+        title={t("deleteGroup")}
         description={
           deleteGroup === null
             ? ""
@@ -288,7 +287,7 @@ export default function GroupsClient({ groups, users }: Props) {
               ? `Delete group "${deleteGroup.name}"? It is managed by an identity provider and will be recreated the next time a member signs in.`
               : `Delete group "${deleteGroup.name}"?`
         }
-        actionLabel="Delete group"
+        actionLabel={t("deleteGroup")}
         onAction={async () => {
           if (deleteGroup === null) return;
           await deleteGroupAction(deleteGroup.id);

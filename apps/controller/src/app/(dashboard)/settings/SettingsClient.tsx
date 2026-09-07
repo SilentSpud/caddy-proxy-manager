@@ -90,6 +90,7 @@ import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import type { AgentStatus } from "@cpm/shared";
 import type { AgentResult } from "@/src/lib/agent/client";
 import type { PairedAgent } from "@/src/lib/models/agents";
+import { useTranslations } from "next-intl";
 import {
   updateDnsProviderSettingsAction,
   updateGeneralSettingsAction,
@@ -324,11 +325,12 @@ function SettingsCmdK({
   onOpenChange: (open: boolean) => void;
   onSelect: (id: string) => void;
 }) {
+  const t = useTranslations("settings");
   return (
     <CommandPalette
       isOpen={open}
       onOpenChange={onOpenChange}
-      label="Jump to a setting"
+      label={t("settingsSearchLabel")}
       searchSource={PALETTE_SOURCE}
       emptySearchText="No settings match your search."
       onValueChange={(id) => {
@@ -360,6 +362,7 @@ function SettingsSidebar({
   onSelect: (id: string) => void;
   onSearchClick: () => void;
 }) {
+  const t = useTranslations("settings");
   return (
     <VStack gap={2} padding={3}>
       <Button
@@ -367,7 +370,7 @@ function SettingsSidebar({
         size="sm"
         width="100%"
         icon={<Search />}
-        label="Jump to setting..."
+        label={t("settingsSearchButtonLabel")}
         endContent={<Kbd keys="mod+K" />}
         onClick={onSearchClick}
       />
@@ -400,6 +403,7 @@ function MobileSettingsNav({
   onSelect: (id: string) => void;
   onSearchClick: () => void;
 }) {
+  const t = useTranslations("settings");
   return (
     <VStack gap={2} data-testid="mobile-settings-nav">
       <Button
@@ -407,11 +411,11 @@ function MobileSettingsNav({
         size="sm"
         width="100%"
         icon={<Search />}
-        label="Jump to setting..."
+        label={t("settingsSearchButtonLabel")}
         onClick={onSearchClick}
       />
       <Selector
-        label="Settings section"
+        label={t("settingsSection")}
         isLabelHidden
         value={active}
         onChange={onSelect}
@@ -515,6 +519,7 @@ export default function SettingsClient({
   baseUrl,
   agents,
 }: Props) {
+  const t = useTranslations("settings");
   const [active, setActive] = useState("general");
   const [cmdkOpen, setCmdkOpen] = useState(false);
 
@@ -587,7 +592,7 @@ export default function SettingsClient({
         height="fill"
         start={
           isNarrow ? undefined : (
-            <LayoutPanel width={260} hasDivider role="navigation" label="Settings navigation">
+            <LayoutPanel width={260} hasDivider role="navigation" label={t("settingsNavigation")}>
               <SettingsSidebar
                 active={active}
                 onSelect={setActive}
@@ -788,13 +793,14 @@ function GeneralSection({
   generalState: { success: boolean; message?: string } | null;
   generalFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [primaryDomain, setPrimaryDomain] = useState(
     general?.primaryDomain ?? "caddyproxymanager.com",
   );
   const [acmeEmail, setAcmeEmail] = useState(general?.acmeEmail ?? "");
 
   return (
-    <FormCard title="Defaults">
+    <FormCard title={t("defaults")}>
       <form action={generalFormAction}>
         <VStack gap={3}>
           {generalState?.message && (
@@ -802,22 +808,22 @@ function GeneralSection({
           )}
           <TextInput
             {...NATIVE_REQUIRED}
-            label="Primary domain"
-            description="Default domain shown when creating new proxy hosts."
+            label={t("primaryDomain")}
+            description={t("primaryDomainHelp")}
             htmlName="primaryDomain"
             value={primaryDomain}
             onChange={setPrimaryDomain}
             isRequired
           />
           <TextInput
-            label="ACME contact email"
-            description="Used by Let's Encrypt for expiry notifications."
+            label={t("acmeContactEmail")}
+            description={t("acmeEmailHelp")}
             type="email"
             htmlName="acmeEmail"
             value={acmeEmail}
             onChange={setAcmeEmail}
           />
-          <SaveButton label="Save general settings" />
+          <SaveButton label={t("saveGeneralSettings")} />
         </VStack>
       </form>
     </FormCard>
@@ -850,6 +856,7 @@ function DefaultResponseSection({
   defaultResponseState: { success: boolean; message?: string } | null;
   defaultResponseFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [mode, setMode] = useState<DefaultResponseSettings["mode"]>(
     defaultResponse?.mode ?? "caddy",
   );
@@ -878,7 +885,7 @@ function DefaultResponseSection({
 
   return (
     <VStack gap={4}>
-      <FormCard title="Unknown Host Handling">
+      <FormCard title={t("unknownHostHandling")}>
         <form action={defaultResponseFormAction}>
           <VStack gap={3}>
             {defaultResponseState?.message && (
@@ -888,8 +895,8 @@ function DefaultResponseSection({
               />
             )}
             <Selector
-              label="Behavior"
-              description="Applied only when no configured proxy host matches the request."
+              label={t("behavior")}
+              description={t("defaultResponseBehaviorHelp")}
               htmlName="mode"
               options={DEFAULT_RESPONSE_MODES}
               value={mode}
@@ -899,8 +906,8 @@ function DefaultResponseSection({
             {mode === "respond" && (
               <>
                 <NumberInput
-                  label="Status code"
-                  description="Any final HTTP status from 200 through 599."
+                  label={t("statusCode")}
+                  description={t("defaultResponseStatusHelp")}
                   htmlName="status"
                   min={200}
                   max={599}
@@ -909,14 +916,14 @@ function DefaultResponseSection({
                   onChange={setStatus}
                 />
                 <TextArea
-                  label="Response body"
+                  label={t("responseBody")}
                   isOptional
-                  description="Plain text, JSON, or custom HTML. Empty is allowed."
+                  description={t("defaultResponseBodyHelp")}
                   htmlName="body"
                   value={body}
                   onChange={setBody}
                   rows={8}
-                  placeholder="Not Found"
+                  placeholder={t("notFound")}
                 />
               </>
             )}
@@ -924,17 +931,17 @@ function DefaultResponseSection({
             {mode === "redirect" && (
               <>
                 <Selector
-                  label="Redirect status"
-                  description="307 and 308 preserve the original request method."
+                  label={t("redirectStatus")}
+                  description={t("defaultRedirectStatusHelp")}
                   htmlName="status"
                   options={REDIRECT_STATUS_OPTIONS}
                   value={redirectStatus}
                   onChange={setRedirectStatus}
                 />
                 <TextInput
-                  label="Redirect URL"
+                  label={t("redirectUrl")}
                   isRequired
-                  description="Absolute, relative, and Caddy placeholder-based targets are supported."
+                  description={t("defaultRedirectUrlHelp")}
                   htmlName="redirectUrl"
                   value={redirectUrl}
                   onChange={setRedirectUrl}
@@ -945,9 +952,9 @@ function DefaultResponseSection({
 
             {(mode === "respond" || mode === "redirect") && (
               <TextArea
-                label="Response headers"
+                label={t("responseHeaders")}
                 isOptional
-                description="Optional Name: value pairs, one per line. For custom HTML, set Content-Type: text/html; charset=utf-8."
+                description={t("defaultResponseHeadersHelp")}
                 htmlName="headers"
                 value={headers}
                 onChange={setHeaders}
@@ -957,19 +964,15 @@ function DefaultResponseSection({
             )}
 
             {mode === "abort" && (
-              <WarnAlert title="Unmatched connections are closed without a response">
-                Caddy writes no status line or body — the native equivalent of a &ldquo;444 / no
-                response&rdquo; policy.
-              </WarnAlert>
+              <WarnAlert title={t("abortResponseTitle")}>{t("abortResponseDescription")}</WarnAlert>
             )}
 
-            <SaveButton label="Save default response" />
+            <SaveButton label={t("saveDefaultResponse")} />
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title="Configured hosts always run before this catch-all">
-        For HTTPS the response can only be sent once a TLS certificate completes the handshake, so
-        an unknown hostname or direct IP may fail earlier.
+      <InfoAlert title={t("defaultResponsePriorityTitle")}>
+        {t("defaultResponseTlsDescription")}
       </InfoAlert>
     </VStack>
   );
@@ -986,36 +989,37 @@ function AcmeSection({
   acmeState: { success: boolean; message?: string } | null;
   acmeFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [caUrl, setCaUrl] = useState(acme?.caUrl ?? "");
   const [caRootPem, setCaRootPem] = useState(acme?.caRootPem ?? "");
 
   return (
-    <FormCard title="Custom ACME Directory">
+    <FormCard title={t("customAcmeDirectory")}>
       <form action={acmeFormAction}>
         <VStack gap={3}>
           {acmeState?.message && (
             <StatusAlert message={acmeState.message} success={acmeState.success} />
           )}
           <TextInput
-            label="ACME directory URL"
+            label={t("acmeDirectoryUrl")}
             isOptional
-            description="Leave empty to use the Let's Encrypt default. For an internal CA (OpenBao, Step-CA, Windows ADCS), paste its ACME directory URL — must be HTTPS."
+            description={t("acmeDirectoryHelp")}
             htmlName="caUrl"
             value={caUrl}
             onChange={setCaUrl}
             placeholder="https://ca.internal.example.com/acme/acme/directory"
           />
           <TextArea
-            label="CA root certificate (PEM)"
+            label={t("caRootCertificatePem")}
             isOptional
-            description="If the ACME endpoint's TLS certificate is signed by an internal root not in the system trust store, paste the root (or chain) here so Caddy can connect to it."
+            description={t("acmeRootCertificateHelp")}
             htmlName="caRootPem"
             value={caRootPem}
             onChange={setCaRootPem}
             placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
             rows={6}
           />
-          <SaveButton label="Save ACME settings" />
+          <SaveButton label={t("saveAcmeSettings")} />
         </VStack>
       </form>
     </FormCard>
@@ -1072,6 +1076,7 @@ function DnsProvidersSection({
   setSelectedProvider: (v: string) => void;
   configuredProviders: string[];
 }) {
+  const t = useTranslations("settings");
   const { enabledModuleIds } = useModuleGate();
   // Each provider is a separate caddy-dns plugin, so availability is per provider, not one blanket
   // "DNS-01 works" flag. A provider whose module is switched off would produce a config Caddy
@@ -1109,7 +1114,7 @@ function DnsProvidersSection({
       )}
 
       {configuredProviders.length > 0 && (
-        <FormCard title="Configured providers">
+        <FormCard title={t("configuredProviders")}>
           <VStack gap={2}>
             {configuredProviders.map((name) => {
               const def = dnsProviderDefinitions.find((p) => p.name === name);
@@ -1121,20 +1126,25 @@ function DnsProvidersSection({
                       <Text type="body" size="sm" weight="semibold">
                         {def?.displayName ?? name}
                       </Text>
-                      {isDefault && <Badge variant="info" label="Default" />}
+                      {isDefault && <Badge variant="info" label={t("default")} />}
                     </HStack>
                     <HStack gap={2}>
                       {!isDefault && (
                         <form action={dnsProviderFormAction}>
                           <input type="hidden" name="action" value="set-default" />
                           <input type="hidden" name="provider" value={name} />
-                          <Button type="submit" variant="secondary" size="sm" label="Set default" />
+                          <Button
+                            type="submit"
+                            variant="secondary"
+                            size="sm"
+                            label={t("setDefault")}
+                          />
                         </form>
                       )}
                       <form action={dnsProviderFormAction}>
                         <input type="hidden" name="action" value="remove" />
                         <input type="hidden" name="provider" value={name} />
-                        <Button type="submit" variant="destructive" size="sm" label="Remove" />
+                        <Button type="submit" variant="destructive" size="sm" label={t("remove")} />
                       </form>
                     </HStack>
                   </HStack>
@@ -1145,12 +1155,7 @@ function DnsProvidersSection({
               <form action={dnsProviderFormAction}>
                 <input type="hidden" name="action" value="set-default" />
                 <input type="hidden" name="provider" value="none" />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="sm"
-                  label="Clear default (HTTP-01 only)"
-                />
+                <Button type="submit" variant="ghost" size="sm" label={t("clearDefaultHttp01")} />
               </form>
             )}
           </VStack>
@@ -1173,7 +1178,7 @@ function DnsProvidersSection({
           <VStack gap={3}>
             <input type="hidden" name="action" value="save" />
             <Selector
-              label="Provider"
+              label={t("provider")}
               description={
                 unavailableCount > 0
                   ? `${dnsProviderDefinitions.length} providers supported — ${unavailableCount} unavailable because their Caddy module is disabled`
@@ -1183,14 +1188,13 @@ function DnsProvidersSection({
               options={providerOptions}
               value={selectedProvider}
               onChange={setSelectedProvider}
-              placeholder="Select a DNS provider..."
+              placeholder={t("dnsProviderPlaceholder")}
               hasSearch
             />
 
             {selectedUnavailable && (
-              <WarnAlert title="This provider's Caddy module is disabled">
-                Enable it under Settings → Caddy Build and rebuild Caddy before using it for DNS-01
-                challenges. Credentials saved now will not be used until then.
+              <WarnAlert title={t("dnsProviderModuleDisabledTitle")}>
+                {t("dnsProviderModuleDisabledDescription")}
               </WarnAlert>
             )}
 
@@ -1198,13 +1202,13 @@ function DnsProvidersSection({
               <>
                 <DnsProviderCredentialFields key={providerDef.name} providerDef={providerDef} />
                 {isUpdate && (
-                  <InfoAlert title="Credentials are already configured">
-                    Leave fields blank to keep existing values.
+                  <InfoAlert title={t("credentialsAreAlreadyConfigured")}>
+                    {t("storedCredentialsHelp")}
                   </InfoAlert>
                 )}
                 {providerDef.docsUrl && (
                   <Link href={providerDef.docsUrl} target="_blank">
-                    Provider documentation
+                    {t("providerDocumentation")}
                   </Link>
                 )}
               </>
@@ -1227,6 +1231,7 @@ function DnsResolversSection({
   dnsState: { success: boolean; message?: string } | null;
   dnsFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(dns?.enabled ?? false);
   const [resolvers, setResolvers] = useState(dns?.resolvers?.join("\n") ?? "");
   const [fallbacks, setFallbacks] = useState(dns?.fallbacks?.join("\n") ?? "");
@@ -1241,13 +1246,13 @@ function DnsResolversSection({
               <StatusAlert message={dnsState.message} success={dnsState.success} />
             )}
             <CheckboxInput
-              label="Enable custom DNS resolvers"
+              label={t("enableCustomDnsResolvers")}
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
             />
             <TextArea
-              label="Primary resolvers"
+              label={t("primaryResolvers")}
               isOptional
               htmlName="resolvers"
               value={resolvers}
@@ -1256,7 +1261,7 @@ function DnsResolversSection({
               rows={2}
             />
             <TextArea
-              label="Fallback resolvers"
+              label={t("fallbackResolvers")}
               isOptional
               htmlName="fallbacks"
               value={fallbacks}
@@ -1265,23 +1270,20 @@ function DnsResolversSection({
               rows={2}
             />
             <TextInput
-              label="Query timeout"
+              label={t("queryTimeout")}
               isOptional
-              description="e.g. 5s, 10s"
+              description={t("dnsQueryTimeoutHelp")}
               htmlName="timeout"
               value={timeout}
               onChange={setTimeoutValue}
               placeholder="5s"
               width={160}
             />
-            <SaveButton label="Save DNS settings" />
+            <SaveButton label={t("saveDnsSettings")} />
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title="When to use custom resolvers">
-        Useful when your DNS provider has slow propagation or when using split-horizon DNS. Common
-        public resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9).
-      </InfoAlert>
+      <InfoAlert title={t("dnsResolversInfoTitle")}>{t("dnsResolversInfoDescription")}</InfoAlert>
     </>
   );
 }
@@ -1303,6 +1305,7 @@ function UpstreamDnsSection({
   upstreamDnsResolutionState: { success: boolean; message?: string } | null;
   upstreamDnsResolutionFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(upstreamDnsResolution?.enabled ?? false);
   const [family, setFamily] = useState<string>(upstreamDnsResolution?.family ?? "both");
 
@@ -1318,30 +1321,26 @@ function UpstreamDnsSection({
               />
             )}
             <CheckboxInput
-              label="Enable upstream DNS pinning"
-              description="Resolves upstream hostnames at config-apply time and writes IPs into Caddy's active config."
+              label={t("enableUpstreamDnsPinning")}
+              description={t("dnsPinningHelp")}
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
             />
             <Selector
-              label="Address family"
-              description="Both resolves AAAA + A with IPv6 preferred ordering."
+              label={t("addressFamily")}
+              description={t("dnsAddressFamilyHelp")}
               htmlName="family"
               options={FAMILY_OPTIONS}
               value={family}
               onChange={setFamily}
               width={280}
             />
-            <SaveButton label="Save upstream DNS pinning settings" />
+            <SaveButton label={t("saveUpstreamDnsPinning")} />
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title="Host-level settings can override this default">
-        Resolution happens at config save/reload time and resolved IPs are written into Caddy&apos;s
-        active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning
-        is skipped for those HTTPS upstreams to avoid SNI mismatch.
-      </InfoAlert>
+      <InfoAlert title={t("authentikDefaultsHelp")}>{t("dnsPinningInfoDescription")}</InfoAlert>
     </>
   );
 }
@@ -1357,6 +1356,7 @@ function TrustedProxiesSection({
   trustedProxiesState: { success: boolean; message?: string } | null;
   trustedProxiesFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [ranges, setRanges] = useState((trustedProxies?.ranges ?? []).join("\n"));
   const [clientIpHeaders, setClientIpHeaders] = useState(
     (trustedProxies?.client_ip_headers ?? []).join("\n"),
@@ -1376,9 +1376,9 @@ function TrustedProxiesSection({
               />
             )}
             <TextArea
-              label="Trusted proxy ranges"
+              label={t("trustedProxyRanges")}
               isOptional
-              description="CIDRs, IPs, or the private_ranges shorthand — one per line. When CPM runs behind another proxy, Caddy resolves the real client IP from these. Leave empty to keep the current behaviour."
+              description={t("trustedProxyRangesHelp")}
               htmlName="ranges"
               value={ranges}
               onChange={setRanges}
@@ -1386,36 +1386,35 @@ function TrustedProxiesSection({
               placeholder={"private_ranges\n172.21.0.1/32"}
             />
             <TextArea
-              label="Client IP headers"
+              label={t("clientIpHeaders")}
               isOptional
-              description="Headers Caddy reads the client IP from — one per line. Empty defaults to X-Forwarded-For. Set Cf-Connecting-Ip for Cloudflare, etc."
+              description={t("clientIpHeadersHelp")}
               htmlName="clientIpHeaders"
               value={clientIpHeaders}
               onChange={setClientIpHeaders}
               rows={2}
-              placeholder="X-Forwarded-For"
+              placeholder={t("clientIpHeadersPlaceholder")}
             />
             <CheckboxInput
-              label="Enable strict trusted proxies"
-              description="Only trust the client IP headers from the configured proxies, rejecting spoofed values from untrusted peers."
+              label={t("enableStrictTrustedProxies")}
+              description={t("strictTrustedProxiesHelp")}
               htmlName="strict"
               value={strict}
               onChange={setStrict}
             />
             <CheckboxInput
-              label="Default geoblock trusted proxies from this list"
-              description="Use these ranges as the default trusted-proxy list for global geoblocking so the two can't silently disagree. A geoblock list set explicitly wins."
+              label={t("defaultGeoblockTrustedProxies")}
+              description={t("geoblockTrustedProxiesHelp")}
               htmlName="defaultGeoblock"
               value={defaultGeoblock}
               onChange={setDefaultGeoblock}
             />
-            <SaveButton label="Save trusted proxies settings" />
+            <SaveButton label={t("saveTrustedProxiesSettings")} />
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title="Applied to the main HTTP server">
-        This fixes client-IP attribution everywhere at once — access logs, analytics, the country
-        map, and any downstream handler using the client_ip placeholder.
+      <InfoAlert title={t("trustedProxiesScopeDescription")}>
+        {t("trustedProxiesInfoDescription")}
       </InfoAlert>
     </>
   );
@@ -1432,6 +1431,7 @@ function GeoBlockSection({
   geoBlockState: { success: boolean; message?: string } | null;
   geoBlockFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   return (
     <FormCard>
       <form action={geoBlockFormAction}>
@@ -1443,7 +1443,7 @@ function GeoBlockSection({
             initialValues={{ geoblock: globalGeoBlock ?? null, geoblock_mode: "merge" }}
             showModeSelector={false}
           />
-          <SaveButton label="Save geoblocking settings" />
+          <SaveButton label={t("saveGeoblockingSettings")} />
         </VStack>
       </form>
     </FormCard>
@@ -1461,6 +1461,7 @@ function ErrorPagesSection({
   errorPagesState: { success: boolean; message?: string } | null;
   errorPagesFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   return (
     <FormCard>
       <form action={errorPagesFormAction}>
@@ -1469,11 +1470,10 @@ function ErrorPagesSection({
             <StatusAlert message={errorPagesState.message} success={errorPagesState.success} />
           )}
           <Text type="body" size="sm" color="secondary">
-            These error pages apply to every proxy host as a fallback. A per-host error page for the
-            same status code takes precedence.
+            {t("globalErrorPagesHelp")}
           </Text>
           <ErrorPagesFields initialData={globalErrorPages?.rules ?? []} />
-          <SaveButton label="Save error pages" />
+          <SaveButton label={t("saveErrorPages")} />
         </VStack>
       </form>
     </FormCard>
@@ -1491,6 +1491,7 @@ function TailscaleSection({
   tailscaleState: { success: boolean; message?: string } | null;
   tailscaleFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(tailscale.enabled);
   const [authKey, setAuthKey] = useState("");
   const [defaultNode, setDefaultNode] = useState(tailscale.defaultNode);
@@ -1504,36 +1505,36 @@ function TailscaleSection({
   const moduleDisabledReason = useDisabledReason("tailscale");
 
   return (
-    <FormCard title="Tailscale">
+    <FormCard title={t("tailscale")}>
       <form action={tailscaleFormAction}>
         <VStack gap={3}>
           {tailscaleState?.message && (
             <StatusAlert message={tailscaleState.message} success={tailscaleState.success} />
           )}
           {moduleDisabledReason && (
-            <WarnAlert title="The Tailscale module is not enabled">
+            <WarnAlert title={t("tailscaleModuleDisabledTitle")}>
               {moduleDisabledReason} These settings still save, but no host is served on the tailnet
               until the module is compiled in.
             </WarnAlert>
           )}
           <ModuleGated feature="tailscale">
             <CheckboxInput
-              label="Use Tailscale"
-              description="Runs a Tailscale node inside Caddy. A proxy host can then be served privately on your tailnet, gated on tailnet identity, or proxied to a backend that only exists on the tailnet."
+              label={t("useTailscale")}
+              description={t("tailscaleHelp")}
               htmlName="tailscaleEnabled"
               value={enabled}
               onChange={setEnabled}
               isDisabled={Boolean(moduleDisabledReason)}
             />
           </ModuleGated>
-          <InfoAlert title="Nothing else on the host has to change">
+          <InfoAlert title={t("trustedProxiesInfoTitle")}>
             The node runs in userspace inside the Caddy container — no <Code>tailscaled</Code>, no
             TUN device, no extra ports published. Its identity is kept in the state directory below,
             so it survives a container recreate.
           </InfoAlert>
           <TextInput
             {...AUTOFILL_NEW_PASSWORD}
-            label="Auth key"
+            label={t("authKey")}
             type="password"
             isOptional
             description={
@@ -1547,8 +1548,8 @@ function TailscaleSection({
           />
           <TextInput
             {...AUTOFILL_OFF}
-            label="Default node name"
-            description="The tailnet machine name used by hosts that do not name one of their own. Lowercase letters, digits and hyphens."
+            label={t("defaultNodeName")}
+            description={t("tailscaleDefaultNodeHelp")}
             htmlName="tailscaleDefaultNode"
             value={defaultNode}
             onChange={setDefaultNode}
@@ -1556,7 +1557,7 @@ function TailscaleSection({
           />
           <TextInput
             {...AUTOFILL_OFF}
-            label="Tags"
+            label={t("tags")}
             isOptional
             description='ACL tags applied when a node registers, comma-separated. Most reusable auth keys require at least one, e.g. "tag:caddy".'
             htmlName="tailscaleTags"
@@ -1566,9 +1567,9 @@ function TailscaleSection({
           />
           <TextInput
             {...AUTOFILL_OFF}
-            label="Control server URL"
+            label={t("controlServerUrl")}
             isOptional
-            description="Point at a Headscale or other coordination server. Empty uses Tailscale's own."
+            description={t("tailscaleControlServerHelp")}
             htmlName="tailscaleControlUrl"
             value={controlUrl}
             onChange={setControlUrl}
@@ -1576,24 +1577,24 @@ function TailscaleSection({
           />
           <TextInput
             {...AUTOFILL_OFF}
-            label="State directory"
+            label={t("stateDirectory")}
             isOptional
-            description="Where each node keeps its identity, one subdirectory per node. Must be on a volume, or every restart registers a new machine."
+            description={t("tailscaleStateDirectoryHelp")}
             htmlName="tailscaleStateDir"
             value={stateDir}
             onChange={setStateDir}
             placeholder="/data/tailscale"
           />
           <CheckboxInput
-            label="Register nodes as ephemeral"
-            description="Ephemeral nodes disappear from the tailnet when Caddy stops, instead of lingering as offline machines. Their identity is not reused, so a restart shows up as a new device."
+            label={t("registerNodesAsEphemeral")}
+            description={t("ephemeralNodesHelp")}
             htmlName="tailscaleEphemeral"
             value={ephemeral}
             onChange={setEphemeral}
           />
           <CheckboxInput
-            label="Check the auth key against the Tailscale API before saving"
-            description="Catches a revoked, expired or mistyped key here instead of at the next config apply. Needs a Tailscale API access token, because an auth key cannot authenticate to the API."
+            label={t("tailscaleKeyValidationLabel")}
+            description={t("tailscaleKeyValidationHelp")}
             htmlName="tailscaleValidateAuthKey"
             value={validateAuthKey}
             onChange={setValidateAuthKey}
@@ -1602,7 +1603,7 @@ function TailscaleSection({
             <>
               <TextInput
                 {...AUTOFILL_NEW_PASSWORD}
-                label="API access token"
+                label={t("apiAccessToken")}
                 type="password"
                 isOptional
                 description={
@@ -1616,7 +1617,7 @@ function TailscaleSection({
               />
               <TextInput
                 {...AUTOFILL_OFF}
-                label="Tailnet"
+                label={t("tailnet")}
                 isOptional
                 description={
                   'Which tailnet to ask. "-" means the token\'s own, which is right unless you administer several.'
@@ -1628,14 +1629,14 @@ function TailscaleSection({
               />
             </>
           ) : (
-            <WarnAlert title="Auth keys are not being checked">
+            <WarnAlert title={t("tailscaleKeyValidationDisabledTitle")}>
               Nothing here can tell a revoked or expired key from a working one — that is only
               discovered when Caddy tries to register the node, and a node that will not come up
               makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy
               host on any agent can be updated.
             </WarnAlert>
           )}
-          <SaveButton label="Save Tailscale settings" />
+          <SaveButton label={t("saveTailscaleSettings")} />
         </VStack>
       </form>
     </FormCard>
@@ -1653,6 +1654,7 @@ function AuthentikSection({
   authentikState: { success: boolean; message?: string } | null;
   authentikFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [outpostDomain, setOutpostDomain] = useState(authentik?.outpostDomain ?? "");
   const [outpostUpstream, setOutpostUpstream] = useState(authentik?.outpostUpstream ?? "");
   const [authEndpoint, setAuthEndpoint] = useState(authentik?.authEndpoint ?? "");
@@ -1666,7 +1668,7 @@ function AuthentikSection({
           )}
           <TextInput
             {...NATIVE_REQUIRED}
-            label="Outpost domain"
+            label={t("outpostDomain")}
             htmlName="outpostDomain"
             value={outpostDomain}
             onChange={setOutpostDomain}
@@ -1675,7 +1677,7 @@ function AuthentikSection({
           />
           <TextInput
             {...NATIVE_REQUIRED}
-            label="Outpost upstream"
+            label={t("outpostUpstream")}
             htmlName="outpostUpstream"
             value={outpostUpstream}
             onChange={setOutpostUpstream}
@@ -1683,14 +1685,14 @@ function AuthentikSection({
             isRequired
           />
           <TextInput
-            label="Auth endpoint"
+            label={t("authEndpoint")}
             isOptional
             htmlName="authEndpoint"
             value={authEndpoint}
             onChange={setAuthEndpoint}
             placeholder="/outpost.goauthentik.io/auth/caddy"
           />
-          <SaveButton label="Save Authentik defaults" />
+          <SaveButton label={t("saveAuthentikDefaults")} />
         </VStack>
       </form>
     </FormCard>
@@ -1734,15 +1736,16 @@ function PasswordPolicySection({
   passwordPolicyState: { success: boolean; message?: string } | null;
   passwordPolicyFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [requireChange, setRequireChange] = useState(passwordPolicy.requireChangeOnLegacyHash);
 
   return (
-    <FormCard title="Legacy password hashes">
+    <FormCard title={t("legacyPasswordHashes")}>
       <form action={passwordPolicyFormAction}>
         <VStack gap={3}>
           {passwordPolicy.fromEnv && (
-            <InfoAlert title="This policy is set by the AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH environment variable">
-              It cannot be changed here.
+            <InfoAlert title={t("passwordPolicyEnvironmentOverrideTitle")}>
+              {t("environmentOverrideDescription")}
             </InfoAlert>
           )}
           {passwordPolicyState?.message && (
@@ -1752,14 +1755,14 @@ function PasswordPolicySection({
             />
           )}
           <CheckboxInput
-            label="Require a password change for users still on an older hash"
-            description="New passwords are hashed with argon2id. Accounts created before that change still use bcrypt, which caps the password at 72 bytes. Turning this on sends those users to a reset screen at their next sign-in; choosing a new password upgrades the hash and clears the prompt. Users who sign in through an OAuth/OIDC provider have no password and are never asked."
+            label={t("legacyPasswordResetLabel")}
+            description={t("legacyPasswordResetHelp")}
             htmlName="requireChangeOnLegacyHash"
             value={requireChange}
             onChange={setRequireChange}
             isDisabled={passwordPolicy.fromEnv}
           />
-          <SaveButton label="Save password policy" isDisabled={passwordPolicy.fromEnv} />
+          <SaveButton label={t("savePasswordPolicy")} isDisabled={passwordPolicy.fromEnv} />
         </VStack>
       </form>
     </FormCard>
@@ -1777,29 +1780,30 @@ function AvatarsSection({
   avatarsState: { success: boolean; message?: string } | null;
   avatarsFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [gravatarEnabled, setGravatarEnabled] = useState(avatars.gravatarEnabled);
 
   return (
-    <FormCard title="Fallback icon">
+    <FormCard title={t("fallbackIcon")}>
       <form action={avatarsFormAction}>
         <VStack gap={3}>
           {avatars.fromEnv && (
-            <InfoAlert title="Gravatar is set by the AVATAR_GRAVATAR environment variable">
-              It cannot be changed here.
+            <InfoAlert title={t("gravatarEnvironmentOverrideTitle")}>
+              {t("environmentOverrideDescription")}
             </InfoAlert>
           )}
           {avatarsState?.message && (
             <StatusAlert message={avatarsState.message} success={avatarsState.success} />
           )}
           <CheckboxInput
-            label="Use Gravatar when a user has no icon"
-            description="For users with no icon of their own, look one up from gravatar.com by their email address. Their browser contacts gravatar.com directly, which discloses their IP and a hash of their address to a third party. Accounts with a local-only address are never looked up, and anyone without a Gravatar falls back to their initial."
+            label={t("gravatarLabel")}
+            description={t("gravatarHelp")}
             htmlName="gravatarEnabled"
             value={gravatarEnabled}
             onChange={setGravatarEnabled}
             isDisabled={avatars.fromEnv}
           />
-          <SaveButton label="Save avatar settings" isDisabled={avatars.fromEnv} />
+          <SaveButton label={t("saveAvatarSettings")} isDisabled={avatars.fromEnv} />
         </VStack>
       </form>
     </FormCard>
@@ -1844,6 +1848,7 @@ function BrandingSection({
   faviconState: { success: boolean; message?: string } | null;
   faviconFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [preview, setPreview] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
 
@@ -1860,16 +1865,13 @@ function BrandingSection({
   const currentSrc = `/api/branding/favicon?v=${faviconState?.success ? "new" : "current"}`;
 
   return (
-    <FormCard title="Favicon">
+    <FormCard title={t("favicon")}>
       <form action={faviconFormAction}>
         <VStack gap={3}>
           {faviconState?.message && (
             <StatusAlert message={faviconState.message} success={faviconState.success} />
           )}
-          <InfoAlert title="Shown in the browser tab and in bookmarks">
-            PNG, ICO, SVG, WebP, GIF or JPEG, up to 256 KB. A square image of at least 32×32 works
-            everywhere; browsers scale it down themselves.
-          </InfoAlert>
+          <InfoAlert title={t("faviconDescription")}>{t("faviconUploadHelp")}</InfoAlert>
 
           <HStack gap={3} align="center">
             {(preview || hasFavicon) && (
@@ -1911,10 +1913,10 @@ function BrandingSection({
                 variant="secondary"
                 name="intent"
                 value="remove"
-                label="Remove favicon"
+                label={t("removeFavicon")}
               />
             )}
-            <Button type="submit" size="sm" label="Save favicon" isDisabled={!preview} />
+            <Button type="submit" size="sm" label={t("saveFavicon")} isDisabled={!preview} />
           </HStack>
         </VStack>
       </form>
@@ -1952,6 +1954,7 @@ function UpdatesSection({
   updatesState: { success: boolean; message?: string } | null;
   updatesFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(updates.enabled);
   const [repository, setRepository] = useState(updates.repository);
   const [checking, setChecking] = useState(false);
@@ -1960,7 +1963,7 @@ function UpdatesSection({
   );
 
   return (
-    <FormCard title="Release updates">
+    <FormCard title={t("releaseUpdates")}>
       <form action={updatesFormAction}>
         <VStack gap={3}>
           {updatesState?.message && (
@@ -1988,8 +1991,8 @@ function UpdatesSection({
           )}
 
           <CheckboxInput
-            label="Check for updates"
-            description="Ask the registry below, a few times a day, whether a newer release has been published. This is the only request this app makes to the internet on its own."
+            label={t("checkForUpdates")}
+            description={t("updateCheckHelp")}
             htmlName="updateCheckEnabled"
             value={enabled}
             onChange={setEnabled}
@@ -1997,9 +2000,9 @@ function UpdatesSection({
 
           <TextInput
             {...AUTOFILL_OFF}
-            label="Image repository"
-            description="Where this deployment's images come from, without the image name. Point it at your own namespace if you run a fork, or it will report releases you cannot pull."
-            placeholder="ghcr.io/owner/name"
+            label={t("imageRepository")}
+            description={t("imageRepositoryHelp")}
+            placeholder={t("imageRepositoryPlaceholder")}
             htmlName="updateImageRepository"
             value={repository}
             onChange={setRepository}
@@ -2031,7 +2034,7 @@ function UpdatesSection({
                 }
               }}
             />
-            <SaveButton label="Save update settings" />
+            <SaveButton label={t("saveUpdateSettings")} />
           </HStack>
         </VStack>
       </form>
@@ -2049,15 +2052,16 @@ function UpdatesSection({
  * deployment's existing configuration being described back to them.
  */
 function InferredNote({ source, children }: { source: string; children: ReactNode }) {
+  const t = useTranslations("settings");
   if (source === "environment") {
     return (
-      <InfoAlert title="Currently set by an environment variable">
+      <InfoAlert title={t("environmentOverrideTitle")}>
         Saving here stores the value in the database, which takes precedence from then on. The
         variable can be removed from your <Code>.env</Code> afterwards.
       </InfoAlert>
     );
   }
-  return <InfoAlert title="Not configured here yet">{children}</InfoAlert>;
+  return <InfoAlert title={t("credentialsMissingStatus")}>{children}</InfoAlert>;
 }
 
 function AnalyticsSection({
@@ -2071,6 +2075,7 @@ function AnalyticsSection({
   analyticsState: { success: boolean; message?: string } | null;
   analyticsFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(analytics.enabled);
   const [url, setUrl] = useState(analytics.url);
   const [user, setUser] = useState(analytics.user);
@@ -2079,7 +2084,7 @@ function AnalyticsSection({
   const [retentionDays, setRetentionDays] = useState(analytics.retentionDays);
 
   return (
-    <FormCard title="Traffic and WAF events">
+    <FormCard title={t("trafficAndWafEvents")}>
       <form action={analyticsFormAction}>
         <VStack gap={3}>
           {analytics.inferred && (
@@ -2092,20 +2097,20 @@ function AnalyticsSection({
             <StatusAlert message={analyticsState.message} success={analyticsState.success} />
           )}
           <CheckboxInput
-            label="Collect analytics"
-            description="Record every proxied request and every WAF event, and show them on the Analytics page. With this off, no events are written and the agents stop reading Caddy's logs."
+            label={t("collectAnalytics")}
+            description={t("analyticsCollectionHelp")}
             htmlName="analyticsEnabled"
             value={enabled}
             onChange={setEnabled}
           />
           {canManageServices ? (
-            <InfoAlert title="The agent starts and stops ClickHouse for you">
+            <InfoAlert title={t("managedAnalyticsTitle")}>
               No <Code>COMPOSE_PROFILES</Code> entry is needed. The first start pulls the ClickHouse
               image, which can take several minutes; turning analytics off stops the container and
               leaves its data volume intact.
             </InfoAlert>
           ) : (
-            <WarnAlert title="No agent is answering, so the container cannot be managed from here">
+            <WarnAlert title={t("agentManagementUnavailableTitle")}>
               These settings still decide whether analytics run. Starting ClickHouse itself needs
               <Code>clickhouse</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
             </WarnAlert>
@@ -2115,22 +2120,22 @@ function AnalyticsSection({
           <input type="hidden" name="hasPassword" value={analytics.hasPassword ? "yes" : "no"} />
           <TextInput
             {...AUTOFILL_OFF}
-            label="ClickHouse URL"
-            description="Where the analytics database is reachable."
+            label={t("clickhouseUrl")}
+            description={t("clickhouseUrlHelp")}
             htmlName="clickhouseUrl"
             value={url}
             onChange={setUrl}
           />
           <TextInput
             {...AUTOFILL_OFF}
-            label="ClickHouse user"
+            label={t("clickhouseUser")}
             htmlName="clickhouseUser"
             value={user}
             onChange={setUser}
           />
           <TextInput
             {...AUTOFILL_NEW_PASSWORD}
-            label="ClickHouse password"
+            label={t("clickhousePassword")}
             type="password"
             isOptional={analytics.hasPassword}
             description={
@@ -2144,14 +2149,14 @@ function AnalyticsSection({
           />
           <TextInput
             {...AUTOFILL_OFF}
-            label="ClickHouse database"
+            label={t("clickhouseDatabase")}
             htmlName="clickhouseDb"
             value={database}
             onChange={setDatabase}
           />
           <NumberInput
-            label="Retention (days)"
-            description="How long events are kept. Lowering it migrates the existing tables' TTL, which rewrites their parts."
+            label={t("retentionDays")}
+            description={t("analyticsRetentionHelp")}
             htmlName="clickhouseRetentionDays"
             value={retentionDays}
             onChange={setRetentionDays}
@@ -2159,7 +2164,7 @@ function AnalyticsSection({
             min={1}
             max={3650}
           />
-          <SaveButton label="Save analytics settings" />
+          <SaveButton label={t("saveAnalyticsSettings")} />
         </VStack>
       </form>
     </FormCard>
@@ -2179,12 +2184,13 @@ function GeoipSection({
   geoipState: { success: boolean; message?: string } | null;
   geoipFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(geoip.enabled);
   const [accountId, setAccountId] = useState(geoip.accountId);
   const [licenseKey, setLicenseKey] = useState("");
 
   return (
-    <FormCard title="MaxMind GeoLite2">
+    <FormCard title={t("maxmindGeolite2")}>
       <form action={geoipFormAction}>
         <VStack gap={3}>
           {geoip.inferred && (
@@ -2198,20 +2204,20 @@ function GeoipSection({
             <StatusAlert message={geoipState.message} success={geoipState.success} />
           )}
           <CheckboxInput
-            label="Use GeoIP"
-            description="Country lookups for analytics, and the country matching that geo blocking is built on. With this off, geo block fields are not offered and no country is recorded against an event."
+            label={t("useGeoip")}
+            description={t("geoipHelp")}
             htmlName="geoipEnabled"
             value={enabled}
             onChange={setEnabled}
           />
           {canManageServices ? (
-            <InfoAlert title="The agent starts and stops geoipupdate for you">
+            <InfoAlert title={t("managedGeoipTitle")}>
               No <Code>COMPOSE_PROFILES</Code> entry is needed. It downloads the databases on a
               schedule using the credentials below, and agents on other hosts fetch them from this
               controller rather than each holding a licence key.
             </InfoAlert>
           ) : (
-            <WarnAlert title="No agent is answering, so the container cannot be managed from here">
+            <WarnAlert title={t("agentManagementUnavailableTitle")}>
               These settings still decide whether GeoIP is used. Downloading the databases needs
               <Code>geoipupdate</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
             </WarnAlert>
@@ -2224,16 +2230,16 @@ function GeoipSection({
           <input type="hidden" name="hasLicenseKey" value={geoip.hasLicenseKey ? "yes" : "no"} />
           <TextInput
             {...AUTOFILL_OFF}
-            label="MaxMind account ID"
+            label={t("maxmindAccountId")}
             isOptional
-            description="From your MaxMind account. Without a subscription the databases cannot be downloaded, though GeoIP still works if you supply the files another way."
+            description={t("maxmindCredentialsHelp")}
             htmlName="geoipAccountId"
             value={accountId}
             onChange={setAccountId}
           />
           <TextInput
             {...AUTOFILL_NEW_PASSWORD}
-            label="MaxMind licence key"
+            label={t("maxmindLicenceKey")}
             type="password"
             isOptional
             description={
@@ -2245,7 +2251,7 @@ function GeoipSection({
             value={licenseKey}
             onChange={setLicenseKey}
           />
-          <SaveButton label="Save GeoIP settings" />
+          <SaveButton label={t("saveGeoipSettings")} />
         </VStack>
       </form>
     </FormCard>
@@ -2277,6 +2283,7 @@ function AgentRow({
   lastSeenAt: string | null;
   onRemove: ReactNode;
 }) {
+  const t = useTranslations("settings");
   return (
     <VStack gap={2}>
       <HStack gap={2} align="center" justify="between">
@@ -2290,7 +2297,7 @@ function AgentRow({
                 v{status.version} · {status.mode} · project {status.composeProject}
               </Text>
             ) : (
-              <Badge variant="error" label="Not answering" />
+              <Badge variant="error" label={t("notAnswering")} />
             )}
           </HStack>
           <Text size="xsm" color="secondary">
@@ -2319,6 +2326,7 @@ function AgentSection({
   pairState: { success: boolean; message?: string } | null;
   pairFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -2333,13 +2341,11 @@ function AgentSection({
       <FormCard title={usingPaired ? "Agents" : "Current agent"}>
         <VStack gap={3}>
           <Text size="sm" color="secondary">
-            An agent recreates, rebuilds and configures the Caddy container on its host. The
-            controller has no Docker access of its own, and no address for any Caddy — everything
-            reaches a proxy through its agent.
+            {t("agentsDescription")}
           </Text>
 
           {usingPaired && paired.length > 1 && (
-            <InfoAlert title="Every agent runs the same configuration">
+            <InfoAlert title={t("sharedAgentConfigTitle")}>
               Proxy hosts, certificates and published ports belong to this controller, not to a
               host. A change is applied to all {paired.length} agents or to none of them, so the
               fleet cannot drift apart.
@@ -2347,7 +2353,7 @@ function AgentSection({
           )}
 
           {statuses.length === 0 ? (
-            <WarnAlert title="No agent is answering">
+            <WarnAlert title={t("agentsUnavailableTitle")}>
               {usingPaired
                 ? "Nothing was reached. Layer-4 ports, Caddy rebuilds and config changes will all fail until an agent answers."
                 : "Start the agent container, or pair a remote one below. Everything else keeps working without it."}
@@ -2356,11 +2362,7 @@ function AgentSection({
             <VStack gap={3}>
               {!usingPaired && (
                 <>
-                  <InfoAlert title="This is the local agent">
-                    It is reached over a socket on the shared data volume and needs no pairing. Pair
-                    a remote agent below only if Caddy runs on a different host from this
-                    controller.
-                  </InfoAlert>
+                  <InfoAlert title={t("localAgentTitle")}>{t("localAgentDescription")}</InfoAlert>
                   <AgentRow
                     name="Local agent"
                     address={null}
@@ -2385,7 +2387,7 @@ function AgentSection({
                     onRemove={
                       <form action={unpairAgentAction}>
                         <input type="hidden" name="agentId" value={agent.id} />
-                        <Button type="submit" size="sm" variant="secondary" label="Unpair" />
+                        <Button type="submit" size="sm" variant="secondary" label={t("unpair")} />
                       </form>
                     }
                   />
@@ -2404,7 +2406,7 @@ function AgentSection({
         </VStack>
       </FormCard>
 
-      <FormCard title="Pair an agent">
+      <FormCard title={t("pairAnAgent")}>
         <form action={pairFormAction}>
           <VStack gap={3}>
             <Text size="sm" color="secondary">
@@ -2417,8 +2419,8 @@ function AgentSection({
             )}
             <TextInput
               {...NATIVE_REQUIRED}
-              label="Agent address"
-              description="Host and port, e.g. agent.example.com:3100. Defaults to port 3100."
+              label={t("agentAddress")}
+              description={t("agentAddressHelp")}
               htmlName="address"
               value={address}
               onChange={setAddress}
@@ -2428,8 +2430,8 @@ function AgentSection({
             <TextInput
               {...NATIVE_REQUIRED}
               {...AUTOFILL_OFF}
-              label="Pairing code"
-              description="Six letters, from the agent's logs."
+              label={t("pairingCode")}
+              description={t("pairingCodeHelp")}
               htmlName="code"
               value={code}
               onChange={setCode}
@@ -2437,14 +2439,14 @@ function AgentSection({
               isRequired
             />
             <TextInput
-              label="Name"
-              description="What to call this agent here. Defaults to its hostname."
+              label={t("name")}
+              description={t("agentNameHelp")}
               htmlName="name"
               value={name}
               onChange={setName}
               isOptional
             />
-            <SaveButton label="Pair agent" />
+            <SaveButton label={t("pairAgent")} />
           </VStack>
         </form>
       </FormCard>
@@ -2467,6 +2469,7 @@ function CaddyBuildSection({
   caddyBuildState: { success: boolean; message?: string } | null;
   caddyBuildFormAction: (formData: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   return (
     <form action={caddyBuildFormAction}>
       <VStack gap={4}>
@@ -2480,7 +2483,7 @@ function CaddyBuildSection({
           initialModules={caddyBuild?.modules ?? {}}
           initialCustomModules={caddyBuild?.customModules ?? []}
         />
-        <SaveButton label="Save Module Selection" />
+        <SaveButton label={t("saveModuleSelection")} />
       </VStack>
     </form>
   );
@@ -2497,6 +2500,7 @@ function MetricsSection({
   metricsState: { success: boolean; message?: string } | null;
   metricsFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(metrics?.enabled ?? false);
   const [port, setPort] = useState(metrics?.port ?? 9090);
 
@@ -2509,15 +2513,15 @@ function MetricsSection({
               <StatusAlert message={metricsState.message} success={metricsState.success} />
             )}
             <CheckboxInput
-              label="Enable metrics endpoint"
-              description="Prometheus-compatible scrape endpoint, exposed on a dedicated port."
+              label={t("enableMetricsEndpoint")}
+              description={t("metricsEndpointHelp")}
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
             />
             <NumberInput
-              label="Port"
-              description="Separate from admin API on port 2019."
+              label={t("port")}
+              description={t("metricsPortHelp")}
               htmlName="port"
               value={port}
               onChange={setPort}
@@ -2526,11 +2530,11 @@ function MetricsSection({
               max={65535}
               width={160}
             />
-            <SaveButton label="Save metrics settings" />
+            <SaveButton label={t("saveMetricsSettings")} />
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title="Point your monitoring tool at the metrics endpoint">
+      <InfoAlert title={t("metricsInfoTitle")}>
         {`Scrape http://caddy-proxy-manager-caddy:${metrics?.port ?? 9090}/metrics from within the Docker network.`}
       </InfoAlert>
     </>
@@ -2553,6 +2557,7 @@ function LoggingSection({
   loggingState: { success: boolean; message?: string } | null;
   loggingFormAction: (payload: FormData) => void;
 }) {
+  const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(logging?.enabled ?? false);
   const [format, setFormat] = useState<string>(logging?.format ?? "json");
 
@@ -2565,26 +2570,24 @@ function LoggingSection({
               <StatusAlert message={loggingState.message} success={loggingState.success} />
             )}
             <CheckboxInput
-              label="Enable access logging"
+              label={t("enableAccessLogging")}
               htmlName="enabled"
               value={enabled}
               onChange={setEnabled}
             />
             <Selector
-              label="Format"
+              label={t("format")}
               htmlName="format"
               options={LOG_FORMAT_OPTIONS}
               value={format}
               onChange={setFormat}
               width={280}
             />
-            <SaveButton label="Save logging settings" />
+            <SaveButton label={t("saveLoggingSettings")} />
           </VStack>
         </form>
       </FormCard>
-      <InfoAlert title="Access logs live in the caddy-logs Docker volume">
-        View with: docker exec caddy-proxy-manager-caddy tail -f /logs/access.log
-      </InfoAlert>
+      <InfoAlert title={t("accessLogsInfoTitle")}>{t("accessLogsCommand")}</InfoAlert>
     </>
   );
 }

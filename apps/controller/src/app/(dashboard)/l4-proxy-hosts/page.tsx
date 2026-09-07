@@ -2,6 +2,7 @@ import L4ProxyHostsClient from "./L4ProxyHostsClient";
 import { listL4ProxyHostsPaginated, countL4ProxyHosts } from "@/src/lib/models/l4-proxy-hosts";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 const PER_PAGE = 25;
 
@@ -9,9 +10,10 @@ interface PageProps {
   searchParams: Promise<{ page?: string; search?: string; sortBy?: string; sortDir?: string }>;
 }
 
-export const metadata: Metadata = {
-  title: "L4 Proxy Hosts",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("l4ProxyHosts") };
+}
 
 export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   await requireAdmin();

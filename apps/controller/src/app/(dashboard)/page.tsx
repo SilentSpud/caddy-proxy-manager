@@ -8,6 +8,7 @@ import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
 import type { Metadata } from "next";
 
 import type { StatCard } from "./OverviewClient";
+import { getTranslations } from "next-intl/server";
 
 async function loadStats(): Promise<StatCard[]> {
   const [proxyHostCountResult, acmeRows, certRows, importedCertCountResult, accessListCountResult] =
@@ -86,9 +87,10 @@ async function loadStats(): Promise<StatCard[]> {
   ];
 }
 
-export const metadata: Metadata = {
-  title: "Overview",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("overview") };
+}
 
 export default async function OverviewPage() {
   const session = await requireUser();
