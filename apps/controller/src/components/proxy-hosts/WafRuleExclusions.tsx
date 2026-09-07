@@ -7,12 +7,14 @@ import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { useTranslations } from "next-intl";
 
 type Props = {
   value?: number[];
 };
 
 export function WafRuleExclusions({ value }: Props) {
+  const t = useTranslations("proxyHosts");
   const [ids, setIds] = useState<number[]>(value ?? []);
   const [draft, setDraft] = useState<number | null>(null);
 
@@ -28,10 +30,10 @@ export function WafRuleExclusions({ value }: Props) {
 
       <VStack gap={1}>
         <Text type="body" size="sm" weight="semibold">
-          Excluded Rule IDs
+          {t("excludedRuleIds")}
         </Text>
         <Text type="body" size="xsm" color="secondary">
-          Rules listed here are disabled via SecRuleRemoveById
+          {t("rulesListedHereAre")}
         </Text>
       </VStack>
 
@@ -52,9 +54,9 @@ export function WafRuleExclusions({ value }: Props) {
 
       <HStack gap={2} vAlign="end">
         <NumberInput
-          label="Rule ID"
+          label={t("ruleId")}
           isLabelHidden
-          placeholder="Rule ID"
+          placeholder={t("ruleId")}
           value={draft}
           onChange={setDraft}
           isIntegerOnly
@@ -71,7 +73,7 @@ export function WafRuleExclusions({ value }: Props) {
         <IconButton
           variant="ghost"
           size="sm"
-          label="Add excluded rule ID"
+          label={t("addExcludedRuleId")}
           icon={<Plus />}
           onClick={addId}
         />

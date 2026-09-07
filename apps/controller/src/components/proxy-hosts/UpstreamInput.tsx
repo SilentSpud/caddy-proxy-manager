@@ -9,6 +9,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { useTranslations } from "next-intl";
 
 type UpstreamEntry = {
   protocol: string;
@@ -37,6 +38,7 @@ export function UpstreamInput({
   defaultUpstreams?: string[];
   name?: string;
 }) {
+  const t = useTranslations("proxyHosts");
   const [entries, setEntries] = useState<WithRowId<UpstreamEntry>[]>(() =>
     withRowIds(
       defaultUpstreams.length > 0
@@ -86,14 +88,14 @@ export function UpstreamInput({
     <VStack gap={2}>
       <input type="hidden" name={name} value={serializedValue} />
       <Text type="body" size="sm" weight="semibold">
-        Upstreams
+        {t("upstreams2")}{" "}
       </Text>
 
       <VStack gap={3}>
         {entries.map((entry, index) => (
           <HStack key={entry.rowId} gap={2} vAlign="end">
             <Selector
-              label="Protocol"
+              label={t("protocol")}
               isLabelHidden
               width={120}
               options={PROTOCOL_OPTIONS}
@@ -126,7 +128,7 @@ export function UpstreamInput({
           <Button
             variant="ghost"
             size="sm"
-            label="Add Upstream"
+            label={t("addUpstream")}
             icon={<Plus />}
             onClick={handleAdd}
           />
@@ -134,7 +136,7 @@ export function UpstreamInput({
       </VStack>
 
       <Text type="body" size="xsm" color="secondary">
-        Backend servers to proxy requests to
+        {t("backendServersToProxy")}
       </Text>
     </VStack>
   );

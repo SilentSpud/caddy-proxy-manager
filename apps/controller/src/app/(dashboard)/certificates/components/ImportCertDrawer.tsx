@@ -12,6 +12,7 @@ import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { createCertificateAction, updateCertificateAction } from "../actions";
 import type { ImportedCertView } from "../page";
+import { useTranslations } from "next-intl";
 
 type Props = {
   open: boolean;
@@ -22,6 +23,7 @@ type Props = {
 const FORM_ID = "import-cert-form";
 
 export function ImportCertDrawer({ open, cert, onClose }: Props) {
+  const t = useTranslations("certificates");
   const isEdit = cert !== null;
   const [isPending, startTransition] = useTransition();
   const [showKey, setShowKey] = useState(false);
@@ -76,7 +78,12 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
       maxWidth="md"
       actions={
         <>
-          <Button variant="secondary" label="Cancel" onClick={handleClose} isDisabled={isPending} />
+          <Button
+            variant="secondary"
+            label={t("cancel")}
+            onClick={handleClose}
+            isDisabled={isPending}
+          />
           {/* The footer sits outside the <form>, so the button is wired to it
               by id. That also restores implicit submission on Enter. */}
           <Button
@@ -95,36 +102,36 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
 
           <TextInput
             {...NATIVE_REQUIRED}
-            label="Name"
+            label={t("name")}
             htmlName="name"
             value={name}
             onChange={setName}
             isRequired
             hasAutoFocus
-            description="Descriptive name to identify this certificate"
+            description={t("descriptiveNameToIdentify")}
           />
 
           <TextArea
-            label="Domains (one per line)"
+            label={t("domainsOnePerLine")}
             htmlName="domain_names"
             value={domains}
             onChange={setDomains}
             rows={3}
-            description="Domains covered by this certificate"
+            description={t("domainsCoveredByThis")}
           />
 
           <VStack gap={2}>
             <TextArea
-              label="Certificate PEM"
+              label={t("certificatePem")}
               htmlName="certificate_pem"
               placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
               rows={6}
               value={certPem}
               onChange={setCertPem}
-              description="Full chain recommended (cert + intermediates)"
+              description={t("fullChainRecommendedCert")}
             />
             <FileInput
-              label="Load certificate from file"
+              label={t("loadCertificateFromFile")}
               isLabelHidden
               accept=".pem,.crt,.cer,.txt"
               value={null}
@@ -138,7 +145,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
                   input strips newlines on paste and would corrupt the PEM. */}
               <div data-masked-input={showKey ? "false" : "true"} style={{ flex: 1 }}>
                 <TextArea
-                  label="Private Key PEM"
+                  label={t("privateKeyPem")}
                   htmlName="private_key_pem"
                   placeholder={
                     showKey
@@ -150,7 +157,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
                   onChange={setKeyPem}
                   hasSpellCheck={false}
                   width="100%"
-                  description="Keep this secure. Never share your private key."
+                  description={t("keepThisSecureNever")}
                 />
               </div>
               <IconButton
@@ -162,7 +169,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
               />
             </HStack>
             <FileInput
-              label="Load private key from file"
+              label={t("loadPrivateKeyFrom")}
               isLabelHidden
               accept=".pem,.key,.txt"
               value={null}

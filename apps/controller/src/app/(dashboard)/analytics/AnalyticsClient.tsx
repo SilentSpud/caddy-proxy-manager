@@ -34,6 +34,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { formatDateTimeUtc } from "@/src/lib/date-format";
 
 import { useChartTheme } from "./chart-theme";
+import { useTranslations } from "next-intl";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
@@ -42,13 +43,19 @@ import { useChartTheme } from "./chart-theme";
 // is nothing to render anyway, since every dataset arrives from /api/analytics/* in an effect.
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
+/** Its own component because `loading` is called at module scope, where no hook can run. */
+function MapLoading() {
+  const t = useTranslations("analytics");
+  return (
+    <HStack justify="center" vAlign="center" height={240}>
+      <Spinner label={t("loadingMap")} />
+    </HStack>
+  );
+}
+
 const WorldMap = dynamic(() => import("./WorldMapInner"), {
   ssr: false,
-  loading: () => (
-    <HStack justify="center" vAlign="center" height={240}>
-      <Spinner label="Loading map" />
-    </HStack>
-  ),
+  loading: () => <MapLoading />,
 }) as React.ComponentType<{
   data: import("./WorldMapInner").CountryStats[];
   selectedCountry?: string | null;
@@ -273,6 +280,7 @@ function HostsCombobox({
   selectedHosts: string[];
   onChange: (v: string[]) => void;
 }) {
+  const t = useTranslations("analytics");
   const [includeUnconfigured, setIncludeUnconfigured] = useState(false);
 
   // Restore the persisted "include unconfigured hosts" preference
@@ -301,7 +309,7 @@ function HostsCombobox({
   return (
     <VStack gap={2}>
       <MultiSelector
-        label="Hosts"
+        label={t("hosts")}
         isLabelHidden
         options={visibleHosts.map((h) => ({ value: h, label: h }))}
         value={selectedHosts}
@@ -311,13 +319,13 @@ function HostsCombobox({
         hasSelectAll
         triggerDisplay="badges"
         maxBadges={2}
-        placeholder="All hosts"
+        placeholder={t("allHosts")}
         width={240}
       />
       {hasUnconfigured && (
         <CheckboxInput
-          label="Include unconfigured hosts"
-          description="Hosts that received traffic but are not configured as proxy hosts in Caddy."
+          label={t("includeUnconfiguredHosts")}
+          description={t("hostsThatReceivedTraffic")}
           value={includeUnconfigured}
           onChange={setFilter}
         />
@@ -356,6 +364,7 @@ function asArray<T>(value: unknown): T[] {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AnalyticsClient() {
+  const t = useTranslations("analytics");
   const [interval, setIntervalVal] = useState<DisplayInterval>("1h");
   const [selectedHosts, setSelectedHosts] = useState<string[]>([]);
   const [allHosts, setAllHosts] = useState<AnalyticsHost[]>([]);
@@ -441,18 +450,18 @@ export default function AnalyticsClient() {
         setUserAgents([]);
         setBlocked(null);
         setWafStats(null);
-        toast.error("Failed to load analytics data");
+        toast.error(t("failedToLoadAnalytics2"));
       })
       .finally(() => setLoading(false));
-  }, [buildParams, interval, customFrom, customTo]);
+  }, [buildParams, interval, customFrom, customTo, t]);
 
   const fetchBlockedPage = useCallback(
     (page: number) => {
       fetchJson(`/api/analytics/blocked${buildParams(`&page=${page}`)}`)
         .then((b) => setBlocked(b as BlockedPage))
-        .catch(() => toast.error("Failed to load blocked requests"));
+        .catch(() => toast.error(t("failedToLoadBlocked")));
     },
-    [buildParams],
+    [buildParams, t],
   );
 
   // ── Chart configs ─────────────────────────────────────────────────────────
@@ -805,7 +814,7 @@ export default function AnalyticsClient() {
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={0}>
           <Text type="label" size="xsm" color="secondary">
-            Traffic Intelligence
+            {t("trafficIntelligence")}
           </Text>
           <Heading level={1}>Analytics</Heading>
         </VStack>
@@ -813,7 +822,7 @@ export default function AnalyticsClient() {
           {/* Was six buttons whose selected state read only as a filled
               variant; SegmentedControl exposes the choice as a radio group. */}
           <SegmentedControl
-            label="Time interval"
+            label={t("timeInterval")}
             size="sm"
             value={interval}
             onChange={(next) => {
@@ -832,11 +841,11 @@ export default function AnalyticsClient() {
 
           {interval === "custom" && (
             <HStack gap={2} vAlign="center">
-              <DateTimePicker value={customFrom} onChange={setCustomFrom} placeholder="From" />
+              <DateTimePicker value={customFrom} onChange={setCustomFrom} placeholder={t("from")} />
               <Text type="body" size="xsm" color="secondary">
                 &ndash;
               </Text>
-              <DateTimePicker value={customTo} onChange={setCustomTo} placeholder="To" />
+              <DateTimePicker value={customTo} onChange={setCustomTo} placeholder={t("to")} />
             </HStack>
           )}
 
@@ -852,7 +861,7 @@ export default function AnalyticsClient() {
           Rendered instead of crashing the page, so the rest of the UI stays usable. */}
       {loadError && (
         <div data-testid="analytics-load-error">
-          <Banner status="error" title="Failed to load analytics data" description={loadError} />
+          <Banner status="error" title={t("failedToLoadAnalytics")} description={loadError} />
         </div>
       )}
 
@@ -860,8 +869,8 @@ export default function AnalyticsClient() {
       {summary?.analyticsDisabled && (
         <Banner
           status="info"
-          title="ClickHouse analytics is not enabled"
-          description="Traffic and WAF data is not being collected. Add COMPOSE_PROFILES=clickhouse and CLICKHOUSE_PASSWORD=… to your .env and restart to enable analytics."
+          title={t("clickhouseAnalyticsIsNot")}
+          description={t("trafficAndWafData")}
         />
       )}
 
@@ -869,7 +878,7 @@ export default function AnalyticsClient() {
       {summary?.loggingDisabled && !summary?.analyticsDisabled && (
         <Banner
           status="warning"
-          title="Caddy access logging is not enabled"
+          title={t("caddyAccessLoggingIs")}
           description={
             <Text type="body" size="sm">
               No traffic data is being collected.{" "}
@@ -882,7 +891,7 @@ export default function AnalyticsClient() {
       {/* Loading overlay */}
       {loading && (
         <HStack justify="center" padding={10}>
-          <Spinner size="lg" label="Loading analytics" />
+          <Spinner size="lg" label={t("loadingAnalytics")} />
         </HStack>
       )}
 
@@ -890,10 +899,10 @@ export default function AnalyticsClient() {
         <>
           {/* Stats row */}
           <Grid columns={{ minWidth: 150, max: 5 }} gap={3}>
-            <StatCard label="Total Requests" value={summary.totalRequests.toLocaleString()} />
-            <StatCard label="Unique IPs" value={summary.uniqueIps.toLocaleString()} />
+            <StatCard label={t("totalRequests")} value={summary.totalRequests.toLocaleString()} />
+            <StatCard label={t("uniqueIps")} value={summary.uniqueIps.toLocaleString()} />
             <StatCard
-              label="Blocked Requests"
+              label={t("blockedRequests")}
               value={summary.blockedRequests.toLocaleString()}
               sub={
                 (wafStats?.total ?? 0) > 0
@@ -903,13 +912,13 @@ export default function AnalyticsClient() {
               tone={summary.blockedRequests > 0 ? "error" : undefined}
             />
             <StatCard
-              label="Block Rate"
+              label={t("blockRate")}
               value={`${summary.blockedPercent}%`}
               sub={`${formatBytes(summary.bytesServed)} served`}
               tone={summary.blockedPercent > 10 ? "warning" : undefined}
             />
             <StatCard
-              label="WAF Events"
+              label={t("wafEvents")}
               value={(wafStats?.total ?? 0).toLocaleString()}
               sub={
                 wafStats && wafStats.topRules.length > 0
@@ -924,10 +933,10 @@ export default function AnalyticsClient() {
           <Card padding={5}>
             <VStack gap={4}>
               <Text type="body" size="sm" weight="semibold">
-                Requests Over Time
+                {t("requestsOverTime")}
               </Text>
               {timeline.length === 0 ? (
-                <EmptyState title="No data for this period" isCompact />
+                <EmptyState title={t("noDataForThis")} isCompact />
               ) : (
                 <div style={{ overflowX: "auto", width: "100%" }}>
                   <ReactApexChart
@@ -946,7 +955,7 @@ export default function AnalyticsClient() {
             <Card padding={5}>
               <VStack gap={2} minHeight={280}>
                 <Text type="body" size="sm" weight="semibold">
-                  Traffic by Country
+                  {t("trafficByCountry")}
                 </Text>
                 <WorldMap data={countries} selectedCountry={selectedCountry} />
               </VStack>
@@ -954,10 +963,10 @@ export default function AnalyticsClient() {
             <Card padding={4}>
               <VStack gap={3}>
                 <Text type="body" size="sm" weight="semibold">
-                  Top Countries
+                  {t("topCountries")}
                 </Text>
                 {countries.length === 0 ? (
-                  <EmptyState title="No geo data available" isCompact />
+                  <EmptyState title={t("noGeoDataAvailable")} isCompact />
                 ) : (
                   <Table
                     data={countryRows}
@@ -976,10 +985,10 @@ export default function AnalyticsClient() {
             <Card padding={5}>
               <VStack gap={4}>
                 <Text type="body" size="sm" weight="semibold">
-                  HTTP Protocols
+                  {t("httpProtocols")}
                 </Text>
                 {protocols.length === 0 ? (
-                  <EmptyState title="No data" isCompact />
+                  <EmptyState title={t("noData")} isCompact />
                 ) : (
                   <>
                     <div style={{ overflowX: "auto", width: "100%" }}>
@@ -998,10 +1007,10 @@ export default function AnalyticsClient() {
             <Card padding={5}>
               <VStack gap={4}>
                 <Text type="body" size="sm" weight="semibold">
-                  Top User Agents
+                  {t("topUserAgents")}
                 </Text>
                 {userAgents.length === 0 ? (
-                  <EmptyState title="No data" isCompact />
+                  <EmptyState title={t("noData")} isCompact />
                 ) : (
                   <div style={{ overflowX: "auto", width: "100%" }}>
                     <ReactApexChart
@@ -1020,10 +1029,10 @@ export default function AnalyticsClient() {
           <Card padding={5}>
             <VStack gap={4}>
               <Text type="body" size="sm" weight="semibold">
-                Recent Blocked Requests
+                {t("recentBlockedRequests")}
               </Text>
               {!blocked || blocked.events.length === 0 ? (
-                <EmptyState title="No blocked requests in this period" isCompact />
+                <EmptyState title={t("noBlockedRequestsIn")} isCompact />
               ) : (
                 <>
                   <Table data={blockedRows} columns={blockedColumns} idKey="id" hasHover />
@@ -1047,7 +1056,7 @@ export default function AnalyticsClient() {
             <Card padding={5}>
               <VStack gap={4}>
                 <Text type="body" size="sm" weight="semibold">
-                  Top WAF Rules Triggered
+                  {t("topWafRulesTriggered")}
                 </Text>
                 <div style={{ overflowX: "auto", width: "100%" }}>
                   <ReactApexChart

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { useTranslations } from "next-intl";
 import { LogIn } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -32,6 +33,7 @@ export default function LoginClient({
   localLoginEnabled = true,
   appName = "Caddy Proxy Manager",
 }: LoginClientProps) {
+  const t = useTranslations("auth.login");
   const router = useRouter();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
@@ -50,7 +52,7 @@ export default function LoginClient({
     const trimmedUsername = username.trim();
 
     if (!trimmedUsername || !password) {
-      setLoginError("Username and password are required.");
+      setLoginError(t("credentialsRequired"));
       setLoginPending(false);
       return;
     }
@@ -67,11 +69,11 @@ export default function LoginClient({
     if (error) {
       let message: string | null = null;
       if (error.status === 429) {
-        message = error.message || "Too many login attempts. Try again in a few minutes.";
+        message = error.message || t("rateLimited");
       } else if (error.message) {
         message = error.message;
       }
-      setLoginError(message ?? "Invalid username or password.");
+      setLoginError(message ?? t("invalidCredentials"));
       setLoginPending(false);
       return;
     }
@@ -86,7 +88,7 @@ export default function LoginClient({
     try {
       await authClient.signIn.social({ provider: providerId, callbackURL: "/" });
     } catch {
-      setLoginError("Failed to sign in with OAuth");
+      setLoginError(t("oauthFailed"));
       setOauthPending(null);
     }
   };
@@ -101,16 +103,14 @@ export default function LoginClient({
             <Heading level={1}>{appName}</Heading>
             <Text type="body" size="sm" color="secondary">
               {!localLoginEnabled
-                ? "Sign in with single sign-on"
+                ? t("subtitleSsoOnly")
                 : enabledProviders.length > 0
-                  ? "Sign in to your account"
-                  : "Sign in with your credentials"}
+                  ? t("subtitleWithProviders")
+                  : t("subtitleCredentials")}
             </Text>
           </VStack>
 
-          {loginError && (
-            <Banner status="error" title="Could not sign in" description={loginError} />
-          )}
+          {loginError && <Banner status="error" title={t("errorTitle")} description={loginError} />}
 
           {enabledProviders.length > 0 && (
             <>
@@ -125,8 +125,8 @@ export default function LoginClient({
                       icon={<LogIn />}
                       label={
                         isPending
-                          ? `Signing in with ${provider.name}…`
-                          : `Continue with ${provider.name}`
+                          ? t("signingInWith", { provider: provider.name })
+                          : t("continueWith", { provider: provider.name })
                       }
                       isLoading={isPending}
                       isDisabled={disabled}
@@ -135,15 +135,15 @@ export default function LoginClient({
                   );
                 })}
               </VStack>
-              {localLoginEnabled && <Divider label="Or sign in with credentials" />}
+              {localLoginEnabled && <Divider label={t("credentialsDivider")} />}
             </>
           )}
 
           {!localLoginEnabled && enabledProviders.length === 0 && (
             <Banner
               status="error"
-              title="No sign-in method available"
-              description="Single sign-on is the only way to sign in, but no provider is configured. Configure one with the OAUTH_* environment variables."
+              title={t("noMethodTitle")}
+              description={t("noMethodDescription")}
             />
           )}
 
@@ -152,7 +152,7 @@ export default function LoginClient({
               <VStack gap={3}>
                 <TextInput
                   {...AUTOFILL_USERNAME}
-                  label="Username"
+                  label={t("username")}
                   htmlName="username"
                   value={username}
                   onChange={setUsername}
@@ -163,7 +163,7 @@ export default function LoginClient({
                 />
                 <TextInput
                   {...AUTOFILL_CURRENT_PASSWORD}
-                  label="Password"
+                  label={t("password")}
                   type="password"
                   htmlName="password"
                   value={password}
@@ -174,7 +174,7 @@ export default function LoginClient({
                 />
                 <Button
                   type="submit"
-                  label={loginPending ? "Signing in…" : "Sign in"}
+                  label={loginPending ? t("submitPending") : t("submit")}
                   isLoading={loginPending}
                   isDisabled={disabled}
                   width="100%"

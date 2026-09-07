@@ -12,6 +12,7 @@ import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { useTranslations } from "next-intl";
 
 /** Icons the overview can show, keyed by name so the server can name one. */
 const STAT_ICONS = {
@@ -107,12 +108,13 @@ export default function OverviewClient({
   recentEvents: RecentEvent[];
   isAdmin?: boolean;
 }) {
+  const t = useTranslations("overview");
   return (
     <VStack gap={8}>
       <VStack gap={1}>
         <Heading level={1}>Welcome back, {userName}</Heading>
         <Text type="body" size="sm" color="secondary">
-          Everything you need to orchestrate Caddy proxies, certificates, and secure edge services.
+          {t("everythingYouNeedTo")}
         </Text>
       </VStack>
 
@@ -134,20 +136,15 @@ export default function OverviewClient({
         ))}
 
         {isAdmin && (
-          <ClickableCard
-            label="Traffic in the last 24 hours"
-            href="/analytics"
-            variant="cyan"
-            padding={5}
-          >
+          <ClickableCard label={t("trafficInTheLast")} href="/analytics" variant="cyan" padding={5}>
             <StatTile
               icon={<Icon icon={BarChart2} />}
               value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "—"}
-              label="Traffic (24h)"
+              label={t("traffic24h")}
             >
               {trafficSummary && trafficSummary.totalRequests > 0 && (
                 <ProgressBar
-                  label="Blocked"
+                  label={t("blocked")}
                   value={Math.min(trafficSummary.blockedPercent, 100)}
                   variant={trafficSummary.blockedPercent > 0 ? "error" : "neutral"}
                   hasValueLabel
@@ -163,14 +160,14 @@ export default function OverviewClient({
           <HStack gap={2} vAlign="center">
             <Icon icon={Activity} size="sm" color="accent" />
             <Heading level={2} accessibilityLevel={2}>
-              Recent Activity
+              {t("recentActivity")}
             </Heading>
           </HStack>
 
           <Card padding={0}>
             {recentEvents.length === 0 ? (
               <Text type="body" size="sm" color="secondary">
-                No activity recorded yet.
+                {t("noActivityRecordedYet")}
               </Text>
             ) : (
               <List hasDividers>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/src/lib/auth";
 import { peekLinkingToken, verifyLinkingToken } from "@/src/lib/services/account-linking";
 import LinkAccountClient from "@/src/components/auth/LinkAccountClient";
+import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 
 interface LinkAccountPageProps {
@@ -10,9 +11,10 @@ interface LinkAccountPageProps {
   }>;
 }
 
-export const metadata: Metadata = {
-  title: "Link Account",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("auth.linkAccount");
+  return { title: t("metaTitle") };
+}
 
 export default async function LinkAccountPage({ searchParams }: LinkAccountPageProps) {
   const session = await auth();

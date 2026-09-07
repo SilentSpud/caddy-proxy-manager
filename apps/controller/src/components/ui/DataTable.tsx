@@ -20,6 +20,7 @@ import { Pagination } from "@astryxdesign/core/Pagination";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { VStack } from "@astryxdesign/core/Stack";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { useTranslations } from "next-intl";
 
 export type Column<T> = {
   id: string;
@@ -149,6 +150,7 @@ export function DataTable<T>({
   mobileCard,
   expandedRow,
 }: DataTableProps<T>) {
+  const t = useTranslations("ui");
   const isEmpty = data.length === 0 && !loading;
   // Replaces the paired `block md:hidden` / `hidden md:block` wrappers, so only one of the two
   // views is ever mounted.
@@ -207,7 +209,7 @@ export function DataTable<T>({
         <IconButton
           variant="ghost"
           size="sm"
-          label="View details"
+          label={t("viewDetails")}
           icon={<ChevronRight />}
           onClick={() => onRowClick(row as T)}
         />

@@ -14,7 +14,8 @@ import {
 } from "@/src/lib/models/issued-client-certificates";
 import { generateKeyPair as generateKeyPairCb, X509Certificate } from "node:crypto";
 import { promisify } from "node:util";
-import { passwordPolicyError } from "@/src/lib/password-policy";
+import { getTranslations } from "next-intl/server";
+import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import forge from "node-forge";
 
 const generateKeyPairAsync = promisify(generateKeyPairCb);
@@ -172,7 +173,12 @@ export async function issueClientCertificateAction(
   // The .p12 leaves this deployment as a file, and forge's PKCS#12 MAC is still SHA-1, so this
   // password is the only thing between whoever holds the bundle and the client private key. Hold
   // it to the same bar as a login password rather than accepting anything non-empty.
-  const exportPasswordError = passwordPolicyError(exportPassword, "Export password");
+  const t = await getTranslations();
+  const exportPasswordError = passwordPolicyMessage(
+    t,
+    exportPassword,
+    t("passwordPolicy.subject.exportPassword"),
+  );
   if (exportPasswordError) throw new Error(exportPasswordError);
 
   const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);

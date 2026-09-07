@@ -9,6 +9,7 @@ import { useState } from "react";
 import { VStack } from "@astryxdesign/core/Stack";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
+import { useTranslations } from "next-intl";
 
 const CADDYFILE_PLACEHOLDER = `# Directives run before this host's reverse proxy.
 # Example: serve a maintenance page for one path.
@@ -25,6 +26,7 @@ export function AdvancedConfigFields({
     "customPreHandlersJson" | "customReverseProxyJson" | "customCaddyfile"
   > | null;
 }) {
+  const t = useTranslations("proxyHosts");
   const [preHandlers, setPreHandlers] = useState(host?.customPreHandlersJson ?? "");
   const [reverseProxy, setReverseProxy] = useState(host?.customReverseProxyJson ?? "");
   const [caddyfile, setCaddyfile] = useState(host?.customCaddyfile ?? "");
@@ -32,34 +34,34 @@ export function AdvancedConfigFields({
   return (
     <VStack gap={5}>
       <CodeEditor
-        label="Custom Caddyfile"
+        label={t("customCaddyfile")}
         htmlName="customCaddyfile"
         language="caddyfile"
         value={caddyfile}
         onChange={setCaddyfile}
         placeholder={CADDYFILE_PLACEHOLDER}
         height="md"
-        description="Caddyfile directives for this host, adapted by Caddy and inserted before the reverse proxy. Rejected on save if Caddy cannot parse them."
+        description={t("caddyfileDirectivesForThis")}
       />
       <CodeEditor
-        label="Custom Pre-Handlers (JSON)"
+        label={t("customPreHandlersJson")}
         htmlName="customPreHandlersJson"
         language="json"
         value={preHandlers}
         onChange={setPreHandlers}
         placeholder='[{"handler": "headers", "response": {"set": {"X-Example": ["1"]}}}]'
         height="sm"
-        description="JSON array of Caddy handlers, run before the reverse proxy."
+        description={t("jsonArrayOfCaddy")}
       />
       <CodeEditor
-        label="Custom Reverse Proxy (JSON)"
+        label={t("customReverseProxyJson")}
         htmlName="customReverseProxyJson"
         language="json"
         value={reverseProxy}
         onChange={setReverseProxy}
         placeholder='{"headers": {"request": {"set": {"X-Example": ["1"]}}}}'
         height="sm"
-        description="Deep-merged into the reverse_proxy handler itself (proxy mode only)."
+        description={t("deepMergedIntoThe")}
       />
     </VStack>
   );

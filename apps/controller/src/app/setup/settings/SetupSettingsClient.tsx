@@ -30,6 +30,7 @@ import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-attrs";
 import { FormCard, InfoAlert, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { saveSetupSettings } from "./actions";
+import { useTranslations } from "next-intl";
 
 export type SettingField = {
   key: string;
@@ -86,6 +87,7 @@ export default function SetupSettingsClient({
   general: GeneralFields;
   oauth: OAuthCard;
 }) {
+  const t = useTranslations("setup");
   const [state, submit] = useActionState(saveSetupSettings, { error: null });
 
   const [primaryDomain, setPrimaryDomain] = useState(general.primaryDomain);
@@ -120,16 +122,12 @@ export default function SetupSettingsClient({
       <VStack gap={5} padding={5}>
         <VStack gap={2}>
           <Heading level={1}>Finish setting up</Heading>
-          <Text color="secondary">
-            These are stored in the database once you save, so they can be changed later without
-            editing a file or restarting.
-          </Text>
+          <Text color="secondary">{t("theseAreStoredIn")}</Text>
         </VStack>
 
         {migratedCount > 0 && (
           <InfoAlert title={`${migratedCount} value(s) came from your .env file`}>
-            They are filled in below and marked. Saving copies them into the database, after which
-            you can remove those entries from your .env.
+            {t("theyAreFilledIn")}
           </InfoAlert>
         )}
 
@@ -137,15 +135,15 @@ export default function SetupSettingsClient({
           <VStack gap={4}>
             {state.error && <StatusAlert message={state.error} success={false} />}
 
-            <FormCard title="Defaults">
+            <FormCard title={t("defaults")}>
               <VStack gap={3}>
                 <TextInput
                   // NATIVE_REQUIRED as well as isRequired, matching the Settings page: isRequired
                   // marks the field, the attribute is what stops an empty one being posted. The
                   // save refuses it either way; the browser refusing first is a better answer.
                   {...NATIVE_REQUIRED}
-                  label="Primary domain"
-                  description="Offered first when you create a proxy host, so the one you use most belongs here."
+                  label={t("primaryDomain")}
+                  description={t("offeredFirstWhenYou")}
                   htmlName="primaryDomain"
                   value={primaryDomain}
                   onChange={setPrimaryDomain}
@@ -153,8 +151,8 @@ export default function SetupSettingsClient({
                   width="100%"
                 />
                 <TextInput
-                  label="ACME contact email"
-                  description="Where Let's Encrypt sends expiry warnings and account notices. Optional, and worth setting: without it nobody is told when a certificate is about to lapse."
+                  label={t("acmeContactEmail")}
+                  description={t("whereLetSEncrypt")}
                   type="email"
                   htmlName="acmeEmail"
                   value={acmeEmail}
@@ -201,7 +199,7 @@ export default function SetupSettingsClient({
 
             <IdentityProviderCard card={oauth} value={idp} onChange={setIdp} />
 
-            <SaveButton label="Save and finish setup" />
+            <SaveButton label={t("saveAndFinishSetup")} />
           </VStack>
         </form>
       </VStack>
@@ -339,6 +337,7 @@ function IdentityProviderCard({
   value: OAuthPrefill;
   onChange: (next: OAuthPrefill) => void;
 }) {
+  const t = useTranslations("setup");
   const set =
     <K extends keyof OAuthPrefill>(key: K) =>
     (next: OAuthPrefill[K]) =>
@@ -346,43 +345,42 @@ function IdentityProviderCard({
 
   if (card.existing.length > 0) {
     return (
-      <FormCard title="Identity provider">
+      <FormCard title={t("identityProvider")}>
         <Banner
           status="info"
           title={`Already configured: ${card.existing.join(", ")}`}
-          description="Add or change providers from Settings once setup is finished."
+          description={t("addOrChangeProviders")}
         />
       </FormCard>
     );
   }
 
   return (
-    <FormCard title="Identity provider (optional)">
+    <FormCard title={t("identityProviderOptional")}>
       <VStack gap={3}>
         <Text size="sm" color="secondary">
-          Sign in through an OIDC provider, as well as or instead of local accounts. Leave these
-          blank to skip — one can be added from Settings at any time.
+          {t("signInThroughAn")}
         </Text>
 
         {card.fromEnvironment && (
           <Banner
             status="info"
-            title="Filled in from your OAUTH_ environment variables"
-            description="Saving stores the provider in the database, after which those variables can be removed."
+            title={t("filledInFromYour")}
+            description={t("savingStoresTheProvider")}
           />
         )}
 
         <TextInput
-          label="Display name"
-          description="Shown on the sign-in button."
+          label={t("displayName")}
+          description={t("shownOnTheSign")}
           htmlName="idpName"
           value={value.providerName}
           onChange={set("providerName")}
           width="100%"
         />
         <TextInput
-          label="Issuer URL"
-          description="The provider's OIDC issuer. Its endpoints are discovered from here."
+          label={t("issuerUrl")}
+          description={t("theProviderSOidc")}
           htmlName="idpIssuer"
           value={value.issuer}
           onChange={set("issuer")}
@@ -390,7 +388,7 @@ function IdentityProviderCard({
         />
         <TextInput
           {...AUTOFILL_OFF}
-          label="Client ID"
+          label={t("clientId")}
           htmlName="idpClientId"
           value={value.clientId}
           onChange={set("clientId")}
@@ -398,7 +396,7 @@ function IdentityProviderCard({
         />
         <TextInput
           {...AUTOFILL_OFF}
-          label="Client secret"
+          label={t("secretLabel")}
           type="password"
           htmlName="idpClientSecret"
           value={value.clientSecret}
@@ -409,41 +407,40 @@ function IdentityProviderCard({
         <Collapsible defaultIsOpen={false} trigger={<Text size="sm">More options</Text>}>
           <VStack gap={3} padding={2}>
             <Text size="xsm" color="secondary">
-              The three endpoints are only needed for a provider that does not publish OIDC
-              discovery; leave them blank otherwise.
+              {t("theThreeEndpointsAre")}
             </Text>
             <TextInput
-              label="Authorization URL"
+              label={t("authorizationUrl")}
               htmlName="idpAuthorizationUrl"
               value={value.authorizationUrl}
               onChange={set("authorizationUrl")}
               width="100%"
             />
             <TextInput
-              label="Token URL"
+              label={t("tokenUrl")}
               htmlName="idpTokenUrl"
               value={value.tokenUrl}
               onChange={set("tokenUrl")}
               width="100%"
             />
             <TextInput
-              label="Userinfo URL"
+              label={t("userinfoUrl")}
               htmlName="idpUserinfoUrl"
               value={value.userinfoUrl}
               onChange={set("userinfoUrl")}
               width="100%"
             />
             <TextInput
-              label="Scopes"
-              description="Space separated. Group claims usually need one more than the default."
+              label={t("scopes")}
+              description={t("spaceSeparatedGroupClaims")}
               htmlName="idpScopes"
               value={value.scopes}
               onChange={set("scopes")}
               width="100%"
             />
             <Switch
-              label="Link to an existing account with the same email"
-              description="Off means a returning user with a matching local account is refused rather than merged."
+              label={t("linkToAnExisting")}
+              description={t("offMeansAReturning")}
               htmlName="idpAutoLink"
               value={value.autoLink}
               onChange={set("autoLink")}
@@ -452,8 +449,8 @@ function IdentityProviderCard({
             <Divider />
 
             <Switch
-              label="Map roles from the provider's groups"
-              description="Off means everyone arrives with the default role below, whatever groups they are in."
+              label={t("mapRolesFromThe")}
+              description={t("offMeansEveryoneArrives")}
               htmlName="idpRoleMapping"
               value={value.roleMappingEnabled}
               onChange={set("roleMappingEnabled")}
@@ -461,44 +458,44 @@ function IdentityProviderCard({
             {value.roleMappingEnabled && (
               <>
                 <TextInput
-                  label="Groups claim"
-                  description="Dot-separated for a nested claim, e.g. resource_access.cpm.roles."
+                  label={t("groupsClaim")}
+                  description={t("dotSeparatedForA")}
                   htmlName="idpGroupsClaim"
                   value={value.groupsClaim}
                   onChange={set("groupsClaim")}
                   width="100%"
                 />
                 <TextInput
-                  label="Group prefix"
-                  description="With CPM_, membership of CPM_Admin grants admin. The three fields below override it."
+                  label={t("groupPrefix")}
+                  description={t("withCpmMembershipOf")}
                   htmlName="idpGroupPrefix"
                   value={value.groupPrefix}
                   onChange={set("groupPrefix")}
                   width="100%"
                 />
                 <TextInput
-                  label="Admin group"
+                  label={t("adminGroup")}
                   htmlName="idpAdminGroup"
                   value={value.adminGroup}
                   onChange={set("adminGroup")}
                   width="100%"
                 />
                 <TextInput
-                  label="User group"
+                  label={t("userGroup")}
                   htmlName="idpUserGroup"
                   value={value.userGroup}
                   onChange={set("userGroup")}
                   width="100%"
                 />
                 <TextInput
-                  label="Viewer group"
+                  label={t("viewerGroup")}
                   htmlName="idpViewerGroup"
                   value={value.viewerGroup}
                   onChange={set("viewerGroup")}
                   width="100%"
                 />
                 <Switch
-                  label="Mirror the remaining prefixed groups into this app's groups"
+                  label={t("mirrorTheRemainingPrefixed")}
                   htmlName="idpSyncGroups"
                   value={value.syncGroups}
                   onChange={set("syncGroups")}
@@ -506,7 +503,7 @@ function IdentityProviderCard({
               </>
             )}
             <Selector
-              label="Role when no group matched"
+              label={t("roleWhenNoGroup")}
               htmlName="idpDefaultRole"
               value={value.defaultRole}
               onChange={(next: string) => set("defaultRole")(next)}

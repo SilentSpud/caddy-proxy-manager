@@ -3,6 +3,7 @@ import db, { nowIso, toIso } from "../db";
 import { apiTokens } from "../db/schema";
 import { and, count, eq } from "drizzle-orm";
 import { NotFoundError } from "../api-auth";
+import { domainError } from "../domain-error";
 
 export type ApiToken = {
   id: number;
@@ -57,10 +58,10 @@ export async function createApiToken(
   if (expiresAt) {
     const parsed = new Date(expiresAt);
     if (Number.isNaN(parsed.getTime())) {
-      throw new Error("expires_at must be a valid ISO 8601 date");
+      throw domainError("expiresAtMustBeA");
     }
     if (parsed <= new Date()) {
-      throw new Error("expires_at must be in the future");
+      throw domainError("expiresAtMustBeIn");
     }
     validatedExpiresAt = parsed.toISOString();
   }
@@ -81,7 +82,7 @@ export async function createApiToken(
     .returning();
 
   if (!row) {
-    throw new Error("Failed to create API token");
+    throw domainError("failedToCreateApiToken");
   }
 
   return { token: toApiToken(row), rawToken };

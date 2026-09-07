@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { domainError } from "./domain-error";
 
 const HOST_LABEL_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
@@ -36,7 +37,7 @@ export function normalizeProxyHostDomains(domains: string[]) {
   );
 
   if (normalizedDomains.length === 0) {
-    throw new Error("At least one domain must be specified");
+    throw domainError("atLeastOneDomainMust");
   }
 
   const invalidDomain = normalizedDomains.find((domain) => !isValidProxyHostDomain(domain));

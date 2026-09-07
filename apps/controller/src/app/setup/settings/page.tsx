@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
@@ -7,21 +8,17 @@ import { getGeneralSettings } from "@/src/lib/settings";
 import { baseUrl, SETTING_DEFINITIONS, SETTING_GROUPS } from "@/src/lib/settings/registry";
 import { gateDefaults } from "@/src/lib/settings/optional-features";
 import { resolveAllSettings } from "@/src/lib/settings/resolve";
+import { settingDescription, settingGroupTitle, settingLabel } from "@/src/lib/settings/messages";
 import { getSetupState, SETUP_PATHS } from "@/src/lib/setup";
 import SetupSettingsClient, { type SettingField } from "./SetupSettingsClient";
 
-export const metadata: Metadata = {
-  title: { absolute: "Finish setting up" },
-};
-
-const GROUP_TITLES: Record<(typeof SETTING_GROUPS)[number], string> = {
-  application: "Application",
-  authentication: "Sign-in and accounts",
-  analytics: "Analytics",
-  geoip: "GeoIP",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("setup.settingsStep");
+  return { title: { absolute: t("metaTitle") } };
+}
 
 export default async function SetupSettingsPage() {
+  const t = await getTranslations();
   const session = await auth();
   const { stage } = await getSetupState(!!session?.user);
   if (stage !== "settings") {
@@ -43,8 +40,8 @@ export default async function SetupSettingsPage() {
       key: definition.key,
       env: definition.env,
       group: definition.group,
-      label: definition.label,
-      description: definition.description,
+      label: settingLabel(t, definition.key),
+      description: settingDescription(t, definition.key),
       kind:
         typeof definition.default === "boolean"
           ? "boolean"
@@ -70,7 +67,7 @@ export default async function SetupSettingsPage() {
   return (
     <SetupSettingsClient
       fields={fields}
-      groups={SETTING_GROUPS.map((group) => ({ id: group, title: GROUP_TITLES[group] }))}
+      groups={SETTING_GROUPS.map((group) => ({ id: group, title: settingGroupTitle(t, group) }))}
       general={{
         primaryDomain:
           general?.primaryDomain ?? domainFromBaseUrl(resolved.get(baseUrl.key)?.value),

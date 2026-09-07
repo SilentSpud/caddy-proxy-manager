@@ -19,6 +19,7 @@ import {
 } from "@/components/ca-certificates/CaCertDialogs";
 import type { CaCertificateView } from "../page";
 import { CaCertDrawer } from "./CaCertDrawer";
+import { useTranslations } from "next-intl";
 
 type Props = {
   caCertificates: CaCertificateView[];
@@ -39,6 +40,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
+  const t = useTranslations("certificates");
   const [issueCaOpen, setIssueCaOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
 
@@ -49,7 +51,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
       <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
         <HStack gap={2} vAlign="center">
           <Text type="label" size="xsm" weight="semibold" color="secondary">
-            Issued Client Certificates
+            {t("issuedClientCertificates")}
           </Text>
           <Badge variant="success" label={`${active.length} active`} />
         </HStack>
@@ -58,7 +60,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
             <Button
               size="sm"
               variant="secondary"
-              label="Issue Cert"
+              label={t("issueCert")}
               onClick={() => setIssueCaOpen(true)}
             />
           )}
@@ -66,7 +68,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
             <Button
               size="sm"
               variant="secondary"
-              label="Manage"
+              label={t("manage")}
               onClick={() => setManageOpen(true)}
             />
           )}
@@ -75,7 +77,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
 
       {active.length === 0 ? (
         <Text type="body" size="sm" color="secondary">
-          No active client certificates for this CA.
+          {t("noActiveClientCertificates")}
         </Text>
       ) : (
         <List hasDividers>
@@ -149,6 +151,7 @@ function activeCount(ca: CaCertificateView) {
 }
 
 export function CaTab({ caCertificates, search, statusFilter }: Props) {
+  const t = useTranslations("certificates");
   const [drawerCert, setDrawerCert] = useState<CaCertificateView | null | false>(false);
   const [deleteCert, setDeleteCert] = useState<CaCertificateView | null>(null);
 
@@ -177,7 +180,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
       width: 140,
       render: (ca) =>
         ca.hasPrivateKey ? (
-          <Badge variant="success" icon={<KeyRound />} label="Stored" />
+          <Badge variant="success" icon={<KeyRound />} label={t("stored")} />
         ) : (
           <Text type="body" size="sm" color="secondary">
             &mdash;
@@ -191,7 +194,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
       render: (ca) =>
         ca.issuedCerts.length === 0 ? (
           <Text type="body" size="sm" color="secondary">
-            None
+            {t("none")}{" "}
           </Text>
         ) : (
           <Badge
@@ -243,7 +246,9 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
             />
           </HStack>
           <HStack gap={2} wrap="wrap" vAlign="center">
-            {ca.hasPrivateKey && <Badge variant="success" icon={<KeyRound />} label="Key stored" />}
+            {ca.hasPrivateKey && (
+              <Badge variant="success" icon={<KeyRound />} label={t("keyStored")} />
+            )}
             {ca.issuedCerts.length > 0 && (
               <Badge
                 variant={activeCount(ca) > 0 ? "info" : "neutral"}
@@ -268,7 +273,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
         <Button
           variant="secondary"
           size="sm"
-          label="Add CA Certificate"
+          label={t("addCaCertificate")}
           icon={<Plus />}
           onClick={() => setDrawerCert(null)}
         />
@@ -287,7 +292,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
           columns={columns}
           data={filtered}
           keyField="id"
-          emptyMessage="No CA certificates match"
+          emptyMessage={t("noCaCertificatesMatch")}
           mobileCard={caMobileCard}
           expandedRow={(ca) => <IssuedCertsPanel ca={ca} />}
         />

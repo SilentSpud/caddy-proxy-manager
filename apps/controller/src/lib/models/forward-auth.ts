@@ -10,6 +10,7 @@ import {
 } from "../db/schema";
 import { and, eq, gt, inArray, lt } from "drizzle-orm";
 import { hostMatchesPattern } from "../host-pattern-priority";
+import { domainError } from "../domain-error";
 
 const DEFAULT_SESSION_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 const EXCHANGE_CODE_TTL = 60; // 60 seconds
@@ -56,7 +57,7 @@ export async function createRedirectIntent(redirectUri: string): Promise<string>
   // match is reduced to the exact origin the browser will visit and the one
   // proxy-host record that authorized it.
   const audience = await resolveForwardAuthAudience(redirectUri);
-  if (!audience) throw new Error("Redirect URI is not a forward-auth target");
+  if (!audience) throw domainError("redirectUriIsNotA");
 
   const rid = randomBytes(16).toString("hex");
   const ridHash = hashToken(rid);
@@ -147,7 +148,7 @@ export async function createForwardAuthSession(
 ): Promise<{ rawToken: string; session: ForwardAuthSession }> {
   const parsedAudience = parseForwardAuthUrl(audience.origin);
   if (!parsedAudience || !audienceMatchesUrl(audience, parsedAudience)) {
-    throw new Error("Invalid forward-auth audience");
+    throw domainError("invalidForwardAuthAudience");
   }
 
   const rawToken = randomBytes(32).toString("hex");
@@ -168,7 +169,7 @@ export async function createForwardAuthSession(
     })
     .returning();
 
-  if (!row) throw new Error("Failed to create forward auth session");
+  if (!row) throw domainError("failedToCreateForwardAuth");
 
   return {
     rawToken,
@@ -232,7 +233,7 @@ export async function createExchangeCode(
 ): Promise<{ rawCode: string }> {
   const parsedRedirect = parseForwardAuthUrl(redirectUri);
   if (!parsedRedirect || !audienceMatchesUrl(audience, parsedRedirect)) {
-    throw new Error("Invalid forward-auth audience");
+    throw domainError("invalidForwardAuthAudience");
   }
 
   const session = await db.query.forwardAuthSessions.findFirst({
@@ -243,7 +244,7 @@ export async function createExchangeCode(
     session.proxyHostId !== audience.proxyHostId ||
     session.audienceOrigin !== audience.origin
   ) {
-    throw new Error("Forward-auth session audience mismatch");
+    throw domainError("forwardAuthSessionAudienceMismatch");
   }
 
   const rawCode = randomBytes(32).toString("hex");

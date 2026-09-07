@@ -13,6 +13,7 @@ import { listMtlsRoles, type MtlsRole } from "@/src/lib/models/mtls-roles";
 import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
 import { countHealthyAcmeHosts } from "./certificate-summary";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 export type { CaCertificate };
 export type { IssuedClientCertificate };
@@ -86,9 +87,10 @@ function getExpiryStatus(validToIso: string): CertExpiryStatus {
   return "ok";
 }
 
-export const metadata: Metadata = {
-  title: "Certificates",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("certificates") };
+}
 
 export default async function CertificatesPage({ searchParams }: PageProps) {
   await requireAdmin();

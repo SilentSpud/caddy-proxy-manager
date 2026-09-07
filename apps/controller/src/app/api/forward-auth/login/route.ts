@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { verifyPassword } from "@/src/lib/password";
 import db from "@/src/lib/db";
 import { config } from "@/src/lib/config";
@@ -14,21 +15,19 @@ import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/r
 
 /** Forward auth login — validates credentials and starts the exchange flow, given a rid. */
 export async function POST(request: NextRequest) {
+  const t = await getTranslations("auth.apiErrors");
   try {
     // CSRF: verify the request originates from the CPM portal
     const origin = request.headers.get("origin");
     const baseOrigin = new URL(config.baseUrl).origin;
     if (!origin || origin !== baseOrigin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: t("forbidden") }, { status: 403 });
     }
 
     // Credential sign-in does not exist in OIDC-only mode; the portal falls
     // back to the provider buttons.
     if (config.auth.disableLocalUsers) {
-      return NextResponse.json(
-        { error: "Password sign-in is disabled. Use single sign-on." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: t("passwordSignInDisabled") }, { status: 403 });
     }
 
     const body = await request.json();
@@ -37,10 +36,10 @@ export async function POST(request: NextRequest) {
     const rid = typeof body.rid === "string" ? body.rid : "";
 
     if (!username || !password) {
-      return NextResponse.json({ error: "Username and password are required" }, { status: 400 });
+      return NextResponse.json({ error: t("credentialsRequired") }, { status: 400 });
     }
     if (!rid) {
-      return NextResponse.json({ error: "Missing redirect intent" }, { status: 400 });
+      return NextResponse.json({ error: t("missingRedirectIntent") }, { status: 400 });
     }
 
     // Rate limiting — prefer x-real-ip (set by reverse proxy) over x-forwarded-for
@@ -50,10 +49,7 @@ export async function POST(request: NextRequest) {
       "unknown";
     const rateLimitResult = await isRateLimited(ip);
     if (rateLimitResult.blocked) {
-      return NextResponse.json(
-        { error: "Too many login attempts. Please try again later." },
-        { status: 429 },
-      );
+      return NextResponse.json({ error: t("tooManyLoginAttempts") }, { status: 429 });
     }
 
     // Authenticate using the same logic as the credentials provider
@@ -70,7 +66,7 @@ export async function POST(request: NextRequest) {
         entityType: "user",
         summary: `Forward auth login failed for username: ${username}`,
       });
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ error: t("invalidCredentials") }, { status: 401 });
     }
 
     const isValid = await verifyPassword(password, user.passwordHash);
@@ -83,7 +79,7 @@ export async function POST(request: NextRequest) {
         entityId: user.id,
         summary: `Forward auth login failed for user ${user.email}`,
       });
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ error: t("invalidCredentials") }, { status: 401 });
     }
 
     // Successful credential check — reset rate limiter for this IP
@@ -93,10 +89,7 @@ export async function POST(request: NextRequest) {
     // This is a one-time operation: the intent is deleted after consumption.
     const intent = await consumeRedirectIntent(rid);
     if (!intent) {
-      return NextResponse.json(
-        { error: "Invalid or expired redirect intent. Please try again." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });
     }
 
     const targetUrl = new URL(intent.redirectUri);
@@ -112,10 +105,7 @@ export async function POST(request: NextRequest) {
         entityType: "proxy_host",
         summary: `Forward auth access denied for user ${user.email} to host ${targetUrl.hostname}`,
       });
-      return NextResponse.json(
-        { error: "You do not have access to this application." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: t("noAccessToApplication") }, { status: 403 });
     }
 
     // Create session and exchange code
@@ -137,6 +127,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ redirectTo: callbackUrl.toString() });
   } catch (error) {
     console.error("Forward auth login error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: t("internalServerError") }, { status: 500 });
   }
 }

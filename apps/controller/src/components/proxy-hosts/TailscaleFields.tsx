@@ -11,6 +11,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
+import { useTranslations } from "next-intl";
 
 export type TailscaleHostDefaults = {
   /** Whether Tailscale is switched on in Settings at all. */
@@ -36,6 +37,7 @@ export function TailscaleFields({
   tailscale?: ProxyHost["tailscale"] | null;
   defaults?: TailscaleHostDefaults | null;
 }) {
+  const t = useTranslations("proxyHosts");
   const initial = tailscale ?? null;
   const [serve, setServe] = useState(initial?.serve ?? false);
   const [node, setNode] = useState(initial?.node ?? "");
@@ -60,15 +62,15 @@ export function TailscaleFields({
         <HStack justify="between" vAlign="center" gap={4}>
           <VStack gap={1}>
             <Text type="body" size="sm" weight="semibold">
-              Tailscale
+              {t("tailscale")}{" "}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              Serve this host on your tailnet instead of, or as well as, the public internet
+              {t("serveThisHostOn")}
             </Text>
           </VStack>
           <ModuleGated feature="tailscale">
             <Switch
-              label="Serve on tailnet"
+              label={t("serveOnTailnet")}
               isLabelHidden
               htmlName="tailscaleServe"
               value={serve}
@@ -83,23 +85,23 @@ export function TailscaleFields({
         {usesTailscale && settingsOff && (
           <Banner
             status="warning"
-            title="Tailscale is switched off in Settings"
-            description="This host will not be served at all until Settings → Tailscale is enabled — it is dropped from the configuration rather than published publicly."
+            title={t("tailscaleIsSwitchedOff")}
+            description={t("thisHostWillNot")}
           />
         )}
 
         {usesTailscale && noAuthKey && (
           <Banner
             status="error"
-            title="No Tailscale auth key is stored"
-            description="Saving will be refused. The node cannot register without a key, and Caddy rejects a configuration whose listener will not come up — that would stop every proxy host from being updated, not just this one. Add a key in Settings → Tailscale first."
+            title={t("noTailscaleAuthKey")}
+            description={t("savingWillBeRefused")}
           />
         )}
 
         {serve && (
           <VStack gap={4}>
             <TextInput
-              label="Node name"
+              label={t("nodeName")}
               isOptional
               htmlName="tailscaleNode"
               value={node}
@@ -109,19 +111,19 @@ export function TailscaleFields({
             />
             <Banner
               status="info"
-              title="Add the node's MagicDNS name to Domains"
+              title={t("addTheNodeS")}
               description={`Routing is still by Host header, so a request to https://${node || placeholderNode}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale — no ACME, no DNS provider.`}
             />
             <CheckboxInput
-              label="Tailnet only"
-              description="Keep this host off the public :80/:443 listener entirely. Uncheck to publish it in both places."
+              label={t("tailnetOnly")}
+              description={t("keepThisHostOff")}
               htmlName="tailscaleTailnetOnly"
               value={tailnetOnly}
               onChange={setTailnetOnly}
             />
             <CheckboxInput
-              label="Require a Tailscale identity"
-              description="Only devices signed in to your tailnet may reach this host, and the caller is identified by their tailnet login. Tagged devices are refused, since they have no user behind them."
+              label={t("requireATailscaleIdentity")}
+              description={t("onlyDevicesSignedIn")}
               htmlName="tailscaleAuth"
               value={auth}
               onChange={setAuth}
@@ -129,28 +131,28 @@ export function TailscaleFields({
             {auth && (
               <VStack gap={4}>
                 <TextArea
-                  label="Protected Paths"
+                  label={t("protectedPaths")}
                   isOptional
                   htmlName="tailscaleProtectedPaths"
                   placeholder="/admin/*"
                   value={protectedPaths}
                   onChange={setProtectedPaths}
                   rows={2}
-                  description="Leave empty to require an identity for the whole host. Comma-separated paths gate only those routes."
+                  description={t("leaveEmptyToRequire")}
                 />
                 <TextArea
-                  label="Excluded Paths"
+                  label={t("excludedPaths")}
                   isOptional
                   htmlName="tailscaleExcludedPaths"
                   placeholder="/healthz, /metrics"
                   value={excludedPaths}
                   onChange={setExcludedPaths}
                   rows={2}
-                  description="Paths that bypass the identity check while everything else stays gated. Ignored if Protected Paths is set."
+                  description={t("pathsThatBypassThe")}
                 />
                 <CheckboxInput
-                  label="Forward the identity upstream"
-                  description="Sets X-Tailscale-User, -Login, -Name, -Tailnet and -Profile-Picture on the proxied request. Any such header sent by the client is stripped first."
+                  label={t("forwardTheIdentityUpstream")}
+                  description={t("setsXTailscaleUser")}
                   htmlName="tailscaleForwardIdentity"
                   value={forwardIdentity}
                   onChange={setForwardIdentity}
@@ -162,14 +164,14 @@ export function TailscaleFields({
 
         <ModuleGated feature="tailscale">
           <TextInput
-            label="Reach upstreams over the tailnet"
+            label={t("reachUpstreamsOverThe")}
             isOptional
             htmlName="tailscaleUpstreamNode"
             value={upstreamNode}
             onChange={setUpstreamNode}
             placeholder={placeholderNode}
             isDisabled={Boolean(moduleDisabledReason)}
-            description="Node to dial the upstreams through, for a backend that only exists on your tailnet. Upstream IP pinning and custom DNS resolvers do not apply — names are resolved by MagicDNS on the far side."
+            description={t("nodeToDialThe")}
           />
         </ModuleGated>
 

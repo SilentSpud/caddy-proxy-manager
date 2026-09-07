@@ -15,6 +15,7 @@ import {
   updateCaCertificateAction,
 } from "../ca-actions";
 import type { CaCertificateView } from "../page";
+import { useTranslations } from "next-intl";
 
 type Props = {
   open: boolean;
@@ -28,6 +29,7 @@ const GENERATE_FORM = "ca-cert-generate-form";
 const IMPORT_FORM = "ca-cert-import-form";
 
 export function CaCertDrawer({ open, cert, onClose }: Props) {
+  const t = useTranslations("certificates");
   const isEdit = cert !== null;
   const [tab, setTab] = useState<"generate" | "import">("generate");
   const [isPending, startTransition] = useTransition();
@@ -102,7 +104,12 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
       maxWidth="md"
       actions={
         <>
-          <Button variant="secondary" label="Cancel" onClick={handleClose} isDisabled={isPending} />
+          <Button
+            variant="secondary"
+            label={t("cancel")}
+            onClick={handleClose}
+            isDisabled={isPending}
+          />
           {/* Wired by id because the footer lives outside the <form>. Which
               form it targets follows the selected tab. */}
           <Button
@@ -120,7 +127,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
           <VStack gap={4}>
             <TextInput
               {...NATIVE_REQUIRED}
-              label="Name"
+              label={t("name")}
               htmlName="name"
               value={editName}
               onChange={setEditName}
@@ -129,13 +136,13 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
             />
             <TextArea
               {...NATIVE_REQUIRED}
-              label="Certificate PEM"
+              label={t("certificatePem")}
               htmlName="certificate_pem"
               value={editPem}
               onChange={setEditPem}
               isRequired
               rows={8}
-              description="PEM-encoded X.509 CA certificate"
+              description={t("pemEncodedX509")}
             />
           </VStack>
         </form>
@@ -147,8 +154,8 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
             layout="fill"
             hasDivider
           >
-            <Tab value="generate" label="Generate" />
-            <Tab value="import" label="Import PEM" />
+            <Tab value="generate" label={t("generate")} />
+            <Tab value="import" label={t("importPem")} />
           </TabList>
 
           {tab === "generate" && (
@@ -156,25 +163,25 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
               <VStack gap={4}>
                 <TextInput
                   {...NATIVE_REQUIRED}
-                  label="Name"
+                  label={t("name")}
                   htmlName="name"
                   value={genName}
                   onChange={setGenName}
                   isRequired
                   hasAutoFocus
-                  placeholder="My Client CA"
-                  description="Display name in this UI"
+                  placeholder={t("myClientCa")}
+                  description={t("displayNameInThis")}
                 />
                 <TextInput
-                  label="Common Name (CN)"
+                  label={t("commonNameCn")}
                   htmlName="common_name"
                   value={genCommonName}
                   onChange={setGenCommonName}
-                  placeholder="My Client CA"
-                  description="CN field in the certificate. Defaults to the name above if left blank."
+                  placeholder={t("myClientCa")}
+                  description={t("cnFieldInThe")}
                 />
                 <NumberInput
-                  label="Validity"
+                  label={t("validity")}
                   htmlName="validity_days"
                   value={genValidity}
                   onChange={setGenValidity}
@@ -192,24 +199,24 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
               <VStack gap={4}>
                 <TextInput
                   {...NATIVE_REQUIRED}
-                  label="Name"
+                  label={t("name")}
                   htmlName="name"
                   value={impName}
                   onChange={setImpName}
                   isRequired
                   hasAutoFocus
-                  placeholder="My Client CA"
+                  placeholder={t("myClientCa")}
                 />
                 <TextArea
                   {...NATIVE_REQUIRED}
-                  label="Certificate PEM"
+                  label={t("certificatePem")}
                   htmlName="certificate_pem"
                   value={impPem}
                   onChange={setImpPem}
                   isRequired
                   rows={8}
                   placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-                  description="PEM-encoded X.509 CA certificate (no private key needed)"
+                  description={t("pemEncodedX5092")}
                 />
               </VStack>
             </form>

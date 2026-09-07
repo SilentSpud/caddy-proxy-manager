@@ -33,7 +33,8 @@ import { formatDistanceToNow } from "date-fns";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
-import { PASSWORD_POLICY_HINT, passwordPolicyError } from "@/src/lib/password-policy";
+import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
+import { useTranslations } from "next-intl";
 
 interface ActiveSession {
   id: number;
@@ -141,6 +142,9 @@ export default function ProfileClient({
   localPasswordsEnabled = true,
   avatar,
 }: ProfileClientProps) {
+  const t = useTranslations("profile");
+  // Unscoped as well, for the password rule — it is shared with every other password field.
+  const tRoot = useTranslations();
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -180,7 +184,11 @@ export default function ProfileClient({
       return;
     }
 
-    const policyError = passwordPolicyError(newPassword);
+    const policyError = passwordPolicyMessage(
+      tRoot,
+      newPassword,
+      tRoot("passwordPolicy.subject.password"),
+    );
     if (policyError) {
       setError(policyError);
       return;
@@ -402,7 +410,7 @@ export default function ProfileClient({
       {error && (
         <Banner
           status="error"
-          title="Something went wrong"
+          title={t("somethingWentWrong")}
           description={error}
           isDismissable
           onDismiss={() => setError(null)}
@@ -414,11 +422,11 @@ export default function ProfileClient({
       )}
 
       <VStack gap={4}>
-        <ProfileSection icon={User} title="Account Information">
+        <ProfileSection icon={User} title={t("accountInformation")}>
           <VStack gap={4}>
             <VStack gap={2}>
               <Text type="body" size="sm" color="secondary">
-                Profile Picture
+                {t("profilePicture")}
               </Text>
               <HStack gap={4} vAlign="center">
                 <UserAvatar
@@ -432,19 +440,19 @@ export default function ProfileClient({
                   {/* FileInput replaces a <label>-wrapped hidden file input,
                       and brings its own keyboard-reachable trigger. */}
                   <FileInput
-                    label="Upload profile picture"
+                    label={t("uploadProfilePicture")}
                     isLabelHidden
                     accept="image/*"
                     value={null}
                     onChange={handleAvatarUpload}
                     isDisabled={loading}
-                    description="Recommended: square image, max 2MB"
+                    description={t("recommendedSquareImageMax")}
                   />
                   {avatarUrl && (
                     <IconButton
                       variant="ghost"
-                      label="Remove profile picture"
-                      tooltip="Remove picture"
+                      label={t("removeProfilePicture")}
+                      tooltip={t("removePicture")}
                       icon={<Trash2 />}
                       isDisabled={loading}
                       onClick={handleAvatarDelete}
@@ -457,20 +465,20 @@ export default function ProfileClient({
             <Divider />
 
             <MetadataList>
-              <MetadataListItem label="Email">{user.email}</MetadataListItem>
-              <MetadataListItem label="Name">{user.name || "Not set"}</MetadataListItem>
-              <MetadataListItem label="Role">
+              <MetadataListItem label={t("email")}>{user.email}</MetadataListItem>
+              <MetadataListItem label={t("name")}>{user.name || "Not set"}</MetadataListItem>
+              <MetadataListItem label={t("role")}>
                 <Badge label={user.role} />
               </MetadataListItem>
-              <MetadataListItem label="Authentication Method">
+              <MetadataListItem label={t("authenticationMethod")}>
                 <Badge
                   variant={user.provider === "credentials" ? "neutral" : "info"}
                   label={getProviderName(user.provider ?? "")}
                 />
               </MetadataListItem>
               {hasPassword && (
-                <MetadataListItem label="Password">
-                  <Badge variant="success" label="Password is set" />
+                <MetadataListItem label={t("password")}>
+                  <Badge variant="success" label={t("passwordIsSet")} />
                 </MetadataListItem>
               )}
             </MetadataList>
@@ -478,16 +486,16 @@ export default function ProfileClient({
         </ProfileSection>
 
         {localPasswordsEnabled && (
-          <ProfileSection icon={Lock} title="Password Management">
+          <ProfileSection icon={Lock} title={t("passwordManagement")}>
             {hasPassword ? (
               <VStack gap={2}>
                 <Text type="body" size="sm" color="secondary">
-                  Change your password to maintain account security
+                  {t("changeYourPasswordTo")}
                 </Text>
                 <HStack>
                   <Button
                     variant="secondary"
-                    label="Change Password"
+                    label={t("changePassword")}
                     onClick={() => setPasswordDialogOpen(true)}
                   />
                 </HStack>
@@ -496,11 +504,11 @@ export default function ProfileClient({
               <VStack gap={3}>
                 <Banner
                   status="warning"
-                  title="You are using OAuth-only authentication"
-                  description="Setting a password will allow you to sign in with either OAuth or credentials."
+                  title={t("youAreUsingOauth")}
+                  description={t("settingAPasswordWill")}
                 />
                 <HStack>
-                  <Button label="Set Password" onClick={() => setPasswordDialogOpen(true)} />
+                  <Button label={t("setPassword")} onClick={() => setPasswordDialogOpen(true)} />
                 </HStack>
               </VStack>
             )}
@@ -509,7 +517,7 @@ export default function ProfileClient({
 
         <ProfileSection
           icon={Monitor}
-          title="Active Sessions"
+          title={t("activeSessions")}
           action={
             sessions.some((s) => !s.current) ? (
               <form action={revokeOtherSessionsAction}>
@@ -518,7 +526,7 @@ export default function ProfileClient({
                   variant="destructive"
                   size="sm"
                   icon={<LogOut />}
-                  label="Sign out all other sessions"
+                  label={t("signOutAllOther")}
                 />
               </form>
             ) : undefined
@@ -526,7 +534,7 @@ export default function ProfileClient({
         >
           <VStack gap={4}>
             <Text type="body" size="sm" color="secondary">
-              Devices currently signed in to your account. Revoke any you don&apos;t recognise.
+              {t("devicesCurrentlySignedIn")}
             </Text>
 
             <List hasDividers>
@@ -552,7 +560,7 @@ export default function ProfileClient({
                   }
                   endContent={
                     s.current ? (
-                      <Badge variant="success" label="This device" />
+                      <Badge variant="success" label={t("thisDevice")} />
                     ) : (
                       <form action={revokeSessionAction.bind(null, s.id)}>
                         <IconButton
@@ -560,7 +568,7 @@ export default function ProfileClient({
                           variant="ghost"
                           size="sm"
                           label={`Revoke session on ${describeDevice(s.userAgent)}`}
-                          tooltip="Revoke session"
+                          tooltip={t("revokeSession")}
                           icon={<Trash2 />}
                         />
                       </form>
@@ -573,7 +581,7 @@ export default function ProfileClient({
         </ProfileSection>
 
         {enabledProviders.length > 0 && (
-          <ProfileSection icon={Link} title="OAuth Connections">
+          <ProfileSection icon={Link} title={t("oauthConnections")}>
             {hasOAuth ? (
               <VStack gap={2}>
                 <Text type="body" size="sm" color="secondary">
@@ -585,30 +593,30 @@ export default function ProfileClient({
                 {!localPasswordsEnabled ? (
                   <Banner
                     status="info"
-                    title="This connection cannot be unlinked"
-                    description="Single sign-on is the only authentication method on this instance."
+                    title={t("thisConnectionCannotBe")}
+                    description={t("singleSignOnIs")}
                   />
                 ) : hasPassword ? (
                   <HStack>
                     <Button
                       variant="secondary"
                       icon={<Unlink />}
-                      label="Unlink OAuth Account"
+                      label={t("unlinkOauthAccount")}
                       onClick={() => setUnlinkDialogOpen(true)}
                     />
                   </HStack>
                 ) : (
                   <Banner
                     status="info"
-                    title="Set a password first"
-                    description="To unlink OAuth, you must first set a password as a fallback authentication method."
+                    title={t("setAPasswordFirst")}
+                    description={t("toUnlinkOauthYou")}
                   />
                 )}
               </VStack>
             ) : (
               <VStack gap={3}>
                 <Text type="body" size="sm" color="secondary">
-                  Link an OAuth provider to enable single sign-on
+                  {t("linkAnOauthProvider")}
                 </Text>
                 <VStack gap={2}>
                   {enabledProviders.map((provider) => (
@@ -627,17 +635,16 @@ export default function ProfileClient({
           </ProfileSection>
         )}
 
-        <ProfileSection icon={Key} title="API Tokens">
+        <ProfileSection icon={Key} title={t("apiTokens")}>
           <VStack gap={4}>
             <Text type="body" size="sm" color="secondary">
-              Create tokens for programmatic access to the API using the header Authorization:
-              Bearer &lt;token&gt;
+              {t("createTokensForProgrammatic")}
             </Text>
 
             {newToken && (
               <VStack gap={2}>
                 <Text type="body" size="sm" weight="semibold">
-                  Copy this token now &mdash; it will not be shown again.
+                  {t("copyThisTokenNow")}
                 </Text>
                 {/* CodeBlock owns the copy button, replacing the hand-built one
                     and its two-second "Copied" flag. */}
@@ -671,14 +678,14 @@ export default function ProfileClient({
                       }
                       endContent={
                         <HStack gap={2} vAlign="center">
-                          {expired && <Badge variant="error" label="Expired" />}
+                          {expired && <Badge variant="error" label={t("expired")} />}
                           <form action={deleteApiTokenAction.bind(null, token.id)}>
                             <IconButton
                               type="submit"
                               variant="ghost"
                               size="sm"
                               label={`Delete token ${token.name}`}
-                              tooltip="Delete token"
+                              tooltip={t("deleteToken")}
                               icon={<Trash2 />}
                             />
                           </form>
@@ -693,8 +700,8 @@ export default function ProfileClient({
             {apiTokens.length === 0 && !newToken && (
               <EmptyState
                 icon={<Key />}
-                title="No API tokens yet"
-                description="Create one below."
+                title={t("noApiTokensYet")}
+                description={t("createOneBelow")}
                 isCompact
               />
             )}
@@ -703,17 +710,17 @@ export default function ProfileClient({
               <VStack gap={3}>
                 <Grid columns={{ minWidth: 220, max: 2 }} gap={3}>
                   <TextInput
-                    label="Name"
+                    label={t("name")}
                     isRequired
                     size="sm"
                     htmlName="name"
                     value={tokenName}
                     onChange={setTokenName}
-                    placeholder="e.g. CI/CD Pipeline"
+                    placeholder={t("eGCiCd")}
                   />
                   <VStack gap={0}>
                     <DateTimeInput
-                      label="Expires at"
+                      label={t("expiresAt")}
                       isOptional
                       size="sm"
                       value={tokenExpiresAt}
@@ -725,7 +732,7 @@ export default function ProfileClient({
                   </VStack>
                 </Grid>
                 <HStack justify="end">
-                  <Button type="submit" size="sm" icon={<Plus />} label="Create Token" />
+                  <Button type="submit" size="sm" icon={<Plus />} label={t("createToken")} />
                 </HStack>
               </VStack>
             </form>
@@ -746,7 +753,7 @@ export default function ProfileClient({
           {hasPassword && (
             <TextInput
               {...AUTOFILL_CURRENT_PASSWORD}
-              label="Current Password"
+              label={t("currentPassword")}
               type="password"
               value={currentPassword}
               onChange={setCurrentPassword}
@@ -754,15 +761,15 @@ export default function ProfileClient({
           )}
           <TextInput
             {...AUTOFILL_NEW_PASSWORD}
-            label="New Password"
+            label={t("newPassword")}
             type="password"
             value={newPassword}
             onChange={setNewPassword}
-            description={PASSWORD_POLICY_HINT}
+            description={passwordPolicyHint(tRoot)}
           />
           <TextInput
             {...AUTOFILL_NEW_PASSWORD}
-            label="Confirm New Password"
+            label={t("confirmNewPassword")}
             type="password"
             value={confirmPassword}
             onChange={setConfirmPassword}
@@ -773,9 +780,9 @@ export default function ProfileClient({
       <AppDialog
         open={unlinkDialogOpen}
         onClose={() => setUnlinkDialogOpen(false)}
-        title="Unlink OAuth Account"
+        title={t("unlinkOauthAccount")}
         maxWidth="sm"
-        submitLabel="Unlink OAuth"
+        submitLabel={t("unlinkOauth")}
         onSubmit={handleUnlinkOAuth}
         isSubmitting={loading}
       >

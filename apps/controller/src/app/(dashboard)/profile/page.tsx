@@ -9,10 +9,12 @@ import { isGravatarEnabled } from "@/src/lib/settings";
 import ProfileClient from "./ProfileClient";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Profile",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("profile") };
+}
 
 export default async function ProfilePage() {
   const session = await requireUser();

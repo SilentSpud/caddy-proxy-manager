@@ -17,6 +17,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AUTOFILL_NEW_PASSWORD } from "@/components/ui/native-input-attrs";
+import { useTranslations } from "next-intl";
 import {
   oauthCallbackUrl,
   oidcBackchannelLogoutUrl,
@@ -96,6 +97,7 @@ export default function OAuthProvidersSection({
   baseUrl,
   localUsersDisabled = false,
 }: OAuthProvidersSectionProps) {
+  const t = useTranslations("settings");
   const [providers, setProviders] = useState(initialProviders);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<OAuthProviderView | null>(null);
@@ -267,7 +269,7 @@ export default function OAuthProvidersSection({
       {localUsersDisabled && (
         <Banner
           status={anyEnabled ? "info" : "error"}
-          title="Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true)"
+          title={t("localUserManagementIs")}
           description={
             anyEnabled
               ? "All accounts are provisioned by the providers below."
@@ -279,8 +281,8 @@ export default function OAuthProvidersSection({
       {providers.length === 0 && (
         <Banner
           status="info"
-          title="No OAuth providers configured"
-          description="Add a provider to enable single sign-on."
+          title={t("noOauthProvidersConfigured")}
+          description={t("addAProviderTo")}
         />
       )}
 
@@ -299,13 +301,13 @@ export default function OAuthProvidersSection({
                     variant={isFromEnv ? "info" : "neutral"}
                     label={isFromEnv ? "ENV" : "UI"}
                   />
-                  {provider.roleMappingEnabled && <Badge label="Group roles" />}
-                  {provider.syncGroups && <Badge label="Group sync" />}
-                  {!provider.enabled && <Badge variant="warning" label="Disabled" />}
+                  {provider.roleMappingEnabled && <Badge label={t("groupRoles")} />}
+                  {provider.syncGroups && <Badge label={t("groupSync")} />}
+                  {!provider.enabled && <Badge variant="warning" label={t("disabled")} />}
                 </HStack>
                 <HStack gap={2} vAlign="center">
                   <Switch
-                    label="Enabled"
+                    label={t("enabled")}
                     value={provider.enabled}
                     onChange={() => handleToggleEnabled(provider)}
                   />
@@ -344,7 +346,7 @@ export default function OAuthProvidersSection({
       })}
 
       <HStack justify="end">
-        <Button size="sm" icon={<Plus />} label="Add Provider" onClick={openAddDialog} />
+        <Button size="sm" icon={<Plus />} label={t("addProvider")} onClick={openAddDialog} />
       </HStack>
 
       {/* The inline Confirm/Cancel pair became a real dialog, so a destructive
@@ -352,13 +354,13 @@ export default function OAuthProvidersSection({
       <AlertDialog
         isOpen={deleteConfirm !== null}
         onOpenChange={(open) => !open && setDeleteConfirm(null)}
-        title="Delete OAuth provider"
+        title={t("deleteOauthProvider")}
         description={
           deleteConfirm === null
             ? ""
             : `Delete "${deleteConfirm.name}"? Users who sign in through it will lose access.`
         }
-        actionLabel="Delete provider"
+        actionLabel={t("deleteProvider")}
         onAction={() => deleteConfirm && handleDelete(deleteConfirm.id)}
       />
 
@@ -379,19 +381,19 @@ export default function OAuthProvidersSection({
               : "Configure a new OAuth or OIDC provider for single sign-on."}
           </Text>
 
-          {error && <Banner status="error" title="Could not save provider" description={error} />}
+          {error && <Banner status="error" title={t("couldNotSaveProvider")} description={error} />}
 
           <TextInput
-            label="Name"
+            label={t("name")}
             isRequired
             size="sm"
             value={form.name}
             onChange={(v) => updateField("name", v)}
-            placeholder="e.g. Google, Keycloak"
+            placeholder={t("eGGoogleKeycloak")}
           />
 
           <Selector
-            label="Type"
+            label={t("type")}
             size="sm"
             options={TYPE_OPTIONS}
             value={form.type}
@@ -399,7 +401,7 @@ export default function OAuthProvidersSection({
           />
 
           <TextInput
-            label="Client ID"
+            label={t("clientId")}
             isRequired
             size="sm"
             value={form.clientId}
@@ -410,17 +412,17 @@ export default function OAuthProvidersSection({
             <HStack justify="between" vAlign="center" gap={3}>
               <VStack gap={1}>
                 <Text type="label" size="xsm">
-                  Client Secret
+                  {t("secretLabel")}
                 </Text>
                 <Text type="body" size="xsm" color="secondary">
-                  A secret is configured. Its existing value cannot be viewed.
+                  {t("aSecretIsConfigured")}
                 </Text>
               </VStack>
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
-                label="Rotate Secret"
+                label={t("rotateSecret")}
                 onClick={() => setRotateClientSecret(true)}
               />
             </HStack>
@@ -443,7 +445,7 @@ export default function OAuthProvidersSection({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    label="Keep Existing"
+                    label={t("keepExisting")}
                     onClick={() => {
                       setRotateClientSecret(false);
                       updateField("clientSecret", "");
@@ -455,65 +457,65 @@ export default function OAuthProvidersSection({
           )}
 
           <TextInput
-            label="Issuer URL"
+            label={t("issuerUrl")}
             isOptional
             size="sm"
             value={form.issuer}
             onChange={(v) => updateField("issuer", v)}
             placeholder="https://accounts.google.com"
-            description="For OIDC providers, the issuer URL enables automatic discovery of endpoints."
+            description={t("forOidcProvidersThe")}
           />
 
           <TextInput
-            label="Authorization URL"
+            label={t("authorizationUrl")}
             isOptional
             size="sm"
             value={form.authorizationUrl}
             onChange={(v) => updateField("authorizationUrl", v)}
-            placeholder="Override discovered endpoint"
+            placeholder={t("overrideDiscoveredEndpoint")}
           />
 
           <TextInput
-            label="Token URL"
+            label={t("tokenUrl")}
             isOptional
             size="sm"
             value={form.tokenUrl}
             onChange={(v) => updateField("tokenUrl", v)}
-            placeholder="Override discovered endpoint"
+            placeholder={t("overrideDiscoveredEndpoint")}
           />
 
           <TextInput
-            label="Userinfo URL"
+            label={t("userinfoUrl")}
             isOptional
             size="sm"
             value={form.userinfoUrl}
             onChange={(v) => updateField("userinfoUrl", v)}
-            placeholder="Override discovered endpoint"
+            placeholder={t("overrideDiscoveredEndpoint")}
           />
 
           <TextInput
-            label="Scopes"
+            label={t("scopes")}
             size="sm"
             value={form.scopes}
             onChange={(v) => updateField("scopes", v)}
-            placeholder="openid email profile"
+            placeholder={t("openidEmailProfile")}
           />
 
           <Switch
-            label="Auto-link accounts"
+            label={t("autoLinkAccounts")}
             value={form.autoLink}
             onChange={(v) => updateField("autoLink", v)}
-            description="Automatically link OAuth accounts to existing users with the same email address."
+            description={t("automaticallyLinkOauthAccounts")}
           />
 
           <Card variant="muted" padding={3}>
             <VStack gap={3}>
               <VStack gap={0}>
                 <Text type="body" size="sm" weight="semibold">
-                  Group mapping
+                  {t("groupMapping")}
                 </Text>
                 <Text type="body" size="xsm" color="secondary">
-                  Derive CPM roles and groups from the identity provider&apos;s group claim.
+                  {t("deriveCpmRolesAnd")}
                 </Text>
               </VStack>
 
@@ -522,36 +524,36 @@ export default function OAuthProvidersSection({
                   a plain string, so the monospace styling is traded for keeping
                   that association. */}
               <TextInput
-                label="Groups claim"
+                label={t("groupsClaim")}
                 size="sm"
                 value={form.groupsClaim}
                 onChange={(v) => updateField("groupsClaim", v)}
                 placeholder="groups"
-                description="Claim holding the user's groups. Use dots for nested claims, e.g. resource_access.cpm.roles. Remember to request a matching scope above."
+                description={t("claimHoldingTheUser")}
               />
 
               <TextInput
-                label="Group prefix"
+                label={t("groupPrefix")}
                 isOptional
                 size="sm"
                 value={form.groupPrefix}
                 onChange={(v) => updateField("groupPrefix", v)}
                 placeholder="CPM_"
-                description="Shorthand for naming the role groups: with prefix CPM_, members of CPM_Admin become admins, CPM_User users and CPM_Viewer viewers. Name the groups below instead if they do not share a prefix."
+                description={t("shorthandForNamingThe")}
               />
 
               <Switch
-                label="Assign roles from groups"
+                label={t("assignRolesFromGroups")}
                 value={form.roleMappingEnabled}
                 onChange={(v) => updateField("roleMappingEnabled", v)}
-                description="The provider becomes authoritative: a user who loses the admin group is demoted on their next sign-in. The last remaining admin is never demoted."
+                description={t("theProviderBecomesAuthoritative")}
               />
 
               {form.roleMappingEnabled && (
                 <>
                   <Grid columns={{ minWidth: 160, max: 3 }} gap={2}>
                     <TextInput
-                      label="Admin groups"
+                      label={t("adminGroups")}
                       size="sm"
                       value={form.adminGroup}
                       onChange={(v) => updateField("adminGroup", v)}
@@ -560,14 +562,14 @@ export default function OAuthProvidersSection({
                       }
                     />
                     <TextInput
-                      label="User groups"
+                      label={t("userGroups")}
                       size="sm"
                       value={form.userGroup}
                       onChange={(v) => updateField("userGroup", v)}
                       placeholder={form.groupPrefix ? `${form.groupPrefix}User` : "staff"}
                     />
                     <TextInput
-                      label="Viewer groups"
+                      label={t("viewerGroups")}
                       size="sm"
                       value={form.viewerGroup}
                       onChange={(v) => updateField("viewerGroup", v)}
@@ -575,14 +577,11 @@ export default function OAuthProvidersSection({
                     />
                   </Grid>
                   <Text type="body" size="xsm" color="secondary">
-                    Name the groups exactly as your provider reports them. Separate several with
-                    commas &mdash; platform-owners, sre-oncall &mdash; and any one of them grants
-                    the role. A role left blank falls back to the prefix above, so the two styles
-                    can be mixed. The most privileged match wins.
+                    {t("nameTheGroupsExactly")}
                   </Text>
 
                   <Selector
-                    label="Role when no group matches"
+                    label={t("roleWhenNoGroup")}
                     size="sm"
                     options={ROLE_OPTIONS}
                     value={form.defaultRole}
@@ -592,10 +591,10 @@ export default function OAuthProvidersSection({
               )}
 
               <Switch
-                label="Mirror groups into CPM groups"
+                label={t("mirrorGroupsIntoCpm")}
                 value={form.syncGroups}
                 onChange={(v) => updateField("syncGroups", v)}
-                description="Creates CPM groups from the remaining prefixed claims (with the prefix stripped) for forward-auth access control. Groups you created yourself are never modified."
+                description={t("createsCpmGroupsFrom")}
               />
             </VStack>
           </Card>
@@ -603,7 +602,7 @@ export default function OAuthProvidersSection({
           {editingProvider && (
             <VStack gap={1}>
               <Text type="label" size="xsm" color="secondary">
-                Callback URL
+                {t("callbackUrl")}
               </Text>
               <CodeBlock code={callbackUrl(editingProvider.id)} width="100%" />
             </VStack>
@@ -613,12 +612,11 @@ export default function OAuthProvidersSection({
               callback URL, which is the other value being copied into the IdP's own form. */}
           <VStack gap={1}>
             <Text type="label" size="xsm" color="secondary">
-              Back-channel logout URL
+              {t("backChannelLogoutUrl")}
             </Text>
             <CodeBlock code={backchannelLogoutUrl} width="100%" />
             <Text type="body" size="xsm" color="secondary">
-              Optional. Set this as the provider&apos;s back-channel logout URL and CPM will end a
-              user&apos;s sessions when the identity provider ends theirs.
+              {t("optionalSetThisAs")}
             </Text>
           </VStack>
         </VStack>

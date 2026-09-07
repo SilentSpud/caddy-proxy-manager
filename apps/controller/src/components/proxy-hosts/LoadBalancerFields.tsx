@@ -10,6 +10,7 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { useTranslations } from "next-intl";
 
 const LOAD_BALANCING_POLICIES = [
   { value: "random", label: "Random", description: "Random selection (default)" },
@@ -53,6 +54,7 @@ export function LoadBalancerFields({
 }: {
   loadBalancer?: ProxyHost["loadBalancer"] | null;
 }) {
+  const t = useTranslations("proxyHosts");
   const initial = loadBalancer ?? null;
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [policy, setPolicy] = useState<LoadBalancingPolicy>(initial?.policy ?? "random");
@@ -99,14 +101,14 @@ export function LoadBalancerFields({
         <HStack justify="between" vAlign="center" gap={4}>
           <VStack gap={1}>
             <Text type="body" size="sm" weight="semibold">
-              Load Balancer
+              {t("loadBalancer")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              Configure load balancing and health checks for multiple upstreams
+              {t("configureLoadBalancingAnd")}
             </Text>
           </VStack>
           <Switch
-            label="Enable load balancing"
+            label={t("enableLoadBalancing")}
             isLabelHidden
             htmlName="lbEnabled"
             value={enabled}
@@ -118,7 +120,7 @@ export function LoadBalancerFields({
           <VStack gap={6}>
             <input type="hidden" name="lbPolicy" value={policy} />
             <Selector
-              label="Selection Policy"
+              label={t("selectionPolicy")}
               options={LOAD_BALANCING_POLICIES}
               value={policy}
               onChange={(next) => setPolicy(next as LoadBalancingPolicy)}
@@ -126,66 +128,66 @@ export function LoadBalancerFields({
 
             {policy === "header" && (
               <TextInput
-                label="Header Field Name"
+                label={t("headerFieldName")}
                 htmlName="lbPolicyHeaderField"
-                placeholder="X-Custom-Header"
+                placeholder={t("xCustomHeader")}
                 value={text.policyHeaderField}
                 onChange={setTextField("policyHeaderField")}
-                description="The request header to hash for upstream selection"
+                description={t("theRequestHeaderTo")}
               />
             )}
 
             {policy === "cookie" && (
               <VStack gap={4}>
                 <TextInput
-                  label="Cookie Name"
+                  label={t("cookieName")}
                   htmlName="lbPolicyCookieName"
                   placeholder="server_id"
                   value={text.policyCookieName}
                   onChange={setTextField("policyCookieName")}
-                  description="Name of the cookie for sticky sessions"
+                  description={t("nameOfTheCookie")}
                 />
                 <TextInput
-                  label="Cookie Secret"
+                  label={t("cookieSecret")}
                   isOptional
                   htmlName="lbPolicyCookieSecret"
                   placeholder="your-secret-key"
                   value={text.policyCookieSecret}
                   onChange={setTextField("policyCookieSecret")}
-                  description="Secret key for HMAC cookie signing"
+                  description={t("secretKeyForHmac")}
                 />
               </VStack>
             )}
 
             <VStack gap={2}>
               <Text type="body" size="sm" weight="semibold">
-                Retry Settings
+                {t("retrySettings")}
               </Text>
               <Grid columns={3} gap={4}>
                 <TextInput
-                  label="Try Duration"
+                  label={t("tryDuration")}
                   htmlName="lbTryDuration"
                   placeholder="5s"
                   value={text.tryDuration}
                   onChange={setTextField("tryDuration")}
-                  description="How long to try upstreams"
+                  description={t("howLongToTry")}
                 />
                 <TextInput
-                  label="Try Interval"
+                  label={t("tryInterval")}
                   htmlName="lbTryInterval"
                   placeholder="250ms"
                   value={text.tryInterval}
                   onChange={setTextField("tryInterval")}
-                  description="Wait between attempts"
+                  description={t("waitBetweenAttempts")}
                 />
                 <NumberInput
-                  label="Max Retries"
+                  label={t("maxRetries")}
                   htmlName="lbRetries"
                   min={0}
                   isIntegerOnly
                   value={numbers.retries}
                   onChange={setNumberField("retries")}
-                  description="Maximum retry attempts"
+                  description={t("maximumRetryAttempts")}
                 />
               </Grid>
             </VStack>
@@ -194,8 +196,8 @@ export function LoadBalancerFields({
               <input type="hidden" name="lbActiveHealthEnabledPresent" value="1" />
               <VStack gap={4}>
                 <Switch
-                  label="Active Health Checks"
-                  description="Periodically probe upstreams to check health"
+                  label={t("activeHealthChecks")}
+                  description={t("periodicallyProbeUpstreamsTo")}
                   htmlName="lbActiveHealthEnabled"
                   value={activeHealthEnabled}
                   onChange={setActiveHealthEnabled}
@@ -203,56 +205,56 @@ export function LoadBalancerFields({
                 {activeHealthEnabled && (
                   <Grid columns={2} gap={4}>
                     <TextInput
-                      label="Health Check URI"
+                      label={t("healthCheckUri")}
                       htmlName="lbActiveHealthUri"
                       placeholder="/health"
                       value={text.activeHealthUri}
                       onChange={setTextField("activeHealthUri")}
-                      description="Path to probe for health"
+                      description={t("pathToProbeFor")}
                     />
                     <NumberInput
-                      label="Health Check Port"
+                      label={t("healthCheckPort")}
                       htmlName="lbActiveHealthPort"
                       min={1}
                       max={65535}
                       isIntegerOnly
                       value={numbers.activeHealthPort}
                       onChange={setNumberField("activeHealthPort")}
-                      description="Override upstream port"
+                      description={t("overrideUpstreamPort")}
                     />
                     <TextInput
-                      label="Check Interval"
+                      label={t("checkInterval")}
                       htmlName="lbActiveHealthInterval"
                       placeholder="30s"
                       value={text.activeHealthInterval}
                       onChange={setTextField("activeHealthInterval")}
-                      description="How often to check"
+                      description={t("howOftenToCheck")}
                     />
                     <TextInput
-                      label="Check Timeout"
+                      label={t("checkTimeout")}
                       htmlName="lbActiveHealthTimeout"
                       placeholder="5s"
                       value={text.activeHealthTimeout}
                       onChange={setTextField("activeHealthTimeout")}
-                      description="Timeout for health probe"
+                      description={t("timeoutForHealthProbe")}
                     />
                     <NumberInput
-                      label="Expected Status Code"
+                      label={t("expectedStatusCode")}
                       htmlName="lbActiveHealthStatus"
                       min={100}
                       max={599}
                       isIntegerOnly
                       value={numbers.activeHealthStatus}
                       onChange={setNumberField("activeHealthStatus")}
-                      description="Expected HTTP status"
+                      description={t("expectedHttpStatus")}
                     />
                     <TextInput
-                      label="Expected Body"
+                      label={t("expectedBody")}
                       htmlName="lbActiveHealthBody"
-                      placeholder="OK"
+                      placeholder={t("ok")}
                       value={text.activeHealthBody}
                       onChange={setTextField("activeHealthBody")}
-                      description="Expected response body"
+                      description={t("expectedResponseBody")}
                     />
                   </Grid>
                 )}
@@ -263,8 +265,8 @@ export function LoadBalancerFields({
               <input type="hidden" name="lbPassiveHealthEnabledPresent" value="1" />
               <VStack gap={4}>
                 <Switch
-                  label="Passive Health Checks"
-                  description="Mark upstreams unhealthy based on response failures"
+                  label={t("passiveHealthChecks")}
+                  description={t("markUpstreamsUnhealthyBased")}
                   htmlName="lbPassiveHealthEnabled"
                   value={passiveHealthEnabled}
                   onChange={setPassiveHealthEnabled}
@@ -272,37 +274,37 @@ export function LoadBalancerFields({
                 {passiveHealthEnabled && (
                   <Grid columns={2} gap={4}>
                     <TextInput
-                      label="Fail Duration"
+                      label={t("failDuration")}
                       htmlName="lbPassiveHealthFailDuration"
                       placeholder="30s"
                       value={text.passiveHealthFailDuration}
                       onChange={setTextField("passiveHealthFailDuration")}
-                      description="How long to remember failures"
+                      description={t("howLongToRemember")}
                     />
                     <NumberInput
-                      label="Max Failures"
+                      label={t("maxFailures")}
                       htmlName="lbPassiveHealthMaxFails"
                       min={0}
                       isIntegerOnly
                       value={numbers.passiveHealthMaxFails}
                       onChange={setNumberField("passiveHealthMaxFails")}
-                      description="Failures before marking unhealthy"
+                      description={t("failuresBeforeMarkingUnhealthy")}
                     />
                     <TextInput
-                      label="Unhealthy Status Codes"
+                      label={t("unhealthyStatusCodes")}
                       htmlName="lbPassiveHealthUnhealthyStatus"
                       placeholder="500, 502, 503"
                       value={text.passiveHealthUnhealthyStatus}
                       onChange={setTextField("passiveHealthUnhealthyStatus")}
-                      description="Comma-separated status codes"
+                      description={t("commaSeparatedStatusCodes")}
                     />
                     <TextInput
-                      label="Unhealthy Latency"
+                      label={t("unhealthyLatency")}
                       htmlName="lbPassiveHealthUnhealthyLatency"
                       placeholder="5s"
                       value={text.passiveHealthUnhealthyLatency}
                       onChange={setTextField("passiveHealthUnhealthyLatency")}
-                      description="Latency threshold for unhealthy"
+                      description={t("latencyThresholdForUnhealthy")}
                     />
                   </Grid>
                 )}

@@ -8,6 +8,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
 import type { AcmeHost } from "../page";
+import { useTranslations } from "next-intl";
 
 type Props = {
   acmeHosts: AcmeHost[];
@@ -64,6 +65,7 @@ function acmeMobileCard(r: AcmeHost) {
 }
 
 export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Props) {
+  const t = useTranslations("certificates");
   const filtered = acmeHosts.filter((h) => {
     if (statusFilter && statusFilter !== "ok") return false;
     if (statusFilter === "ok" && !h.enabled) return false;
@@ -84,7 +86,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
       columns={columns}
       data={filtered}
       keyField="id"
-      emptyMessage="No ACME certificates match"
+      emptyMessage={t("noAcmeCertificatesMatch")}
       pagination={pagination}
       mobileCard={acmeMobileCard}
       rowStatus={(r) => (r.enabled ? null : { color: "gray", label: "Disabled" })}

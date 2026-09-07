@@ -11,6 +11,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ErrorPageRule } from "@/lib/models/proxy-hosts";
 import { CodeEditor } from "@/components/ui/CodeEditor";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { useTranslations } from "next-intl";
 
 type RuleState = { statuses: string; body: string; contentType: string };
 
@@ -55,6 +56,7 @@ type Props = {
 };
 
 export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: Props) {
+  const t = useTranslations("proxyHosts");
   const [rules, setRules] = useState<WithRowId<RuleState>[]>(() => toState(initialData));
 
   const addRule = () =>
@@ -74,7 +76,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
   return (
     <VStack gap={2}>
       <Text type="body" size="sm" weight="semibold">
-        Error Pages
+        {t("errorPages")}
       </Text>
       <input type="hidden" name={name} value={toJson(rules)} />
 
@@ -85,17 +87,17 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
               <VStack gap={2}>
                 <HStack gap={2} vAlign="end">
                   <TextInput
-                    label="Status codes"
+                    label={t("statusCodes")}
                     size="sm"
-                    placeholder="502, 503, 504 (blank = all errors)"
+                    placeholder={t("n502503504Blank")}
                     value={rule.statuses}
                     onChange={(next) => updateRule(rule.rowId, "statuses", next)}
                   />
                   <TextInput
-                    label="Content type"
+                    label={t("contentType")}
                     isOptional
                     size="sm"
-                    placeholder="text/html; charset=utf-8"
+                    placeholder={t("textHtmlCharsetUtf")}
                     value={rule.contentType}
                     onChange={(next) => updateRule(rule.rowId, "contentType", next)}
                   />
@@ -110,10 +112,10 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                 {/* Error bodies are usually a chunk of styled HTML, which is
                     unreadable in a three-row textarea. */}
                 <CodeEditor
-                  label="Response body"
+                  label={t("responseBody")}
                   language="html"
                   height="sm"
-                  placeholder="<h1>Service temporarily unavailable</h1>"
+                  placeholder={t("h1ServiceTemporarilyUnavailable")}
                   value={rule.body}
                   onChange={(next) => updateRule(rule.rowId, "body", next)}
                 />
@@ -127,16 +129,14 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
         <Button
           variant="ghost"
           size="sm"
-          label="Add Error Page"
+          label={t("addErrorPage")}
           icon={<Plus />}
           onClick={addRule}
         />
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">
-        Serve a custom response body when a request errors (e.g. 502/503 when the upstream is down,
-        or 404). Comma-separate status codes, or leave blank to match every error. The original
-        status code is preserved.
+        {t("serveACustomResponse")}
       </Text>
     </VStack>
   );

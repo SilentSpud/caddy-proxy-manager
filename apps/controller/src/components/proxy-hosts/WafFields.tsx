@@ -18,6 +18,7 @@ import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/lib/caddy-
 import { WafRuleExclusions } from "./WafRuleExclusions";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { CodeEditor } from "@/components/ui/CodeEditor";
+import { useTranslations } from "next-intl";
 
 type WafMode = "merge" | "override";
 type EngineMode = "Off" | "On" | "inherit";
@@ -51,6 +52,7 @@ type Props = {
 };
 
 export function WafFields({ value, showModeSelector = true }: Props) {
+  const t = useTranslations("proxyHosts");
   // The WAF is the Coraza plugin and nothing else. Without it compiled in, a
   // saved rule set is inert, so the switch reports why instead of accepting
   // configuration that will never run.
@@ -92,10 +94,10 @@ export function WafFields({ value, showModeSelector = true }: Props) {
             <Icon icon={ShieldOff} size="md" color="error" />
             <VStack gap={1}>
               <Text type="body" size="sm" weight="bold">
-                Web Application Firewall
+                {t("webApplicationFirewall")}
               </Text>
               <Text type="body" size="sm" color="secondary">
-                Inspect and block malicious requests via Coraza / OWASP CRS
+                {t("inspectAndBlockMalicious")}
               </Text>
             </VStack>
           </HStack>
@@ -103,7 +105,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               attached by wrapping rather than as a prop on the Switch. */}
           <ModuleGated feature="waf">
             <Switch
-              label="Enable web application firewall"
+              label={t("enableWebApplicationFirewall")}
               isLabelHidden
               value={enabled}
               onChange={setEnabled}
@@ -130,12 +132,12 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               <>
                 {/* Real radio-group semantics, replacing clickable divs. */}
                 <SegmentedControl
-                  label="Global rule handling"
+                  label={t("globalRuleHandling")}
                   value={wafMode}
                   onChange={(next) => setWafMode(next as WafMode)}
                 >
-                  <SegmentedControlItem value="merge" label="Merge with global" />
-                  <SegmentedControlItem value="override" label="Override global" />
+                  <SegmentedControlItem value="merge" label={t("mergeWithGlobal")} />
+                  <SegmentedControlItem value="override" label={t("overrideGlobal")} />
                 </SegmentedControl>
                 <Divider />
               </>
@@ -143,20 +145,20 @@ export function WafFields({ value, showModeSelector = true }: Props) {
             {!showModeSelector && <Divider />}
 
             <SegmentedControl
-              label="Engine Mode"
+              label={t("engineMode")}
               value={engineMode}
               onChange={(next) => setEngineMode(next as EngineMode)}
             >
-              <SegmentedControlItem value="inherit" label="Global default" />
-              <SegmentedControlItem value="Off" label="Off" />
-              <SegmentedControlItem value="On" label="On" />
+              <SegmentedControlItem value="inherit" label={t("globalDefault")} />
+              <SegmentedControlItem value="Off" label={t("off")} />
+              <SegmentedControlItem value="On" label={t("on")} />
             </SegmentedControl>
 
             <Divider />
 
             <CheckboxInput
-              label="Load OWASP Core Rule Set"
-              description="Covers SQLi, XSS, LFI, RCE and hundreds of other attack patterns"
+              label={t("loadOwaspCoreRule")}
+              description={t("coversSqliXssLfi")}
               value={loadCrs}
               onChange={setLoadCrs}
             />
@@ -165,12 +167,10 @@ export function WafFields({ value, showModeSelector = true }: Props) {
 
             <VStack gap={2}>
               <Text type="body" size="sm" weight="bold">
-                Request Body Limits
+                {t("requestBodyLimits")}
               </Text>
               <Text type="body" size="xsm" color="secondary">
-                Coraza buffers request bodies for inspection and rejects anything larger than its
-                limit — 12.5 MiB with the OWASP CRS loaded. Raise it for hosts that receive large
-                uploads. Leave blank to inherit.
+                {t("corazaBuffersRequestBodies")}
               </Text>
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
@@ -182,10 +182,10 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                   step={1}
                   isIntegerOnly
                   hasClear
-                  placeholder="Inherit"
+                  placeholder={t("inherit")}
                 />
                 <NumberInput
-                  label="Buffered in memory (MiB)"
+                  label={t("bufferedInMemoryMib")}
                   value={inMemoryLimitMb}
                   onChange={setInMemoryLimitMb}
                   min={MIN_BODY_LIMIT_MIB}
@@ -193,20 +193,20 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                   step={1}
                   isIntegerOnly
                   hasClear
-                  placeholder="Inherit"
+                  placeholder={t("inherit")}
                 />
               </HStack>
               <SegmentedControl
-                label="Over-limit action"
+                label={t("overLimitAction")}
                 value={limitAction}
                 onChange={(next) => setLimitAction(next as LimitAction)}
               >
-                <SegmentedControlItem value="inherit" label="Inherit" />
-                <SegmentedControlItem value="Reject" label="Reject" />
-                <SegmentedControlItem value="ProcessPartial" label="Partial" />
+                <SegmentedControlItem value="inherit" label={t("inherit")} />
+                <SegmentedControlItem value="Reject" label={t("reject")} />
+                <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
               </SegmentedControl>
               <Text type="body" size="xsm" color="secondary">
-                Reject returns 413; Partial inspects what fits and forwards the rest.
+                {t("rejectReturns413Partial")}
               </Text>
             </VStack>
 
@@ -215,13 +215,13 @@ export function WafFields({ value, showModeSelector = true }: Props) {
             <WafRuleExclusions value={value?.excluded_rule_ids} />
 
             <CodeEditor
-              label="Custom SecLang Directives"
+              label={t("customSeclangDirectives")}
               language="ini"
               placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
               value={customDirectives}
               onChange={setCustomDirectives}
               height="sm"
-              description="ModSecurity SecLang syntax. Appended after OWASP CRS if enabled."
+              description={t("modsecuritySeclangSyntaxAppended")}
             />
 
             <Collapsible trigger="Quick Templates">

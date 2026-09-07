@@ -10,12 +10,14 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { RedirectRule } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { useTranslations } from "next-intl";
 
 type Props = { initialData?: RedirectRule[] };
 
 const STATUS_OPTIONS = [301, 302, 307, 308].map((s) => ({ value: String(s), label: String(s) }));
 
 export function RedirectsFields({ initialData = [] }: Props) {
+  const t = useTranslations("proxyHosts");
   const [rules, setRules] = useState<WithRowId<RedirectRule>[]>(() => withRowIds(initialData));
 
   const addRule = () => setRules((r) => [...r, withRowId({ from: "", to: "", status: 301 })]);
@@ -26,7 +28,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
   return (
     <VStack gap={2}>
       <Text type="body" size="sm" weight="semibold">
-        Redirects
+        {t("redirects")}{" "}
       </Text>
       <input
         type="hidden"
@@ -41,7 +43,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
           {rules.map((rule, i) => (
             <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
-                label="From Path"
+                label={t("fromPath")}
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/.well-known/carddav"
@@ -49,7 +51,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "from", next)}
               />
               <TextInput
-                label="To URL / Path"
+                label={t("toUrlPath")}
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/remote.php/dav/"
@@ -57,7 +59,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "to", next)}
               />
               <Selector
-                label="Status"
+                label={t("status")}
                 isLabelHidden={i > 0}
                 size="sm"
                 width={110}
@@ -78,7 +80,13 @@ export function RedirectsFields({ initialData = [] }: Props) {
       )}
 
       <HStack>
-        <Button variant="ghost" size="sm" label="Add Redirect" icon={<Plus />} onClick={addRule} />
+        <Button
+          variant="ghost"
+          size="sm"
+          label={t("addRedirect")}
+          icon={<Plus />}
+          onClick={addRule}
+        />
       </HStack>
     </VStack>
   );

@@ -26,6 +26,7 @@ import type { MtlsConfig } from "@/lib/models/proxy-hosts";
 import type { MtlsAccessRule } from "@/lib/models/mtls-access-rules";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
+import { useTranslations } from "next-intl";
 
 type Props = {
   value?: MtlsConfig | null;
@@ -42,6 +43,7 @@ export function MtlsFields({
   proxyHostId,
   mtlsRoles = [],
 }: Props) {
+  const t = useTranslations("proxyHosts");
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [selectedCertIds, setSelectedCertIds] = useState<number[]>(
     value?.trusted_client_cert_ids ?? [],
@@ -129,48 +131,48 @@ export function MtlsFields({
             <Icon icon={LockKeyhole} size="md" color="warning" />
             <VStack gap={1}>
               <Text type="body" size="sm" weight="bold">
-                Mutual TLS (mTLS)
+                {t("mutualTlsMtls")}
               </Text>
               <Text type="body" size="sm" color="secondary">
-                Require clients to present a trusted certificate to connect
+                {t("requireClientsToPresent")}
               </Text>
             </VStack>
           </HStack>
-          <Switch label="Enable mTLS" isLabelHidden value={enabled} onChange={setEnabled} />
+          <Switch label={t("enableMtls")} isLabelHidden value={enabled} onChange={setEnabled} />
         </HStack>
 
         {enabled && (
           <VStack gap={4}>
             <Banner
               status="info"
-              title="mTLS requires TLS on this host"
-              description="A certificate must be set. Select roles and/or individual certificates to allow."
+              title={t("mtlsRequiresTlsOn")}
+              description={t("aCertificateMustBe")}
             />
 
             <TextArea
-              label="Protected Paths"
+              label={t("protectedPaths")}
               isOptional
               htmlName="mtlsProtectedPaths"
               placeholder="/admin/*, /internal/*"
               value={protectedPaths}
               onChange={setProtectedPaths}
               rows={2}
-              description="Leave empty to require mTLS for the entire domain. Comma-separated paths to require client certificates on specific routes only."
+              description={t("leaveEmptyToRequire")}
             />
             <TextArea
-              label="Excluded Paths"
+              label={t("excludedPaths")}
               isOptional
               htmlName="mtlsExcludedPaths"
               placeholder="/health, /public/*"
               value={excludedPaths}
               onChange={setExcludedPaths}
               rows={2}
-              description="Paths to exclude from mTLS. These paths bypass client certificate enforcement while all other paths remain protected. Ignored if Protected Paths is set."
+              description={t("pathsToExcludeFrom")}
             />
 
             {mtlsRoles.length > 0 && (
               <CheckboxList
-                label="Trusted Roles"
+                label={t("trustedRoles")}
                 hasDividers
                 value={selectedRoleIds.map(String)}
                 onChange={(values) => setSelectedRoleIds(values.map(Number))}
@@ -189,13 +191,13 @@ export function MtlsFields({
 
             <VStack gap={2}>
               <Text type="body" size="sm" weight="semibold">
-                Trusted Certificates
+                {t("trustedCertificates")}
               </Text>
 
               {activeCerts.length === 0 ? (
                 <EmptyState
-                  title="No client certificates issued yet"
-                  description="Issue certificates from a CA on the Certificates page."
+                  title={t("noClientCertificatesIssued")}
+                  description={t("issueCertificatesFromA")}
                   isCompact
                 />
               ) : (
@@ -264,8 +266,8 @@ export function MtlsFields({
             {!hasTrust && activeCerts.length > 0 && (
               <Banner
                 status="error"
-                title="mTLS will block all connections"
-                description="No roles or certificates are selected."
+                title={t("mtlsWillBlockAll")}
+                description={t("noRolesOrCertificates")}
               />
             )}
 
@@ -275,17 +277,16 @@ export function MtlsFields({
                 <HStack justify="between" vAlign="center" gap={2}>
                   <VStack gap={1}>
                     <Text type="body" size="sm" weight="semibold">
-                      Path-Based Access Rules
+                      {t("pathBasedAccessRules")}
                     </Text>
                     <Text type="body" size="xsm" color="secondary">
-                      Restrict specific paths to certain roles or certificates. Paths without rules
-                      allow any trusted cert/role above.
+                      {t("restrictSpecificPathsTo")}
                     </Text>
                   </VStack>
                   <Button
                     size="sm"
                     variant="secondary"
-                    label="Add Rule"
+                    label={t("addRule")}
                     icon={<Plus />}
                     onClick={() => setAddRuleOpen(true)}
                   />
@@ -293,12 +294,12 @@ export function MtlsFields({
 
                 {!rulesLoaded ? (
                   <HStack justify="center">
-                    <Spinner label="Loading access rules" />
+                    <Spinner label={t("loadingAccessRules")} />
                   </HStack>
                 ) : rules.length === 0 ? (
                   <EmptyState
-                    title="No access rules configured"
-                    description="All trusted certificates and roles have equal access to every path."
+                    title={t("noAccessRulesConfigured")}
+                    description={t("allTrustedCertificatesAnd")}
                     isCompact
                   />
                 ) : (
@@ -308,7 +309,7 @@ export function MtlsFields({
                         <HStack gap={2} vAlign="center" wrap="wrap">
                           <Token size="sm" label={rule.pathPattern} />
                           {rule.denyAll ? (
-                            <Badge label="Deny" icon={<Ban />} variant="error" />
+                            <Badge label={t("deny")} icon={<Ban />} variant="error" />
                           ) : (
                             <HStack gap={1} wrap="wrap">
                               {rule.allowedRoleIds.map((roleId) => {
@@ -329,7 +330,7 @@ export function MtlsFields({
                               {rule.allowedRoleIds.length === 0 &&
                                 rule.allowedCertIds.length === 0 && (
                                   <Text type="body" size="xsm" color="secondary">
-                                    No roles/certs — effectively denied
+                                    {t("noRolesCertsEffectively")}
                                   </Text>
                                 )}
                             </HStack>
@@ -364,8 +365,8 @@ export function MtlsFields({
                     proxyHostId={proxyHostId!}
                     roles={mtlsRoles}
                     activeCerts={activeCerts}
-                    title="Add Access Rule"
-                    submitLabel="Add Rule"
+                    title={t("addAccessRule")}
+                    submitLabel={t("addRule")}
                     onSaved={loadRules}
                   />
                 )}
@@ -375,8 +376,8 @@ export function MtlsFields({
                     proxyHostId={proxyHostId!}
                     roles={mtlsRoles}
                     activeCerts={activeCerts}
-                    title="Edit Access Rule"
-                    submitLabel="Save"
+                    title={t("editAccessRule")}
+                    submitLabel={t("save")}
                     existing={editRule}
                     onSaved={loadRules}
                   />
@@ -409,6 +410,7 @@ function RuleDialog({
   existing?: MtlsAccessRule;
   onSaved: () => void;
 }) {
+  const t = useTranslations("proxyHosts");
   const [pathPattern, setPathPattern] = useState(existing?.pathPattern ?? "*");
   const [priority, setPriority] = useState<number | null>(existing?.priority ?? 0);
   const [description, setDescription] = useState(existing?.description ?? "");
@@ -470,14 +472,14 @@ function RuleDialog({
 
         <HStack gap={3} vAlign="start">
           <TextInput
-            label="Path Pattern"
+            label={t("pathPattern")}
             value={pathPattern}
             onChange={setPathPattern}
             placeholder="*"
-            description="Use * for all paths, /admin/* for prefix match"
+            description={t("useForAllPaths")}
           />
           <NumberInput
-            label="Priority"
+            label={t("priority")}
             value={priority}
             onChange={setPriority}
             isIntegerOnly
@@ -485,9 +487,14 @@ function RuleDialog({
           />
         </HStack>
 
-        <TextInput label="Description" isOptional value={description} onChange={setDescription} />
+        <TextInput
+          label={t("description")}
+          isOptional
+          value={description}
+          onChange={setDescription}
+        />
 
-        <Switch label="Deny all access to this path" value={denyAll} onChange={setDenyAll} />
+        <Switch label={t("denyAllAccessTo")} value={denyAll} onChange={setDenyAll} />
 
         {/* Unmounted rather than dimmed to 30% opacity, so these are not
             reachable while the rule denies everything. */}
@@ -495,11 +502,11 @@ function RuleDialog({
           <VStack gap={4}>
             {roles.length === 0 ? (
               <Text type="body" size="sm" color="secondary">
-                No mTLS roles yet. Create roles on the Certificates page.
+                {t("noMtlsRolesYet")}
               </Text>
             ) : (
               <CheckboxList
-                label="Allowed Roles"
+                label={t("allowedRoles")}
                 value={selectedRoleIds.map(String)}
                 onChange={(values) => setSelectedRoleIds(values.map(Number))}
               >
@@ -516,12 +523,12 @@ function RuleDialog({
 
             {activeCerts.length === 0 ? (
               <Text type="body" size="sm" color="secondary">
-                No active client certificates.
+                {t("noActiveClientCertificates")}
               </Text>
             ) : (
               <CheckboxList
-                label="Allowed Specific Certificates"
-                description="These bypass role checks for this path"
+                label={t("allowedSpecificCertificates")}
+                description={t("theseBypassRoleChecks")}
                 value={selectedCertIds.map(String)}
                 onChange={(values) => setSelectedCertIds(values.map(Number))}
               >

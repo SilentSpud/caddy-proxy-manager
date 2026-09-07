@@ -24,6 +24,7 @@ import {
 import { L4PortsApplyBanner } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
 import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { Banner } from "@astryxdesign/core/Banner";
+import { useTranslations } from "next-intl";
 
 type Props = {
   hosts: L4ProxyHost[];
@@ -100,6 +101,7 @@ export default function L4ProxyHostsClient({
   initialSearch,
   initialSort,
 }: Props) {
+  const t = useTranslations("l4ProxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<L4ProxyHost | null>(null);
@@ -258,7 +260,7 @@ export default function L4ProxyHostsClient({
       {l4DisabledReason && (
         <Banner
           status="warning"
-          title="Layer 4 proxying is switched off"
+          title={t("layer4ProxyingIs")}
           description={`${l4DisabledReason} Hosts below are saved but are not being served.`}
         />
       )}
@@ -266,8 +268,8 @@ export default function L4ProxyHostsClient({
       {!l4DisabledReason && <L4PortsApplyBanner refreshSignal={bannerRefresh} />}
 
       <PageHeader
-        title="L4 Proxy Hosts"
-        description="Define TCP/UDP stream proxies powered by caddy-l4. Port mappings are applied automatically."
+        title={t("l4ProxyHosts")}
+        description={t("defineTcpUdpStream")}
         action={{
           label: "Create L4 Host",
           onClick: openCreate,
@@ -279,7 +281,7 @@ export default function L4ProxyHostsClient({
         <SearchField
           value={searchTerm}
           onChange={handleSearchChange}
-          placeholder="Search L4 hosts..."
+          placeholder={t("searchL4Hosts")}
         />
       </HStack>
 

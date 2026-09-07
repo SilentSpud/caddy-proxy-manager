@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ShieldAlert } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
@@ -16,9 +17,10 @@ import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_NEW_PASSWORD,
 } from "@/components/ui/native-input-attrs";
-import { PASSWORD_POLICY_HINT, passwordPolicyError } from "@/src/lib/password-policy";
+import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
 
 export default function LegacyPasswordChangeForm() {
+  const t = useTranslations();
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -31,16 +33,20 @@ export default function LegacyPasswordChangeForm() {
     setError(null);
 
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      setError(t("auth.passwordChange.mismatch"));
       return;
     }
-    const policyError = passwordPolicyError(newPassword, "New password");
+    const policyError = passwordPolicyMessage(
+      t,
+      newPassword,
+      t("passwordPolicy.subject.newPassword"),
+    );
     if (policyError) {
       setError(policyError);
       return;
     }
     if (newPassword === currentPassword) {
-      setError("New password must be different from your current password");
+      setError(t("auth.passwordChange.mustDiffer"));
       return;
     }
 
@@ -53,14 +59,14 @@ export default function LegacyPasswordChangeForm() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error ?? "Failed to change password");
+        setError(data.error ?? t("auth.passwordChange.failed"));
         return;
       }
       // The new hash is argon2id, so the dashboard gate no longer matches.
       router.replace("/");
       router.refresh();
     } catch {
-      setError("Failed to change password");
+      setError(t("auth.passwordChange.failed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -73,9 +79,9 @@ export default function LegacyPasswordChangeForm() {
           <VStack gap={4}>
             <VStack gap={1} hAlign="center">
               <Icon icon={ShieldAlert} size="lg" color="secondary" />
-              <Heading level={1}>Update your password</Heading>
+              <Heading level={1}>{t("auth.passwordChange.heading")}</Heading>
               <Text type="body" size="sm" color="secondary" justify="center">
-                Your password is stored with an older algorithm. Choose a new one to continue.
+                {t("auth.passwordChange.subtitle")}
               </Text>
             </VStack>
 
@@ -84,7 +90,7 @@ export default function LegacyPasswordChangeForm() {
             <VStack gap={3}>
               <TextInput
                 {...AUTOFILL_CURRENT_PASSWORD}
-                label="Current Password"
+                label={t("auth.passwordChange.currentPassword")}
                 type="password"
                 value={currentPassword}
                 onChange={setCurrentPassword}
@@ -92,16 +98,16 @@ export default function LegacyPasswordChangeForm() {
               />
               <TextInput
                 {...AUTOFILL_NEW_PASSWORD}
-                label="New Password"
+                label={t("auth.passwordChange.newPassword")}
                 type="password"
                 value={newPassword}
                 onChange={setNewPassword}
-                description={PASSWORD_POLICY_HINT}
+                description={passwordPolicyHint(t)}
                 isRequired
               />
               <TextInput
                 {...AUTOFILL_NEW_PASSWORD}
-                label="Confirm New Password"
+                label={t("auth.passwordChange.confirmPassword")}
                 type="password"
                 value={confirmPassword}
                 onChange={setConfirmPassword}
@@ -111,7 +117,7 @@ export default function LegacyPasswordChangeForm() {
 
             <Button
               type="submit"
-              label="Update Password"
+              label={t("auth.passwordChange.submit")}
               isLoading={isSubmitting}
               isDisabled={isSubmitting}
             />

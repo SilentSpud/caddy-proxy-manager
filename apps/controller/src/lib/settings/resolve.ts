@@ -140,7 +140,7 @@ export async function saveSettings(values: Record<string, unknown>): Promise<voi
   for (const [key, raw] of Object.entries(values)) {
     const definition = SETTINGS_BY_KEY.get(key);
     if (!definition) {
-      throw new SettingValidationError(key, `Unknown setting "${key}"`);
+      throw new SettingValidationError(key, "unknown", { label: key }, `Unknown setting "${key}"`);
     }
 
     const parsed = definition.parse(raw);
@@ -168,7 +168,7 @@ export async function saveSettings(values: Record<string, unknown>): Promise<voi
 /** Remove a stored value, so the setting falls back to the environment or its default. */
 export async function clearStoredSetting(key: string): Promise<void> {
   if (!SETTINGS_BY_KEY.has(key)) {
-    throw new SettingValidationError(key, `Unknown setting "${key}"`);
+    throw new SettingValidationError(key, "unknown", { label: key }, `Unknown setting "${key}"`);
   }
   await db.delete(settings).where(eq(settings.key, key));
   invalidateSettingsCache();

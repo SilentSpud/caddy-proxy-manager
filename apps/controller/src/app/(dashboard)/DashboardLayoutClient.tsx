@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useTheme } from "@astryxdesign/core";
 import {
   LayoutDashboard,
@@ -30,6 +31,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Badge } from "@astryxdesign/core/Badge";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
+import { LocaleSwitcher } from "@/src/components/locale/LocaleSwitcher";
 import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
 import { formatAppVersion } from "@/src/lib/app-version";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
@@ -42,25 +44,28 @@ type User = {
   role?: string;
 };
 
+// `labelKey` rather than a label: this is module scope, where no hook can run. Each key is
+// resolved against the `nav` namespace at render.
 const NAV_ITEMS = [
-  { href: "/", label: "Overview", icon: LayoutDashboard, adminOnly: false },
-  { href: "/proxy-hosts", label: "Proxy Hosts", icon: ArrowLeftRight, adminOnly: true },
-  { href: "/l4-proxy-hosts", label: "L4 Proxy Hosts", icon: Cable, adminOnly: true },
-  { href: "/access-lists", label: "Access Lists", icon: KeyRound, adminOnly: true },
-  { href: "/groups", label: "Groups", icon: Users, adminOnly: true },
-  { href: "/users", label: "Users", icon: UserCog, adminOnly: true },
-  { href: "/certificates", label: "Certificates", icon: ShieldCheck, adminOnly: true },
-  { href: "/waf", label: "WAF", icon: ShieldOff, adminOnly: true },
-  { href: "/analytics", label: "Analytics", icon: BarChart2, adminOnly: true },
-  { href: "/audit-log", label: "Audit Log", icon: History, adminOnly: true },
-  { href: "/api-docs", label: "API Docs", icon: FileJson2, adminOnly: true },
-  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
+  { href: "/", labelKey: "overview", icon: LayoutDashboard, adminOnly: false },
+  { href: "/proxy-hosts", labelKey: "proxyHosts", icon: ArrowLeftRight, adminOnly: true },
+  { href: "/l4-proxy-hosts", labelKey: "l4ProxyHosts", icon: Cable, adminOnly: true },
+  { href: "/access-lists", labelKey: "accessLists", icon: KeyRound, adminOnly: true },
+  { href: "/groups", labelKey: "groups", icon: Users, adminOnly: true },
+  { href: "/users", labelKey: "users", icon: UserCog, adminOnly: true },
+  { href: "/certificates", labelKey: "certificates", icon: ShieldCheck, adminOnly: true },
+  { href: "/waf", labelKey: "waf", icon: ShieldOff, adminOnly: true },
+  { href: "/analytics", labelKey: "analytics", icon: BarChart2, adminOnly: true },
+  { href: "/audit-log", labelKey: "auditLog", icon: History, adminOnly: true },
+  { href: "/api-docs", labelKey: "apiDocs", icon: FileJson2, adminOnly: true },
+  { href: "/settings", labelKey: "settings", icon: Settings, adminOnly: true },
 ] as const;
 
 function ThemeToggle() {
   // Astryx's useTheme reports the *resolved* mode, so "system" already reads as
   // light or dark here and tracks the OS if it changes. Clicking pins the
   // opposite mode, which is what leaves "system" behind.
+  const t = useTranslations("common.theme");
   const { mode } = useTheme();
   const { setMode } = useThemeMode();
   const isDark = mode === "dark";
@@ -68,7 +73,7 @@ function ThemeToggle() {
     <IconButton
       variant="ghost"
       size="sm"
-      label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      label={isDark ? t("toLight") : t("toDark")}
       icon={isDark ? <Moon /> : <Sun />}
       onClick={() => setMode(isDark ? "light" : "dark")}
     />
@@ -76,15 +81,17 @@ function ThemeToggle() {
 }
 
 function SignOutButton() {
+  const t = useTranslations("common");
   return (
     <form action="/api/auth/logout" method="POST">
-      <IconButton variant="ghost" size="sm" label="Sign out" icon={<LogOut />} type="submit" />
+      <IconButton variant="ghost" size="sm" label={t("signOut")} icon={<LogOut />} type="submit" />
     </form>
   );
 }
 
 /** The signed-in user, shown in the SideNav footer as a link to their profile. */
 function UserFooter({ user, avatar }: { user: User; avatar: ResolvedAvatar }) {
+  const t = useTranslations("nav");
   const router = useRouter();
   const { closeMobileNav } = useAppShellMobile();
 
@@ -99,10 +106,10 @@ function UserFooter({ user, avatar }: { user: User; avatar: ResolvedAvatar }) {
           closeMobileNav();
         }}
       >
-        <UserAvatar avatar={avatar} alt={user.name ?? "User"} size="sm" />
+        <UserAvatar avatar={avatar} alt={user.name ?? t("avatarAlt")} size="sm" />
         <VStack hAlign="start">
           <Text type="body" size="sm" weight="medium" maxLines={1}>
-            {user.name ?? "Administrator"}
+            {user.name ?? t("defaultUserName")}
           </Text>
           <Text type="body" size="xsm" color="secondary" maxLines={1}>
             {user.email}
@@ -110,6 +117,7 @@ function UserFooter({ user, avatar }: { user: User; avatar: ResolvedAvatar }) {
         </VStack>
       </HStack>
       <HStack gap={1} vAlign="center">
+        <LocaleSwitcher />
         <ThemeToggle />
         <SignOutButton />
       </HStack>
@@ -131,6 +139,7 @@ export default function DashboardLayoutClient({
   updateAvailable: boolean;
   children: ReactNode;
 }) {
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const isAdmin = user.role === "admin";
   const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
@@ -154,7 +163,7 @@ export default function DashboardLayoutClient({
               // anything. The link goes to where it can be acted on or switched off.
               subheadingHref={updateAvailable ? "/settings" : undefined}
               headerEndContent={
-                updateAvailable ? <Badge variant="warning" label="Update" /> : undefined
+                updateAvailable ? <Badge variant="warning" label={t("updateBadge")} /> : undefined
               }
               icon={
                 <NavIcon
@@ -169,13 +178,13 @@ export default function DashboardLayoutClient({
           }
           footer={<UserFooter user={user} avatar={avatar} />}
         >
-          <SideNavSection title="Navigation" isHeaderHidden>
-            {visibleItems.map(({ href, label, icon }) => (
+          <SideNavSection title={t("sectionLabel")} isHeaderHidden>
+            {visibleItems.map(({ href, labelKey, icon }) => (
               <SideNavItem
                 key={href}
                 as={Link}
                 href={href}
-                label={label}
+                label={t(labelKey)}
                 icon={icon}
                 isSelected={pathname === href}
               />

@@ -138,6 +138,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
+- **Internationalization** - Every string in the interface comes from a message catalog rather than the code, so translating the app is adding one JSON file. The language follows the browser's `Accept-Language` (refined by `navigator.languages`) unless one is picked explicitly, and the choice is remembered in a cookie — no `/en/` in front of every URL. English ships today; a language picker appears in the sidebar as soon as a second catalog is present
 - **Mobile UI** - Fully responsive interface optimised for iPhone and other narrow viewports
 
 ---

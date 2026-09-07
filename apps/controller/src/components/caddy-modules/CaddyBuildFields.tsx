@@ -20,6 +20,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@/components/ui/FormBooleanControls";
 import { CodeEditor } from "@/components/ui/CodeEditor";
+import { useTranslations } from "next-intl";
 import {
   CADDY_MODULES,
   type CaddyCustomModule,
@@ -74,6 +75,7 @@ export function CaddyBuildFields({
   initialModules: Record<string, boolean>;
   initialCustomModules: CaddyCustomModule[];
 }) {
+  const t = useTranslations("caddyModules");
   const [modules, setModules] = useState<Record<string, boolean>>(() => {
     const resolved: Record<string, boolean> = {};
     for (const module of CADDY_MODULES) {
@@ -178,7 +180,7 @@ export function CaddyBuildFields({
   return (
     <VStack gap={5}>
       {rebuildError && (
-        <Banner status="error" title="Rebuild failed to start" description={rebuildError} />
+        <Banner status="error" title={t("rebuildFailedToStart")} description={rebuildError} />
       )}
 
       <RebuildBanner
@@ -190,8 +192,8 @@ export function CaddyBuildFields({
 
       <Banner
         status="info"
-        title="Plugins are compiled into Caddy"
-        description="Turning a module off stops this app from generating config for it right away. Removing it from the binary — and adding a new one — needs a rebuild, which restarts the proxy."
+        title={t("pluginsAreCompiledInto")}
+        description={t("turningAModuleOff")}
       />
 
       {groupModules().map(([category, group]) => (
@@ -219,14 +221,12 @@ export function CaddyBuildFields({
           <Heading level={2}>Custom modules</Heading>
           <Divider />
           <Text type="body" size="xsm" color="secondary">
-            Any Caddy plugin published as a Go module. Compiled from source at build time, so an
-            unreachable or non-building module fails the rebuild — the running container is left
-            untouched when that happens.
+            {t("anyCaddyPluginPublished")}
           </Text>
 
           {customModules.length === 0 && (
             <Text type="body" size="sm" color="secondary">
-              No custom modules.
+              {t("noCustomModules")}
             </Text>
           )}
 
@@ -237,30 +237,30 @@ export function CaddyBuildFields({
                 <VStack gap={2}>
                   <HStack gap={2} align="end" wrap="wrap">
                     <TextInput
-                      label="Module path"
+                      label={t("modulePath")}
                       value={entry.modulePath}
                       onChange={(next) => updateCustomModule(entry.uid, { modulePath: next })}
-                      placeholder="github.com/greenpau/caddy-security"
+                      placeholder={t("githubComGreenpauCaddy")}
                       status={error ? { type: "error", message: error } : undefined}
                     />
                     <TextInput
-                      label="Version"
+                      label={t("version")}
                       value={entry.version ?? ""}
                       onChange={(next) => updateCustomModule(entry.uid, { version: next })}
                       placeholder="latest"
-                      description="Tag, branch, or commit"
+                      description={t("tagBranchOrCommit")}
                     />
                     <Button
                       variant="ghost"
                       size="sm"
                       icon={<Trash2 />}
-                      label="Remove"
+                      label={t("remove")}
                       isIconOnly
                       onClick={() => removeCustomModule(entry.uid)}
                     />
                   </HStack>
                   <Switch
-                    label="Include in the build"
+                    label={t("includeInTheBuild")}
                     value={entry.enabled}
                     onChange={(next) => updateCustomModule(entry.uid, { enabled: next })}
                   />
@@ -274,7 +274,7 @@ export function CaddyBuildFields({
               variant="secondary"
               size="sm"
               icon={<Plus />}
-              label="Add module"
+              label={t("addModule")}
               onClick={addCustomModule}
             />
           </HStack>
@@ -282,7 +282,7 @@ export function CaddyBuildFields({
       </Card>
 
       <CodeEditor
-        label="Build command preview"
+        label={t("buildCommandPreview")}
         language="dockerfile"
         value={dockerfilePreview}
         isReadOnly
@@ -346,6 +346,7 @@ function RebuildBanner({
   onRebuild: () => void;
   inFlight: boolean;
 }) {
+  const t = useTranslations("caddyModules");
   if (!build) return null;
   const { diff, status } = build;
 
@@ -353,7 +354,7 @@ function RebuildBanner({
     return (
       <Banner
         status="success"
-        title="Caddy is running the selected modules"
+        title={t("caddyIsRunningThe")}
         description={`${diff.appliedSpecs.length} module(s) compiled in.`}
       />
     );
@@ -382,7 +383,7 @@ function RebuildBanner({
           {diff.added.length > 0 && (
             <HStack gap={1} wrap="wrap" vAlign="center">
               <Text type="body" size="sm">
-                Adding:
+                {t("adding")}
               </Text>
               {diff.added.map((spec) => (
                 <Badge key={spec} label={spec} />
@@ -392,7 +393,7 @@ function RebuildBanner({
           {diff.removed.length > 0 && (
             <HStack gap={1} wrap="wrap" vAlign="center">
               <Text type="body" size="sm">
-                Removing:
+                {t("removing")}
               </Text>
               {diff.removed.map((spec) => (
                 <Badge key={spec} label={spec} />
@@ -401,8 +402,7 @@ function RebuildBanner({
           )}
           {!inFlight && (
             <Text type="body" size="xsm" color="secondary">
-              Compiling Caddy takes several minutes. The proxy keeps serving on the current binary
-              until the new one is ready, then restarts.
+              {t("compilingCaddyTakesSeveral")}
             </Text>
           )}
         </VStack>
@@ -412,7 +412,7 @@ function RebuildBanner({
           variant="secondary"
           size="sm"
           icon={<Hammer />}
-          label="Rebuild Caddy"
+          label={t("rebuildCaddy")}
           isLoading={rebuilding}
           isDisabled={rebuilding || inFlight}
           onClick={onRebuild}

@@ -9,6 +9,7 @@ import {
 } from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
 import { ApiConflictError } from "../api-errors";
+import { domainError } from "../domain-error";
 
 function tryParseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -84,7 +85,7 @@ export async function createCaCertificate(
     .returning();
 
   if (!record) {
-    throw new Error("Failed to create CA certificate");
+    throw domainError("failedToCreateCaCertificate");
   }
 
   await logAuditEvent({
@@ -105,7 +106,7 @@ export async function updateCaCertificate(
 ): Promise<CaCertificate> {
   const existing = await getCaCertificate(id);
   if (!existing) {
-    throw new Error("CA certificate not found");
+    throw domainError("caCertificateNotFound");
   }
 
   const now = nowIso();
@@ -135,7 +136,7 @@ export async function updateCaCertificate(
 export async function deleteCaCertificate(id: number, actorUserId: number): Promise<void> {
   const existing = await getCaCertificate(id);
   if (!existing) {
-    throw new Error("CA certificate not found");
+    throw domainError("caCertificateNotFound");
   }
 
   // Issued client certificates belonging to this CA, plus any mTLS roles that include them — used

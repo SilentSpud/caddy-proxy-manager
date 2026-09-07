@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
 import {
@@ -14,33 +15,31 @@ import { logAuditEvent } from "@/src/lib/audit";
  * Called when the portal finds the user already signed in (e.g. after OAuth).
  */
 export async function POST(request: NextRequest) {
+  const t = await getTranslations("auth.apiErrors");
   try {
     // CSRF: verify the request originates from the CPM portal
     const origin = request.headers.get("origin");
     const baseOrigin = new URL(config.baseUrl).origin;
     if (!origin || origin !== baseOrigin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: t("forbidden") }, { status: 403 });
     }
 
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return NextResponse.json({ error: t("notAuthenticated") }, { status: 401 });
     }
 
     const body = await request.json();
     const rid = typeof body.rid === "string" ? body.rid : "";
 
     if (!rid) {
-      return NextResponse.json({ error: "Missing redirect intent" }, { status: 400 });
+      return NextResponse.json({ error: t("missingRedirectIntent") }, { status: 400 });
     }
 
     // Consume the redirect intent — returns the server-stored redirect URI
     const intent = await consumeRedirectIntent(rid);
     if (!intent) {
-      return NextResponse.json(
-        { error: "Invalid or expired redirect intent. Please try again." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });
     }
 
     const targetUrl = new URL(intent.redirectUri);
@@ -55,10 +54,7 @@ export async function POST(request: NextRequest) {
         entityType: "proxy_host",
         summary: `Forward auth access denied for user ${session.user.email} to host ${targetUrl.hostname}`,
       });
-      return NextResponse.json(
-        { error: "You do not have access to this application." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: t("noAccessToApplication") }, { status: 403 });
     }
 
     // Create forward auth session and exchange code
@@ -79,6 +75,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ redirectTo: callbackUrl.toString() });
   } catch (error) {
     console.error("Forward auth session login error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: t("internalServerError") }, { status: 500 });
   }
 }

@@ -24,6 +24,7 @@ import {
 // this a same-origin fetch (CSP `connect-src 'self'`) instead of inlining 756 KB into a JS chunk.
 import atlasUrl from "world-atlas/countries-50m.json?url";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+import { useTranslations } from "next-intl";
 
 // maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling —
 // the worker never starts and the map is empty ocean. `?worker&url` bundles its module graph into
@@ -490,6 +491,7 @@ export default function WorldMapInner({
   data: CountryStats[];
   selectedCountry?: string | null;
 }) {
+  const t = useTranslations("analytics");
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
@@ -747,7 +749,7 @@ export default function WorldMapInner({
                       <div
                         style={{ color: "var(--color-text-disabled)", marginTop: 3, fontSize: 12 }}
                       >
-                        No traffic recorded
+                        {t("noTrafficRecorded")}
                       </div>
                     )}
                   </div>
@@ -760,7 +762,7 @@ export default function WorldMapInner({
       {max > 0 && (
         <HStack gap={2} vAlign="center">
           <Text type="body" size="xsm" color="secondary">
-            Low
+            {t("low")}{" "}
           </Text>
           {/* Mirrors the map's own fill-colour interpolation — same stops, same
               order — so the key stays true to the map after a theme flip
@@ -774,7 +776,7 @@ export default function WorldMapInner({
             }}
           />
           <Text type="body" size="xsm" color="secondary">
-            High
+            {t("high")}{" "}
           </Text>
         </HStack>
       )}

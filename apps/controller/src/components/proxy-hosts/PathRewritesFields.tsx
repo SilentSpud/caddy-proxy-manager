@@ -9,10 +9,12 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { PathRewriteRule } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { useTranslations } from "next-intl";
 
 type Props = { initialData?: PathRewriteRule[] };
 
 export function PathRewritesFields({ initialData = [] }: Props) {
+  const t = useTranslations("proxyHosts");
   const [rules, setRules] = useState<WithRowId<PathRewriteRule>[]>(() => withRowIds(initialData));
 
   const addRule = () => setRules((r) => [...r, withRowId({ from: "", to: "" })]);
@@ -23,7 +25,7 @@ export function PathRewritesFields({ initialData = [] }: Props) {
   return (
     <VStack gap={2}>
       <Text type="body" size="sm" weight="semibold">
-        Path Rewrites
+        {t("pathRewrites")}
       </Text>
       <input
         type="hidden"
@@ -36,7 +38,7 @@ export function PathRewritesFields({ initialData = [] }: Props) {
           {rules.map((rule, i) => (
             <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
-                label="From Path"
+                label={t("fromPath")}
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/secretpath"
@@ -44,7 +46,7 @@ export function PathRewritesFields({ initialData = [] }: Props) {
                 onChange={(next) => updateRule(rule.rowId, "from", next)}
               />
               <TextInput
-                label="Internal Target URI"
+                label={t("internalTargetUri")}
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/dns-query"
@@ -67,15 +69,14 @@ export function PathRewritesFields({ initialData = [] }: Props) {
         <Button
           variant="ghost"
           size="sm"
-          label="Add Path Rewrite"
+          label={t("addPathRewrite")}
           icon={<Plus />}
           onClick={addRule}
         />
       </HStack>
 
       <Text type="body" size="xsm" color="secondary">
-        Internally rewrite the request URI before proxying. The client URL is unchanged; the
-        upstream sees the target URI.
+        {t("internallyRewriteTheRequest")}
       </Text>
     </VStack>
   );

@@ -8,6 +8,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { useTranslations } from "next-intl";
 
 type PortsDiff = {
   currentPorts: string[];
@@ -29,6 +30,7 @@ type PortsResponse = {
 };
 
 export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }) {
+  const t = useTranslations("l4ProxyHosts");
   const [data, setData] = useState<PortsResponse | null>(null);
   const [applying, setApplying] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -119,12 +121,12 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
           {diff.needsApply && (
             <>
               <Text type="body" size="sm">
-                The caddy container needs to be recreated to expose L4 ports.
+                {t("theCaddyContainerNeeds")}
               </Text>
               {diff.requiredPorts.length > 0 && (
                 <HStack gap={1} wrap="wrap" vAlign="center">
                   <Text type="body" size="sm">
-                    Required:
+                    {t("required")}
                   </Text>
                   {diff.requiredPorts.map((p) => (
                     <Badge key={p} label={p} />
@@ -146,7 +148,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
             variant="secondary"
             size="sm"
             icon={<RefreshCw />}
-            label="Apply Ports"
+            label={t("applyPorts")}
             isLoading={applying}
             isDisabled={applying || isSpinning}
             onClick={handleApply}

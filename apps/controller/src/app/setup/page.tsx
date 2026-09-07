@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { getMigrationSource, getSetupState, SETUP_PATHS } from "@/src/lib/setup";
 import SetupAccountClient from "./SetupAccountClient";
 
-export const metadata: Metadata = {
-  title: { absolute: "Set up Caddy Proxy Manager" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("setup.account");
+  return { title: { absolute: t("metaTitle") } };
+}
 
 /**
  * The account step. Public by necessity — there is nothing to authenticate against yet — so the

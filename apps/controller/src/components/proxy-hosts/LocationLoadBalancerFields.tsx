@@ -9,6 +9,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { LoadBalancerConfig, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
+import { useTranslations } from "next-intl";
 
 const LOAD_BALANCING_POLICIES: { value: LoadBalancingPolicy; label: string }[] = [
   { value: "random", label: "Random (default)" },
@@ -66,6 +67,7 @@ type Props = {
  * object via onChange, for serializing into the location-rules JSON.
  */
 export function LocationLoadBalancerFields({ value, onChange }: Props) {
+  const t = useTranslations("proxyHosts");
   const lb = value;
   const enabled = Boolean(lb?.enabled);
   const policy = lb?.policy ?? "random";
@@ -78,14 +80,14 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
         <HStack justify="between" vAlign="center" gap={3}>
           <VStack gap={1}>
             <Text type="body" size="sm" weight="semibold">
-              Load Balancer
+              {t("loadBalancer")}
             </Text>
             <Text type="body" size="xsm" color="secondary">
-              Health checks &amp; balancing for this path&apos;s upstreams
+              {t("healthChecksAndBalancing")}
             </Text>
           </VStack>
           <Switch
-            label="Enable load balancing for this path"
+            label={t("enableLoadBalancingFor")}
             isLabelHidden
             value={enabled}
             onChange={(on) =>
@@ -97,7 +99,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
         {enabled && (
           <VStack gap={4}>
             <Selector
-              label="Selection Policy"
+              label={t("selectionPolicy")}
               size="sm"
               options={LOAD_BALANCING_POLICIES}
               value={policy}
@@ -106,9 +108,9 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
 
             {policy === "header" && (
               <TextInput
-                label="Header Field Name"
+                label={t("headerFieldName")}
                 size="sm"
-                placeholder="X-Custom-Header"
+                placeholder={t("xCustomHeader")}
                 value={lb?.policyHeaderField ?? ""}
                 onChange={(next) => patch({ policyHeaderField: str(next) })}
               />
@@ -117,14 +119,14 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
             {policy === "cookie" && (
               <Grid columns={2} gap={3}>
                 <TextInput
-                  label="Cookie Name"
+                  label={t("cookieName")}
                   size="sm"
                   placeholder="server_id"
                   value={lb?.policyCookieName ?? ""}
                   onChange={(next) => patch({ policyCookieName: str(next) })}
                 />
                 <TextInput
-                  label="Cookie Secret"
+                  label={t("cookieSecret")}
                   isOptional
                   size="sm"
                   placeholder="secret"
@@ -136,21 +138,21 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
 
             <Grid columns={3} gap={3}>
               <TextInput
-                label="Try Duration"
+                label={t("tryDuration")}
                 size="sm"
                 placeholder="5s"
                 value={lb?.tryDuration ?? ""}
                 onChange={(next) => patch({ tryDuration: str(next) })}
               />
               <TextInput
-                label="Try Interval"
+                label={t("tryInterval")}
                 size="sm"
                 placeholder="250ms"
                 value={lb?.tryInterval ?? ""}
                 onChange={(next) => patch({ tryInterval: str(next) })}
               />
               <NumberInput
-                label="Max Retries"
+                label={t("maxRetries")}
                 size="sm"
                 min={0}
                 isIntegerOnly
@@ -162,7 +164,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
             <Card variant="muted">
               <VStack gap={3}>
                 <Switch
-                  label="Active Health Checks"
+                  label={t("activeHealthChecks")}
                   value={Boolean(lb?.activeHealthCheck?.enabled)}
                   onChange={(on) =>
                     patch({
@@ -175,7 +177,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                 {lb?.activeHealthCheck?.enabled && (
                   <Grid columns={2} gap={3}>
                     <TextInput
-                      label="URI"
+                      label={t("uri")}
                       size="sm"
                       placeholder="/health"
                       value={lb.activeHealthCheck.uri ?? ""}
@@ -184,7 +186,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <NumberInput
-                      label="Port"
+                      label={t("port")}
                       size="sm"
                       min={1}
                       max={65535}
@@ -195,7 +197,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <TextInput
-                      label="Interval"
+                      label={t("interval")}
                       size="sm"
                       placeholder="30s"
                       value={lb.activeHealthCheck.interval ?? ""}
@@ -206,7 +208,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <TextInput
-                      label="Timeout"
+                      label={t("timeout")}
                       size="sm"
                       placeholder="5s"
                       value={lb.activeHealthCheck.timeout ?? ""}
@@ -217,7 +219,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <NumberInput
-                      label="Expected Status"
+                      label={t("expectedStatus")}
                       size="sm"
                       min={100}
                       max={599}
@@ -228,9 +230,9 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <TextInput
-                      label="Expected Body"
+                      label={t("expectedBody")}
                       size="sm"
-                      placeholder="OK"
+                      placeholder={t("ok")}
                       value={lb.activeHealthCheck.body ?? ""}
                       onChange={(next) =>
                         patch({ activeHealthCheck: { ...lb.activeHealthCheck!, body: str(next) } })
@@ -244,7 +246,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
             <Card variant="muted">
               <VStack gap={3}>
                 <Switch
-                  label="Passive Health Checks"
+                  label={t("passiveHealthChecks")}
                   value={Boolean(lb?.passiveHealthCheck?.enabled)}
                   onChange={(on) =>
                     patch({
@@ -257,7 +259,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                 {lb?.passiveHealthCheck?.enabled && (
                   <Grid columns={2} gap={3}>
                     <TextInput
-                      label="Fail Duration"
+                      label={t("failDuration")}
                       size="sm"
                       placeholder="30s"
                       value={lb.passiveHealthCheck.failDuration ?? ""}
@@ -271,7 +273,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <NumberInput
-                      label="Max Failures"
+                      label={t("maxFailures")}
                       size="sm"
                       min={0}
                       isIntegerOnly
@@ -281,7 +283,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }
                     />
                     <TextInput
-                      label="Unhealthy Status Codes"
+                      label={t("unhealthyStatusCodes")}
                       size="sm"
                       placeholder="500, 502, 503"
                       value={lb.passiveHealthCheck.unhealthyStatus?.join(", ") ?? ""}
@@ -299,7 +301,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                       }}
                     />
                     <TextInput
-                      label="Unhealthy Latency"
+                      label={t("unhealthyLatency")}
                       size="sm"
                       placeholder="5s"
                       value={lb.passiveHealthCheck.unhealthyLatency ?? ""}

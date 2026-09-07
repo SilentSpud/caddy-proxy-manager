@@ -30,10 +30,12 @@ import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
 import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Settings",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("settings") };
+}
 
 export default async function SettingsPage() {
   await requireAdmin();

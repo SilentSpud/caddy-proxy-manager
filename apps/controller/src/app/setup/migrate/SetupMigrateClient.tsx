@@ -32,6 +32,7 @@ import {
 } from "@/src/lib/migration/selection";
 import { skipMigration } from "./actions";
 import RestartDialog from "./RestartDialog";
+import { useTranslations } from "next-intl";
 
 export type Candidate = {
   path: string;
@@ -61,6 +62,7 @@ export default function SetupMigrateClient({
   candidates: Candidate[];
   rejected: Array<{ path: string; reason: string }>;
 }) {
+  const t = useTranslations("setup");
   const [selected, setSelected] = useState(candidates[0]?.path ?? "");
   // Everything, to start: an operator who reads none of this and presses the button gets the
   // migration they would have got before there was anything to choose.
@@ -159,17 +161,14 @@ export default function SetupMigrateClient({
       <VStack gap={5} padding={5}>
         <VStack gap={2}>
           <Heading level={1}>Migrate an existing installation</Heading>
-          <Text color="secondary">
-            A database from a previous version is on this host. Migrating copies the parts you
-            choose into PostgreSQL. The original file is not modified.
-          </Text>
+          <Text color="secondary">{t("aDatabaseFromA")}</Text>
         </VStack>
 
         {error && <StatusAlert message={error} success={false} />}
 
         <form onSubmit={runMigration}>
           <VStack gap={4}>
-            <FormCard title="Databases found">
+            <FormCard title={t("databasesFound")}>
               <VStack gap={3}>
                 {candidates.map((entry) => {
                   const isSelected = selected === entry.path;
@@ -214,7 +213,7 @@ export default function SetupMigrateClient({
             </FormCard>
 
             {rejected.length > 0 && (
-              <FormCard title="Files that were skipped">
+              <FormCard title={t("filesThatWereSkipped")}>
                 <VStack gap={2}>
                   {rejected.map((entry) => (
                     <Text key={entry.path} size="xsm" color="secondary">
@@ -225,10 +224,10 @@ export default function SetupMigrateClient({
               </FormCard>
             )}
 
-            <FormCard title="What to migrate">
+            <FormCard title={t("whatToMigrate")}>
               <VStack gap={3}>
                 <Text size="sm" color="secondary">
-                  Anything left unticked stays in the old file, which is not modified either way.
+                  {t("anythingLeftUntickedStays")}
                 </Text>
                 {MIGRATION_GROUPS.map((group) => {
                   const requiredBy = lockedBy.get(group.id);
@@ -258,7 +257,7 @@ export default function SetupMigrateClient({
             {!migratingUsers && (
               <Banner
                 status="info"
-                title="No accounts will be brought across"
+                title={t("noAccountsWillBe")}
                 description={
                   migratingOAuth
                     ? "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next — unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead."
@@ -268,7 +267,7 @@ export default function SetupMigrateClient({
             )}
 
             {needsLegacyKey && (
-              <FormCard title="This database was encrypted with a different key">
+              <FormCard title={t("thisDatabaseWasEncrypted")}>
                 <VStack gap={3}>
                   <Text size="sm" color="secondary">
                     Certificate private keys, DNS provider credentials, OAuth client secrets and
@@ -278,10 +277,10 @@ export default function SetupMigrateClient({
                   </Text>
                   <TextInput
                     {...AUTOFILL_OFF}
-                    label="The old SESSION_SECRET"
+                    label={t("theOldSessionSecret")}
                     htmlName="legacyKey"
                     type="password"
-                    description="From the .env that installation ran with, exactly as it appears there. It is checked before anything is written, used to re-encrypt these values under this deployment's own key, and not stored."
+                    description={t("fromTheEnvThat")}
                     value={legacyKey}
                     onChange={setLegacyKey}
                     isRequired
@@ -289,8 +288,8 @@ export default function SetupMigrateClient({
                   />
                   <Banner
                     status="info"
-                    title="You do not have to keep the old secret"
-                    description="Everything is re-encrypted with the SESSION_SECRET this deployment already uses, so the old one is needed for this import and never again. Migrating without it would leave those secrets unreadable, and each would have to be entered again by hand."
+                    title={t("youDoNotHave")}
+                    description={t("everythingIsReEncrypted")}
                   />
                 </VStack>
               </FormCard>
@@ -298,8 +297,8 @@ export default function SetupMigrateClient({
 
             <Banner
               status="warning"
-              title="Migrate into an empty database"
-              description="This copies rows with their original identifiers, so it expects nothing to have been created here yet. Running it against a database that is already in use is not supported."
+              title={t("migrateIntoAnEmpty")}
+              description={t("thisCopiesRowsWith")}
             />
 
             <SaveButton
@@ -309,14 +308,13 @@ export default function SetupMigrateClient({
           </VStack>
         </form>
 
-        <FormCard title="Or start fresh">
+        <FormCard title={t("orStartFresh")}>
           <VStack gap={3}>
             <Text size="sm" color="secondary">
-              Skip the migration and configure this instance from scratch. The old file is left
-              alone, and this offer will not appear again.
+              {t("skipTheMigrationAnd")}
             </Text>
             <form action={skipMigration}>
-              <Button type="submit" variant="secondary" size="sm" label="Skip and set up fresh" />
+              <Button type="submit" variant="secondary" size="sm" label={t("skipAndSetUp")} />
             </form>
           </VStack>
         </FormCard>

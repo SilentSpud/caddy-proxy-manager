@@ -1,4 +1,4 @@
-import { passwordPolicyFailures } from "./password-policy";
+import { passwordPolicyViolationsInEnglish } from "./password-policy-message";
 
 const DEV_SECRET = "dev-secret-change-in-production-12345678901234567890123456789012";
 const DEFAULT_ADMIN_PASSWORD = "admin";
@@ -135,7 +135,7 @@ function resolveAdminCredentials(): { username: string | null; password: string 
     if (password === DEFAULT_ADMIN_PASSWORD) {
       errors.push("ADMIN_PASSWORD must not be 'admin'");
     } else {
-      for (const failure of passwordPolicyFailures(password)) {
+      for (const failure of passwordPolicyViolationsInEnglish(password)) {
         errors.push(`ADMIN_PASSWORD ${failure}`);
       }
     }

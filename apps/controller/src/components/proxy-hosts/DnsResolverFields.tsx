@@ -9,12 +9,14 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { useTranslations } from "next-intl";
 
 export function DnsResolverFields({
   dnsResolver,
 }: {
   dnsResolver?: ProxyHost["dnsResolver"] | null;
 }) {
+  const t = useTranslations("proxyHosts");
   const initial = dnsResolver ?? null;
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [resolvers, setResolvers] = useState(initial?.resolvers?.join("\n") ?? "");
@@ -30,14 +32,14 @@ export function DnsResolverFields({
         <HStack justify="between" vAlign="center" gap={4}>
           <VStack gap={1}>
             <Text type="body" size="sm" weight="semibold">
-              Custom DNS Resolvers
+              {t("customDnsResolvers")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              Configure per-host DNS resolution for upstream discovery and health checks
+              {t("configurePerHostDns")}
             </Text>
           </VStack>
           <Switch
-            label="Enable custom DNS resolvers"
+            label={t("enableCustomDnsResolvers")}
             isLabelHidden
             htmlName="dnsEnabled"
             value={enabled}
@@ -50,36 +52,36 @@ export function DnsResolverFields({
         {enabled && (
           <VStack gap={5}>
             <TextArea
-              label="DNS Resolvers"
+              label={t("dnsResolvers")}
               htmlName="dnsResolvers"
               placeholder={"1.1.1.1\n9.9.9.9"}
               value={resolvers}
               onChange={setResolvers}
               rows={2}
-              description="One resolver per line (e.g., 1.1.1.1, 9.9.9.9). Used for dynamic upstream DNS resolution."
+              description={t("oneResolverPerLine")}
             />
             <TextArea
-              label="Fallback DNS Resolvers"
+              label={t("fallbackDnsResolvers")}
               isOptional
               htmlName="dnsFallbacks"
               placeholder={"1.0.0.1\n149.112.112.112"}
               value={fallbacks}
               onChange={setFallbacks}
               rows={2}
-              description="Fallback resolvers if primary fails. One per line."
+              description={t("fallbackResolversIfPrimary")}
             />
             <TextInput
-              label="DNS Query Timeout"
+              label={t("dnsQueryTimeout")}
               htmlName="dnsTimeout"
               placeholder="5s"
               value={timeout}
               onChange={setTimeout}
-              description="Timeout for DNS queries (e.g., 5s, 10s)"
+              description={t("timeoutForDnsQueries")}
             />
             <Banner
               status="info"
-              title="Per-host resolvers override global DNS settings"
-              description="Useful for upstream services that require specific DNS resolution, such as internal DNS or service discovery. Common resolvers: 1.1.1.1 (Cloudflare), 194.242.2.2 (Mullvad), 9.9.9.9 (Quad9)."
+              title={t("perHostResolversOverride")}
+              description={t("usefulForUpstreamServices")}
             />
           </VStack>
         )}

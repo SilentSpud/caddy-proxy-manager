@@ -8,10 +8,11 @@
  * POST to a setup action on a configured instance would otherwise be a way to mint one.
  */
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createOAuthProvider } from "@/src/lib/models/oauth-providers";
 import { createUser, findUserByEmail } from "@/src/lib/models/user";
 import { hashPassword } from "@/src/lib/password";
-import { passwordPolicyError } from "@/src/lib/password-policy";
+import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import { hasAnySignIn, isSetupCompleted } from "@/src/lib/setup";
 
 export type SetupActionState = { error: string | null };
@@ -25,7 +26,8 @@ export type SetupActionState = { error: string | null };
  */
 async function assertAccountStepOpen(): Promise<void> {
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
-    throw new Error("Setup has already been completed.");
+    const t = await getTranslations("setup.errors");
+    throw new Error(t("alreadyCompleted"));
   }
 }
 
@@ -38,23 +40,25 @@ export async function createFirstAdmin(
   const password = String(formData.get("password") ?? "");
   const confirmation = String(formData.get("passwordConfirmation") ?? "");
 
-  if (!username) return { error: "A username is required." };
-  if (password !== confirmation) return { error: "The two passwords do not match." };
+  const t = await getTranslations();
 
-  const policyFailure = passwordPolicyError(password);
+  if (!username) return { error: t("setup.errors.usernameRequired") };
+  if (password !== confirmation) return { error: t("setup.errors.passwordsDiffer") };
+
+  const policyFailure = passwordPolicyMessage(t, password, t("passwordPolicy.subject.password"));
   if (policyFailure) return { error: policyFailure };
 
   try {
     await assertAccountStepOpen();
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Setup is no longer open." };
+    return { error: error instanceof Error ? error.message : t("setup.errors.noLongerOpen") };
   }
 
   // The same synthetic address the environment-seeded admin has always used, so an operator who
   // later sets ADMIN_USERNAME to the same name updates this account rather than making a second.
   const email = `${username.toLowerCase()}@localhost`;
   if (await findUserByEmail(email)) {
-    return { error: "That username is already taken." };
+    return { error: t("setup.errors.usernameTaken") };
   }
 
   await createUser({
@@ -83,16 +87,18 @@ export async function configureFirstOAuthProvider(
   const clientSecret = String(formData.get("clientSecret") ?? "").trim();
   const issuer = String(formData.get("issuer") ?? "").trim();
 
-  if (!name) return { error: "A display name is required." };
-  if (!clientId || !clientSecret) return { error: "A client ID and secret are required." };
+  const t = await getTranslations("setup.errors");
+
+  if (!name) return { error: t("displayNameRequired") };
+  if (!clientId || !clientSecret) return { error: t("clientIdAndSecretRequired") };
   if (!/^https?:\/\/\S+$/.test(issuer)) {
-    return { error: "The issuer must be a URL starting with http:// or https://." };
+    return { error: t("issuerMustBeUrl") };
   }
 
   try {
     await assertAccountStepOpen();
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Setup is no longer open." };
+    return { error: error instanceof Error ? error.message : t("noLongerOpen") };
   }
 
   try {
@@ -109,7 +115,7 @@ export async function configureFirstOAuthProvider(
     });
   } catch (error) {
     console.error("Setup: failed to create the OAuth provider", error);
-    return { error: "Could not save the provider. Check the values and try again." };
+    return { error: t("providerSaveFailed") };
   }
 
   redirect("/login");

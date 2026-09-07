@@ -5,7 +5,8 @@ import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 import { config } from "@/src/lib/config";
 import { hashPassword, verifyPassword } from "@/src/lib/password";
-import { passwordPolicyError } from "@/src/lib/password-policy";
+import { getTranslations } from "next-intl/server";
+import { passwordPolicyMessage } from "@/src/lib/password-policy-message";
 
 export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
@@ -44,7 +45,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
-    const policyError = passwordPolicyError(newPassword ?? "", "New password");
+    const t = await getTranslations();
+    const policyError = passwordPolicyMessage(
+      t,
+      newPassword ?? "",
+      t("passwordPolicy.subject.newPassword"),
+    );
     if (policyError) {
       return NextResponse.json({ error: policyError }, { status: 400 });
     }

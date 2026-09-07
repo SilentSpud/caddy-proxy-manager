@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import {
   retrieveLinkingToken,
   verifyLinkingToken,
@@ -8,23 +9,24 @@ import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  const t = await getTranslations("auth.apiErrors");
   try {
     const body = await request.json();
     const { linkingId, password } = body;
 
     if (!linkingId || !password) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ error: t("missingRequiredFields") }, { status: 400 });
     }
 
     // Retrieve and consume the linking token server-side — the raw JWT never reaches the browser
     const rawToken = await retrieveLinkingToken(linkingId);
     if (!rawToken) {
-      return NextResponse.json({ error: "Authentication failed" }, { status: 401 });
+      return NextResponse.json({ error: t("authenticationFailed") }, { status: 401 });
     }
 
     const tokenPayload = await verifyLinkingToken(rawToken);
     if (!tokenPayload) {
-      return NextResponse.json({ error: "Authentication failed" }, { status: 401 });
+      return NextResponse.json({ error: t("authenticationFailed") }, { status: 401 });
     }
 
     // Rate limiting: check before attempting password verification
@@ -40,10 +42,7 @@ export async function POST(request: NextRequest) {
         data: JSON.stringify({ provider: tokenPayload.provider }),
       });
 
-      return NextResponse.json(
-        { error: "Too many attempts. Please try again later." },
-        { status: 429 },
-      );
+      return NextResponse.json({ error: t("tooManyAttempts") }, { status: 429 });
     }
 
     // Verify password and link OAuth account
@@ -67,7 +66,7 @@ export async function POST(request: NextRequest) {
         data: JSON.stringify({ provider: tokenPayload.provider }),
       });
 
-      return NextResponse.json({ error: "Authentication failed" }, { status: 401 });
+      return NextResponse.json({ error: t("authenticationFailed") }, { status: 401 });
     }
 
     // Success — clear rate limit for this user
@@ -91,6 +90,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Account linking error:", error);
-    return NextResponse.json({ error: "Failed to link account" }, { status: 500 });
+    return NextResponse.json({ error: t("linkFailed") }, { status: 500 });
   }
 }

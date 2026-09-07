@@ -47,6 +47,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
+import { useTranslations } from "next-intl";
 import {
   createAccessListAction,
   updateAccessListAction,
@@ -130,6 +131,7 @@ function MembersTab({
   list: AccessList;
   onListUpdated: (list: AccessList) => void;
 }) {
+  const t = useTranslations("accessLists");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({ username: "", password: "" });
@@ -156,16 +158,16 @@ function MembersTab({
     if (updated) onListUpdated(updated);
     try {
       await navigator.clipboard.writeText(pw);
-      toast.success("New password generated and copied");
+      toast.success(t("newPasswordGeneratedAnd"));
     } catch {
-      toast.success("New password generated");
+      toast.success(t("newPasswordGenerated"));
     }
   };
 
   const submitNew = async () => {
     if (!draft.username.trim() || !draft.password) return;
     if (list.entries.some((e) => e.username === draft.username.trim())) {
-      toast.error("Username already exists");
+      toast.error(t("usernameAlreadyExists"));
       return;
     }
     setSubmitting(true);
@@ -233,7 +235,7 @@ function MembersTab({
             variant="ghost"
             size="sm"
             label={`Regenerate password for ${row.username}`}
-            tooltip="Regenerate password (copies the new one to the clipboard)"
+            tooltip={t("regeneratePasswordCopiesThe")}
             icon={<RefreshCw />}
             onClick={() => regen(row.id)}
           />
@@ -261,7 +263,7 @@ function MembersTab({
           variant="ghost"
           size="sm"
           label={`Remove ${row.username}`}
-          tooltip="Remove"
+          tooltip={t("remove")}
           icon={<Trash2 />}
           onClick={() => removeOne(row.id)}
         />
@@ -282,13 +284,13 @@ function MembersTab({
                 variant="ghost"
                 size="sm"
                 icon={<Trash2 />}
-                label="Remove"
+                label={t("remove")}
                 onClick={removeSelected}
               />
               <Button
                 variant="ghost"
                 size="sm"
-                label="Cancel"
+                label={t("cancel")}
                 onClick={() => setSelected(new Set())}
               />
             </>
@@ -298,7 +300,7 @@ function MembersTab({
             </Text>
           )}
         </HStack>
-        <Button size="sm" icon={<Plus />} label="Add member" onClick={() => setAdding(true)} />
+        <Button size="sm" icon={<Plus />} label={t("addMember")} onClick={() => setAdding(true)} />
       </HStack>
 
       {adding && (
@@ -306,7 +308,7 @@ function MembersTab({
           <VStack gap={3}>
             <TextInput
               {...AUTOFILL_OFF}
-              label="Username"
+              label={t("username")}
               isRequired
               size="sm"
               value={draft.username}
@@ -318,19 +320,19 @@ function MembersTab({
               <HStack gap={2} vAlign="end">
                 <TextInput
                   {...AUTOFILL_OFF}
-                  label="Password"
+                  label={t("password")}
                   isRequired
                   size="sm"
                   value={draft.password}
                   onChange={(v) => setDraft({ ...draft, password: v })}
-                  placeholder="auto-generate or paste"
+                  placeholder={t("autoGenerateOrPaste")}
                   width="100%"
                 />
                 <IconButton
                   variant="secondary"
                   size="sm"
-                  label="Generate a strong password"
-                  tooltip="Generate strong password"
+                  label={t("generateAStrongPassword")}
+                  tooltip={t("generateStrongPassword")}
                   icon={<Sparkles />}
                   onClick={() => setDraft((d) => ({ ...d, password: genPassword() }))}
                 />
@@ -351,7 +353,7 @@ function MembersTab({
               <Button
                 variant="secondary"
                 size="sm"
-                label="Cancel"
+                label={t("cancel")}
                 onClick={() => {
                   setAdding(false);
                   setDraft({ username: "", password: "" });
@@ -359,7 +361,7 @@ function MembersTab({
               />
               <Button
                 size="sm"
-                label="Add"
+                label={t("add")}
                 onClick={submitNew}
                 isLoading={submitting}
                 isDisabled={!draft.username.trim() || !draft.password || submitting}
@@ -372,13 +374,13 @@ function MembersTab({
       {list.entries.length === 0 ? (
         <EmptyState
           icon={<Users />}
-          title="No members yet"
-          description="Add the first credentials. Anyone using this list to reach a proxy host will be denied until at least one account exists."
+          title={t("noMembersYet")}
+          description={t("addTheFirstCredentials")}
           actions={
             <Button
               size="sm"
               icon={<Plus />}
-              label="Add the first member"
+              label={t("addTheFirstMember")}
               onClick={() => setAdding(true)}
             />
           }
@@ -403,6 +405,7 @@ function SettingsTab({
   onListUpdated: (list: AccessList) => void;
   onDeleted: () => void;
 }) {
+  const t = useTranslations("accessLists");
   const [name, setName] = useState(list.name);
   const [desc, setDesc] = useState(list.description || "");
   const [confirm, setConfirm] = useState("");
@@ -428,7 +431,7 @@ function SettingsTab({
         description: desc.trim() || null,
       });
       onListUpdated(updated);
-      toast.success("Saved");
+      toast.success(t("saved"));
     } finally {
       setSaving(false);
     }
@@ -450,20 +453,20 @@ function SettingsTab({
   return (
     <VStack gap={6} maxWidth={672}>
       <VStack gap={3}>
-        <TextInput label="Name" isRequired size="sm" value={name} onChange={setName} />
+        <TextInput label={t("name")} isRequired size="sm" value={name} onChange={setName} />
         <TextArea
-          label="Description"
+          label={t("description")}
           isOptional
           size="sm"
           value={desc}
           onChange={setDesc}
           rows={3}
-          placeholder="What is this list for? Who manages it?"
+          placeholder={t("whatIsThisList")}
         />
         <HStack gap={2} vAlign="center">
           <Button
             size="sm"
-            label="Save changes"
+            label={t("saveChanges")}
             onClick={save}
             isLoading={saving}
             isDisabled={!dirty || !name.trim() || saving}
@@ -472,7 +475,7 @@ function SettingsTab({
             <Button
               variant="ghost"
               size="sm"
-              label="Discard"
+              label={t("discard")}
               onClick={() => {
                 setName(list.name);
                 setDesc(list.description || "");
@@ -484,9 +487,11 @@ function SettingsTab({
 
       <Card padding={3}>
         <MetadataList>
-          <MetadataListItem label="Created">{fmtDate(list.createdAt)}</MetadataListItem>
-          <MetadataListItem label="Last updated">{fmtRelative(list.updatedAt)}</MetadataListItem>
-          <MetadataListItem label="List ID">
+          <MetadataListItem label={t("created")}>{fmtDate(list.createdAt)}</MetadataListItem>
+          <MetadataListItem label={t("lastUpdated")}>
+            {fmtRelative(list.updatedAt)}
+          </MetadataListItem>
+          <MetadataListItem label={t("listId")}>
             <Text type="code" size="sm">
               {list.id}
             </Text>
@@ -497,8 +502,8 @@ function SettingsTab({
       <Banner
         status="error"
         icon={<AlertTriangle />}
-        title="Danger zone"
-        description="Delete this access list"
+        title={t("dangerZone")}
+        description={t("deleteThisAccessList")}
         collapsible={{ defaultIsOpen: true }}
       >
         <VStack gap={3}>
@@ -522,7 +527,7 @@ function SettingsTab({
               variant="destructive"
               size="sm"
               icon={<Trash2 />}
-              label="Delete list permanently"
+              label={t("deleteListPermanently")}
               isLoading={deleting}
               isDisabled={confirm !== list.name || deleting}
               onClick={handleDelete}
@@ -537,12 +542,13 @@ function SettingsTab({
 // --- Usage Tab ---
 
 function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
+  const t = useTranslations("accessLists");
   if (hosts.length === 0) {
     return (
       <EmptyState
         icon={<Globe />}
-        title="Not used by any proxy host"
-        description="This list is currently dormant. You can keep it for later, or delete it from Settings."
+        title={t("notUsedByAny")}
+        description={t("thisListIsCurrently")}
       />
     );
   }
@@ -592,14 +598,15 @@ function DetailPane({
   onListUpdated: (list: AccessList) => void;
   onDeleted: () => void;
 }) {
+  const t = useTranslations("accessLists");
   const [tab, setTab] = useState<DetailTab>("members");
 
   if (!list) {
     return (
       <EmptyState
         icon={<KeyRound />}
-        title="Select an access list"
-        description="Pick one from the list on the left, or create a new one."
+        title={t("selectAnAccessList")}
+        description={t("pickOneFromThe")}
       />
     );
   }
@@ -633,17 +640,17 @@ function DetailPane({
       <TabList value={tab} onChange={(v) => setTab(v as DetailTab)} size="sm" hasDivider>
         <Tab
           value="members"
-          label="Members"
+          label={t("members")}
           icon={<Users />}
           endContent={<Badge label={list.entries.length} />}
         />
         <Tab
           value="usage"
-          label="Used by"
+          label={t("usedBy")}
           icon={<Globe />}
           endContent={<Badge label={usage.length} />}
         />
-        <Tab value="settings" label="Settings" icon={<Settings2 />} />
+        <Tab value="settings" label={t("settings")} icon={<Settings2 />} />
       </TabList>
 
       {tab === "members" && <MembersTab list={list} onListUpdated={onListUpdated} />}
@@ -677,6 +684,7 @@ function NewListDialog({
   onClose: () => void;
   onCreate: (list: AccessList) => void;
 }) {
+  const t = useTranslations("accessLists");
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [seed, setSeed] = useState<WithRowId<SeedMember>[]>(() => [blankSeedMember()]);
@@ -715,39 +723,39 @@ function NewListDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title="New access list"
+      title={t("newAccessList")}
       maxWidth="lg"
-      submitLabel="Create list"
+      submitLabel={t("createList")}
       onSubmit={submit}
       isSubmitting={submitting}
       isSubmitDisabled={!name.trim()}
     >
       <VStack gap={4}>
         <Text type="body" size="sm" color="secondary">
-          Define a set of credentials you can attach to one or more proxy hosts.
+          {t("defineASetOf")}
         </Text>
 
         <TextInput
-          label="Name"
+          label={t("name")}
           isRequired
           size="sm"
           value={name}
           onChange={setName}
-          placeholder="e.g. Internal — Engineering"
+          placeholder={t("eGInternalEngineering")}
           hasAutoFocus
         />
         <TextInput
-          label="Description"
+          label={t("description")}
           isOptional
           size="sm"
           value={desc}
           onChange={setDesc}
-          placeholder="What is this list for?"
+          placeholder={t("whatIsThisList2")}
         />
 
         <VStack gap={2}>
           <Text type="label" size="xsm" color="secondary">
-            Seed members (optional)
+            {t("seedMembersOptional")}
           </Text>
           {seed.map((s, i) => (
             <HStack key={s.rowId} gap={2} vAlign="end">
@@ -779,7 +787,7 @@ function NewListDialog({
                 variant="secondary"
                 size="sm"
                 label={`Generate a password for seed member ${i + 1}`}
-                tooltip="Generate password"
+                tooltip={t("generatePassword")}
                 icon={<Sparkles />}
                 onClick={() =>
                   setSeed(
@@ -791,7 +799,7 @@ function NewListDialog({
                 variant="ghost"
                 size="sm"
                 label={`Remove seed member ${i + 1}`}
-                tooltip="Remove"
+                tooltip={t("remove")}
                 icon={<X />}
                 onClick={() =>
                   setSeed(
@@ -808,7 +816,7 @@ function NewListDialog({
               variant="ghost"
               size="sm"
               icon={<Plus />}
-              label="Add another member"
+              label={t("addAnotherMember")}
               onClick={() => setSeed([...seed, blankSeedMember()])}
             />
           </HStack>
@@ -848,6 +856,7 @@ function ListsRail({
   setSort: (s: SortKey) => void;
   usage: Record<number, AccessListUsage[]>;
 }) {
+  const t = useTranslations("accessLists");
   const filtered = useMemo(() => {
     let arr = lists.slice();
     const q = query.trim().toLowerCase();
@@ -879,22 +888,22 @@ function ListsRail({
             {lists.length} {lists.length === 1 ? "list" : "lists"} · HTTP basic auth
           </Text>
         </VStack>
-        <Button size="sm" icon={<Plus />} label="New" onClick={onNew} />
+        <Button size="sm" icon={<Plus />} label={t("new")} onClick={onNew} />
       </HStack>
 
       <HStack gap={2} vAlign="center">
         <SearchField
           value={query}
           onChange={setQuery}
-          placeholder="Search lists or members..."
-          label="Search access lists"
+          placeholder={t("searchListsOrMembers")}
+          label={t("searchAccessLists")}
           width="100%"
         />
         <Kbd keys="mod+K" />
       </HStack>
 
       <SegmentedControl
-        label="Sort access lists"
+        label={t("sortAccessLists")}
         size="sm"
         layout="fill"
         value={sort}
@@ -910,7 +919,12 @@ function ListsRail({
           title={`No lists match "${query}"`}
           isCompact
           actions={
-            <Button variant="ghost" size="sm" label="Clear search" onClick={() => setQuery("")} />
+            <Button
+              variant="ghost"
+              size="sm"
+              label={t("clearSearch")}
+              onClick={() => setQuery("")}
+            />
           }
         />
       ) : (
@@ -946,6 +960,7 @@ function ListsRail({
 // --- Main Client Component ---
 
 export default function AccessListsClient({ lists: initialLists, usage: initialUsage }: Props) {
+  const t = useTranslations("accessLists");
   const router = useRouter();
   const [lists, setLists] = useState(initialLists);
   const [usage, setUsage] = useState(initialUsage);
@@ -1011,7 +1026,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
       <Layout
         height="fill"
         start={
-          <LayoutPanel width={320} hasDivider role="navigation" label="Access lists">
+          <LayoutPanel width={320} hasDivider role="navigation" label={t("accessLists")}>
             <div ref={searchRef}>
               <ListsRail
                 lists={lists}

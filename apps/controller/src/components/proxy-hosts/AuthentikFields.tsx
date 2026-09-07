@@ -9,6 +9,7 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AuthentikSettings } from "@/lib/settings";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
+import { useTranslations } from "next-intl";
 
 const AUTHENTIK_DEFAULT_HEADERS = [
   "X-Authentik-Username",
@@ -56,6 +57,7 @@ export function AuthentikFields({
   /** Global Authentik defaults for blank fields. Required so a call site cannot omit it (#232). */
   defaults: AuthentikSettings | null;
 }) {
+  const t = useTranslations("proxyHosts");
   const initial = authentik ?? null;
   const [enabled, setEnabled] = useState(false);
   const [outpostDomain, setOutpostDomain] = useState("");
@@ -92,14 +94,14 @@ export function AuthentikFields({
         <HStack justify="between" vAlign="center" gap={4}>
           <VStack gap={1}>
             <Text type="body" size="sm" weight="semibold">
-              Authentik Forward Auth
+              {t("authentikForwardAuth")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              Proxy authentication via Authentik outpost
+              {t("proxyAuthenticationViaAuthentik")}
             </Text>
           </VStack>
           <Switch
-            label="Enable Authentik forward auth"
+            label={t("enableAuthentikForwardAuth")}
             isLabelHidden
             value={enabled}
             onChange={setEnabled}
@@ -113,7 +115,7 @@ export function AuthentikFields({
         {enabled && (
           <VStack gap={4}>
             <TextInput
-              label="Outpost Domain"
+              label={t("outpostDomain")}
               htmlName="authentikOutpostDomain"
               placeholder="outpost.goauthentik.io"
               value={outpostDomain}
@@ -121,7 +123,7 @@ export function AuthentikFields({
               isRequired
             />
             <TextInput
-              label="Outpost Upstream URL"
+              label={t("outpostUpstreamUrl")}
               htmlName="authentikOutpostUpstream"
               placeholder="https://outpost.internal:9000"
               value={outpostUpstream}
@@ -129,7 +131,7 @@ export function AuthentikFields({
               isRequired
             />
             <TextInput
-              label="Auth Endpoint"
+              label={t("authEndpoint")}
               isOptional
               htmlName="authentikAuthEndpoint"
               placeholder="/outpost.goauthentik.io/auth/caddy"
@@ -137,43 +139,43 @@ export function AuthentikFields({
               onChange={setAuthEndpoint}
             />
             <TextArea
-              label="Headers to Copy"
+              label={t("headersToCopy")}
               htmlName="authentikCopyHeaders"
               value={copyHeadersValue}
               onChange={setCopyHeadersValue}
               rows={3}
             />
             <TextInput
-              label="Trusted Proxies"
+              label={t("trustedProxies")}
               htmlName="authentikTrustedProxies"
               value={trustedProxiesValue}
               onChange={setTrustedProxiesValue}
             />
             <TextArea
-              label="Protected Paths"
+              label={t("protectedPaths")}
               isOptional
               htmlName="authentikProtectedPaths"
               placeholder="/secret/*, /admin/*"
               value={protectedPaths}
               onChange={setProtectedPaths}
               rows={2}
-              description="Leave empty to protect entire domain. Specify paths to protect specific routes only."
+              description={t("leaveEmptyToProtect")}
             />
             <TextArea
-              label="Excluded Paths"
+              label={t("excludedPaths")}
               isOptional
               htmlName="authentikExcludedPaths"
               placeholder="/share/*, /rest/*"
               value={excludedPaths}
               onChange={setExcludedPaths}
               rows={2}
-              description="Paths to exclude from authentication. These paths bypass forward auth while all other paths remain protected. Ignored if Protected Paths is set."
+              description={t("pathsToExcludeFrom")}
             />
 
             <VStack gap={1}>
               <CheckboxInput
-                label="Set Host Header for Outpost"
-                description="Recommended: keep enabled. Only disable if using IP-based outpost access or troubleshooting routing issues."
+                label={t("setHostHeaderFor")}
+                description={t("recommendedKeepEnabledOnly")}
                 htmlName="authentikSetHostHeader"
                 value={setHostHeader}
                 onChange={setSetHostHeader}

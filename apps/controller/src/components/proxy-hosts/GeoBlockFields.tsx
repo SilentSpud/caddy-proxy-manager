@@ -26,12 +26,14 @@ import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
 import { COUNTRIES, flagEmoji } from "./countries";
 import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
+import { useTranslations } from "next-intl";
 
 // ─── GeoIpStatus ─────────────────────────────────────────────────────────────
 
 type GeoIpStatusData = { enabled?: boolean; country: boolean; asn: boolean } | null;
 
 function GeoIpStatus() {
+  const t = useTranslations("proxyHosts");
   const [status, setStatus] = useState<GeoIpStatusData>(null);
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +46,7 @@ function GeoIpStatus() {
   }, []);
 
   if (loading) {
-    return <Spinner size="sm" label="Checking GeoIP databases" />;
+    return <Spinner size="sm" label={t("checkingGeoipDatabases")} />;
   }
 
   // `enabled: false` is a deliberate choice rather than a missing file, so it gets its own label
@@ -117,6 +119,7 @@ function CodeMultiSelect({
   initialValues?: string[];
   searchPlaceholder?: string;
 }) {
+  const t = useTranslations("proxyHosts");
   const [selected, setSelected] = useState<string[]>(() =>
     initialValues.map((c) => c.toUpperCase()).filter(Boolean),
   );
@@ -134,7 +137,7 @@ function CodeMultiSelect({
         hasSelectAll
         triggerDisplay="badges"
         maxBadges={6}
-        placeholder="None selected"
+        placeholder={t("noneSelected")}
       />
     </>
   );
@@ -224,6 +227,7 @@ function TagInput({
 type HeaderRow = { key: string; value: string };
 
 function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<string, string> }) {
+  const t = useTranslations("proxyHosts");
   const [rows, setRows] = useState<WithRowId<HeaderRow>[]>(() =>
     withRowIds(Object.entries(initialHeaders).map(([key, value]) => ({ key, value }))),
   );
@@ -232,12 +236,12 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
     <VStack gap={2}>
       <HStack justify="between" vAlign="center">
         <Text type="body" size="sm" weight="semibold">
-          Custom Response Headers
+          {t("customResponseHeaders")}
         </Text>
         <IconButton
           variant="ghost"
           size="sm"
-          label="Add response header"
+          label={t("addResponseHeader")}
           icon={<Plus />}
           onClick={() => setRows((prev) => [...prev, withRowId({ key: "", value: "" })])}
         />
@@ -245,7 +249,7 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
 
       {rows.length === 0 ? (
         <Text type="body" size="xsm" color="secondary">
-          No custom headers — use the + button to add one.
+          {t("noCustomHeadersUse")}
         </Text>
       ) : (
         <VStack gap={2}>
@@ -254,10 +258,10 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
               <input type="hidden" name="geoblockResponseHeadersKeys[]" value={row.key} />
               <input type="hidden" name="geoblockResponseHeadersValues[]" value={row.value} />
               <TextInput
-                label="Header"
+                label={t("header")}
                 isLabelHidden={i > 0}
                 size="sm"
-                placeholder="Header"
+                placeholder={t("header")}
                 value={row.key}
                 onChange={(next) =>
                   setRows((prev) =>
@@ -266,10 +270,10 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
                 }
               />
               <TextInput
-                label="Value"
+                label={t("value")}
                 isLabelHidden={i > 0}
                 size="sm"
-                placeholder="Value"
+                placeholder={t("value")}
                 value={row.value}
                 onChange={(next) =>
                   setRows((prev) =>
@@ -301,6 +305,7 @@ type RulesPanelProps = {
 };
 
 function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
+  const t = useTranslations("proxyHosts");
   const cap = prefix === "block" ? "Block" : "Allow";
   const countries =
     prefix === "block" ? (initial?.block_countries ?? []) : (initial?.allow_countries ?? []);
@@ -315,7 +320,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
       <CodeMultiSelect
         key={`${prefix}-countries-${resetKey}`}
         name={`geoblock${cap}Countries`}
-        label="Countries"
+        label={t("countries")}
         options={COUNTRY_OPTIONS}
         initialValues={countries}
         searchPlaceholder="Search countries…"
@@ -326,7 +331,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
       <CodeMultiSelect
         key={`${prefix}-continents-${resetKey}`}
         name={`geoblock${cap}Continents`}
-        label="Continents"
+        label={t("continents")}
         options={CONTINENT_OPTIONS}
         initialValues={continents}
       />
@@ -336,7 +341,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
       <TagInput
         key={`${prefix}-asns-${resetKey}`}
         name={`geoblock${cap}Asns`}
-        label="ASNs"
+        label={t("asns")}
         initialValues={asns.map(String)}
         placeholder="13335, 15169…"
         helperText="Autonomous System Numbers — press Enter to add"
@@ -347,7 +352,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
         <TagInput
           key={`${prefix}-cidrs-${resetKey}`}
           name={`geoblock${cap}Cidrs`}
-          label="CIDRs"
+          label={t("cidrs")}
           initialValues={cidrs}
           placeholder="10.0.0.0/8…"
           helperText="Press Enter to add"
@@ -355,7 +360,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
         <TagInput
           key={`${prefix}-ips-${resetKey}`}
           name={`geoblock${cap}Ips`}
-          label="IP Addresses"
+          label={t("ipAddresses")}
           initialValues={ips}
           placeholder="1.2.3.4…"
           helperText="Press Enter to add"
@@ -379,6 +384,7 @@ const RFC1918_CIDRS = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"];
 const BLOCK_ALL_CIDR = "0.0.0.0/0";
 
 export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBlockFieldsProps) {
+  const t = useTranslations("proxyHosts");
   const rawInitial = initialValues?.geoblock ?? null;
   // Geoblocking is entirely the caddy-blocker plugin. With it off the rules would be recorded and
   // then never emitted, so the switch is locked rather than left to look functional.
@@ -449,12 +455,12 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
             <VStack gap={1}>
               <HStack gap={2} vAlign="center" wrap="wrap">
                 <Text type="body" size="sm" weight="bold">
-                  Geo Blocking
+                  {t("geoBlocking")}
                 </Text>
                 <GeoIpStatus />
               </HStack>
               <Text type="body" size="sm" color="secondary">
-                Block or allow traffic by country, continent, ASN, CIDR, or IP
+                {t("blockOrAllowTraffic")}
               </Text>
             </VStack>
           </HStack>
@@ -462,7 +468,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               ModuleGated wraps it in the tooltip that explains why. */}
           <ModuleGated feature="geoblock">
             <Switch
-              label="Enable geo blocking"
+              label={t("enableGeoBlocking")}
               isLabelHidden
               htmlName="geoblockEnabled"
               value={enabled}
@@ -488,12 +494,12 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
             {showModeSelector && (
               <>
                 <SegmentedControl
-                  label="Global rule handling"
+                  label={t("globalRuleHandling")}
                   value={mode}
                   onChange={(next) => setMode(next as GeoBlockMode)}
                 >
-                  <SegmentedControlItem value="merge" label="Merge with global" />
-                  <SegmentedControlItem value="override" label="Override global" />
+                  <SegmentedControlItem value="merge" label={t("mergeWithGlobal")} />
+                  <SegmentedControlItem value="override" label={t("overrideGlobal")} />
                 </SegmentedControl>
                 <Divider />
               </>
@@ -502,20 +508,20 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
 
             <HStack gap={2} vAlign="center">
               <Text type="body" size="xsm" color="secondary">
-                Presets:
+                {t("presets")}
               </Text>
               <Button
                 size="sm"
                 variant="secondary"
-                label="LAN Only (RFC1918)"
+                label={t("lanOnlyRfc1918")}
                 icon={<Home />}
                 onClick={applyLanOnlyPreset}
               />
             </HStack>
 
             <TabList value={activeTab} onChange={setActiveTab} layout="fill">
-              <Tab value="block" label="Block Rules" />
-              <Tab value="allow" label="Allow Rules" />
+              <Tab value="block" label={t("blockRules")} />
+              <Tab value="allow" label={t("allowRules")} />
             </TabList>
 
             {/* Both panels stay mounted and the inactive one is hidden, rather
@@ -531,7 +537,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               <div hidden={activeTab !== "allow"}>
                 <VStack gap={3}>
                   <Text type="body" size="xsm" color="secondary">
-                    Allow rules take precedence over block rules.
+                    {t("allowRulesTakePrecedence")}
                   </Text>
                   <RulesPanel prefix="allow" initial={initial} resetKey={resetKey} />
                 </VStack>
@@ -543,15 +549,15 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                 <TagInput
                   key={`trusted-proxies-${resetKey}`}
                   name="geoblockTrustedProxies"
-                  label="Trusted Proxies"
+                  label={t("trustedProxies")}
                   initialValues={initial?.trusted_proxies ?? []}
-                  placeholder="private_ranges, 10.0.0.0/8…"
+                  placeholder={t("privateRanges100")}
                   helperText="Used to parse X-Forwarded-For. Use private_ranges for all RFC-1918 ranges."
                 />
 
                 <CheckboxInput
-                  label="Fail closed (block indeterminate IPs)"
-                  description="Blocks requests where the real client IP cannot be determined, e.g. behind a trusted proxy with no usable X-Forwarded-For. Default: off (fail-open)."
+                  label={t("failClosedBlockIndeterminate")}
+                  description={t("blocksRequestsWhereThe")}
                   htmlName="geoblockFailClosed"
                   value={failClosed}
                   onChange={setFailClosed}
@@ -561,29 +567,29 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
 
                 <Grid columns={3} gap={4}>
                   <NumberInput
-                    label="Status Code"
+                    label={t("statusCode")}
                     htmlName="geoblockResponseStatus"
                     min={100}
                     max={599}
                     isIntegerOnly
                     value={responseStatus}
                     onChange={setResponseStatus}
-                    description="HTTP status when blocked"
+                    description={t("httpStatusWhenBlocked")}
                   />
                   <TextInput
-                    label="Response Body"
+                    label={t("responseBody")}
                     htmlName="geoblockResponseBody"
                     value={responseBody}
                     onChange={setResponseBody}
-                    description="Body text returned to blocked clients"
+                    description={t("bodyTextReturnedTo")}
                   />
                   <TextInput
-                    label="Redirect URL"
+                    label={t("redirectUrl")}
                     htmlName="geoblockRedirectUrl"
                     value={redirectUrl}
                     onChange={setRedirectUrl}
                     placeholder="https://example.com/blocked"
-                    description="If set, sends a 302 redirect instead of the status/body above"
+                    description={t("ifSetSendsA")}
                   />
                 </Grid>
 

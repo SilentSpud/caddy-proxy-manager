@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '@/tests/helpers/next-intl';
 import forge from 'node-forge';
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+
+// The action reports the password rule to the operator, so it asks for a translator; a unit test
+// has no request for one to resolve against.
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 vi.mock('@/src/lib/auth', () => ({
   requireAdmin: vi.fn().mockResolvedValue({ user: { id: '1' } }),

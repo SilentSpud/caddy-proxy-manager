@@ -5,6 +5,7 @@ import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { HStack } from "@astryxdesign/core/Stack";
 import { Button } from "@astryxdesign/core/Button";
+import { useTranslations } from "next-intl";
 
 type AppDialogProps = {
   open: boolean;
@@ -41,6 +42,7 @@ export function AppDialog({
   isSubmitting = false,
   isSubmitDisabled = false,
 }: AppDialogProps) {
+  const t = useTranslations("ui");
   return (
     <Dialog
       isOpen={open}
@@ -57,7 +59,7 @@ export function AppDialog({
             <HStack gap={2} justify="end">
               {actions ?? (
                 <>
-                  <Button variant="secondary" label="Cancel" onClick={onClose} />
+                  <Button variant="secondary" label={t("cancel")} onClick={onClose} />
                   {onSubmit && (
                     <Button
                       label={submitLabel}

@@ -6,6 +6,7 @@ import { encryptSecret, decryptSecret } from "../secret";
 import type { AppRole } from "../oidc-groups";
 import { isAppRole } from "../oidc-groups";
 import { toOAuthProviderView, type OAuthProviderView } from "../oauth-provider-view";
+import { domainError } from "../domain-error";
 
 /** Per-provider OIDC group mapping, shared by the type, create and update paths. */
 export type OAuthGroupMapping = {
@@ -208,11 +209,11 @@ export async function deleteOAuthProvider(id: string): Promise<void> {
   });
 
   if (!row) {
-    throw new Error("OAuth provider not found");
+    throw domainError("oauthProviderNotFound");
   }
 
   if (row.source === "env") {
-    throw new Error("Cannot delete an environment-sourced OAuth provider");
+    throw domainError("cannotDeleteAnEnvironmentSourced");
   }
 
   await db.delete(oauthProviders).where(eq(oauthProviders.id, id));
