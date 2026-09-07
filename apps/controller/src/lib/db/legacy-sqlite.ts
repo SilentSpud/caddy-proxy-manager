@@ -111,6 +111,23 @@ function fixSessionsSchema(client: Database) {
   }
 }
 
+/** The columns the rebuild below writes; kept beside it so the readiness check cannot drift. */
+const REBUILT_ACCOUNT_COLUMNS = [
+  "id",
+  "userId",
+  "accountId",
+  "providerId",
+  "accessToken",
+  "refreshToken",
+  "idToken",
+  "accessTokenExpiresAt",
+  "refreshTokenExpiresAt",
+  "scope",
+  "password",
+  "createdAt",
+  "updatedAt",
+] as const;
+
 /**
  * Ensure `accounts.id` is INTEGER PRIMARY KEY AUTOINCREMENT — some upgraded deployments have a
  * NOT NULL non-rowid column, failing inserts that omit it. Accounts are durable, so preserve rows.
@@ -128,7 +145,36 @@ function fixAccountsSchema(client: Database) {
     if (!idCol) return;
     const idIsCorrect = idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1;
 
-    if (idIsCorrect) {
+    // The whole shape the rebuild below produces, not just `id`: a table can have a sound id and
+    // still be missing a column or the identity index, and returning early on `id` alone would
+    // leave it that way. `accounts_provider_account_idx` is the one that matters most — without it
+    // nothing stops two rows claiming the same (providerId, accountId).
+    const columnNames = new Set(cols.map((c) => c.name));
+    const hasAllColumns = REBUILT_ACCOUNT_COLUMNS.every((name) => columnNames.has(name));
+
+    const indexes = client.prepare('PRAGMA index_list("accounts")').all() as Array<{
+      name: string;
+      unique: number;
+    }>;
+    const indexColumns = (name: string) =>
+      (
+        client.prepare(`PRAGMA index_info("${name}")`).all() as Array<{
+          name: string;
+          seqno: number;
+        }>
+      )
+        .sort((left, right) => left.seqno - right.seqno)
+        .map((column) => column.name)
+        .join(",");
+    const providerIndex = indexes.find(
+      (index) => index.name === "accounts_provider_account_idx" && index.unique === 1,
+    );
+    const userIndex = indexes.find((index) => index.name === "accounts_user_idx");
+    const hasProviderIndex =
+      providerIndex !== undefined && indexColumns(providerIndex.name) === "providerId,accountId";
+    const hasUserIndex = userIndex !== undefined && indexColumns(userIndex.name) === "userId";
+
+    if (idIsCorrect && hasAllColumns && hasProviderIndex && hasUserIndex) {
       return;
     }
 
