@@ -2703,10 +2703,10 @@ const spec = {
       GeneralSettings: {
         type: "object",
         properties: {
-          primaryDomain: { type: "string", example: "example.com" },
+          defaultDomain: { type: "string", example: "example.com" },
           acmeEmail: { type: "string", format: "email", example: "admin@example.com" },
         },
-        required: ["primaryDomain"],
+        required: ["defaultDomain"],
       },
       CloudflareSettings: {
         type: "object",

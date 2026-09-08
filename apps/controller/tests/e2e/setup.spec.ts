@@ -131,7 +131,7 @@ test.describe('First-run setup', () => {
 
     // Prefilled from the public URL rather than left blank: it is required, and an empty required
     // field is the one thing that can stop setup finishing.
-    await expect(page.locator('input[name="primaryDomain"]')).toHaveValue(
+    await expect(page.locator('input[name="defaultDomain"]')).toHaveValue(
       new URL(SETUP_ORIGIN).hostname,
     );
   });

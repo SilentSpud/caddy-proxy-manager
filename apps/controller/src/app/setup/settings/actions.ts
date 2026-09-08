@@ -119,7 +119,7 @@ export async function saveSetupSettings(
   try {
     const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
     general = validateSettingsGroup("general", {
-      primaryDomain: String(formData.get("primaryDomain") ?? "").trim(),
+      defaultDomain: String(formData.get("defaultDomain") ?? "").trim(),
       // Omitted rather than empty when blank: the validator treats the key as optional, and
       // storing "" would hand an empty contact to the ACME issuer instead of leaving it unset.
       ...(acmeEmail === "" ? {} : { acmeEmail }),

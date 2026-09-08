@@ -899,8 +899,8 @@ function GeneralSection({
   generalFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
-  const [primaryDomain, setPrimaryDomain] = useState(
-    general?.primaryDomain ?? "caddyproxymanager.com",
+  const [defaultDomain, setDefaultDomain] = useState(
+    general?.defaultDomain ?? "caddyproxymanager.com",
   );
   const [acmeEmail, setAcmeEmail] = useState(general?.acmeEmail ?? "");
 
@@ -913,11 +913,11 @@ function GeneralSection({
           )}
           <TextInput
             {...NATIVE_REQUIRED}
-            label={t("primaryDomain")}
-            description={t("primaryDomainHelp")}
-            htmlName="primaryDomain"
-            value={primaryDomain}
-            onChange={setPrimaryDomain}
+            label={t("defaultDomain")}
+            description={t("defaultDomainHelp")}
+            htmlName="defaultDomain"
+            value={defaultDomain}
+            onChange={setDefaultDomain}
             isRequired
           />
           <TextInput

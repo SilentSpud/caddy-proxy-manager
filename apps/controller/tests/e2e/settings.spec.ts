@@ -225,14 +225,14 @@ test.describe('Settings — General', () => {
   // FormRow uses <div> labels (not <Label htmlFor>), so we target inputs by name attribute
   test('shows primary domain and ACME email fields', async ({ page }) => {
     await goToSection(page, 'General');
-    await expect(page.locator('input[name="primaryDomain"]')).toBeVisible();
+    await expect(page.locator('input[name="defaultDomain"]')).toBeVisible();
     await expect(page.locator('input[name="acmeEmail"]')).toBeVisible();
     await expect(page.getByRole('button', { name: /save general settings/i })).toBeVisible();
   });
 
   test('fill primary domain and save', async ({ page }) => {
     await goToSection(page, 'General');
-    const domainInput = page.locator('input[name="primaryDomain"]');
+    const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('test.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
     await expect(page.getByRole('button', { name: /save general settings/i })).toBeEnabled({
@@ -242,17 +242,17 @@ test.describe('Settings — General', () => {
 
   test('primary domain persists after save and page reload', async ({ page }) => {
     await goToSection(page, 'General');
-    const domainInput = page.locator('input[name="primaryDomain"]');
+    const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('persist-test.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
     await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
 
     // Reload and navigate back
     await goToSection(page, 'General');
-    await expect(page.locator('input[name="primaryDomain"]')).toHaveValue('persist-test.local');
+    await expect(page.locator('input[name="defaultDomain"]')).toHaveValue('persist-test.local');
 
     // Reset
-    await page.locator('input[name="primaryDomain"]').fill('caddyproxymanager.com');
+    await page.locator('input[name="defaultDomain"]').fill('caddyproxymanager.com');
     await page.getByRole('button', { name: /save general settings/i }).click();
     await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
   });
@@ -266,7 +266,7 @@ test.describe('Settings — General', () => {
     // Deliberately no reload before the assertion: the test above reloads, which repopulates from
     // the database and would hide exactly this.
     await goToSection(page, 'General');
-    const domain = page.locator('input[name="primaryDomain"]');
+    const domain = page.locator('input[name="defaultDomain"]');
     const save = page.getByRole('button', { name: /save general settings/i });
     const original = await domain.inputValue();
 
@@ -841,18 +841,18 @@ test.describe('Settings — form data round-trip via API', () => {
 
   test('general settings: UI save is reflected in API', async ({ page }) => {
     await goToSection(page, 'General');
-    await page.locator('input[name="primaryDomain"]').fill('api-roundtrip.local');
+    await page.locator('input[name="defaultDomain"]').fill('api-roundtrip.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
     await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
 
     const res = await page.request.get(API_SETTINGS_GENERAL);
     const data = await res.json();
-    expect(data.primaryDomain).toBe('api-roundtrip.local');
+    expect(data.defaultDomain).toBe('api-roundtrip.local');
 
     // Reset
     await page.request.put(API_SETTINGS_GENERAL, {
       headers: { Origin: SETTINGS_ORIGIN },
-      data: { primaryDomain: 'caddyproxymanager.com', acmeEmail: '' },
+      data: { defaultDomain: 'caddyproxymanager.com', acmeEmail: '' },
     });
   });
 

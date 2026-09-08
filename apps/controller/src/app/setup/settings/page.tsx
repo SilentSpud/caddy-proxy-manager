@@ -70,8 +70,8 @@ export default async function SetupSettingsPage() {
       fields={fields}
       groups={SETTING_GROUPS.map((group) => ({ id: group, title: settingGroupTitle(t, group) }))}
       general={{
-        primaryDomain:
-          general?.primaryDomain ?? domainFromBaseUrl(resolved.get(baseUrl.key)?.value),
+        defaultDomain:
+          general?.defaultDomain ?? domainFromBaseUrl(resolved.get(baseUrl.key)?.value),
         acmeEmail: general?.acmeEmail ?? "",
       }}
       oauth={oauthCard(providers.map((provider) => provider.name))}

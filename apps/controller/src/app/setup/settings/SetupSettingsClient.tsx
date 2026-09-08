@@ -48,7 +48,7 @@ export type SettingField = {
   source: "stored" | "environment" | "default";
 };
 
-export type GeneralFields = { primaryDomain: string; acmeEmail: string };
+export type GeneralFields = { defaultDomain: string; acmeEmail: string };
 
 export type OAuthPrefill = {
   providerName: string;
@@ -93,7 +93,7 @@ export default function SetupSettingsClient({
   const t = useTranslations("setup");
   const [state, submit] = useActionState(saveSetupSettings, { error: null });
 
-  const [primaryDomain, setPrimaryDomain] = useState(general.primaryDomain);
+  const [defaultDomain, setDefaultDomain] = useState(general.defaultDomain);
   const [acmeEmail, setAcmeEmail] = useState(general.acmeEmail);
   const [idp, setIdp] = useState<OAuthPrefill>(oauth.prefill);
 
@@ -145,11 +145,11 @@ export default function SetupSettingsClient({
                   // marks the field, the attribute is what stops an empty one being posted. The
                   // save refuses it either way; the browser refusing first is a better answer.
                   {...NATIVE_REQUIRED}
-                  label={t("primaryDomain")}
-                  description={t("primaryDomainHelp")}
-                  htmlName="primaryDomain"
-                  value={primaryDomain}
-                  onChange={setPrimaryDomain}
+                  label={t("defaultDomain")}
+                  description={t("defaultDomainHelp")}
+                  htmlName="defaultDomain"
+                  value={defaultDomain}
+                  onChange={setDefaultDomain}
                   isRequired
                   width="100%"
                 />

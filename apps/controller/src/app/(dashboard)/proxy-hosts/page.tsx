@@ -3,7 +3,7 @@ import { listProxyHostsPaginated, countProxyHosts } from "@/src/lib/models/proxy
 import { listCertificates } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
 import { listAccessLists } from "@/src/lib/models/access-lists";
-import { getAuthentikSettings, getTailscaleSettings } from "@/src/lib/settings";
+import { getAuthentikSettings, getGeneralSettings, getTailscaleSettings } from "@/src/lib/settings";
 import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
 import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-certificates";
 import { listUsers } from "@/src/lib/models/user";
@@ -53,6 +53,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     accessLists,
     authentikDefaults,
     tailscaleSettings,
+    generalSettings,
   ] = await Promise.all([
     listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds),
     countProxyHosts(search, visibleIds),
@@ -61,6 +62,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     listAccessLists(),
     getAuthentikSettings(),
     getTailscaleSettings(),
+    getGeneralSettings(),
   ]);
   // These are safe to fail if the RBAC migration hasn't been applied yet
   const [mtlsRoles, issuedClientCerts, allUsers, allGroups] = await Promise.all([
@@ -115,6 +117,9 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       caCertificates={caCertificates}
       accessLists={accessLists}
       authentikDefaults={authentikDefaults}
+      // Prefills the domains field of a new host. Empty when setup has not run, which is the
+      // same as having no default: the field simply starts blank.
+      defaultDomain={generalSettings?.defaultDomain ?? ""}
       // Only what the host form needs to warn accurately: whether the feature is on, whether a
       // key exists at all, and the node a host inherits. Never the key itself.
       //

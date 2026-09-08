@@ -22,7 +22,7 @@ const geoblock = {
 };
 
 const validGroups: Record<string, Record<string, unknown>> = {
-  general: { primaryDomain: 'example.com', acmeEmail: 'admin@example.com' },
+  general: { defaultDomain: 'example.com', acmeEmail: 'admin@example.com' },
   acme: { caUrl: 'https://ca.example.com/acme/directory' },
   cloudflare: { apiToken: 'secret', zoneId: 'zone' },
   authentik: { outpostDomain: 'auth.example.com', outpostUpstream: 'http://authentik:9000' },
@@ -179,10 +179,10 @@ describe('REST settings runtime validation', () => {
   it('accepts empty optional email and multiline ACME root PEM values', () => {
     expect(
       validateSettingsGroup('general', {
-        primaryDomain: 'example.com',
+        defaultDomain: 'example.com',
         acmeEmail: '',
       }),
-    ).toEqual({ primaryDomain: 'example.com', acmeEmail: '' });
+    ).toEqual({ defaultDomain: 'example.com', acmeEmail: '' });
 
     const caRootPem = '-----BEGIN CERTIFICATE-----\r\nMIIB\n-----END CERTIFICATE-----\n';
     expect(validateSettingsGroup('acme', { caRootPem })).toEqual({ caRootPem });
@@ -190,10 +190,10 @@ describe('REST settings runtime validation', () => {
 
   it('validates the shape of an ACME contact address', () => {
     const withEmail = (acmeEmail: string) =>
-      validateSettingsGroup('general', { primaryDomain: 'example.com', acmeEmail });
+      validateSettingsGroup('general', { defaultDomain: 'example.com', acmeEmail });
 
     for (const good of ['admin@example.com', 'admin@mail.example.co.uk']) {
-      expect(withEmail(good), good).toEqual({ primaryDomain: 'example.com', acmeEmail: good });
+      expect(withEmail(good), good).toEqual({ defaultDomain: 'example.com', acmeEmail: good });
     }
 
     for (const bad of ['admin', 'admin@example', 'admin@.com', 'admin@example.', 'a b@x.com']) {
@@ -211,7 +211,7 @@ describe('REST settings runtime validation', () => {
     // so it has to stay in front of the match rather than beside it.
     expect(() =>
       validateSettingsGroup('general', {
-        primaryDomain: 'example.com',
+        defaultDomain: 'example.com',
         acmeEmail: `!@${'!.'.repeat(5000)}`,
       }),
     ).toThrow(/between 0 and 320 characters/);

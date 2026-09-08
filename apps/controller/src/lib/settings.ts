@@ -26,7 +26,8 @@ export type CloudflareSettings = {
 };
 
 export type GeneralSettings = {
-  primaryDomain: string;
+  /** Offered as the starting value when a proxy host is created. */
+  defaultDomain: string;
   acmeEmail?: string;
 };
 
@@ -180,7 +181,15 @@ export async function saveCloudflareSettings(settings: CloudflareSettings): Prom
 }
 
 export async function getGeneralSettings(): Promise<GeneralSettings | null> {
-  return await getSetting<GeneralSettings>("general");
+  const stored = await getSetting<GeneralSettings & { primaryDomain?: string }>("general");
+  if (!stored) return null;
+
+  // `primaryDomain` is what every release before this one wrote, and what a pre-3.0 database
+  // still holds after the migration copies its `settings` rows across verbatim. Read either name
+  // and answer with the current one, so an upgrade does not present an empty field and quietly
+  // overwrite the operator's domain the first time the form is saved.
+  const { primaryDomain, ...rest } = stored;
+  return { ...rest, defaultDomain: stored.defaultDomain ?? primaryDomain ?? "" };
 }
 
 export async function saveGeneralSettings(settings: GeneralSettings): Promise<void> {

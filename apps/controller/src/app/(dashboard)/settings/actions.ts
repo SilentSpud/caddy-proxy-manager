@@ -91,7 +91,7 @@ async function updateGeneralSettingsActionUnlocked(
   try {
     await requireAdmin();
     await saveGeneralSettings({
-      primaryDomain: String(formData.get("primaryDomain") ?? ""),
+      defaultDomain: String(formData.get("defaultDomain") ?? ""),
       acmeEmail: formData.get("acmeEmail") ? String(formData.get("acmeEmail")) : undefined,
     });
     revalidatePath("/settings");

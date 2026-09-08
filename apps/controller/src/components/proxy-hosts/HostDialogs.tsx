@@ -73,6 +73,7 @@ export function CreateHostDialog({
   certificates,
   accessLists,
   authentikDefaults,
+  defaultDomain,
   initialData,
   caCertificates = [],
   mtlsRoles = [],
@@ -88,6 +89,12 @@ export function CreateHostDialog({
   accessLists: AccessList[];
   authentikDefaults: AuthentikSettings | null;
   tailscaleDefaults?: TailscaleHostDefaults | null;
+  /**
+   * Settings → General's default domain, prefilled so the common case is editing a subdomain
+   * rather than typing the whole name. Only for a genuinely new host: duplicating one carries
+   * the original's domains, which is what the operator opened the dialog to change.
+   */
+  defaultDomain?: string;
   initialData?: ProxyHost | null;
   caCertificates?: CaCertificate[];
   mtlsRoles?: MtlsRole[];
@@ -100,7 +107,7 @@ export function CreateHostDialog({
   const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
 
   const [name, setName] = useState(initialData ? `${initialData.name} (Copy)` : "");
-  const [domains, setDomains] = useState(initialData?.domains.join("\n") ?? "");
+  const [domains, setDomains] = useState(initialData?.domains.join("\n") ?? defaultDomain ?? "");
   const [certificateId, setCertificateId] = useState(
     String(initialData?.certificateId ?? NONE_VALUE),
   );

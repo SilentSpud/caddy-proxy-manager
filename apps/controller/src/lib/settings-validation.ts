@@ -175,8 +175,8 @@ function headerMap(value: unknown, label: string): void {
 }
 
 function validateGeneral(value: Record<string, unknown>): void {
-  onlyKeys(value, ["primaryDomain", "acmeEmail"], "general settings");
-  stringValue(required(value, "primaryDomain", "general settings"), "general.primaryDomain", {
+  onlyKeys(value, ["defaultDomain", "acmeEmail"], "general settings");
+  stringValue(required(value, "defaultDomain", "general settings"), "general.defaultDomain", {
     min: 1,
     max: 253,
   });
