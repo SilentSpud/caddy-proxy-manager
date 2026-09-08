@@ -66,6 +66,42 @@ export function tail(output: string, lines: number): string {
   return output.split("\n").slice(-lines).join("\n").trim();
 }
 
+/**
+ * A drive-letter path, as recorded by a compose CLI running on Windows.
+ *
+ * Anchored and case-insensitive on the letter; a UNC path (`\\server\share`) deliberately does
+ * not match, because there is no drive for Docker Desktop to have mounted.
+ */
+const WINDOWS_DRIVE_PATH = /^([A-Za-z]):[\\/](.*)$/;
+
+/**
+ * Where Docker Desktop exposes a Windows path to the daemon, or "" if it cannot be worked out.
+ *
+ * The agent runs a Linux `docker compose` against the host's daemon, and hands it
+ * `--project-directory` so relative bind mounts resolve somewhere the *daemon* can find. On a
+ * Linux host the label is already such a path. On Docker Desktop for Windows it is a drive path,
+ * which is not a path at all as far as the daemon is concerned: passing it raw produces
+ * "mount denied: too many colons", and passing nothing leaves `./docker/...` resolving against the
+ * agent's own `/compose`, where the daemon silently creates an empty directory instead.
+ *
+ * Docker Desktop mounts each shared drive inside its VM at `/run/desktop/mnt/host/<letter>`, so
+ * `C:\\deploy\\cpm` is `/run/desktop/mnt/host/c/deploy/cpm`. Verified against Docker Desktop
+ * 29.7: a bind resolved through this prefix mounts the real file, where the untranslated form
+ * mounts an empty directory.
+ *
+ * Only the current layout is produced. Docker Desktop used `/host_mnt/<letter>` years ago, and
+ * guessing between the two would be wrong half the time on deployments that still have it;
+ * COMPOSE_HOST_DIR is the answer there, and the caller says so when this returns "".
+ */
+export function hostPathForDaemon(label: string): string {
+  const match = WINDOWS_DRIVE_PATH.exec(label.trim());
+  if (!match) return "";
+
+  const [, drive, rest] = match;
+  const path = rest.replace(/\\/g, "/").replace(/\/+$/, "");
+  return `/run/desktop/mnt/host/${drive.toLowerCase()}/${path}`;
+}
+
 export class DockerHost {
   /** Cached because it comes from a container label that cannot change without a recreate. */
   private detectedProject: string | null = null;
@@ -163,12 +199,23 @@ export class DockerHost {
       (await this.selfLabel("com.docker.compose.project.working_dir")) ||
       (await this.caddyLabel("com.docker.compose.project.working_dir"));
 
-    // Only an absolute POSIX path is usable. A Docker Desktop host on Windows records the label as
-    // a Windows path, which the Linux-side compose in this container cannot chdir to —
-    // passing it turns every invocation into "mount denied: too many colons". Skipping it there
-    // leaves the pre-existing behaviour, which is wrong in a quieter way and not this change's to
-    // fix.
-    const usable = detected.startsWith("/") ? detected : "";
+    // A POSIX path is already what the daemon wants. A Windows one is not, and passing it raw
+    // turns every invocation into "mount denied: too many colons" — see hostPathForDaemon, which
+    // translates it into the path Docker Desktop exposes the drive at instead.
+    const usable = detected.startsWith("/") ? detected : hostPathForDaemon(detected);
+
+    if (detected && !usable) {
+      // Loud, because the alternative is a container that comes up wrong. Without a project
+      // directory the daemon resolves `./docker/...` against a path only this container has, and
+      // silently creates an empty directory there — the service starts, without the configuration
+      // it was supposed to be given.
+      console.warn(
+        `[docker] Cannot translate the compose project directory "${detected}" into a path the ` +
+          "Docker daemon can resolve. Services mounting files by relative path will come up " +
+          "without them. Set COMPOSE_HOST_DIR to that directory as the daemon sees it.",
+      );
+    }
+
     if (usable) this.detectedHostDir = usable;
     return usable;
   }

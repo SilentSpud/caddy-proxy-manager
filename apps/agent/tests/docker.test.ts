@@ -166,6 +166,50 @@ describe("compose invocation", () => {
     expect(argv[argv.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
   });
 
+  it("translates a Windows project directory into the path the daemon can resolve", async () => {
+    // Docker Desktop for Windows records the label as a drive path, which means nothing to the
+    // daemon. It mounts each shared drive in its VM at /run/desktop/mnt/host/<letter>, and a bind
+    // resolved through that prefix reaches the real file — where the untranslated form gets an
+    // empty directory Docker created at a path the host does not have.
+    hostDirLabel = "C:\\deploy\\cpm";
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).recreateCaddy();
+    const argv = lastCompose();
+    expect(argv[argv.indexOf("--project-directory") + 1]).toBe(
+      "/run/desktop/mnt/host/c/deploy/cpm",
+    );
+  });
+
+  it("translates any drive letter, lowercased", async () => {
+    hostDirLabel = "D:\\stacks\\cpm";
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).recreateCaddy();
+    const argv = lastCompose();
+    expect(argv[argv.indexOf("--project-directory") + 1]).toBe(
+      "/run/desktop/mnt/host/d/stacks/cpm",
+    );
+  });
+
+  it("leaves a POSIX label alone", async () => {
+    // A Linux host already records a path the daemon resolves; touching it would break the case
+    // that has always worked.
+    hostDirLabel = "/srv/cpm";
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).recreateCaddy();
+    const argv = lastCompose();
+    expect(argv[argv.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
+  });
+
+  it("omits --project-directory for a path it cannot translate", async () => {
+    // A UNC path has no drive for Docker Desktop to have mounted, so there is nothing to convert
+    // it to. Passing a guess would be worse than the pre-existing behaviour; COMPOSE_HOST_DIR is
+    // the way out, and the agent logs that it needs setting.
+    hostDirLabel = "\\\\server\\share\\cpm";
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).recreateCaddy();
+    expect(lastCompose()).not.toContain("--project-directory");
+  });
+
   it("omits --project-directory when the label cannot be read", async () => {
     // Unconditionally passing something breaks named-volume deployments, where the agent's
     // /compose mount is the correct project directory; a guess would be worse than nothing.
