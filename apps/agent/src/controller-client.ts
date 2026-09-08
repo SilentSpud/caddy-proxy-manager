@@ -151,15 +151,16 @@ export class ControllerClient {
 
     const payload = (await response.json().catch(() => null)) as {
       data?: T;
-      errors?: { message?: string }[];
+      errors?: GraphQLErrorShape[];
     } | null;
 
-    const failure = payload?.errors?.[0]?.message;
+    const failure = payload?.errors?.[0];
     if (failure) {
-      // 400 rather than the transport's 200: to everything upstream this is a refusal, and the
-      // lifecycle distinguishes a 401 from anything else. Reporting 200 would make a refusal look
-      // like a success that returned nothing.
-      throw new ControllerRejected(400, failure);
+      // GraphQL answers 200 with an errors array where REST answered a status code, and the
+      // lifecycle upstream keys on that code: only a 401 means the controller has forgotten this
+      // agent, which is what stops it retrying a secret that will never be accepted again.
+      // Flattening every refusal to one code would leave an unpaired agent looping forever.
+      throw new ControllerRejected(statusForError(failure), failure.message ?? "Request refused.");
     }
     if (!payload?.data) {
       throw new ControllerRejected(response.status, "The controller returned no data.");
@@ -281,6 +282,34 @@ export class ControllerClient {
   }
 }
 
+type GraphQLErrorShape = { message?: string; extensions?: { code?: unknown } };
+
+/**
+ * The status code a GraphQL error stands for.
+ *
+ * The controller tags its refusals with `extensions.code`, and this is where those become the
+ * codes the rest of the agent already reasons about. 401 is the one that matters: the lifecycle
+ * treats it as "the controller has forgotten this agent" and drops to idle, where every other code
+ * means retry. Getting this wrong in either direction is bad — a mapped-down 401 loops forever
+ * against a secret that will never work, and a mapped-up anything-else throws away a pairing over
+ * a transient fault.
+ *
+ * An untagged error is a fault the controller did not anticipate, which is a retry rather than a
+ * reason to unpair.
+ */
+function statusForError(error: GraphQLErrorShape): number {
+  switch (error.extensions?.code) {
+    case "AGENT_UNAUTHORIZED":
+      return 401;
+    case "AGENT_NOT_CONNECTED":
+      return 409;
+    case "PAYLOAD_TOO_LARGE":
+      return 413;
+    default:
+      return 400;
+  }
+}
+
 /**
  * One SSE frame to an event, or null for anything that carries no payload.
  *
@@ -295,7 +324,7 @@ function parseFrame(frame: string): AgentServerEvent | null {
     .join("\n");
   if (data.length === 0) return null;
 
-  let payload: { data?: { agentEvents?: AgentServerEvent }; errors?: { message?: string }[] };
+  let payload: { data?: { agentEvents?: AgentServerEvent }; errors?: GraphQLErrorShape[] };
   try {
     payload = JSON.parse(data);
   } catch {
@@ -308,9 +337,17 @@ function parseFrame(frame: string): AgentServerEvent | null {
   // rather than the event itself. An `errors` frame is a resolver that failed mid-stream: nothing
   // to act on, and the subscription carries on — the controller closes it if it is really over.
   if (payload.errors?.length) {
+    const failure = payload.errors[0] ?? {};
+    // A refusal can arrive inside a frame rather than as a status, and it means the same thing:
+    // if the controller has forgotten this agent, sitting in the read loop would retry a secret
+    // that will never be accepted. Thrown so the lifecycle sees it, exactly as it would from a
+    // mutation.
+    if (statusForError(failure) === 401) {
+      throw new ControllerRejected(401, failure.message ?? "The controller refused the stream.");
+    }
     console.warn(
       "[controller] The event subscription reported an error:",
-      payload.errors[0]?.message ?? "unknown",
+      failure.message ?? "unknown",
     );
     return null;
   }

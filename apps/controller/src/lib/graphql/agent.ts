@@ -16,7 +16,12 @@
  * cannot use this path — the exchange is what produces the credential everything here depends on.
  */
 
-import type { AgentServerEvent, AgentStatus, AgentCommandResult } from "@cpm/shared";
+import {
+  MAX_CADDY_CONFIG_BYTES,
+  type AgentCommandResult,
+  type AgentServerEvent,
+  type AgentStatus,
+} from "@cpm/shared";
 import { attach, isConnected, recordStatus, settleResults } from "../agent/registry";
 import { buildDesiredState } from "../agent/desired-state";
 import { verifyAgentRequest } from "../agent/verify";
@@ -25,8 +30,15 @@ import { getSetting } from "../settings";
 import type { GraphQLContext } from "./context";
 import { GraphQLError } from "graphql";
 
-/** A status is one small object. Well clear of the real thing, and still bounded. */
-const MAX_BODY_BYTES = 64 * 1024;
+/**
+ * How large a signed agent request may be, per operation.
+ *
+ * These were two routes with two different caps, and collapsing them into one endpoint lost that:
+ * a status is one small object, but a command result carries a Caddy admin response, which for a
+ * config readback is measured in megabytes. One shared 64KiB ceiling would have rejected valid
+ * results before they were even verified.
+ */
+const MAX_STATUS_BYTES = 64 * 1024;
 
 export type VerifiedAgent = { id: number; agentId: string; name: string };
 
@@ -37,9 +49,12 @@ export type VerifiedAgent = { id: number; agentId: string; name: string };
  * the signature covers the bytes the agent sent — verifying anything else would be verifying a
  * re-serialisation that may differ in key order or spacing from what was signed.
  */
-export async function requireAgent(context: GraphQLContext): Promise<VerifiedAgent> {
+export async function requireAgent(
+  context: GraphQLContext,
+  maxBytes: number,
+): Promise<VerifiedAgent> {
   const raw = await context.rawBody();
-  if (raw.length > MAX_BODY_BYTES) {
+  if (raw.length > maxBytes) {
     throw new GraphQLError("That request is too large.", {
       extensions: { code: "PAYLOAD_TOO_LARGE" },
     });
@@ -56,7 +71,8 @@ export const agentResolvers = {
   Subscription: {
     agentEvents: {
       subscribe: async (_: unknown, __: unknown, context: GraphQLContext) => {
-        const agent = await requireAgent(context);
+        // The document is all that is sent to open one; the payloads travel the other way.
+        const agent = await requireAgent(context, MAX_STATUS_BYTES);
 
         const controllerName =
           (await getSetting<string>("branding_title").catch(() => null)) || "Caddy Proxy Manager";
@@ -88,7 +104,7 @@ export const agentResolvers = {
       args: { status: AgentStatus },
       context: GraphQLContext,
     ): Promise<boolean> => {
-      const agent = await requireAgent(context);
+      const agent = await requireAgent(context, MAX_STATUS_BYTES);
 
       // Refused rather than accepted: a status from an agent with no open subscription describes a
       // host the controller cannot reach, and recording it would make the dashboard claim
@@ -109,7 +125,8 @@ export const agentResolvers = {
       args: { results: AgentCommandResult[] },
       context: GraphQLContext,
     ): Promise<boolean> => {
-      const agent = await requireAgent(context);
+      // The ceiling a Caddy config readback needs, which is what these results carry.
+      const agent = await requireAgent(context, MAX_CADDY_CONFIG_BYTES);
 
       settleResults(agent.agentId, args.results);
       return true;
