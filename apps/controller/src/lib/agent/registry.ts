@@ -1,9 +1,14 @@
 /**
  * Every agent currently attached to this controller, and the only way to reach one.
  *
- * The agent dials in and holds an SSE stream open; the controller can no longer call out. So
- * "reaching an agent" is writing to a stream this map is holding, and an agent that is not in here
- * is unreachable no matter what the database says about it.
+ * The agent dials in and holds a GraphQL subscription open over SSE; the controller can no longer
+ * call out. So "reaching an agent" is pushing onto a queue this map is holding, and an agent that
+ * is not in here is unreachable no matter what the database says about it.
+ *
+ * This file deliberately knows nothing about SSE. It used to encode the frames itself, which was
+ * fine while it owned the response; the transport is the GraphQL server's now, so what `attach`
+ * hands back is an async iterable of events and the framing happens above it. The keepalive moved
+ * into the protocol as a `ping` event for the same reason.
  *
  * In memory, deliberately. A connection is a property of *this* process — the socket lives here or
  * nowhere — so persisting it would only produce rows describing streams that no longer exist. The
@@ -69,8 +74,13 @@ export class AgentCommandError extends Error {
 // ─── Attaching ───────────────────────────────────────────────────────────────
 
 export type AttachedAgent = {
-  /** The body to hand back from the route: an SSE stream that stays open. */
-  stream: ReadableStream<Uint8Array>;
+  /**
+   * The events to publish, in order, until the agent goes away.
+   *
+   * Returning an iterable rather than a stream is what lets the GraphQL layer own the transport:
+   * the same source would serve a websocket or a poll without this file changing.
+   */
+  events: AsyncIterableIterator<AgentServerEvent>;
   /** Push new desired state to this agent alone. */
   push: (state: AgentDesiredState) => void;
 };
@@ -96,60 +106,78 @@ export function attach(params: {
     connections.delete(params.agentId);
   }
 
-  const encoder = new TextEncoder();
-  let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
+  // A queue rather than a stream: events are produced by whoever is pushing commands, and consumed
+  // by the subscription at its own pace. `pending` holds what has been produced and not yet taken;
+  // `waiting` holds a consumer that arrived first. Exactly one of the two is ever non-empty.
+  const pending: AgentServerEvent[] = [];
+  let waiting: ((event: IteratorResult<AgentServerEvent>) => void) | null = null;
+  let closed = false;
   let keepalive: ReturnType<typeof setInterval> | null = null;
 
   const send = (event: AgentServerEvent): boolean => {
-    if (!controller) return false;
-    try {
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    if (closed) return false;
+    if (waiting) {
+      const resolve = waiting;
+      waiting = null;
+      resolve({ value: event, done: false });
       return true;
-    } catch {
-      // The client went away between the check and the write. Treated as a disconnect.
-      return false;
     }
+    pending.push(event);
+    return true;
   };
 
   const close = (): void => {
+    if (closed) return;
+    closed = true;
     if (keepalive) clearInterval(keepalive);
     keepalive = null;
-    try {
-      controller?.close();
-    } catch {
-      // Already closed by the client disconnecting; nothing to do.
+    // Ends the consumer's `for await`, which is what tears the subscription down.
+    if (waiting) {
+      const resolve = waiting;
+      waiting = null;
+      resolve({ value: undefined, done: true });
     }
-    controller = null;
   };
 
-  const stream = new ReadableStream<Uint8Array>({
-    start(streamController) {
-      controller = streamController;
-
-      // `hello` first, so the agent can log what it attached to before any state arrives.
-      send({
-        type: "hello",
-        controllerId: params.controllerId,
-        controllerName: params.controllerName,
+  const events: AsyncIterableIterator<AgentServerEvent> = {
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+    next() {
+      const queued = pending.shift();
+      if (queued) return Promise.resolve({ value: queued, done: false });
+      if (closed)
+        return Promise.resolve({
+          value: undefined,
+          done: true,
+        } as IteratorResult<AgentServerEvent>);
+      return new Promise<IteratorResult<AgentServerEvent>>((resolve) => {
+        waiting = resolve;
       });
-      send({ type: "desired-state", state: params.initialState });
-
-      // A comment frame, which the agent's parser skips. SSE has no ping of its own, and a stream
-      // that says nothing for minutes is indistinguishable from one a proxy silently dropped.
-      keepalive = setInterval(() => {
-        if (!controller) return;
-        try {
-          controller.enqueue(encoder.encode(": keepalive\n\n"));
-        } catch {
-          detach(params.agentId);
-        }
-      }, AGENT_STREAM_KEEPALIVE_MS);
     },
-    cancel() {
-      // The agent hung up. This is the normal way a connection ends.
+    // Called when the consumer stops — the agent hung up, or the server is shutting the
+    // subscription down. Either way this connection is over.
+    return() {
       detach(params.agentId);
+      return Promise.resolve({ value: undefined, done: true } as IteratorResult<AgentServerEvent>);
     },
+    throw(error) {
+      detach(params.agentId);
+      return Promise.reject(error);
+    },
+  };
+
+  // `hello` first, so the agent can log what it attached to before any state arrives.
+  send({
+    type: "hello",
+    controllerId: params.controllerId,
+    controllerName: params.controllerName,
   });
+  send({ type: "desired-state", state: params.initialState });
+
+  keepalive = setInterval(() => {
+    send({ type: "ping" });
+  }, AGENT_STREAM_KEEPALIVE_MS);
 
   connections.set(params.agentId, {
     agentId: params.agentId,
@@ -163,7 +191,7 @@ export function attach(params: {
   });
 
   return {
-    stream,
+    events,
     push: (state) => {
       send({ type: "desired-state", state });
     },

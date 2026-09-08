@@ -255,5 +255,26 @@ export const typeDefs = /* GraphQL */ `
 
     """Rebuild and push the Caddy configuration to every agent. All of them, or none."""
     applyCaddyConfig: Boolean!
+
+    """
+    What this agent currently has applied. Requires a signed agent, not a user token.
+    Refused when the agent has no open subscription: a status from an unreachable host would
+    make the dashboard claim it is reachable.
+    """
+    agentStatus(status: JSON!): Boolean!
+
+    """Results for the Caddy admin calls the controller is blocked on. Signed agents only."""
+    agentCommandResults(results: [JSON!]!): Boolean!
+  }
+
+  """
+  The controller's half of the agent conversation.
+
+  One long-lived subscription per agent, carrying desired state, commands, an opening hello and a
+  periodic ping. Delivered over SSE, which is what the agent already spoke — the difference is
+  that the framing now belongs to the GraphQL server rather than to the registry.
+  """
+  type Subscription {
+    agentEvents: JSON!
   }
 `;

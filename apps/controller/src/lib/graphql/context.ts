@@ -22,6 +22,14 @@ export type GraphQLContext = {
   viewer: () => Promise<ApiAuthResult>;
   /** The grant-aware view of the same viewer, for the resources grants apply to. */
   access: () => Promise<Access>;
+  /**
+   * The request body exactly as it arrived, for the agent's signature check.
+   *
+   * Read from a clone, because the GraphQL server has already consumed the original to parse the
+   * document. Re-serialising the parsed document would not do: the signature covers the bytes the
+   * agent sent, and a round trip can change key order or spacing.
+   */
+  rawBody: () => Promise<string>;
   request: NextRequest;
 };
 
@@ -55,7 +63,16 @@ export function createContext(request: NextRequest): GraphQLContext {
     return accessPromise;
   };
 
-  return { viewer, access, request };
+  let bodyPromise: Promise<string> | null = null;
+  const rawBody = () => {
+    bodyPromise ??= request
+      .clone()
+      .text()
+      .catch(() => "");
+    return bodyPromise;
+  };
+
+  return { viewer, access, rawBody, request };
 }
 
 /** Resolve the viewer, or fail the field. */

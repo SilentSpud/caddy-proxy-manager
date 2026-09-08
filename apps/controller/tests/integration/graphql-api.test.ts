@@ -65,6 +65,8 @@ function contextFor(role: string | null): GraphQLContext {
       isOperator: role === 'operator',
       grants: { proxyHosts: new Map(), l4ProxyHosts: new Map(), agents: new Map() },
     }),
+    // Nothing here signs a request; the agent fields are covered by their own tests.
+    rawBody: async () => '',
     request: {} as never,
   };
 }

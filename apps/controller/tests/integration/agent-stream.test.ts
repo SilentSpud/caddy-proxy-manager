@@ -43,9 +43,14 @@ function status(agentId: string): AgentStatus {
   };
 }
 
-/** Attach an agent and start collecting the frames the controller writes to it. */
+/**
+ * Attach an agent and start collecting the events the controller sends it.
+ *
+ * The registry deals in events rather than SSE bytes now — framing is the GraphQL server's job —
+ * so this collects what the subscription would publish, with no parser in between.
+ */
 function connect(agentId: string, name = agentId) {
-  const { stream } = attach({
+  const { events } = attach({
     agentId,
     agentRowId: 1,
     name,
@@ -55,27 +60,12 @@ function connect(agentId: string, name = agentId) {
   });
 
   const frames: AgentServerEvent[] = [];
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
 
   const pump = (async () => {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) return;
-      buffer += decoder.decode(value, { stream: true });
-      let split = buffer.indexOf('\n\n');
-      while (split !== -1) {
-        const data = buffer
-          .slice(0, split)
-          .split('\n')
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => line.slice(5).trimStart())
-          .join('\n');
-        buffer = buffer.slice(split + 2);
-        if (data.length > 0) frames.push(JSON.parse(data) as AgentServerEvent);
-        split = buffer.indexOf('\n\n');
-      }
+    for await (const event of events) {
+      // Keepalives are part of the protocol now. They are asserted on in their own test; letting
+      // them into this list would make every ordering assertion depend on timing.
+      if (event.type !== 'ping') frames.push(event);
     }
   })().catch(() => {
     // Closed by detach; that is the normal end of a connection.

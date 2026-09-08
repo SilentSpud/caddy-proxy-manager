@@ -21,6 +21,7 @@ import {
   type AgentPairResponse,
   type AgentServerEvent,
   type AgentStatus,
+  AGENT_OPERATIONS,
   CONTROLLER_AGENT_ROUTES,
   signatureBase,
 } from "@cpm/shared";
@@ -119,59 +120,82 @@ export class ControllerClient {
     return (await response.json()) as AgentPairResponse;
   }
 
-  /** Report what this agent currently has applied. */
-  async postStatus(secret: string, status: AgentStatus): Promise<void> {
+  /**
+   * Run one GraphQL operation and return its data, or throw what the controller said.
+   *
+   * GraphQL answers 200 with an `errors` array where REST answered a status code, so a caller that
+   * only checked `response.ok` would treat "that agent is not connected" as success. The status is
+   * still checked first — an unauthenticated request never reaches the resolver — and then the
+   * body.
+   */
+  private async operation<T>(
+    secret: string,
+    query: string,
+    variables: Record<string, unknown>,
+  ): Promise<T> {
+    const body = JSON.stringify({ query, variables });
     const response = await this.send(
-      CONTROLLER_AGENT_ROUTES.status,
+      CONTROLLER_AGENT_ROUTES.graphql,
       "POST",
-      JSON.stringify({ status }),
+      body,
       POST_TIMEOUT_MS,
       secret,
     );
+
     if (!response.ok) {
       throw new ControllerRejected(
         response.status,
-        await errorMessage(response, `The controller refused the status (${response.status}).`),
+        await errorMessage(response, `The controller refused the request (${response.status}).`),
       );
     }
+
+    const payload = (await response.json().catch(() => null)) as {
+      data?: T;
+      errors?: { message?: string }[];
+    } | null;
+
+    const failure = payload?.errors?.[0]?.message;
+    if (failure) {
+      // 400 rather than the transport's 200: to everything upstream this is a refusal, and the
+      // lifecycle distinguishes a 401 from anything else. Reporting 200 would make a refusal look
+      // like a success that returned nothing.
+      throw new ControllerRejected(400, failure);
+    }
+    if (!payload?.data) {
+      throw new ControllerRejected(response.status, "The controller returned no data.");
+    }
+    return payload.data;
+  }
+
+  /** Report what this agent currently has applied. */
+  async postStatus(secret: string, status: AgentStatus): Promise<void> {
+    await this.operation(secret, AGENT_OPERATIONS.status, { status });
   }
 
   /**
-   * Hand back the results of commands the stream issued.
+   * Hand back the results of commands the subscription issued.
    *
-   * Its own request rather than a frame on the stream, because the stream only runs one way: SSE
-   * has no client-to-server channel, which is exactly the trade that keeps this inside ordinary
-   * route handlers.
+   * Its own request rather than a message on the subscription, because a subscription only runs
+   * one way: SSE has no client-to-server channel, which is exactly the trade that keeps this side
+   * of the conversation in ordinary mutations.
    */
   async postResults(secret: string, results: AgentCommandResult[]): Promise<void> {
     if (results.length === 0) return;
-    const response = await this.send(
-      CONTROLLER_AGENT_ROUTES.commandResults,
-      "POST",
-      JSON.stringify({ results }),
-      POST_TIMEOUT_MS,
-      secret,
-    );
-    if (!response.ok) {
-      throw new ControllerRejected(
-        response.status,
-        await errorMessage(response, `The controller refused the results (${response.status}).`),
-      );
-    }
+    await this.operation(secret, AGENT_OPERATIONS.commandResults, { results });
   }
 
   /**
-   * Open the event stream and yield frames until it ends or `signal` aborts.
+   * Open the event subscription and yield events until it ends or `signal` aborts.
    *
    * No overall timeout: this request is meant to stay open for as long as the agent runs. Liveness
-   * is the controller's keepalive comment instead — a stream that has said nothing at all is the
-   * one case a timeout could not tell apart from a healthy idle fleet.
+   * is the protocol's `ping` event instead — a subscription that has said nothing at all is the one
+   * case a timeout could not tell apart from a healthy idle fleet.
    */
   async *events(secret: string, signal: AbortSignal): AsyncGenerator<AgentServerEvent> {
     const response = await this.send(
-      CONTROLLER_AGENT_ROUTES.events,
-      "GET",
-      "",
+      CONTROLLER_AGENT_ROUTES.graphql,
+      "POST",
+      JSON.stringify({ query: AGENT_OPERATIONS.events }),
       null,
       secret,
       signal,
@@ -271,10 +295,24 @@ function parseFrame(frame: string): AgentServerEvent | null {
     .join("\n");
   if (data.length === 0) return null;
 
+  let payload: { data?: { agentEvents?: AgentServerEvent }; errors?: { message?: string }[] };
   try {
-    return JSON.parse(data) as AgentServerEvent;
+    payload = JSON.parse(data);
   } catch {
-    // A frame the controller wrote badly must not take the stream down; the next one may be fine.
+    // A frame the controller wrote badly must not take the subscription down; the next one may
+    // be fine.
     return null;
   }
+
+  // A subscription delivers execution results, so each frame is `{"data":{"agentEvents":…}}`
+  // rather than the event itself. An `errors` frame is a resolver that failed mid-stream: nothing
+  // to act on, and the subscription carries on — the controller closes it if it is really over.
+  if (payload.errors?.length) {
+    console.warn(
+      "[controller] The event subscription reported an error:",
+      payload.errors[0]?.message ?? "unknown",
+    );
+    return null;
+  }
+  return payload.data?.agentEvents ?? null;
 }
