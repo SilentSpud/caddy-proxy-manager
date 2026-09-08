@@ -3,6 +3,7 @@ import {
   DASHBOARD_HOST_ID,
   buildDashboardHostRow,
   checkDashboardDns,
+  isHostname,
 } from '@/src/lib/dashboard-host';
 import { createProbeNonce, probeSignatureMatches, signProbe } from '@/src/lib/reachability-probe';
 import { validateSettingsGroup } from '@/src/lib/settings-validation';
@@ -121,6 +122,52 @@ describe('the probe signature', () => {
   });
 });
 
+describe('the hostname gate', () => {
+  it('accepts names and bare addresses', () => {
+    for (const value of [
+      'cpm.example.com',
+      'example.com',
+      'localhost',
+      'a-b.c-d.example',
+      '10.0.0.5',
+    ]) {
+      expect(isHostname(value), value).toBe(true);
+    }
+  });
+
+  it('refuses anything that could carry more than a host', () => {
+    // The reachability check interpolates this into a URL. Each of these would make that request
+    // go somewhere other than the host it appears to name, which is what CodeQL objected to.
+    for (const value of [
+      'example.com/path',
+      'example.com:8080',
+      'user@example.com',
+      'example.com?x=1',
+      'example.com#f',
+      'http://example.com',
+      '//evil.example.com',
+      '[::1]',
+      'exam ple.com',
+      'example.com\nHost: evil',
+      '',
+      '   ',
+      `${'a'.repeat(254)}`,
+    ]) {
+      expect(isHostname(value), JSON.stringify(value)).toBe(false);
+    }
+  });
+
+  it('is what the probe checks before requesting anything', async () => {
+    // deps.probe is not supplied, so a domain that got past the gate would reach the real fetch.
+    // A refused one must answer without making a request at all.
+    const result = await checkDashboardDns('evil.example.com/redirect', {
+      resolveAddresses: async () => [],
+    });
+
+    expect(result.ok).toBe(false);
+  });
+});
+
 describe('dashboard settings validation', () => {
   it('accepts a complete group', () => {
     expect(
@@ -133,6 +180,18 @@ describe('dashboard settings validation', () => {
     // would store a setting that silently produces nothing.
     expect(() =>
       validateSettingsGroup('dashboard', { enabled: false, domain: '', tls: false }),
+    ).toThrow();
+  });
+
+  it('refuses a domain that is not a hostname', () => {
+    // Closed at the source too: nothing that fails the gate can be stored, so the Caddy host
+    // matcher this feeds cannot receive it either.
+    expect(() =>
+      validateSettingsGroup('dashboard', {
+        enabled: true,
+        domain: 'example.com/path',
+        tls: false,
+      }),
     ).toThrow();
   });
 

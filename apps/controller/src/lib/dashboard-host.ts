@@ -160,6 +160,20 @@ export function buildDashboardHostRow(
   };
 }
 
+/**
+ * A DNS hostname, and nothing that could be mistaken for one.
+ *
+ * Labels of letters, digits and hyphens, separated by dots, up to the 253 characters DNS allows.
+ * That excludes everything an attacker-shaped value would need: `//`, `@`, `:`, `?`, `#`, a path,
+ * whitespace, or a bracketed IPv6 literal. A bare IPv4 literal passes, which is intended — an
+ * operator may reasonably serve the dashboard on an address rather than a name.
+ */
+export function isHostname(value: string): boolean {
+  const name = value.trim();
+  if (name.length === 0 || name.length > 253) return false;
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/i.test(name);
+}
+
 /** What the reachability check found. `ok` is what the TLS toggle is set from. */
 export type DashboardDnsCheck = {
   ok: boolean;
@@ -204,6 +218,18 @@ async function resolveAddresses(name: string): Promise<string[]> {
  * the precondition for asking Caddy for a certificate, not something that can wait until after.
  */
 async function probeSelf(domain: string): Promise<boolean> {
+  // Interpolating the stored setting straight into a URL is what CodeQL flagged, and it was right
+  // to. `isHostname` is the narrow gate: letters, digits, dots and hyphens only, so nothing can
+  // carry a scheme, credentials, a port, a path or a query into the request. An unusable value
+  // means the check simply fails rather than dialling somewhere unintended.
+  //
+  // Note what is deliberately *not* blocked: an address in private or loopback space. This is a
+  // deployment probing its own domain, and plenty of legitimate installs answer on a private
+  // address — a LAN-only instance, or one reached through NAT hairpin. Refusing those would break
+  // the feature for the deployments most likely to use it, to prevent an administrator from
+  // pointing a boolean-valued probe at their own network.
+  if (!isHostname(domain)) return false;
+
   const nonce = createProbeNonce();
   const url = `http://${domain}${PROBE_PATH}?${PROBE_PARAM}=${encodeURIComponent(nonce)}`;
 

@@ -1,3 +1,4 @@
+import { isHostname } from "./dashboard-host";
 import { isIP } from "node:net";
 import {
   bodyLimitRangeMessage,
@@ -225,10 +226,17 @@ function validateDashboard(value: Record<string, unknown>): void {
   booleanValue(required(value, "tls", "dashboard settings"), "dashboard.tls");
   // Required even when disabled: the domain is what the route is rebuilt from the moment it is
   // switched back on, and a blank one there would silently produce no route at all.
-  stringValue(required(value, "domain", "dashboard settings"), "dashboard.domain", {
+  const domain = stringValue(required(value, "domain", "dashboard settings"), "dashboard.domain", {
     min: 1,
     max: 253,
   });
+  // A hostname, not merely a non-empty string. This value is interpolated into a Caddy host matcher
+  // and into the URL the reachability check requests, so "any text up to 253 characters" was the
+  // wrong bar in both places — the check being the one CodeQL objected to. Refusing it here is
+  // what stops anything else being stored to begin with.
+  if (!isHostname(domain)) {
+    invalid("dashboard.domain must be a hostname, e.g. cpm.example.com");
+  }
 }
 
 function validateMetrics(value: Record<string, unknown>): void {
