@@ -995,6 +995,7 @@
     "enableUpstreamDnsPinning": "Enable upstream DNS pinning",
     "enabled": "Enabled",
     "environmentOverrideDescription": "It cannot be changed here.",
+    "environmentVariablesLabel": "Environment variables for this setting",
     "environmentOverrideTitle": "Currently set by an environment variable",
     "ephemeralNodesHelp": "Ephemeral nodes disappear from the tailnet when Caddy stops, instead of lingering as offline machines. Their identity is not reused, so a restart shows up as a new device.",
     "fallbackIcon": "Fallback icon",

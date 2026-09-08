@@ -125,6 +125,23 @@ type SettingItem = {
   name: string;
   desc: string;
   icon: LucideIcon;
+  /**
+   * Environment variables that configure this section, shown as tokens beside its name.
+   *
+   * An operator arrives here from a `.env` file, so the variable name is the handle they already
+   * have. Only variables that set a value this section shows belong here — `PRIMARY_DOMAIN`, for
+   * one, is the domain the bundled Caddyfile serves the dashboard on and has nothing to do with
+   * General's primary domain, so listing it would send someone to the wrong page. The ones a
+   * database setting supersedes are in `src/lib/settings/registry.ts`, which is where their
+   * precedence is defined.
+   */
+  env?: readonly string[];
+  /**
+   * Variables the search should match that are not worth showing. For a section configured by a
+   * whole family of variables, `env` carries the prefix and this carries the members, so typing
+   * any one of them still lands on the section.
+   */
+  envSearch?: readonly string[];
 };
 
 type SettingsGroup = {
@@ -149,6 +166,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "ACME Server",
         desc: "Custom ACME directory URL for internal CAs",
         icon: ShieldCheck,
+        env: ["ACME_CA_ROOT_DIR"],
       },
       {
         id: "default-response",
@@ -161,6 +179,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "User Avatars",
         desc: "Gravatar fallback for users without an icon",
         icon: UserCircle,
+        env: ["AVATAR_GRAVATAR"],
       },
       {
         id: "branding",
@@ -173,18 +192,21 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Updates",
         desc: "Whether to check the registry for a newer release, and which one",
         icon: RefreshCw,
+        env: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
       },
       {
         id: "caddy-build",
         name: "Caddy Build",
         desc: "Which plugins the Caddy image is compiled with",
         icon: Package,
+        env: ["CADDY_BUILD_TIMEOUT"],
       },
       {
         id: "agent",
         name: "Agent",
         desc: "The service that recreates and rebuilds the Caddy container",
         icon: Cpu,
+        env: ["CONTROLLER_URL", "AGENT_MODE", "PAIRING_CODE", "CADDY_API_URL"],
       },
     ],
   },
@@ -221,6 +243,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Tailscale",
         desc: "Node defaults for hosts served on, or reached over, your tailnet",
         icon: Network,
+        env: ["TS_AUTHKEY"],
       },
     ],
   },
@@ -233,6 +256,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "GeoIP Databases",
         desc: "MaxMind subscription and whether country lookups run at all",
         icon: Globe2,
+        env: ["GEOIP_ENABLED", "GEOIPUPDATE_ACCOUNT_ID", "GEOIPUPDATE_LICENSE_KEY"],
       },
       {
         id: "geoblock",
@@ -251,13 +275,45 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Authentik Defaults",
         desc: "Forward-auth defaults for new proxy hosts",
         icon: UserCheck,
+        env: ["FORWARD_AUTH_INTERNAL_URL"],
       },
-      { id: "oauth", name: "OAuth Providers", desc: "OAuth/OIDC SSO providers", icon: KeyRound },
+      {
+        id: "oauth",
+        name: "OAuth Providers",
+        desc: "OAuth/OIDC SSO providers",
+        icon: KeyRound,
+        // A provider's whole configuration is one family of variables, and `runEnvProviderSync`
+        // reads every one of them into `oauth_providers` at startup. Nineteen tokens under the
+        // heading would drown it, so the prefix is shown and the members stay searchable.
+        env: ["OAUTH_*"],
+        envSearch: [
+          "OAUTH_ENABLED",
+          "OAUTH_PROVIDER_NAME",
+          "OAUTH_ISSUER",
+          "OAUTH_CLIENT_ID",
+          "OAUTH_CLIENT_SECRET",
+          "OAUTH_AUTHORIZATION_URL",
+          "OAUTH_TOKEN_URL",
+          "OAUTH_USERINFO_URL",
+          "OAUTH_SCOPES",
+          "OAUTH_ALLOW_AUTO_LINKING",
+          "OAUTH_DEFAULT_ROLE",
+          "OAUTH_ROLE_MAPPING",
+          "OAUTH_SYNC_GROUPS",
+          "OAUTH_GROUPS_CLAIM",
+          "OAUTH_GROUP_PREFIX",
+          "OAUTH_ADMIN_GROUP",
+          "OAUTH_OPERATOR_GROUP",
+          "OAUTH_USER_GROUP",
+          "OAUTH_VIEWER_GROUP",
+        ],
+      },
       {
         id: "password-policy",
         name: "Password Policy",
         desc: "Migrate users off older password hashes",
         icon: KeyRound,
+        env: ["AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH"],
       },
     ],
   },
@@ -270,6 +326,14 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Analytics",
         desc: "Traffic and WAF event collection, and the ClickHouse it writes to",
         icon: BarChart2,
+        env: [
+          "ANALYTICS_ENABLED",
+          "CLICKHOUSE_URL",
+          "CLICKHOUSE_USER",
+          "CLICKHOUSE_PASSWORD",
+          "CLICKHOUSE_DB",
+          "CLICKHOUSE_RETENTION_DAYS",
+        ],
       },
       {
         id: "metrics",
@@ -302,19 +366,29 @@ function findItem(id: string) {
 type PaletteItem = {
   id: string;
   label: string;
-  auxiliaryData: { desc: string; group: string };
+  auxiliaryData: { desc: string; group: string; env: readonly string[] };
 };
 
 const PALETTE_ITEMS: PaletteItem[] = ALL_ITEMS.map((item) => ({
   id: item.id,
   label: item.name,
-  auxiliaryData: { desc: item.desc, group: item.groupLabel },
+  auxiliaryData: {
+    desc: item.desc,
+    group: item.groupLabel,
+    env: [...(item.env ?? []), ...(item.envSearch ?? [])],
+  },
 }));
 
 // Keywords let a search match a setting's description or its group, as the old CommandItem
-// `value` string concatenation did.
+// `value` string concatenation did — and its environment variables, so an operator who knows a
+// setting only as the line in their `.env` can search for that name and land on the page that
+// owns it.
 const PALETTE_SOURCE = createStaticSource(PALETTE_ITEMS, {
-  keywords: (item) => [item.auxiliaryData.desc, item.auxiliaryData.group],
+  keywords: (item) => [
+    item.auxiliaryData.desc,
+    item.auxiliaryData.group,
+    ...item.auxiliaryData.env,
+  ],
 });
 
 function SettingsCmdK({
@@ -432,6 +506,34 @@ function MobileSettingsNav({
 
 // ─── Detail header ───────────────────────────────────────────────────────────
 
+/**
+ * The environment variables a section is configured by, as tokens beside its name.
+ *
+ * Named rather than explained: an operator holding a `.env` line recognises `CLICKHOUSE_URL`
+ * faster than any sentence about it, and the same string is what the search matches on.
+ */
+function EnvTokens({ names }: { names?: readonly string[] }) {
+  const t = useTranslations("settings");
+  if (!names || names.length === 0) return null;
+  return (
+    // A bare div with an aria-label is not exposed; the role is what gives the tokens a name
+    // instead of reading them out as loose words after the heading.
+    <HStack
+      gap={1}
+      vAlign="center"
+      wrap="wrap"
+      role="group"
+      aria-label={t("environmentVariablesLabel")}
+    >
+      {names.map((name) => (
+        <Code key={name} size="inherit" color="secondary">
+          {name}
+        </Code>
+      ))}
+    </HStack>
+  );
+}
+
 function DetailHeader({ activeId }: { activeId: string }) {
   const item = findItem(activeId);
   if (!item) return null;
@@ -443,7 +545,10 @@ function DetailHeader({ activeId }: { activeId: string }) {
           <BreadcrumbItem isCurrent>{item.groupLabel}</BreadcrumbItem>
         </Breadcrumbs>
       </div>
-      <Heading level={1}>{item.name}</Heading>
+      <HStack gap={2} vAlign="center" wrap="wrap">
+        <Heading level={1}>{item.name}</Heading>
+        <EnvTokens names={item.env} />
+      </HStack>
       <Text type="body" size="sm" color="secondary">
         {item.desc}
       </Text>
