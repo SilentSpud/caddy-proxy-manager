@@ -62,6 +62,8 @@ type Props = {
   accessLists: AccessList[];
   caCertificates: CaCertificate[];
   authentikDefaults: AuthentikSettings | null;
+  /** Prefilled into a new host's domains field. Empty means there is nothing to offer. */
+  defaultDomain: string;
   tailscaleDefaults: TailscaleHostDefaults | null;
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
@@ -196,6 +198,7 @@ export default function ProxyHostsClient({
   accessLists,
   caCertificates,
   authentikDefaults,
+  defaultDomain,
   tailscaleDefaults,
   pagination,
   initialSearch,
@@ -395,6 +398,7 @@ export default function ProxyHostsClient({
       />
 
       <CreateHostDialog
+        defaultDomain={defaultDomain}
         key={dialogKey}
         open={createOpen}
         onClose={() => {

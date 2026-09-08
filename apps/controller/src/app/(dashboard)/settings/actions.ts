@@ -3,12 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { applyCaddyConfig } from "@/src/lib/caddy";
+import { validateSettingsGroup } from "@/src/lib/settings-validation";
+import {
+  type DashboardDnsCheck,
+  type DashboardHostSettings,
+  checkDashboardDns,
+} from "@/src/lib/dashboard-host";
 import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import {
   getSetting,
   saveCloudflareSettings,
   getDnsProviderSettings,
   saveDnsProviderSettings,
+  getDashboardSettings,
+  saveDashboardSettings,
   saveGeneralSettings,
   saveAcmeSettings,
   saveAuthentikSettings,
@@ -91,7 +99,7 @@ async function updateGeneralSettingsActionUnlocked(
   try {
     await requireAdmin();
     await saveGeneralSettings({
-      primaryDomain: String(formData.get("primaryDomain") ?? ""),
+      defaultDomain: String(formData.get("defaultDomain") ?? ""),
       acmeEmail: formData.get("acmeEmail") ? String(formData.get("acmeEmail")) : undefined,
     });
     revalidatePath("/settings");
@@ -784,6 +792,65 @@ function parseResolverList(value: string | null): string[] {
     .split(/[,\n]/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Save how the dashboard is served, and rebuild Caddy so the change takes effect at once.
+ *
+ * Switching this off is the one settings change that can remove the reader's own route to this
+ * page. That is deliberate and reversible — the controller publishes its own port, so
+ * `http://<host>:3000` still reaches here — and the form warns before submitting when the request
+ * arrived through the domain being turned off.
+ */
+async function updateDashboardSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const settings = validateSettingsGroup("dashboard", {
+      enabled: formData.get("enabled") === "on",
+      domain: String(formData.get("domain") ?? "").trim(),
+      tls: formData.get("tls") === "on",
+    }) as DashboardHostSettings;
+
+    await saveDashboardSettings(settings);
+
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: "Dashboard host saved and applied successfully" };
+    } catch (error) {
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      return { success: true, message: `Saved, but could not apply to Caddy: ${errorMsg}` };
+    }
+  } catch (error) {
+    console.error("Failed to save dashboard settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save dashboard settings",
+    };
+  }
+}
+
+/**
+ * Ask whether the dashboard's domain currently reaches this deployment.
+ *
+ * Takes no argument on purpose. It used to accept the domain typed into the form, which made an
+ * administrator's keystrokes the host of a server-side request — CodeQL called that server-side
+ * request forgery and was right to. It now checks the domain that is *saved*, which has been
+ * through the settings validator, and is also the more truthful question: what the check reports is
+ * the configuration Caddy is actually serving, not a string somebody is part-way through typing.
+ *
+ * Admin-gated like everything else on this page.
+ */
+export async function checkDashboardDnsAction(): Promise<DashboardDnsCheck> {
+  await requireAdmin();
+  const saved = await getDashboardSettings();
+  return await checkDashboardDns(saved?.domain ?? "");
 }
 
 async function updateTrustedProxiesSettingsActionUnlocked(
@@ -1591,6 +1658,9 @@ export const updateLoggingSettingsAction = serializedSettingsAction(
 );
 export const updateTrustedProxiesSettingsAction = serializedSettingsAction(
   updateTrustedProxiesSettingsActionUnlocked,
+);
+export const updateDashboardSettingsAction = serializedSettingsAction(
+  updateDashboardSettingsActionUnlocked,
 );
 export const updateDnsSettingsAction = serializedSettingsAction(updateDnsSettingsActionUnlocked);
 export const updateUpstreamDnsResolutionSettingsAction = serializedSettingsAction(

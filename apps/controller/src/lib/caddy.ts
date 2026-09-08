@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { Resolver } from "node:dns/promises";
+import { buildDashboardHostRow } from "./dashboard-host";
 import { join, dirname } from "node:path";
 import { isIP } from "node:net";
 import { isConnectionError } from "./net-errors";
@@ -27,6 +28,7 @@ import db from "./db";
 import { eq, isNull } from "drizzle-orm";
 import { config } from "./config";
 import {
+  getDashboardSettings,
   getGeneralSettings,
   getAcmeSettings,
   getMetricsSettings,
@@ -164,7 +166,7 @@ const DEFAULT_AUTHENTIK_HEADERS = [
 
 const DEFAULT_AUTHENTIK_TRUSTED_PROXIES = ["private_ranges"];
 
-type ProxyHostRow = {
+export type ProxyHostRow = {
   id: number;
   name: string;
   domains: string;
@@ -2904,7 +2906,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
           return proxyHostRecords.filter((h) => servedByAgent(assignments, h.id, agentRowId));
         })();
 
-  const proxyHostRows: ProxyHostRow[] = servedRecords.map((h) => ({
+  const storedHostRows: ProxyHostRow[] = servedRecords.map((h) => ({
     id: h.id,
     name: h.name,
     domains: h.domains,
@@ -2920,6 +2922,17 @@ export async function buildCaddyDocument(agentRowId?: number) {
     meta: h.meta,
     enabled: h.enabled ? 1 : 0,
   }));
+
+  // CPM's own dashboard, served by the Caddy it manages. Synthesised rather than stored, and ahead
+  // of the stored rows: sortRoutesByHostPriority settles every other overlap by specificity, but
+  // two rows claiming the same exact domain tie and fall back to this order. Winning that tie is
+  // the point — a host someone creates for the dashboard's domain must not shadow the route the
+  // dashboard is reached through. Absent entirely when the setting is off, the domain is blank, or
+  // the dial address could not be worked out.
+  const dashboardRow = buildDashboardHostRow(await getDashboardSettings(), getCpmDialAddress());
+  const proxyHostRows: ProxyHostRow[] = dashboardRow
+    ? [dashboardRow, ...storedHostRows]
+    : storedHostRows;
 
   const certRowsMapped: CertificateRow[] = certRows.map((c: (typeof certRows)[0]) => ({
     id: c.id,

@@ -304,20 +304,31 @@ export type AgentErrorCode =
 export const CONTROLLER_AGENT_API_PREFIX = "/api/agent/v1";
 
 export const CONTROLLER_AGENT_ROUTES = {
-  /** Unauthenticated. Exchanges a controller-minted code for the shared secret. */
+  /**
+   * Unauthenticated, and deliberately not GraphQL.
+   *
+   * Pairing runs before there is a secret, and the secret is what every signed call — including
+   * every GraphQL one — depends on. A chicken-and-egg exchange does not belong behind the door it
+   * is producing the key for.
+   */
   pair: `${CONTROLLER_AGENT_API_PREFIX}/pair`,
   /**
-   * The controller's half of the conversation: an SSE stream of desired state and commands.
+   * Everything else: the event subscription, the status report and the command results.
    *
-   * Opened by the agent and held open. The agent reads it with `fetch`, not `EventSource` — it is
-   * Bun, not a browser — so the request carries the same signature headers as every other call and
-   * needs no token in the query string.
+   * One endpoint, because that is how GraphQL works. The agent opens a `subscription` here and
+   * holds it open — delivered as SSE, read with `fetch` rather than `EventSource` because this is
+   * Bun and not a browser, so the request carries the same signature headers as every other call
+   * and needs no token in a query string. Its reports go to the same URL as mutations.
    */
-  events: `${CONTROLLER_AGENT_API_PREFIX}/events`,
-  /** The agent's half: what it currently has applied. Posted on change and on a slow heartbeat. */
-  status: `${CONTROLLER_AGENT_API_PREFIX}/status`,
-  /** Results for commands the stream issued. Separate so a slow command cannot stall the stream. */
-  commandResults: `${CONTROLLER_AGENT_API_PREFIX}/command-results`,
+  graphql: "/api/graphql",
+} as const;
+
+/** The documents the agent sends. Written out so both ends can be read against one definition. */
+export const AGENT_OPERATIONS = {
+  events: "subscription AgentEvents { agentEvents }",
+  status: "mutation AgentStatus($status: JSON!) { agentStatus(status: $status) }",
+  commandResults:
+    "mutation AgentCommandResults($results: [JSON!]!) { agentCommandResults(results: $results) }",
 } as const;
 
 // The MaxMind databases are not listed here: that route already ran agent-to-controller, keeps its
@@ -425,7 +436,17 @@ export type AgentServerEvent =
   | { type: "desired-state"; state: AgentDesiredState }
   | { type: "command"; command: AgentCommand }
   /** Sent once when the stream opens, so the agent can log what it is attached to. */
-  | { type: "hello"; controllerId: string; controllerName: string };
+  | { type: "hello"; controllerId: string; controllerName: string }
+  /**
+   * Nothing to say, said out loud.
+   *
+   * A stream that is silent for minutes is indistinguishable from one a proxy dropped without
+   * telling either end. This used to be an SSE comment frame, which only worked because the
+   * controller was writing the frames itself; as a GraphQL subscription the transport belongs to
+   * the server library, so the keepalive has to be part of the protocol rather than under it.
+   * The agent ignores it — receiving it is the entire point.
+   */
+  | { type: "ping" };
 
 export type AgentCommandResult = { id: string } & (
   | { ok: true; response: CaddyAdminProxyResponse }

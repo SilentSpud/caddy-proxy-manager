@@ -24,6 +24,7 @@ import {
   Image,
   Network,
   RefreshCw,
+  MonitorSmartphone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -31,6 +32,7 @@ import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
+import { AppDialog } from "@/src/components/ui/AppDialog";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Kbd } from "@astryxdesign/core/Kbd";
@@ -73,6 +75,7 @@ import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-
 import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
 import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
+import type { DashboardDnsCheck, DashboardHostSettings } from "@/src/lib/dashboard-host";
 import type { UpdateStatus } from "@/src/lib/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
@@ -113,6 +116,8 @@ import {
   updateTrustedProxiesSettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
+  updateDashboardSettingsAction,
+  checkDashboardDnsAction,
   updateTailscaleSettingsAction,
   pairingCodeAction,
   unpairAgentAction,
@@ -125,6 +130,23 @@ type SettingItem = {
   name: string;
   desc: string;
   icon: LucideIcon;
+  /**
+   * Environment variables that configure this section, shown as tokens beside its name.
+   *
+   * An operator arrives here from a `.env` file, so the variable name is the handle they already
+   * have. Only variables that set a value this section shows belong here: a near-miss sends
+   * someone to a page that cannot change what they came to change. `DASHBOARD_DOMAIN` belongs to
+   * Dashboard Host and not to General, whose default domain is a starting value for new proxy
+   * hosts and is configured nowhere but the database. The ones a database setting supersedes are
+   * in `src/lib/settings/registry.ts`, which is where their precedence is defined.
+   */
+  env?: readonly string[];
+  /**
+   * Variables the search should match that are not worth showing. For a section configured by a
+   * whole family of variables, `env` carries the prefix and this carries the members, so typing
+   * any one of them still lands on the section.
+   */
+  envSearch?: readonly string[];
 };
 
 type SettingsGroup = {
@@ -149,6 +171,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "ACME Server",
         desc: "Custom ACME directory URL for internal CAs",
         icon: ShieldCheck,
+        env: ["ACME_CA_ROOT_DIR"],
       },
       {
         id: "default-response",
@@ -161,6 +184,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "User Avatars",
         desc: "Gravatar fallback for users without an icon",
         icon: UserCircle,
+        env: ["AVATAR_GRAVATAR"],
       },
       {
         id: "branding",
@@ -173,18 +197,28 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Updates",
         desc: "Whether to check the registry for a newer release, and which one",
         icon: RefreshCw,
+        env: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
       },
       {
         id: "caddy-build",
         name: "Caddy Build",
         desc: "Which plugins the Caddy image is compiled with",
         icon: Package,
+        env: ["CADDY_BUILD_TIMEOUT"],
+      },
+      {
+        id: "dashboard",
+        name: "Dashboard Host",
+        desc: "Serve this dashboard through Caddy, on a domain of its own",
+        icon: MonitorSmartphone,
+        env: ["DASHBOARD_DOMAIN"],
       },
       {
         id: "agent",
         name: "Agent",
         desc: "The service that recreates and rebuilds the Caddy container",
         icon: Cpu,
+        env: ["CONTROLLER_URL", "AGENT_MODE", "PAIRING_CODE", "CADDY_API_URL"],
       },
     ],
   },
@@ -221,6 +255,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Tailscale",
         desc: "Node defaults for hosts served on, or reached over, your tailnet",
         icon: Network,
+        env: ["TS_AUTHKEY"],
       },
     ],
   },
@@ -233,6 +268,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "GeoIP Databases",
         desc: "MaxMind subscription and whether country lookups run at all",
         icon: Globe2,
+        env: ["GEOIP_ENABLED", "GEOIPUPDATE_ACCOUNT_ID", "GEOIPUPDATE_LICENSE_KEY"],
       },
       {
         id: "geoblock",
@@ -251,13 +287,45 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Authentik Defaults",
         desc: "Forward-auth defaults for new proxy hosts",
         icon: UserCheck,
+        env: ["FORWARD_AUTH_INTERNAL_URL"],
       },
-      { id: "oauth", name: "OAuth Providers", desc: "OAuth/OIDC SSO providers", icon: KeyRound },
+      {
+        id: "oauth",
+        name: "OAuth Providers",
+        desc: "OAuth/OIDC SSO providers",
+        icon: KeyRound,
+        // A provider's whole configuration is one family of variables, and `runEnvProviderSync`
+        // reads every one of them into `oauth_providers` at startup. Nineteen tokens under the
+        // heading would drown it, so the prefix is shown and the members stay searchable.
+        env: ["OAUTH_*"],
+        envSearch: [
+          "OAUTH_ENABLED",
+          "OAUTH_PROVIDER_NAME",
+          "OAUTH_ISSUER",
+          "OAUTH_CLIENT_ID",
+          "OAUTH_CLIENT_SECRET",
+          "OAUTH_AUTHORIZATION_URL",
+          "OAUTH_TOKEN_URL",
+          "OAUTH_USERINFO_URL",
+          "OAUTH_SCOPES",
+          "OAUTH_ALLOW_AUTO_LINKING",
+          "OAUTH_DEFAULT_ROLE",
+          "OAUTH_ROLE_MAPPING",
+          "OAUTH_SYNC_GROUPS",
+          "OAUTH_GROUPS_CLAIM",
+          "OAUTH_GROUP_PREFIX",
+          "OAUTH_ADMIN_GROUP",
+          "OAUTH_OPERATOR_GROUP",
+          "OAUTH_USER_GROUP",
+          "OAUTH_VIEWER_GROUP",
+        ],
+      },
       {
         id: "password-policy",
         name: "Password Policy",
         desc: "Migrate users off older password hashes",
         icon: KeyRound,
+        env: ["AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH"],
       },
     ],
   },
@@ -270,6 +338,14 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "Analytics",
         desc: "Traffic and WAF event collection, and the ClickHouse it writes to",
         icon: BarChart2,
+        env: [
+          "ANALYTICS_ENABLED",
+          "CLICKHOUSE_URL",
+          "CLICKHOUSE_USER",
+          "CLICKHOUSE_PASSWORD",
+          "CLICKHOUSE_DB",
+          "CLICKHOUSE_RETENTION_DAYS",
+        ],
       },
       {
         id: "metrics",
@@ -302,19 +378,29 @@ function findItem(id: string) {
 type PaletteItem = {
   id: string;
   label: string;
-  auxiliaryData: { desc: string; group: string };
+  auxiliaryData: { desc: string; group: string; env: readonly string[] };
 };
 
 const PALETTE_ITEMS: PaletteItem[] = ALL_ITEMS.map((item) => ({
   id: item.id,
   label: item.name,
-  auxiliaryData: { desc: item.desc, group: item.groupLabel },
+  auxiliaryData: {
+    desc: item.desc,
+    group: item.groupLabel,
+    env: [...(item.env ?? []), ...(item.envSearch ?? [])],
+  },
 }));
 
 // Keywords let a search match a setting's description or its group, as the old CommandItem
-// `value` string concatenation did.
+// `value` string concatenation did — and its environment variables, so an operator who knows a
+// setting only as the line in their `.env` can search for that name and land on the page that
+// owns it.
 const PALETTE_SOURCE = createStaticSource(PALETTE_ITEMS, {
-  keywords: (item) => [item.auxiliaryData.desc, item.auxiliaryData.group],
+  keywords: (item) => [
+    item.auxiliaryData.desc,
+    item.auxiliaryData.group,
+    ...item.auxiliaryData.env,
+  ],
 });
 
 function SettingsCmdK({
@@ -432,6 +518,34 @@ function MobileSettingsNav({
 
 // ─── Detail header ───────────────────────────────────────────────────────────
 
+/**
+ * The environment variables a section is configured by, as tokens beside its name.
+ *
+ * Named rather than explained: an operator holding a `.env` line recognises `CLICKHOUSE_URL`
+ * faster than any sentence about it, and the same string is what the search matches on.
+ */
+function EnvTokens({ names }: { names?: readonly string[] }) {
+  const t = useTranslations("settings");
+  if (!names || names.length === 0) return null;
+  return (
+    // A bare div with an aria-label is not exposed; the role is what gives the tokens a name
+    // instead of reading them out as loose words after the heading.
+    <HStack
+      gap={1}
+      vAlign="center"
+      wrap="wrap"
+      role="group"
+      aria-label={t("environmentVariablesLabel")}
+    >
+      {names.map((name) => (
+        <Code key={name} size="inherit" color="secondary">
+          {name}
+        </Code>
+      ))}
+    </HStack>
+  );
+}
+
 function DetailHeader({ activeId }: { activeId: string }) {
   const item = findItem(activeId);
   if (!item) return null;
@@ -443,7 +557,10 @@ function DetailHeader({ activeId }: { activeId: string }) {
           <BreadcrumbItem isCurrent>{item.groupLabel}</BreadcrumbItem>
         </Breadcrumbs>
       </div>
-      <Heading level={1}>{item.name}</Heading>
+      <HStack gap={2} vAlign="center" wrap="wrap">
+        <Heading level={1}>{item.name}</Heading>
+        <EnvTokens names={item.env} />
+      </HStack>
       <Text type="body" size="sm" color="secondary">
         {item.desc}
       </Text>
@@ -474,6 +591,8 @@ type Props = {
   caddyBuild: CaddyBuildSettings | null;
   agentBuildTargets?: { id: number; name: string; connected: boolean }[];
   agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
+  /** How the dashboard is served through Caddy. Always a value: unset reads as off. */
+  dashboard: DashboardHostSettings;
   /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
   tailscale: TailscaleSettingsView;
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
@@ -515,6 +634,7 @@ export default function SettingsClient({
   caddyBuild,
   agentBuildTargets,
   agentBuildSelections,
+  dashboard,
   tailscale,
   hasFavicon,
   updates,
@@ -543,6 +663,7 @@ export default function SettingsClient({
   // Form action states
   const [generalState, generalFormAction] = useActionState(updateGeneralSettingsAction, null);
   const [acmeState, acmeFormAction] = useActionState(updateAcmeSettingsAction, null);
+  const [dashboardState, dashboardFormAction] = useActionState(updateDashboardSettingsAction, null);
   const [caddyBuildState, caddyBuildFormAction] = useActionState(
     updateCaddyBuildSettingsAction,
     null,
@@ -628,6 +749,13 @@ export default function SettingsClient({
                 )}
                 {active === "acme" && (
                   <AcmeSection acme={acme} acmeState={acmeState} acmeFormAction={acmeFormAction} />
+                )}
+                {active === "dashboard" && (
+                  <DashboardHostSection
+                    dashboard={dashboard}
+                    dashboardState={dashboardState}
+                    dashboardFormAction={dashboardFormAction}
+                  />
                 )}
                 {active === "default-response" && (
                   <DefaultResponseSection
@@ -794,8 +922,8 @@ function GeneralSection({
   generalFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
-  const [primaryDomain, setPrimaryDomain] = useState(
-    general?.primaryDomain ?? "caddyproxymanager.com",
+  const [defaultDomain, setDefaultDomain] = useState(
+    general?.defaultDomain ?? "caddyproxymanager.com",
   );
   const [acmeEmail, setAcmeEmail] = useState(general?.acmeEmail ?? "");
 
@@ -808,11 +936,11 @@ function GeneralSection({
           )}
           <TextInput
             {...NATIVE_REQUIRED}
-            label={t("primaryDomain")}
-            description={t("primaryDomainHelp")}
-            htmlName="primaryDomain"
-            value={primaryDomain}
-            onChange={setPrimaryDomain}
+            label={t("defaultDomain")}
+            description={t("defaultDomainHelp")}
+            htmlName="defaultDomain"
+            value={defaultDomain}
+            onChange={setDefaultDomain}
             isRequired
           />
           <TextInput
@@ -1346,6 +1474,191 @@ function UpstreamDnsSection({
 }
 
 // ─── Section: Trusted Proxies ────────────────────────────────────────────────
+
+/**
+ * How this dashboard is served through the Caddy it manages.
+ *
+ * Two things make this section different from the rest of the page. Turning it off can remove the
+ * route the reader is using right now, so it asks first when it can tell that is the case — the
+ * page is being served on the very domain about to stop being claimed. And TLS is a question about
+ * the world rather than a preference, so the DNS check is offered inline: forcing HTTPS on a name
+ * that does not resolve here yet buys nothing but a failing certificate order.
+ */
+function DashboardHostSection({
+  dashboard,
+  dashboardState,
+  dashboardFormAction,
+}: {
+  dashboard: DashboardHostSettings;
+  dashboardState: { success: boolean; message?: string } | null;
+  dashboardFormAction: (payload: FormData) => void;
+}) {
+  const t = useTranslations("settings");
+  const [enabled, setEnabled] = useState(dashboard.enabled);
+  const [domain, setDomain] = useState(dashboard.domain);
+  const [tls, setTls] = useState(dashboard.tls);
+  const [check, setCheck] = useState<DashboardDnsCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [confirmDisable, setConfirmDisable] = useState(false);
+
+  // Whether this page arrived through the route in question. Read after mount rather than during
+  // render: the server has no window to ask, so deciding it inline would render one button on the
+  // server and a different one in the browser, which is a hydration mismatch. Until it resolves
+  // the form behaves normally, which is the safe way round — the worst case is the dialog not
+  // appearing for the first instant, not a warning that never appears.
+  //
+  // Compared against what is stored rather than what is typed: the saved domain is what Caddy is
+  // serving right now, and a half-typed replacement says nothing about how the reader got here.
+  const [servedThroughProxy, setServedThroughProxy] = useState(false);
+  useEffect(() => {
+    setServedThroughProxy(
+      dashboard.enabled &&
+        dashboard.domain.trim().toLowerCase() === window.location.hostname.toLowerCase(),
+    );
+  }, [dashboard.enabled, dashboard.domain]);
+
+  const losingOwnAccess = servedThroughProxy && !enabled;
+
+  // The check runs against the saved domain, not the field: a request whose host came from the
+  // form would be an administrator's keystrokes deciding where the server connects. So a field
+  // that has been edited has to be saved before the answer would mean anything.
+  const domainIsSaved = domain.trim().toLowerCase() === dashboard.domain.trim().toLowerCase();
+
+  async function runCheck() {
+    setChecking(true);
+    try {
+      const result = await checkDashboardDnsAction();
+      setCheck(result);
+      // The check is the whole reason to trust the answer, so let it set the toggle rather than
+      // leaving the operator to read a warning and reproduce its conclusion by hand.
+      setTls(result.ok);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  function submit() {
+    (document.getElementById("dashboard-host-form") as HTMLFormElement)?.requestSubmit();
+  }
+
+  return (
+    <>
+      <FormCard title={t("dashboardHostTitle")}>
+        <form id="dashboard-host-form" action={dashboardFormAction}>
+          <VStack gap={3}>
+            {dashboardState?.message && (
+              <StatusAlert message={dashboardState.message} success={dashboardState.success} />
+            )}
+            <CheckboxInput
+              label={t("dashboardEnabledLabel")}
+              description={t("dashboardEnabledHelp")}
+              htmlName="enabled"
+              value={enabled}
+              onChange={setEnabled}
+            />
+            <TextInput
+              label={t("dashboardDomainLabel")}
+              description={t("dashboardDomainHelp")}
+              htmlName="domain"
+              value={domain}
+              onChange={setDomain}
+              isRequired
+            />
+            <HStack gap={2} vAlign="end" wrap="wrap">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={runCheck}
+                isDisabled={checking || !domainIsSaved || domain.trim() === ""}
+                label={checking ? t("dashboardDnsChecking") : t("dashboardDnsCheckLabel")}
+              />
+            </HStack>
+            {!domainIsSaved && (
+              <InfoAlert title={t("dashboardCheckNeedsSaveTitle")}>
+                {t("dashboardCheckNeedsSaveDescription")}
+              </InfoAlert>
+            )}
+            {check && <DnsCheckResult check={check} />}
+            <CheckboxInput
+              label={t("dashboardTlsLabel")}
+              description={t("dashboardTlsHelp")}
+              htmlName="tls"
+              value={tls}
+              onChange={setTls}
+            />
+            {tls && check && !check.ok && (
+              <WarnAlert title={t("dashboardTlsUnverifiedTitle")}>
+                {t("dashboardTlsUnverifiedDescription")}
+              </WarnAlert>
+            )}
+            {/*
+              A plain SaveButton would submit before anything could be said about it, so when the
+              reader is about to cut their own route the button asks first and the dialog submits.
+            */}
+            {losingOwnAccess ? (
+              <HStack>
+                <Button
+                  variant="primary"
+                  type="button"
+                  onClick={() => setConfirmDisable(true)}
+                  label={t("saveDashboardHost")}
+                />
+              </HStack>
+            ) : (
+              <SaveButton label={t("saveDashboardHost")} />
+            )}
+          </VStack>
+        </form>
+      </FormCard>
+      <InfoAlert title={t("dashboardPortEscapeTitle")}>
+        {t("dashboardPortEscapeDescription")}
+      </InfoAlert>
+      <AppDialog
+        open={confirmDisable}
+        onClose={() => setConfirmDisable(false)}
+        title={t("dashboardDisableConfirmTitle")}
+        submitLabel={t("dashboardDisableConfirmAction")}
+        onSubmit={() => {
+          setConfirmDisable(false);
+          submit();
+        }}
+      >
+        <VStack gap={3}>
+          <WarnAlert title={t("dashboardDisableConfirmTitle")}>
+            {t("dashboardDisableConfirmBody", { domain: dashboard.domain })}
+          </WarnAlert>
+          <Text type="body" size="sm" color="secondary">
+            {t("dashboardDisableConfirmRecovery")}
+          </Text>
+        </VStack>
+      </AppDialog>
+    </>
+  );
+}
+
+/** What the reachability check found, in the terms the toggle above it is decided by. */
+function DnsCheckResult({ check }: { check: DashboardDnsCheck }) {
+  const t = useTranslations("settings");
+
+  if (check.reason === "reached") {
+    return (
+      <InfoAlert title={t("dashboardDnsMatchTitle")}>{t("dashboardDnsMatchDescription")}</InfoAlert>
+    );
+  }
+  return (
+    <WarnAlert
+      title={
+        check.reason === "unresolved"
+          ? t("dashboardDnsUnresolvedTitle")
+          : t("dashboardDnsMismatchTitle")
+      }
+    >
+      {check.reason === "unresolved"
+        ? t("dashboardDnsUnresolvedDescription")
+        : t("dashboardDnsMismatchDescription", { resolved: check.resolved.join(", ") })}
+    </WarnAlert>
+  );
+}
 
 function TrustedProxiesSection({
   trustedProxies,

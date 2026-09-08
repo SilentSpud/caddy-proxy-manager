@@ -134,7 +134,7 @@ export async function startFakeAgent(
     };
   }
 
-  const { stream } = attach({
+  const { events } = attach({
     agentId,
     agentRowId: 1,
     name,
@@ -149,42 +149,28 @@ export async function startFakeAgent(
     },
   });
 
+  // The registry hands back events now rather than SSE bytes — the framing belongs to the GraphQL
+  // server. So this helper consumes what the real agent consumes once its transport is unwrapped,
+  // and no longer reimplements a frame parser to do it.
   let reading = true;
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-
   void (async () => {
-    let buffer = '';
-    while (reading) {
-      const { done, value } = await reader.read();
-      if (done) return;
-      buffer += decoder.decode(value, { stream: true });
-
-      let split = buffer.indexOf('\n\n');
-      while (split !== -1) {
-        const frame = buffer.slice(0, split);
-        buffer = buffer.slice(split + 2);
-        handleFrame(frame);
-        split = buffer.indexOf('\n\n');
-      }
+    for await (const event of events) {
+      if (!reading) return;
+      handleEvent(event);
     }
   })().catch(() => {
     // The registry closed the stream; the test is over or the agent was detached.
   });
 
-  function handleFrame(frame: string): void {
-    const data = frame
-      .split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trimStart())
-      .join('\n');
-    // A keepalive comment carries no data lines.
-    if (data.length === 0) return;
-
-    const event = JSON.parse(data) as
+  function handleEvent(
+    event:
       | { type: 'hello' }
+      | { type: 'ping' }
       | { type: 'desired-state'; state: AgentDesiredState }
-      | { type: 'command'; command: AgentCommand };
+      | { type: 'command'; command: AgentCommand },
+  ): void {
+    // Keepalives are an event now rather than a comment frame, and carry nothing to act on.
+    if (event.type === 'ping') return;
 
     if (event.type === 'hello') {
       requests.push({ kind: 'hello' });

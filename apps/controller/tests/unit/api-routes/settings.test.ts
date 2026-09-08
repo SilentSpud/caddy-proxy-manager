@@ -302,7 +302,7 @@ describe('PUT /api/v1/settings/[group]', () => {
   it('saves general settings and applies caddy config', async () => {
     mockSaveGeneral.mockResolvedValue(undefined);
 
-    const body = { primaryDomain: 'updated.example.com' };
+    const body = { defaultDomain: 'updated.example.com' };
     const response = await PUT(createMockRequest({ method: 'PUT', body }), {
       params: Promise.resolve({ group: 'general' }),
     });
@@ -376,7 +376,7 @@ describe('PUT /api/v1/settings/[group]', () => {
   });
 
   it('returns 502 and restores the exact stored value if Caddy rejects the update', async () => {
-    const previous = { primaryDomain: 'old.example.com', acmeEmail: 'old@example.com' };
+    const previous = { defaultDomain: 'old.example.com', acmeEmail: 'old@example.com' };
     mockGetSetting.mockResolvedValue(previous);
     mockSaveGeneral.mockResolvedValue(undefined);
     mockApplyCaddyConfig
@@ -384,7 +384,7 @@ describe('PUT /api/v1/settings/[group]', () => {
       .mockResolvedValueOnce({ ok: true } as any);
 
     const response = await PUT(
-      createMockRequest({ method: 'PUT', body: { primaryDomain: 'new.example.com' } }),
+      createMockRequest({ method: 'PUT', body: { defaultDomain: 'new.example.com' } }),
       { params: Promise.resolve({ group: 'general' }) },
     );
     const data = await response.json();
@@ -436,7 +436,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     const firstApply = new Promise<never>((_resolve, reject) => {
       rejectFirstApply = reject;
     });
-    mockGetSetting.mockResolvedValue({ primaryDomain: 'old.example.com' });
+    mockGetSetting.mockResolvedValue({ defaultDomain: 'old.example.com' });
     mockSaveGeneral.mockResolvedValue(undefined);
     mockApplyCaddyConfig
       .mockImplementationOnce(() => firstApply)
@@ -446,7 +446,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     const first = PUT(
       createMockRequest({
         method: 'PUT',
-        body: { primaryDomain: 'first.example.com' },
+        body: { defaultDomain: 'first.example.com' },
       }),
       { params: Promise.resolve({ group: 'general' }) },
     );
@@ -455,7 +455,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     const second = PUT(
       createMockRequest({
         method: 'PUT',
-        body: { primaryDomain: 'second.example.com' },
+        body: { defaultDomain: 'second.example.com' },
       }),
       { params: Promise.resolve({ group: 'general' }) },
     );
@@ -467,7 +467,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     expect((await first).status).toBe(502);
     expect((await second).status).toBe(200);
     expect(mockSaveGeneral).toHaveBeenNthCalledWith(2, {
-      primaryDomain: 'second.example.com',
+      defaultDomain: 'second.example.com',
     });
     expect(mockApplyCaddyConfig).toHaveBeenCalledTimes(3);
   });
@@ -477,7 +477,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     const apiApply = new Promise<never>((_resolve, reject) => {
       rejectApiApply = reject;
     });
-    mockGetSetting.mockResolvedValue({ primaryDomain: 'old.example.com' });
+    mockGetSetting.mockResolvedValue({ defaultDomain: 'old.example.com' });
     mockSaveGeneral.mockResolvedValue(undefined);
     mockApplyCaddyConfig
       .mockImplementationOnce(() => apiApply)
@@ -486,14 +486,14 @@ describe('PUT /api/v1/settings/[group]', () => {
     const apiUpdate = PUT(
       createMockRequest({
         method: 'PUT',
-        body: { primaryDomain: 'api.example.com' },
+        body: { defaultDomain: 'api.example.com' },
       }),
       { params: Promise.resolve({ group: 'general' }) },
     );
     await vi.waitFor(() => expect(mockApplyCaddyConfig).toHaveBeenCalledTimes(1));
 
     const formData = new FormData();
-    formData.set('primaryDomain', 'dashboard.example.com');
+    formData.set('defaultDomain', 'dashboard.example.com');
     const dashboardUpdate = updateGeneralSettingsAction(null, formData);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -503,7 +503,7 @@ describe('PUT /api/v1/settings/[group]', () => {
     expect((await apiUpdate).status).toBe(502);
     expect(await dashboardUpdate).toMatchObject({ success: true });
     expect(mockSaveGeneral).toHaveBeenNthCalledWith(2, {
-      primaryDomain: 'dashboard.example.com',
+      defaultDomain: 'dashboard.example.com',
       acmeEmail: undefined,
     });
   });

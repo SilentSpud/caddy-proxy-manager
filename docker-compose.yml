@@ -60,6 +60,12 @@ services:
       # Renames the app in the sidebar, login card, and page titles.
       APP_NAME: ${APP_NAME:-}
 
+      # Seeds the managed dashboard host that setup turns on, so CPM proxies its own dashboard.
+      # Read once, at the end of setup: after that the stored setting is what the route is built
+      # from, and this line only matters again on a fresh database. Left unset, setup falls back to
+      # the hostname in BASE_URL. Caddy reads the same variable for its placeholder site.
+      DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-}
+
       # Users without an icon fall back to Gravatar, which their browser fetches directly.
       # Set false to disable it and lock the Settings toggle.
       AVATAR_GRAVATAR: ${AVATAR_GRAVATAR:-true}
@@ -196,7 +202,7 @@ services:
       # Metrics for Prometheus/Grafana, once enabled in Settings.
       # - "9090:9090"
     environment:
-      PRIMARY_DOMAIN: ${PRIMARY_DOMAIN:-caddyproxymanager.com}
+      DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-caddyproxymanager.com}
     volumes:
       - caddy-data:/data
       - caddy-config:/config

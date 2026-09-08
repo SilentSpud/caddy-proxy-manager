@@ -151,7 +151,9 @@ test.describe('Migrating an existing installation', () => {
 
   test('the settings it had came across too', async () => {
     await page.goto('/settings');
-    await expect(page.locator('input[name="primaryDomain"]')).toHaveValue(
+    // Named `defaultDomain` now; the legacy database still holds `primaryDomain`, so this is
+    // also the assertion that the read fallback in getGeneralSettings works.
+    await expect(page.locator('input[name="defaultDomain"]')).toHaveValue(
       LEGACY_FIXTURE.primaryDomain,
       { timeout: 15_000 },
     );

@@ -1,3 +1,4 @@
+import type { DashboardHostSettings } from "./dashboard-host";
 import db, { nowIso } from "./db";
 import { settings } from "./db/schema";
 import { eq } from "drizzle-orm";
@@ -26,7 +27,8 @@ export type CloudflareSettings = {
 };
 
 export type GeneralSettings = {
-  primaryDomain: string;
+  /** Offered as the starting value when a proxy host is created. */
+  defaultDomain: string;
   acmeEmail?: string;
 };
 
@@ -180,11 +182,31 @@ export async function saveCloudflareSettings(settings: CloudflareSettings): Prom
 }
 
 export async function getGeneralSettings(): Promise<GeneralSettings | null> {
-  return await getSetting<GeneralSettings>("general");
+  const stored = await getSetting<GeneralSettings & { primaryDomain?: string }>("general");
+  if (!stored) return null;
+
+  // `primaryDomain` is what every release before this one wrote, and what a pre-3.0 database
+  // still holds after the migration copies its `settings` rows across verbatim. Read either name
+  // and answer with the current one, so an upgrade does not present an empty field and quietly
+  // overwrite the operator's domain the first time the form is saved.
+  const { primaryDomain, ...rest } = stored;
+  return { ...rest, defaultDomain: stored.defaultDomain ?? primaryDomain ?? "" };
 }
 
 export async function saveGeneralSettings(settings: GeneralSettings): Promise<void> {
   await setSetting("general", settings);
+}
+
+/**
+ * How the dashboard is served through Caddy. Null until setup has decided, which the managed-host
+ * builder reads as "off".
+ */
+export async function getDashboardSettings(): Promise<DashboardHostSettings | null> {
+  return await getSetting<DashboardHostSettings>("dashboard");
+}
+
+export async function saveDashboardSettings(settings: DashboardHostSettings): Promise<void> {
+  await setSetting("dashboard", settings);
 }
 
 export async function getAvatarSettings(): Promise<AvatarSettings | null> {

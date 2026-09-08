@@ -74,6 +74,45 @@ Two things skip the flow entirely:
   configure a way in and someone can already sign in, setup is marked complete at startup and never
   shown. Upgrading an existing install changes nothing about how it starts.
 
+### Proxying the dashboard itself
+
+Setup finishes by pointing CPM at the one upstream every deployment already has: this dashboard.
+It becomes a proxy host CPM maintains for you, so a new install is serving something by name
+before you have created anything.
+
+The domain comes from `DASHBOARD_DOMAIN` if you set it, and otherwise from the hostname in
+`BASE_URL` — the address you are already reaching CPM at. A localhost address says nothing about
+how the instance will be reached, so that leaves the host switched off with the field ready.
+
+It comes up on **HTTP**. Forcing HTTPS before the domain reaches you would mean a fresh install's
+first act is a certificate order failing on a name nobody has pointed at it yet.
+
+HTTPS is turned on by a check you run from **Settings → Dashboard Host**, once the host is live.
+The check sends a request to the domain and looks for a signature only this instance can produce:
+
+| What the check finds | What happens |
+| -------------------- | ------------ |
+| The request came back here, signed | HTTPS on. DNS, the network in between and Caddy's route all work, so a certificate order will too |
+| The domain resolves but the request arrived elsewhere | HTTPS off, with the address it currently points at |
+| Nothing answers for the name | HTTPS off. Create the record, then check again |
+
+Nothing is asked of a third party — no IP-echo service, no external resolver. The trade-off is
+that the request is made from this deployment, so two situations it cannot see through: a resolver
+inside your network that points the name here while public DNS does not (passes, and ACME still
+fails), and a network that will not let a request leave and come back by its own public address
+(fails, though the outside world reaches you fine). The toggle is a default you can override in
+both.
+
+**This host is managed, not stored.** It is generated from those settings every time the
+configuration is applied, so it is not in Proxy Hosts and nothing can delete it by accident.
+It is also placed ahead of every other route, so a host somebody creates for the same domain
+cannot shadow the one the dashboard is reached through.
+
+**You cannot lock yourself out with it.** The controller publishes its own port, so
+`http://<host>:3000` reaches this dashboard whatever the route is doing — including when you turn
+the host off, which the settings page warns about first if you are reading it through that very
+domain.
+
 ### Runtime
 
 [Bun](https://bun.sh) is the only supported runtime. The app reaches PostgreSQL through
@@ -124,7 +163,8 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
 - **Tailscale** - Serve a proxy host privately on your tailnet, gate it on the caller's Tailscale identity, or reach a backend that only exists on the tailnet. A Tailscale node runs inside the Caddy container — no `tailscaled` on the host, no TUN device, no published ports — and `*.ts.net` certificates come from Tailscale rather than ACME
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
-- **REST API** - Full REST API under `/api/v1/` with Bearer token authentication, covering all resources. Interactive OpenAPI 3.1.0 docs at `/api-docs`
+- **GraphQL API** - Every resource under `/api/graphql`, with Bearer token authentication. One endpoint, one schema, introspectable by any GraphQL client. The agent protocol lives in the same schema as a subscription, separated by which credential a field requires
+- **REST API (deprecated)** - `/api/v1/` still works exactly as it did, with Bearer token authentication and interactive OpenAPI 3.1.0 docs at `/api-docs`. It is no longer the documented path and will be removed in a later release; new integrations should use GraphQL
 - **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
@@ -227,7 +267,7 @@ is still honoured as an override until a value is stored.
 | `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
-| `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
+| `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard — see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 | `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Compose-only. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 
 ### The agent's environment
@@ -249,7 +289,7 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
 | `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`, `geoipupdate`) is abandoned. Generous because the first start pulls the image | `900` |
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
-| `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs | Auto-detected |
+| `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs. `COMPOSE_HOST_DIR` is only needed where the project directory cannot be worked out from the compose labels — a UNC path, or a Docker Desktop old enough to expose drives at `/host_mnt/<letter>`; the agent logs a warning naming it when that happens | Auto-detected |
 | `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` / `GEOIP_DIR` / `GEOIP_DB` | Where the agent reads Caddy's logs and the GeoLite2 databases from | Container paths |
 | `NODE_EXTRA_CA_CERTS` | A CA bundle to trust in addition to the system store, for a controller behind TLS from a private CA. See [Connecting agents over Tailscale or Headscale](#connecting-agents-over-tailscale-or-headscale) | Unset |
 
@@ -263,6 +303,44 @@ There is no longer a development default: setting neither variable is not an err
 environment, it means the deployment runs [First Run](#first-run) instead of seeding an account.
 The password policy above — including the refusal of `admin` itself — is enforced only when
 `NODE_ENV=production`, so a development instance may set whatever it likes.
+
+---
+
+## The API
+
+`/api/graphql` serves every resource: proxy hosts, L4 hosts, certificates, access lists, users,
+groups, agents, settings, the audit log, and a Caddy apply.
+
+```bash
+curl -sX POST https://cpm.example.com/api/graphql   -H "Authorization: Bearer $CPM_TOKEN"   -H 'content-type: application/json'   -d '{"query":"{ proxyHosts { id name domains enabled } }"}'
+```
+
+Tokens are created from **Profile → API Tokens** in an authenticated dashboard session, with an
+optional expiry — an existing bearer token cannot mint replacement credentials, so a leaked one
+cannot extend its own life.
+
+### What is a field and what is JSON
+
+Stable, queryable things are fields: ids, names, domains, timestamps, foreign keys. Configuration
+the model layer owns — load balancing, WAF and geoblock overrides, location rules, mTLS — travels
+as a `JSON` scalar, reachable through `config` on a host and passed back as `input` on a mutation.
+
+That split is deliberate. Those shapes change with the product and are validated by functions that
+already exist; restating them in SDL would be thousands of lines that can drift out of step with
+the validator while looking authoritative. It also means a GraphQL mutation and the REST route
+beside it hand identical input to identical validation, which is what makes them interchangeable.
+
+### Roles
+
+A token carries its owner's role, and the management fields are **admin-only** — including for an
+operator, because a [group grant](#groups-and-delegated-management) delegates the dashboard rather
+than the API. `apiTokens` is the exception: every signed-in role manages its own.
+
+### REST is still there
+
+`/api/v1/` is unchanged and still documented at `/api-docs`. It is deprecated rather than removed:
+nothing in the field breaks, and both APIs call the same model functions, so they cannot disagree
+about what a write does. New integrations should use GraphQL.
 
 ---
 
@@ -727,10 +805,14 @@ Two consequences worth knowing:
 
 ### How an agent connects
 
-The agent dials the controller, never the other way round. It opens one long-lived event stream and
-holds it open; the controller pushes desired state and Caddy admin calls down it, and the agent
-posts status and results back. So an agent on a NAT'd or firewalled host needs **no inbound port** —
-only outbound reach to the controller.
+The agent dials the controller, never the other way round. It opens one long-lived **GraphQL
+subscription** at `/api/graphql`, delivered as SSE, and holds it open: the controller pushes desired
+state, Caddy admin calls, and a periodic `ping` down it, and the agent reports status and command
+results back as mutations to the same endpoint. So an agent on a NAT'd or firewalled host needs
+**no inbound port** — only outbound reach to the controller.
+
+Every one of those calls is signed with the secret agreed at pairing, over the request body. Pairing
+itself is the one thing still on a plain REST route, because it runs before that secret exists.
 
 An agent that has never been paired does nothing, and **leaves Caddy stopped**. Caddy sits behind a
 Compose profile precisely so that `docker compose up` will not start it: a host nobody has finished
@@ -775,7 +857,7 @@ place after a successful pair is ignored rather than burned again on every resta
 ### Connecting agents over Tailscale or Headscale
 
 An agent needs one thing from the network: an outbound route to the controller. It dials out and
-holds an event stream open, and the controller never dials back — so a tailnet is a natural fit,
+holds a GraphQL subscription open, and the controller never dials back — so a tailnet is a natural fit,
 and CPM needs no Tailscale-specific configuration to use one. Point `CONTROLLER_URL` (or
 `--host`) at the controller's tailnet address and everything else is unchanged.
 
@@ -792,24 +874,12 @@ https address means something in front of it is terminating TLS. A bare host or 
 address with no port still means 3000. `--port` overrides either.
 
 **Getting the agent onto the tailnet.** If the agent's host is already on it, there is nothing to
-do. For the bundled Compose stack, `docker-compose.tailscale.yml` adds a sidecar:
+do. Otherwise put the container on the tailnet however you normally would — a `tailscale/tailscale`
+sidecar sharing the agent's network namespace works, and so does joining the host itself. CPM has
+no opinion about it: the agent only needs an outbound route to `CONTROLLER_URL`.
 
-```bash
-# .env
-TS_AUTHKEY=tskey-auth-...           # or: headscale preauthkeys create
-CONTROLLER_URL=https://cpm-controller.tailnet-1234.ts.net
-# Headscale only:
-# TS_EXTRA_ARGS=--login-server=https://headscale.example.com
-```
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
-```
-
-The sidecar joins the **agent's** network namespace rather than the other way round. That is what
-lets the agent keep resolving `caddy` and `docker-socket-proxy` by compose service name while
-gaining tailnet routing and MagicDNS — putting the agent inside the sidecar's namespace instead
-would take those service names away and break every Caddy admin call it proxies.
+This path is tested — an agent reaching its controller across a real tailnet pairs, streams, and
+serves exactly as it does on a flat network.
 
 Pairing is unchanged: generate a code under **Settings → Agents** and run
 

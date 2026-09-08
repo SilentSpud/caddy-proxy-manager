@@ -1,0 +1,62 @@
+name: Site
+
+on:
+  # Only when the site itself changes. The rest of the repository changes far more often, and
+  # rebuilding a static site for a change to the agent would spend a runner to publish the same
+  # bytes. `workflow_dispatch` covers the case where you want it published anyway.
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/site/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+# Least privilege, then the two Pages needs: `pages` to publish and `id-token` for the deployment's
+# OIDC exchange. `contents: read` is all the build requires.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one in flight: a half-finished deploy would leave the
+# published site inconsistent, and the next push will supersede it anyway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The whole workspace: apps/site is a workspace member, so its dependencies come from the
+      # root lockfile rather than one of its own.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the site
+        run: bun run --filter @cpm/site build
+
+      - name: Upload the artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: apps/site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,56 @@
+---
+title: Tailscale
+description: Serve a host privately on your tailnet, gate it on the caller's Tailscale identity, or proxy to a tailnet-only backend.
+---
+
+A proxy host can be served on your [tailnet](https://tailscale.com/) instead of, or as well as, the
+public internet — and it needs nothing else on the host. The
+[caddy-tailscale](https://github.com/tailscale/caddy-tailscale) plugin runs a Tailscale node in
+userspace inside the Caddy process: no `tailscaled`, no `/dev/net/tun`, no extra published ports,
+and no change to your compose file.
+
+## Setting it up
+
+Turn it on in **Settings → Tailscale**. The one thing it needs is a reusable auth key from the
+Tailscale admin console. If you would rather not store the key in the database, put a Caddy
+placeholder in the field instead — `{env.TS_AUTHKEY}` is passed through untouched and resolved from
+the container's environment.
+
+| Setting | What it does |
+| ------- | ------------ |
+| **Auth key** | Registers each node. Encrypted at rest, never sent back to the browser |
+| **Default node name** | The machine name a host inherits when it names none. Several hosts can share one node |
+| **Tags** | ACL tags applied at registration. Most reusable keys need at least one, e.g. `tag:caddy` |
+| **Control server URL** | Point at Headscale or another coordination server. Empty uses Tailscale's own |
+| **State directory** | Where each node keeps its identity. Keep it on a volume, or every restart registers a new machine |
+| **Ephemeral** | Nodes leave the tailnet when Caddy stops rather than lingering as offline machines |
+
+## Per host
+
+**Serve on tailnet** moves the host's routes to a listener on the chosen node. **Tailnet only** —
+on by default — keeps them off the public listener entirely, so the service exists only for devices
+on your tailnet.
+
+Routing is still by `Host` header, so add the node's MagicDNS name to the host's domains. Caddy gets
+the certificate for that name from Tailscale — no ACME, no DNS provider, nothing to configure. A
+`.ts.net` name is never sent to a public CA, which could not validate it anyway.
+
+**Require a Tailscale identity** admits only devices signed in to your tailnet, identified by their
+tailnet login, with the same protected and excluded path lists the other authentication
+integrations use. The identity can be forwarded upstream as headers.
+
+**Proxy to a tailnet backend** reaches a service that only exists on the tailnet, without exposing
+it anywhere else.
+
+## Fail-closed
+
+A host set to serve only on the tailnet, on a deployment where Tailscale is off or the module is not
+in the running binary, is left out of the configuration entirely rather than published on the public
+listener. Falling back would expose a service deliberately kept private.
+
+## Agents over a tailnet
+
+Separately from serving hosts, an [agent](../agent/) can reach its controller across a tailnet —
+it only needs an outbound route, so point `CONTROLLER_URL` at the controller's tailnet address.
+Tested against a real tailnet: pairing, the event stream and long-lived connections all behave as
+they do on a flat network.

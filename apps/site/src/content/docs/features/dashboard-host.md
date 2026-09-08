@@ -1,0 +1,50 @@
+---
+title: Dashboard host
+description: CPM reverse-proxying its own dashboard, on a domain of its own.
+---
+
+The quickest way to see what this product does is to watch it proxy something, and the one upstream
+every deployment already has is the dashboard you are reading it in. Setup switches this on.
+
+## How it differs from an ordinary host
+
+It is **managed**: generated from **Settings → Dashboard Host** every time the configuration is
+applied, rather than stored as a row in Proxy Hosts. Nothing can delete it by accident, and there is
+no second copy to drift from the setting.
+
+It is also built ahead of the stored hosts. Routes are ordered by host specificity, which settles
+every overlap except one — two hosts claiming the same exact domain — and in that tie the managed
+route wins. A host somebody creates for the dashboard's domain cannot shadow the route the
+dashboard is reached through.
+
+## The domain
+
+`DASHBOARD_DOMAIN` if you set it, otherwise the hostname in `BASE_URL` — the address you are
+already reaching CPM at. A localhost address says nothing about the name the instance will answer
+to, so that leaves the feature off with the field ready.
+
+## HTTPS is checked, not assumed
+
+It comes up on HTTP. Forcing HTTPS before the domain reaches you would mean a fresh install's first
+act is a certificate order failing on a name nobody has pointed at it yet.
+
+**Settings → Dashboard Host** offers a reachability check: it sends a request to the domain and
+looks for a signature only this instance can produce. Any server can return 200 and echo a nonce
+back; only yours can sign it.
+
+| What the check finds | What happens |
+| -------------------- | ------------ |
+| The request came back, signed | HTTPS on — DNS, the network and Caddy's route all work |
+| The domain resolves but arrives elsewhere | HTTPS off, with the address it currently points at |
+| Nothing answers for the name | HTTPS off — create the record and check again |
+
+Nothing is asked of a third party. The trade-off is that the request is made from the deployment
+itself, so it cannot see through split-horizon DNS (passes, and ACME still fails) or a network
+without NAT hairpinning (fails, though the outside world reaches you fine). The toggle is a default
+you can override in both.
+
+## You cannot lock yourself out
+
+The controller publishes its own port, so `http://<host>:3000` reaches the dashboard whatever the
+route is doing. Turning the host off warns you first if you are reading the page through that very
+domain.

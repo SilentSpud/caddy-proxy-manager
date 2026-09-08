@@ -1,3 +1,4 @@
+import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
 import SettingsClient from "./SettingsClient";
 import {
   getGeneralSettings,
@@ -15,6 +16,7 @@ import {
   getAvatarSettings,
   getPasswordPolicySettings,
   getCaddyBuildSettings,
+  getDashboardSettings,
   getTailscaleSettings,
   defaultTailscaleSettings,
 } from "@/src/lib/settings";
@@ -58,6 +60,7 @@ export default async function SettingsPage() {
     passwordPolicySettings,
     caddyBuild,
     tailscale,
+    dashboard,
     analytics,
     geoip,
     favicon,
@@ -80,6 +83,7 @@ export default async function SettingsPage() {
     getPasswordPolicySettings(),
     getCaddyBuildSettings(),
     getTailscaleSettings(),
+    getDashboardSettings(),
     analyticsView(),
     geoipView(),
     getFavicon(),
@@ -139,6 +143,9 @@ export default async function SettingsPage() {
       // The auth key never leaves the server: the page ships only whether one is stored, so
       // the form can say "leave blank to keep the current key" without shipping it.
       tailscale={redactTailscaleSettingsForApi(tailscale ?? defaultTailscaleSettings())}
+      // Never null downstream: an unset blob means the feature has not been decided, which the
+      // form and the route builder both read as off with a domain to fill in.
+      dashboard={dashboard ?? defaultDashboardSettings()}
       // Only whether one exists: the image itself is served by its own route, so shipping it in
       // this page's HTML would be a couple of hundred kilobytes of base64 for nothing.
       hasFavicon={favicon !== null}

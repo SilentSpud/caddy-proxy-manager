@@ -59,15 +59,24 @@ function bucket(access: Access, kind: ResourceKind): Map<number, GrantCapability
  * and a query per request for a value nothing reads is a query per request for nothing.
  */
 export async function resolveAccess(session: Session): Promise<Access> {
-  const userId = Number(session.user.id);
-  const role = session.user.role;
-  const isAdmin = role === "admin";
+  return await accessFor(Number(session.user.id), session.user.role);
+}
+
+/**
+ * The same answer, for a caller that has an id and a role but no session object.
+ *
+ * The GraphQL API authenticates a Bearer token, which produces exactly those two facts and no
+ * email or display name. Building a half-empty `Session` to hand to `resolveAccess` would be
+ * inventing fields nothing reads, so the identity-shaped part of the question lives here and
+ * `resolveAccess` is the session-shaped wrapper over it.
+ */
+export async function accessFor(userId: number, role: string): Promise<Access> {
   const isOperator = role === "operator";
 
   return {
     userId,
     role,
-    isAdmin,
+    isAdmin: role === "admin",
     isOperator,
     grants: isOperator ? await grantsForUser(userId) : emptyGrants(),
   };

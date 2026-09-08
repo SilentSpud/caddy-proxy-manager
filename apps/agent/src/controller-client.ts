@@ -21,6 +21,7 @@ import {
   type AgentPairResponse,
   type AgentServerEvent,
   type AgentStatus,
+  AGENT_OPERATIONS,
   CONTROLLER_AGENT_ROUTES,
   signatureBase,
 } from "@cpm/shared";
@@ -119,59 +120,83 @@ export class ControllerClient {
     return (await response.json()) as AgentPairResponse;
   }
 
-  /** Report what this agent currently has applied. */
-  async postStatus(secret: string, status: AgentStatus): Promise<void> {
+  /**
+   * Run one GraphQL operation and return its data, or throw what the controller said.
+   *
+   * GraphQL answers 200 with an `errors` array where REST answered a status code, so a caller that
+   * only checked `response.ok` would treat "that agent is not connected" as success. The status is
+   * still checked first — an unauthenticated request never reaches the resolver — and then the
+   * body.
+   */
+  private async operation<T>(
+    secret: string,
+    query: string,
+    variables: Record<string, unknown>,
+  ): Promise<T> {
+    const body = JSON.stringify({ query, variables });
     const response = await this.send(
-      CONTROLLER_AGENT_ROUTES.status,
+      CONTROLLER_AGENT_ROUTES.graphql,
       "POST",
-      JSON.stringify({ status }),
+      body,
       POST_TIMEOUT_MS,
       secret,
     );
+
     if (!response.ok) {
       throw new ControllerRejected(
         response.status,
-        await errorMessage(response, `The controller refused the status (${response.status}).`),
+        await errorMessage(response, `The controller refused the request (${response.status}).`),
       );
     }
+
+    const payload = (await response.json().catch(() => null)) as {
+      data?: T;
+      errors?: GraphQLErrorShape[];
+    } | null;
+
+    const failure = payload?.errors?.[0];
+    if (failure) {
+      // GraphQL answers 200 with an errors array where REST answered a status code, and the
+      // lifecycle upstream keys on that code: only a 401 means the controller has forgotten this
+      // agent, which is what stops it retrying a secret that will never be accepted again.
+      // Flattening every refusal to one code would leave an unpaired agent looping forever.
+      throw new ControllerRejected(statusForError(failure), failure.message ?? "Request refused.");
+    }
+    if (!payload?.data) {
+      throw new ControllerRejected(response.status, "The controller returned no data.");
+    }
+    return payload.data;
+  }
+
+  /** Report what this agent currently has applied. */
+  async postStatus(secret: string, status: AgentStatus): Promise<void> {
+    await this.operation(secret, AGENT_OPERATIONS.status, { status });
   }
 
   /**
-   * Hand back the results of commands the stream issued.
+   * Hand back the results of commands the subscription issued.
    *
-   * Its own request rather than a frame on the stream, because the stream only runs one way: SSE
-   * has no client-to-server channel, which is exactly the trade that keeps this inside ordinary
-   * route handlers.
+   * Its own request rather than a message on the subscription, because a subscription only runs
+   * one way: SSE has no client-to-server channel, which is exactly the trade that keeps this side
+   * of the conversation in ordinary mutations.
    */
   async postResults(secret: string, results: AgentCommandResult[]): Promise<void> {
     if (results.length === 0) return;
-    const response = await this.send(
-      CONTROLLER_AGENT_ROUTES.commandResults,
-      "POST",
-      JSON.stringify({ results }),
-      POST_TIMEOUT_MS,
-      secret,
-    );
-    if (!response.ok) {
-      throw new ControllerRejected(
-        response.status,
-        await errorMessage(response, `The controller refused the results (${response.status}).`),
-      );
-    }
+    await this.operation(secret, AGENT_OPERATIONS.commandResults, { results });
   }
 
   /**
-   * Open the event stream and yield frames until it ends or `signal` aborts.
+   * Open the event subscription and yield events until it ends or `signal` aborts.
    *
    * No overall timeout: this request is meant to stay open for as long as the agent runs. Liveness
-   * is the controller's keepalive comment instead — a stream that has said nothing at all is the
-   * one case a timeout could not tell apart from a healthy idle fleet.
+   * is the protocol's `ping` event instead — a subscription that has said nothing at all is the one
+   * case a timeout could not tell apart from a healthy idle fleet.
    */
   async *events(secret: string, signal: AbortSignal): AsyncGenerator<AgentServerEvent> {
     const response = await this.send(
-      CONTROLLER_AGENT_ROUTES.events,
-      "GET",
-      "",
+      CONTROLLER_AGENT_ROUTES.graphql,
+      "POST",
+      JSON.stringify({ query: AGENT_OPERATIONS.events }),
       null,
       secret,
       signal,
@@ -257,6 +282,34 @@ export class ControllerClient {
   }
 }
 
+type GraphQLErrorShape = { message?: string; extensions?: { code?: unknown } };
+
+/**
+ * The status code a GraphQL error stands for.
+ *
+ * The controller tags its refusals with `extensions.code`, and this is where those become the
+ * codes the rest of the agent already reasons about. 401 is the one that matters: the lifecycle
+ * treats it as "the controller has forgotten this agent" and drops to idle, where every other code
+ * means retry. Getting this wrong in either direction is bad — a mapped-down 401 loops forever
+ * against a secret that will never work, and a mapped-up anything-else throws away a pairing over
+ * a transient fault.
+ *
+ * An untagged error is a fault the controller did not anticipate, which is a retry rather than a
+ * reason to unpair.
+ */
+function statusForError(error: GraphQLErrorShape): number {
+  switch (error.extensions?.code) {
+    case "AGENT_UNAUTHORIZED":
+      return 401;
+    case "AGENT_NOT_CONNECTED":
+      return 409;
+    case "PAYLOAD_TOO_LARGE":
+      return 413;
+    default:
+      return 400;
+  }
+}
+
 /**
  * One SSE frame to an event, or null for anything that carries no payload.
  *
@@ -271,10 +324,32 @@ function parseFrame(frame: string): AgentServerEvent | null {
     .join("\n");
   if (data.length === 0) return null;
 
+  let payload: { data?: { agentEvents?: AgentServerEvent }; errors?: GraphQLErrorShape[] };
   try {
-    return JSON.parse(data) as AgentServerEvent;
+    payload = JSON.parse(data);
   } catch {
-    // A frame the controller wrote badly must not take the stream down; the next one may be fine.
+    // A frame the controller wrote badly must not take the subscription down; the next one may
+    // be fine.
     return null;
   }
+
+  // A subscription delivers execution results, so each frame is `{"data":{"agentEvents":…}}`
+  // rather than the event itself. An `errors` frame is a resolver that failed mid-stream: nothing
+  // to act on, and the subscription carries on — the controller closes it if it is really over.
+  if (payload.errors?.length) {
+    const failure = payload.errors[0] ?? {};
+    // A refusal can arrive inside a frame rather than as a status, and it means the same thing:
+    // if the controller has forgotten this agent, sitting in the read loop would retry a secret
+    // that will never be accepted. Thrown so the lifecycle sees it, exactly as it would from a
+    // mutation.
+    if (statusForError(failure) === 401) {
+      throw new ControllerRejected(401, failure.message ?? "The controller refused the stream.");
+    }
+    console.warn(
+      "[controller] The event subscription reported an error:",
+      failure.message ?? "unknown",
+    );
+    return null;
+  }
+  return payload.data?.agentEvents ?? null;
 }
