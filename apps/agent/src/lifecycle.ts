@@ -49,6 +49,14 @@ export type LifecycleDeps = {
   operations: Operations;
 };
 
+/**
+ * How often an idle agent looks for a bootstrap token the controller has not written yet.
+ *
+ * Frequent enough that a stack coming up together pairs itself in seconds, slow enough that an
+ * agent which will never have one — every remote agent — spends nothing worth measuring on it.
+ */
+const BOOTSTRAP_POLL_MS = 3_000;
+
 /** Same shape both entry points want back: the CLI prints it, the local route serialises it. */
 export type PairOutcome = { ok: true } | { ok: false; error: string };
 
@@ -64,6 +72,8 @@ export class AgentLifecycle {
   /** What the controller last said it wanted. Null until the first frame arrives. */
   private desired: AgentDesiredState | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  /** Polls for a bootstrap token that has not been written yet. Null unless idle and waiting. */
+  private bootstrapWatch: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly deps: LifecycleDeps) {}
 
@@ -100,6 +110,46 @@ export class AgentLifecycle {
         ? "No pairing code. Run `cpm-agent --pair --host <controller> --code <code>`."
         : "No controller configured. Run `cpm-agent --pair --host <controller> --code <code>`.",
     );
+
+    // The bundled stack starts the agent and the controller together, and the controller writes
+    // the bootstrap token as it boots. Reading it once meant losing that race left the agent idle
+    // *forever* — Caddy never started, and the only clue was "No pairing code" on a stack the
+    // operator never had to pair by hand. So keep looking while there is a controller to pair
+    // with. A remote agent has no such file and this finds nothing, which costs one `existsSync`
+    // a few seconds and is the state it is already sitting in.
+    if (controllerUrl && !pairingCode) this.watchForBootstrapToken(controllerUrl);
+  }
+
+  /**
+   * Wait for a bootstrap token to appear, then pair with it.
+   *
+   * Stops on the first success, and on `stop()`. Every failure is left to the next tick rather
+   * than logged: the common one is the controller not being up yet, which is not worth a line
+   * every few seconds on a stack that is still starting.
+   */
+  private watchForBootstrapToken(controllerUrl: string): void {
+    if (this.bootstrapWatch) return;
+    this.bootstrapWatch = setInterval(() => {
+      if (this.stopped || this.lifecycle !== "idle") {
+        this.clearBootstrapWatch();
+        return;
+      }
+      const token = this.readBootstrapToken();
+      if (!token) return;
+      this.clearBootstrapWatch();
+      void this.pairWith(controllerUrl, token).then((outcome) => {
+        if (outcome.ok) return;
+        // Redeeming a token can fail for a reason a retry fixes — the controller still starting —
+        // so go back to watching rather than giving up the way the old single read did.
+        console.warn(`[agent] ${outcome.error}`);
+        if (!this.stopped && this.lifecycle === "idle") this.watchForBootstrapToken(controllerUrl);
+      });
+    }, BOOTSTRAP_POLL_MS);
+  }
+
+  private clearBootstrapWatch(): void {
+    if (this.bootstrapWatch) clearInterval(this.bootstrapWatch);
+    this.bootstrapWatch = null;
   }
 
   /**
@@ -163,6 +213,9 @@ export class AgentLifecycle {
     this.connection = null;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
+    // Cleared here as well as on the next tick: an interval still armed keeps the process alive
+    // after a SIGTERM, which turns a clean shutdown into a ten-second wait for the kill.
+    this.clearBootstrapWatch();
   }
 
   // ─── Pairing ───────────────────────────────────────────────────────────────

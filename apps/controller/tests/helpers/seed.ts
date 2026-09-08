@@ -8,7 +8,7 @@
  * write rows the application did not write.
  */
 import { execFileSync } from 'node:child_process';
-import { COMPOSE_ARGS, COMPOSE_CWD, composeEnv } from './compose';
+import { COMPOSE_ARGS, COMPOSE_CWD } from './compose';
 
 /** How db-seed reaches the database. The password matches tests/e2e.env. */
 const DB = 'postgres://cpm:e2e-postgres-password@postgres:5432/cpm';
@@ -27,7 +27,7 @@ export function runSeedScript(script: string): string {
   return execFileSync(
     'docker',
     [...COMPOSE_ARGS, 'run', '--rm', '--no-deps', '-T', 'db-seed', '-e', `${PRELUDE}${script}`],
-    { cwd: COMPOSE_CWD, stdio: 'pipe', encoding: 'utf8', env: composeEnv() },
+    { cwd: COMPOSE_CWD, stdio: 'pipe', encoding: 'utf8' },
   );
 }
 

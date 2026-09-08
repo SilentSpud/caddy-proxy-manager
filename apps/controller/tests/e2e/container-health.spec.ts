@@ -4,7 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { COMPOSE_ARGS, COMPOSE_CWD, composeEnv } from '../helpers/compose';
+import { COMPOSE_ARGS, COMPOSE_CWD } from '../helpers/compose';
 
 type ContainerInfo = {
   name: string;
@@ -22,7 +22,7 @@ type ContainerInfo = {
 function getContainers(): ContainerInfo[] {
   const output = execFileSync('docker', [...COMPOSE_ARGS, 'ps', '--format', 'json', '-a'], {
     cwd: COMPOSE_CWD,
-    env: composeEnv({ CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026' }),
+    env: { ...process.env, CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026' },
     encoding: 'utf-8',
   });
 

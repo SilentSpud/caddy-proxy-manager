@@ -86,10 +86,11 @@ services:
       CLICKHOUSE_PASSWORD: ""
     volumes:
       - caddy-manager-registration-data:/app/data
+    # Not caddy: the agent owns Caddy's lifecycle now and stops it while unpaired, so waiting on
+    # it here deadlocks `up --wait` against the agent doing exactly what it should. This service
+    # is a second controller for the registration tests and never talks to Caddy anyway.
     depends_on:
       postgres:
-        condition: service_healthy
-      caddy:
         condition: service_healthy
     networks:
       - caddy-network
@@ -105,6 +106,11 @@ services:
     # Expose the HTTP interface so retention/TTL e2e tests can query directly.
     ports:
       - "8123:8123"
+  # Still behind the `caddy` profile it inherits from docker-compose.yml, so `up` does not start
+  # it — the agent does, once it has paired and the controller has a configuration to serve. That
+  # is production behaviour and the suite follows it: starting Caddy here instead had the agent
+  # immediately stop it for being unpaired, which `up --wait` then reported as a container that
+  # exited. global-setup waits for Caddy separately, after the agent has had its say.
   caddy:
     # Alias so the Step-CA container can resolve the ACME test domain to Caddy
     # for HTTP-01 / TLS-ALPN-01 challenge validation (functional/acme-custom-ca.spec.ts).

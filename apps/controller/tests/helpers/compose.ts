@@ -40,33 +40,3 @@ const BASE_ARGS = [
 const EXTRA_FILE = process.env.E2E_COMPOSE_EXTRA_FILE;
 
 export const COMPOSE_ARGS = EXTRA_FILE ? [...BASE_ARGS, '-f', EXTRA_FILE] : BASE_ARGS;
-
-/**
- * The environment every compose invocation needs, whatever else the caller adds.
- *
- * `caddy` sits behind a profile in docker-compose.yml so a plain `docker compose up` does not
- * start it — an unpaired host must not answer 80 and 443 with a default page. The e2e stack does
- * want it, and more than wants it: `web-registration-enabled` declares `depends_on: caddy`, and
- * compose rejects the *entire project* as invalid when a dependency names a service no active
- * profile defines. So this is not a convenience, it is what makes the project parse at all —
- * without it every command here fails with "depends on undefined service", `down` included.
- *
- * Threaded through this helper rather than set at six call sites for the reason in the file
- * header: they drift. Two of them deliberately run without the clickhouse profile, so what is
- * merged is the union of what the caller asked for and what the project cannot do without.
- */
-export function composeEnv(
-  // Not NodeJS.ProcessEnv: Bun's typings make NODE_ENV required on it, so every caller would have
-  // to restate a variable none of them care about.
-  extra: Record<string, string | undefined> = {},
-): NodeJS.ProcessEnv {
-  const requested = (extra.COMPOSE_PROFILES ?? '')
-    .split(',')
-    .map((profile) => profile.trim())
-    .filter(Boolean);
-  return {
-    ...process.env,
-    ...extra,
-    COMPOSE_PROFILES: [...new Set(['caddy', ...requested])].join(','),
-  };
-}
