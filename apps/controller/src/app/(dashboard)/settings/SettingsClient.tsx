@@ -1519,10 +1519,15 @@ function DashboardHostSection({
 
   const losingOwnAccess = servedThroughProxy && !enabled;
 
+  // The check runs against the saved domain, not the field: a request whose host came from the
+  // form would be an administrator's keystrokes deciding where the server connects. So a field
+  // that has been edited has to be saved before the answer would mean anything.
+  const domainIsSaved = domain.trim().toLowerCase() === dashboard.domain.trim().toLowerCase();
+
   async function runCheck() {
     setChecking(true);
     try {
-      const result = await checkDashboardDnsAction(domain);
+      const result = await checkDashboardDnsAction();
       setCheck(result);
       // The check is the whole reason to trust the answer, so let it set the toggle rather than
       // leaving the operator to read a warning and reproduce its conclusion by hand.
@@ -1564,10 +1569,15 @@ function DashboardHostSection({
                 variant="secondary"
                 type="button"
                 onClick={runCheck}
-                isDisabled={checking || domain.trim() === ""}
+                isDisabled={checking || !domainIsSaved || domain.trim() === ""}
                 label={checking ? t("dashboardDnsChecking") : t("dashboardDnsCheckLabel")}
               />
             </HStack>
+            {!domainIsSaved && (
+              <InfoAlert title={t("dashboardCheckNeedsSaveTitle")}>
+                {t("dashboardCheckNeedsSaveDescription")}
+              </InfoAlert>
+            )}
             {check && <DnsCheckResult check={check} />}
             <CheckboxInput
               label={t("dashboardTlsLabel")}

@@ -963,6 +963,8 @@
     "credentialsAreAlreadyConfigured": "Credentials are already configured",
     "credentialsMissingStatus": "Not configured here yet",
     "customAcmeDirectory": "Custom ACME Directory",
+    "dashboardCheckNeedsSaveDescription": "The check asks the domain that is saved, not the one in the field. Save first, then check.",
+    "dashboardCheckNeedsSaveTitle": "Save the domain before checking it",
     "dashboardDisableConfirmAction": "Turn it off anyway",
     "dashboardDisableConfirmBody": "You are reading this page on {domain}, which is the domain about to stop being served. Saving will take this route away while you are using it.",
     "dashboardDisableConfirmRecovery": "The dashboard stays reachable on the controller's own port — http://<host>:3000 — which is where you would turn this back on.",

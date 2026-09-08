@@ -15,6 +15,7 @@ import {
   saveCloudflareSettings,
   getDnsProviderSettings,
   saveDnsProviderSettings,
+  getDashboardSettings,
   saveDashboardSettings,
   saveGeneralSettings,
   saveAcmeSettings,
@@ -836,14 +837,20 @@ async function updateDashboardSettingsActionUnlocked(
 }
 
 /**
- * Ask whether the domain currently points at this deployment.
+ * Ask whether the dashboard's domain currently reaches this deployment.
  *
- * Read-only, and admin-gated like everything else on this page: it reports the deployment's public
- * address, which is not something a viewer is otherwise told.
+ * Takes no argument on purpose. It used to accept the domain typed into the form, which made an
+ * administrator's keystrokes the host of a server-side request — CodeQL called that server-side
+ * request forgery and was right to. It now checks the domain that is *saved*, which has been
+ * through the settings validator, and is also the more truthful question: what the check reports is
+ * the configuration Caddy is actually serving, not a string somebody is part-way through typing.
+ *
+ * Admin-gated like everything else on this page.
  */
-export async function checkDashboardDnsAction(domain: string): Promise<DashboardDnsCheck> {
+export async function checkDashboardDnsAction(): Promise<DashboardDnsCheck> {
   await requireAdmin();
-  return await checkDashboardDns(domain);
+  const saved = await getDashboardSettings();
+  return await checkDashboardDns(saved?.domain ?? "");
 }
 
 async function updateTrustedProxiesSettingsActionUnlocked(
