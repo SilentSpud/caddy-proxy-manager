@@ -829,8 +829,11 @@ Two things worth knowing:
 - **An agent that starts before tailscaled is up is fine.** A controller it cannot resolve is an
   ordinary unreachable controller: the agent retries with backoff and keeps Caddy serving whatever
   it already had. Only a 401 — the controller having forgotten this agent — ends the loop.
-- **The stream is long-lived, and `tailscale serve` does not buffer it.** Verified against a real
-  tailnet: frames arrive as they are sent, not batched at the end.
+- **The stream is long-lived, and `tailscale serve` neither buffers it nor times it out.**
+  Verified against a real tailnet: frames arrive as they are sent rather than batched at the end,
+  and a stream held open for five and a half minutes still carried data at the end of it — even
+  one sent nothing at all in between, so the agent's 20-second keepalive has margin to spare
+  rather than being the only thing holding the connection up.
 
 ### Unpairing
 
