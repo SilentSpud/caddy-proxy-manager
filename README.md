@@ -163,7 +163,8 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
 - **Tailscale** - Serve a proxy host privately on your tailnet, gate it on the caller's Tailscale identity, or reach a backend that only exists on the tailnet. A Tailscale node runs inside the Caddy container — no `tailscaled` on the host, no TUN device, no published ports — and `*.ts.net` certificates come from Tailscale rather than ACME
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
-- **REST API** - Full REST API under `/api/v1/` with Bearer token authentication, covering all resources. Interactive OpenAPI 3.1.0 docs at `/api-docs`
+- **GraphQL API** - Every resource under `/api/graphql`, with Bearer token authentication. One endpoint, one schema, introspectable by any GraphQL client. The agent protocol lives in the same schema as a subscription, separated by which credential a field requires
+- **REST API (deprecated)** - `/api/v1/` still works exactly as it did, with Bearer token authentication and interactive OpenAPI 3.1.0 docs at `/api-docs`. It is no longer the documented path and will be removed in a later release; new integrations should use GraphQL
 - **API Tokens** - Create and manage API tokens with optional expiration for programmatic access
 - **Default Response** - Replace Caddy's native behavior for unknown hosts or direct-IP requests with a custom status/body/headers, redirect, or connection abort
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
@@ -302,6 +303,44 @@ There is no longer a development default: setting neither variable is not an err
 environment, it means the deployment runs [First Run](#first-run) instead of seeding an account.
 The password policy above — including the refusal of `admin` itself — is enforced only when
 `NODE_ENV=production`, so a development instance may set whatever it likes.
+
+---
+
+## The API
+
+`/api/graphql` serves every resource: proxy hosts, L4 hosts, certificates, access lists, users,
+groups, agents, settings, the audit log, and a Caddy apply.
+
+```bash
+curl -sX POST https://cpm.example.com/api/graphql   -H "Authorization: Bearer $CPM_TOKEN"   -H 'content-type: application/json'   -d '{"query":"{ proxyHosts { id name domains enabled } }"}'
+```
+
+Tokens are created from **Profile → API Tokens** in an authenticated dashboard session, with an
+optional expiry — an existing bearer token cannot mint replacement credentials, so a leaked one
+cannot extend its own life.
+
+### What is a field and what is JSON
+
+Stable, queryable things are fields: ids, names, domains, timestamps, foreign keys. Configuration
+the model layer owns — load balancing, WAF and geoblock overrides, location rules, mTLS — travels
+as a `JSON` scalar, reachable through `config` on a host and passed back as `input` on a mutation.
+
+That split is deliberate. Those shapes change with the product and are validated by functions that
+already exist; restating them in SDL would be thousands of lines that can drift out of step with
+the validator while looking authoritative. It also means a GraphQL mutation and the REST route
+beside it hand identical input to identical validation, which is what makes them interchangeable.
+
+### Roles
+
+A token carries its owner's role, and the management fields are **admin-only** — including for an
+operator, because a [group grant](#groups-and-delegated-management) delegates the dashboard rather
+than the API. `apiTokens` is the exception: every signed-in role manages its own.
+
+### REST is still there
+
+`/api/v1/` is unchanged and still documented at `/api-docs`. It is deprecated rather than removed:
+nothing in the field breaks, and both APIs call the same model functions, so they cannot disagree
+about what a write does. New integrations should use GraphQL.
 
 ---
 
@@ -766,10 +805,14 @@ Two consequences worth knowing:
 
 ### How an agent connects
 
-The agent dials the controller, never the other way round. It opens one long-lived event stream and
-holds it open; the controller pushes desired state and Caddy admin calls down it, and the agent
-posts status and results back. So an agent on a NAT'd or firewalled host needs **no inbound port** —
-only outbound reach to the controller.
+The agent dials the controller, never the other way round. It opens one long-lived **GraphQL
+subscription** at `/api/graphql`, delivered as SSE, and holds it open: the controller pushes desired
+state, Caddy admin calls, and a periodic `ping` down it, and the agent reports status and command
+results back as mutations to the same endpoint. So an agent on a NAT'd or firewalled host needs
+**no inbound port** — only outbound reach to the controller.
+
+Every one of those calls is signed with the secret agreed at pairing, over the request body. Pairing
+itself is the one thing still on a plain REST route, because it runs before that secret exists.
 
 An agent that has never been paired does nothing, and **leaves Caddy stopped**. Caddy sits behind a
 Compose profile precisely so that `docker compose up` will not start it: a host nobody has finished
@@ -814,7 +857,7 @@ place after a successful pair is ignored rather than burned again on every resta
 ### Connecting agents over Tailscale or Headscale
 
 An agent needs one thing from the network: an outbound route to the controller. It dials out and
-holds an event stream open, and the controller never dials back — so a tailnet is a natural fit,
+holds a GraphQL subscription open, and the controller never dials back — so a tailnet is a natural fit,
 and CPM needs no Tailscale-specific configuration to use one. Point `CONTROLLER_URL` (or
 `--host`) at the controller's tailnet address and everything else is unchanged.
 

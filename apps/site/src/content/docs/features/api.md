@@ -1,0 +1,55 @@
+---
+title: API
+description: Every resource under one GraphQL endpoint, with Bearer token authentication. The REST API is still there, deprecated.
+---
+
+Everything the dashboard does, it does through an API you can use too.
+
+![Interactive API documentation](../../../assets/api-docs.png)
+
+## GraphQL
+
+`/api/graphql` serves every resource: proxy hosts, L4 hosts, certificates, access lists, users,
+groups, agents, settings, the audit log, and a Caddy apply.
+
+```bash
+curl -sX POST https://cpm.example.com/api/graphql   -H "Authorization: Bearer $CPM_TOKEN"   -H 'content-type: application/json'   -d '{"query":"{ proxyHosts { id name domains enabled } }"}'
+```
+
+The schema is introspectable by any authenticated GraphQL client, so your tooling can discover it
+rather than being told about it.
+
+## What is a field, and what is JSON
+
+Stable, queryable things are fields: ids, names, domains, timestamps, foreign keys. Configuration
+that the model layer owns — load balancing, WAF and geoblock overrides, location rules, mTLS —
+travels as a `JSON` scalar: readable through `config` on a host, and passed back as `input` on a
+mutation.
+
+That split is deliberate. Those shapes change with the product and are already validated by code
+that exists; restating them in the schema would be thousands of lines that can drift out of step
+with the validator while looking authoritative.
+
+## Authentication
+
+Bearer tokens, created from **Profile → API Tokens** in an authenticated dashboard session with an
+optional expiry. That restriction is deliberate: an existing token cannot mint replacement
+credentials, so a leaked one cannot extend its own life.
+
+A token carries its owner's role. The management fields are **admin-only**, including for an
+operator — a [group grant](../users-and-groups/) delegates the dashboard, not the API. Managing your
+own tokens is the exception, and open to every signed-in role.
+
+## The REST API is deprecated
+
+`/api/v1/` still works exactly as it did, with the same Bearer tokens and interactive OpenAPI 3.1.0
+documentation at `/api-docs`. It is no longer the documented path and will be removed in a later
+release.
+
+Nothing in the field breaks in the meantime: both APIs call the same model functions, so they
+cannot disagree about what a write does.
+
+## Health
+
+`/api/health` is public and unauthenticated — it is what the container health check probes. It also
+answers the [dashboard host](../dashboard-host/) reachability probe when asked with a nonce.

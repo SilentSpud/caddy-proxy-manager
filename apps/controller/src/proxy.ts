@@ -25,6 +25,13 @@ export default async function proxy(req: NextRequest) {
   /** The sparse header set a page nobody has signed in for still needs. */
   const publicPageResponse = () => {
     const response = NextResponse.next();
+    // Says so in the protocol, not only in the README. A client that never reads our docs still
+    // sees this on every call, which is the only way a deprecation reaches an integration written
+    // years ago by somebody who has moved on.
+    if (pathname.startsWith("/api/v1/")) {
+      response.headers.set("Deprecation", "true");
+      response.headers.set("Link", '</api/graphql>; rel="successor-version"');
+    }
     // Anti-clickjacking for public pages (/login, /portal): the authenticated branch below sets the
     // full header set, but public responses carried none, leaving those forms framable.
     response.headers.set("X-Frame-Options", "DENY");
@@ -50,6 +57,11 @@ export default async function proxy(req: NextRequest) {
     // a secret: anyone who can reach the instance can already see it in their tab.
     pathname === "/api/branding/favicon" ||
     pathname.startsWith("/api/v1/") ||
+    // Authenticates itself, twice over: a Bearer token or session for the operator API, and an
+    // agent signature for the agent's subscription and mutations. Redirecting an unauthenticated
+    // call to /login would answer a GraphQL client with an HTML page it cannot use, and would take
+    // the agent protocol down with it.
+    pathname === "/api/graphql" ||
     // Authenticates itself: an agent signs with the secret agreed at pairing, and an unsigned
     // caller is answered 404 rather than being redirected to a login page it cannot use.
     pathname.startsWith("/api/agent/") ||

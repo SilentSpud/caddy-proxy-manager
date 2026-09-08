@@ -20,7 +20,7 @@ and the account, so "who disabled this host last Tuesday" is one query rather th
 
 ## Attribution
 
-Changes made through the [REST API](../rest-api/) are attributed to the token's owner, so an
+Changes made through the [API](../api/) are attributed to the token's owner, so an
 automated change is traceable to the person whose token made it rather than appearing anonymous.
 
 ## Access
