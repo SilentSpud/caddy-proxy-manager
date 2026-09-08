@@ -344,31 +344,38 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
   if (policy !== undefined) {
     result.policy = policy;
   }
-  if (policyHeaderField !== null) {
+  // Every one of these is gated on the field being *present*, never on its value.
+  //
+  // The model already draws the line this relies on: `undefined` leaves a meta key alone and
+  // `null` deletes it. Testing the value instead collapsed those two into one, so an emptied box
+  // was indistinguishable from a field the form never rendered — and no load-balancer field could
+  // be cleared once set. A policy's fields are only rendered while that policy is selected, so
+  // switching policy still leaves the old values untouched rather than wiping them.
+  if (formData.has("lbPolicyHeaderField")) {
     result.policyHeaderField = policyHeaderField;
   }
-  if (policyCookieName !== null) {
+  if (formData.has("lbPolicyCookieName")) {
     result.policyCookieName = policyCookieName;
   }
-  if (policyCookieSecret !== null) {
+  if (formData.has("lbPolicyCookieSecret")) {
     result.policyCookieSecret = policyCookieSecret;
   }
-  if (policyQueryKey !== null) {
+  if (formData.has("lbPolicyQueryKey")) {
     result.policyQueryKey = policyQueryKey;
   }
-  if (policyChoose !== null) {
+  if (formData.has("lbPolicyChoose")) {
     result.policyChoose = policyChoose;
   }
-  if (policyWeights !== null) {
+  if (formData.has("lbPolicyWeights")) {
     result.policyWeights = policyWeights;
   }
-  if (tryDuration !== null) {
+  if (formData.has("lbTryDuration")) {
     result.tryDuration = tryDuration;
   }
-  if (tryInterval !== null) {
+  if (formData.has("lbTryInterval")) {
     result.tryInterval = tryInterval;
   }
-  if (retries !== null) {
+  if (formData.has("lbRetries")) {
     result.retries = retries;
   }
   if (activeHealthCheck !== undefined) {

@@ -53,7 +53,9 @@ export async function pushDesiredState(): Promise<void> {
     try {
       return await buildDesiredState(agent.agentRowId);
     } catch (error) {
-      console.warn(`[cpm] could not build desired state for agent "${agent.name}":`, error);
+      // Same reason as models/agents.ts: the name is whatever the agent called itself at
+      // pairing, so it must not become part of the format string.
+      console.warn("[cpm] could not build desired state for agent:", agent.name, error);
       return null;
     }
   });

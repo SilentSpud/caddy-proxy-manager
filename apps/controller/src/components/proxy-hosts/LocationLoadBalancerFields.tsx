@@ -11,21 +11,29 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { LoadBalancerConfig, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 import { useTranslations } from "next-intl";
 
-/** Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build. */
-const LOAD_BALANCING_POLICIES: { value: LoadBalancingPolicy; label: string }[] = [
-  { value: "random", label: "Random (default)" },
-  { value: "random_choose", label: "Random (choose N)" },
-  { value: "round_robin", label: "Round Robin" },
-  { value: "weighted_round_robin", label: "Weighted Round Robin" },
-  { value: "least_conn", label: "Least Connections" },
-  { value: "ip_hash", label: "IP Hash" },
-  { value: "client_ip_hash", label: "Client IP Hash" },
-  { value: "first", label: "First Available" },
-  { value: "header", label: "Header Hash" },
-  { value: "cookie", label: "Cookie" },
-  { value: "uri_hash", label: "URI Hash" },
-  { value: "query", label: "Query Hash" },
-];
+/**
+ * Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build.
+ *
+ * See LoadBalancerFields for why this is a function: the labels live in the message catalog.
+ */
+function loadBalancingPolicies(
+  t: ReturnType<typeof useTranslations<"proxyHosts">>,
+): { value: LoadBalancingPolicy; label: string }[] {
+  return [
+    { value: "random", label: t("lbPolicyRandomDefault") },
+    { value: "random_choose", label: t("lbPolicyRandomChoose") },
+    { value: "round_robin", label: t("lbPolicyRoundRobin") },
+    { value: "weighted_round_robin", label: t("lbPolicyWeightedRoundRobin") },
+    { value: "least_conn", label: t("lbPolicyLeastConn") },
+    { value: "ip_hash", label: t("lbPolicyIpHash") },
+    { value: "client_ip_hash", label: t("lbPolicyClientIpHash") },
+    { value: "first", label: t("lbPolicyFirst") },
+    { value: "header", label: t("lbPolicyHeader") },
+    { value: "cookie", label: t("lbPolicyCookie") },
+    { value: "uri_hash", label: t("lbPolicyUriHash") },
+    { value: "query", label: t("lbPolicyQuery") },
+  ];
+}
 
 export const EMPTY_LOAD_BALANCER: LoadBalancerConfig = {
   enabled: true,
@@ -127,7 +135,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
             <Selector
               label={t("selectionPolicy")}
               size="sm"
-              options={LOAD_BALANCING_POLICIES}
+              options={loadBalancingPolicies(t)}
               value={policy}
               onChange={(next) => patch({ policy: next as LoadBalancingPolicy })}
             />

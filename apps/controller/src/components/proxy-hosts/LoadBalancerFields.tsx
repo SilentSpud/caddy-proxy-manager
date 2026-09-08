@@ -12,33 +12,44 @@ import type { ProxyHost, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
 
-/** Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build. */
-const LOAD_BALANCING_POLICIES = [
-  { value: "random", label: "Random", description: "Random selection (default)" },
-  {
-    value: "random_choose",
-    label: "Random (choose N)",
-    description: "Least loaded of N at random",
-  },
-  { value: "round_robin", label: "Round Robin", description: "Sequential distribution" },
-  {
-    value: "weighted_round_robin",
-    label: "Weighted Round Robin",
-    description: "Sequential, in proportion to per-upstream weights",
-  },
-  { value: "least_conn", label: "Least Connections", description: "Fewest active connections" },
-  { value: "ip_hash", label: "IP Hash", description: "Peer IP-based sticky sessions" },
-  {
-    value: "client_ip_hash",
-    label: "Client IP Hash",
-    description: "Real client IP — set trusted proxies first",
-  },
-  { value: "first", label: "First Available", description: "First available upstream" },
-  { value: "header", label: "Header Hash", description: "Hash based on request header" },
-  { value: "cookie", label: "Cookie", description: "Cookie-based sticky sessions" },
-  { value: "uri_hash", label: "URI Hash", description: "URI path-based distribution" },
-  { value: "query", label: "Query Hash", description: "Hash on a query parameter" },
-];
+/**
+ * Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build.
+ *
+ * A function rather than a module constant because the labels come from the message catalog, and
+ * `useTranslations` is only available inside the component.
+ */
+function loadBalancingPolicies(t: ReturnType<typeof useTranslations<"proxyHosts">>) {
+  return [
+    { value: "random", label: t("lbPolicyRandom"), description: t("lbPolicyRandomHelp") },
+    {
+      value: "random_choose",
+      label: t("lbPolicyRandomChoose"),
+      description: t("lbPolicyRandomChooseHelp"),
+    },
+    {
+      value: "round_robin",
+      label: t("lbPolicyRoundRobin"),
+      description: t("lbPolicyRoundRobinHelp"),
+    },
+    {
+      value: "weighted_round_robin",
+      label: t("lbPolicyWeightedRoundRobin"),
+      description: t("lbPolicyWeightedRoundRobinHelp"),
+    },
+    { value: "least_conn", label: t("lbPolicyLeastConn"), description: t("lbPolicyLeastConnHelp") },
+    { value: "ip_hash", label: t("lbPolicyIpHash"), description: t("lbPolicyIpHashHelp") },
+    {
+      value: "client_ip_hash",
+      label: t("lbPolicyClientIpHash"),
+      description: t("lbPolicyClientIpHashHelp"),
+    },
+    { value: "first", label: t("lbPolicyFirst"), description: t("lbPolicyFirstHelp") },
+    { value: "header", label: t("lbPolicyHeader"), description: t("lbPolicyHeaderHelp") },
+    { value: "cookie", label: t("lbPolicyCookie"), description: t("lbPolicyCookieHelp") },
+    { value: "uri_hash", label: t("lbPolicyUriHash"), description: t("lbPolicyUriHashHelp") },
+    { value: "query", label: t("lbPolicyQuery"), description: t("lbPolicyQueryHelp") },
+  ];
+}
 
 /**
  * One state object because Astryx inputs are controlled where these were `defaultValue` fields.
@@ -154,7 +165,7 @@ export function LoadBalancerFields({
             <input type="hidden" name="lbPolicy" value={policy} />
             <Selector
               label={t("selectionPolicy")}
-              options={LOAD_BALANCING_POLICIES}
+              options={loadBalancingPolicies(t)}
               value={policy}
               onChange={(next) => setPolicy(next as LoadBalancingPolicy)}
             />

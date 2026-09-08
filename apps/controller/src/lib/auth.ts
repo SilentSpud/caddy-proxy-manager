@@ -119,7 +119,9 @@ export async function requireAdmin(): Promise<Session> {
 export async function requireManager(): Promise<Session> {
   const session = await requireUser();
   if (session.user.role !== "admin" && session.user.role !== "operator") {
-    throw new Error("Administrator privileges required");
+    // Role-neutral: this gate admits operators too, and borrowing requireAdmin's wording would
+    // tell an operator who was refused for a different reason to go and find an administrator.
+    throw new Error("You do not have access to that.");
   }
   return session;
 }

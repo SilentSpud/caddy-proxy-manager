@@ -30,8 +30,16 @@ export type GroupGrant = {
   capability: GrantCapability;
 };
 
+/**
+ * Anything that is not exactly "manage" reads as "view".
+ *
+ * The permissive direction would be the wrong default for a column that decides privilege: a row
+ * with a typo in it, or one edited by hand, must not silently grant more than it says. The writer
+ * only ever stores the two literals, so this only matters when something has already gone wrong —
+ * which is exactly when it should fail closed.
+ */
 function toCapability(value: string): GrantCapability {
-  return value === "view" ? "view" : "manage";
+  return value === "manage" ? "manage" : "view";
 }
 
 function toResource(row: typeof groupGrants.$inferSelect): GrantResource | null {

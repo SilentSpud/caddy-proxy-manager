@@ -201,10 +201,9 @@ export async function getAgentBuildSettings(id: number): Promise<CaddyBuildSetti
   try {
     return JSON.parse(row.raw) as CaddyBuildSettings;
   } catch (error) {
-    console.warn(
-      `[cpm] agent ${id} has unparseable build settings; using the fleet default:`,
-      error,
-    );
+    // The id is passed as an argument rather than interpolated: console.warn reads its first
+    // argument as a format string, and this one reaches here from a request parameter.
+    console.warn("[cpm] agent has unparseable build settings; using the fleet default:", id, error);
     return null;
   }
 }

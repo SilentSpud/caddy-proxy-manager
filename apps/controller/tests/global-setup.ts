@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { COMPOSE_ARGS, COMPOSE_CWD } from './helpers/compose';
+import { COMPOSE_ARGS, COMPOSE_CWD, composeEnv } from './helpers/compose';
 import { waitForHydration } from './helpers/hydration';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -15,11 +15,10 @@ const MAX_WAIT_MS = 180_000;
 const POLL_INTERVAL_MS = 3_000;
 // docker-compose.yml hard-requires SESSION_SECRET, and .env is gitignored -- without this the
 // stack will not interpolate anywhere there is no local .env, CI included.
-const ENV = {
-  ...process.env,
+const ENV = composeEnv({
   CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026',
   COMPOSE_PROFILES: 'clickhouse',
-};
+});
 
 async function waitForHealth(): Promise<void> {
   const start = Date.now();

@@ -81,16 +81,28 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
   const result: Partial<L4LoadBalancerConfig> = {};
   if (enabled !== undefined) result.enabled = enabled;
   if (policy) result.policy = policy;
-  const tryDuration = parseOptionalText(formData.get("lbTryDuration"));
-  if (tryDuration !== null) result.tryDuration = tryDuration;
-  const tryInterval = parseOptionalText(formData.get("lbTryInterval"));
-  if (tryInterval !== null) result.tryInterval = tryInterval;
-  const retries = parseOptionalNumber(formData.get("lbRetries"));
-  if (retries !== null) result.retries = retries;
-  const choose = parseOptionalNumber(formData.get("lbPolicyChoose"));
-  if (choose !== null) result.policyChoose = choose;
-  const weights = parseWeights(formData.get("lbPolicyWeights"));
-  if (weights !== null) result.policyWeights = weights;
+  // Presence, not value — see parseLoadBalancerConfig in the proxy-hosts actions: gating on the
+  // value made an emptied box indistinguishable from a field the form never rendered, so nothing
+  // here could be cleared once set.
+  //
+  // The three caddy-l4 does not define keep their lines because a host saved before they were
+  // withdrawn still has them in `meta`; the form no longer renders them, so these never fire, and
+  // the generator already refuses to emit them.
+  if (formData.has("lbTryDuration")) {
+    result.tryDuration = parseOptionalText(formData.get("lbTryDuration"));
+  }
+  if (formData.has("lbTryInterval")) {
+    result.tryInterval = parseOptionalText(formData.get("lbTryInterval"));
+  }
+  if (formData.has("lbRetries")) {
+    result.retries = parseOptionalNumber(formData.get("lbRetries")) ?? undefined;
+  }
+  if (formData.has("lbPolicyChoose")) {
+    result.policyChoose = parseOptionalNumber(formData.get("lbPolicyChoose"));
+  }
+  if (formData.has("lbPolicyWeights")) {
+    result.policyWeights = parseWeights(formData.get("lbPolicyWeights"));
+  }
 
   // Active health check
   if (formData.has("lbActiveHealthEnabledPresent")) {
