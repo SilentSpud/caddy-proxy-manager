@@ -17,6 +17,24 @@ export class ControllerAddressError extends Error {
 }
 
 /**
+ * Whether the operator actually typed a port, which `new URL` will not tell you.
+ *
+ * The URL API normalises a scheme's default port away — `new URL("https://h:443").port` is the
+ * empty string, indistinguishable from `https://h`. Both mean 443 here, but for http the two
+ * differ: `http://h:80` asked for 80 and `http://h` did not ask for anything, and the second has
+ * always meant the controller's own default.
+ */
+function authorityHasExplicitPort(input: string): boolean {
+  const withoutScheme = input.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  const authority = withoutScheme.split(/[/?#]/, 1)[0] ?? "";
+  // A port only ever follows the closing bracket of an IPv6 literal, never a colon inside it.
+  const afterHost = authority.startsWith("[")
+    ? authority.slice(authority.indexOf("]") + 1)
+    : authority;
+  return /:\d+$/.test(afterHost);
+}
+
+/**
  * `host` may be a bare host, a host:port, or a full origin; `port` overrides whatever the host
  * carried. Returns an origin with no trailing slash.
  */
@@ -51,9 +69,20 @@ export function normalizeControllerUrl(host: string, port?: number | null): stri
     url.port = String(port);
   }
 
-  // An explicit --port wins; otherwise whatever was in the address; otherwise the controller's own
-  // default rather than 80, which nothing about this address suggests.
-  const resolved = url.port || String(DEFAULT_CONTROLLER_PORT);
+  // An explicit --port wins, then a port in the address, then the scheme's own default where the
+  // operator committed to one — and only then the controller's default.
+  //
+  // `https://` is the case that matters: the controller serves plain HTTP, so an https address
+  // means something is terminating TLS in front of it, and that thing listens on 443. This is how
+  // a Tailscale or Headscale deployment addresses its controller — `tailscale serve` publishes it
+  // at `https://<machine>.<tailnet>.ts.net` with no port to type — and defaulting that to 3000
+  // dialled a port nothing was listening on. `http://` keeps meaning 3000 without an explicit
+  // port, which is what every existing deployment relies on.
+  const typedPort = authorityHasExplicitPort(trimmed);
+  const schemeDefault = url.protocol === "https:" ? "443" : "80";
+  const resolved =
+    url.port ||
+    (typedPort || url.protocol === "https:" ? schemeDefault : String(DEFAULT_CONTROLLER_PORT));
   return `${url.protocol}//${url.hostname}:${resolved}`;
 }
 

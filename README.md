@@ -237,7 +237,7 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
-| `CONTROLLER_URL` | Where the agent dials to reach its controller. Overridden by `--host`/`--port` | Unset (idle until paired) |
+| `CONTROLLER_URL` | Where the agent dials to reach its controller. A tailnet IP or MagicDNS name works here like any other address. Overridden by `--host`/`--port` | Unset (idle until paired) |
 | `PAIRING_CODE` | Pair on first start instead of idling. Overridden by `--code` | Unset |
 | `AGENT_MODE` | `standalone` or `managed`. Startup fails on any other value rather than guessing | `standalone` |
 | `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
@@ -251,6 +251,7 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
 | `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs | Auto-detected |
 | `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` / `GEOIP_DIR` / `GEOIP_DB` | Where the agent reads Caddy's logs and the GeoLite2 databases from | Container paths |
+| `NODE_EXTRA_CA_CERTS` | A CA bundle to trust in addition to the system store, for a controller behind TLS from a private CA. See [Connecting agents over Tailscale or Headscale](#connecting-agents-over-tailscale-or-headscale) | Unset |
 
 **Production requirements:**
 
@@ -770,6 +771,66 @@ Start the agent first; pairing a stopped one is an error, not a wait.
 `CONTROLLER_URL` and `PAIRING_CODE` do the same thing without a terminal, for a deployment that
 configures everything through the environment. A stored pairing wins over both, so a code left in
 place after a successful pair is ignored rather than burned again on every restart.
+
+### Connecting agents over Tailscale or Headscale
+
+An agent needs one thing from the network: an outbound route to the controller. It dials out and
+holds an event stream open, and the controller never dials back — so a tailnet is a natural fit,
+and CPM needs no Tailscale-specific configuration to use one. Point `CONTROLLER_URL` (or
+`--host`) at the controller's tailnet address and everything else is unchanged.
+
+Three ways to address it, all of which work:
+
+| Address | When |
+| ------- | ---- |
+| `http://100.98.59.37:3000` | Tailnet IP. No DNS, no TLS, nothing to set up on the controller |
+| `http://cpm-controller:3000` | MagicDNS name. Same, but survives the IP changing |
+| `https://cpm-controller.tailnet-1234.ts.net` | Behind `tailscale serve --bg --https=443 http://127.0.0.1:3000` on the controller's host |
+
+An `https://` address with no port means **443**, because the controller serves plain HTTP and an
+https address means something in front of it is terminating TLS. A bare host or an `http://`
+address with no port still means 3000. `--port` overrides either.
+
+**Getting the agent onto the tailnet.** If the agent's host is already on it, there is nothing to
+do. For the bundled Compose stack, `docker-compose.tailscale.yml` adds a sidecar:
+
+```bash
+# .env
+TS_AUTHKEY=tskey-auth-...           # or: headscale preauthkeys create
+CONTROLLER_URL=https://cpm-controller.tailnet-1234.ts.net
+# Headscale only:
+# TS_EXTRA_ARGS=--login-server=https://headscale.example.com
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
+```
+
+The sidecar joins the **agent's** network namespace rather than the other way round. That is what
+lets the agent keep resolving `caddy` and `docker-socket-proxy` by compose service name while
+gaining tailnet routing and MagicDNS — putting the agent inside the sidecar's namespace instead
+would take those service names away and break every Caddy admin call it proxies.
+
+Pairing is unchanged: generate a code under **Settings → Agents** and run
+
+```bash
+docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm-controller.tailnet-1234.ts.net --code ABCDEF
+```
+
+**Headscale.** Everything above applies; set `--login-server` and use whatever address your
+control server hands out. Headscale deployments usually have no `.ts.net` certificate, so the
+plain `http://<tailnet-ip>:3000` or MagicDNS form is the normal one. If you do put TLS in front of
+the controller using a private CA, mount the CA into the agent and set `NODE_EXTRA_CA_CERTS` to
+its path — the agent's HTTP client reads it, and without it the connection is refused as
+`unable to verify the first certificate`.
+
+Two things worth knowing:
+
+- **An agent that starts before tailscaled is up is fine.** A controller it cannot resolve is an
+  ordinary unreachable controller: the agent retries with backoff and keeps Caddy serving whatever
+  it already had. Only a 401 — the controller having forgotten this agent — ends the loop.
+- **The stream is long-lived, and `tailscale serve` does not buffer it.** Verified against a real
+  tailnet: frames arrive as they are sent, not batched at the end.
 
 ### Unpairing
 
