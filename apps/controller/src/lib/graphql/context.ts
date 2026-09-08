@@ -25,9 +25,11 @@ export type GraphQLContext = {
   /**
    * The request body exactly as it arrived, for the agent's signature check.
    *
-   * Read from a clone, because the GraphQL server has already consumed the original to parse the
-   * document. Re-serialising the parsed document would not do: the signature covers the bytes the
-   * agent sent, and a round trip can change key order or spacing.
+   * Captured by the route *before* the GraphQL server reads the request, not here. A clone has to
+   * be taken while the body is still untouched: asking for one afterwards throws "Body is
+   * disturbed or locked", which is a resolver-time failure that no test driving the schema
+   * directly can reproduce. Re-serialising the parsed document would not do either — the signature
+   * covers the bytes the agent sent, and a round trip can change key order or spacing.
    */
   rawBody: () => Promise<string>;
   request: NextRequest;
@@ -40,7 +42,10 @@ export type GraphQLContext = {
  * request that turns out to be malformed should not pay for it. Both thunks memoise, so a document
  * touching twenty fields authenticates once.
  */
-export function createContext(request: NextRequest): GraphQLContext {
+export function createContext(
+  request: NextRequest,
+  rawBody: () => Promise<string>,
+): GraphQLContext {
   let viewerPromise: Promise<ApiAuthResult> | null = null;
   let accessPromise: Promise<Access> | null = null;
 
@@ -61,15 +66,6 @@ export function createContext(request: NextRequest): GraphQLContext {
       return await accessFor(result.userId, result.role);
     })();
     return accessPromise;
-  };
-
-  let bodyPromise: Promise<string> | null = null;
-  const rawBody = () => {
-    bodyPromise ??= request
-      .clone()
-      .text()
-      .catch(() => "");
-    return bodyPromise;
   };
 
   return { viewer, access, rawBody, request };
