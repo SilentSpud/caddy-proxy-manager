@@ -177,6 +177,15 @@ export const config = {
   caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
   appName: APP_NAME,
+  /**
+   * Domain the dashboard is served on, when the operator pinned one.
+   *
+   * Null rather than a default: this seeds the managed dashboard host once, at the end of setup,
+   * and "unset" has to stay distinguishable from a real choice so the fallback to BASE_URL's
+   * hostname can happen. The bundled Caddyfile has its own default for the placeholder site it
+   * serves until then. After setup the stored setting is what the route is built from.
+   */
+  dashboardDomain: process.env.DASHBOARD_DOMAIN?.trim() || null,
   avatars: {
     /** true/false when AVATAR_GRAVATAR pins it, null when the setting decides. */
     gravatarFromEnv: resolveGravatarEnv(),

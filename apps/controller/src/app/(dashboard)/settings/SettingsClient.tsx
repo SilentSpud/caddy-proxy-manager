@@ -24,6 +24,7 @@ import {
   Image,
   Network,
   RefreshCw,
+  MonitorSmartphone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -31,6 +32,7 @@ import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
+import { AppDialog } from "@/src/components/ui/AppDialog";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Kbd } from "@astryxdesign/core/Kbd";
@@ -73,6 +75,7 @@ import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-
 import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
 import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
+import type { DashboardDnsCheck, DashboardHostSettings } from "@/src/lib/dashboard-host";
 import type { UpdateStatus } from "@/src/lib/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
@@ -113,6 +116,8 @@ import {
   updateTrustedProxiesSettingsAction,
   updateCaddyBuildSettingsAction,
   updateDefaultResponseSettingsAction,
+  updateDashboardSettingsAction,
+  checkDashboardDnsAction,
   updateTailscaleSettingsAction,
   pairingCodeAction,
   unpairAgentAction,
@@ -129,11 +134,11 @@ type SettingItem = {
    * Environment variables that configure this section, shown as tokens beside its name.
    *
    * An operator arrives here from a `.env` file, so the variable name is the handle they already
-   * have. Only variables that set a value this section shows belong here — `PRIMARY_DOMAIN`, for
-   * one, is the domain the bundled Caddyfile serves the dashboard on and has nothing to do with
-   * General's primary domain, so listing it would send someone to the wrong page. The ones a
-   * database setting supersedes are in `src/lib/settings/registry.ts`, which is where their
-   * precedence is defined.
+   * have. Only variables that set a value this section shows belong here: a near-miss sends
+   * someone to a page that cannot change what they came to change. `DASHBOARD_DOMAIN` belongs to
+   * Dashboard Host and not to General, whose default domain is a starting value for new proxy
+   * hosts and is configured nowhere but the database. The ones a database setting supersedes are
+   * in `src/lib/settings/registry.ts`, which is where their precedence is defined.
    */
   env?: readonly string[];
   /**
@@ -200,6 +205,13 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         desc: "Which plugins the Caddy image is compiled with",
         icon: Package,
         env: ["CADDY_BUILD_TIMEOUT"],
+      },
+      {
+        id: "dashboard",
+        name: "Dashboard Host",
+        desc: "Serve this dashboard through Caddy, on a domain of its own",
+        icon: MonitorSmartphone,
+        env: ["DASHBOARD_DOMAIN"],
       },
       {
         id: "agent",
@@ -579,6 +591,8 @@ type Props = {
   caddyBuild: CaddyBuildSettings | null;
   agentBuildTargets?: { id: number; name: string; connected: boolean }[];
   agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
+  /** How the dashboard is served through Caddy. Always a value: unset reads as off. */
+  dashboard: DashboardHostSettings;
   /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
   tailscale: TailscaleSettingsView;
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
@@ -620,6 +634,7 @@ export default function SettingsClient({
   caddyBuild,
   agentBuildTargets,
   agentBuildSelections,
+  dashboard,
   tailscale,
   hasFavicon,
   updates,
@@ -648,6 +663,7 @@ export default function SettingsClient({
   // Form action states
   const [generalState, generalFormAction] = useActionState(updateGeneralSettingsAction, null);
   const [acmeState, acmeFormAction] = useActionState(updateAcmeSettingsAction, null);
+  const [dashboardState, dashboardFormAction] = useActionState(updateDashboardSettingsAction, null);
   const [caddyBuildState, caddyBuildFormAction] = useActionState(
     updateCaddyBuildSettingsAction,
     null,
@@ -733,6 +749,13 @@ export default function SettingsClient({
                 )}
                 {active === "acme" && (
                   <AcmeSection acme={acme} acmeState={acmeState} acmeFormAction={acmeFormAction} />
+                )}
+                {active === "dashboard" && (
+                  <DashboardHostSection
+                    dashboard={dashboard}
+                    dashboardState={dashboardState}
+                    dashboardFormAction={dashboardFormAction}
+                  />
                 )}
                 {active === "default-response" && (
                   <DefaultResponseSection
@@ -1451,6 +1474,188 @@ function UpstreamDnsSection({
 }
 
 // ─── Section: Trusted Proxies ────────────────────────────────────────────────
+
+/**
+ * How this dashboard is served through the Caddy it manages.
+ *
+ * Two things make this section different from the rest of the page. Turning it off can remove the
+ * route the reader is using right now, so it asks first when it can tell that is the case — the
+ * page is being served on the very domain about to stop being claimed. And TLS is a question about
+ * the world rather than a preference, so the DNS check is offered inline: forcing HTTPS on a name
+ * that does not resolve here yet buys nothing but a failing certificate order.
+ */
+function DashboardHostSection({
+  dashboard,
+  dashboardState,
+  dashboardFormAction,
+}: {
+  dashboard: DashboardHostSettings;
+  dashboardState: { success: boolean; message?: string } | null;
+  dashboardFormAction: (payload: FormData) => void;
+}) {
+  const t = useTranslations("settings");
+  const [enabled, setEnabled] = useState(dashboard.enabled);
+  const [domain, setDomain] = useState(dashboard.domain);
+  const [tls, setTls] = useState(dashboard.tls);
+  const [check, setCheck] = useState<DashboardDnsCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [confirmDisable, setConfirmDisable] = useState(false);
+
+  // Whether this page arrived through the route in question. Read after mount rather than during
+  // render: the server has no window to ask, so deciding it inline would render one button on the
+  // server and a different one in the browser, which is a hydration mismatch. Until it resolves
+  // the form behaves normally, which is the safe way round — the worst case is the dialog not
+  // appearing for the first instant, not a warning that never appears.
+  //
+  // Compared against what is stored rather than what is typed: the saved domain is what Caddy is
+  // serving right now, and a half-typed replacement says nothing about how the reader got here.
+  const [servedThroughProxy, setServedThroughProxy] = useState(false);
+  useEffect(() => {
+    setServedThroughProxy(
+      dashboard.enabled &&
+        dashboard.domain.trim().toLowerCase() === window.location.hostname.toLowerCase(),
+    );
+  }, [dashboard.enabled, dashboard.domain]);
+
+  const losingOwnAccess = servedThroughProxy && !enabled;
+
+  async function runCheck() {
+    setChecking(true);
+    try {
+      const result = await checkDashboardDnsAction(domain);
+      setCheck(result);
+      // The check is the whole reason to trust the answer, so let it set the toggle rather than
+      // leaving the operator to read a warning and reproduce its conclusion by hand.
+      setTls(result.ok);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  function submit() {
+    (document.getElementById("dashboard-host-form") as HTMLFormElement)?.requestSubmit();
+  }
+
+  return (
+    <>
+      <FormCard title={t("dashboardHostTitle")}>
+        <form id="dashboard-host-form" action={dashboardFormAction}>
+          <VStack gap={3}>
+            {dashboardState?.message && (
+              <StatusAlert message={dashboardState.message} success={dashboardState.success} />
+            )}
+            <CheckboxInput
+              label={t("dashboardEnabledLabel")}
+              description={t("dashboardEnabledHelp")}
+              htmlName="enabled"
+              value={enabled}
+              onChange={setEnabled}
+            />
+            <TextInput
+              label={t("dashboardDomainLabel")}
+              description={t("dashboardDomainHelp")}
+              htmlName="domain"
+              value={domain}
+              onChange={setDomain}
+              isRequired
+            />
+            <HStack gap={2} vAlign="end" wrap="wrap">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={runCheck}
+                isDisabled={checking || domain.trim() === ""}
+                label={checking ? t("dashboardDnsChecking") : t("dashboardDnsCheckLabel")}
+              />
+            </HStack>
+            {check && <DnsCheckResult check={check} />}
+            <CheckboxInput
+              label={t("dashboardTlsLabel")}
+              description={t("dashboardTlsHelp")}
+              htmlName="tls"
+              value={tls}
+              onChange={setTls}
+            />
+            {tls && check && !check.ok && (
+              <WarnAlert title={t("dashboardTlsUnverifiedTitle")}>
+                {t("dashboardTlsUnverifiedDescription")}
+              </WarnAlert>
+            )}
+            {/*
+              A plain SaveButton would submit before anything could be said about it, so when the
+              reader is about to cut their own route the button asks first and the dialog submits.
+            */}
+            {losingOwnAccess ? (
+              <HStack>
+                <Button
+                  variant="primary"
+                  type="button"
+                  onClick={() => setConfirmDisable(true)}
+                  label={t("saveDashboardHost")}
+                />
+              </HStack>
+            ) : (
+              <SaveButton label={t("saveDashboardHost")} />
+            )}
+          </VStack>
+        </form>
+      </FormCard>
+      <InfoAlert title={t("dashboardPortEscapeTitle")}>
+        {t("dashboardPortEscapeDescription")}
+      </InfoAlert>
+      <AppDialog
+        open={confirmDisable}
+        onClose={() => setConfirmDisable(false)}
+        title={t("dashboardDisableConfirmTitle")}
+        submitLabel={t("dashboardDisableConfirmAction")}
+        onSubmit={() => {
+          setConfirmDisable(false);
+          submit();
+        }}
+      >
+        <VStack gap={3}>
+          <WarnAlert title={t("dashboardDisableConfirmTitle")}>
+            {t("dashboardDisableConfirmBody", { domain: dashboard.domain })}
+          </WarnAlert>
+          <Text type="body" size="sm" color="secondary">
+            {t("dashboardDisableConfirmRecovery")}
+          </Text>
+        </VStack>
+      </AppDialog>
+    </>
+  );
+}
+
+/** What the DNS check found, in the terms the toggle above it is decided by. */
+function DnsCheckResult({ check }: { check: DashboardDnsCheck }) {
+  const t = useTranslations("settings");
+  const resolved = check.resolved.join(", ");
+
+  if (check.reason === "match") {
+    return (
+      <InfoAlert title={t("dashboardDnsMatchTitle")}>
+        {t("dashboardDnsMatchDescription", { ip: check.publicIp ?? "" })}
+      </InfoAlert>
+    );
+  }
+  return (
+    <WarnAlert
+      title={
+        check.reason === "unresolved"
+          ? t("dashboardDnsUnresolvedTitle")
+          : check.reason === "noPublicIp"
+            ? t("dashboardDnsNoPublicIpTitle")
+            : t("dashboardDnsMismatchTitle")
+      }
+    >
+      {check.reason === "mismatch"
+        ? t("dashboardDnsMismatchDescription", { resolved, ip: check.publicIp ?? "" })
+        : check.reason === "unresolved"
+          ? t("dashboardDnsUnresolvedDescription")
+          : t("dashboardDnsNoPublicIpDescription")}
+    </WarnAlert>
+  );
+}
 
 function TrustedProxiesSection({
   trustedProxies,

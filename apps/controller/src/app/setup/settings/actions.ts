@@ -12,7 +12,12 @@ import {
 } from "@/src/lib/settings/registry";
 import { propagateOptionalFeatureSettings } from "@/src/lib/settings/optional-features";
 import { resolveAllSettings, saveSettings } from "@/src/lib/settings/resolve";
-import { type GeneralSettings, saveGeneralSettings } from "@/src/lib/settings";
+import {
+  type GeneralSettings,
+  saveDashboardSettings,
+  saveGeneralSettings,
+} from "@/src/lib/settings";
+import { activateDashboardHost } from "@/src/lib/dashboard-host";
 // SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
 // JSON groups and one to the registry, and this action now saves through both.
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
@@ -149,6 +154,16 @@ export async function saveSetupSettings(
 
   const providerError = await createProviderFromForm(formData);
   if (providerError) return { error: providerError };
+
+  // CPM proxies its own dashboard from here on, so the operator's first look at the product is a
+  // working host rather than an empty list. Best-effort on purpose: this decides a convenience,
+  // and a DNS lookup or a settings write failing is not a reason to refuse a setup that has
+  // already saved everything it was asked to.
+  try {
+    await saveDashboardSettings(await activateDashboardHost());
+  } catch (error) {
+    console.error("Setup: could not enable the dashboard host", error);
+  }
 
   await markSetupCompleted();
 

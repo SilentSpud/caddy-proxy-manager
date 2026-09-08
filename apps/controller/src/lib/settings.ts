@@ -1,3 +1,4 @@
+import type { DashboardHostSettings } from "./dashboard-host";
 import db, { nowIso } from "./db";
 import { settings } from "./db/schema";
 import { eq } from "drizzle-orm";
@@ -194,6 +195,18 @@ export async function getGeneralSettings(): Promise<GeneralSettings | null> {
 
 export async function saveGeneralSettings(settings: GeneralSettings): Promise<void> {
   await setSetting("general", settings);
+}
+
+/**
+ * How the dashboard is served through Caddy. Null until setup has decided, which the managed-host
+ * builder reads as "off".
+ */
+export async function getDashboardSettings(): Promise<DashboardHostSettings | null> {
+  return await getSetting<DashboardHostSettings>("dashboard");
+}
+
+export async function saveDashboardSettings(settings: DashboardHostSettings): Promise<void> {
+  await setSetting("dashboard", settings);
 }
 
 export async function getAvatarSettings(): Promise<AvatarSettings | null> {

@@ -219,6 +219,18 @@ function validateAuthentik(value: Record<string, unknown>): void {
   optionalString(value, "authEndpoint", "authentik", 4096);
 }
 
+function validateDashboard(value: Record<string, unknown>): void {
+  onlyKeys(value, ["enabled", "domain", "tls"], "dashboard settings");
+  booleanValue(required(value, "enabled", "dashboard settings"), "dashboard.enabled");
+  booleanValue(required(value, "tls", "dashboard settings"), "dashboard.tls");
+  // Required even when disabled: the domain is what the route is rebuilt from the moment it is
+  // switched back on, and a blank one there would silently produce no route at all.
+  stringValue(required(value, "domain", "dashboard settings"), "dashboard.domain", {
+    min: 1,
+    max: 253,
+  });
+}
+
 function validateMetrics(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "port"], "metrics settings");
   booleanValue(required(value, "enabled", "metrics settings"), "metrics.enabled");
@@ -534,6 +546,9 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
       break;
     case "authentik":
       validateAuthentik(value);
+      break;
+    case "dashboard":
+      validateDashboard(value);
       break;
     case "metrics":
       validateMetrics(value);

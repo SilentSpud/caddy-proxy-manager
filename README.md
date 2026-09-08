@@ -74,6 +74,39 @@ Two things skip the flow entirely:
   configure a way in and someone can already sign in, setup is marked complete at startup and never
   shown. Upgrading an existing install changes nothing about how it starts.
 
+### Proxying the dashboard itself
+
+Setup finishes by pointing CPM at the one upstream every deployment already has: this dashboard.
+It becomes a proxy host CPM maintains for you, so a new install is serving something by name
+before you have created anything.
+
+The domain comes from `DASHBOARD_DOMAIN` if you set it, and otherwise from the hostname in
+`BASE_URL` — the address you are already reaching CPM at. A localhost address says nothing about
+how the instance will be reached, so that leaves the host switched off with the field ready.
+
+HTTPS is decided by a DNS check rather than assumed. Setup resolves the domain and compares it
+with this deployment's public address:
+
+| What the check finds | What happens |
+| -------------------- | ------------ |
+| The domain resolves here | HTTPS on. Caddy orders a certificate immediately, and it will succeed |
+| It resolves somewhere else, or nowhere | HTTPS off, with the reason shown. The host still serves over HTTP |
+| The public address could not be determined | HTTPS off. Turn it on yourself if you know the record is right |
+
+Forcing HTTPS before DNS is pointed here would mean a fresh install's first act is a failing
+certificate order on a name that does not reach it — so the check decides, and **Settings →
+Dashboard Host** re-runs it whenever you ask.
+
+**This host is managed, not stored.** It is generated from those settings every time the
+configuration is applied, so it is not in Proxy Hosts and nothing can delete it by accident.
+It is also placed ahead of every other route, so a host somebody creates for the same domain
+cannot shadow the one the dashboard is reached through.
+
+**You cannot lock yourself out with it.** The controller publishes its own port, so
+`http://<host>:3000` reaches this dashboard whatever the route is doing — including when you turn
+the host off, which the settings page warns about first if you are reading it through that very
+domain.
+
 ### Runtime
 
 [Bun](https://bun.sh) is the only supported runtime. The app reaches PostgreSQL through
@@ -227,7 +260,7 @@ is still honoured as an override until a value is stored.
 | `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
-| `PRIMARY_DOMAIN` | Domain the bundled Caddyfile serves the dashboard on, alongside `http://localhost` | `caddyproxymanager.com` | No |
+| `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard — see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 | `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Compose-only. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 
 ### The agent's environment

@@ -1,0 +1,251 @@
+/**
+ * Serving CPM's own dashboard through the Caddy it manages.
+ *
+ * The quickest way to understand what this product does is to watch it proxy something, and the
+ * one upstream every deployment already has is the dashboard the operator is reading. So setup
+ * turns this on and the dashboard is reachable by name immediately, with no host to create first.
+ *
+ * It is a *managed* host, not a row in `proxy_hosts`. Those two facts follow from that:
+ *
+ * - It is synthesised into the Caddy document on every apply, from these settings. Nothing can
+ *   delete it out from under the operator, and changing the domain here is the only way to change
+ *   it — there is no second copy in the hosts table to drift from this one.
+ * - It is put ahead of the stored hosts before routes are built. Routes are then sorted by host
+ *   specificity, which decides every case where two hosts could match the same request except one:
+ *   two rows claiming the *same* exact domain, where the sort falls back to original order. Being
+ *   first is what wins that tie, so a host somebody creates for the dashboard's domain cannot
+ *   shadow the route the dashboard is reached through — the page that would fix the mistake is the
+ *   one that would have stopped answering.
+ *
+ * The escape hatch is the reason all of this is safe: the controller publishes its own port
+ * (`3000:3000` in the bundled compose file), so a broken dashboard host never locks anybody out —
+ * `http://<host>:3000` still serves the settings page that turns it off.
+ */
+
+import { Resolver } from "node:dns/promises";
+import { config } from "./config";
+// Type-only: erased at compile time, so this does not import caddy.ts at runtime and cannot
+// close a cycle with the module that consumes buildDashboardHostRow.
+import type { ProxyHostRow } from "./caddy";
+
+/** How CPM serves its own dashboard. Stored as the `dashboard` settings blob. */
+export type DashboardHostSettings = {
+  /** Whether the managed route exists at all. Off means the dashboard is reached by port only. */
+  enabled: boolean;
+  /** The domain it answers on. */
+  domain: string;
+  /**
+   * Whether to force HTTPS, which is also what asks Caddy to obtain a certificate.
+   *
+   * Set from a DNS check rather than defaulted to true: a fresh install whose domain does not
+   * resolve to this machine yet would otherwise start failing ACME the moment setup finished, and
+   * the operator's first experience of the product would be a certificate error.
+   */
+  tls: boolean;
+};
+
+/**
+ * The id the synthetic row carries.
+ *
+ * Negative so it cannot collide with a `proxy_hosts` serial, and so anything that does look this
+ * up by id — an access list, a certificate, an agent assignment — finds nothing rather than
+ * somebody else's host.
+ */
+export const DASHBOARD_HOST_ID = -1;
+
+/** Shown as the host's name wherever the generated config is inspected. */
+export const DASHBOARD_HOST_NAME = "CPM Dashboard (managed)";
+
+/**
+ * Names that describe how to reach a machine from itself, and so cannot be proxied usefully.
+ *
+ * A deployment reached at `http://localhost:3000` during setup has told us nothing about the name
+ * it will be reached at afterwards, and claiming `localhost` in Caddy would take the port-based
+ * escape hatch away from the very deployment least likely to have a domain yet.
+ */
+const NOT_A_PUBLIC_NAME = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", ""]);
+
+/** The hostname in BASE_URL, when it is one this could serve. */
+function domainFromBaseUrl(): string {
+  try {
+    const hostname = new URL(config.baseUrl).hostname.toLowerCase();
+    return NOT_A_PUBLIC_NAME.has(hostname) ? "" : hostname;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The domain to serve the dashboard on before anybody has chosen one.
+ *
+ * DASHBOARD_DOMAIN first, because setting it is an explicit answer. Otherwise the hostname in
+ * BASE_URL — the deployment is already being reached there, so it is the name the operator has in
+ * hand, and proxying it is exactly what they came to do. Empty when neither says anything usable,
+ * which leaves the feature off rather than claiming a domain nobody asked for.
+ */
+export function seedDashboardDomain(): string {
+  return config.dashboardDomain ?? domainFromBaseUrl();
+}
+
+export function defaultDashboardSettings(): DashboardHostSettings {
+  return { enabled: false, domain: seedDashboardDomain(), tls: false };
+}
+
+/**
+ * Turn the dashboard host on as setup finishes.
+ *
+ * The TLS answer comes from DNS rather than a default. If the domain already resolves here, HTTPS
+ * is what the operator wants and asking Caddy for a certificate will work; if it does not, forcing
+ * it would mean the first thing a new install does is fail ACME on a name that is not pointed at
+ * it yet. Either way the operator can change it, and the Settings page says which way it landed
+ * and why.
+ *
+ * Never throws. A failed check is a reason to leave TLS off, not a reason to fail setup.
+ */
+export async function activateDashboardHost(): Promise<DashboardHostSettings> {
+  const domain = seedDashboardDomain();
+  if (!domain) return { enabled: false, domain: "", tls: false };
+
+  const dns = await checkDashboardDns(domain);
+  return { enabled: true, domain, tls: dns.ok };
+}
+
+/**
+ * The synthetic host, or null when there is nothing to serve.
+ *
+ * Returns a `ProxyHostRow` rather than a Caddy route so it travels the same path every other host
+ * does — TLS automation, websocket upgrades, host-header handling, error pages. A hand-built route
+ * would have to re-implement each of those and would drift from them at the first change.
+ */
+export function buildDashboardHostRow(
+  settings: DashboardHostSettings | null,
+  upstream: string | null,
+): ProxyHostRow | null {
+  if (!settings?.enabled) return null;
+
+  const domain = settings.domain.trim().toLowerCase();
+  if (!domain) return null;
+
+  // No upstream means the controller could not work out how Caddy reaches it. Serving the domain
+  // anyway would answer with a proxy error, which is worse than not claiming the domain at all.
+  if (!upstream) return null;
+
+  return {
+    id: DASHBOARD_HOST_ID,
+    name: DASHBOARD_HOST_NAME,
+    domains: JSON.stringify([domain]),
+    // Plain strings, the shape parseUpstreamTarget reads. http:// because Caddy reaches the
+    // controller inside the network the two share, not across the internet.
+    upstreams: JSON.stringify([`http://${upstream}`]),
+    certificateId: null,
+    accessListId: null,
+    sslForced: settings.tls ? 1 : 0,
+    // Tied to TLS: an HSTS header sent over a domain that is not yet on HTTPS pins the browser to
+    // a scheme this host is not serving, and the operator cannot clear it from here.
+    hstsEnabled: settings.tls ? 1 : 0,
+    hstsSubdomains: 0,
+    // The dashboard streams: agent status and the log views are server-sent events.
+    allowWebsocket: 1,
+    // The controller builds absolute URLs from the request host, and better-auth checks it.
+    preserveHostHeader: 1,
+    skipHttpsHostnameValidation: 0,
+    meta: null,
+    enabled: 1,
+  };
+}
+
+/** What a DNS check found. `ok` is what the TLS toggle is set from. */
+export type DashboardDnsCheck = {
+  ok: boolean;
+  /** Addresses the domain resolves to, empty when it resolves to nothing. */
+  resolved: string[];
+  /** This deployment's public address, or null when it could not be determined. */
+  publicIp: string | null;
+  /** Why the check could not answer, for a domain that resolves somewhere else or not at all. */
+  reason: "match" | "mismatch" | "unresolved" | "noPublicIp" | "noDomain";
+};
+
+/** Bounded so a slow resolver or echo service cannot hold a form submission open. */
+const CHECK_TIMEOUT_MS = 5_000;
+
+/**
+ * Services that answer with the caller's address and nothing else.
+ *
+ * More than one because this decides a default an operator would otherwise have to fix by hand,
+ * and a single provider having a bad day should not silently mean "no HTTPS". Tried in order, and
+ * the first plain answer wins. All of them are asked over HTTPS so the answer cannot be rewritten
+ * in transit by whatever the deployment sits behind.
+ */
+const PUBLIC_IP_SERVICES = ["https://api.ipify.org", "https://icanhazip.com"];
+
+const IP_ADDRESS = /^[0-9a-f.:]+$/i;
+
+async function withTimeout<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+  try {
+    return await work(controller.signal);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Every address the name resolves to, over both families. Empty when it resolves to nothing. */
+async function resolveAddresses(name: string): Promise<string[]> {
+  const resolver = new Resolver({ timeout: CHECK_TIMEOUT_MS, tries: 1 });
+  const [v4, v6] = await Promise.all([
+    resolver.resolve4(name).catch(() => [] as string[]),
+    resolver.resolve6(name).catch(() => [] as string[]),
+  ]);
+  return [...v4, ...v6];
+}
+
+/** This deployment's address as the internet sees it, or null if nothing would say. */
+export async function resolvePublicIp(): Promise<string | null> {
+  for (const service of PUBLIC_IP_SERVICES) {
+    const address = await withTimeout(async (signal) => {
+      const response = await fetch(service, { signal, redirect: "error" });
+      if (!response.ok) return null;
+      const text = (await response.text()).trim();
+      return IP_ADDRESS.test(text) ? text : null;
+    });
+    if (address) return address;
+  }
+  return null;
+}
+
+/**
+ * Whether the domain points at this machine.
+ *
+ * Never throws: every failure is an answer of `ok: false` with a reason, because the caller is
+ * either seeding a default at the end of setup or rendering a warning, and neither is a place to
+ * fail a request over a resolver being slow.
+ */
+export async function checkDashboardDns(
+  domain: string,
+  // Injected by tests, the way tailscale-api takes its fetchImpl. Real callers pass nothing and
+  // get the resolver and the echo services above.
+  deps: {
+    resolveAddresses?: (name: string) => Promise<string[]>;
+    publicIp?: () => Promise<string | null>;
+  } = {},
+): Promise<DashboardDnsCheck> {
+  const name = domain.trim().toLowerCase();
+  if (!name) return { ok: false, resolved: [], publicIp: null, reason: "noDomain" };
+
+  const [resolved, publicIp] = await Promise.all([
+    withTimeout(async () =>
+      deps.resolveAddresses ? await deps.resolveAddresses(name) : await resolveAddresses(name),
+    ),
+    (deps.publicIp ?? resolvePublicIp)(),
+  ]);
+
+  const addresses = resolved ?? [];
+  if (addresses.length === 0) return { ok: false, resolved: [], publicIp, reason: "unresolved" };
+  if (!publicIp) return { ok: false, resolved: addresses, publicIp: null, reason: "noPublicIp" };
+
+  const ok = addresses.includes(publicIp);
+  return { ok, resolved: addresses, publicIp, reason: ok ? "match" : "mismatch" };
+}

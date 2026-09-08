@@ -118,7 +118,7 @@ services:
     image: cpm-test/caddy:latest
     container_name: cpm-test-caddy
     environment:
-      PRIMARY_DOMAIN: cpm.test
+      DASHBOARD_DOMAIN: cpm.test
     volumes:
       - caddy-data:/data
       - caddy-config:/config
