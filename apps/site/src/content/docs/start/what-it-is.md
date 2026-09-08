@@ -1,0 +1,41 @@
+---
+title: What it is
+description: How Caddy Proxy Manager relates to Caddy, what it stores, and what it deliberately does not do.
+sidebar:
+  order: 1
+---
+
+Caddy Proxy Manager is a web interface and API in front of [Caddy](https://caddyserver.com). You
+configure hosts, certificates, firewall rules and access control in the UI; it renders those into a
+Caddy JSON configuration and applies it over Caddy's admin API.
+
+## The pieces
+
+| Piece | What it is |
+| ----- | ---------- |
+| **Controller** | The web app and API. Holds the database and decides what the configuration should be |
+| **Agent** | Runs beside Caddy on each host. Applies configuration, recreates the container, and reports back |
+| **Caddy** | The server actually handling traffic |
+| **PostgreSQL** | Where everything is stored |
+| **ClickHouse** | Optional. Only for [analytics](../../features/analytics/) |
+
+The controller never dials the agent. The agent connects out and holds an event stream open, which
+is what lets a Caddy host sit behind NAT with no inbound port.
+
+## What it stores
+
+Configuration lives in PostgreSQL, not in a Caddyfile. Caddy's running configuration is generated
+from the database on every apply, so the database is the source of truth and the Caddy config is
+derived — editing Caddy directly will be overwritten on the next apply.
+
+Secrets — DNS provider credentials, private keys, auth keys — are encrypted at rest under the
+deployment's `SESSION_SECRET`.
+
+## What it is not
+
+- **Not a Caddyfile editor.** You can attach a custom Caddyfile snippet to a host, but the normal
+  path is the form.
+- **Not a DNS server.** It talks to your DNS provider for ACME DNS-01 challenges; it does not host
+  your zone.
+- **Not multi-tenant.** [Roles and group grants](../../features/users-and-groups/) delegate
+  specific hosts to specific people, but everyone shares one instance and one configuration.

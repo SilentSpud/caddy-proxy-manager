@@ -1,0 +1,51 @@
+---
+title: WAF
+description: Coraza and the OWASP Core Rule Set — block or detect, per host, with suppression and custom directives.
+---
+
+The web application firewall is [Coraza](https://coraza.io/) with the OWASP Core Rule Set. Turn it
+on globally in **WAF → Settings**, then override per proxy host where a particular application
+needs something different.
+
+![The WAF event log](../../../assets/waf.png)
+
+## Two modes
+
+- **Block** — matching requests are rejected with 403.
+- **Detect** — matching requests are logged and allowed through.
+
+Detect first is the usual order. It tells you what the rules would have done to your traffic before
+they start doing it.
+
+## The rule set
+
+OWASP CRS covers SQL injection, cross-site scripting, local file inclusion, remote code execution
+and more. It is enabled by default when the WAF is on.
+
+## When a rule is wrong
+
+Real applications trip generic rules. Two ways out, both from the event detail drawer or the
+Suppressed Rules tab:
+
+- **Suppress globally** — the rule stops firing everywhere.
+- **Suppress for one host** — it keeps protecting everything else.
+
+## Custom directives
+
+Any ModSecurity SecLang syntax is accepted, so you can write rules of your own or disable the
+engine for a path:
+
+```text
+SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
+```
+
+## The event log
+
+Every blocked and detected request is recorded with its rule, severity and classification, and the
+log is searchable. That log is how suppression decisions get made — the drawer for an event links
+straight to suppressing the rule that produced it.
+
+:::note
+The WAF is a compiled-in Caddy module. If the settings are greyed out, turn Coraza on in
+[Caddy Build](../caddy-build/) and rebuild.
+:::

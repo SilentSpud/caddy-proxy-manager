@@ -1,0 +1,55 @@
+---
+title: Users, roles & groups
+description: Four roles, group-based delegation, and OAuth/OIDC single sign-on.
+---
+
+## The four roles
+
+| Capability | Viewer | User | Operator | Admin |
+| ---------- | ------ | ---- | -------- | ----- |
+| Log in to the dashboard | Yes | Yes | Yes | Yes |
+| Access forward-auth apps (when granted) | Yes | Yes | Yes | Yes |
+| Manage hosts and agents | No | No | Only what their groups were granted | Yes |
+| Create or delete hosts | No | No | No | Yes |
+| Manage certificates and access lists | No | No | No | Yes |
+| Manage users, groups and settings | No | No | No | Yes |
+| View analytics and the audit log | No | No | No | Yes |
+| Create and manage own API tokens | Yes | Yes | Yes | Yes |
+
+New accounts default to **user**. The first administrator comes from
+[first run](../../start/first-run/).
+
+## Operator is the delegating role
+
+Its baseline is nothing, and it reaches exactly what its groups were granted. That shape is what
+makes grants safe to add: viewer and user gain nothing from a grant, so creating one can never
+widen an existing account. Someone has to be made an operator deliberately.
+
+Grants apply to the dashboard. The management endpoints under `/api/v1/` stay admin-only — an
+operator's [API token](../rest-api/) gets the same user-scoped endpoints a user's does.
+
+## Groups
+
+Groups are lists of users doing two jobs:
+
+1. Gating access to [forward-auth](../forward-auth/) protected apps.
+2. Deciding what an operator may manage, through **Groups → Access**: tick the proxy hosts, L4
+   hosts and agents the group should reach, then choose the capability.
+
+## OAuth / SSO
+
+Any OAuth2/OIDC provider — Authentik, Keycloak, Auth0, and others. Accounts can be linked from the
+Profile page, so an existing local account gains SSO rather than becoming a duplicate.
+
+Two options worth knowing:
+
+- **Group-based role mapping.** Members of a claimed group become admins, operators, users or
+  viewers automatically, so role changes happen in your IdP rather than here.
+- **OIDC-only mode.** Disables local accounts entirely. No bootstrap admin, no credential sign-in —
+  every identity comes from the provider.
+
+## Password policy
+
+Production enforces strong passwords, and two independent throttles guard the auth endpoints: a
+request limit and a login lockout, both configurable in Settings. Accounts still on an older
+password hash can be forced to reset, which rehashes them on next sign-in.
