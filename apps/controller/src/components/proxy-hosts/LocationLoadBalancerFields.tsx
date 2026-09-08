@@ -11,16 +11,29 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { LoadBalancerConfig, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 import { useTranslations } from "next-intl";
 
-const LOAD_BALANCING_POLICIES: { value: LoadBalancingPolicy; label: string }[] = [
-  { value: "random", label: "Random (default)" },
-  { value: "round_robin", label: "Round Robin" },
-  { value: "least_conn", label: "Least Connections" },
-  { value: "ip_hash", label: "IP Hash" },
-  { value: "first", label: "First Available" },
-  { value: "header", label: "Header Hash" },
-  { value: "cookie", label: "Cookie" },
-  { value: "uri_hash", label: "URI Hash" },
-];
+/**
+ * Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build.
+ *
+ * See LoadBalancerFields for why this is a function: the labels live in the message catalog.
+ */
+function loadBalancingPolicies(
+  t: ReturnType<typeof useTranslations<"proxyHosts">>,
+): { value: LoadBalancingPolicy; label: string }[] {
+  return [
+    { value: "random", label: t("lbPolicyRandomDefault") },
+    { value: "random_choose", label: t("lbPolicyRandomChoose") },
+    { value: "round_robin", label: t("lbPolicyRoundRobin") },
+    { value: "weighted_round_robin", label: t("lbPolicyWeightedRoundRobin") },
+    { value: "least_conn", label: t("lbPolicyLeastConn") },
+    { value: "ip_hash", label: t("lbPolicyIpHash") },
+    { value: "client_ip_hash", label: t("lbPolicyClientIpHash") },
+    { value: "first", label: t("lbPolicyFirst") },
+    { value: "header", label: t("lbPolicyHeader") },
+    { value: "cookie", label: t("lbPolicyCookie") },
+    { value: "uri_hash", label: t("lbPolicyUriHash") },
+    { value: "query", label: t("lbPolicyQuery") },
+  ];
+}
 
 export const EMPTY_LOAD_BALANCER: LoadBalancerConfig = {
   enabled: true,
@@ -28,6 +41,9 @@ export const EMPTY_LOAD_BALANCER: LoadBalancerConfig = {
   policyHeaderField: null,
   policyCookieName: null,
   policyCookieSecret: null,
+  policyQueryKey: null,
+  policyChoose: null,
+  policyWeights: null,
   tryDuration: null,
   tryInterval: null,
   retries: null,
@@ -43,6 +59,12 @@ const EMPTY_ACTIVE = {
   timeout: null,
   status: null,
   body: null,
+  passes: null,
+  fails: null,
+  method: null,
+  requestBody: null,
+  followRedirects: false,
+  headers: null,
 };
 const EMPTY_PASSIVE = {
   enabled: true,
@@ -50,7 +72,19 @@ const EMPTY_PASSIVE = {
   maxFails: null,
   unhealthyStatus: null,
   unhealthyLatency: null,
+  unhealthyRequestCount: null,
 };
+
+/** Weights are typed as a comma-separated list, positional against the upstream list. */
+function parseWeightList(value: string): number[] | null {
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+  const weights = parts.map((part) => Number.parseInt(part, 10));
+  return weights.every((w) => Number.isInteger(w) && w >= 0) ? weights : null;
+}
 
 function str(v: string): string | null {
   const t = v.trim();
@@ -101,10 +135,42 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
             <Selector
               label={t("selectionPolicy")}
               size="sm"
-              options={LOAD_BALANCING_POLICIES}
+              options={loadBalancingPolicies(t)}
               value={policy}
               onChange={(next) => patch({ policy: next as LoadBalancingPolicy })}
             />
+
+            {policy === "random_choose" && (
+              <NumberInput
+                label={t("lbChoose")}
+                description={t("lbChooseHelp")}
+                size="sm"
+                value={lb?.policyChoose ?? undefined}
+                onChange={(next) => patch({ policyChoose: next ?? null })}
+              />
+            )}
+
+            {policy === "weighted_round_robin" && (
+              <TextInput
+                label={t("lbWeights")}
+                description={t("lbWeightsHelp")}
+                size="sm"
+                placeholder="3, 2, 1"
+                value={lb?.policyWeights?.join(", ") ?? ""}
+                onChange={(next) => patch({ policyWeights: parseWeightList(next) })}
+              />
+            )}
+
+            {policy === "query" && (
+              <TextInput
+                label={t("lbQueryKey")}
+                description={t("lbQueryKeyHelp")}
+                size="sm"
+                placeholder="session"
+                value={lb?.policyQueryKey ?? ""}
+                onChange={(next) => patch({ policyQueryKey: str(next) })}
+              />
+            )}
 
             {policy === "header" && (
               <TextInput

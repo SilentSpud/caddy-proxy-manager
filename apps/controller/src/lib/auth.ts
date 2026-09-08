@@ -110,6 +110,23 @@ export async function requireAdmin(): Promise<Session> {
 }
 
 /**
+ * Require a role that manages something: an admin, or an operator with grants.
+ *
+ * Separate from `requireAdmin` because the two answer different questions. This one gates a page
+ * an operator is allowed to open — the host list, the agent list — and what they actually see on
+ * it is decided per resource by `lib/permissions.ts`. Everything global stays on `requireAdmin`.
+ */
+export async function requireManager(): Promise<Session> {
+  const session = await requireUser();
+  if (session.user.role !== "admin" && session.user.role !== "operator") {
+    // Role-neutral: this gate admits operators too, and borrowing requireAdmin's wording would
+    // tell an operator who was refused for a different reason to go and find an administrator.
+    throw new Error("You do not have access to that.");
+  }
+  return session;
+}
+
+/**
  * Defense-in-depth CSRF check: 403 when Origin is present and mismatches Host, else null.
  * Browsers always send Origin cross-origin.
  */

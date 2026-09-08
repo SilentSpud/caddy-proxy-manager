@@ -124,6 +124,7 @@ describe('mapOAuthProvider — OAuth self-registration gating (M2)', () => {
     groupPrefix: null,
     roleMappingEnabled: false,
     adminGroup: null,
+    operatorGroup: null,
     userGroup: null,
     viewerGroup: null,
     defaultRole: 'user',

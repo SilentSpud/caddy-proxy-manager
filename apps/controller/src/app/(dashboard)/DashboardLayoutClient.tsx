@@ -21,6 +21,7 @@ import {
   FileJson2,
   Users,
   UserCog,
+  Server,
 } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
@@ -46,19 +47,50 @@ type User = {
 
 // `labelKey` rather than a label: this is module scope, where no hook can run. Each key is
 // resolved against the `nav` namespace at render.
+/**
+ * `adminOnly` gates the pages that answer for the whole instance. `operator` marks the three an
+ * operator can also open — they show only the hosts and agents that operator's groups were
+ * granted, and an operator with no grants sees them empty rather than not at all, because "you
+ * have no hosts yet" explains itself and a missing menu item does not.
+ */
 const NAV_ITEMS = [
-  { href: "/", labelKey: "overview", icon: LayoutDashboard, adminOnly: false },
-  { href: "/proxy-hosts", labelKey: "proxyHosts", icon: ArrowLeftRight, adminOnly: true },
-  { href: "/l4-proxy-hosts", labelKey: "l4ProxyHosts", icon: Cable, adminOnly: true },
-  { href: "/access-lists", labelKey: "accessLists", icon: KeyRound, adminOnly: true },
-  { href: "/groups", labelKey: "groups", icon: Users, adminOnly: true },
-  { href: "/users", labelKey: "users", icon: UserCog, adminOnly: true },
-  { href: "/certificates", labelKey: "certificates", icon: ShieldCheck, adminOnly: true },
-  { href: "/waf", labelKey: "waf", icon: ShieldOff, adminOnly: true },
-  { href: "/analytics", labelKey: "analytics", icon: BarChart2, adminOnly: true },
-  { href: "/audit-log", labelKey: "auditLog", icon: History, adminOnly: true },
-  { href: "/api-docs", labelKey: "apiDocs", icon: FileJson2, adminOnly: true },
-  { href: "/settings", labelKey: "settings", icon: Settings, adminOnly: true },
+  { href: "/", labelKey: "overview", icon: LayoutDashboard, adminOnly: false, operator: false },
+  {
+    href: "/proxy-hosts",
+    labelKey: "proxyHosts",
+    icon: ArrowLeftRight,
+    adminOnly: true,
+    operator: true,
+  },
+  {
+    href: "/l4-proxy-hosts",
+    labelKey: "l4ProxyHosts",
+    icon: Cable,
+    adminOnly: true,
+    operator: true,
+  },
+  { href: "/agents", labelKey: "agents", icon: Server, adminOnly: true, operator: true },
+  {
+    href: "/access-lists",
+    labelKey: "accessLists",
+    icon: KeyRound,
+    adminOnly: true,
+    operator: false,
+  },
+  { href: "/groups", labelKey: "groups", icon: Users, adminOnly: true, operator: false },
+  { href: "/users", labelKey: "users", icon: UserCog, adminOnly: true, operator: false },
+  {
+    href: "/certificates",
+    labelKey: "certificates",
+    icon: ShieldCheck,
+    adminOnly: true,
+    operator: false,
+  },
+  { href: "/waf", labelKey: "waf", icon: ShieldOff, adminOnly: true, operator: false },
+  { href: "/analytics", labelKey: "analytics", icon: BarChart2, adminOnly: true, operator: false },
+  { href: "/audit-log", labelKey: "auditLog", icon: History, adminOnly: true, operator: false },
+  { href: "/api-docs", labelKey: "apiDocs", icon: FileJson2, adminOnly: true, operator: false },
+  { href: "/settings", labelKey: "settings", icon: Settings, adminOnly: true, operator: false },
 ] as const;
 
 function ThemeToggle() {
@@ -142,7 +174,10 @@ export default function DashboardLayoutClient({
   const t = useTranslations("nav");
   const pathname = usePathname();
   const isAdmin = user.role === "admin";
-  const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
+  const isOperator = user.role === "operator";
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.adminOnly || isAdmin || (isOperator && item.operator === true),
+  );
 
   // Settings and Access Lists render their own full-bleed frame, so the shell
   // does not add page padding on top of it.

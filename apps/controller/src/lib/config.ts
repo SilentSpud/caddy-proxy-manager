@@ -224,6 +224,7 @@ export const config = {
     groupPrefix: process.env.OAUTH_GROUP_PREFIX?.trim() || null,
     roleMappingEnabled: process.env.OAUTH_ROLE_MAPPING === "true",
     adminGroup: process.env.OAUTH_ADMIN_GROUP?.trim() || null,
+    operatorGroup: process.env.OAUTH_OPERATOR_GROUP?.trim() || null,
     userGroup: process.env.OAUTH_USER_GROUP?.trim() || null,
     viewerGroup: process.env.OAUTH_VIEWER_GROUP?.trim() || null,
     defaultRole: process.env.OAUTH_DEFAULT_ROLE?.trim() || null,

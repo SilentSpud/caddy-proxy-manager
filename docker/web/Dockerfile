@@ -101,6 +101,18 @@ RUN mkdir -p /acme-ca && chmod 0777 /acme-ca
 COPY --chown=cpm:cpm docker/web/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Image identity, so a pulled image describes itself without the compose file beside it. Static
+# facts only: the version, revision and build timestamp are supplied by docker/metadata-action in
+# .github/workflows/docker-build-trusted.yml, whose --label flags override anything set here.
+LABEL org.opencontainers.image.title="Caddy Proxy Manager Web Dashboard" \
+      org.opencontainers.image.description="Web UI and API for managing Caddy reverse proxies, certificates and routes." \
+      org.opencontainers.image.vendor="SilentSpud" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
+      org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
+      org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
+      org.opencontainers.image.base.name="docker.io/library/debian:bookworm-slim"
+
 EXPOSE 3000
 USER cpm
 ENTRYPOINT ["/entrypoint.sh"]

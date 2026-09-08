@@ -12,17 +12,35 @@
  * the server is a service container, and how a developer points the suite at their own.
  */
 import { SQL } from "bun";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
 const IMAGE = "postgres:17-alpine";
 const CONTAINER = `cpm-test-db-${process.pid}`;
 const PASSWORD = "cpm-test";
 const READY_TIMEOUT_MS = 60_000;
 
-const command = process.argv.slice(2);
-if (command.length === 0) {
-  console.error("usage: bun scripts/with-test-db.ts <command> [args...]");
-  process.exit(2);
-}
+/**
+ * `halt-at-non-option` is what keeps this a wrapper rather than a parser: everything from the first
+ * bare word on belongs to the child, so `bun test --parallel` reaches Bun with its flag intact
+ * instead of yargs claiming `--parallel` for itself. Positional numbers stay strings for the same
+ * reason — an argument like `007` must not arrive as `7`.
+ */
+const command = yargs(hideBin(process.argv))
+  .scriptName("with-test-db")
+  .usage("Usage: $0 <command> [args...]")
+  .parserConfiguration({ "halt-at-non-option": true, "parse-positional-numbers": false })
+  .demandCommand(1, "a command to run is required")
+  // Exit 2 for a usage error, as before: yargs would exit 1, which is indistinguishable from the
+  // wrapped command having failed.
+  .fail((message, error) => {
+    if (error) throw error;
+    console.error(message);
+    process.exit(2);
+  })
+  .help()
+  .parseSync()
+  ._.map(String);
 
 async function docker(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   const proc = Bun.spawn(["docker", ...args], { stdout: "pipe", stderr: "pipe" });

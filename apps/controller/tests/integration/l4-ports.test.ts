@@ -264,21 +264,10 @@ describe('getL4PortsDiff', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyL4Ports', () => {
-  it('sends the required ports to the agent', async () => {
+  it('pushes the required ports to the agent', async () => {
     await ctx.db.insert(schema.l4ProxyHosts).values(makeL4Host({ listenAddress: ':5432' }));
     await applyL4Ports();
-
-    const posted = agent.requests.filter((r) => r.method === 'POST');
-    expect(posted).toHaveLength(1);
-    expect(posted[0].path).toBe('/v1/l4-ports');
-    expect(posted[0].body).toEqual({ ports: ['5432:5432'] });
-  });
-
-  it('signs the request it sends', async () => {
-    await applyL4Ports();
-    // The fake verifies the HMAC itself; an unsigned request is answered 401 and would have thrown
-    // above. Asserted explicitly so a change that stops signing cannot pass quietly.
-    expect(agent.requests.every((r) => r.signed)).toBe(true);
+    expect(agent.desired?.l4Ports).toEqual(['5432:5432']);
   });
 
   it('returns the in-progress status the agent answers with', async () => {
@@ -286,16 +275,16 @@ describe('applyL4Ports', () => {
     // Accepted, not finished: a recreate takes seconds, so the agent answers immediately and the
     // controller polls. Reporting "applied" here would tell the operator the ports are up before
     // the container has come back.
-    expect((await applyL4Ports()).state).toBe('applying');
+    expect((await applyL4Ports()).state).toBe('pending');
 
     agent.completeL4Ports();
     expect(await getAppliedL4Ports()).toEqual(['5432:5432']);
     expect((await getL4PortsStatus()).state).toBe('applied');
   });
 
-  it('sends an empty list when no host needs a port', async () => {
+  it('pushes an empty list when no host needs a port', async () => {
     await applyL4Ports();
-    expect(agent.requests.find((r) => r.method === 'POST')?.body).toEqual({ ports: [] });
+    expect(agent.desired?.l4Ports).toEqual([]);
   });
 
   it('sends the same ports for the same hosts, whatever order they were added in', async () => {
@@ -306,9 +295,7 @@ describe('applyL4Ports', () => {
         makeL4Host({ listenAddress: ':5432', name: 'a' }),
       ]);
     await applyL4Ports();
-    expect(agent.requests.find((r) => r.method === 'POST')?.body).toEqual({
-      ports: ['5432:5432', '6379:6379'],
-    });
+    expect(agent.desired?.l4Ports).toEqual(['5432:5432', '6379:6379']);
   });
 
   it('fails loudly when there is no agent to send to', async () => {
@@ -363,12 +350,10 @@ describe('isAgentAvailable', () => {
     expect(await isAgentAvailable()).toBe(false);
   });
 
-  it('is false when an agent is configured but not answering', async () => {
-    const { url, secret } = agent;
+  it('is false once the agent disconnects', async () => {
     await agent.stop();
-    // Configured, but the process behind it is gone — the case a health probe exists for.
-    process.env.AGENT_URL = url;
-    process.env.AGENT_SECRET = secret;
+    // "Configured but unreachable" is no longer a state: an agent that is not holding a stream open
+    // cannot be reached by any means, so a dropped connection is the whole of unavailability.
     expect(await isAgentAvailable()).toBe(false);
     clearAgentEnv();
   });

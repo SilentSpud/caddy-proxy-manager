@@ -10,21 +10,23 @@ import { VStack } from "@astryxdesign/core/Stack";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import { useTranslations } from "next-intl";
 
+// Labels are looked up at render: these lists are module constants, and `useTranslations` only
+// exists inside the component.
 type ResolutionMode = "inherit" | "enabled" | "disabled";
 type FamilyMode = "inherit" | "ipv6" | "ipv4" | "both";
 
 const MODE_OPTIONS = [
-  { value: "inherit", label: "Inherit Global" },
-  { value: "enabled", label: "Enabled" },
-  { value: "disabled", label: "Disabled" },
-];
+  { value: "inherit", key: "optDnsInherit" },
+  { value: "enabled", key: "optDnsEnabled" },
+  { value: "disabled", key: "optDnsDisabled" },
+] as const;
 
 const FAMILY_OPTIONS = [
-  { value: "inherit", label: "Inherit Global" },
-  { value: "both", label: "Both (Prefer IPv6)" },
-  { value: "ipv6", label: "IPv6 only" },
-  { value: "ipv4", label: "IPv4 only" },
-];
+  { value: "inherit", key: "optDnsFamilyInherit" },
+  { value: "both", key: "optDnsFamilyBoth" },
+  { value: "ipv6", key: "optDnsFamilyIpv6" },
+  { value: "ipv4", key: "optDnsFamilyIpv4" },
+] as const;
 
 function toResolutionMode(enabled: boolean | null | undefined): ResolutionMode {
   if (enabled === true) return "enabled";
@@ -80,7 +82,7 @@ export function UpstreamDnsResolutionFields({
           <input type="hidden" name="upstreamDnsResolutionMode" value={currentMode} />
           <Selector
             label={t("resolutionMode")}
-            options={MODE_OPTIONS}
+            options={MODE_OPTIONS.map((o) => ({ value: o.value, label: t(o.key) }))}
             value={currentMode}
             onChange={(next) => setCurrentMode(next as ResolutionMode)}
             description={t("dnsPinningModeHelp")}
@@ -89,7 +91,7 @@ export function UpstreamDnsResolutionFields({
           <input type="hidden" name="upstreamDnsResolutionFamily" value={currentFamily} />
           <Selector
             label={t("addressFamilyPreference")}
-            options={FAMILY_OPTIONS}
+            options={FAMILY_OPTIONS.map((o) => ({ value: o.value, label: t(o.key) }))}
             value={currentFamily}
             onChange={(next) => setCurrentFamily(next as FamilyMode)}
             description={t("dnsAddressFamilyHelp")}

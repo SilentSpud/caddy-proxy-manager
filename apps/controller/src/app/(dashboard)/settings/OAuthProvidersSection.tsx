@@ -37,7 +37,7 @@ interface OAuthProvidersSectionProps {
   localUsersDisabled?: boolean;
 }
 
-type AppRole = "admin" | "user" | "viewer";
+type AppRole = "admin" | "operator" | "user" | "viewer";
 
 type FormData = {
   name: string;
@@ -54,6 +54,7 @@ type FormData = {
   groupPrefix: string;
   roleMappingEnabled: boolean;
   adminGroup: string;
+  operatorGroup: string;
   userGroup: string;
   viewerGroup: string;
   defaultRole: AppRole;
@@ -75,6 +76,7 @@ const emptyForm: FormData = {
   groupPrefix: "",
   roleMappingEnabled: false,
   adminGroup: "",
+  operatorGroup: "",
   userGroup: "",
   viewerGroup: "",
   defaultRole: "user",
@@ -88,6 +90,7 @@ const TYPE_OPTIONS = [
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
+  { value: "operator", label: "Operator" },
   { value: "user", label: "User" },
   { value: "viewer", label: "Viewer" },
 ];
@@ -152,6 +155,7 @@ export default function OAuthProvidersSection({
       groupPrefix: provider.groupPrefix ?? "",
       roleMappingEnabled: provider.roleMappingEnabled,
       adminGroup: provider.adminGroup ?? "",
+      operatorGroup: provider.operatorGroup ?? "",
       userGroup: provider.userGroup ?? "",
       viewerGroup: provider.viewerGroup ?? "",
       defaultRole: provider.defaultRole,
@@ -193,6 +197,7 @@ export default function OAuthProvidersSection({
             groupPrefix: form.groupPrefix.trim() || null,
             roleMappingEnabled: form.roleMappingEnabled,
             adminGroup: form.adminGroup.trim() || null,
+            operatorGroup: form.operatorGroup.trim() || null,
             userGroup: form.userGroup.trim() || null,
             viewerGroup: form.viewerGroup.trim() || null,
             defaultRole: form.defaultRole,
@@ -220,6 +225,7 @@ export default function OAuthProvidersSection({
           groupPrefix: form.groupPrefix.trim() || null,
           roleMappingEnabled: form.roleMappingEnabled,
           adminGroup: form.adminGroup.trim() || null,
+          operatorGroup: form.operatorGroup.trim() || null,
           userGroup: form.userGroup.trim() || null,
           viewerGroup: form.viewerGroup.trim() || null,
           defaultRole: form.defaultRole,
@@ -560,6 +566,13 @@ export default function OAuthProvidersSection({
                       placeholder={
                         form.groupPrefix ? `${form.groupPrefix}Admin` : "platform-owners"
                       }
+                    />
+                    <TextInput
+                      label={t("operatorGroups")}
+                      size="sm"
+                      value={form.operatorGroup}
+                      onChange={(v) => updateField("operatorGroup", v)}
+                      placeholder={form.groupPrefix ? `${form.groupPrefix}Operator` : "proxy-ops"}
                     />
                     <TextInput
                       label={t("userGroups")}

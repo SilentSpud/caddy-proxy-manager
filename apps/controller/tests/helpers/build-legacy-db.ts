@@ -17,16 +17,29 @@ import { fileURLToPath } from 'node:url';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { LEGACY_FILE, LEGACY_FIXTURE, LEGACY_DIR } from './legacy-db';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const LEGACY_MIGRATIONS = resolve(moduleDir, '../../drizzle/legacy-sqlite');
 const NOW = '2026-01-01T00:00:00.000Z';
 
-const password = process.argv[2];
-if (!password) {
-  console.error('usage: bun build-legacy-db.ts <password>');
-  process.exit(1);
-}
+/**
+ * A bare positional rather than a flag: this is spawned by `legacy-db.ts`, never typed by hand.
+ * Read off `_` because @types/yargs widens a `.command()` positional to `unknown` at the top level,
+ * and the alternative is moving the whole script into a command handler for one argument.
+ * `strictOptions` rather than `strict`, which with no commands declared would reject the positional
+ * itself; positional numbers stay strings so a password of `007` reaches the hash intact.
+ */
+const [password] = yargs(hideBin(process.argv))
+  .scriptName('build-legacy-db')
+  .usage('Usage: $0 <password>')
+  .parserConfiguration({ 'parse-positional-numbers': false })
+  .demandCommand(1, 'the admin password to hash into the fixture is required')
+  .strictOptions()
+  .help()
+  .parseSync()
+  ._.map(String);
 
 // A real argon2id hash, produced exactly as the application produces one. A placeholder would make
 // the spec's sign-in step untestable, and signing in is the only thing that proves the credential

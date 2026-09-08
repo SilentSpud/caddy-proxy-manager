@@ -106,6 +106,16 @@ export async function register() {
       // Don't throw - analytics is non-critical
     }
 
+    // Leave a token on the shared volume so the agent in this same stack can pair itself. Before
+    // the fleet push, so an agent that comes up while the controller is still starting finds one
+    // waiting rather than idling until the next restart.
+    const { ensureBootstrapToken } = await import("./lib/agent/bootstrap");
+    try {
+      ensureBootstrapToken();
+    } catch (error) {
+      console.error("Failed to write the agent bootstrap token:", error);
+    }
+
     // The log parsers moved to the agent: the Caddy log is a file on the agent's host, which a
     // controller elsewhere cannot read at all. Hand each agent the credentials to write its own
     // events instead.

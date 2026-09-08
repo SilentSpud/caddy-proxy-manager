@@ -16,6 +16,7 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
+import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@/components/ui/FormBooleanControls";
@@ -67,27 +68,68 @@ function groupModules(): [CaddyModuleCategory, CaddyModuleDefinition[]][] {
   ]);
 }
 
+/** The fleet default, as a target id. Zero is not a valid `agents.id`, so it cannot collide. */
+const FLEET = 0;
+
+function resolveModuleMap(overrides: Record<string, boolean>): Record<string, boolean> {
+  const resolved: Record<string, boolean> = {};
+  for (const module of CADDY_MODULES) {
+    // A module missing from the map counts as enabled, so one added to the catalog after the
+    // operator last saved appears on rather than silently off.
+    resolved[module.id] = overrides[module.id] !== false;
+  }
+  return resolved;
+}
+
 export function CaddyBuildFields({
   initialModules,
   initialCustomModules,
+  agents = [],
+  agentSelections = {},
 }: {
   /** Stored overrides. A module missing from the map counts as enabled. */
   initialModules: Record<string, boolean>;
   initialCustomModules: CaddyCustomModule[];
+  /** Every paired agent, so one can be configured separately from the fleet. */
+  agents?: { id: number; name: string; connected: boolean }[];
+  /**
+   * Each agent's own selection, keyed by row id. An agent absent from here — or mapped to null —
+   * follows the fleet default, which is the state every agent starts in.
+   */
+  agentSelections?: Record<
+    number,
+    { modules: Record<string, boolean>; customModules: CaddyCustomModule[] } | null
+  >;
 }) {
   const t = useTranslations("caddyModules");
-  const [modules, setModules] = useState<Record<string, boolean>>(() => {
-    const resolved: Record<string, boolean> = {};
-    for (const module of CADDY_MODULES) {
-      resolved[module.id] = initialModules[module.id] !== false;
-    }
-    return resolved;
-  });
+  const [target, setTarget] = useState<number>(FLEET);
+  // Whether the selected agent tracks the fleet rather than carrying a selection of its own.
+  // Saving with this on clears the agent's row instead of writing a frozen copy of today's fleet.
+  const [follows, setFollows] = useState(false);
+  const [modules, setModules] = useState<Record<string, boolean>>(() =>
+    resolveModuleMap(initialModules),
+  );
   // Rows carry a client-only id because they have no server identity until saved, and reordering
   // or deleting by array index makes React recycle inputs into the wrong row mid-edit.
   const [customModules, setCustomModules] = useState<CustomModuleRow[]>(() =>
     initialCustomModules.map((entry) => ({ ...entry, uid: nextRowId() })),
   );
+
+  // Switching target reloads the editor from that target's stored selection. An agent with none
+  // starts from the fleet's, which is what it is actually running — so turning the switch off
+  // gives an accurate starting point rather than an empty form.
+  const selectTarget = (next: number) => {
+    setTarget(next);
+    const own = next === FLEET ? null : (agentSelections[next] ?? null);
+    setFollows(next !== FLEET && own === null);
+    setModules(resolveModuleMap(own?.modules ?? initialModules));
+    setCustomModules(
+      (own?.customModules ?? initialCustomModules).map((entry) => ({
+        ...entry,
+        uid: nextRowId(),
+      })),
+    );
+  };
   const [build, setBuild] = useState<BuildResponse | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
   // Errors from the trigger request itself, which never reach the status file.
@@ -95,12 +137,14 @@ export function CaddyBuildFields({
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/caddy-build");
+      const res = await fetch(
+        target === FLEET ? "/api/caddy-build" : `/api/caddy-build?agent=${target}`,
+      );
       if (res.ok) setBuild(await res.json());
     } catch {
       // A failed poll is not worth interrupting the page for; the next tick retries.
     }
-  }, []);
+  }, [target]);
 
   useEffect(() => {
     void fetchStatus();
@@ -149,7 +193,10 @@ export function CaddyBuildFields({
     setRebuilding(true);
     setRebuildError(null);
     try {
-      const res = await fetch("/api/caddy-build", { method: "POST" });
+      const res = await fetch(
+        target === FLEET ? "/api/caddy-build" : `/api/caddy-build?agent=${target}`,
+        { method: "POST" },
+      );
       if (!res.ok) {
         // Not left to the status poll: these failures abort before the agent writes any status,
         // and the poll only runs while it says pending/building — the spinner would just stop.
@@ -179,6 +226,39 @@ export function CaddyBuildFields({
 
   return (
     <VStack gap={5}>
+      <input type="hidden" name="agentRowId" value={String(target)} />
+      {target !== FLEET && follows && <input type="hidden" name="followFleetDefault" value="1" />}
+
+      {agents.length > 0 && (
+        <Card padding={4}>
+          <VStack gap={3}>
+            <Selector
+              label={t("buildTarget")}
+              description={t("buildTargetHelp")}
+              options={[
+                { value: String(FLEET), label: t("fleetDefault") },
+                ...agents.map((agent) => ({
+                  value: String(agent.id),
+                  label: agent.name,
+                })),
+              ]}
+              value={String(target)}
+              onChange={(next) => selectTarget(Number(next))}
+            />
+            {target !== FLEET && (
+              <Switch
+                label={t("followFleetDefault")}
+                description={t("followFleetDefaultHelp")}
+                labelPosition="start"
+                labelSpacing="spread"
+                value={follows}
+                onChange={setFollows}
+              />
+            )}
+          </VStack>
+        </Card>
+      )}
+
       {rebuildError && (
         <Banner status="error" title={t("rebuildFailedToStart")} description={rebuildError} />
       )}

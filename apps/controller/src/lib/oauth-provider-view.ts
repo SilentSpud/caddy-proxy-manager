@@ -30,6 +30,7 @@ export function toOAuthProviderView(provider: OAuthProvider): OAuthProviderView 
     groupPrefix: provider.groupPrefix,
     roleMappingEnabled: provider.roleMappingEnabled,
     adminGroup: provider.adminGroup,
+    operatorGroup: provider.operatorGroup,
     userGroup: provider.userGroup,
     viewerGroup: provider.viewerGroup,
     defaultRole: provider.defaultRole,

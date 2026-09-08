@@ -12,16 +12,44 @@ import type { ProxyHost, LoadBalancingPolicy } from "@/lib/models/proxy-hosts";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { useTranslations } from "next-intl";
 
-const LOAD_BALANCING_POLICIES = [
-  { value: "random", label: "Random", description: "Random selection (default)" },
-  { value: "round_robin", label: "Round Robin", description: "Sequential distribution" },
-  { value: "least_conn", label: "Least Connections", description: "Fewest active connections" },
-  { value: "ip_hash", label: "IP Hash", description: "Client IP-based sticky sessions" },
-  { value: "first", label: "First Available", description: "First available upstream" },
-  { value: "header", label: "Header Hash", description: "Hash based on request header" },
-  { value: "cookie", label: "Cookie", description: "Cookie-based sticky sessions" },
-  { value: "uri_hash", label: "URI Hash", description: "URI path-based distribution" },
-];
+/**
+ * Every policy `http.reverse_proxy.selection_policies.*` registers in the shipped Caddy build.
+ *
+ * A function rather than a module constant because the labels come from the message catalog, and
+ * `useTranslations` is only available inside the component.
+ */
+function loadBalancingPolicies(t: ReturnType<typeof useTranslations<"proxyHosts">>) {
+  return [
+    { value: "random", label: t("lbPolicyRandom"), description: t("lbPolicyRandomHelp") },
+    {
+      value: "random_choose",
+      label: t("lbPolicyRandomChoose"),
+      description: t("lbPolicyRandomChooseHelp"),
+    },
+    {
+      value: "round_robin",
+      label: t("lbPolicyRoundRobin"),
+      description: t("lbPolicyRoundRobinHelp"),
+    },
+    {
+      value: "weighted_round_robin",
+      label: t("lbPolicyWeightedRoundRobin"),
+      description: t("lbPolicyWeightedRoundRobinHelp"),
+    },
+    { value: "least_conn", label: t("lbPolicyLeastConn"), description: t("lbPolicyLeastConnHelp") },
+    { value: "ip_hash", label: t("lbPolicyIpHash"), description: t("lbPolicyIpHashHelp") },
+    {
+      value: "client_ip_hash",
+      label: t("lbPolicyClientIpHash"),
+      description: t("lbPolicyClientIpHashHelp"),
+    },
+    { value: "first", label: t("lbPolicyFirst"), description: t("lbPolicyFirstHelp") },
+    { value: "header", label: t("lbPolicyHeader"), description: t("lbPolicyHeaderHelp") },
+    { value: "cookie", label: t("lbPolicyCookie"), description: t("lbPolicyCookieHelp") },
+    { value: "uri_hash", label: t("lbPolicyUriHash"), description: t("lbPolicyUriHashHelp") },
+    { value: "query", label: t("lbPolicyQuery"), description: t("lbPolicyQueryHelp") },
+  ];
+}
 
 /**
  * One state object because Astryx inputs are controlled where these were `defaultValue` fields.
@@ -31,12 +59,16 @@ type TextFields = {
   policyHeaderField: string;
   policyCookieName: string;
   policyCookieSecret: string;
+  policyQueryKey: string;
+  policyWeights: string;
   tryDuration: string;
   tryInterval: string;
   activeHealthUri: string;
   activeHealthInterval: string;
   activeHealthTimeout: string;
   activeHealthBody: string;
+  activeHealthMethod: string;
+  activeHealthRequestBody: string;
   passiveHealthFailDuration: string;
   passiveHealthUnhealthyStatus: string;
   passiveHealthUnhealthyLatency: string;
@@ -44,9 +76,13 @@ type TextFields = {
 
 type NumberFields = {
   retries: number | null;
+  policyChoose: number | null;
   activeHealthPort: number | null;
   activeHealthStatus: number | null;
+  activeHealthPasses: number | null;
+  activeHealthFails: number | null;
   passiveHealthMaxFails: number | null;
+  passiveHealthUnhealthyRequestCount: number | null;
 };
 
 export function LoadBalancerFields({
@@ -69,12 +105,16 @@ export function LoadBalancerFields({
     policyHeaderField: initial?.policyHeaderField ?? "",
     policyCookieName: initial?.policyCookieName ?? "",
     policyCookieSecret: initial?.policyCookieSecret ?? "",
+    policyQueryKey: initial?.policyQueryKey ?? "",
+    policyWeights: initial?.policyWeights?.join(", ") ?? "",
     tryDuration: initial?.tryDuration ?? "",
     tryInterval: initial?.tryInterval ?? "",
     activeHealthUri: initial?.activeHealthCheck?.uri ?? "",
     activeHealthInterval: initial?.activeHealthCheck?.interval ?? "",
     activeHealthTimeout: initial?.activeHealthCheck?.timeout ?? "",
     activeHealthBody: initial?.activeHealthCheck?.body ?? "",
+    activeHealthMethod: initial?.activeHealthCheck?.method ?? "",
+    activeHealthRequestBody: initial?.activeHealthCheck?.requestBody ?? "",
     passiveHealthFailDuration: initial?.passiveHealthCheck?.failDuration ?? "",
     passiveHealthUnhealthyStatus: initial?.passiveHealthCheck?.unhealthyStatus?.join(", ") ?? "",
     passiveHealthUnhealthyLatency: initial?.passiveHealthCheck?.unhealthyLatency ?? "",
@@ -82,9 +122,13 @@ export function LoadBalancerFields({
 
   const [numbers, setNumbers] = useState<NumberFields>({
     retries: initial?.retries ?? null,
+    policyChoose: initial?.policyChoose ?? null,
     activeHealthPort: initial?.activeHealthCheck?.port ?? null,
     activeHealthStatus: initial?.activeHealthCheck?.status ?? null,
+    activeHealthPasses: initial?.activeHealthCheck?.passes ?? null,
+    activeHealthFails: initial?.activeHealthCheck?.fails ?? null,
     passiveHealthMaxFails: initial?.passiveHealthCheck?.maxFails ?? null,
+    passiveHealthUnhealthyRequestCount: initial?.passiveHealthCheck?.unhealthyRequestCount ?? null,
   });
 
   const setTextField = (key: keyof TextFields) => (value: string) =>
@@ -121,10 +165,45 @@ export function LoadBalancerFields({
             <input type="hidden" name="lbPolicy" value={policy} />
             <Selector
               label={t("selectionPolicy")}
-              options={LOAD_BALANCING_POLICIES}
+              options={loadBalancingPolicies(t)}
               value={policy}
               onChange={(next) => setPolicy(next as LoadBalancingPolicy)}
             />
+
+            {policy === "random_choose" && (
+              <NumberInput
+                label={t("lbChoose")}
+                htmlName="lbPolicyChoose"
+                min={2}
+                max={16}
+                isIntegerOnly
+                value={numbers.policyChoose}
+                onChange={setNumberField("policyChoose")}
+                description={t("lbChooseHelp")}
+              />
+            )}
+
+            {policy === "weighted_round_robin" && (
+              <TextInput
+                label={t("lbWeights")}
+                htmlName="lbPolicyWeights"
+                placeholder="3, 2, 1"
+                value={text.policyWeights}
+                onChange={setTextField("policyWeights")}
+                description={t("lbWeightsHelp")}
+              />
+            )}
+
+            {policy === "query" && (
+              <TextInput
+                label={t("lbQueryKey")}
+                htmlName="lbPolicyQueryKey"
+                placeholder="session"
+                value={text.policyQueryKey}
+                onChange={setTextField("policyQueryKey")}
+                description={t("lbQueryKeyHelp")}
+              />
+            )}
 
             {policy === "header" && (
               <TextInput
@@ -256,6 +335,41 @@ export function LoadBalancerFields({
                       onChange={setTextField("activeHealthBody")}
                       description={t("expectedResponseBody")}
                     />
+                    <NumberInput
+                      label={t("lbHealthPasses")}
+                      htmlName="lbActiveHealthPasses"
+                      min={1}
+                      max={100}
+                      isIntegerOnly
+                      value={numbers.activeHealthPasses}
+                      onChange={setNumberField("activeHealthPasses")}
+                      description={t("lbHealthPassesHelp")}
+                    />
+                    <NumberInput
+                      label={t("lbHealthFails")}
+                      htmlName="lbActiveHealthFails"
+                      min={1}
+                      max={100}
+                      isIntegerOnly
+                      value={numbers.activeHealthFails}
+                      onChange={setNumberField("activeHealthFails")}
+                      description={t("lbHealthFailsHelp")}
+                    />
+                    <TextInput
+                      label={t("lbHealthMethod")}
+                      htmlName="lbActiveHealthMethod"
+                      placeholder="GET"
+                      value={text.activeHealthMethod}
+                      onChange={setTextField("activeHealthMethod")}
+                      description={t("lbHealthMethodHelp")}
+                    />
+                    <TextInput
+                      label={t("lbHealthRequestBody")}
+                      htmlName="lbActiveHealthRequestBody"
+                      value={text.activeHealthRequestBody}
+                      onChange={setTextField("activeHealthRequestBody")}
+                      description={t("lbHealthRequestBodyHelp")}
+                    />
                   </Grid>
                 )}
               </VStack>
@@ -305,6 +419,15 @@ export function LoadBalancerFields({
                       value={text.passiveHealthUnhealthyLatency}
                       onChange={setTextField("passiveHealthUnhealthyLatency")}
                       description={t("unhealthyLatencyHelp")}
+                    />
+                    <NumberInput
+                      label={t("lbUnhealthyRequestCount")}
+                      htmlName="lbPassiveHealthUnhealthyRequestCount"
+                      min={1}
+                      isIntegerOnly
+                      value={numbers.passiveHealthUnhealthyRequestCount}
+                      onChange={setNumberField("passiveHealthUnhealthyRequestCount")}
+                      description={t("lbUnhealthyRequestCountHelp")}
                     />
                   </Grid>
                 )}

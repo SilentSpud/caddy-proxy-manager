@@ -3,7 +3,7 @@ import { applyCaddyConfig } from "../caddy";
 import { validateCaddyfileSnippet } from "../caddy-caddyfile";
 import { logAuditEvent } from "../audit";
 import { proxyHosts } from "../db/schema";
-import { asc, desc, eq, count, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
@@ -15,6 +15,7 @@ import {
 } from "../caddy-waf";
 import { normalizeNodeName, validateNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
+import { setHostAgents } from "./host-agents";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -159,13 +160,17 @@ export type WafHostConfig = {
 // Load Balancer Types
 export type LoadBalancingPolicy =
   | "random"
+  | "random_choose"
   | "round_robin"
+  | "weighted_round_robin"
   | "least_conn"
   | "ip_hash"
+  | "client_ip_hash"
   | "first"
   | "header"
   | "cookie"
-  | "uri_hash";
+  | "uri_hash"
+  | "query";
 
 export type LoadBalancerActiveHealthCheck = {
   enabled: boolean;
@@ -173,8 +178,21 @@ export type LoadBalancerActiveHealthCheck = {
   port: number | null;
   interval: string | null;
   timeout: string | null;
+  /** Expected response status. Caddy calls this `expect_status`; `status` here predates the rest. */
   status: number | null;
+  /** Regexp the response body must match. Caddy's `expect_body`. */
   body: string | null;
+  /** Consecutive passes before an upstream is considered healthy again. */
+  passes: number | null;
+  /** Consecutive failures before an upstream is taken out. */
+  fails: number | null;
+  /** HTTP method for the probe. GET when unset. */
+  method: string | null;
+  /** Body to send *with* the probe, as opposed to `body`, which matches the response. */
+  requestBody: string | null;
+  followRedirects: boolean;
+  /** Extra probe headers, one value each — enough for a token or a routing hint. */
+  headers: Record<string, string> | null;
 };
 
 export type LoadBalancerPassiveHealthCheck = {
@@ -183,6 +201,8 @@ export type LoadBalancerPassiveHealthCheck = {
   maxFails: number | null;
   unhealthyStatus: number[] | null;
   unhealthyLatency: string | null;
+  /** Concurrent requests to one upstream before it counts as unhealthy. */
+  unhealthyRequestCount: number | null;
 };
 
 export type LoadBalancerConfig = {
@@ -191,6 +211,19 @@ export type LoadBalancerConfig = {
   policyHeaderField: string | null;
   policyCookieName: string | null;
   policyCookieSecret: string | null;
+  /** Query parameter to hash on, for the `query` policy. */
+  policyQueryKey: string | null;
+  /** How many upstreams `random_choose` picks between. */
+  policyChoose: number | null;
+  /**
+   * Weights for `weighted_round_robin`, positional against the upstream list.
+   *
+   * Kept here rather than beside each upstream because `upstreams` is a flat list of dial strings
+   * and always has been; a parallel array needs no migration and is the shape Caddy wants anyway.
+   * A list that has drifted out of step with the upstreams is dropped at build time rather than
+   * padded — a silently reweighted backend is worse than an unweighted one.
+   */
+  policyWeights: number[] | null;
   tryDuration: string | null;
   tryInterval: string | null;
   retries: number | null;
@@ -204,6 +237,9 @@ export type LoadBalancerInput = {
   policyHeaderField?: string | null;
   policyCookieName?: string | null;
   policyCookieSecret?: string | null;
+  policyQueryKey?: string | null;
+  policyChoose?: number | null;
+  policyWeights?: number[] | null;
   tryDuration?: string | null;
   tryInterval?: string | null;
   retries?: number | null;
@@ -215,6 +251,12 @@ export type LoadBalancerInput = {
     timeout?: string | null;
     status?: number | null;
     body?: string | null;
+    passes?: number | null;
+    fails?: number | null;
+    method?: string | null;
+    requestBody?: string | null;
+    followRedirects?: boolean;
+    headers?: Record<string, string> | null;
   } | null;
   passiveHealthCheck?: {
     enabled?: boolean;
@@ -222,6 +264,7 @@ export type LoadBalancerInput = {
     maxFails?: number | null;
     unhealthyStatus?: number[] | null;
     unhealthyLatency?: string | null;
+    unhealthyRequestCount?: number | null;
   } | null;
 };
 
@@ -233,6 +276,12 @@ type LoadBalancerActiveHealthCheckMeta = {
   timeout?: string;
   status?: number;
   body?: string;
+  passes?: number;
+  fails?: number;
+  method?: string;
+  request_body?: string;
+  follow_redirects?: boolean;
+  headers?: Record<string, string>;
 };
 
 type LoadBalancerPassiveHealthCheckMeta = {
@@ -241,6 +290,7 @@ type LoadBalancerPassiveHealthCheckMeta = {
   max_fails?: number;
   unhealthy_status?: number[];
   unhealthy_latency?: string;
+  unhealthy_request_count?: number;
 };
 
 type LoadBalancerMeta = {
@@ -249,6 +299,9 @@ type LoadBalancerMeta = {
   policy_header_field?: string;
   policy_cookie_name?: string;
   policy_cookie_secret?: string;
+  policy_query_key?: string;
+  policy_choose?: number;
+  policy_weights?: number[];
   try_duration?: string;
   try_interval?: string;
   retries?: number;
@@ -749,6 +802,11 @@ export type ProxyHostInput = {
   name: string;
   domains: string[];
   upstreams: string[];
+  /**
+   * The `agents.id` rows that serve this host. Empty — and, on update, undefined — means every
+   * agent, which is what a host had before it could be assigned at all.
+   */
+  agentIds?: number[];
   certificateId?: number | null;
   accessListId?: number | null;
   sslForced?: boolean;
@@ -863,14 +921,27 @@ function sanitizeAuthentikMeta(
 
 const VALID_LB_POLICIES: LoadBalancingPolicy[] = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
+  "client_ip_hash",
   "first",
   "header",
   "cookie",
   "uri_hash",
+  "query",
 ];
+
+/**
+ * Control characters, refused in a health-check header value.
+ *
+ * A newline in either half would forge a second header on every probe, which is a request
+ * Caddy makes on a timer against the operator's own backend.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: refusing them is the point.
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
 function sanitizeLoadBalancerMeta(
   meta: LoadBalancerMeta | undefined,
@@ -902,6 +973,32 @@ function sanitizeLoadBalancerMeta(
   const cookieSecret = normalizeMetaValue(meta.policy_cookie_secret ?? null);
   if (cookieSecret) {
     normalized.policy_cookie_secret = cookieSecret;
+  }
+
+  const queryKey = normalizeMetaValue(meta.policy_query_key ?? null);
+  if (queryKey) {
+    normalized.policy_query_key = queryKey;
+  }
+
+  // Bounded: `random_choose` picks between this many upstreams, so a value below two is not a
+  // choice and an absurd one only wastes work per request.
+  if (
+    typeof meta.policy_choose === "number" &&
+    Number.isInteger(meta.policy_choose) &&
+    meta.policy_choose >= 2 &&
+    meta.policy_choose <= 16
+  ) {
+    normalized.policy_choose = meta.policy_choose;
+  }
+
+  if (Array.isArray(meta.policy_weights)) {
+    const weights = meta.policy_weights.filter(
+      (w): w is number => typeof w === "number" && Number.isInteger(w) && w >= 0 && w <= 1000,
+    );
+    // All or nothing: a partly-valid list would silently reweight the upstreams that survived.
+    if (weights.length > 0 && weights.length === meta.policy_weights.length) {
+      normalized.policy_weights = weights;
+    }
   }
 
   const tryDuration = normalizeMetaValue(meta.try_duration ?? null);
@@ -953,6 +1050,38 @@ function sanitizeLoadBalancerMeta(
     if (body) {
       ahc.body = body;
     }
+    for (const key of ["passes", "fails"] as const) {
+      const value = meta.active_health_check[key];
+      if (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 100) {
+        ahc[key] = value;
+      }
+    }
+    const method = normalizeMetaValue(meta.active_health_check.method ?? null);
+    // Allowlisted rather than pattern-matched: this becomes the method of a request Caddy makes on
+    // a timer, and anything outside these is a probe nobody meant to configure.
+    if (method && ["GET", "HEAD", "POST", "PUT", "OPTIONS"].includes(method.toUpperCase())) {
+      ahc.method = method.toUpperCase();
+    }
+    const requestBody = normalizeMetaValue(meta.active_health_check.request_body ?? null);
+    if (requestBody) {
+      ahc.request_body = requestBody;
+    }
+    if (meta.active_health_check.follow_redirects !== undefined) {
+      ahc.follow_redirects = Boolean(meta.active_health_check.follow_redirects);
+    }
+    if (meta.active_health_check.headers && typeof meta.active_health_check.headers === "object") {
+      const headers: Record<string, string> = {};
+      for (const [field, value] of Object.entries(meta.active_health_check.headers)) {
+        // A newline in either half would forge a second header on every probe.
+        if (!/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(field)) continue;
+        const cleaned = normalizeMetaValue(typeof value === "string" ? value : null);
+        if (!cleaned || CONTROL_CHARS.test(cleaned)) continue;
+        headers[field] = cleaned;
+      }
+      if (Object.keys(headers).length > 0) {
+        ahc.headers = headers;
+      }
+    }
     if (Object.keys(ahc).length > 0) {
       normalized.active_health_check = ahc;
     }
@@ -987,6 +1116,13 @@ function sanitizeLoadBalancerMeta(
     );
     if (unhealthyLatency) {
       phc.unhealthy_latency = unhealthyLatency;
+    }
+    if (
+      typeof meta.passive_health_check.unhealthy_request_count === "number" &&
+      Number.isInteger(meta.passive_health_check.unhealthy_request_count) &&
+      meta.passive_health_check.unhealthy_request_count > 0
+    ) {
+      phc.unhealthy_request_count = meta.passive_health_check.unhealthy_request_count;
     }
     if (Object.keys(phc).length > 0) {
       normalized.passive_health_check = phc;
@@ -1553,6 +1689,31 @@ function normalizeLoadBalancerInput(
     }
   }
 
+  if (input.policyQueryKey !== undefined) {
+    const val = normalizeMetaValue(input.policyQueryKey ?? null);
+    if (val) {
+      next.policy_query_key = val;
+    } else {
+      delete next.policy_query_key;
+    }
+  }
+
+  if (input.policyChoose !== undefined) {
+    if (typeof input.policyChoose === "number" && Number.isInteger(input.policyChoose)) {
+      next.policy_choose = input.policyChoose;
+    } else {
+      delete next.policy_choose;
+    }
+  }
+
+  if (input.policyWeights !== undefined) {
+    if (Array.isArray(input.policyWeights) && input.policyWeights.length > 0) {
+      next.policy_weights = input.policyWeights;
+    } else {
+      delete next.policy_weights;
+    }
+  }
+
   if (input.policyCookieName !== undefined) {
     const val = normalizeMetaValue(input.policyCookieName ?? null);
     if (val) {
@@ -1661,6 +1822,31 @@ function normalizeLoadBalancerInput(
         }
       }
 
+      for (const key of ["passes", "fails"] as const) {
+        const value = input.activeHealthCheck[key];
+        if (value !== undefined) {
+          if (typeof value === "number" && Number.isInteger(value)) ahc[key] = value;
+          else delete ahc[key];
+        }
+      }
+      if (input.activeHealthCheck.method !== undefined) {
+        const val = normalizeMetaValue(input.activeHealthCheck.method ?? null);
+        if (val) ahc.method = val;
+        else delete ahc.method;
+      }
+      if (input.activeHealthCheck.requestBody !== undefined) {
+        const val = normalizeMetaValue(input.activeHealthCheck.requestBody ?? null);
+        if (val) ahc.request_body = val;
+        else delete ahc.request_body;
+      }
+      if (input.activeHealthCheck.followRedirects !== undefined) {
+        ahc.follow_redirects = Boolean(input.activeHealthCheck.followRedirects);
+      }
+      if (input.activeHealthCheck.headers !== undefined) {
+        if (input.activeHealthCheck.headers) ahc.headers = input.activeHealthCheck.headers;
+        else delete ahc.headers;
+      }
+
       if (Object.keys(ahc).length > 0) {
         next.active_health_check = ahc;
       } else {
@@ -1717,6 +1903,15 @@ function normalizeLoadBalancerInput(
           phc.unhealthy_latency = val;
         } else {
           delete phc.unhealthy_latency;
+        }
+      }
+
+      if (input.passiveHealthCheck.unhealthyRequestCount !== undefined) {
+        const value = input.passiveHealthCheck.unhealthyRequestCount;
+        if (typeof value === "number" && Number.isInteger(value)) {
+          phc.unhealthy_request_count = value;
+        } else {
+          delete phc.unhealthy_request_count;
         }
       }
 
@@ -2096,6 +2291,11 @@ function dehydrateAuthentik(
   return meta;
 }
 
+/** A stored count, or null. The sanitizer already bounded these; this only re-reads them. */
+function positiveInt(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
 function hydrateLoadBalancer(meta: LoadBalancerMeta | undefined): LoadBalancerConfig | null {
   if (!meta) {
     return null;
@@ -2137,6 +2337,15 @@ function hydrateLoadBalancer(meta: LoadBalancerMeta | undefined): LoadBalancerCo
           ? meta.active_health_check.status
           : null,
       body: normalizeMetaValue(meta.active_health_check.body ?? null),
+      passes: positiveInt(meta.active_health_check.passes),
+      fails: positiveInt(meta.active_health_check.fails),
+      method: normalizeMetaValue(meta.active_health_check.method ?? null),
+      requestBody: normalizeMetaValue(meta.active_health_check.request_body ?? null),
+      followRedirects: Boolean(meta.active_health_check.follow_redirects),
+      headers:
+        meta.active_health_check.headers && Object.keys(meta.active_health_check.headers).length > 0
+          ? meta.active_health_check.headers
+          : null,
     };
   }
 
@@ -2159,6 +2368,7 @@ function hydrateLoadBalancer(meta: LoadBalancerMeta | undefined): LoadBalancerCo
           : null,
       unhealthyStatus: unhealthyStatus && unhealthyStatus.length > 0 ? unhealthyStatus : null,
       unhealthyLatency: normalizeMetaValue(meta.passive_health_check.unhealthy_latency ?? null),
+      unhealthyRequestCount: positiveInt(meta.passive_health_check.unhealthy_request_count),
     };
   }
 
@@ -2168,6 +2378,12 @@ function hydrateLoadBalancer(meta: LoadBalancerMeta | undefined): LoadBalancerCo
     policyHeaderField,
     policyCookieName,
     policyCookieSecret,
+    policyQueryKey: normalizeMetaValue(meta.policy_query_key ?? null),
+    policyChoose: positiveInt(meta.policy_choose),
+    policyWeights:
+      Array.isArray(meta.policy_weights) && meta.policy_weights.length > 0
+        ? meta.policy_weights
+        : null,
     tryDuration,
     tryInterval,
     retries,
@@ -2400,15 +2616,39 @@ export async function listProxyHosts(): Promise<ProxyHost[]> {
   return hosts.map(parseProxyHost);
 }
 
-export async function countProxyHosts(search?: string): Promise<number> {
-  const where = search
-    ? or(
+/**
+ * The list filter shared by the paginated read and its count.
+ *
+ * `visibleIds` narrows the list to what the viewer may see — null means no restriction, which is
+ * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
+ * viewer may see nothing, and turning that into an unfiltered query would list the whole fleet.
+ */
+function proxyHostListFilter(search?: string, visibleIds?: number[] | null) {
+  const clauses = [];
+  if (search) {
+    clauses.push(
+      or(
         like(proxyHosts.name, `%${search}%`),
         like(proxyHosts.domains, `%${search}%`),
         like(proxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
-  const [row] = await db.select({ value: count() }).from(proxyHosts).where(where);
+      ),
+    );
+  }
+  if (visibleIds != null) {
+    clauses.push(visibleIds.length > 0 ? inArray(proxyHosts.id, visibleIds) : sql`false`);
+  }
+  if (clauses.length === 0) return undefined;
+  return clauses.length === 1 ? clauses[0] : and(...clauses);
+}
+
+export async function countProxyHosts(
+  search?: string,
+  visibleIds?: number[] | null,
+): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(proxyHosts)
+    .where(proxyHostListFilter(search, visibleIds));
   return row?.value ?? 0;
 }
 
@@ -2427,14 +2667,9 @@ export async function listProxyHostsPaginated(
   search?: string,
   sortBy?: string,
   sortDir?: "asc" | "desc",
+  visibleIds?: number[] | null,
 ): Promise<ProxyHost[]> {
-  const where = search
-    ? or(
-        like(proxyHosts.name, `%${search}%`),
-        like(proxyHosts.domains, `%${search}%`),
-        like(proxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
+  const where = proxyHostListFilter(search, visibleIds);
   const col = (sortBy && PROXY_HOST_SORT_COLUMNS[sortBy]) || proxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db
@@ -2497,6 +2732,11 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
 
   if (!record) {
     throw domainError("failedToCreateProxyHost");
+  }
+
+  // Before the apply, so the first document each agent is sent already reflects the placement.
+  if (input.agentIds !== undefined) {
+    await setHostAgents("http", record.id, input.agentIds);
   }
 
   await logAuditEvent({
@@ -2613,6 +2853,10 @@ export async function updateProxyHost(
       updatedAt: now,
     })
     .where(eq(proxyHosts.id, id));
+
+  if (input.agentIds !== undefined) {
+    await setHostAgents("http", id, input.agentIds);
+  }
 
   await logAuditEvent({
     userId: actorUserId,

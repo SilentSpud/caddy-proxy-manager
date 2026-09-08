@@ -24,6 +24,7 @@ import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
+import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
 
 /**
@@ -42,49 +43,76 @@ function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
   }, [state.status, onClose]);
 }
 
+/** The namespace's translator, so the option builders below can be hoisted out of the form. */
+type Translator = ReturnType<typeof useTranslations<"l4ProxyHosts">>;
+
 const PROTOCOL_OPTIONS = [
   { value: "tcp", label: "TCP" },
   { value: "udp", label: "UDP" },
 ];
 
-const MATCHER_OPTIONS = [
-  { value: "none", label: "None (catch-all)" },
-  { value: "tls_sni", label: "TLS SNI" },
-  { value: "http_host", label: "HTTP Host" },
-  { value: "proxy_protocol", label: "Proxy Protocol" },
-];
+function matcherOptions(t: Translator) {
+  return [
+    { value: "none", label: t("optMatcherNone") },
+    { value: "tls_sni", label: t("optMatcherTlsSni") },
+    { value: "http_host", label: t("optMatcherHttpHost") },
+    { value: "proxy_protocol", label: t("optMatcherProxyProtocol") },
+  ];
+}
 
-const PROXY_PROTOCOL_OPTIONS = [
-  { value: "__none__", label: "None" },
-  { value: "v1", label: "v1" },
-  { value: "v2", label: "v2" },
-];
+function proxyProtocolOptions(t: Translator) {
+  return [
+    { value: "__none__", label: t("optProxyProtocolNone") },
+    // Version identifiers, not prose — nothing to translate.
+    { value: "v1", label: "v1" },
+    { value: "v2", label: "v2" },
+  ];
+}
 
-const LB_POLICY_OPTIONS = [
-  { value: "random", label: "Random" },
-  { value: "round_robin", label: "Round Robin" },
-  { value: "least_conn", label: "Least Connections" },
-  { value: "ip_hash", label: "IP Hash" },
-  { value: "first", label: "First Available" },
-];
+/**
+ * What `layer4.proxy.selection_policies.*` registers — a strict subset of the HTTP list.
+ *
+ * No header, cookie, uri_hash, query or client_ip_hash: each needs a request to read, and layer 4
+ * has a connection. Checked against the shipped binary, not assumed from the HTTP side.
+ *
+ * A function because the labels come from the message catalog, which is only reachable from
+ * inside the component.
+ */
+function lbPolicyOptions(t: ReturnType<typeof useTranslations<"l4ProxyHosts">>) {
+  return [
+    { value: "random", label: t("lbPolicyRandom") },
+    { value: "random_choose", label: t("lbPolicyRandomChoose") },
+    { value: "round_robin", label: t("lbPolicyRoundRobin") },
+    { value: "weighted_round_robin", label: t("lbPolicyWeightedRoundRobin") },
+    { value: "least_conn", label: t("lbPolicyLeastConn") },
+    { value: "ip_hash", label: t("lbPolicyIpHash") },
+    { value: "first", label: t("lbPolicyFirst") },
+  ];
+}
 
-const GEOBLOCK_MODE_OPTIONS = [
-  { value: "merge", label: "Merge with global settings" },
-  { value: "override", label: "Override global settings" },
-];
+function geoblockModeOptions(t: Translator) {
+  return [
+    { value: "merge", label: t("optGeoblockMerge") },
+    { value: "override", label: t("optGeoblockOverride") },
+  ];
+}
 
-const UPSTREAM_DNS_MODE_OPTIONS = [
-  { value: "inherit", label: "Inherit from global settings" },
-  { value: "enabled", label: "Enabled" },
-  { value: "disabled", label: "Disabled" },
-];
+function upstreamDnsModeOptions(t: Translator) {
+  return [
+    { value: "inherit", label: t("optDnsInherit") },
+    { value: "enabled", label: t("optDnsEnabled") },
+    { value: "disabled", label: t("optDnsDisabled") },
+  ];
+}
 
-const UPSTREAM_DNS_FAMILY_OPTIONS = [
-  { value: "inherit", label: "Inherit from global settings" },
-  { value: "both", label: "Both (IPv6 + IPv4)" },
-  { value: "ipv6", label: "IPv6 only" },
-  { value: "ipv4", label: "IPv4 only" },
-];
+function upstreamDnsFamilyOptions(t: Translator) {
+  return [
+    { value: "inherit", label: t("optDnsFamilyInherit") },
+    { value: "both", label: t("optDnsFamilyBoth") },
+    { value: "ipv6", label: t("optDnsFamilyIpv6") },
+    { value: "ipv4", label: t("optDnsFamilyIpv4") },
+  ];
+}
 
 /** Collapsible section with an icon in its trigger, replacing the accordions. */
 function Section({
@@ -123,15 +151,13 @@ type TextFields = {
   listenAddress: string;
   upstreams: string;
   matcherValue: string;
-  lbTryDuration: string;
-  lbTryInterval: string;
-  lbRetries: string;
+  lbPolicyChoose: string;
+  lbPolicyWeights: string;
   lbActiveHealthPort: string;
   lbActiveHealthInterval: string;
   lbActiveHealthTimeout: string;
   lbPassiveHealthFailDuration: string;
   lbPassiveHealthMaxFails: string;
-  lbPassiveHealthUnhealthyLatency: string;
   dnsResolvers: string;
   dnsFallbacks: string;
   dnsTimeout: string;
@@ -155,9 +181,8 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     listenAddress: initialData?.listenAddress ?? "",
     upstreams: initialData?.upstreams.join("\n") ?? "",
     matcherValue: initialData?.matcherValue?.join(", ") ?? "",
-    lbTryDuration: lb?.tryDuration ?? "",
-    lbTryInterval: lb?.tryInterval ?? "",
-    lbRetries: lb?.retries != null ? String(lb.retries) : "",
+    lbPolicyChoose: lb?.policyChoose != null ? String(lb.policyChoose) : "",
+    lbPolicyWeights: lb?.policyWeights?.join(", ") ?? "",
     lbActiveHealthPort:
       lb?.activeHealthCheck?.port != null ? String(lb.activeHealthCheck.port) : "",
     lbActiveHealthInterval: lb?.activeHealthCheck?.interval ?? "",
@@ -165,7 +190,6 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     lbPassiveHealthFailDuration: lb?.passiveHealthCheck?.failDuration ?? "",
     lbPassiveHealthMaxFails:
       lb?.passiveHealthCheck?.maxFails != null ? String(lb.passiveHealthCheck.maxFails) : "",
-    lbPassiveHealthUnhealthyLatency: lb?.passiveHealthCheck?.unhealthyLatency ?? "",
     dnsResolvers: initialData?.dnsResolver?.resolvers?.join("\n") ?? "",
     dnsFallbacks: initialData?.dnsResolver?.fallbacks?.join("\n") ?? "",
     dnsTimeout: initialData?.dnsResolver?.timeout ?? "",
@@ -187,11 +211,15 @@ function L4HostForm({
   formAction,
   state,
   initialData,
+  agents = [],
+  assignedAgentIds = [],
 }: {
   formId: string;
   formAction: (formData: FormData) => void;
   state: { status: string; message?: string };
   initialData?: L4ProxyHost | null;
+  agents?: AgentOption[];
+  assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [enabled, setEnabled] = useState(initialData?.enabled ?? true);
@@ -298,6 +326,8 @@ function L4HostForm({
           description={t("listenAddressHelp")}
         />
 
+        <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
+
         <TextArea
           {...NATIVE_REQUIRED}
           label={t("upstreams")}
@@ -313,7 +343,7 @@ function L4HostForm({
         <Selector
           label={t("matcher")}
           htmlName="matcherType"
-          options={MATCHER_OPTIONS}
+          options={matcherOptions(t)}
           value={matcherType}
           onChange={(v) => setMatcherType(v as "none" | "tls_sni" | "http_host" | "proxy_protocol")}
           description={t("matcherHelp")}
@@ -351,7 +381,7 @@ function L4HostForm({
         <Selector
           label={t("upstreamProxyProtocolLabel")}
           htmlName="proxyProtocolVersion"
-          options={PROXY_PROTOCOL_OPTIONS}
+          options={proxyProtocolOptions(t)}
           value={proxyProtocolVersion}
           onChange={setProxyProtocolVersion}
         />
@@ -372,33 +402,30 @@ function L4HostForm({
           <Selector
             label={t("policy")}
             htmlName="lbPolicy"
-            options={LB_POLICY_OPTIONS}
+            options={lbPolicyOptions(t)}
             value={lbPolicy}
             onChange={setLbPolicy}
           />
-          <TextInput
-            label={t("tryDuration")}
-            isOptional
-            htmlName="lbTryDuration"
-            placeholder="5s"
-            value={text.lbTryDuration}
-            onChange={set("lbTryDuration")}
-          />
-          <TextInput
-            label={t("tryInterval")}
-            isOptional
-            htmlName="lbTryInterval"
-            placeholder="250ms"
-            value={text.lbTryInterval}
-            onChange={set("lbTryInterval")}
-          />
-          <TextInput
-            label={t("retries")}
-            isOptional
-            htmlName="lbRetries"
-            value={text.lbRetries}
-            onChange={set("lbRetries")}
-          />
+          {lbPolicy === "random_choose" && (
+            <TextInput
+              label={t("lbChoose")}
+              isOptional
+              htmlName="lbPolicyChoose"
+              placeholder="2"
+              value={text.lbPolicyChoose}
+              onChange={set("lbPolicyChoose")}
+            />
+          )}
+          {lbPolicy === "weighted_round_robin" && (
+            <TextInput
+              label={t("lbWeights")}
+              isOptional
+              htmlName="lbPolicyWeights"
+              placeholder="3, 2, 1"
+              value={text.lbPolicyWeights}
+              onChange={set("lbPolicyWeights")}
+            />
+          )}
 
           <Text type="label" size="xsm" weight="semibold" color="secondary">
             {t("activeHealthCheck")}
@@ -458,14 +485,6 @@ function L4HostForm({
             htmlName="lbPassiveHealthMaxFails"
             value={text.lbPassiveHealthMaxFails}
             onChange={set("lbPassiveHealthMaxFails")}
-          />
-          <TextInput
-            label={t("unhealthyLatency")}
-            isOptional
-            htmlName="lbPassiveHealthUnhealthyLatency"
-            placeholder="5s"
-            value={text.lbPassiveHealthUnhealthyLatency}
-            onChange={set("lbPassiveHealthUnhealthyLatency")}
           />
         </Section>
 
@@ -527,7 +546,7 @@ function L4HostForm({
           <Selector
             label={t("mode")}
             htmlName="geoblockMode"
-            options={GEOBLOCK_MODE_OPTIONS}
+            options={geoblockModeOptions(t)}
             value={geoblockMode}
             onChange={setGeoblockMode}
           />
@@ -641,14 +660,14 @@ function L4HostForm({
           <Selector
             label={t("resolutionMode")}
             htmlName="upstreamDnsResolutionMode"
-            options={UPSTREAM_DNS_MODE_OPTIONS}
+            options={upstreamDnsModeOptions(t)}
             value={upstreamDnsMode}
             onChange={setUpstreamDnsMode}
           />
           <Selector
             label={t("addressFamilyPreference")}
             htmlName="upstreamDnsResolutionFamily"
-            options={UPSTREAM_DNS_FAMILY_OPTIONS}
+            options={upstreamDnsFamilyOptions(t)}
             value={upstreamDnsFamily}
             onChange={setUpstreamDnsFamily}
           />
@@ -662,10 +681,12 @@ export function CreateL4HostDialog({
   open,
   onClose,
   initialData,
+  agents = [],
 }: {
   open: boolean;
   onClose: () => void;
   initialData?: L4ProxyHost | null;
+  agents?: AgentOption[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(createL4ProxyHostAction, INITIAL_ACTION_STATE);
@@ -688,6 +709,7 @@ export function CreateL4HostDialog({
         formAction={formAction}
         state={state}
         initialData={initialData ? { ...initialData, name: `${initialData.name} (Copy)` } : null}
+        agents={agents}
       />
     </AppDialog>
   );
@@ -697,10 +719,14 @@ export function EditL4HostDialog({
   open,
   host,
   onClose,
+  agents = [],
+  assignedAgentIds = [],
 }: {
   open: boolean;
   host: L4ProxyHost;
   onClose: () => void;
+  agents?: AgentOption[];
+  assignedAgentIds?: number[];
 }) {
   const t = useTranslations("l4ProxyHosts");
   const [state, formAction] = useActionState(
@@ -726,6 +752,8 @@ export function EditL4HostDialog({
         formAction={formAction}
         state={state}
         initialData={host}
+        agents={agents}
+        assignedAgentIds={assignedAgentIds}
       />
     </AppDialog>
   );

@@ -66,8 +66,10 @@ import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { saveAnalyticsSettings, saveGeoipSettings } from "@/src/lib/settings/optional-features";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
-import { PairingError, pairWithAgent } from "@/src/lib/agent/pairing";
-import { deleteAgent } from "@/src/lib/models/agents";
+import { ensurePairingCode, revokePairingCode } from "@/src/lib/agent/pairing-codes";
+import { deleteAgent, setAgentBuildSettings } from "@/src/lib/models/agents";
+import { pushDesiredState } from "@/src/lib/agent/desired-state";
+import type { AppRole } from "@/src/lib/oidc-groups";
 
 type ActionResult = {
   success: boolean;
@@ -1238,9 +1240,10 @@ export async function createOAuthProviderAction(data: {
   groupPrefix?: string | null;
   roleMappingEnabled?: boolean;
   adminGroup?: string | null;
+  operatorGroup?: string | null;
   userGroup?: string | null;
   viewerGroup?: string | null;
-  defaultRole?: "admin" | "user" | "viewer";
+  defaultRole?: AppRole;
   syncGroups?: boolean;
 }) {
   const session = await requireAdmin();
@@ -1279,9 +1282,10 @@ export async function updateOAuthProviderAction(
     groupPrefix: string | null;
     roleMappingEnabled: boolean;
     adminGroup: string | null;
+    operatorGroup: string | null;
     userGroup: string | null;
     viewerGroup: string | null;
-    defaultRole: "admin" | "user" | "viewer";
+    defaultRole: AppRole;
     syncGroups: boolean;
   }>,
 ) {
@@ -1452,6 +1456,11 @@ async function updateWafSettingsActionUnlocked(
  * Save the module selection. Does not rebuild — plugins are compiled in — but it changes what the
  * config builder will emit, so applyCaddyConfig runs here: a module switched off stops producing
  * handlers at once, rather than leaving config naming a plugin about to vanish.
+ *
+ * `agentRowId` picks what is being edited: absent or 0 is the fleet default, which every agent
+ * without a selection of its own follows. With `followFleetDefault` set the agent's own selection
+ * is cleared rather than overwritten, which is the only way back to tracking the fleet — saving a
+ * copy of today's default would leave it frozen there.
  */
 async function updateCaddyBuildSettingsActionUnlocked(
   _prevState: ActionResult | null,
@@ -1459,6 +1468,17 @@ async function updateCaddyBuildSettingsActionUnlocked(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
+
+    const agentRowIdRaw = Number.parseInt(String(formData.get("agentRowId") ?? "0"), 10);
+    const agentRowId =
+      Number.isInteger(agentRowIdRaw) && agentRowIdRaw > 0 ? agentRowIdRaw : undefined;
+
+    if (agentRowId !== undefined && formData.get("followFleetDefault") === "1") {
+      await setAgentBuildSettings(agentRowId, null);
+      await pushDesiredState();
+      revalidatePath("/settings");
+      return { success: true, message: "That agent now follows the fleet module selection." };
+    }
 
     const modules: Record<string, boolean> = {};
     for (const module of CADDY_MODULES) {
@@ -1472,14 +1492,20 @@ async function updateCaddyBuildSettingsActionUnlocked(
 
     // Refuse a selection that would strip a module something is actively using: the rebuild would
     // otherwise succeed and the feature would just stop, with settings still showing it enabled.
-    const conflict = await describeModuleConflicts(settings);
+    const conflict = await describeModuleConflicts(settings, agentRowId);
     if (conflict) {
       return { success: false, message: conflict };
     }
 
-    await saveCaddyBuildSettings(settings);
+    if (agentRowId === undefined) {
+      await saveCaddyBuildSettings(settings);
+    } else {
+      await setAgentBuildSettings(agentRowId, settings);
+    }
+    // The module set is part of desired state, so the agent learns what to build from this.
+    await pushDesiredState();
 
-    const diff = await getCaddyBuildDiff();
+    const diff = await getCaddyBuildDiff(agentRowId);
     const rebuildNote = diff.needsRebuild
       ? " Rebuild Caddy to apply the change to the running container."
       : "";
@@ -1613,39 +1639,32 @@ export const updateGeoipSettingsAction = serializedSettingsAction(
 // ─── Agents ──────────────────────────────────────────────────────────────────
 
 /**
- * Pair with an agent using the one-time code it printed to its logs.
+ * Mint (or re-read) the code an operator carries to a new agent.
  *
- * The secret the exchange produces never comes back through this result: a server action's return
- * value is serialized to the browser, so putting it here would publish the credential the whole
- * exchange exists to keep on the server.
+ * The controller issues it now, where the agent used to and the operator had to read the new host's
+ * container logs to find it. The code is all that comes back — the secret it is exchanged for is
+ * minted at `/api/agent/v1/pair` and never leaves the server, because a server action's return
+ * value is serialized to the browser.
  */
-export async function pairAgentAction(
-  _prevState: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    await requireAdmin();
-    const agent = await pairWithAgent({
-      address: String(formData.get("address") ?? ""),
-      code: String(formData.get("code") ?? ""),
-      name: formData.get("name") ? String(formData.get("name")) : undefined,
-    });
-    revalidatePath("/settings");
-    return { success: true, message: `Paired with ${agent.name} at ${agent.address}.` };
-  } catch (error) {
-    if (error instanceof PairingError) {
-      return { success: false, message: error.message };
-    }
-    console.error("Failed to pair with the agent:", error);
-    return { success: false, message: "Pairing failed." };
-  }
+export async function pairingCodeAction(): Promise<{ code: string; expiresAt: number }> {
+  await requireAdmin();
+  const { code, expiresAt } = ensurePairingCode();
+  return { code, expiresAt };
+}
+
+/** Throw the live code away, so the next read mints a fresh one. */
+export async function revokePairingCodeAction(): Promise<void> {
+  await requireAdmin();
+  revokePairingCode();
+  revalidatePath("/settings");
 }
 
 /**
  * Forget a paired agent.
  *
- * Only removes this controller's side. The agent keeps the secret until it is re-paired or
- * restarted, which is why the UI says so rather than implying the grant has been revoked.
+ * Removes this controller's side and, because the agent's next signed call is then refused, drops
+ * it back to idle on its own host — which stops its Caddy. Unpairing takes a host out of service,
+ * so the UI says so.
  */
 export async function unpairAgentAction(formData: FormData): Promise<void> {
   await requireAdmin();

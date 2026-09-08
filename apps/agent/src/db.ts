@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS parse_state (
 `;
 
 const AGENT_ID_KEY = "agent_id";
+const CONTROLLER_URL_KEY = "controller_url";
 const L4_STATUS_KEY = "l4_ports_status";
 const BUILD_STATUS_KEY = "caddy_build_status";
 const APPLIED_PORTS_KEY = "applied_l4_ports";
@@ -130,6 +131,33 @@ export class AgentStore {
       )
       .run(entry.controllerId, entry.controllerName, entry.secret, pairedAt);
     return { ...entry, pairedAt };
+  }
+
+  /**
+   * The controller origin this agent polls, once pairing has settled on one.
+   *
+   * In `state` rather than a column on `controllers`: the table predates this and adding a column
+   * would need a migration path for every agent database already on disk, for one row that is now
+   * always singular — an agent polls exactly one controller.
+   */
+  pairedControllerUrl(): string | null {
+    return this.readState(CONTROLLER_URL_KEY);
+  }
+
+  setPairedControllerUrl(url: string): void {
+    this.writeState(CONTROLLER_URL_KEY, url);
+  }
+
+  /**
+   * Forget every controller and the address they were reached at, returning the agent to idle.
+   *
+   * Used when a poll is refused as unauthenticated: the controller no longer recognises this
+   * agent, so the stored secret is dead and holding it only makes the next `--pair` fail on a
+   * conflict the operator cannot see.
+   */
+  clearPairing(): void {
+    this.db.query("DELETE FROM controllers").run();
+    this.db.query("DELETE FROM state WHERE key = ?").run(CONTROLLER_URL_KEY);
   }
 
   // ─── Operation state ───────────────────────────────────────────────────────

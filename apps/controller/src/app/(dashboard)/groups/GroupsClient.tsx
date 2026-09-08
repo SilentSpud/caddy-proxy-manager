@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Plus, Trash2, UserPlus, UserMinus } from "lucide-react";
+import { Users, Plus, Trash2, UserPlus, UserMinus, ShieldCheck } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Avatar } from "@astryxdesign/core/Avatar";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -25,7 +25,15 @@ import {
   deleteGroupAction,
   addGroupMemberAction,
   removeGroupMemberAction,
+  setGroupGrantsAction,
+  setGroupMappingsAction,
 } from "./actions";
+import {
+  GroupAccessDialog,
+  type GroupAccess,
+  type NamedResource,
+  type ProviderOption,
+} from "@/components/groups/GroupAccessDialog";
 
 type GroupMember = {
   userId: number;
@@ -54,18 +62,43 @@ type UserEntry = {
 type Props = {
   groups: Group[];
   users: UserEntry[];
+  providers?: ProviderOption[];
+  proxyHosts?: NamedResource[];
+  l4ProxyHosts?: NamedResource[];
+  agents?: NamedResource[];
+  /** Group id → what that group is mapped from and what it may manage. */
+  access?: Record<number, GroupAccess>;
 };
 
 function displayName(entry: { name: string | null; email: string }) {
   return entry.name ?? entry.email.split("@")[0];
 }
 
-export default function GroupsClient({ groups, users }: Props) {
+function emptyAccess(): GroupAccess {
+  return {
+    mappings: [],
+    proxyHostIds: [],
+    l4ProxyHostIds: [],
+    agentIds: [],
+    capability: "manage",
+  };
+}
+
+export default function GroupsClient({
+  groups,
+  users,
+  providers = [],
+  proxyHosts = [],
+  l4ProxyHosts = [],
+  agents = [],
+  access = {},
+}: Props) {
   const t = useTranslations("groups");
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [addMemberGroupId, setAddMemberGroupId] = useState<number | null>(null);
   const [deleteGroup, setDeleteGroup] = useState<Group | null>(null);
+  const [accessGroup, setAccessGroup] = useState<Group | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -184,6 +217,14 @@ export default function GroupsClient({ groups, users }: Props) {
                     <IconButton
                       variant="ghost"
                       size="sm"
+                      label={`${t("access")} — ${group.name}`}
+                      tooltip={t("access")}
+                      icon={<ShieldCheck />}
+                      onClick={() => setAccessGroup(group)}
+                    />
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
                       label={`Delete group ${group.name}`}
                       tooltip={t("deleteGroup")}
                       icon={<Trash2 />}
@@ -295,6 +336,42 @@ export default function GroupsClient({ groups, users }: Props) {
           router.refresh();
         }}
       />
+
+      {accessGroup && (
+        <GroupAccessDialog
+          open
+          groupName={accessGroup.name}
+          providers={providers}
+          proxyHosts={proxyHosts}
+          l4ProxyHosts={l4ProxyHosts}
+          agents={agents}
+          initial={access[accessGroup.id] ?? emptyAccess()}
+          onClose={() => setAccessGroup(null)}
+          onSave={async (next) => {
+            const groupId = accessGroup.id;
+            setAccessGroup(null);
+            // Two writes, because they are two tables. The mapping is the harmless one, so it goes
+            // first: if the grants write fails the group is renamed in the IdP's terms but has
+            // gained nothing, which is the safe half to land alone.
+            await setGroupMappingsAction(groupId, next.mappings);
+            await setGroupGrantsAction(groupId, [
+              ...next.proxyHostIds.map((id) => ({
+                resource: { kind: "proxyHost" as const, id },
+                capability: next.capability,
+              })),
+              ...next.l4ProxyHostIds.map((id) => ({
+                resource: { kind: "l4ProxyHost" as const, id },
+                capability: next.capability,
+              })),
+              ...next.agentIds.map((id) => ({
+                resource: { kind: "agent" as const, id },
+                capability: next.capability,
+              })),
+            ]);
+            router.refresh();
+          }}
+        />
+      )}
     </VStack>
   );
 }

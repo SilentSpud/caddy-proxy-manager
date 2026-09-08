@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { assertCanManage, requireAccess } from "@/src/lib/permissions";
 import {
   actionError,
   actionSuccess,
@@ -31,6 +32,7 @@ import {
   PATH_BLOCK_STATUS_CODES,
   sanitizeErrorPageRules,
 } from "@/src/lib/models/proxy-hosts";
+import { parseAgentIds } from "@/src/lib/models/host-agents";
 import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { setForwardAuthAccess } from "@/src/lib/models/forward-auth";
@@ -214,14 +216,36 @@ function parseRedirectUrl(raw: FormDataEntryValue | null): string {
 
 const VALID_LB_POLICIES: LoadBalancingPolicy[] = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
+  "client_ip_hash",
   "first",
   "header",
   "cookie",
   "uri_hash",
+  "query",
 ];
+
+/**
+ * Weights for `weighted_round_robin`, typed as a comma-separated list in upstream order.
+ *
+ * All or nothing: a list with one unparseable entry is rejected rather than partially applied,
+ * because a weight silently dropped to 0 takes a backend out of rotation with nothing on screen
+ * to say why.
+ */
+function parseWeightList(value: FormDataEntryValue | null): number[] | null {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+  const weights = parts.map((part) => Number.parseInt(part, 10));
+  return weights.every((w) => Number.isInteger(w) && w >= 0 && w <= 1000) ? weights : null;
+}
 const VALID_UPSTREAM_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
 function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefined {
@@ -245,6 +269,9 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
   const policyHeaderField = parseOptionalText(formData.get("lbPolicyHeaderField"));
   const policyCookieName = parseOptionalText(formData.get("lbPolicyCookieName"));
   const policyCookieSecret = parseOptionalText(formData.get("lbPolicyCookieSecret"));
+  const policyQueryKey = parseOptionalText(formData.get("lbPolicyQueryKey"));
+  const policyChoose = parseOptionalNumber(formData.get("lbPolicyChoose"));
+  const policyWeights = parseWeightList(formData.get("lbPolicyWeights"));
   const tryDuration = parseOptionalText(formData.get("lbTryDuration"));
   const tryInterval = parseOptionalText(formData.get("lbTryInterval"));
   const retries = parseOptionalNumber(formData.get("lbRetries"));
@@ -266,6 +293,13 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       timeout: parseOptionalText(formData.get("lbActiveHealthTimeout")),
       status: parseOptionalNumber(formData.get("lbActiveHealthStatus")),
       body: parseOptionalText(formData.get("lbActiveHealthBody")),
+      passes: parseOptionalNumber(formData.get("lbActiveHealthPasses")),
+      fails: parseOptionalNumber(formData.get("lbActiveHealthFails")),
+      method: parseOptionalText(formData.get("lbActiveHealthMethod")),
+      requestBody: parseOptionalText(formData.get("lbActiveHealthRequestBody")),
+      followRedirects: formData.has("lbActiveHealthFollowRedirectsPresent")
+        ? parseCheckbox(formData.get("lbActiveHealthFollowRedirects"))
+        : undefined,
     };
   }
 
@@ -297,6 +331,9 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
       maxFails: parseOptionalNumber(formData.get("lbPassiveHealthMaxFails")),
       unhealthyStatus,
       unhealthyLatency: parseOptionalText(formData.get("lbPassiveHealthUnhealthyLatency")),
+      unhealthyRequestCount: parseOptionalNumber(
+        formData.get("lbPassiveHealthUnhealthyRequestCount"),
+      ),
     };
   }
 
@@ -307,22 +344,38 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
   if (policy !== undefined) {
     result.policy = policy;
   }
-  if (policyHeaderField !== null) {
+  // Every one of these is gated on the field being *present*, never on its value.
+  //
+  // The model already draws the line this relies on: `undefined` leaves a meta key alone and
+  // `null` deletes it. Testing the value instead collapsed those two into one, so an emptied box
+  // was indistinguishable from a field the form never rendered — and no load-balancer field could
+  // be cleared once set. A policy's fields are only rendered while that policy is selected, so
+  // switching policy still leaves the old values untouched rather than wiping them.
+  if (formData.has("lbPolicyHeaderField")) {
     result.policyHeaderField = policyHeaderField;
   }
-  if (policyCookieName !== null) {
+  if (formData.has("lbPolicyCookieName")) {
     result.policyCookieName = policyCookieName;
   }
-  if (policyCookieSecret !== null) {
+  if (formData.has("lbPolicyCookieSecret")) {
     result.policyCookieSecret = policyCookieSecret;
   }
-  if (tryDuration !== null) {
+  if (formData.has("lbPolicyQueryKey")) {
+    result.policyQueryKey = policyQueryKey;
+  }
+  if (formData.has("lbPolicyChoose")) {
+    result.policyChoose = policyChoose;
+  }
+  if (formData.has("lbPolicyWeights")) {
+    result.policyWeights = policyWeights;
+  }
+  if (formData.has("lbTryDuration")) {
     result.tryDuration = tryDuration;
   }
-  if (tryInterval !== null) {
+  if (formData.has("lbTryInterval")) {
     result.tryInterval = tryInterval;
   }
-  if (retries !== null) {
+  if (formData.has("lbRetries")) {
     result.retries = retries;
   }
   if (activeHealthCheck !== undefined) {
@@ -692,6 +745,9 @@ export async function createProxyHostAction(
         name: String(formData.get("name") ?? "Untitled"),
         domains: parseCsv(formData.get("domains")),
         upstreams: parseUpstreams(formData.get("upstreams")),
+        // No checkboxes ticked is the empty list, which means every agent — the same thing the
+        // field being absent means, so a client that predates assignments keeps working.
+        agentIds: parseAgentIds(formData.getAll("agentId")),
         certificateId: certificateId,
         accessListId: parseAccessListId(formData.get("accessListId")),
         sslForced: formData.has("sslForcedPresent")
@@ -759,8 +815,11 @@ export async function updateProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
+    // An operator may edit a host their groups were granted; creating one stays with admins,
+    // because a grant names a host that already exists.
+    const access = await requireAccess();
+    assertCanManage(access, "proxyHost", id);
+    const userId = access.userId;
     const boolField = (key: string) =>
       formData.has(`${key}Present`) ? parseCheckbox(formData.get(key)) : undefined;
 
@@ -795,6 +854,12 @@ export async function updateProxyHostAction(
         domains: formData.get("domains") ? parseCsv(formData.get("domains")) : undefined,
         upstreams: formData.get("upstreams")
           ? parseUpstreams(formData.get("upstreams"))
+          : undefined,
+        // Gated on the marker, not on the values: an empty list is a real edit ("serve this
+        // everywhere"), and reading it as "field absent" would make clearing the selection
+        // impossible.
+        agentIds: formData.has("agentAssignmentPresent")
+          ? parseAgentIds(formData.getAll("agentId"))
           : undefined,
         certificateId: certificateId,
         accessListId: formData.has("accessListId")
@@ -871,9 +936,9 @@ export async function deleteProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await deleteProxyHost(id, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "proxyHost", id);
+    await deleteProxyHost(id, access.userId);
     revalidatePath("/proxy-hosts");
     return actionSuccess("Proxy host deleted.");
   } catch (error) {
@@ -885,9 +950,9 @@ export async function deleteProxyHostAction(
 
 export async function toggleProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await updateProxyHost(id, { enabled }, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "proxyHost", id);
+    await updateProxyHost(id, { enabled }, access.userId);
     revalidatePath("/proxy-hosts");
     return actionSuccess(`Proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {

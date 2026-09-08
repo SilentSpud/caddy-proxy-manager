@@ -1,4 +1,5 @@
 import db, { nowIso, toIso } from "../db";
+import type { AppRole } from "../oidc-groups";
 import { users, accounts } from "../db/schema";
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
@@ -8,7 +9,7 @@ export type User = {
   email: string;
   name: string | null;
   passwordHash: string | null;
-  role: "admin" | "user" | "viewer";
+  role: AppRole;
   provider: string | null;
   subject: string | null;
   avatarUrl: string | null;
@@ -25,7 +26,7 @@ function parseDbUser(user: DbUser): User {
     email: user.email,
     name: user.name,
     passwordHash: user.passwordHash,
-    role: user.role as "admin" | "user" | "viewer",
+    role: user.role as AppRole,
     provider: user.provider,
     subject: user.subject,
     avatarUrl: user.avatarUrl,

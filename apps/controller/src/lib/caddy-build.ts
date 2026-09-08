@@ -26,7 +26,13 @@ import {
 } from "./caddy-modules";
 import { type CaddyBuildSettings, getCaddyBuildSettings } from "./settings";
 
-import { getAllAgentStatuses, requestCaddyBuild, tryGetAgentStatus } from "./agent/client";
+import {
+  getAgentStatusFor,
+  getAllAgentStatuses,
+  requestCaddyBuild,
+  tryGetAgentStatus,
+} from "./agent/client";
+import { getAgentBuildSettings } from "./models/agents";
 
 export type { CaddyBuildState, CaddyBuildStatus };
 
@@ -91,7 +97,17 @@ export function defaultModuleSpecs(): string[] {
  * either — the apply fails on it and says so — and stripping every plugin-backed handler from the
  * hosts that *are* reachable would turn one unreachable agent into a fleet-wide outage.
  */
-export async function getAppliedModuleSpecs(): Promise<string[]> {
+export async function getAppliedModuleSpecs(agentRowId?: number): Promise<string[]> {
+  // Asked about one agent, the intersection is beside the point: that agent's document is built
+  // for it alone, so what its own binary carries is the whole answer. An agent that is not
+  // connected reads as the shipped image, the same assumption the fleet path makes for one that
+  // has never rebuilt.
+  if (agentRowId !== undefined) {
+    const status = await getAgentStatusFor(agentRowId);
+    const applied = status?.caddyBuild.applied;
+    return applied && applied.length > 0 ? [...applied].sort() : defaultModuleSpecs();
+  }
+
   const statuses = await getAllAgentStatuses();
   const reachable = statuses.filter((result) => result.ok);
   if (reachable.length === 0) return defaultModuleSpecs();
@@ -121,14 +137,30 @@ export function parseModuleSpecList(value: string): string[] {
     .sort();
 }
 
+/**
+ * The module selection that applies to an agent: its own if it has one, else the fleet default.
+ *
+ * Called with no agent for the fleet-wide answer, which is what the Settings page shows and what a
+ * deployment that has never configured an agent separately gets everywhere.
+ */
+export async function resolveBuildSettingsFor(
+  agentRowId?: number,
+): Promise<CaddyBuildSettings | null> {
+  if (agentRowId !== undefined) {
+    const own = await getAgentBuildSettings(agentRowId);
+    if (own) return own;
+  }
+  return getCaddyBuildSettings();
+}
+
 function hashSpecs(specs: string[]): string {
   return crypto.createHash("sha256").update(specs.join(" ")).digest("hex").slice(0, 16);
 }
 
-export async function getCaddyBuildDiff(): Promise<CaddyBuildDiff> {
+export async function getCaddyBuildDiff(agentRowId?: number): Promise<CaddyBuildDiff> {
   const [settings, appliedSpecs] = await Promise.all([
-    getCaddyBuildSettings(),
-    getAppliedModuleSpecs(),
+    resolveBuildSettingsFor(agentRowId),
+    getAppliedModuleSpecs(agentRowId),
   ]);
   const desiredSpecs = resolveModuleSpecs(settings);
   const appliedSet = new Set(appliedSpecs);
@@ -164,10 +196,12 @@ function featuresForPaths(paths: Set<string>): Set<CaddyFeatureId> {
   return features;
 }
 
-export async function getCaddyModuleAvailability(): Promise<CaddyModuleAvailability> {
+export async function getCaddyModuleAvailability(
+  agentRowId?: number,
+): Promise<CaddyModuleAvailability> {
   const [settings, appliedSpecs] = await Promise.all([
-    getCaddyBuildSettings(),
-    getAppliedModuleSpecs(),
+    resolveBuildSettingsFor(agentRowId),
+    getAppliedModuleSpecs(agentRowId),
   ]);
   const desiredIds = new Set(resolveEnabledModuleIds(settings));
   const desiredPaths = new Set(
@@ -242,8 +276,8 @@ ARG CADDY_MODULES="${specs.join(" ")}"
  * Send the selection to the agent to build with. Validated here as well as in the UI, since the
  * REST API reaches this too and a bad module path would otherwise fail opaquely inside the build.
  */
-export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
-  const settings = await getCaddyBuildSettings();
+export async function applyCaddyBuild(agentRowId?: number): Promise<CaddyBuildStatus> {
+  const settings = await resolveBuildSettingsFor(agentRowId);
 
   for (const entry of settings?.customModules ?? []) {
     if (!entry.enabled) continue;
@@ -260,9 +294,10 @@ export async function applyCaddyBuild(): Promise<CaddyBuildStatus> {
   return requestCaddyBuild(resolveModuleSpecs(settings));
 }
 
-/** The agent's last word on the rebuild. */
-export async function getCaddyBuildStatus(): Promise<CaddyBuildStatus> {
-  const status = await tryGetAgentStatus();
+/** The agent's last word on the rebuild — one named agent's, or the primary's. */
+export async function getCaddyBuildStatus(agentRowId?: number): Promise<CaddyBuildStatus> {
+  const status =
+    agentRowId === undefined ? await tryGetAgentStatus() : await getAgentStatusFor(agentRowId);
   return status?.caddyBuild.status ?? { state: "idle" };
 }
 

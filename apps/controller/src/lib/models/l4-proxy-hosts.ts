@@ -3,14 +3,29 @@ import { splitHostPort } from "../caddy-utils";
 import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
-import { asc, desc, eq, count, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
+import { setHostAgents } from "./host-agents";
 
 export type L4Protocol = "tcp" | "udp";
 export type L4MatcherType = "none" | "tls_sni" | "http_host" | "proxy_protocol";
 export type L4ProxyProtocolVersion = "v1" | "v2";
 
-export type L4LoadBalancingPolicy = "random" | "round_robin" | "least_conn" | "ip_hash" | "first";
+/**
+ * What `layer4.proxy.selection_policies.*` actually registers in the shipped image.
+ *
+ * Deliberately shorter than the HTTP list: header, cookie, uri_hash, query and client_ip_hash all
+ * need a request to read, and layer 4 has a connection. Confirmed against `caddy list-modules`
+ * rather than assumed — caddy-l4 has no client_ip_hash even though reverse_proxy does.
+ */
+export type L4LoadBalancingPolicy =
+  | "random"
+  | "random_choose"
+  | "round_robin"
+  | "weighted_round_robin"
+  | "least_conn"
+  | "ip_hash"
+  | "first";
 
 export type L4LoadBalancerActiveHealthCheck = {
   enabled: boolean;
@@ -29,6 +44,10 @@ export type L4LoadBalancerPassiveHealthCheck = {
 export type L4LoadBalancerConfig = {
   enabled: boolean;
   policy: L4LoadBalancingPolicy;
+  /** How many upstreams `random_choose` picks between. */
+  policyChoose: number | null;
+  /** Weights for `weighted_round_robin`, positional against the upstream list. */
+  policyWeights: number[] | null;
   tryDuration: string | null;
   tryInterval: string | null;
   retries: number | null;
@@ -65,6 +84,8 @@ type L4LoadBalancerPassiveHealthCheckMeta = {
 type L4LoadBalancerMeta = {
   enabled?: boolean;
   policy?: string;
+  policy_choose?: number;
+  policy_weights?: number[];
   try_duration?: string;
   try_interval?: string;
   retries?: number;
@@ -110,7 +131,9 @@ export type L4ProxyHostMeta = {
 
 const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
   "first",
@@ -148,6 +171,12 @@ export type L4ProxyHostInput = {
   protocol: L4Protocol;
   listenAddress: string;
   upstreams: string[];
+  /**
+   * The `agents.id` rows that serve this host. Empty — and, on update, undefined — means every
+   * agent. Note that the port still has to be published with the usual apply: assigning a host to
+   * an agent tells it what to serve, not to recreate its Caddy container on the spot.
+   */
+  agentIds?: number[];
   matcherType?: L4MatcherType;
   matcherValue?: string[];
   tlsTermination?: boolean;
@@ -179,6 +208,11 @@ function normalizeMetaValue(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+/** A positive whole count off the stored meta, or null. */
+function l4Count(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBalancerConfig | null {
@@ -230,6 +264,11 @@ function hydrateL4LoadBalancer(meta: L4LoadBalancerMeta | undefined): L4LoadBala
   return {
     enabled,
     policy,
+    policyChoose: l4Count(meta.policy_choose),
+    policyWeights:
+      Array.isArray(meta.policy_weights) && meta.policy_weights.length > 0
+        ? meta.policy_weights
+        : null,
     tryDuration,
     tryInterval,
     retries,
@@ -249,6 +288,12 @@ function dehydrateL4LoadBalancer(
 
   if (config.policy) {
     meta.policy = config.policy;
+  }
+  if (config.policyChoose !== undefined && config.policyChoose !== null) {
+    meta.policy_choose = config.policyChoose;
+  }
+  if (config.policyWeights && config.policyWeights.length > 0) {
+    meta.policy_weights = config.policyWeights;
   }
   if (config.tryDuration) {
     meta.try_duration = config.tryDuration;
@@ -471,15 +516,39 @@ export async function listL4ProxyHosts(): Promise<L4ProxyHost[]> {
   return hosts.map(parseL4ProxyHost);
 }
 
-export async function countL4ProxyHosts(search?: string): Promise<number> {
-  const where = search
-    ? or(
+/**
+ * The list filter shared by the paginated read and its count.
+ *
+ * `visibleIds` narrows the list to what the viewer may see — null means no restriction, which is
+ * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
+ * viewer may see nothing, and turning that into an unfiltered query would list every host.
+ */
+function l4ListFilter(search?: string, visibleIds?: number[] | null) {
+  const clauses = [];
+  if (search) {
+    clauses.push(
+      or(
         like(l4ProxyHosts.name, `%${search}%`),
         like(l4ProxyHosts.listenAddress, `%${search}%`),
         like(l4ProxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
-  const [row] = await db.select({ value: count() }).from(l4ProxyHosts).where(where);
+      ),
+    );
+  }
+  if (visibleIds != null) {
+    clauses.push(visibleIds.length > 0 ? inArray(l4ProxyHosts.id, visibleIds) : sql`false`);
+  }
+  if (clauses.length === 0) return undefined;
+  return clauses.length === 1 ? clauses[0] : and(...clauses);
+}
+
+export async function countL4ProxyHosts(
+  search?: string,
+  visibleIds?: number[] | null,
+): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(l4ProxyHosts)
+    .where(l4ListFilter(search, visibleIds));
   return row?.value ?? 0;
 }
 
@@ -487,12 +556,13 @@ export async function countL4ProxyHosts(search?: string): Promise<number> {
  * Enabled hosts only — used to refuse switching caddy-l4 off while something still listens.
  * Disabled hosts emit no config, so they do not block the change.
  */
-export async function countEnabledL4ProxyHosts(): Promise<number> {
-  const [row] = await db
-    .select({ value: count() })
+/** The enabled hosts' ids, for callers that then narrow them to one agent's assignments. */
+export async function listEnabledL4ProxyHostIds(): Promise<number[]> {
+  const rows = await db
+    .select({ id: l4ProxyHosts.id })
     .from(l4ProxyHosts)
     .where(eq(l4ProxyHosts.enabled, true));
-  return row?.value ?? 0;
+  return rows.map((row) => row.id);
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
@@ -511,14 +581,9 @@ export async function listL4ProxyHostsPaginated(
   search?: string,
   sortBy?: string,
   sortDir?: "asc" | "desc",
+  visibleIds?: number[] | null,
 ): Promise<L4ProxyHost[]> {
-  const where = search
-    ? or(
-        like(l4ProxyHosts.name, `%${search}%`),
-        like(l4ProxyHosts.listenAddress, `%${search}%`),
-        like(l4ProxyHosts.upstreams, `%${search}%`),
-      )
-    : undefined;
+  const where = l4ListFilter(search, visibleIds);
   const col = (sortBy && L4_SORT_COLUMNS[sortBy]) || l4ProxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db
@@ -571,6 +636,10 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
 
   if (!record) {
     throw domainError("l4ProxyHostCreationFailed");
+  }
+
+  if (input.agentIds !== undefined) {
+    await setHostAgents("l4", record.id, input.agentIds);
   }
 
   await logAuditEvent({
@@ -722,6 +791,10 @@ export async function updateL4ProxyHost(
       updatedAt: now,
     })
     .where(eq(l4ProxyHosts.id, id));
+
+  if (input.agentIds !== undefined) {
+    await setHostAgents("l4", id, input.agentIds);
+  }
 
   await logAuditEvent({
     userId: actorUserId,

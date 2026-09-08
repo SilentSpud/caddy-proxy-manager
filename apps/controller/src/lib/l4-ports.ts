@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import db from "./db";
 import { splitHostPort } from "./caddy-utils";
 import { l4ProxyHosts } from "./db/schema";
+import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { isAgentAvailable, requestL4Ports, tryGetAgentStatus } from "./agent/client";
 
 export type { L4PortsStatus };
@@ -24,15 +25,30 @@ export type L4PortsDiff = {
   needsApply: boolean;
 };
 
-/** The ports that must be published on the Caddy container for every enabled L4 proxy host. */
-export async function getRequiredL4Ports(): Promise<string[]> {
-  const hosts = await db
+/**
+ * The ports that must be published on the Caddy container for every enabled L4 proxy host.
+ *
+ * Scoped to one agent when `agentRowId` is given, so a host pinned to a different agent does not
+ * make this one publish a port it will never answer on — and, more to the point, does not make it
+ * recreate its Caddy container to open one.
+ */
+export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]> {
+  const allHosts = await db
     .select({
+      id: l4ProxyHosts.id,
       listenAddress: l4ProxyHosts.listenAddress,
       protocol: l4ProxyHosts.protocol,
     })
     .from(l4ProxyHosts)
     .where(eq(l4ProxyHosts.enabled, true));
+
+  const hosts =
+    agentRowId === undefined
+      ? allHosts
+      : await (async () => {
+          const assignments = await listHostAssignments("l4");
+          return allHosts.filter((host) => servedByAgent(assignments, host.id, agentRowId));
+        })();
 
   const portSet = new Set<string>();
   for (const host of hosts) {

@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { agents } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../secret";
-import { getSetting, setSetting } from "../settings";
+import { type CaddyBuildSettings, getSetting, setSetting } from "../settings";
 
 /** Setting holding this controller's stable id, as agents know it. */
 const CONTROLLER_ID_KEY = "controller_id";
@@ -19,9 +19,10 @@ const CONTROLLER_ID_KEY = "controller_id";
 export type PairedAgent = {
   id: number;
   name: string;
-  address: string;
-  agentId: string | null;
+  agentId: string;
   enabled: boolean;
+  /** True when this agent has a Caddy build selection of its own rather than the fleet default. */
+  hasOwnBuildSettings: boolean;
   lastSeenAt: string | null;
   lastError: string | null;
   createdAt: string;
@@ -38,9 +39,9 @@ function toView(row: Row): PairedAgent {
   return {
     id: row.id,
     name: row.name,
-    address: row.address,
     agentId: row.agentId,
     enabled: row.enabled,
+    hasOwnBuildSettings: row.buildSettings !== null,
     lastSeenAt: row.lastSeenAt,
     lastError: row.lastError,
     createdAt: row.createdAt,
@@ -97,8 +98,7 @@ export async function getActiveAgent(): Promise<AgentCredentials | null> {
 
 export async function saveAgent(input: {
   name: string;
-  address: string;
-  agentId: string | null;
+  agentId: string;
   secret: string;
 }): Promise<PairedAgent> {
   const now = nowIso();
@@ -106,20 +106,18 @@ export async function saveAgent(input: {
     .insert(agents)
     .values({
       name: input.name,
-      address: input.address,
       agentId: input.agentId,
       secret: encryptSecret(input.secret),
       enabled: true,
       createdAt: now,
       updatedAt: now,
     })
-    // Pairing the same address again replaces its secret. That is the recovery path for a
-    // controller whose copy is gone, and refusing it would leave the operator editing the database.
+    // The same host pairing again replaces its secret. That is the recovery path for an agent whose
+    // database was rebuilt, and refusing it would leave the operator editing this table by hand.
     .onConflictDoUpdate({
-      target: agents.address,
+      target: agents.agentId,
       set: {
         name: input.name,
-        agentId: input.agentId,
         secret: encryptSecret(input.secret),
         enabled: true,
         lastError: null,
@@ -129,6 +127,28 @@ export async function saveAgent(input: {
     .returning();
 
   return toView(row);
+}
+
+/** The stored row for an agent asserting this id, secret included, or null if it is unknown. */
+export async function findAgentByAgentId(agentId: string): Promise<AgentCredentials | null> {
+  const [row] = await db.select().from(agents).where(eq(agents.agentId, agentId)).limit(1);
+  if (!row?.enabled) return null;
+  try {
+    return { ...toView(row), secret: decryptSecret(row.secret) };
+  } catch (error) {
+    // Encrypted under a SESSION_SECRET this process no longer has. Re-pairing is the only fix, and
+    // it is the same answer as "unknown agent" from the caller's point of view.
+    console.error(`Failed to decrypt the secret for agent "${row.name}":`, error);
+    return null;
+  }
+}
+
+/** Rename an agent. Operator-facing only: routing is by agentId, which this never touches. */
+export async function renameAgent(id: number, name: string): Promise<void> {
+  await db
+    .update(agents)
+    .set({ name: name.trim().slice(0, 128), updatedAt: nowIso() })
+    .where(eq(agents.id, id));
 }
 
 export async function deleteAgent(id: number): Promise<void> {
@@ -161,4 +181,58 @@ export async function recordAgentContact(
   } catch (error) {
     console.warn("Failed to record agent contact:", error);
   }
+}
+
+// ─── Per-agent Caddy build settings ──────────────────────────────────────────
+
+/**
+ * This agent's own module selection, or null when it follows the fleet default.
+ *
+ * Unparseable JSON reads as null rather than throwing. The column is written by this module alone,
+ * so bad content means someone edited the row by hand — and falling back to the fleet selection
+ * keeps that agent building something, which is better than a page that will not render.
+ */
+export async function getAgentBuildSettings(id: number): Promise<CaddyBuildSettings | null> {
+  const [row] = await db
+    .select({ raw: agents.buildSettings })
+    .from(agents)
+    .where(eq(agents.id, id));
+  if (!row?.raw) return null;
+  try {
+    return JSON.parse(row.raw) as CaddyBuildSettings;
+  } catch (error) {
+    // The id is passed as an argument rather than interpolated: console.warn reads its first
+    // argument as a format string, and this one reaches here from a request parameter.
+    console.warn("[cpm] agent has unparseable build settings; using the fleet default:", id, error);
+    return null;
+  }
+}
+
+/** Every agent's own selection, keyed by row id. Absent means "follows the fleet default". */
+export async function getAllAgentBuildSettings(): Promise<Map<number, CaddyBuildSettings>> {
+  const rows = await db.select({ id: agents.id, raw: agents.buildSettings }).from(agents);
+  const result = new Map<number, CaddyBuildSettings>();
+  for (const row of rows) {
+    if (!row.raw) continue;
+    try {
+      result.set(row.id, JSON.parse(row.raw) as CaddyBuildSettings);
+    } catch {
+      // Same reasoning as above: fall through to the fleet default for this one agent.
+    }
+  }
+  return result;
+}
+
+/** Give an agent its own selection, or pass null to put it back on the fleet default. */
+export async function setAgentBuildSettings(
+  id: number,
+  settings: CaddyBuildSettings | null,
+): Promise<void> {
+  await db
+    .update(agents)
+    .set({
+      buildSettings: settings === null ? null : JSON.stringify(settings),
+      updatedAt: nowIso(),
+    })
+    .where(eq(agents.id, id));
 }

@@ -1,15 +1,23 @@
 /** Pure OIDC group-claim → role/group mapping. No I/O; side effects in oidc-group-sync.ts. */
 
-export type AppRole = "admin" | "user" | "viewer";
+export type AppRole = "admin" | "operator" | "user" | "viewer";
 
-export const APP_ROLES: readonly AppRole[] = ["admin", "user", "viewer"] as const;
+export const APP_ROLES: readonly AppRole[] = ["admin", "operator", "user", "viewer"] as const;
 
-/** Privilege order, most privileged first. The first match wins. */
-const ROLE_PRECEDENCE: readonly AppRole[] = ["admin", "user", "viewer"] as const;
+/**
+ * Privilege order, most privileged first. The first match wins.
+ *
+ * `operator` sits above `user` and `viewer` because those two manage nothing at all — they are
+ * forward-auth identities with a dashboard that shows them their own profile. An operator manages
+ * whatever their groups were granted, which is strictly more, even though the two axes are not
+ * otherwise comparable.
+ */
+const ROLE_PRECEDENCE: readonly AppRole[] = ["admin", "operator", "user", "viewer"] as const;
 
 /** Suffix appended to `groupPrefix` when no explicit group name is configured. */
 const ROLE_SUFFIX: Record<AppRole, string> = {
   admin: "Admin",
+  operator: "Operator",
   user: "User",
   viewer: "Viewer",
 };
@@ -24,6 +32,7 @@ export type GroupMappingConfig = {
   groupPrefix: string | null;
   roleMappingEnabled: boolean;
   adminGroup: string | null;
+  operatorGroup: string | null;
   userGroup: string | null;
   viewerGroup: string | null;
   defaultRole: AppRole;
@@ -35,6 +44,7 @@ export function toGroupMappingConfig(provider: {
   groupPrefix?: string | null;
   roleMappingEnabled?: boolean | null;
   adminGroup?: string | null;
+  operatorGroup?: string | null;
   userGroup?: string | null;
   viewerGroup?: string | null;
   defaultRole?: string | null;
@@ -45,6 +55,7 @@ export function toGroupMappingConfig(provider: {
     groupPrefix: provider.groupPrefix?.trim() || null,
     roleMappingEnabled: provider.roleMappingEnabled === true,
     adminGroup: provider.adminGroup?.trim() || null,
+    operatorGroup: provider.operatorGroup?.trim() || null,
     userGroup: provider.userGroup?.trim() || null,
     viewerGroup: provider.viewerGroup?.trim() || null,
     defaultRole: isAppRole(provider.defaultRole) ? provider.defaultRole : "user",
@@ -164,6 +175,7 @@ export function parseGroupNames(value: string | null): string[] {
 export function resolveRoleGroups(cfg: GroupMappingConfig): Record<AppRole, string[]> {
   const configured: Record<AppRole, string | null> = {
     admin: cfg.adminGroup,
+    operator: cfg.operatorGroup,
     user: cfg.userGroup,
     viewer: cfg.viewerGroup,
   };

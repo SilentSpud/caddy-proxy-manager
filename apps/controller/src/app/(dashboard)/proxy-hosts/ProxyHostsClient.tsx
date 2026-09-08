@@ -45,6 +45,7 @@ import {
   EditHostDialog,
   DeleteHostDialog,
 } from "@/components/proxy-hosts/HostDialogs";
+import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -70,6 +71,12 @@ type Props = {
   forwardAuthUsers?: ForwardAuthUser[];
   forwardAuthGroups?: ForwardAuthGroup[];
   forwardAuthAccessMap?: ForwardAuthAccessMap;
+  agents?: AgentOption[];
+  /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
+  agentAssignments?: Record<number, number[]>;
+  /** False for an operator: a grant names a host that already exists, so creating one is an
+   * admin's job. The dialogs and the duplicate action go with the button. */
+  canCreate?: boolean;
 };
 
 /** The feature badges as data. `variant` marks the two meaning "traffic is being restricted". */
@@ -150,12 +157,15 @@ function HostActions({
   onEdit,
   onDuplicate,
   onDelete,
+  canCreate,
 }: {
   host: ProxyHost;
   onToggle: (enabled: boolean) => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
+  canCreate: boolean;
 }) {
   return (
     <HStack gap={2} vAlign="center" justify="end">
@@ -171,7 +181,7 @@ function HostActions({
         alignment="end"
         items={[
           { label: "Edit", onClick: onEdit },
-          { label: "Duplicate", onClick: onDuplicate },
+          ...(canCreate ? [{ label: "Duplicate", onClick: onDuplicate }] : []),
           { type: "divider" },
           { label: "Delete", variant: "destructive", onClick: onDelete },
         ]}
@@ -195,6 +205,9 @@ export default function ProxyHostsClient({
   forwardAuthUsers,
   forwardAuthGroups,
   forwardAuthAccessMap,
+  agents,
+  agentAssignments,
+  canCreate = true,
 }: Props) {
   const t = useTranslations("proxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
@@ -310,6 +323,7 @@ export default function ProxyHostsClient({
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
+          canCreate={canCreate}
           onDelete={() => setDeleteHost(host)}
         />
       ),
@@ -336,6 +350,7 @@ export default function ProxyHostsClient({
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onEdit={() => setEditHost(host)}
           onDuplicate={() => openDuplicate(host)}
+          canCreate={canCreate}
           onDelete={() => setDeleteHost(host)}
         />
       </HStack>
@@ -347,13 +362,17 @@ export default function ProxyHostsClient({
       <PageHeader
         title={t("proxyHosts")}
         description={t("pageDescription")}
-        action={{
-          label: "Create Host",
-          onClick: () => {
-            setDialogKey((k) => k + 1);
-            setCreateOpen(true);
-          },
-        }}
+        action={
+          canCreate
+            ? {
+                label: "Create Host",
+                onClick: () => {
+                  setDialogKey((k) => k + 1);
+                  setCreateOpen(true);
+                },
+              }
+            : undefined
+        }
       />
 
       <HStack gap={2} vAlign="center">
@@ -392,6 +411,7 @@ export default function ProxyHostsClient({
         issuedClientCerts={issuedClientCerts ?? []}
         forwardAuthUsers={forwardAuthUsers ?? []}
         forwardAuthGroups={forwardAuthGroups ?? []}
+        agents={agents ?? []}
       />
 
       {editHost && (
@@ -409,6 +429,8 @@ export default function ProxyHostsClient({
           forwardAuthUsers={forwardAuthUsers ?? []}
           forwardAuthGroups={forwardAuthGroups ?? []}
           forwardAuthAccess={forwardAuthAccessMap?.[editHost.id] ?? null}
+          agents={agents ?? []}
+          assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
         />
       )}
 

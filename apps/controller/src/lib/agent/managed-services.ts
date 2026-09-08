@@ -13,10 +13,10 @@
  * the database and a file on the host in step by hand.
  */
 
-import { AGENT_ROUTES, type ManagedServicesRequest } from "@cpm/shared";
-import { callOnEveryAgent } from "./client";
+import type { ManagedServicesRequest } from "@cpm/shared";
 import { geoipEnabled } from "./geoip";
 import { isAnalyticsEnabled } from "../clickhouse/client";
+import { pushDesiredState } from "./desired-state";
 
 /** What the optional services should currently be, from the settings alone. */
 export async function desiredManagedServices(): Promise<ManagedServicesRequest> {
@@ -55,24 +55,14 @@ export async function desiredManagedServices(): Promise<ManagedServicesRequest> 
 /**
  * Ask every agent to reconcile its optional services with the current settings.
  *
- * Never throws, for the same reason `pushFleetConfig` does not: the agent accepts this and works in
- * the background, so there is no success to wait for, and failing a settings save because one host
- * is down would leave the operator unable to save a setting that has nothing to do with that host.
- * The outcome is reported through the agent's status instead.
+ * Desired state now, like everything else the controller wants: the services travel in the same
+ * frame as the ports and the modules, and the agent reconciles at its own pace. Kept as its own
+ * function because the callers name what changed, not how it is delivered.
+ *
+ * Never throws. An agent that is not attached gets the whole state the moment it reconnects, which
+ * is also the answer for a deployment whose agent has not started — the operator manages those
+ * containers themselves there, which is what COMPOSE_PROFILES is still for.
  */
 export async function applyManagedServices(): Promise<void> {
-  const body = await desiredManagedServices();
-  try {
-    const results = await callOnEveryAgent(AGENT_ROUTES.services, { method: "POST", body });
-    for (const result of results) {
-      if (!result.ok) {
-        console.warn(
-          `[agent] could not apply the optional services on ${result.agent}: ${result.error}`,
-        );
-      }
-    }
-  } catch {
-    // No agent at all — a standalone binary, or a stack whose agent has not started. The operator
-    // manages these containers themselves there, which is what COMPOSE_PROFILES is still for.
-  }
+  await pushDesiredState();
 }

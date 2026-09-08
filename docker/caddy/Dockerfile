@@ -105,6 +105,20 @@ COPY --from=builder /caddy-modules.resolved.txt /etc/caddy/caddy-modules.resolve
 
 COPY --chown=caddy:caddy docker/caddy/Caddyfile /etc/caddy/Caddyfile
 
+# Image identity, so a pulled image describes itself without the compose file beside it. Static
+# facts only: the version, revision and build timestamp are supplied by docker/metadata-action in
+# .github/workflows/docker-build-trusted.yml, whose --label flags override anything set here. The
+# compiled-in plugin list is deliberately not a label — it is a build arg the UI overrides, and
+# /etc/caddy/caddy-modules.txt above records whatever this image was actually built with.
+LABEL org.opencontainers.image.title="Caddy Proxy Manager Caddy Handler" \
+      org.opencontainers.image.description="Caddy built with xcaddy, bundling the DNS, layer-4 and WAF plugins Caddy Proxy Manager configures." \
+      org.opencontainers.image.vendor="SilentSpud" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
+      org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
+      org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
+      org.opencontainers.image.base.name="docker.io/library/alpine:3.24"
+
 EXPOSE 80 443 2019
 
 # Set environment variables to use /data and /config like official Caddy image

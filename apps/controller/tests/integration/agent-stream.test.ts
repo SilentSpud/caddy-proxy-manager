@@ -1,0 +1,250 @@
+/**
+ * The connection registry: the only way the controller reaches an agent.
+ *
+ * Since the controller stopped dialling out, "is this agent reachable" is entirely a question about
+ * this map. The properties worth pinning are the ones that used to be the transport's problem and
+ * are now this file's: a command must not outlive its agent, a reconnect must not leave two live
+ * streams, and a result must not be settleable by an agent it was not issued to.
+ */
+import { afterEach, describe, expect, it } from 'bun:test';
+import type { AgentDesiredState, AgentServerEvent, AgentStatus } from '@cpm/shared';
+
+const {
+  attach,
+  detach,
+  connectedAgents,
+  isConnected,
+  recordStatus,
+  dispatchCaddyAdmin,
+  settleResults,
+  broadcastDesiredState,
+  resetRegistry,
+  AgentNotConnectedError,
+} = await import('../../src/lib/agent/registry');
+
+const STATE: AgentDesiredState = {
+  l4Ports: [],
+  caddyModules: [],
+  services: { services: { clickhouse: false, geoipupdate: false }, env: {} },
+  fleetConfig: { clickhouse: null, geoip: null },
+  caddyEnabled: true,
+};
+
+function status(agentId: string): AgentStatus {
+  return {
+    agentId,
+    version: 'test',
+    mode: 'standalone',
+    composeProject: 'cpm',
+    l4Ports: { applied: [], status: { state: 'idle' } },
+    caddyBuild: { applied: null, status: { state: 'idle' } },
+    services: { applied: null, status: { state: 'idle' } },
+    analytics: { enabled: false, accessLogPresent: false },
+  };
+}
+
+/** Attach an agent and start collecting the frames the controller writes to it. */
+function connect(agentId: string, name = agentId) {
+  const { stream } = attach({
+    agentId,
+    agentRowId: 1,
+    name,
+    controllerId: 'c1',
+    controllerName: 'Test',
+    initialState: STATE,
+  });
+
+  const frames: AgentServerEvent[] = [];
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const pump = (async () => {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true });
+      let split = buffer.indexOf('\n\n');
+      while (split !== -1) {
+        const data = buffer
+          .slice(0, split)
+          .split('\n')
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.slice(5).trimStart())
+          .join('\n');
+        buffer = buffer.slice(split + 2);
+        if (data.length > 0) frames.push(JSON.parse(data) as AgentServerEvent);
+        split = buffer.indexOf('\n\n');
+      }
+    }
+  })().catch(() => {
+    // Closed by detach; that is the normal end of a connection.
+  });
+
+  return { frames, pump };
+}
+
+afterEach(() => {
+  resetRegistry();
+});
+
+describe('attaching', () => {
+  it('greets a new agent and sends it the desired state before anything else', async () => {
+    const { frames } = connect('a1');
+    await Bun.sleep(5);
+
+    expect(frames[0]).toEqual({ type: 'hello', controllerId: 'c1', controllerName: 'Test' });
+    expect(frames[1]).toEqual({ type: 'desired-state', state: STATE });
+  });
+
+  it('replaces a reconnecting agent rather than attaching it twice', async () => {
+    connect('a1');
+    await Bun.sleep(5);
+    const second = connect('a1');
+    await Bun.sleep(5);
+
+    // One entry, and the *new* stream is the live one — a second connection after a partition must
+    // not leave the old one attached, or every command would be sent twice.
+    expect(connectedAgents()).toHaveLength(1);
+    await broadcastDesiredState(async () => ({ ...STATE, caddyEnabled: false }));
+    await Bun.sleep(5);
+    expect(second.frames.at(-1)).toEqual({
+      type: 'desired-state',
+      state: { ...STATE, caddyEnabled: false },
+    });
+  });
+
+  it('reports an agent as gone once detached', async () => {
+    connect('a1');
+    await Bun.sleep(5);
+    expect(isConnected('a1')).toBe(true);
+    detach('a1');
+    expect(isConnected('a1')).toBe(false);
+    expect(connectedAgents()).toHaveLength(0);
+  });
+});
+
+describe('status', () => {
+  it('keeps the last status beside the connection', async () => {
+    connect('a1');
+    await Bun.sleep(5);
+    recordStatus('a1', status('a1'));
+    expect(connectedAgents()[0].status?.agentId).toBe('a1');
+  });
+
+  it('ignores a status from an agent that is not attached', () => {
+    recordStatus('ghost', status('ghost'));
+    expect(connectedAgents()).toHaveLength(0);
+  });
+});
+
+describe('commands', () => {
+  it('delivers a command and resolves with the agent’s answer', async () => {
+    const { frames } = connect('a1');
+    await Bun.sleep(5);
+
+    const pending = dispatchCaddyAdmin('a1', { path: '/config/', method: 'GET' });
+    await Bun.sleep(5);
+
+    const frame = frames.at(-1);
+    expect(frame?.type).toBe('command');
+    const id = frame?.type === 'command' ? frame.command.id : '';
+
+    settleResults('a1', [
+      { id, ok: true, response: { status: 200, text: '{"ok":true}', headers: {} } },
+    ]);
+    await expect(pending).resolves.toEqual({ status: 200, text: '{"ok":true}', headers: {} });
+  });
+
+  it('rejects when the agent reports a failure', async () => {
+    const { frames } = connect('a1');
+    await Bun.sleep(5);
+
+    const pending = dispatchCaddyAdmin('a1', { path: '/load', method: 'POST' });
+    await Bun.sleep(5);
+    const frame = frames.at(-1);
+    const id = frame?.type === 'command' ? frame.command.id : '';
+
+    settleResults('a1', [{ id, ok: false, error: 'Caddy refused it', code: 'INTERNAL' }]);
+    await expect(pending).rejects.toThrow('Caddy refused it');
+  });
+
+  it('refuses to dispatch to an agent that is not connected', async () => {
+    await expect(dispatchCaddyAdmin('nobody', { path: '/config/', method: 'GET' })).rejects.toThrow(
+      AgentNotConnectedError,
+    );
+  });
+
+  it('fails anything in flight when the agent disconnects', async () => {
+    connect('a1');
+    await Bun.sleep(5);
+
+    const pending = dispatchCaddyAdmin('a1', { path: '/config/', method: 'GET' });
+    await Bun.sleep(5);
+    detach('a1');
+
+    // Failed immediately rather than left to time out: the answer is already known, and holding a
+    // page render open for another minute helps nobody.
+    await expect(pending).rejects.toThrow(AgentNotConnectedError);
+  });
+
+  it('will not let one agent settle another’s command', async () => {
+    const first = connect('a1');
+    connect('a2');
+    await Bun.sleep(5);
+
+    const pending = dispatchCaddyAdmin('a1', { path: '/config/', method: 'GET' });
+    await Bun.sleep(5);
+    const frame = first.frames.at(-1);
+    const id = frame?.type === 'command' ? frame.command.id : '';
+
+    settleResults('a2', [{ id, ok: true, response: { status: 200, text: 'stolen', headers: {} } }]);
+
+    // Still pending: a2 must not be able to answer for a1. Settled properly so the test does not
+    // leave a live timer behind.
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+    await Bun.sleep(10);
+    expect(settled).toBe(false);
+
+    settleResults('a1', [{ id, ok: true, response: { status: 200, text: 'real', headers: {} } }]);
+    await expect(pending).resolves.toMatchObject({ text: 'real' });
+  });
+});
+
+describe('broadcast', () => {
+  it('reaches every attached agent', async () => {
+    const a = connect('a1');
+    const b = connect('a2');
+    await Bun.sleep(5);
+
+    const next = { ...STATE, l4Ports: ['3306:3306'] };
+    await broadcastDesiredState(async () => next);
+    await Bun.sleep(5);
+
+    expect(a.frames.at(-1)).toEqual({ type: 'desired-state', state: next });
+    expect(b.frames.at(-1)).toEqual({ type: 'desired-state', state: next });
+  });
+
+  it('builds a separate state for each agent, and skips the ones that would not build', async () => {
+    // The whole point of the per-agent push: two agents can want different ports, and one whose
+    // state cannot be computed must be left on the last one it had rather than handed a guess.
+    const a = connect('a1');
+    const b = connect('a2');
+    await Bun.sleep(5);
+    const bBefore = b.frames.at(-1);
+
+    await broadcastDesiredState(async (agent) =>
+      agent.agentId === 'a1' ? { ...STATE, l4Ports: ['3306:3306'] } : null,
+    );
+    await Bun.sleep(5);
+
+    expect(a.frames.at(-1)).toEqual({
+      type: 'desired-state',
+      state: { ...STATE, l4Ports: ['3306:3306'] },
+    });
+    expect(b.frames.at(-1)).toEqual(bBefore);
+  });
+});

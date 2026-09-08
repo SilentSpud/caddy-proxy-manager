@@ -40,6 +40,7 @@ import { AdvancedConfigFields } from "./AdvancedConfigFields";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
+import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
@@ -78,6 +79,7 @@ export function CreateHostDialog({
   issuedClientCerts = [],
   forwardAuthUsers = [],
   forwardAuthGroups = [],
+  agents = [],
   tailscaleDefaults,
 }: {
   open: boolean;
@@ -92,6 +94,7 @@ export function CreateHostDialog({
   issuedClientCerts?: IssuedClientCertificate[];
   forwardAuthUsers?: ForwardAuthUser[];
   forwardAuthGroups?: ForwardAuthGroup[];
+  agents?: AgentOption[];
 }) {
   const t = useTranslations("proxyHosts");
   const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
@@ -161,6 +164,7 @@ export function CreateHostDialog({
             value={accessListId}
             onChange={(next) => setAccessListId(next as string)}
           />
+          <AgentAssignmentFields agents={agents} selected={[]} />
           <RedirectsFields initialData={initialData?.redirects} />
           <LocationRulesFields initialData={initialData?.locationRules} />
           <RewriteFields initialData={initialData?.rewrite} />
@@ -206,6 +210,8 @@ export function EditHostDialog({
   forwardAuthUsers = [],
   forwardAuthGroups = [],
   forwardAuthAccess,
+  agents = [],
+  assignedAgentIds = [],
   tailscaleDefaults,
 }: {
   open: boolean;
@@ -221,6 +227,8 @@ export function EditHostDialog({
   forwardAuthUsers?: ForwardAuthUser[];
   forwardAuthGroups?: ForwardAuthGroup[];
   forwardAuthAccess?: ForwardAuthAccessData | null;
+  agents?: AgentOption[];
+  assignedAgentIds?: number[];
   tailscaleDefaults?: TailscaleHostDefaults | null;
 }) {
   const t = useTranslations("proxyHosts");
@@ -283,6 +291,7 @@ export function EditHostDialog({
             value={accessListId}
             onChange={(next) => setAccessListId(next as string)}
           />
+          <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
           <RedirectsFields initialData={host.redirects} />
           <LocationRulesFields initialData={host.locationRules} />
           <RewriteFields initialData={host.rewrite} />

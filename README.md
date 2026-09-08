@@ -106,8 +106,8 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 
 ## Features
 
-- **Proxy Hosts** - Reverse proxies with custom headers, multiple upstreams, load balancing (8 policies), active/passive health checks, retries, and enable/disable toggle
-- **L4 Proxy Hosts** - TCP/UDP stream proxying with TLS SNI matching, proxy protocol (v1/v2), load balancing, health checks, and per-host geo blocking. Automatic Docker Compose port management via agent
+- **Proxy Hosts** - Reverse proxies with custom headers, multiple upstreams, load balancing (12 policies, including weighted and query/header/cookie hashing), active/passive health checks, retries, and enable/disable toggle
+- **L4 Proxy Hosts** - TCP/UDP stream proxying with TLS SNI matching, proxy protocol (v1/v2), load balancing (7 policies), health checks, and per-host geo blocking. Automatic Docker Compose port management via agent
 - **Location Rules** - Path-based routing to different upstreams per proxy host (e.g. `/api/*` to one backend, `/ws/*` to another)
 - **Redirect & Rewrite** - Per-host redirect rules (301/302/307/308) and path prefix rewriting
 - **Forward Auth Portal** - Built-in identity provider for protecting proxy hosts without an external IdP. Credential and OAuth login portal, user groups with membership management, per-host access control by user or group, and excluded paths that bypass authentication
@@ -224,9 +224,6 @@ is still honoured as an override until a value is stored.
 | `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
 | `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
-| `AGENT_URL` | Address of an agent to use instead of the local one, e.g. `http://agent.example.com:3100`. An agent paired under **Settings → Agent** takes precedence | Unset (local socket) | No |
-| `AGENT_SECRET` | Shared secret for `AGENT_URL`. Pairing through the UI stores this encrypted in the database instead | None | With `AGENT_URL` |
-| `AGENT_SOCKET` / `AGENT_CONTROLLER_ID` | Override the local agent's socket path, and the identity the controller signs as | `$L4_PORTS_DIR/agent.sock` / built-in | No |
 | `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
@@ -240,10 +237,11 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
-| `AGENT_MODE` | `standalone` binds a Unix socket on the shared volume; `managed` binds TCP and prints a pairing code. Startup fails on any other value rather than guessing | `standalone` |
-| `AGENT_HOST` / `AGENT_PORT` | Listen address in `managed` mode | `::` / `3100` |
-| `AGENT_SOCKET` | Socket path in `standalone` mode | `$DATA_DIR/agent.sock` |
-| `DATA_DIR` | Where the agent's SQLite state, socket and secret live. Must be writable | `/data` |
+| `CONTROLLER_URL` | Where the agent dials to reach its controller. A tailnet IP or MagicDNS name works here like any other address. Overridden by `--host`/`--port` | Unset (idle until paired) |
+| `PAIRING_CODE` | Pair on first start instead of idling. Overridden by `--code` | Unset |
+| `AGENT_MODE` | `standalone` or `managed`. Startup fails on any other value rather than guessing | `standalone` |
+| `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
+| `DATA_DIR` | Where the agent's SQLite state and control socket live. Must be writable | `/data` |
 | `COMPOSE_DIR` | Where the compose project files are mounted, read-only | `/compose` |
 | `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy:2019` |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
@@ -253,6 +251,7 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
 | `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs | Auto-detected |
 | `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` / `GEOIP_DIR` / `GEOIP_DB` | Where the agent reads Caddy's logs and the GeoLite2 databases from | Container paths |
+| `NODE_EXTRA_CA_CERTS` | A CA bundle to trust in addition to the system store, for a controller behind TLS from a private CA. See [Connecting agents over Tailscale or Headscale](#connecting-agents-over-tailscale-or-headscale) | Unset |
 
 **Production requirements:**
 
@@ -437,26 +436,84 @@ Then create the administrator through [First Run](#first-run). Nothing needs a p
 
 ## User Roles
 
-CPM has three roles with increasing privileges:
+CPM has four roles:
 
-| Capability | Viewer | User | Admin |
-| ---------- | ------ | ---- | ----- |
-| Log in to the dashboard | Yes | Yes | Yes |
-| View own profile | Yes | Yes | Yes |
-| Access forward-auth-protected apps (when granted) | Yes | Yes | Yes |
-| Manage proxy hosts, certificates, access lists | No | No | Yes |
-| Manage users, groups, and settings | No | No | Yes |
-| View analytics, audit log, and API docs | No | No | Yes |
-| Create and manage own API tokens | Yes | Yes | Yes |
-| Access role-appropriate REST API endpoints (`/api/v1/`) | Yes | Yes | Yes |
+| Capability | Viewer | User | Operator | Admin |
+| ---------- | ------ | ---- | -------- | ----- |
+| Log in to the dashboard | Yes | Yes | Yes | Yes |
+| View own profile | Yes | Yes | Yes | Yes |
+| Access forward-auth-protected apps (when granted) | Yes | Yes | Yes | Yes |
+| Manage proxy hosts, L4 hosts and agents | No | No | Only what their groups were granted | Yes |
+| Create or delete hosts | No | No | No | Yes |
+| Manage certificates and access lists | No | No | No | Yes |
+| Manage users, groups, and settings | No | No | No | Yes |
+| View analytics, audit log, and API docs | No | No | No | Yes |
+| Create and manage own API tokens | Yes | Yes | Yes | Yes |
+| Access role-appropriate REST API endpoints (`/api/v1/`) | Yes | Yes | Yes | Yes |
 
 New users default to the **user** role. The first administrator is created in [First Run](#first-run), or imported from a migrated 3.0 database. `ADMIN_USERNAME` / `ADMIN_PASSWORD` still seed one at startup for deployments that predate the setup flow.
+
+**Operator** is the delegating role: its baseline is nothing, and it reaches exactly what
+[group grants](#groups-and-delegated-management) name. Viewer and user are unchanged and gain
+nothing from a grant, so adding one never widens an existing account — someone has to be given the
+operator role deliberately.
+
+The management endpoints under `/api/v1/` remain **admin-only**. Grants apply to the dashboard;
+an operator's API token gets the same user-scoped endpoints a user's does.
 
 API tokens can only be created from an authenticated dashboard session; an
 existing bearer token cannot mint replacement credentials. Viewer and user
 tokens are restricted to the same user-scoped API capabilities as their owner.
 
 > **Forward Auth access** is separate from role — all roles must be explicitly granted access to each protected host via the forward auth access list.
+
+---
+
+## Groups and delegated management
+
+Groups are lists of users. They do two jobs: they gate access to forward-auth-protected apps, and —
+with the **Access** button on a group — they decide what an **Operator** may manage.
+
+### Granting management
+
+Open **Groups → Access** on a group and tick the proxy hosts, layer-4 hosts and agents it should
+reach, then choose the capability:
+
+- **Manage** — edit, enable, disable and delete those resources.
+- **View only** — see them in the lists, change nothing.
+
+The rules, stated once:
+
+- Grants **only** reach users whose role is Operator. An admin already has everything and ignores
+  them; a user and a viewer manage nothing and gain nothing from one.
+- An operator sees empty lists until something is granted, and the pages stay in their navigation
+  so the emptiness is explainable.
+- **Creating** a host is not grantable — a grant names a resource that already exists. Operators
+  ask an admin for a new host, and can then be granted it.
+- Two groups reaching the same host give the more permissive of the two capabilities.
+- A grant disappears with the resource it named: deleting a host takes its grants with it.
+
+Agents work the same way. An operator granted an agent can rename it and trigger a Caddy rebuild
+from the **Agents** page; pairing, unpairing and disabling stay in Settings with the admins,
+because they decide whether the controller talks to that host at all.
+
+### Mapping IdP groups onto CPM groups
+
+An OIDC provider's `groupPrefix` convention mirrors claimed groups by name, which stops being
+useful when the IdP's name is not the one you want to see. **Groups → Access → Identity provider
+groups** is that mapping written down: list the names this group is known by in your IdP, one per
+line, optionally scoped to one provider.
+
+- Matching is case-insensitive, and a Keycloak-style path (`/company/Infra`) is reduced to its last
+  segment.
+- A name mapped here is **not** also mirrored under its raw IdP name, so one claim never puts a
+  user in two groups.
+- Mappings are applied at sign-in when the provider has **Sync groups** switched on, which is the
+  same switch that governs the prefix convention.
+
+Role mapping is separate and unchanged: the provider's group settings decide whether a claim makes
+someone an admin, operator, user or viewer, and group membership then decides what an operator can
+reach.
 
 ---
 
@@ -636,47 +693,153 @@ This is the only request that runs agent-to-controller, and it is signed with th
 secret — no extra credential. It does mean a remote agent has to be able to reach `BASE_URL`. An
 agent that cannot keeps using whatever database it already has.
 
-### One controller, one configuration
+### One controller, many configurations
 
 Everything a proxy serves — hosts, certificates, access lists, published ports, compiled-in
-plugins — belongs to this controller's database, not to any host. Every agent's Caddy is loaded
-with the identical document. A change is applied to all of them or to none: if one agent rejects
-the config or cannot be reached, the whole apply fails and names that agent, rather than leaving
-one proxy serving the new configuration and another serving the old.
+plugins — belongs to this controller's database, not to any host. What each agent runs is computed
+from that database and sent to it: **a document per agent**, not one for the fleet. A change is
+applied to every agent or to none — if one rejects the config or cannot be reached, the whole apply
+fails and names that agent, rather than leaving one proxy serving the new configuration and another
+serving the old.
+
+**Assigning hosts to agents.** Each proxy host and layer-4 host has an *Agents* section listing
+every paired agent. Tick none and the host is served by all of them, which is what every host did
+before assignment existed and what a new host defaults to. Tick one or more and only those agents
+receive it — useful for a host that only one site can reach, or a pair of edge nodes sharing a
+domain.
+
+**Per-agent Caddy builds.** Settings → Caddy Build has a *Module selection for* picker: the fleet
+default, or one named agent. An agent with no selection of its own follows the fleet default, so
+enabling a module for everyone still reaches the agents nobody configured separately. Give an agent
+its own selection when it needs a plugin the rest do not — a DNS provider only it can reach — and
+switch *Follow the fleet default* back on to put it back on the shared list.
 
 Two consequences worth knowing:
 
-- **Plugins are the intersection.** A handler is only emitted if *every* agent's Caddy was built
-  with the module behind it, because one document goes to all of them and Caddy rejects a document
-  naming a module it lacks — wholesale, taking every host on that instance down with it. Rebuild
-  the fleet before a newly enabled module takes effect.
-- **Ports are published everywhere.** A layer-4 host's port is opened on every agent, since any of
-  them may be the one a client reaches.
+- **Plugins are per agent, and a document only names what that agent has.** Caddy rejects a
+  document naming a module it lacks — wholesale, taking every host on that instance down with it —
+  so generation is gated on what each agent reports having actually built. Rebuild an agent before
+  a newly enabled module takes effect on it.
+- **Ports follow the assignment.** A layer-4 host's port is opened on the agents that serve it, and
+  on all of them when it is unassigned. Publishing a port still needs the usual apply from the
+  layer-4 page: assigning a host tells an agent what to serve, not to recreate its container on the
+  spot.
 
-### Same host — nothing to configure
+### How an agent connects
 
-The default. The agent listens on a Unix socket on the shared data volume and writes its secret
-beside it, rotating that secret on every start. A controller that mounts the same volume finds both.
-This is what `docker-compose.yml` sets up, and there is nothing to enter anywhere.
+The agent dials the controller, never the other way round. It opens one long-lived event stream and
+holds it open; the controller pushes desired state and Caddy admin calls down it, and the agent
+posts status and results back. So an agent on a NAT'd or firewalled host needs **no inbound port** —
+only outbound reach to the controller.
+
+An agent that has never been paired does nothing, and **leaves Caddy stopped**. Caddy sits behind a
+Compose profile precisely so that `docker compose up` will not start it: a host nobody has finished
+installing must not answer on 80 and 443 with a default page. Pairing is what starts it.
+
+### Same host — nothing to enter
+
+The bundled stack pairs itself. The controller leaves a single-use token on the shared data volume
+both containers already mount, and an idle agent that finds one pairs with it — so `docker compose
+up` gives you a working install with no code typed anywhere.
+
+The boundary is the volume: reaching that file already means being inside the stack. It is the same
+boundary the pre-3.1 design used, which kept a long-lived shared secret there; this token is
+single-use and is rotated the moment it is redeemed, so a copy someone else read stops working.
+
+Caddy still waits for first-run setup to finish, because until then there is no configuration to
+serve. Reach the dashboard on `:3000` to complete it, and Caddy starts on its own.
 
 ### A different host — pairing
 
-Run the agent with `AGENT_MODE=managed` and publish its port (3100 by default). It prints a
-six-letter code to its logs:
+An agent on another host cannot mount that volume, so it pairs with a code you carry.
+
+Generate one under **Settings → Agents**. It is six letters, valid for five minutes, works once,
+and is refused after ten wrong guesses. Then, on the agent's host:
 
 ```bash
-docker logs caddy-proxy-manager-agent
+docker exec caddy-proxy-manager-agent cpm-agent --pair --host 10.0.0.5 --code ABCDEF
 ```
 
-The code is valid for five minutes, works once, and is refused after ten wrong guesses. Enter it
-with the agent's address under **Settings → Agent**; the two exchange a secret, which is stored
-encrypted and is the only thing used from then on. The code is never needed again.
+`--host` is the controller's address as the agent can reach it; add `--port` if it is not 3000. The
+two exchange a secret, which is stored encrypted on the controller and in the agent's own database,
+and the code is never used again. The agent then pulls its configuration and starts Caddy.
 
-Unpairing forgets this side only. The agent keeps the secret until it is restarted or paired again,
-so restart it too if you are removing an agent you no longer trust.
+`--pair` talks to the agent already running on that host rather than doing the work itself — the
+running process is the one holding the database the secret lands in and the stream it will open.
+Start the agent first; pairing a stopped one is an error, not a wait.
 
-`AGENT_URL` and `AGENT_SECRET` do the same thing without the UI, for a deployment that configures
-everything through the environment. An agent paired through Settings takes precedence over them.
+`CONTROLLER_URL` and `PAIRING_CODE` do the same thing without a terminal, for a deployment that
+configures everything through the environment. A stored pairing wins over both, so a code left in
+place after a successful pair is ignored rather than burned again on every restart.
+
+### Connecting agents over Tailscale or Headscale
+
+An agent needs one thing from the network: an outbound route to the controller. It dials out and
+holds an event stream open, and the controller never dials back — so a tailnet is a natural fit,
+and CPM needs no Tailscale-specific configuration to use one. Point `CONTROLLER_URL` (or
+`--host`) at the controller's tailnet address and everything else is unchanged.
+
+Three ways to address it, all of which work:
+
+| Address | When |
+| ------- | ---- |
+| `http://100.98.59.37:3000` | Tailnet IP. No DNS, no TLS, nothing to set up on the controller |
+| `http://cpm-controller:3000` | MagicDNS name. Same, but survives the IP changing |
+| `https://cpm-controller.tailnet-1234.ts.net` | Behind `tailscale serve --bg --https=443 http://127.0.0.1:3000` on the controller's host |
+
+An `https://` address with no port means **443**, because the controller serves plain HTTP and an
+https address means something in front of it is terminating TLS. A bare host or an `http://`
+address with no port still means 3000. `--port` overrides either.
+
+**Getting the agent onto the tailnet.** If the agent's host is already on it, there is nothing to
+do. For the bundled Compose stack, `docker-compose.tailscale.yml` adds a sidecar:
+
+```bash
+# .env
+TS_AUTHKEY=tskey-auth-...           # or: headscale preauthkeys create
+CONTROLLER_URL=https://cpm-controller.tailnet-1234.ts.net
+# Headscale only:
+# TS_EXTRA_ARGS=--login-server=https://headscale.example.com
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
+```
+
+The sidecar joins the **agent's** network namespace rather than the other way round. That is what
+lets the agent keep resolving `caddy` and `docker-socket-proxy` by compose service name while
+gaining tailnet routing and MagicDNS — putting the agent inside the sidecar's namespace instead
+would take those service names away and break every Caddy admin call it proxies.
+
+Pairing is unchanged: generate a code under **Settings → Agents** and run
+
+```bash
+docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm-controller.tailnet-1234.ts.net --code ABCDEF
+```
+
+**Headscale.** Everything above applies; set `--login-server` and use whatever address your
+control server hands out. Headscale deployments usually have no `.ts.net` certificate, so the
+plain `http://<tailnet-ip>:3000` or MagicDNS form is the normal one. If you do put TLS in front of
+the controller using a private CA, mount the CA into the agent and set `NODE_EXTRA_CA_CERTS` to
+its path — the agent's HTTP client reads it, and without it the connection is refused as
+`unable to verify the first certificate`.
+
+Two things worth knowing:
+
+- **An agent that starts before tailscaled is up is fine.** A controller it cannot resolve is an
+  ordinary unreachable controller: the agent retries with backoff and keeps Caddy serving whatever
+  it already had. Only a 401 — the controller having forgotten this agent — ends the loop.
+- **The stream is long-lived, and `tailscale serve` neither buffers it nor times it out.**
+  Verified against a real tailnet: frames arrive as they are sent rather than batched at the end,
+  and a stream held open for five and a half minutes still carried data at the end of it — even
+  one sent nothing at all in between, so the agent's 20-second keepalive has margin to spare
+  rather than being the only thing holding the connection up.
+
+### Unpairing
+
+Unpairing revokes the secret. The agent's next call is refused, it drops back to idle, and **it
+stops Caddy** — so unpairing takes that host out of service. Pair it again with a fresh code to
+bring it back.
 
 ---
 
@@ -1083,6 +1246,7 @@ OAUTH_SCOPES="openid email profile groups"   # ask the IdP for the claim
 OAUTH_GROUPS_CLAIM=groups                    # dots address nested claims
 OAUTH_ROLE_MAPPING=true
 OAUTH_ADMIN_GROUP="platform-owners, sre-oncall"
+OAUTH_OPERATOR_GROUP="proxy-ops"
 OAUTH_USER_GROUP="staff"
 OAUTH_VIEWER_GROUP="auditors, contractors"
 OAUTH_DEFAULT_ROLE=user
@@ -1091,12 +1255,13 @@ OAUTH_DEFAULT_ROLE=user
 Membership of *any one* of a role's groups grants it, so several unrelated groups can
 map to the same role.
 
-**Or use a prefix**, if your groups already share one. CPM then derives all three
+**Or use a prefix**, if your groups already share one. CPM then derives all four
 names for you:
 
 | Group (prefix `CPM_`) | CPM role |
 | --------------------- | -------- |
 | `CPM_Admin` | admin |
+| `CPM_Operator` | operator |
 | `CPM_User` | user |
 | `CPM_Viewer` | viewer |
 
@@ -1108,7 +1273,11 @@ OAUTH_ROLE_MAPPING=true
 The two mix freely: a role with its own group names ignores the prefix, and a role
 left unset falls back to it. So `OAUTH_GROUP_PREFIX=CPM_` together with
 `OAUTH_ADMIN_GROUP=platform-owners` means admins come from `platform-owners` while
-users and viewers still come from `CPM_User` and `CPM_Viewer`.
+the rest still come from `CPM_Operator`, `CPM_User` and `CPM_Viewer`.
+
+Where two of a user's groups map to different roles the more privileged one wins, in the order
+admin, operator, user, viewer — so losing the admin group demotes an account to operator rather
+than all the way down.
 
 `OAUTH_DEFAULT_ROLE` decides the role for users in none of the role groups.
 

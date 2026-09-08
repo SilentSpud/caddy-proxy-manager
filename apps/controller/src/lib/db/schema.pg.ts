@@ -126,6 +126,7 @@ export const oauthProviders = pgTable(
     roleMappingEnabled: boolean("roleMappingEnabled").notNull().default(false),
     // Explicit overrides; when unset they are derived from groupPrefix.
     adminGroup: text("adminGroup"),
+    operatorGroup: text("operatorGroup"),
     userGroup: text("userGroup"),
     viewerGroup: text("viewerGroup"),
     // Role assigned when no role group matched.
@@ -185,30 +186,39 @@ export const settings = pgTable("settings", {
 /**
  * Agents this controller has paired with.
  *
- * The local agent is not in here: it is found by its socket on the shared volume and proves itself
- * with a secret it rotates on every start, so a stored row would go stale on every restart. This
- * table is for agents reached over the network, whose secret was agreed once during pairing and is
- * the only way back to them.
+ * No address, because the controller never dials one: agents connect inbound and hold an event
+ * stream open, so whether an agent is reachable is a question about `lib/agent/registry.ts` and
+ * this table cannot answer it. What lives here is the half that must outlive a restart — who the
+ * agent is, and the secret it signs with.
+ *
+ * `agentId` is the identity the agent asserts on every request and the key pairing upserts on, so
+ * an agent that re-pairs replaces its row rather than accumulating one per attempt.
  */
 export const agents = pgTable(
   "agents",
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
-    /** Origin the agent listens on, e.g. `https://agent.example.com:3100`. No trailing slash. */
-    address: text("address").notNull(),
-    /** The agent's own stable id, as it reported at pairing. Detects a replaced host. */
-    agentId: text("agentId"),
+    /** The agent's own stable id, minted once on its host and reported at pairing. */
+    agentId: text("agentId").notNull(),
     /** Shared secret, encrypted at rest. Never leaves the server. */
     secret: text("secret").notNull(),
     enabled: boolean("enabled").notNull().default(true),
+    /**
+     * This agent's own Caddy build selection, as JSON, or null to follow the fleet default.
+     *
+     * Null rather than a copy of the default: an agent that has never been configured separately
+     * must keep tracking the fleet selection, so enabling a module for everyone does not silently
+     * skip the hosts nobody thought to open.
+     */
+    buildSettings: text("buildSettings"),
     lastSeenAt: text("lastSeenAt"),
     lastError: text("lastError"),
     createdAt: text("createdAt").notNull(),
     updatedAt: text("updatedAt").notNull(),
   },
   (table) => ({
-    addressUnique: uniqueIndex("agents_address_unique").on(table.address),
+    agentIdUnique: uniqueIndex("agents_agentId_unique").on(table.agentId),
   }),
 );
 
@@ -555,3 +565,120 @@ export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
 });
+
+/**
+ * Which agents serve a host.
+ *
+ * No rows for a host means every agent serves it, which is what the whole fleet did before this
+ * table existed — so an upgrade changes nothing and an operator opts in per host. Many-to-many
+ * rather than a column, because two edge nodes serving one host is an ordinary HA arrangement and
+ * a single-valued assignment would forbid what the fleet-wide broadcast already allowed.
+ */
+export const proxyHostAgents = pgTable(
+  "proxy_host_agents",
+  {
+    id: serial("id").primaryKey(),
+    proxyHostId: integer("proxyHostId")
+      .references(() => proxyHosts.id, { onDelete: "cascade" })
+      .notNull(),
+    agentId: integer("agentId")
+      .references(() => agents.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    pairUnique: uniqueIndex("proxy_host_agents_unique").on(table.proxyHostId, table.agentId),
+    agentIdx: index("proxy_host_agents_agent_idx").on(table.agentId),
+  }),
+);
+
+/** The same, for layer-4 hosts. Separate table because the two host tables are separate. */
+export const l4ProxyHostAgents = pgTable(
+  "l4_proxy_host_agents",
+  {
+    id: serial("id").primaryKey(),
+    l4ProxyHostId: integer("l4ProxyHostId")
+      .references(() => l4ProxyHosts.id, { onDelete: "cascade" })
+      .notNull(),
+    agentId: integer("agentId")
+      .references(() => agents.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    pairUnique: uniqueIndex("l4_proxy_host_agents_unique").on(table.l4ProxyHostId, table.agentId),
+    agentIdx: index("l4_proxy_host_agents_agent_idx").on(table.agentId),
+  }),
+);
+
+/**
+ * IdP group names that resolve to a CPM group.
+ *
+ * The prefix convention on `oauth_providers` mirrors claimed groups by name, which works right up
+ * until the IdP's name is not the one an operator wants to see — "AD-Infra-Proxy-Admins" against a
+ * CPM group called "Networking". This table is that mapping written down: a CPM group can claim as
+ * many external names as it likes, and the prefix convention keeps working for everything not
+ * named here.
+ *
+ * `providerId` is nullable and means "any provider", for the deployment with one IdP that does not
+ * want to restate it. Uniqueness is enforced in the model rather than by an index, because
+ * PostgreSQL treats NULLs as distinct and a partial index per case would be two indexes saying one
+ * thing.
+ */
+export const groupIdpMappings = pgTable(
+  "group_idp_mappings",
+  {
+    id: serial("id").primaryKey(),
+    groupId: integer("groupId")
+      .references(() => groups.id, { onDelete: "cascade" })
+      .notNull(),
+    providerId: text("providerId").references(() => oauthProviders.id, { onDelete: "cascade" }),
+    /** As the operator typed it, for display. */
+    externalName: text("externalName").notNull(),
+    /** Lower-cased and path-stripped, which is what claims are compared against. */
+    externalKey: text("externalKey").notNull(),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    groupIdx: index("group_idp_mappings_group_idx").on(table.groupId),
+    keyIdx: index("group_idp_mappings_key_idx").on(table.externalKey),
+  }),
+);
+
+/**
+ * What a group is allowed to manage.
+ *
+ * Additive, never subtractive: a grant widens what an `operator` can reach and does nothing at all
+ * to an `admin`, a `user` or a `viewer`. That is what makes this safe to ship — no existing user's
+ * access changes until someone is deliberately moved to the operator role.
+ *
+ * One nullable column per resource kind rather than a polymorphic (type, id) pair, matching
+ * `forward_auth_access`: it buys real foreign keys, so deleting a host takes its grants with it
+ * instead of leaving a row pointing at an id something else will later reuse.
+ */
+export const groupGrants = pgTable(
+  "group_grants",
+  {
+    id: serial("id").primaryKey(),
+    groupId: integer("groupId")
+      .references(() => groups.id, { onDelete: "cascade" })
+      .notNull(),
+    proxyHostId: integer("proxyHostId").references(() => proxyHosts.id, { onDelete: "cascade" }),
+    l4ProxyHostId: integer("l4ProxyHostId").references(() => l4ProxyHosts.id, {
+      onDelete: "cascade",
+    }),
+    agentId: integer("agentId").references(() => agents.id, { onDelete: "cascade" }),
+    /** "view" or "manage". A manage grant implies view. */
+    capability: text("capability").notNull().default("manage"),
+    createdAt: text("createdAt").notNull(),
+  },
+  (table) => ({
+    groupIdx: index("group_grants_group_idx").on(table.groupId),
+    proxyHostUnique: uniqueIndex("group_grants_proxy_host_unique").on(
+      table.groupId,
+      table.proxyHostId,
+    ),
+    l4HostUnique: uniqueIndex("group_grants_l4_host_unique").on(table.groupId, table.l4ProxyHostId),
+    agentUnique: uniqueIndex("group_grants_agent_unique").on(table.groupId, table.agentId),
+  }),
+);

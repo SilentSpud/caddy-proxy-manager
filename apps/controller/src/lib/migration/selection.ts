@@ -55,6 +55,12 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "api_tokens",
       "groups",
       "group_members",
+      // The two tables that say what a group is mapped from and what it may manage. Here rather
+      // than with the hosts because they belong to the group: leaving the hosts behind clears the
+      // resource column (see clearedColumns in migration/import.ts), and a grant naming nothing
+      // grants nothing — which is the safe direction for a privilege that lost its subject.
+      "group_idp_mappings",
+      "group_grants",
       "forward_auth_access",
       "forward_auth_sessions",
       "forward_auth_exchanges",
@@ -67,8 +73,18 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     description:
       "Your HTTP and layer-4 hosts, with their mTLS access rules. Certificates and access lists " +
       "come with them, because a host that lost its access list would be published unprotected.",
-    tables: ["proxy_hosts", "l4_proxy_hosts", "mtls_access_rules", "forward_auth_redirect_intents"],
-    requires: ["certificates", "accessLists"],
+    tables: [
+      "proxy_hosts",
+      "l4_proxy_hosts",
+      "mtls_access_rules",
+      "forward_auth_redirect_intents",
+      "proxy_host_agents",
+      "l4_proxy_host_agents",
+    ],
+    // Agents, for the same reason as access lists: a placement that lost its agent rows would not
+    // fail, it would read as "no assignment" — which means *every* agent. Dropping the table
+    // would quietly widen a host pinned to one node into one served fleet-wide.
+    requires: ["certificates", "accessLists", "agents"],
   },
   {
     id: "certificates",

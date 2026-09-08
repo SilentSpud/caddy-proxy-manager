@@ -130,6 +130,7 @@ async function runEnvProviderSync() {
       groupPrefix: string | null;
       roleMappingEnabled: boolean;
       adminGroup: string | null;
+      operatorGroup: string | null;
       userGroup: string | null;
       viewerGroup: string | null;
       defaultRole: string | null;
@@ -179,6 +180,7 @@ async function runEnvProviderSync() {
     groupPrefix: config.oauth.groupPrefix ?? null,
     roleMappingEnabled: config.oauth.roleMappingEnabled,
     adminGroup: config.oauth.adminGroup ?? null,
+    operatorGroup: config.oauth.operatorGroup ?? null,
     userGroup: config.oauth.userGroup ?? null,
     viewerGroup: config.oauth.viewerGroup ?? null,
     defaultRole,

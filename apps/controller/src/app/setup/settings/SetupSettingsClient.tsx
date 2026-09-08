@@ -64,6 +64,7 @@ export type OAuthPrefill = {
   groupsClaim: string;
   groupPrefix: string;
   adminGroup: string;
+  operatorGroup: string;
   userGroup: string;
   viewerGroup: string;
   defaultRole: string;
@@ -498,6 +499,13 @@ function IdentityProviderCard({
                   htmlName="idpAdminGroup"
                   value={value.adminGroup}
                   onChange={set("adminGroup")}
+                  width="100%"
+                />
+                <TextInput
+                  label={t("operatorGroup")}
+                  htmlName="idpOperatorGroup"
+                  value={value.operatorGroup}
+                  onChange={set("operatorGroup")}
                   width="100%"
                 />
                 <TextInput

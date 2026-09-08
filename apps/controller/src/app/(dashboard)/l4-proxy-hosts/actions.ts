@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { assertCanManage, requireAccess } from "@/src/lib/permissions";
 import { getTranslations } from "next-intl/server";
 import {
   actionError,
@@ -24,6 +25,7 @@ import {
   type L4GeoBlockConfig,
   type L4GeoBlockMode,
 } from "@/src/lib/models/l4-proxy-hosts";
+import { parseAgentIds } from "@/src/lib/models/host-agents";
 import {
   parseCheckbox,
   parseCsv,
@@ -37,12 +39,33 @@ const VALID_MATCHER_TYPES: L4MatcherType[] = ["none", "tls_sni", "http_host", "p
 const VALID_PP_VERSIONS: L4ProxyProtocolVersion[] = ["v1", "v2"];
 const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
   "random",
+  "random_choose",
   "round_robin",
+  "weighted_round_robin",
   "least_conn",
   "ip_hash",
   "first",
 ];
 const VALID_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
+
+/**
+ * Weights for `weighted_round_robin`, typed as a comma-separated list in upstream order.
+ *
+ * All or nothing: a list with one unparseable entry is rejected rather than partially applied,
+ * because a weight silently dropped to 0 takes a backend out of rotation with nothing on screen
+ * to say why.
+ */
+function parseWeights(value: FormDataEntryValue | null): number[] | null {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+
+  const weights = parts.map((part) => Number.parseInt(part, 10));
+  return weights.every((w) => Number.isInteger(w) && w >= 0 && w <= 1000) ? weights : null;
+}
 
 function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerConfig> | undefined {
   if (!formData.has("lbPresent")) return undefined;
@@ -58,12 +81,28 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
   const result: Partial<L4LoadBalancerConfig> = {};
   if (enabled !== undefined) result.enabled = enabled;
   if (policy) result.policy = policy;
-  const tryDuration = parseOptionalText(formData.get("lbTryDuration"));
-  if (tryDuration !== null) result.tryDuration = tryDuration;
-  const tryInterval = parseOptionalText(formData.get("lbTryInterval"));
-  if (tryInterval !== null) result.tryInterval = tryInterval;
-  const retries = parseOptionalNumber(formData.get("lbRetries"));
-  if (retries !== null) result.retries = retries;
+  // Presence, not value — see parseLoadBalancerConfig in the proxy-hosts actions: gating on the
+  // value made an emptied box indistinguishable from a field the form never rendered, so nothing
+  // here could be cleared once set.
+  //
+  // The three caddy-l4 does not define keep their lines because a host saved before they were
+  // withdrawn still has them in `meta`; the form no longer renders them, so these never fire, and
+  // the generator already refuses to emit them.
+  if (formData.has("lbTryDuration")) {
+    result.tryDuration = parseOptionalText(formData.get("lbTryDuration"));
+  }
+  if (formData.has("lbTryInterval")) {
+    result.tryInterval = parseOptionalText(formData.get("lbTryInterval"));
+  }
+  if (formData.has("lbRetries")) {
+    result.retries = parseOptionalNumber(formData.get("lbRetries")) ?? undefined;
+  }
+  if (formData.has("lbPolicyChoose")) {
+    result.policyChoose = parseOptionalNumber(formData.get("lbPolicyChoose"));
+  }
+  if (formData.has("lbPolicyWeights")) {
+    result.policyWeights = parseWeights(formData.get("lbPolicyWeights"));
+  }
 
   // Active health check
   if (formData.has("lbActiveHealthEnabledPresent")) {
@@ -226,6 +265,7 @@ export async function createL4ProxyHostAction(
       proxyProtocolVersion: parseProxyProtocolVersion(formData),
       proxyProtocolReceive: parseCheckbox(formData.get("proxyProtocolReceive")),
       enabled: parseCheckbox(formData.get("enabled")),
+      agentIds: parseAgentIds(formData.getAll("agentId")),
       loadBalancer: parseL4LoadBalancerConfig(formData),
       dnsResolver: parseL4DnsResolverConfig(formData),
       upstreamDnsResolution: parseL4UpstreamDnsResolutionConfig(formData),
@@ -249,8 +289,11 @@ export async function updateL4ProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
+    // An operator may edit a host their groups were granted; creating one stays with admins,
+    // because a grant names a host that already exists.
+    const access = await requireAccess();
+    assertCanManage(access, "l4ProxyHost", id);
+    const userId = access.userId;
 
     const matcherType = parseMatcherType(formData);
     const matcherValue =
@@ -271,6 +314,9 @@ export async function updateL4ProxyHostAction(
       proxyProtocolVersion: parseProxyProtocolVersion(formData),
       proxyProtocolReceive: parseCheckbox(formData.get("proxyProtocolReceive")),
       enabled: formData.has("enabledPresent") ? parseCheckbox(formData.get("enabled")) : undefined,
+      agentIds: formData.has("agentAssignmentPresent")
+        ? parseAgentIds(formData.getAll("agentId"))
+        : undefined,
       loadBalancer: parseL4LoadBalancerConfig(formData),
       dnsResolver: parseL4DnsResolverConfig(formData),
       upstreamDnsResolution: parseL4UpstreamDnsResolutionConfig(formData),
@@ -293,9 +339,9 @@ export async function deleteL4ProxyHostAction(
 ): Promise<ActionState> {
   void _prevState;
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await deleteL4ProxyHost(id, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "l4ProxyHost", id);
+    await deleteL4ProxyHost(id, access.userId);
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess("L4 proxy host deleted.");
   } catch (error) {
@@ -307,9 +353,9 @@ export async function deleteL4ProxyHostAction(
 
 export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Promise<ActionState> {
   try {
-    const session = await requireAdmin();
-    const userId = Number(session.user.id);
-    await updateL4ProxyHost(id, { enabled }, userId);
+    const access = await requireAccess();
+    assertCanManage(access, "l4ProxyHost", id);
+    await updateL4ProxyHost(id, { enabled }, access.userId);
     revalidatePath("/l4-proxy-hosts");
     return actionSuccess(`L4 proxy host ${enabled ? "enabled" : "disabled"}.`);
   } catch (error) {

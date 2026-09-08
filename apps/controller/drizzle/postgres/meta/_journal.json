@@ -15,6 +15,27 @@
       "when": 1788768247696,
       "tag": "0001_drop_account_issuer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788786077600,
+      "tag": "0002_agent_dials_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788960000000,
+      "tag": "0003_per_agent_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788960100000,
+      "tag": "0004_group_grants",
+      "breakpoints": true
     }
   ]
 }
