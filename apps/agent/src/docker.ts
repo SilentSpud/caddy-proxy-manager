@@ -7,7 +7,7 @@
  * create time, and compiled-in plugins.
  */
 
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ManagedServiceName, ManagedServicesRequest } from "@cpm/shared";
 import type { AgentConfig } from "./config";
@@ -82,17 +82,36 @@ export class DockerHost {
    * an empty answer as "fall back", so giving up early costs nothing.
    */
   private async caddyLabel(label: string): Promise<string> {
+    return this.containerLabel(this.config.caddyContainerName, label);
+  }
+
+  /**
+   * One compose label off this agent's own container.
+   *
+   * The agent is a service in the same project, so it carries the same project name and working
+   * directory as everything else — and unlike Caddy it is, by definition, running whenever this
+   * code executes. `/etc/hostname` is the container id inside the container, which is what the
+   * daemon accepts in place of a name.
+   */
+  private async selfLabel(label: string): Promise<string> {
+    let id: string;
+    try {
+      id = readFileSync("/etc/hostname", "utf-8").trim();
+    } catch {
+      return "";
+    }
+    if (!id) return "";
+    return this.containerLabel(id, label);
+  }
+
+  private async containerLabel(container: string, label: string): Promise<string> {
     const result = await run(
-      [
-        "docker",
-        "inspect",
-        "--format",
-        `{{index .Config.Labels "${label}"}}`,
-        this.config.caddyContainerName,
-      ],
+      ["docker", "inspect", "--format", `{{index .Config.Labels "${label}"}}`, container],
       { timeoutSeconds: 15 },
     );
-    return result.ok ? result.output.trim() : "";
+    // `docker inspect` prints "<no value>" for a label that is not set, which is not an answer.
+    const value = result.ok ? result.output.trim() : "";
+    return value === "<no value>" ? "" : value;
   }
 
   /**
@@ -106,7 +125,11 @@ export class DockerHost {
     if (this.config.composeProject) return this.config.composeProject;
     if (this.detectedProject) return this.detectedProject;
 
-    const detected = await this.caddyLabel("com.docker.compose.project");
+    // This agent's own container first: Caddy may not exist yet — the agent is what starts it —
+    // and asking a container that is not there returns nothing at all.
+    const detected =
+      (await this.selfLabel("com.docker.compose.project")) ||
+      (await this.caddyLabel("com.docker.compose.project"));
     this.detectedProject = detected.length > 0 ? detected : "caddy-proxy-manager";
     return this.detectedProject;
   }
@@ -126,10 +149,28 @@ export class DockerHost {
    */
   private async composeHostDir(): Promise<string> {
     if (this.config.composeHostDir) return this.config.composeHostDir;
-    if (this.detectedHostDir !== null) return this.detectedHostDir;
+    if (this.detectedHostDir) return this.detectedHostDir;
 
-    this.detectedHostDir = await this.caddyLabel("com.docker.compose.project.working_dir");
-    return this.detectedHostDir;
+    // Own container first, for the reason in composeProject: the first thing the agent brings up
+    // may be a managed service rather than Caddy, and reading Caddy's labels before Caddy exists
+    // answers "" — which meant no --project-directory and every relative bind resolving against a
+    // path only this container has. ClickHouse came up with an empty directory where its config
+    // should have been, which is a wrong container rather than a failed command.
+    //
+    // Only a real answer is cached. Caching "" meant one early miss poisoned every later
+    // invocation for the life of the process, long after Caddy was up and could have answered.
+    const detected =
+      (await this.selfLabel("com.docker.compose.project.working_dir")) ||
+      (await this.caddyLabel("com.docker.compose.project.working_dir"));
+
+    // Only an absolute POSIX path is usable. A Docker Desktop host on Windows records the label as
+    // a Windows path, which the Linux-side compose in this container cannot chdir to —
+    // passing it turns every invocation into "mount denied: too many colons". Skipping it there
+    // leaves the pre-existing behaviour, which is wrong in a quieter way and not this change's to
+    // fix.
+    const usable = detected.startsWith("/") ? detected : "";
+    if (usable) this.detectedHostDir = usable;
+    return usable;
   }
 
   /**
