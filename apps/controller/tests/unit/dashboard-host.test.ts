@@ -4,6 +4,7 @@ import {
   buildDashboardHostRow,
   checkDashboardDns,
 } from '@/src/lib/dashboard-host';
+import { createProbeNonce, probeSignatureMatches, signProbe } from '@/src/lib/reachability-probe';
 import { validateSettingsGroup } from '@/src/lib/settings-validation';
 
 const on = { enabled: true, domain: 'cpm.example.com', tls: false };
@@ -53,69 +54,70 @@ describe('the managed dashboard host', () => {
   });
 });
 
-describe('the dashboard DNS check', () => {
-  const deps = (resolved: string[], publicIp: string | null) => ({
+describe('the dashboard reachability check', () => {
+  const deps = (resolved: string[], reached: boolean) => ({
     resolveAddresses: async () => resolved,
-    publicIp: async () => publicIp,
+    probe: async () => reached,
   });
 
-  it('confirms a domain that resolves here', async () => {
-    const result = await checkDashboardDns(
-      'cpm.example.com',
-      deps(['203.0.113.10'], '203.0.113.10'),
-    );
+  it('confirms a domain that arrives here', async () => {
+    const result = await checkDashboardDns('cpm.example.com', deps(['203.0.113.10'], true));
 
     expect(result.ok).toBe(true);
-    expect(result.reason).toBe('match');
+    expect(result.reason).toBe('reached');
   });
 
-  it('matches on any of the addresses the name carries', async () => {
-    const result = await checkDashboardDns(
-      'cpm.example.com',
-      deps(['198.51.100.7', '203.0.113.10'], '203.0.113.10'),
-    );
+  it('trusts the probe over the record', async () => {
+    // The record is only a diagnostic. A name that resolves to nothing this resolver can see but
+    // still reaches us — split DNS, a hosts entry, a search domain — has answered the question.
+    const result = await checkDashboardDns('cpm.example.com', deps([], true));
 
     expect(result.ok).toBe(true);
   });
 
-  it('refuses a domain pointed somewhere else', async () => {
-    const result = await checkDashboardDns(
-      'cpm.example.com',
-      deps(['198.51.100.7'], '203.0.113.10'),
-    );
+  it('refuses a domain that resolves but does not reach here', async () => {
+    const result = await checkDashboardDns('cpm.example.com', deps(['198.51.100.7'], false));
 
     expect(result.ok).toBe(false);
-    expect(result.reason).toBe('mismatch');
-    // Both halves are reported: "it points at X, we are Y" is the sentence that tells an operator
-    // which record to fix.
+    expect(result.reason).toBe('otherServer');
+    // Reported so the operator can see where it currently points.
     expect(result.resolved).toEqual(['198.51.100.7']);
-    expect(result.publicIp).toBe('203.0.113.10');
   });
 
-  it('separates a name that resolves nowhere from one that cannot be compared', async () => {
-    expect((await checkDashboardDns('cpm.example.com', deps([], '203.0.113.10'))).reason).toBe(
-      'unresolved',
-    );
-    expect((await checkDashboardDns('cpm.example.com', deps(['203.0.113.10'], null))).reason).toBe(
-      'noPublicIp',
-    );
-    expect((await checkDashboardDns('  ', deps(['203.0.113.10'], '203.0.113.10'))).reason).toBe(
-      'noDomain',
-    );
+  it('separates a name that resolves nowhere from one pointed elsewhere', async () => {
+    expect((await checkDashboardDns('cpm.example.com', deps([], false))).reason).toBe('unresolved');
+    expect((await checkDashboardDns('  ', deps(['203.0.113.10'], true))).reason).toBe('noDomain');
   });
 
   it('answers rather than throwing when the lookup fails', async () => {
-    // Seeding a default at the end of setup and rendering a warning are both places where a slow
-    // or broken resolver must not become an error the operator has to deal with.
+    // Rendering a warning is not a place to handle an exception, and a broken resolver must not
+    // become an error the operator has to deal with.
     const result = await checkDashboardDns('cpm.example.com', {
       resolveAddresses: async () => {
         throw new Error('SERVFAIL');
       },
-      publicIp: async () => '203.0.113.10',
+      probe: async () => false,
     });
 
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('unresolved');
+  });
+});
+
+describe('the probe signature', () => {
+  it('accepts only what this instance signed', () => {
+    const nonce = createProbeNonce();
+
+    expect(probeSignatureMatches(nonce, signProbe(nonce))).toBe(true);
+    // A server that merely echoes the nonce, or answers with anything else, is not this instance.
+    expect(probeSignatureMatches(nonce, nonce)).toBe(false);
+    expect(probeSignatureMatches(nonce, '')).toBe(false);
+    expect(probeSignatureMatches(nonce, signProbe(`${nonce}x`))).toBe(false);
+  });
+
+  it('gives every check a different nonce', () => {
+    // A fixed nonce would let a server that once saw a valid answer replay it later.
+    expect(createProbeNonce()).not.toBe(createProbeNonce());
   });
 });
 

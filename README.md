@@ -84,18 +84,24 @@ The domain comes from `DASHBOARD_DOMAIN` if you set it, and otherwise from the h
 `BASE_URL` — the address you are already reaching CPM at. A localhost address says nothing about
 how the instance will be reached, so that leaves the host switched off with the field ready.
 
-HTTPS is decided by a DNS check rather than assumed. Setup resolves the domain and compares it
-with this deployment's public address:
+It comes up on **HTTP**. Forcing HTTPS before the domain reaches you would mean a fresh install's
+first act is a certificate order failing on a name nobody has pointed at it yet.
+
+HTTPS is turned on by a check you run from **Settings → Dashboard Host**, once the host is live.
+The check sends a request to the domain and looks for a signature only this instance can produce:
 
 | What the check finds | What happens |
 | -------------------- | ------------ |
-| The domain resolves here | HTTPS on. Caddy orders a certificate immediately, and it will succeed |
-| It resolves somewhere else, or nowhere | HTTPS off, with the reason shown. The host still serves over HTTP |
-| The public address could not be determined | HTTPS off. Turn it on yourself if you know the record is right |
+| The request came back here, signed | HTTPS on. DNS, the network in between and Caddy's route all work, so a certificate order will too |
+| The domain resolves but the request arrived elsewhere | HTTPS off, with the address it currently points at |
+| Nothing answers for the name | HTTPS off. Create the record, then check again |
 
-Forcing HTTPS before DNS is pointed here would mean a fresh install's first act is a failing
-certificate order on a name that does not reach it — so the check decides, and **Settings →
-Dashboard Host** re-runs it whenever you ask.
+Nothing is asked of a third party — no IP-echo service, no external resolver. The trade-off is
+that the request is made from this deployment, so two situations it cannot see through: a resolver
+inside your network that points the name here while public DNS does not (passes, and ACME still
+fails), and a network that will not let a request leave and come back by its own public address
+(fails, though the outside world reaches you fine). The toggle is a default you can override in
+both.
 
 **This host is managed, not stored.** It is generated from those settings every time the
 configuration is applied, so it is not in Proxy Hosts and nothing can delete it by accident.

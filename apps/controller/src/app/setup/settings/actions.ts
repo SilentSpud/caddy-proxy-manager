@@ -156,11 +156,12 @@ export async function saveSetupSettings(
   if (providerError) return { error: providerError };
 
   // CPM proxies its own dashboard from here on, so the operator's first look at the product is a
-  // working host rather than an empty list. Best-effort on purpose: this decides a convenience,
-  // and a DNS lookup or a settings write failing is not a reason to refuse a setup that has
-  // already saved everything it was asked to.
+  // working host rather than an empty list. Over HTTP: whether HTTPS would work is a question only
+  // the reachability check can answer, and it cannot answer it until the route is live. Best-effort
+  // on purpose — a settings write failing is not a reason to refuse a setup that has already saved
+  // everything it was asked to.
   try {
-    await saveDashboardSettings(await activateDashboardHost());
+    await saveDashboardSettings(activateDashboardHost());
   } catch (error) {
     console.error("Setup: could not enable the dashboard host", error);
   }

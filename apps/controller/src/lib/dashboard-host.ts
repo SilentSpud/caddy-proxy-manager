@@ -24,6 +24,12 @@
 
 import { Resolver } from "node:dns/promises";
 import { config } from "./config";
+import {
+  PROBE_PARAM,
+  PROBE_PATH,
+  createProbeNonce,
+  probeSignatureMatches,
+} from "./reachability-probe";
 // Type-only: erased at compile time, so this does not import caddy.ts at runtime and cannot
 // close a cycle with the module that consumes buildDashboardHostRow.
 import type { ProxyHostRow } from "./caddy";
@@ -37,9 +43,9 @@ export type DashboardHostSettings = {
   /**
    * Whether to force HTTPS, which is also what asks Caddy to obtain a certificate.
    *
-   * Set from a DNS check rather than defaulted to true: a fresh install whose domain does not
-   * resolve to this machine yet would otherwise start failing ACME the moment setup finished, and
-   * the operator's first experience of the product would be a certificate error.
+   * Set from a reachability check rather than defaulted to true: a fresh install whose domain does
+   * not arrive here yet would otherwise start failing ACME the moment setup finished, and the
+   * operator's first experience of the product would be a certificate error.
    */
   tls: boolean;
 };
@@ -94,20 +100,20 @@ export function defaultDashboardSettings(): DashboardHostSettings {
 /**
  * Turn the dashboard host on as setup finishes.
  *
- * The TLS answer comes from DNS rather than a default. If the domain already resolves here, HTTPS
- * is what the operator wants and asking Caddy for a certificate will work; if it does not, forcing
- * it would mean the first thing a new install does is fail ACME on a name that is not pointed at
- * it yet. Either way the operator can change it, and the Settings page says which way it landed
- * and why.
+ * Over HTTP, always. The check that decides HTTPS works by asking the domain for a signature only
+ * this instance can produce, and at this moment there is nothing on that domain to ask: the route
+ * is being created by this very call, no configuration has been applied yet, and on the bundled
+ * stack Caddy may not even be running — it starts once an agent is paired. Probing here would
+ * answer "unreachable" for reasons that say nothing about the operator's DNS.
  *
- * Never throws. A failed check is a reason to leave TLS off, not a reason to fail setup.
+ * So the host comes up on HTTP and Settings -> Dashboard Host offers the check, which is
+ * meaningful the moment the route is live. That is also the safe order: HTTP works immediately,
+ * and HTTPS is turned on once something has confirmed it will succeed.
  */
-export async function activateDashboardHost(): Promise<DashboardHostSettings> {
+export function activateDashboardHost(): DashboardHostSettings {
   const domain = seedDashboardDomain();
   if (!domain) return { enabled: false, domain: "", tls: false };
-
-  const dns = await checkDashboardDns(domain);
-  return { enabled: true, domain, tls: dns.ok };
+  return { enabled: true, domain, tls: false };
 }
 
 /**
@@ -154,31 +160,17 @@ export function buildDashboardHostRow(
   };
 }
 
-/** What a DNS check found. `ok` is what the TLS toggle is set from. */
+/** What the reachability check found. `ok` is what the TLS toggle is set from. */
 export type DashboardDnsCheck = {
   ok: boolean;
   /** Addresses the domain resolves to, empty when it resolves to nothing. */
   resolved: string[];
-  /** This deployment's public address, or null when it could not be determined. */
-  publicIp: string | null;
-  /** Why the check could not answer, for a domain that resolves somewhere else or not at all. */
-  reason: "match" | "mismatch" | "unresolved" | "noPublicIp" | "noDomain";
+  /** Why the check answered the way it did. */
+  reason: "reached" | "otherServer" | "unreachable" | "unresolved" | "noDomain";
 };
 
-/** Bounded so a slow resolver or echo service cannot hold a form submission open. */
+/** Bounded so a slow resolver or an unreachable domain cannot hold a form submission open. */
 const CHECK_TIMEOUT_MS = 5_000;
-
-/**
- * Services that answer with the caller's address and nothing else.
- *
- * More than one because this decides a default an operator would otherwise have to fix by hand,
- * and a single provider having a bad day should not silently mean "no HTTPS". Tried in order, and
- * the first plain answer wins. All of them are asked over HTTPS so the answer cannot be rewritten
- * in transit by whatever the deployment sits behind.
- */
-const PUBLIC_IP_SERVICES = ["https://api.ipify.org", "https://icanhazip.com"];
-
-const IP_ADDRESS = /^[0-9a-f.:]+$/i;
 
 async function withTimeout<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T | null> {
   const controller = new AbortController();
@@ -202,50 +194,66 @@ async function resolveAddresses(name: string): Promise<string[]> {
   return [...v4, ...v6];
 }
 
-/** This deployment's address as the internet sees it, or null if nothing would say. */
-export async function resolvePublicIp(): Promise<string | null> {
-  for (const service of PUBLIC_IP_SERVICES) {
-    const address = await withTimeout(async (signal) => {
-      const response = await fetch(service, { signal, redirect: "error" });
-      if (!response.ok) return null;
-      const text = (await response.text()).trim();
-      return IP_ADDRESS.test(text) ? text : null;
-    });
-    if (address) return address;
-  }
-  return null;
+/**
+ * Ask the domain for a signature only this instance can produce.
+ *
+ * Answers true only when the response carries the right signature: a server that is not this one
+ * can return 200, can return `{"status":"ok"}`, and can echo the nonce, but cannot sign it.
+ *
+ * Plain HTTP, because this runs before HTTPS has been turned on — proving the name arrives here is
+ * the precondition for asking Caddy for a certificate, not something that can wait until after.
+ */
+async function probeSelf(domain: string): Promise<boolean> {
+  const nonce = createProbeNonce();
+  const url = `http://${domain}${PROBE_PATH}?${PROBE_PARAM}=${encodeURIComponent(nonce)}`;
+
+  const answered = await withTimeout(async (signal) => {
+    // `redirect: "manual"` rather than following: a redirect to somewhere else is not this
+    // instance answering, and chasing it could send the nonce to a third party.
+    const response = await fetch(url, { signal, redirect: "manual", cache: "no-store" });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { probe?: unknown };
+    return typeof body.probe === "string" ? body.probe : null;
+  });
+
+  return answered !== null && probeSignatureMatches(nonce, answered);
 }
 
 /**
- * Whether the domain points at this machine.
+ * Whether the domain reaches this instance.
  *
  * Never throws: every failure is an answer of `ok: false` with a reason, because the caller is
- * either seeding a default at the end of setup or rendering a warning, and neither is a place to
- * fail a request over a resolver being slow.
+ * rendering a warning rather than handling an exception, and a resolver being slow is not a reason
+ * to fail their request.
+ *
+ * DNS resolution is kept alongside the probe purely to tell two failures apart — a name nothing
+ * answers for needs a record created, a name that resolves but does not arrive here needs the
+ * record or the network fixed. Both are local lookups; nothing is asked of a third party.
  */
 export async function checkDashboardDns(
   domain: string,
-  // Injected by tests, the way tailscale-api takes its fetchImpl. Real callers pass nothing and
-  // get the resolver and the echo services above.
+  // Injected by tests, the way tailscale-api takes its fetchImpl. Real callers pass nothing.
   deps: {
     resolveAddresses?: (name: string) => Promise<string[]>;
-    publicIp?: () => Promise<string | null>;
+    probe?: (name: string) => Promise<boolean>;
   } = {},
 ): Promise<DashboardDnsCheck> {
   const name = domain.trim().toLowerCase();
-  if (!name) return { ok: false, resolved: [], publicIp: null, reason: "noDomain" };
+  if (!name) return { ok: false, resolved: [], reason: "noDomain" };
 
-  const [resolved, publicIp] = await Promise.all([
+  const [resolved, reachedSelf] = await Promise.all([
     withTimeout(async () =>
       deps.resolveAddresses ? await deps.resolveAddresses(name) : await resolveAddresses(name),
     ),
-    (deps.publicIp ?? resolvePublicIp)(),
+    (deps.probe ?? probeSelf)(name),
   ]);
 
   const addresses = resolved ?? [];
-  if (addresses.length === 0) return { ok: false, resolved: [], publicIp, reason: "unresolved" };
-  if (!publicIp) return { ok: false, resolved: addresses, publicIp: null, reason: "noPublicIp" };
+  if (reachedSelf) return { ok: true, resolved: addresses, reason: "reached" };
+  if (addresses.length === 0) return { ok: false, resolved: [], reason: "unresolved" };
 
-  const ok = addresses.includes(publicIp);
-  return { ok, resolved: addresses, publicIp, reason: ok ? "match" : "mismatch" };
+  // It resolves and something is there, or nothing is. The probe cannot tell a wrong server from a
+  // closed port without reporting more than it can be sure of, so both read as "did not reach
+  // here" and the message covers the ways that happens.
+  return { ok: false, resolved: addresses, reason: "otherServer" };
 }

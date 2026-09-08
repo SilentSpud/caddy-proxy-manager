@@ -1626,16 +1626,13 @@ function DashboardHostSection({
   );
 }
 
-/** What the DNS check found, in the terms the toggle above it is decided by. */
+/** What the reachability check found, in the terms the toggle above it is decided by. */
 function DnsCheckResult({ check }: { check: DashboardDnsCheck }) {
   const t = useTranslations("settings");
-  const resolved = check.resolved.join(", ");
 
-  if (check.reason === "match") {
+  if (check.reason === "reached") {
     return (
-      <InfoAlert title={t("dashboardDnsMatchTitle")}>
-        {t("dashboardDnsMatchDescription", { ip: check.publicIp ?? "" })}
-      </InfoAlert>
+      <InfoAlert title={t("dashboardDnsMatchTitle")}>{t("dashboardDnsMatchDescription")}</InfoAlert>
     );
   }
   return (
@@ -1643,16 +1640,12 @@ function DnsCheckResult({ check }: { check: DashboardDnsCheck }) {
       title={
         check.reason === "unresolved"
           ? t("dashboardDnsUnresolvedTitle")
-          : check.reason === "noPublicIp"
-            ? t("dashboardDnsNoPublicIpTitle")
-            : t("dashboardDnsMismatchTitle")
+          : t("dashboardDnsMismatchTitle")
       }
     >
-      {check.reason === "mismatch"
-        ? t("dashboardDnsMismatchDescription", { resolved, ip: check.publicIp ?? "" })
-        : check.reason === "unresolved"
-          ? t("dashboardDnsUnresolvedDescription")
-          : t("dashboardDnsNoPublicIpDescription")}
+      {check.reason === "unresolved"
+        ? t("dashboardDnsUnresolvedDescription")
+        : t("dashboardDnsMismatchDescription", { resolved: check.resolved.join(", ") })}
     </WarnAlert>
   );
 }
