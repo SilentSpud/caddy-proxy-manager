@@ -792,24 +792,12 @@ https address means something in front of it is terminating TLS. A bare host or 
 address with no port still means 3000. `--port` overrides either.
 
 **Getting the agent onto the tailnet.** If the agent's host is already on it, there is nothing to
-do. For the bundled Compose stack, `docker-compose.tailscale.yml` adds a sidecar:
+do. Otherwise put the container on the tailnet however you normally would — a `tailscale/tailscale`
+sidecar sharing the agent's network namespace works, and so does joining the host itself. CPM has
+no opinion about it: the agent only needs an outbound route to `CONTROLLER_URL`.
 
-```bash
-# .env
-TS_AUTHKEY=tskey-auth-...           # or: headscale preauthkeys create
-CONTROLLER_URL=https://cpm-controller.tailnet-1234.ts.net
-# Headscale only:
-# TS_EXTRA_ARGS=--login-server=https://headscale.example.com
-```
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
-```
-
-The sidecar joins the **agent's** network namespace rather than the other way round. That is what
-lets the agent keep resolving `caddy` and `docker-socket-proxy` by compose service name while
-gaining tailnet routing and MagicDNS — putting the agent inside the sidecar's namespace instead
-would take those service names away and break every Caddy admin call it proxies.
+This path is tested — an agent reaching its controller across a real tailnet pairs, streams, and
+serves exactly as it does on a flat network.
 
 Pairing is unchanged: generate a code under **Settings → Agents** and run
 
