@@ -1,6 +1,15 @@
 // @ts-check
+import { fileURLToPath } from "node:url";
+import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
+
+/**
+ * Absolute path inside the controller workspace, for the aliases below.
+ *
+ * @param {string} path
+ */
+const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, import.meta.url));
 
 /**
  * The project site, built as static files and served from GitHub Pages.
@@ -14,6 +23,7 @@ export default defineConfig({
   site: "https://silentspud.github.io",
   base: "/caddy-proxy-manager",
   integrations: [
+    react(),
     starlight({
       title: "Caddy Proxy Manager",
       description:
@@ -28,7 +38,7 @@ export default defineConfig({
       editLink: {
         baseUrl: "https://github.com/SilentSpud/caddy-proxy-manager/edit/main/apps/site/",
       },
-      customCss: ["./src/styles/theme.css"],
+      customCss: ["./src/styles/theme.css", "./src/styles/demo.css"],
       // Written out rather than generated from the directory: the order these appear in is the
       // order someone new should meet them, which is not alphabetical and not the order the files
       // happen to sit in.
@@ -74,4 +84,37 @@ export default defineConfig({
       ],
     }),
   ],
+
+  vite: {
+    resolve: {
+      /**
+       * The demos render the controller's own components rather than copies, so the docs cannot
+       * drift from the product. Three of the controller's tsconfig paths have to be repeated here
+       * for its imports to resolve from this app; the fourth (`@/*`) is ambiguous by design there
+       * and unused by anything a demo pulls in.
+       *
+       * The two shims stand in for framework packages the components import but do not need: only
+       * `useTranslations` is used from next-intl, and `next/navigation` is reached by one
+       * component. Both resolve to a few lines each rather than dragging Next into a static site.
+       */
+      alias: [
+        { find: /^@\/components\//, replacement: `${controller("src/components")}/` },
+        { find: /^@\/lib\//, replacement: `${controller("src/lib")}/` },
+        { find: /^@\/src\//, replacement: `${controller("src")}/` },
+        {
+          find: /^next-intl$/,
+          replacement: fileURLToPath(new URL("./src/demos/shims/next-intl.ts", import.meta.url)),
+        },
+        {
+          find: /^next\/navigation$/,
+          replacement: fileURLToPath(
+            new URL("./src/demos/shims/next-navigation.ts", import.meta.url),
+          ),
+        },
+      ],
+      // The controller is a workspace symlink, so its React would otherwise resolve to a second
+      // copy and every hook in a demo would throw.
+      dedupe: ["react", "react-dom"],
+    },
+  },
 });

@@ -1,0 +1,7 @@
+{
+  // `astro check` cannot run here: it needs the TypeScript compiler API that the native
+  // TypeScript 7 this repo standardises on does not expose yet. So the demos are typechecked
+  // with tsc directly, which means leaving out the one .astro file — only tsc's own languages.
+  "extends": "./tsconfig.json",
+  "include": [".astro/types.d.ts", "src/**/*.ts", "src/**/*.tsx", "*.mjs"]
+}

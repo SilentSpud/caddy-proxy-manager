@@ -9,9 +9,8 @@ head:
     content: Caddy Proxy Manager — control every edge
 hero:
   tagline: Control every edge. The modern web interface for Caddy Server.
-  image:
-    alt: The Caddy Proxy Manager dashboard
-    file: ../../assets/dashboard-main.png
+  # No hero image: the dashboard below is the real one, running, which is a better first
+  # impression than a picture of it and cannot go stale.
   actions:
     - text: Install it
       link: start/install/
@@ -23,6 +22,12 @@ hero:
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Demo from '../../components/Demo.astro';
+import OverviewDemo from '../../demos/samples/OverviewDemo';
+
+<Demo title="The dashboard" note="Every page on this site works like this one.">
+  <OverviewDemo client:visible />
+</Demo>
 
 Caddy is a web server that gets TLS right by default. Caddy Proxy Manager is a UI in front of it, so
 the things Caddy can do — reverse proxying, certificates, a WAF, layer‑4 streams — become things you

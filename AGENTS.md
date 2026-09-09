@@ -10,7 +10,7 @@ A Bun workspace. Nothing but config, docs and the Compose stack lives at the roo
 | --- | --- |
 | `apps/controller` | `@cpm/controller` — the web UI, REST API, schema, migrations and the whole test suite |
 | `apps/agent` | `@cpm/agent` — manages the Caddy container on its host. Was `docker/sidecar` |
-| `apps/site` | `@cpm/site` — the project website, static, no build step |
+| `apps/site` | `@cpm/site` — the project website and docs. Astro Starlight, built to static files |
 | `packages/shared` | `@cpm/shared` — contracts both the controller and the agent hard-code |
 | `docker/` | Dockerfiles and image config. Build contexts are the repo root |
 
@@ -27,6 +27,27 @@ resolving means adding the dependency, never loosening the linker. Note the layo
 the root `node_modules` holds the store (`.bun/`) plus the root's own devDependencies, and each
 workspace member gets a `node_modules` of relative symlinks into it. `docker/web/Dockerfile` copies
 both trees for that reason.
+
+## The site runs the controller's components
+
+`apps/site` depends on `@cpm/controller` and its docs embed the real dashboard components as React
+islands — the WAF card, the geo-block editor, the proxy host table — rather than screenshots of
+them. Three things make that work, and all three live in `apps/site/astro.config.mjs` and
+`apps/site/src/demos/`:
+
+- **The controller's tsconfig paths are repeated as Vite aliases**, so its `@/lib/...` imports
+  resolve from the site. `apps/site/tsconfig.json` mirrors them again for tsc.
+- **`next-intl` and `next/navigation` resolve to shims.** Only `useTranslations` is used from the
+  first, which `use-intl` provides framework-agnostically; the second is reached by `DataTable`
+  alone, and the shim makes the query string reactive so a demo can sort and page for real.
+- **Astryx's global reset is not loaded.** It would strip Starlight's prose, so `src/demos/demo.css`
+  carries the rules its components need, scoped to `.cpm-demo`. For the same reason `DemoSurface`
+  renders Astryx's theme wrapper itself instead of using `<Theme>`, which would write its
+  attributes onto `<html>` and restyle the whole documentation site.
+
+A component that imports a server action or the database cannot be demoed — the import would pull
+the db into the browser bundle. That rules out the page clients under `(dashboard)` that import
+`./actions`; `AuditLogClient` is demoed because it does not.
 
 ## The agent connects inwards
 

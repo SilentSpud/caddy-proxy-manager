@@ -1,0 +1,37 @@
+---
+/**
+ * The frame around a live demo.
+ *
+ * The demo itself is a React island in the default slot — the controller's own component, running,
+ * not a screenshot of it. This wrapper is deliberately dumb: it names what is on screen, says that
+ * it is real, and draws a border so a dark form does not bleed into a dark page. Everything about
+ * how the component looks belongs to Astryx, and is set up in DemoSurface and demo.css.
+ */
+interface Props {
+  /** What the reader is looking at, in the product's own words. */
+  title: string;
+  /** Optional line telling the reader what to try, or what is stubbed out. */
+  note?: string;
+}
+
+const { title, note } = Astro.props;
+
+/**
+ * Astro has no `useId`, and the badge and its tooltip have to agree on one. This markup is
+ * rendered once at build time and never hydrated, so a random id is stable in the output and
+ * cannot collide with the second demo on a page — which a title slug could.
+ */
+const hintID = `cpm-demo-hint-${crypto.randomUUID().slice(0, 8)}`;
+---
+
+<figure class="cpm-demo-frame not-content">
+  <figcaption>
+    <strong>{title}</strong>
+    {note && <span>{note}</span>}
+    {/* Focusable, so the tooltip is reachable without a pointer, and described-by rather than
+        labelled-by so a screen reader reads the badge and then the caveat. */}
+    <em class="cpm-demo-badge" tabindex="0" aria-describedby={hintID}>Demo</em>
+    <span class="cpm-demo-hint" id={hintID} role="tooltip">Nothing you change here is saved</span>
+  </figcaption>
+  <slot />
+</figure>

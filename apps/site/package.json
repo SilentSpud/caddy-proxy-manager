@@ -8,11 +8,26 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json"
   },
   "dependencies": {
+    "@astrojs/react": "^6.0.5",
     "@astrojs/starlight": "^0.42.0",
+    "@astryxdesign/core": "^0.5.3",
+    "@astryxdesign/theme-neutral": "^0.5.3",
+    "@cpm/controller": "workspace:*",
+    "apexcharts": "^7.1.0",
     "astro": "^7.3.1",
-    "sharp": "^0.35.4"
+    "lucide-react": "^1.41.0",
+    "react": "^19.2.8",
+    "react-apexcharts": "^2.1.1",
+    "react-dom": "^19.2.8",
+    "sharp": "^0.35.4",
+    "use-intl": "^4.14.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "^7.0.2"
   }
 }

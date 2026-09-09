@@ -1,14 +1,21 @@
 name: Site
 
 on:
-  # Only when the site itself changes. The rest of the repository changes far more often, and
-  # rebuilding a static site for a change to the agent would spend a runner to publish the same
-  # bytes. `workflow_dispatch` covers the case where you want it published anyway.
+  # Only when the site or the code it embeds changes. The rest of the repository changes far more
+  # often, and rebuilding a static site for a change to the agent would spend a runner to publish
+  # the same bytes. `workflow_dispatch` covers the case where you want it published anyway.
+  #
+  # The controller is here because the docs render its components live, so a change to one of them
+  # changes the published site. The whole of `src/` rather than the handful of directories a demo
+  # reaches today: that list would go stale the first time a demo imports something new, and it
+  # would go stale silently, leaving the docs showing a component the product no longer has.
   push:
     branches:
       - main
     paths:
       - "apps/site/**"
+      - "apps/controller/src/**"
+      - "apps/controller/messages/**"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 

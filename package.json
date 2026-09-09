@@ -37,7 +37,7 @@
     "lint:fix": "biome check --write",
     "format": "biome format --write",
     "format:check": "biome format",
-    "typecheck": "bun run --filter @cpm/shared typecheck && bun run --filter @cpm/agent typecheck && bun run --filter @cpm/controller typecheck",
+    "typecheck": "bun run --filter @cpm/shared typecheck && bun run --filter @cpm/agent typecheck && bun run --filter @cpm/controller typecheck && bun run --filter @cpm/site typecheck",
     "test:all": "./scripts/test-all.sh",
     "db:generate": "bun run --filter @cpm/controller db:generate",
     "db:migrate": "bun run --filter @cpm/controller db:migrate",
