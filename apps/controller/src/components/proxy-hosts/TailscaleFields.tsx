@@ -107,12 +107,14 @@ export function TailscaleFields({
               value={node}
               onChange={setNode}
               placeholder={placeholderNode}
-              description={`The tailnet machine this host is served on. Empty uses "${placeholderNode}" from Settings → Tailscale. Several hosts can share one node.`}
+              description={t("tailscaleNodeHelp", { node: placeholderNode })}
             />
             <Banner
               status="info"
               title={t("tailscaleDomainRequirementTitle")}
-              description={`Routing is still by Host header, so a request to https://${node || placeholderNode}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale - no ACME, no DNS provider.`}
+              description={t("tailscaleDomainRequirementDescription", {
+                node: node || placeholderNode,
+              })}
             />
             <CheckboxInput
               label={t("tailnetOnly")}

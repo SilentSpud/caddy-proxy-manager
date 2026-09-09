@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { domainError } from "@/src/lib/domain-error";
 import {
   createCaCertificate,
   deleteCaCertificate,
@@ -182,8 +183,9 @@ export async function issueClientCertificateAction(
   if (exportPasswordError) throw new Error(exportPasswordError);
 
   const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
-  if (!caPrivateKeyPem)
-    throw new Error("This CA has no stored private key - cannot issue client certificates");
+  // A code rather than a sentence: this reaches the issue dialog, `/api/v1/*` and the agent's sync,
+  // and only the first of those has a reader with a language. See `domain-error.ts`.
+  if (!caPrivateKeyPem) throw domainError("caCertificatePrivateKeyMissing");
 
   const caCertRecord = await import("@/src/lib/models/ca-certificates").then((m) =>
     m.getCaCertificate(caCertId),

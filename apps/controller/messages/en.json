@@ -306,6 +306,7 @@
   "errors": {
     "accessListNotFound": "Access list not found",
     "caCertificateNotFound": "CA certificate not found",
+    "caCertificatePrivateKeyMissing": "This CA has no stored private key - cannot issue client certificates",
     "certificateDomainsRequired": "At least one domain is required for a certificate",
     "certificateNotFound": "Certificate not found",
     "createL4HostFailed": "Failed to create L4 proxy host.",
@@ -882,10 +883,12 @@
     "tailscaleDescription": "Serve this host on your tailnet instead of, or as well as, the public internet",
     "tailscaleDisabledDescription": "This host will not be served at all until Settings → Tailscale is enabled - it is dropped from the configuration rather than published publicly.",
     "tailscaleDisabledTitle": "Tailscale is switched off in Settings",
+    "tailscaleDomainRequirementDescription": "Routing is still by Host header, so a request to https://{node}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale - no ACME, no DNS provider.",
     "tailscaleDomainRequirementTitle": "Add the node's MagicDNS name to Domains",
     "tailscaleExcludedPathsHelp": "Paths that bypass the identity check while everything else stays gated. Ignored if Protected Paths is set.",
     "tailscaleForwardIdentityHelp": "Sets X-Tailscale-User, -Login, -Name, -Tailnet and -Profile-Picture on the proxied request. Any such header sent by the client is stripped first.",
     "tailscaleIdentityHelp": "Only devices signed in to your tailnet may reach this host, and the caller is identified by their tailnet login. Tagged devices are refused, since they have no user behind them.",
+    "tailscaleNodeHelp": "The tailnet machine this host is served on. Empty uses \"{node}\" from Settings → Tailscale. Several hosts can share one node.",
     "tailscaleUpstreamNodeHelp": "Node to dial the upstreams through, for a backend that only exists on your tailnet. Upstream IP pinning and custom DNS resolvers do not apply - names are resolved by MagicDNS on the far side.",
     "tailscaleUpstreamNodeLabel": "Reach upstreams over the tailnet",
     "timeout": "Timeout",
@@ -1431,6 +1434,7 @@
     "codeEditor": {
       "keyboardHint": "Tab indents; press Escape then Tab to leave the field"
     },
+    "emptyValue": "-",
     "passwordField": {
       "copiedLabel": "Copied",
       "copyLabel": "Copy password",
