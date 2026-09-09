@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { declineMigration, hasAnySignIn, isSetupCompleted } from "@/src/lib/setup";
 import { domainError } from "@/src/lib/domain-error";
+import { withTranslatedErrors } from "@/src/lib/translated-action";
 
 /**
  * Declining the offer, which is the only half of this screen that is still a server action.
@@ -12,10 +13,14 @@ import { domainError } from "@/src/lib/domain-error";
  * `getSetupState` answers this page redirects, which is precisely what the restart step needs not
  * to happen. Declining has no such problem: the redirect it performs is the point.
  */
-export async function skipMigration(): Promise<void> {
+async function skipMigrationUntranslated(): Promise<void> {
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
     throw domainError("setupAlreadyCompleted");
   }
   await declineMigration();
   redirect("/setup");
+}
+
+export async function skipMigration(): Promise<void> {
+  return withTranslatedErrors(() => skipMigrationUntranslated());
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/domain-error";
+import { withTranslatedErrors } from "@/src/lib/translated-action";
 import {
   createCaCertificate,
   deleteCaCertificate,
@@ -51,7 +52,7 @@ function validatePem(pem: string): void {
   }
 }
 
-export async function createCaCertificateAction(formData: FormData) {
+async function createCaCertificateActionUntranslated(formData: FormData) {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   const name = String(formData.get("name") ?? "").trim();
@@ -105,7 +106,9 @@ export async function deleteCaCertificateAction(
   }
 }
 
-export async function generateCaCertificateAction(formData: FormData): Promise<{ id: number }> {
+async function generateCaCertificateActionUntranslated(
+  formData: FormData,
+): Promise<{ id: number }> {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   const name = String(formData.get("name") ?? "").trim();
@@ -155,7 +158,7 @@ export type IssuedClientCert = {
   passwordProtected: boolean;
 };
 
-export async function issueClientCertificateAction(
+async function issueClientCertificateActionUntranslated(
   caCertId: number,
   formData: FormData,
 ): Promise<IssuedClientCert> {
@@ -262,4 +265,25 @@ export async function revokeIssuedClientCertificateAction(
   const record = await revokeIssuedClientCertificate(id, userId);
   revalidatePath("/certificates");
   return { revokedAt: record.revokedAt! };
+}
+
+/*
+ * These three return data, so they cannot report a failure as an `ActionState` the way the
+ * proxy-host actions do. They still throw; the wrapper is what turns the code into the reader's
+ * language first, since only the server can reach the catalog.
+ */
+
+export async function createCaCertificateAction(formData: FormData) {
+  return withTranslatedErrors(() => createCaCertificateActionUntranslated(formData));
+}
+
+export async function generateCaCertificateAction(formData: FormData): Promise<{ id: number }> {
+  return withTranslatedErrors(() => generateCaCertificateActionUntranslated(formData));
+}
+
+export async function issueClientCertificateAction(
+  caCertId: number,
+  formData: FormData,
+): Promise<IssuedClientCert> {
+  return withTranslatedErrors(() => issueClientCertificateActionUntranslated(caCertId, formData));
 }

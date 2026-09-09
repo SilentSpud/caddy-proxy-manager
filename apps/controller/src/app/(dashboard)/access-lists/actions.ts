@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
 import { domainError } from "@/src/lib/domain-error";
+import { withTranslatedErrors } from "@/src/lib/translated-action";
 import {
   addAccessListEntry,
   createAccessList,
@@ -78,7 +79,7 @@ export async function bulkDeleteEntriesAction(accessListId: number, entryIds: nu
   return list;
 }
 
-export async function regeneratePasswordAction(
+async function regeneratePasswordActionUntranslated(
   accessListId: number,
   entryId: number,
   newPassword: string,
@@ -101,4 +102,15 @@ export async function regeneratePasswordAction(
   const list = await add(accessListId, { username: entry.username, password: newPassword }, userId);
   revalidatePath("/access-lists");
   return list;
+}
+
+/** Returns the updated list, so it reports failure by throwing - translated on the way out. */
+export async function regeneratePasswordAction(
+  accessListId: number,
+  entryId: number,
+  newPassword: string,
+) {
+  return withTranslatedErrors(() =>
+    regeneratePasswordActionUntranslated(accessListId, entryId, newPassword),
+  );
 }
