@@ -58,6 +58,15 @@ describe('Caddyfile', () => {
   it('paints a duration as a number', () => {
     expect(typeAt('  interval 10s', 'caddyfile', 0, '10s')).toBe('number');
   });
+
+  it('starts an indented directive on the glyph, not on the indentation', () => {
+    // The line-anchored rules match their own indentation to avoid a lookbehind, so the scanner
+    // has to move the token past it. Getting this wrong paints the whitespace and shifts every
+    // following token on the line.
+    const tokens = tokenizeCode(code, 'caddyfile')[2] ?? [];
+    expect(tokens[0]).toMatchObject({ type: 'keyword', start: 2, end: 9 });
+    expect((code.split('\n')[2] ?? '').slice(2, 9)).toBe('respond');
+  });
 });
 
 describe('SecLang', () => {
