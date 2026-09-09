@@ -1428,6 +1428,9 @@
   },
   "ui": {
     "cancel": "Cancel",
+    "codeEditor": {
+      "keyboardHint": "Tab indents; press Escape then Tab to leave the field"
+    },
     "passwordField": {
       "copiedLabel": "Copied",
       "copyLabel": "Copy password",

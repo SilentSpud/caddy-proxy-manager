@@ -216,7 +216,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
 
             <CodeEditor
               label={t("customSeclangDirectives")}
-              language="ini"
+              language="seclang"
               placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
               value={customDirectives}
               onChange={setCustomDirectives}
