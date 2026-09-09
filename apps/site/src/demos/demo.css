@@ -1,0 +1,136 @@
+/*
+ * Everything a live demo needs to look like the product, without restyling the docs around it.
+ *
+ * Imported by DemoSurface rather than listed in `customCss`, so the ~200 kB of compiled component
+ * CSS below lands only on the pages that actually have a demo.
+ *
+ * Astryx ships three cascade layers and this states their order. Where they sit relative to
+ * Starlight's own layers is not stated and does not need to be: the frame carries Starlight's
+ * `not-content`, which its content styles exclude by selector, and every rule here is scoped to
+ * `.cpm-demo` or to `[data-astryx-theme]`, which nothing outside a demo carries.
+ */
+@layer reset, astryx-base, astryx-theme;
+
+/*
+ * Astryx's compiled component CSS: atomic classes only, all inside @layer astryx-base, so it
+ * cannot reach any markup that does not carry those classes. The theme is @scope'd to
+ * `[data-astryx-theme]`, which DemoSurface puts on its wrapper and nothing else — see the note
+ * there about why the demos do not use Astryx's own <Theme>.
+ */
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+
+/*
+ * Astryx's reset, scoped.
+ *
+ * The real `@astryxdesign/core/reset.css` is global and would take Starlight's prose with it —
+ * bullets, heading sizes, link colours, the lot. The rules its components actually depend on are
+ * these, so they are repeated here under `.cpm-demo`. Zero-specificity `:where()` is kept, so
+ * layer order alone decides: astryx-base and astryx-theme still win inside a demo.
+ */
+@layer reset {
+  .cpm-demo :where(*, *::before, *::after) {
+    box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: currentColor;
+  }
+
+  .cpm-demo :where(h1, h2, h3, h4, h5, h6) {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  .cpm-demo :where(h1, h2, h3, h4, h5, h6, p, blockquote, figure, pre, dl, dd) {
+    margin: 0;
+  }
+
+  .cpm-demo :where(a) {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  .cpm-demo :where(code, kbd, samp, pre) {
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+      monospace;
+    font-size: 1em;
+  }
+
+  .cpm-demo :where(ol, ul, menu) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .cpm-demo :where(img, svg, video, canvas, audio, iframe, embed, object) {
+    display: block;
+    vertical-align: middle;
+  }
+
+  .cpm-demo :where(img, video) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .cpm-demo :where(button, input, optgroup, select, textarea) {
+    font: inherit;
+    color: inherit;
+    margin: 0;
+    padding: 0;
+  }
+
+  .cpm-demo :where(button, [type="button"], [type="reset"], [type="submit"]) {
+    -webkit-appearance: button;
+    appearance: button;
+    background-color: transparent;
+    background-image: none;
+  }
+
+  .cpm-demo :where(button, [role="button"]) {
+    cursor: pointer;
+  }
+
+  .cpm-demo :where(:disabled, [aria-disabled="true"]) {
+    cursor: default;
+  }
+
+  .cpm-demo :where(textarea) {
+    resize: vertical;
+  }
+
+  .cpm-demo :where(input::placeholder, textarea::placeholder) {
+    opacity: 1;
+    color: var(--color-text-secondary, #9ca3af);
+  }
+
+  .cpm-demo :where(fieldset, legend) {
+    margin: 0;
+    padding: 0;
+  }
+
+  .cpm-demo :where(table) {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+
+  .cpm-demo :where(hr) {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+
+  .cpm-demo :where(summary) {
+    display: list-item;
+  }
+
+  .cpm-demo :where(dialog) {
+    padding: 0;
+    outline: none;
+  }
+
+  .cpm-demo :where([hidden]) {
+    display: none;
+  }
+}

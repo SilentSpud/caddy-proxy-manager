@@ -111,7 +111,7 @@ function buildLegacyDatabase(): string {
     [NOW, NOW],
   );
 
-  raw.close();
+  raw.close(true);
   return path;
 }
 
@@ -132,7 +132,9 @@ beforeEach(async () => {
 
 afterEach(() => {
   delete process.env.LEGACY_SQLITE_PATH;
-  Bun.gc(true);
+  // Every handle above and in the importer is closed with `close(true)`, so the file is released
+  // here rather than whenever the collector gets to it. Without that this line fails on Windows,
+  // intermittently, with EBUSY.
   rmSync(directory, { recursive: true, force: true });
 });
 
@@ -150,7 +152,7 @@ describe('inspection', () => {
     const path = join(directory, 'unrelated.db');
     const other = new Database(path);
     other.run('CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)');
-    other.close();
+    other.close(true);
 
     const result = inspectLegacyDatabase(path);
     expect('reason' in result).toBe(true);
@@ -255,7 +257,7 @@ describe('import', () => {
     const raw = new Database(path);
     raw.run('CREATE TABLE dead_hosts (id INTEGER PRIMARY KEY, domain TEXT)');
     raw.run("INSERT INTO dead_hosts (id, domain) VALUES (1, 'gone.example.com')");
-    raw.close();
+    raw.close(true);
 
     const report = await importLegacyDatabase(path);
     expect(report.droppedFromSchema).toContain('dead_hosts');
@@ -429,7 +431,7 @@ describe('a database encrypted with a different SESSION_SECRET', () => {
        VALUES (1, 'wildcard', 'custom', '["*.example.com"]', 0, ?, ?, ?)`,
       [encryptWithOldSecret('-----BEGIN PRIVATE KEY-----'), NOW, NOW],
     );
-    raw.close();
+    raw.close(true);
     return path;
   }
 
@@ -480,7 +482,7 @@ describe('a database encrypted with a different SESSION_SECRET', () => {
        VALUES (1, 'wildcard', 'custom', '["*.example.com"]', 0, ?, ?, ?)`,
       [encryptSecret('-----BEGIN PRIVATE KEY-----'), NOW, NOW],
     );
-    raw.close();
+    raw.close(true);
 
     // The ordinary upgrade: same secret carried over, so the flow never asks for anything.
     const report = await importLegacyDatabase(path);

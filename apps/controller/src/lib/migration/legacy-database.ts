@@ -134,7 +134,7 @@ export function inspectLegacyDatabase(path: string): LegacyCandidate | LegacyRej
   } catch (error) {
     return { path, reason: `Could not read the database: ${describe(error)}` };
   } finally {
-    database.close();
+    database.close(true);
   }
 }
 

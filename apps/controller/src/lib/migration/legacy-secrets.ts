@@ -191,7 +191,7 @@ function collectSamples(sqlitePath: string): string[] {
       }
     }
   } finally {
-    database.close();
+    database.close(true);
   }
 
   return found.slice(0, SAMPLE_LIMIT);

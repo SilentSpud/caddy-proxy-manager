@@ -1354,7 +1354,7 @@ export default function WafEventsClient({
               </Text>
               <CodeEditor
                 label={t("customSeclangDirectives")}
-                language="ini"
+                language="seclang"
                 htmlName="wafCustomDirectives"
                 height="sm"
                 value={wafCustomDirectives}

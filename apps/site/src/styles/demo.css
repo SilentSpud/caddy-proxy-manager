@@ -1,0 +1,106 @@
+/*
+ * The frame a live demo sits in, and the surface behind it. Both are drawn in Starlight's own
+ * tokens, because they belong to the page rather than to the product — what goes inside the frame
+ * is styled by Astryx, out of src/demos/demo.css, which only pages with a demo on them load.
+ *
+ * Unlayered: these selectors reach nothing but the elements Demo.astro and DemoSurface write.
+ */
+.cpm-demo-frame {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  margin-block: 1.5rem;
+  overflow: hidden;
+}
+
+.cpm-demo-frame > figcaption {
+  align-items: baseline;
+  position: relative;
+  background: var(--sl-color-gray-6);
+  border-bottom: 1px solid var(--sl-color-gray-5);
+  color: var(--sl-color-gray-2);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--sl-text-sm);
+  gap: 0.5rem 0.75rem;
+  padding: 0.625rem 1rem;
+}
+
+.cpm-demo-frame > figcaption strong {
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+/* Says the thing is real rather than a picture — the one claim the frame has to make. */
+.cpm-demo-badge {
+  background: var(--sl-color-accent-low);
+  border-radius: 999px;
+  color: var(--sl-color-accent-high);
+  cursor: help;
+  font-size: var(--sl-text-xs);
+  font-style: normal;
+  letter-spacing: 0.02em;
+  margin-inline-start: auto;
+  padding: 0.125rem 0.5rem;
+  white-space: nowrap;
+}
+
+.cpm-demo-badge:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * The caveat, on hover or focus. CSS rather than a component: the frame is plain Astro markup with
+ * no island of its own, and one line of text does not justify shipping React to every page that
+ * has a demo on it.
+ */
+.cpm-demo-hint {
+  background: var(--sl-color-gray-5);
+  /* The tooltip sits on the demo surface, which is close to it in both themes; the border is what
+     separates the two. */
+  border: 1px solid var(--sl-color-gray-4);
+  border-radius: 0.375rem;
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-xs);
+  inset-block-start: calc(100% - 0.25rem);
+  inset-inline-end: 1rem;
+  opacity: 0;
+  padding: 0.25rem 0.5rem;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 0.12s ease-out;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+/* `:focus`, not `:focus-visible`: the ring below is a visual affordance and belongs to keyboard
+   focus alone, but the caveat itself should show however the badge came to be focused. */
+.cpm-demo-badge:hover + .cpm-demo-hint,
+.cpm-demo-badge:focus + .cpm-demo-hint {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cpm-demo-hint {
+    transition: none;
+  }
+}
+
+/*
+ * The surface a demo's card sits on. Astryx's Card is near-black in dark mode and white in light,
+ * so one colour cannot sit behind both — the light override is what keeps a white card from
+ * vanishing into a white page.
+ */
+.cpm-demo {
+  background: var(--sl-color-black);
+  padding: 1.25rem;
+}
+
+:root[data-theme="light"] .cpm-demo {
+  background: var(--sl-color-gray-7);
+}
+
+/* Wide forms (the geo-block country picker, the WAF card) scroll rather than widen the page. */
+.cpm-demo > * {
+  overflow-x: auto;
+}

@@ -86,6 +86,12 @@
 
   "overrides": [
     {
+      // Biome reads only an .astro file's frontmatter, never the template below it,
+      // so every prop a component destructures and then renders reads as unused.
+      "includes": ["**/*.astro"],
+      "linter": { "rules": { "correctness": { "noUnusedVariables": "off" } } }
+    },
+    {
       // The test tree writes single-quoted and leans on `any` for fixtures and
       // on require() for module-mocking; both were already exempt under eslint.
       "includes": ["apps/controller/tests/**"],

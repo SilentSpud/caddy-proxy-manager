@@ -1,0 +1,51 @@
+---
+title: Certificates & HTTPS
+description: Automatic ACME certificates, DNS-01 providers, manual imports, and the built-in CA.
+---
+
+import Demo from "../../../components/Demo.astro";
+import CertificatesTableDemo from "../../../demos/samples/CertificatesTableDemo";
+
+Caddy obtains and renews certificates on its own. CPM's job is to tell it what to obtain, to show
+you what exists, and to hold the credentials that DNS challenges need.
+
+<Demo title="The certificates list">
+  <CertificatesTableDemo client:visible />
+</Demo>
+
+## Automatic
+
+Every proxy host gets HTTPS by default through ACME — Let's Encrypt, ZeroSSL, or any directory you
+point it at. The Certificates page shows issuer, expiry and status for each one.
+
+For an internal CA, set the ACME directory URL under **Settings → ACME Server** and supply its root
+so Caddy trusts it.
+
+## DNS-01
+
+HTTP-01 needs port 80 reachable from the internet. DNS-01 does not, which is what makes wildcard
+certificates and internal-only hosts possible.
+
+Twenty providers are supported, including Cloudflare, Route 53, DigitalOcean, Hetzner, Vultr,
+Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, netcup, deSEC, Dynu, acme-dns and ClouDNS.
+Credentials are encrypted at rest, and propagation delay and timeout are configurable per provider
+— netcup ships with slow-propagation defaults because it needs them.
+
+A provider can be overridden per certificate when one domain lives somewhere else.
+
+:::note
+A DNS provider is a compiled-in Caddy module. If the one you want is greyed out, turn it on in
+[Caddy Build](../caddy-build/) and rebuild.
+:::
+
+## Manual imports
+
+Bring your own certificate and key. Expiry is tracked and surfaced the same way managed ones are,
+so an import that is about to lapse is visible rather than a surprise.
+
+## The built-in CA
+
+CPM can act as its own certificate authority for client certificates — see
+[access lists & mTLS](../access-control/). Issued certificates are tracked and revocable, and
+revocation is fail-closed: revoking every certificate rejects every connection rather than falling
+open.
