@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { domainError } from "@/src/lib/domain-error";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { validateSettingsGroup } from "@/src/lib/settings-validation";
 import {
@@ -1631,7 +1632,7 @@ function parseCustomModules(raw: FormDataEntryValue | null): CaddyCustomModule[]
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("Custom modules could not be read. Try re-entering them.");
+    throw domainError("customModulesUnreadable");
   }
   if (!Array.isArray(parsed)) return [];
   return parsed as CaddyCustomModule[];

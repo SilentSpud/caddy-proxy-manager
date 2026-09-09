@@ -235,7 +235,7 @@ export default function OAuthProvidersSection({
       }
       closeDialog();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(err instanceof Error ? err.message : t("unexpectedError"));
     } finally {
       setSaving(false);
     }

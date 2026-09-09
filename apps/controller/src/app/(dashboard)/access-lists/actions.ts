@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { domainError } from "@/src/lib/domain-error";
 import {
   addAccessListEntry,
   createAccessList,
@@ -92,9 +93,9 @@ export async function regeneratePasswordAction(
     getAccessList,
   } = await import("@/src/lib/models/access-lists");
   const listBefore = await getAccessList(accessListId);
-  if (!listBefore) throw new Error("Access list not found");
+  if (!listBefore) throw domainError("accessListNotFound");
   const entry = listBefore.entries.find((e) => e.id === entryId);
-  if (!entry) throw new Error("Entry not found");
+  if (!entry) throw domainError("accessListEntryNotFound");
 
   await remove(accessListId, entryId, userId);
   const list = await add(accessListId, { username: entry.username, password: newPassword }, userId);

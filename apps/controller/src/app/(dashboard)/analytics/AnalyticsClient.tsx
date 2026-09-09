@@ -444,7 +444,7 @@ export default function AnalyticsClient() {
       })
       .catch((err: unknown) => {
         // Reset to empty rather than leaving stale data next to an error banner.
-        setLoadError(err instanceof Error ? err.message : "Failed to load analytics data");
+        setLoadError(err instanceof Error ? err.message : t("loadErrorToast"));
         setSummary(null);
         setTimeline([]);
         setCountries([]);

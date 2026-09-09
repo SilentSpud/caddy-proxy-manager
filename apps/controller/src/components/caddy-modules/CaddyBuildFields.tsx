@@ -206,7 +206,7 @@ export function CaddyBuildFields({
       }
       await fetchStatus();
     } catch (error) {
-      setRebuildError(error instanceof Error ? error.message : "Rebuild could not be started.");
+      setRebuildError(error instanceof Error ? error.message : t("rebuildCouldNotStart"));
     } finally {
       setRebuilding(false);
     }

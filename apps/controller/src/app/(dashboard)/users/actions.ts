@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { domainError } from "@/src/lib/domain-error";
 import {
   createUser,
   updateUserProfile,
@@ -21,7 +22,7 @@ export async function createUserAction(formData: FormData) {
   const actorId = Number(session.user.id);
 
   if (config.auth.disableLocalUsers) {
-    throw new Error("Local user creation is disabled. Users are provisioned by the OIDC provider.");
+    throw domainError("localUserCreationDisabled");
   }
 
   const email = String(formData.get("email") ?? "").trim();
@@ -33,7 +34,7 @@ export async function createUserAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    throw new Error("Email and password are required");
+    throw domainError("emailAndPasswordRequired");
   }
 
   const passwordHash = await hashPassword(password);
@@ -63,7 +64,7 @@ export async function updateUserRoleAction(userId: number, role: User["role"]) {
   const actorId = Number(session.user.id);
 
   if (actorId === userId) {
-    throw new Error("Cannot change your own role");
+    throw domainError("cannotChangeOwnRole");
   }
 
   await updateUserRole(userId, role);
@@ -84,7 +85,7 @@ export async function updateUserStatusAction(userId: number, status: string) {
   const actorId = Number(session.user.id);
 
   if (actorId === userId) {
-    throw new Error("Cannot change your own status");
+    throw domainError("cannotChangeOwnStatus");
   }
 
   await updateUserStatus(userId, status);
@@ -125,7 +126,7 @@ export async function deleteUserAction(userId: number) {
   const actorId = Number(session.user.id);
 
   if (actorId === userId) {
-    throw new Error("Cannot delete your own account");
+    throw domainError("cannotDeleteOwnAccount");
   }
 
   await deleteUser(userId);

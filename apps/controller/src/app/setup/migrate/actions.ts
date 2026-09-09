@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { declineMigration, hasAnySignIn, isSetupCompleted } from "@/src/lib/setup";
+import { domainError } from "@/src/lib/domain-error";
 
 /**
  * Declining the offer, which is the only half of this screen that is still a server action.
@@ -13,7 +14,7 @@ import { declineMigration, hasAnySignIn, isSetupCompleted } from "@/src/lib/setu
  */
 export async function skipMigration(): Promise<void> {
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
-    throw new Error("Setup has already been completed.");
+    throw domainError("setupAlreadyCompleted");
   }
   await declineMigration();
   redirect("/setup");

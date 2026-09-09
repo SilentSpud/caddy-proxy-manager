@@ -63,7 +63,7 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
         await deleteCertificateAction(cert.id);
         setDeleteOpen(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to delete certificate");
+        setError(err instanceof Error ? err.message : t("deleteFailed"));
       }
     });
   }
