@@ -339,7 +339,7 @@ export async function importLegacyDatabase(
       totalRows,
     };
   } finally {
-    source.close();
+    source.close(true);
   }
 }
 

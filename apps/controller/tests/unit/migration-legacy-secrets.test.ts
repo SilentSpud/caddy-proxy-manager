@@ -121,7 +121,7 @@ describe('probeLegacySecrets', () => {
     values.forEach((value, index) => {
       raw.run('INSERT INTO settings (key, value) VALUES (?, ?)', [`k${index}`, value]);
     });
-    raw.close();
+    raw.close(true);
     return path;
   }
 

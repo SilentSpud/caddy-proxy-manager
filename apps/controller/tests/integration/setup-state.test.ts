@@ -211,23 +211,18 @@ describe('the migration offer', () => {
     const path = join(directory, 'old.db');
     const raw = new Database(path);
     migrate(drizzle(raw), { migrationsFolder: resolve(process.cwd(), 'drizzle', 'legacy-sqlite') });
-    raw.close();
+    raw.close(true);
     process.env.LEGACY_SQLITE_PATH = path;
     return directory;
   }
 
   /**
-   * bun:sqlite releases the file only once its statements are finalized, which happens on
-   * collection — Windows refuses the removal until then, and a leftover temp directory is not
-   * worth failing a test over.
+   * bun:sqlite's plain `close()` releases the file only once its statements are finalized, which
+   * happens on collection — and Windows refuses the removal until then. `close(true)` above
+   * finalizes them there and then, so this can just delete the directory.
    */
   function discard(directory: string): void {
-    Bun.gc(true);
-    try {
-      rmSync(directory, { recursive: true, force: true });
-    } catch {
-      // Left for the operating system to clean up.
-    }
+    rmSync(directory, { recursive: true, force: true });
   }
 
   it('offers migration before account creation when an old database is present', async () => {

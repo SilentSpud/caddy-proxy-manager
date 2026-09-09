@@ -83,5 +83,5 @@ raw.run("INSERT INTO settings (key, value, updatedAt) VALUES ('general', ?, ?)",
   NOW,
 ]);
 
-raw.close();
+raw.close(true);
 console.log(LEGACY_FILE);
