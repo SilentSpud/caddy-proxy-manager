@@ -3,7 +3,7 @@
  *
  * This used to be an HTTP client: the controller held every agent's address and dialled it. It no
  * longer dials anything. Agents connect inbound and hold an event stream open, so this file is now
- * a facade over `registry.ts` — the map of who is currently attached — and the shape of the
+ * a facade over `registry.ts` - the map of who is currently attached - and the shape of the
  * functions is all that survives the inversion.
  *
  * That shape is deliberate. Nine modules call into here, and keeping their signatures identical is
@@ -62,7 +62,7 @@ function noAgentError(): AgentUnavailableError {
 /**
  * Every agent currently attached to this controller.
  *
- * "Configured" and "reachable" used to be different questions — a row could exist for a host that
+ * "Configured" and "reachable" used to be different questions - a row could exist for a host that
  * was down. They are the same question now: an agent that is not holding a stream open cannot be
  * reached by any means, so it is not a target.
  */
@@ -75,7 +75,7 @@ export async function listAgentTargets(): Promise<ConnectedAgent[]> {
  *
  * Deliberately not `listAgentTargets`: a host is pinned to an agent that exists, not to one that
  * happens to be holding a stream right now. An agent that is down still has hosts placed on it and
- * still appears here — with `connected` false, so the form can say so rather than hiding it and
+ * still appears here - with `connected` false, so the form can say so rather than hiding it and
  * losing the assignment on the next save.
  */
 export async function listAgentOptions(): Promise<
@@ -132,7 +132,7 @@ export async function tryGetAgentStatus(): Promise<AgentStatus | null> {
  * One agent's state by its `agents` row id, or null when it is not connected.
  *
  * Row id rather than the self-asserted `agentId`, because everything that configures an agent
- * separately — its module selection, the hosts pinned to it — is keyed on the row an operator
+ * separately - its module selection, the hosts pinned to it - is keyed on the row an operator
  * picked from a list.
  */
 export async function getAgentStatusFor(agentRowId: number): Promise<AgentStatus | null> {
@@ -154,7 +154,7 @@ export async function getAllAgentStatuses(): Promise<AgentResult<AgentStatus>[]>
  * Publish the same ports on every agent.
  *
  * Every agent runs the same configuration, so a port an L4 host needs has to be published on all
- * of them — a request that lands on one Caddy and not another is the split brain this exists to
+ * of them - a request that lands on one Caddy and not another is the split brain this exists to
  * prevent. The fan-out is the broadcast inside `pushDesiredState`; `ports` is not passed on,
  * because desired state is recomputed from the settings that just changed rather than trusted from
  * the caller. Two sources for one fact is how they drift.

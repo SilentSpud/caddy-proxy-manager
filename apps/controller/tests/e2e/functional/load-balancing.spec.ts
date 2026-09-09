@@ -14,7 +14,7 @@ test.describe
       await createProxyHost(page, {
         name: 'Functional LB Test',
         domain: DOMAIN,
-        // Two upstreams separated by newline — both will be round-robined by Caddy.
+        // Two upstreams separated by newline - both will be round-robined by Caddy.
         // echo-server returns "echo-ok", echo-server-2 returns "echo-server-2".
         upstream: 'echo-server:8080\necho-server-2:8080',
       });

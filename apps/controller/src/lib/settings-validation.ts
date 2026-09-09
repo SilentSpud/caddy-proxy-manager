@@ -232,7 +232,7 @@ function validateDashboard(value: Record<string, unknown>): void {
   });
   // A hostname, not merely a non-empty string. This value is interpolated into a Caddy host matcher
   // and into the URL the reachability check requests, so "any text up to 253 characters" was the
-  // wrong bar in both places — the check being the one CodeQL objected to. Refusing it here is
+  // wrong bar in both places - the check being the one CodeQL objected to. Refusing it here is
   // what stops anything else being stored to begin with.
   if (!isHostname(domain)) {
     invalid("dashboard.domain must be a hostname, e.g. cpm.example.com");
@@ -429,7 +429,7 @@ function validateWaf(value: Record<string, unknown>): void {
   const badDirective = findInvalidBodyLimitDirective(directives);
   if (badDirective) {
     invalid(
-      `waf.custom_directives has an out-of-range body limit: "${badDirective}" — ${bodyLimitRangeMessage("the byte count")}`,
+      `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
     );
   }
   if (value.excluded_rule_ids !== undefined)
@@ -517,7 +517,7 @@ function validateTailscale(value: Record<string, unknown>): void {
   booleanValue(required(value, "enabled", "Tailscale settings"), "tailscale.enabled");
   try {
     // The normalizer is the single source of truth for what a node name, a tag and a state
-    // directory may be — it also runs on every read, so duplicating the rules here would let the
+    // directory may be - it also runs on every read, so duplicating the rules here would let the
     // API accept something the next read would silently drop.
     normalizeTailscaleSettings(value);
   } catch (error) {

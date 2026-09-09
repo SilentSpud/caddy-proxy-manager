@@ -1,7 +1,7 @@
 import { CpmForwardAuthFields } from "@cpm/controller/src/components/proxy-hosts/CpmForwardAuthFields";
 import { DemoSurface } from "../DemoSurface";
 
-/** One group let in, one webhook path let past — the two decisions this page is about. */
+/** One group let in, one webhook path let past - the two decisions this page is about. */
 export default function ForwardAuthDemo() {
   return (
     <DemoSurface>

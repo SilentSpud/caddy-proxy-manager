@@ -39,7 +39,7 @@ import { useTranslations } from "next-intl";
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
 // `ssr: false` is deliberate. ApexCharts v7 renders on the server only through
-// `react-apexcharts/server`, an async Server Component this client file cannot reach — and there
+// `react-apexcharts/server`, an async Server Component this client file cannot reach - and there
 // is nothing to render anyway, since every dataset arrives from /api/analytics/* in an effect.
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -61,7 +61,7 @@ const WorldMap = dynamic(() => import("./WorldMapInner"), {
   selectedCountry?: string | null;
 }>;
 
-// ── Types (mirrored from analytics-db — can't import server-only code) ────────
+// ── Types (mirrored from analytics-db - can't import server-only code) ────────
 
 type Interval = "1h" | "12h" | "24h" | "7d" | "30d";
 type DisplayInterval = Interval | "custom";
@@ -339,7 +339,7 @@ function HostsCombobox({
 /**
  * Fetch JSON, treating a non-2xx as a failure. The analytics endpoints answer errors with
  * `{ error: "…" }`, which parsed without checking `response.ok` lands an object in array-typed
- * state — the first `.map()` then throws during render and blanks the page.
+ * state - the first `.map()` then throws during render and blanks the page.
  */
 async function fetchJson(url: string): Promise<unknown> {
   const response = await fetch(url);
@@ -350,7 +350,7 @@ async function fetchJson(url: string): Promise<unknown> {
         ? String((body as { error: unknown }).error).trim()
         : "";
     // Errors thrown by the ClickHouse client often carry an empty message, so always fall back to
-    // something renderable — an empty string is falsy and would leave the banner invisible.
+    // something renderable - an empty string is falsy and would leave the banner invisible.
     throw new Error(reported || `${url.split("?")[0]} failed with status ${response.status}`);
   }
   return body;
@@ -384,7 +384,7 @@ export default function AnalyticsClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
-  /** How many seconds the current selection spans — used for chart axis labels */
+  /** How many seconds the current selection spans - used for chart axis labels */
   const rangeSeconds = useMemo(() => {
     if (interval === "custom" && customFrom && customTo) {
       const diff = customTo.unix() - customFrom.unix();
@@ -618,7 +618,7 @@ export default function AnalyticsClient() {
       width: pixel(80),
       renderCell: (row) => (
         <Text type="body" size="sm" color={row.waf > 0 ? "primary" : "secondary"} hasTabularNumbers>
-          {row.waf > 0 ? row.waf.toLocaleString() : "—"}
+          {row.waf > 0 ? row.waf.toLocaleString() : "-"}
         </Text>
       ),
     },
@@ -706,7 +706,7 @@ export default function AnalyticsClient() {
       width: pixel(100),
       renderCell: (row) => (
         <Text type="body" size="sm">
-          {row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : "—"}
+          {row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : "-"}
         </Text>
       ),
     },
@@ -716,7 +716,7 @@ export default function AnalyticsClient() {
       width: pixel(160),
       renderCell: (row) => (
         <Text type="body" size="sm" maxLines={1}>
-          {row.host || "—"}
+          {row.host || "-"}
         </Text>
       ),
     },
@@ -777,7 +777,7 @@ export default function AnalyticsClient() {
           </Tooltip>
         ) : (
           <Text type="body" size="sm" color="secondary">
-            —
+            -
           </Text>
         ),
     },
@@ -857,7 +857,7 @@ export default function AnalyticsClient() {
         </HStack>
       </HStack>
 
-      {/* Load failure alert — e.g. ClickHouse unreachable or a failing query.
+      {/* Load failure alert - e.g. ClickHouse unreachable or a failing query.
           Rendered instead of crashing the page, so the rest of the UI stays usable. */}
       {loadError && (
         <div data-testid="analytics-load-error">

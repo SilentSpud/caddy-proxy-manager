@@ -43,7 +43,7 @@ One compose file and two generated secrets. Everything else is entered in the br
    docker compose up -d
    ```
 
-   Caddy itself does not start yet — it sits behind a compose profile, and the agent starts it once
+   Caddy itself does not start yet - it sits behind a compose profile, and the agent starts it once
    the two are paired. An unpaired host answering 80 and 443 with a default page would be worse
    than one not listening at all.
 
@@ -65,7 +65,7 @@ rather than at the end. It shows the exact OAuth callback URL to register, which
 guessable. And a credential saved there is handed to `docker compose` in the environment of the
 command the agent runs, instead of sitting in plaintext on the host for as long as the file exists.
 
-`.env.example` is the reference for everything else — every variable that exists, what it defaults
+`.env.example` is the reference for everything else - every variable that exists, what it defaults
 to, and whether Settings owns it. Read it when you need something setup does not cover: a
 PostgreSQL server other than the bundled one, a larger connection pool, a private CA for the agent,
 a deployment with no agent at all. Append the one line you need; there is no reason to carry the
@@ -77,7 +77,7 @@ rest.
 | ---- | ---- |
 | 3000 | The dashboard and API. Published so you always have a way in |
 | 80 / 443 | Caddy, once it is running |
-| 2019 | Caddy's admin API. **Internal only** — publishing it hands over your proxy |
+| 2019 | Caddy's admin API. **Internal only** - publishing it hands over your proxy |
 
 ## Upgrading
 
@@ -99,12 +99,12 @@ cp .env.example .env
 ```
 
 It still works. Resolution order is stored value → `.env` → built-in default, so a variable set
-there is honoured and still beats the default — it is only overridden once the same setting is
+there is honoured and still beats the default - it is only overridden once the same setting is
 saved in the app, at which point the line can be deleted.
 
 But it is no longer the shape of a new install. Most settings now live in the database, so a copied
 `.env.example` is mostly commented-out lines that duplicate what the setup page will ask you for
 anyway, and every secret written into it is a plaintext copy that the Settings path would not have
 made. Use it when you are provisioning unattended and there is no browser to reach the setup page
-in — setting both `ADMIN_USERNAME` and `ADMIN_PASSWORD` seeds an administrator at startup and skips
+in - setting both `ADMIN_USERNAME` and `ADMIN_PASSWORD` seeds an administrator at startup and skips
 the flow entirely.

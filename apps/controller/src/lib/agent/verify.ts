@@ -3,7 +3,7 @@
  *
  * The mirror of what the agent used to do to the controller. Both sides sign the same canonical
  * string with the same symmetric secret, so this is the old `verifyRequest` with the roles swapped
- * — which is the whole security consequence of inverting the dial direction: the party that has to
+ * - which is the whole security consequence of inverting the dial direction: the party that has to
  * prove itself changed, the primitive did not.
  */
 
@@ -51,7 +51,7 @@ async function sha256Hex(body: string): Promise<string> {
 /**
  * Verify a signed agent request.
  *
- * `body` is the raw text the agent signed — read it once at the route and pass it here, because
+ * `body` is the raw text the agent signed - read it once at the route and pass it here, because
  * re-reading a consumed request body would hash the empty string and fail every POST.
  */
 export async function verifyAgentRequest(

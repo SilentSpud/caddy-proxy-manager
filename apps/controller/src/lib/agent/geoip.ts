@@ -29,7 +29,7 @@ export function geoipDatabasePath(edition: GeoipEdition): string {
  * A strong ETag for a database file.
  *
  * Size and mtime rather than a content hash: these files are tens of megabytes, this runs on every
- * agent's daily check, and geoipupdate replaces the file wholesale — so a changed file always has
+ * agent's daily check, and geoipupdate replaces the file wholesale - so a changed file always has
  * a changed mtime, and hashing it would buy nothing but I/O.
  */
 export function geoipEtag(path: string): string {
@@ -70,7 +70,7 @@ export async function geoipEnabled(): Promise<boolean> {
  * What to tell agents about GeoIP, or null when this controller has none to offer.
  *
  * The URL has to be one the *agent* can reach, which for a remote agent means the controller's
- * public address — `BASE_URL`. There is no way to derive it from the request, because this is
+ * public address - `BASE_URL`. There is no way to derive it from the request, because this is
  * assembled when the controller pushes rather than when an agent asks.
  */
 export async function geoipFleetConfig(): Promise<FleetConfig["geoip"]> {

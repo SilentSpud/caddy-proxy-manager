@@ -1,7 +1,7 @@
 /** mTLS helpers for Caddy TLS connection policies and HTTP-layer RBAC routes. */
 
 /**
- * Normalise a fingerprint to Caddy's format — lowercase hex, no colons. Node gives "AB:CD:EF:…";
+ * Normalise a fingerprint to Caddy's format - lowercase hex, no colons. Node gives "AB:CD:EF:…";
  * Caddy's placeholder gives "abcdef…".
  */
 export function normalizeFingerprint(fp: string): string {
@@ -25,7 +25,7 @@ export function pemToBase64Der(pem: string): string {
 }
 
 /**
- * Builds a Caddy `client_authentication` block for the given domains, unioning their CA cert IDs —
+ * Builds a Caddy `client_authentication` block for the given domains, unioning their CA cert IDs -
  * so callers must pre-group domains sharing a CA config (`groupMtlsDomainsByCaSet`). Per CA:
  * unmanaged → trust anything it signed; managed with active certs → CA plus active leaves in
  * `trusted_leaf_certs`; all revoked → excluded. Null when no CA certs are left to trust.
@@ -88,7 +88,7 @@ export function buildClientAuthentication(
         const activeLeafCerts = issuedClientCertMap.get(id) ?? [];
         trustedCaCerts.push(pemToBase64Der(ca.certificatePem));
         if (activeLeafCerts.length === 0) {
-          // All certs revoked — pin the CA cert itself as a leaf. No client cert can hash-match a
+          // All certs revoked - pin the CA cert itself as a leaf. No client cert can hash-match a
           // CA cert, so this rejects everyone while keeping a valid client_authentication block.
           trustedLeafCerts.push(pemToBase64Der(ca.certificatePem));
         } else {
@@ -118,7 +118,7 @@ export function buildValidClientCertCelExpression(): string {
 
 /**
  * Groups mTLS domains by sorted CA ID fingerprint, so each group gets its own TLS policy with an
- * isolated trust set — a cert from CA_B cannot authenticate against a host that configured CA_A.
+ * isolated trust set - a cert from CA_B cannot authenticate against a host that configured CA_A.
  */
 export function groupMtlsDomainsByCaSet(
   domains: string[],

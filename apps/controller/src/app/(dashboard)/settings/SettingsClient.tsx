@@ -392,7 +392,7 @@ const PALETTE_ITEMS: PaletteItem[] = ALL_ITEMS.map((item) => ({
 }));
 
 // Keywords let a search match a setting's description or its group, as the old CommandItem
-// `value` string concatenation did — and its environment variables, so an operator who knows a
+// `value` string concatenation did - and its environment variables, so an operator who knows a
 // setting only as the line in their `.env` can search for that name and land on the page that
 // owns it.
 const PALETTE_SOURCE = createStaticSource(PALETTE_ITEMS, {
@@ -706,8 +706,8 @@ export default function SettingsClient({
   );
   const [tailscaleState, tailscaleFormAction] = useActionState(updateTailscaleSettingsAction, null);
 
-  // The page has two navigations — the sidebar panel and the compact picker in the content column
-  // — and neither carried a media gate, so both rendered at every width. Same breakpoint DataTable
+  // The page has two navigations - the sidebar panel and the compact picker in the content column
+  // - and neither carried a media gate, so both rendered at every width. Same breakpoint DataTable
   // uses for its card layout.
   const isNarrow = useMediaQuery("(max-width: 767px)");
 
@@ -1309,7 +1309,7 @@ function DnsProvidersSection({
               label={t("provider")}
               description={
                 unavailableCount > 0
-                  ? `${dnsProviderDefinitions.length} providers supported — ${unavailableCount} unavailable because their Caddy module is disabled`
+                  ? `${dnsProviderDefinitions.length} providers supported - ${unavailableCount} unavailable because their Caddy module is disabled`
                   : `${dnsProviderDefinitions.length} providers supported`
               }
               htmlName="provider"
@@ -1479,7 +1479,7 @@ function UpstreamDnsSection({
  * How this dashboard is served through the Caddy it manages.
  *
  * Two things make this section different from the rest of the page. Turning it off can remove the
- * route the reader is using right now, so it asks first when it can tell that is the case — the
+ * route the reader is using right now, so it asks first when it can tell that is the case - the
  * page is being served on the very domain about to stop being claimed. And TLS is a question about
  * the world rather than a preference, so the DNS check is offered inline: forcing HTTPS on a name
  * that does not resolve here yet buys nothing but a failing certificate order.
@@ -1504,7 +1504,7 @@ function DashboardHostSection({
   // Whether this page arrived through the route in question. Read after mount rather than during
   // render: the server has no window to ask, so deciding it inline would render one button on the
   // server and a different one in the browser, which is a hydration mismatch. Until it resolves
-  // the form behaves normally, which is the safe way round — the worst case is the dialog not
+  // the form behaves normally, which is the safe way round - the worst case is the dialog not
   // appearing for the first instant, not a warning that never appears.
   //
   // Compared against what is stored rather than what is typed: the saved domain is what Caddy is
@@ -1841,7 +1841,7 @@ function TailscaleSection({
             />
           </ModuleGated>
           <InfoAlert title={t("trustedProxiesInfoTitle")}>
-            The node runs in userspace inside the Caddy container — no <Code>tailscaled</Code>, no
+            The node runs in userspace inside the Caddy container - no <Code>tailscaled</Code>, no
             TUN device, no extra ports published. Its identity is kept in the state directory below,
             so it survives a container recreate.
           </InfoAlert>
@@ -1943,7 +1943,7 @@ function TailscaleSection({
             </>
           ) : (
             <WarnAlert title={t("tailscaleKeyValidationDisabledTitle")}>
-              Nothing here can tell a revoked or expired key from a working one — that is only
+              Nothing here can tell a revoked or expired key from a working one - that is only
               discovered when Caddy tries to register the node, and a node that will not come up
               makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy
               host on any agent can be updated.
@@ -2128,8 +2128,8 @@ function AvatarsSection({
 /**
  * An object URL for a file the operator just picked, or null if it is not one.
  *
- * `URL.createObjectURL` is specified to return `blob:<this origin>/<uuid>` — a name the browser
- * mints, carrying no byte of the file's name or contents — so the guard cannot fail at runtime.
+ * `URL.createObjectURL` is specified to return `blob:<this origin>/<uuid>` - a name the browser
+ * mints, carrying no byte of the file's name or contents - so the guard cannot fail at runtime.
  * It is here because the value still *derives* from a file the user chose, and that is enough for
  * a scanner tracing it into an attribute to call it attacker-controlled text (js/xss-through-dom
  * did). Narrowing to the one scheme this may ever be turns the invariant into something both a
@@ -2150,7 +2150,7 @@ function objectUrlForPreview(file: File): string | null {
  *
  * A plain `<input type="file">` rather than a design-system control: Astryx has no file input, and
  * the point of this field is the native picker anyway. The preview is built from the chosen File
- * with an object URL — the stored icon is never sent to this page, only served by its own route.
+ * with an object URL - the stored icon is never sent to this page, only served by its own route.
  */
 function BrandingSection({
   hasFavicon,
@@ -2203,7 +2203,7 @@ function BrandingSection({
                 ? `Selected: ${chosen}. Save to apply it.`
                 : hasFavicon
                   ? "A custom favicon is set."
-                  : "No custom favicon — browsers show their own default."}
+                  : "No custom favicon - browsers show their own default."}
             </Text>
           </HStack>
 
@@ -2452,7 +2452,7 @@ function AnalyticsSection({
             description={
               analytics.hasPassword
                 ? "A password is stored. Leave this empty to keep it."
-                : "Required — the ClickHouse container refuses to start without one."
+                : "Required - the ClickHouse container refuses to start without one."
             }
             htmlName="clickhousePassword"
             value={password}
@@ -2696,7 +2696,7 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
 
           {usingPaired && (
             <Text size="xsm" color="secondary">
-              {answering} of {paired.length} answering. Unpairing forgets this side only — the agent
+              {answering} of {paired.length} answering. Unpairing forgets this side only - the agent
               keeps the secret until it is restarted or paired again, so restart it too if you are
               removing an agent you no longer trust.
             </Text>
@@ -2750,7 +2750,7 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
  * One selection per agent, on top of a fleet default the rest follow.
  *
  * The module list describes a binary built on a particular host, so an agent that needs a plugin
- * the others do not — a DNS provider only it can reach — should not force that plugin into every
+ * the others do not - a DNS provider only it can reach - should not force that plugin into every
  * other image. What an agent without its own selection follows is the fleet default, which is what
  * this page edited before and what every agent starts on.
  */

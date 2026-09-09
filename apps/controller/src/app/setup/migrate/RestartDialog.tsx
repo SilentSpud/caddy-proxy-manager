@@ -4,14 +4,14 @@
  * What happens between the import finishing and the operator signing in.
  *
  * The app read its configuration from an empty database when it started, and the migration has
- * just replaced that database underneath it — settings are cached, the enabled OAuth providers
+ * just replaced that database underneath it - settings are cached, the enabled OAuth providers
  * were listed at boot, the environment backfill already decided what this deployment looks like.
  * Going straight to the login page means signing in to a process still running on the old answers,
  * and what an operator sees then is their proxy hosts with none of their settings and no reason to
  * suspect a restart would fix it.
  *
  * So the restart is part of the flow rather than a line in the release notes, and this is the only
- * screen that can say so — a page cannot explain itself while its own server is down.
+ * screen that can say so - a page cannot explain itself while its own server is down.
  *
  * The wait is deliberately in two halves. Waiting only for the app to answer would be satisfied by
  * the process that is still about to exit, so this waits for it to go away first and only then for
@@ -185,8 +185,8 @@ export default function RestartDialog({
                       title={t("restartFailedTitle")}
                       description={
                         detail
-                          ? `${detail} Restart it yourself, then continue — the migration itself is finished and does not need repeating.`
-                          : "Restart it yourself, then continue — the migration itself is finished and does not need repeating."
+                          ? `${detail} Restart it yourself, then continue - the migration itself is finished and does not need repeating.`
+                          : "Restart it yourself, then continue - the migration itself is finished and does not need repeating."
                       }
                     />
                     <Text size="sm" color="secondary">

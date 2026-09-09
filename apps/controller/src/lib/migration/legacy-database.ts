@@ -2,7 +2,7 @@
  * Finding and vetting a pre-3.0 SQLite database.
  *
  * An upgrading deployment has a file somewhere its `.env` used to point at, and the operator
- * should not have to tell us where — but neither should we open something at a guessed path and
+ * should not have to tell us where - but neither should we open something at a guessed path and
  * start copying rows out of it. So candidates are discovered, then each is opened read-only and
  * checked against the schema we expect before it is offered as something to migrate.
  *
@@ -31,7 +31,7 @@ export type LegacyCandidate = {
   counts: { users: number; proxyHosts: number; certificates: number; settings: number };
   /**
    * Rows per selectable group, so the setup page can say what ticking one would actually bring
-   * across. A group at zero is still offered — an empty audit log is not an error, and hiding it
+   * across. A group at zero is still offered - an empty audit log is not an error, and hiding it
    * would leave the operator wondering where it went.
    */
   groupCounts: Record<MigrationGroupId, number>;
@@ -93,7 +93,7 @@ function newestUpdate(database: Database, present: Set<string>): string | null {
 /**
  * Open a file read-only and decide whether it is a Caddy Proxy Manager database.
  *
- * Returns the candidate, or a rejection carrying the reason — which the setup UI shows verbatim,
+ * Returns the candidate, or a rejection carrying the reason - which the setup UI shows verbatim,
  * because "that file is a Caddy Proxy Manager database but has no users table" is the difference
  * between an operator picking a different file and giving up.
  */
@@ -115,7 +115,7 @@ export function inspectLegacyDatabase(path: string): LegacyCandidate | LegacyRej
     if (missing.length > 0) {
       return {
         path,
-        reason: `Missing the ${missing.join(", ")} table(s) — this is not a Caddy Proxy Manager database.`,
+        reason: `Missing the ${missing.join(", ")} table(s) - this is not a Caddy Proxy Manager database.`,
       };
     }
 
@@ -171,7 +171,7 @@ function candidateFiles(): string[] {
 /**
  * Every SQLite database on this host that looks like ours.
  *
- * More than one is a real situation — a stale copy beside the live file, or a backup — and the
+ * More than one is a real situation - a stale copy beside the live file, or a backup - and the
  * flow asks the operator which rather than guessing, since picking wrong migrates the wrong data
  * and there is no obvious signal that it happened.
  */

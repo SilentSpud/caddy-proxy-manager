@@ -5,7 +5,7 @@
  *
  * **Parity.** A GraphQL mutation and the `/api/v1/` route it stands beside call the same model
  * function, so they must produce the same row. The tests below write through GraphQL and read back
- * through the model the REST route uses — if a resolver ever starts doing its own validation or
+ * through the model the REST route uses - if a resolver ever starts doing its own validation or
  * shaping, that is where it shows up.
  *
  * **The gate.** Management is admin-only, including for an operator, because a group grant
@@ -105,7 +105,7 @@ describe('the GraphQL schema', () => {
       result.data as { __schema: { queryType: { fields: { name: string }[] } } }
     ).__schema.queryType.fields.map((f) => f.name);
 
-    // Not an exhaustive list — a spot check that the big resources are reachable, so a schema that
+    // Not an exhaustive list - a spot check that the big resources are reachable, so a schema that
     // silently lost a query fails here rather than in somebody's client.
     expect(names).toContain('proxyHosts');
     expect(names).toContain('l4ProxyHosts');
@@ -147,7 +147,7 @@ describe('reading through GraphQL', () => {
       .proxyHosts[0].config;
 
     // Everything the type does not name is still reachable, rather than being dropped on the way
-    // out — which is the whole justification for the JSON scalar.
+    // out - which is the whole justification for the JSON scalar.
     expect(config).toHaveProperty('locationRules');
     expect(config).toHaveProperty('geoblockMode');
     // ...and nothing promoted to a real field is duplicated inside it.

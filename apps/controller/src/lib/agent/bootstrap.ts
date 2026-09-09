@@ -7,8 +7,8 @@
  *
  * So the controller leaves a token on the shared data volume and an idle agent that finds one pairs
  * with it. The boundary is the volume: reaching this file already means being inside the stack.
- * That is the same boundary the pre-inversion design used — it kept a long-lived shared secret
- * there — except this token is single-use, so redeeming it is what makes the copy on disk worthless
+ * That is the same boundary the pre-inversion design used - it kept a long-lived shared secret
+ * there - except this token is single-use, so redeeming it is what makes the copy on disk worthless
  * rather than something that keeps working for whoever else read it.
  *
  * An agent on another host cannot mount this volume and never sees any of it. It pairs with a
@@ -22,7 +22,7 @@ import { AGENT_BOOTSTRAP_FILE, AGENT_BOOTSTRAP_TOKEN_PATTERN } from "@cpm/shared
 
 /**
  * Where the shared volume is mounted. Named for the setting it originally served so a deployment
- * that already points it at a scratch directory — every test rig does — keeps working.
+ * that already points it at a scratch directory - every test rig does - keeps working.
  */
 function dataDir(): string {
   return process.env.L4_PORTS_DIR || "/app/data";
@@ -50,7 +50,7 @@ function secureEquals(a: string, b: string): boolean {
  *
  * Called at startup. Absent rather than expiring: a controller that has been up for a week must
  * still be able to adopt an agent that was restarted this morning, and a token with a lifetime
- * would need a timer to stay useful for no gain — it is single-use either way.
+ * would need a timer to stay useful for no gain - it is single-use either way.
  */
 export function ensureBootstrapToken(): boolean {
   const path = bootstrapPath();
@@ -61,7 +61,7 @@ export function ensureBootstrapToken(): boolean {
     writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o600 });
     return true;
   } catch (error) {
-    // No shared volume — a controller running without the bundled agent, or a read-only mount.
+    // No shared volume - a controller running without the bundled agent, or a read-only mount.
     // Not an error: that deployment pairs with a typed code like any remote one.
     console.warn(`[cpm] could not write the agent bootstrap token to ${path}:`, error);
     return false;

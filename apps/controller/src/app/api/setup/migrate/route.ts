@@ -11,16 +11,16 @@ import { carryOverBlobSettings } from "@/src/lib/migration/settings-carryover";
 import { hasAnySignIn, isSetupCompleted, recordMigrationSource } from "@/src/lib/setup";
 
 /**
- * POST /api/setup/migrate — copy the chosen groups out of a legacy database.
+ * POST /api/setup/migrate - copy the chosen groups out of a legacy database.
  *
  * A route handler rather than a server action, and that is the whole reason this file exists. A
  * server action re-renders the page it was called from, and this page redirects as soon as the
- * import has changed what `getSetupState` answers — so the operator was thrown to /login the
+ * import has changed what `getSetupState` answers - so the operator was thrown to /login the
  * instant the import finished, with no chance to be told the app is about to restart. A fetch
  * leaves the page mounted, which is what lets the restart happen in front of them.
  *
  * Unauthenticated by necessity: nothing can sign in to a deployment that has not been set up. The
- * guard is the same one the account step uses — this reads an arbitrary file off the host into the
+ * guard is the same one the account step uses - this reads an arbitrary file off the host into the
  * application database, so it must only work while the database is genuinely empty.
  */
 
@@ -66,10 +66,10 @@ export async function POST(request: NextRequest): Promise<Response> {
   // Matched against the scan rather than used, and this is the whole guard.
   //
   // The posted value names a file to open on the host, and this endpoint is unauthenticated by
-  // necessity — nothing can sign in to a deployment that has not been set up yet. Inspecting the
+  // necessity - nothing can sign in to a deployment that has not been set up yet. Inspecting the
   // posted path, which is what this did before, proves the file is a database of ours; it does not
   // prove it is one this host offered. Anything else on the filesystem was still reachable: an
-  // existence check, a size, an error message naming why a file would not open — and, for a real
+  // existence check, a size, an error message naming why a file would not open - and, for a real
   // SQLite file with the right tables, an import of accounts an attacker had written themselves.
   //
   // So the browser chooses among what the scan enumerated, and the path that reaches the importer
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           ok: false,
           code: "legacy-key-required",
           error:
-            "This database's secrets — certificate keys, provider credentials, agent secrets — are " +
+            "This database's secrets - certificate keys, provider credentials, agent secrets - are " +
             "encrypted with the SESSION_SECRET the old installation ran with, which is not the one " +
             "this deployment uses. Enter the old value to bring them across.",
         },
@@ -126,20 +126,20 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     await importLegacyDatabase(chosen.path, groups, { legacyKey: legacyKey || null });
     // The old JSON blobs live in the settings table, so there is nothing to lift when settings
-    // were left behind — and writing them anyway would pin values the operator declined to bring.
+    // were left behind - and writing them anyway would pin values the operator declined to bring.
     if (groups.includes("settings")) await carryOverBlobSettings();
     await recordMigrationSource(chosen.path);
   } catch (error) {
     console.error("Migration failed", error);
     // Reachable despite the check above only when a value outside the sampled ones is encrypted
-    // under a third key — a database whose secret was rotated more than once. Nothing was written:
+    // under a third key - a database whose secret was rotated more than once. Nothing was written:
     // every row is converted before any is inserted, so this is a refusal, not a partial import.
     if (error instanceof LegacySecretError) {
       return json(
         {
           ok: false,
           code: "legacy-key-invalid",
-          error: `${error.message} Nothing was written — the import stops before writing when a value cannot be read.`,
+          error: `${error.message} Nothing was written - the import stops before writing when a value cannot be read.`,
         },
         400,
       );
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       {
         ok: false,
         error:
-          "The migration failed partway through. The database may be partly populated — empty it " +
+          "The migration failed partway through. The database may be partly populated - empty it " +
           "before trying again, so a retry does not merge two attempts.",
       },
       500,

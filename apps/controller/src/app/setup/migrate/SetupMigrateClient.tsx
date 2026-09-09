@@ -3,8 +3,8 @@
 /**
  * The migration offer: which old database, how much of it, or none at all.
  *
- * Every candidate is shown with what is actually in it — users, proxy hosts, certificates, and
- * when it was last written — because on a host with a backup beside the live file those counts are
+ * Every candidate is shown with what is actually in it - users, proxy hosts, certificates, and
+ * when it was last written - because on a host with a backup beside the live file those counts are
  * the only way to tell them apart, and choosing wrong migrates the wrong data with nothing to
  * signal it afterwards.
  *
@@ -44,7 +44,7 @@ export type Candidate = {
   lastUpdatedAt: string | null;
   /**
    * Whether this file's secrets are encrypted with a `SESSION_SECRET` this deployment does not
-   * have — decided on the server, which is the only side that can try the key.
+   * have - decided on the server, which is the only side that can try the key.
    */
   needsLegacyKey: boolean;
 };
@@ -72,7 +72,7 @@ export default function SetupMigrateClient({
   // The old deployment's SESSION_SECRET, when this file's secrets need one. Held only long enough
   // to be posted: the import re-encrypts everything under the current key, so nothing keeps it.
   const [legacyKey, setLegacyKey] = useState("");
-  // Set when the server asks for the key despite the probe not having done so — a database whose
+  // Set when the server asks for the key despite the probe not having done so - a database whose
   // secret was rotated more than once, where the sample read but something later did not.
   const [keyDemanded, setKeyDemanded] = useState(false);
   // Set once the import has succeeded, which swaps the page for the restart dialog.
@@ -217,7 +217,7 @@ export default function SetupMigrateClient({
                 <VStack gap={2}>
                   {rejected.map((entry) => (
                     <Text key={entry.path} size="xsm" color="secondary">
-                      {entry.path} — {entry.reason}
+                      {entry.path} - {entry.reason}
                     </Text>
                   ))}
                 </VStack>
@@ -232,7 +232,7 @@ export default function SetupMigrateClient({
                 {MIGRATION_GROUPS.map((group) => {
                   const requiredBy = lockedBy.get(group.id);
                   const rows = candidate?.groupCounts?.[group.id];
-                  const suffix = rows === undefined ? "" : ` — ${rows} row(s)`;
+                  const suffix = rows === undefined ? "" : ` - ${rows} row(s)`;
                   return (
                     <CheckboxInput
                       key={group.id}
@@ -260,7 +260,7 @@ export default function SetupMigrateClient({
                 title={t("accountsExcludedTitle")}
                 description={
                   migratingOAuth
-                    ? "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next — unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead."
+                    ? "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next - unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead."
                     : "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator, or configure single sign-on, on the next screen."
                 }
               />

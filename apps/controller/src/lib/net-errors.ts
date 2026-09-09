@@ -2,7 +2,7 @@
  * Recognising "the other end was not reachable" across runtimes. Bun 1.4 puts the code on
  * `TypeError.code` with no `.cause`, Node on `.cause.code`, and the names differ
  * (`ConnectionRefused` vs `ECONNREFUSED`). So match the union, walk `.cause` for wrapped errors,
- * and match the message too — the ClickHouse client keeps only text.
+ * and match the message too - the ClickHouse client keeps only text.
  */
 
 /** Codes meaning "could not open a connection to the host". */
@@ -20,7 +20,7 @@ const CONNECTION_ERROR_CODES = new Set([
 
 /**
  * Message fragments the runtimes use when no code survives wrapping. Narrow enough that an
- * application failure — a bad query, a 500 — cannot match by accident.
+ * application failure - a bad query, a 500 - cannot match by accident.
  */
 const CONNECTION_ERROR_MESSAGES = [
   "ECONNREFUSED",
@@ -38,7 +38,7 @@ function errorCode(error: unknown): string | undefined {
 }
 
 /**
- * True when `error` — or anything it wraps — is a failure to reach the host. `depth` bounds the
+ * True when `error` - or anything it wraps - is a failure to reach the host. `depth` bounds the
  * `.cause` walk so a self-referential chain cannot spin.
  */
 export function isConnectionError(error: unknown, depth = 4): boolean {

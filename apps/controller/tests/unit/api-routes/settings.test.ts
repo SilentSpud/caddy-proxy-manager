@@ -159,7 +159,7 @@ beforeEach(() => {
   mockRequireApiAdmin.mockResolvedValue({ userId: 1, role: 'admin', authMethod: 'bearer' });
   mockGetSetting.mockResolvedValue(null);
   mockApplyCaddyConfig.mockResolvedValue({ ok: true } as any);
-  // clearAllMocks clears call history, not implementations — and a `...Once` left unconsumed by a
+  // clearAllMocks clears call history, not implementations - and a `...Once` left unconsumed by a
   // sibling test would otherwise leak into whichever test the seed runs next.
   mockSaveDefaultResponse.mockReset();
   mockSaveDefaultResponse.mockResolvedValue(undefined);

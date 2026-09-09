@@ -3,7 +3,7 @@
  *
  * Grants are **additive and non-subtractive**: they widen what an `operator` can reach and change
  * nothing at all for an `admin`, a `user` or a `viewer`. That is the property that makes this safe
- * to ship into an existing deployment — until someone is deliberately given the operator role,
+ * to ship into an existing deployment - until someone is deliberately given the operator role,
  * every row in this table is inert.
  *
  * Resources are named by one nullable column each rather than a polymorphic (type, id) pair, so
@@ -35,7 +35,7 @@ export type GroupGrant = {
  *
  * The permissive direction would be the wrong default for a column that decides privilege: a row
  * with a typo in it, or one edited by hand, must not silently grant more than it says. The writer
- * only ever stores the two literals, so this only matters when something has already gone wrong —
+ * only ever stores the two literals, so this only matters when something has already gone wrong -
  * which is exactly when it should fail closed.
  */
 function toCapability(value: string): GrantCapability {
@@ -66,7 +66,7 @@ export async function listGrantsForGroup(groupId: number): Promise<GroupGrant[]>
   return rows.map(toGrant).filter((grant): grant is GroupGrant => grant !== null);
 }
 
-/** Every grant, keyed by group id — for the page that lists all the groups at once. */
+/** Every grant, keyed by group id - for the page that lists all the groups at once. */
 export async function listAllGrants(): Promise<Map<number, GroupGrant[]>> {
   const rows = await db.select().from(groupGrants);
   const byGroup = new Map<number, GroupGrant[]>();

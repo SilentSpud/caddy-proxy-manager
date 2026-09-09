@@ -46,7 +46,7 @@ COPY --from=deps /app/apps/controller/node_modules ./apps/controller/node_module
 COPY . .
 # `build` emits dist/standalone; `build:binary` compiles scripts/standalone-entry.ts and the vinext
 # production server into dist/standalone/cpm-server. This stage runs on the host arch, so the binary
-# is cross-compiled for the target — Bun names targets by libc and arch, and the glibc variants
+# is cross-compiled for the target - Bun names targets by libc and arch, and the glibc variants
 # match the debian:bookworm-slim runtime. BUN_COMPILE_TARGET feeds the package.json script.
 RUN case "$TARGETARCH" in \
       amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
@@ -58,7 +58,7 @@ RUN case "$TARGETARCH" in \
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package manager
 # and Bun CLI would be dead weight. Bookworm matches oven/bun:1-slim's base, so the glibc matches.
-# The only runtime stage — the e2e suite runs this same image, seeding through the `db-seed`
+# The only runtime stage - the e2e suite runs this same image, seeding through the `db-seed`
 # container rather than executing code here.
 FROM debian:bookworm-slim AS runner
 ARG PUID=10001
@@ -94,7 +94,7 @@ RUN mkdir -p /app/data && chown -R cpm:cpm /app/data
 
 # Shared volume for the custom ACME CA root PEM (issue #192). The web container writes it here;
 # Caddy mounts the same volume read-only. Mode 0777 so it stays writable regardless of which
-# container (with differing UIDs) initializes the named volume first — the file only ever holds a
+# container (with differing UIDs) initializes the named volume first - the file only ever holds a
 # public CA certificate.
 RUN mkdir -p /acme-ca && chmod 0777 /acme-ca
 

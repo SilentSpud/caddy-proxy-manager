@@ -1,6 +1,6 @@
 ---
 title: WAF
-description: Coraza and the OWASP Core Rule Set — block or detect, per host, with suppression and custom directives.
+description: Coraza and the OWASP Core Rule Set - block or detect, per host, with suppression and custom directives.
 ---
 
 import WafEventLogDemo from "../../../demos/samples/WafEventLogDemo";
@@ -22,8 +22,8 @@ import WafDemo from "../../../demos/samples/WafDemo";
 
 ## Two modes
 
-- **Block** — matching requests are rejected with 403.
-- **Detect** — matching requests are logged and allowed through.
+- **Block** - matching requests are rejected with 403.
+- **Detect** - matching requests are logged and allowed through.
 
 Detect first is the usual order. It tells you what the rules would have done to your traffic before
 they start doing it.
@@ -38,8 +38,8 @@ and more. It is enabled by default when the WAF is on.
 Real applications trip generic rules. Two ways out, both from the event detail drawer or the
 Suppressed Rules tab:
 
-- **Suppress globally** — the rule stops firing everywhere.
-- **Suppress for one host** — it keeps protecting everything else.
+- **Suppress globally** - the rule stops firing everywhere.
+- **Suppress for one host** - it keeps protecting everything else.
 
 ## Custom directives
 
@@ -53,7 +53,7 @@ SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolo
 ## The event log
 
 Every blocked and detected request is recorded with its rule, severity and classification, and the
-log is searchable. That log is how suppression decisions get made — the drawer for an event links
+log is searchable. That log is how suppression decisions get made - the drawer for an event links
 straight to suppressing the rule that produced it.
 
 :::note

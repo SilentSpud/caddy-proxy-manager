@@ -1,7 +1,7 @@
 /**
  * Module selection, the compose override it produces, and the gate it feeds: *desired* modules
  * (what the admin selected) vs *applied* (what the binary was built with). Generation uses the
- * intersection — Caddy rejects a whole document naming a module it lacks.
+ * intersection - Caddy rejects a whole document naming a module it lacks.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -14,7 +14,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -63,7 +63,7 @@ let pushBaseline = 0;
  * Whether the controller pushed new desired state during this test.
  *
  * Asking for a rebuild is a push now, not a POST to a rebuild endpoint. Saving the build settings
- * does not push — only applying does — so a frame appearing after the baseline is the rebuild
+ * does not push - only applying does - so a frame appearing after the baseline is the rebuild
  * request, and its absence is the controller declining to ask for one.
  */
 function rebuildRequested(): boolean {
@@ -76,7 +76,7 @@ const BLOCKER = 'github.com/fuomag9/caddy-blocker-plugin';
 const CLOUDFLARE = 'github.com/caddy-dns/cloudflare';
 
 /**
- * Pretend a rebuild already completed with these modules — the agent's *applied* set, which it
+ * Pretend a rebuild already completed with these modules - the agent's *applied* set, which it
  * reports only after a build has succeeded and Caddy is healthy again. Never the selection.
  */
 function setAppliedModules(specs: string[]) {
@@ -145,7 +145,7 @@ describe('selection resolution', () => {
 describe('applied module specs', () => {
   it('reports the full catalog when no rebuild has happened', async () => {
     // The agent reports null until it has built something, meaning the container is still the
-    // shipped image — which carries everything. Returning an empty list here would make config
+    // shipped image - which carries everything. Returning an empty list here would make config
     // generation drop every plugin-backed handler on a perfectly healthy install.
     expect(await getAppliedModuleSpecs()).toEqual(defaultModuleSpecs());
   });
@@ -207,9 +207,9 @@ describe('feature gating', () => {
     const availability = await getCaddyModuleAvailability();
     // Selected and built: usable.
     expect(isFeatureUsable(availability, 'l4')).toBe(true);
-    // Selected but not built yet — emitting it would fail the whole config.
+    // Selected but not built yet - emitting it would fail the whole config.
     expect(isFeatureUsable(availability, 'waf')).toBe(false);
-    // Built but deselected — the admin is on their way to removing it.
+    // Built but deselected - the admin is on their way to removing it.
     expect(isFeatureUsable(availability, 'geoblock')).toBe(false);
   });
 
@@ -299,7 +299,7 @@ describe('applyCaddyBuild', () => {
   it('regenerates the config before signalling the rebuild', async () => {
     // Caddy runs with --resume, so the recreated container reloads the last autosaved config. If
     // that still names a module the new binary does not have, Caddy refuses to load it and the
-    // proxy stays down — with no way in, because the admin API never comes up either. The apply
+    // proxy stays down - with no way in, because the admin API never comes up either. The apply
     // has to happen before the trigger is written, not after.
     const caddy: FakeCaddy = installFakeCaddy();
     await saveCaddyBuildSettings({ modules: { 'coraza-waf': false }, customModules: [] });
@@ -349,7 +349,7 @@ describe('applyCaddyBuild', () => {
     await applyCaddyBuild();
 
     // Still the old binary's module set, and the diff still says a rebuild is
-    // outstanding — it only settles once the agent reports success.
+    // outstanding - it only settles once the agent reports success.
     expect(await getAppliedModuleSpecs()).toEqual([CORAZA, L4].sort());
     expect((await getCaddyBuildDiff()).needsRebuild).toBe(true);
   });

@@ -1,5 +1,5 @@
 /**
- * E2E: forward auth portal (/portal) — error states, form rendering, credential submit. Runs
+ * E2E: forward auth portal (/portal) - error states, form rendering, credential submit. Runs
  * without pre-authenticated state, since this is a login page.
  */
 import { test, expect } from '@playwright/test';
@@ -27,7 +27,7 @@ test.describe('Portal login page', () => {
 
   test('shows error with invalid credentials', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
-    // The portal's credential form is the same shape as /login's — onSubmit with preventDefault,
+    // The portal's credential form is the same shape as /login's - onSubmit with preventDefault,
     // so it submits natively until React attaches.
     await waitForHydration(page);
 
@@ -42,7 +42,7 @@ test.describe('Portal login page', () => {
   test('username and password fields are required', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
 
-    // Fields have required attribute — clicking sign in with empty fields should not submit
+    // Fields have required attribute - clicking sign in with empty fields should not submit
     const username = page.getByLabel('Username');
     const password = page.getByLabel('Password');
 
@@ -50,20 +50,20 @@ test.describe('Portal login page', () => {
     await expect(password).toHaveAttribute('aria-required', 'true');
   });
 
-  test('rejects javascript: URI — no rid is created', async ({ page }) => {
+  test('rejects javascript: URI - no rid is created', async ({ page }) => {
     await page.goto('/portal?rd=javascript:alert(1)');
-    // Form shows (hasRedirect is true) but no rid is created — login will fail
+    // Form shows (hasRedirect is true) but no rid is created - login will fail
     await expect(page.getByText('Authentication Required')).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
   });
 
-  test('rejects data: URI — no rid is created', async ({ page }) => {
+  test('rejects data: URI - no rid is created', async ({ page }) => {
     await page.goto('/portal?rd=data:text/html,<h1>evil</h1>');
     await expect(page.getByText('Authentication Required')).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
   });
 
-  test('rejects file: URI — no rid is created', async ({ page }) => {
+  test('rejects file: URI - no rid is created', async ({ page }) => {
     await page.goto('/portal?rd=file:///etc/passwd');
     await expect(page.getByText('Authentication Required')).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
@@ -71,7 +71,7 @@ test.describe('Portal login page', () => {
 
   test('shows OAuth sign-in button when OIDC is enabled', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
-    // Dex is configured in the test stack — the OAuth button should appear
+    // Dex is configured in the test stack - the OAuth button should appear
     await expect(page.getByRole('button', { name: /Sign in with Dex/i })).toBeVisible();
   });
 

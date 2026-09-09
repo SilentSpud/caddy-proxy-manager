@@ -139,7 +139,7 @@ export default function OverviewClient({
           <ClickableCard label={t("trafficCardLabel")} href="/analytics" variant="cyan" padding={5}>
             <StatTile
               icon={<Icon icon={BarChart2} />}
-              value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "—"}
+              value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "-"}
               label={t("traffic24h")}
             >
               {trafficSummary && trafficSummary.totalRequests > 0 && (

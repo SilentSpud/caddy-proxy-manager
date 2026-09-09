@@ -6,7 +6,7 @@
  * matters because OAuth is the part of auth the fast suites cannot otherwise reach: the unit tests
  * stub `betterAuth` entirely, and everything else drives the adapter directly, which misses the
  * queries Better Auth only builds during a callback. Before this existed, an OAuth regression was
- * invisible until the end-to-end suite ran — after a push, and 14 minutes later.
+ * invisible until the end-to-end suite ran - after a push, and 14 minutes later.
  *
  * Start it with:
  *
@@ -28,7 +28,7 @@ export const MOCK_IDP_URL = (process.env.TEST_OIDC_URL ?? 'http://localhost:5599
 /** The issuer for the "default" realm, which is what the app is configured with. */
 export const MOCK_IDP_ISSUER = `${MOCK_IDP_URL}/default`;
 
-/** Claims the IdP returns. `role: "admin"` is deliberate — see oauth-flow.test.ts. */
+/** Claims the IdP returns. `role: "admin"` is deliberate - see oauth-flow.test.ts. */
 export const MOCK_IDP_CLAIMS = {
   sub: 'test-oauth-user',
   email: 'oauth@test.local',
@@ -77,7 +77,7 @@ export type OAuthSignInResult = {
 /**
  * Run a full OAuth sign-in against the mock IdP and return where the app landed.
  *
- * `auth.handler` is called directly rather than over HTTP — nothing has to be listening on
+ * `auth.handler` is called directly rather than over HTTP - nothing has to be listening on
  * BASE_URL, only the redirect_uri has to match what the provider was registered with.
  */
 export async function completeOAuthSignIn(
@@ -97,7 +97,7 @@ export async function completeOAuthSignIn(
   const cookieHeader = () => [...cookies].map(([k, v]) => `${k}=${v}`).join('; ');
 
   // Since Better Auth 1.7 the generic-OAuth plugin registers each provider as a first-class social
-  // provider, so this is /sign-in/social — /sign-in/oauth2 does not exist and returns 404.
+  // provider, so this is /sign-in/social - /sign-in/oauth2 does not exist and returns 404.
   const startResponse = await auth.handler(
     new Request(`${base}/api/auth/sign-in/social`, {
       method: 'POST',
@@ -118,7 +118,7 @@ export async function completeOAuthSignIn(
   const callbackUrl = idpResponse.headers.get('location');
   if (!callbackUrl) {
     throw new Error(
-      `IdP did not redirect (HTTP ${idpResponse.status}) — it is probably running with ` +
+      `IdP did not redirect (HTTP ${idpResponse.status}) - it is probably running with ` +
         `interactiveLogin enabled, which serves an HTML login form instead.`,
     );
   }

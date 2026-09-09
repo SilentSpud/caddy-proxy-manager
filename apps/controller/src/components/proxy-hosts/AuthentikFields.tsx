@@ -109,7 +109,7 @@ export function AuthentikFields({
         </HStack>
 
         {/* Unmounted when off. Previously these stayed mounted but `disabled`
-            inside a max-h-0 wrapper — disabled controls are omitted from
+            inside a max-h-0 wrapper - disabled controls are omitted from
             FormData, so the submitted payload is unchanged, and they are no
             longer reachable by keyboard while hidden. */}
         {enabled && (

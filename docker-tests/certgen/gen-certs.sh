@@ -53,7 +53,7 @@ openssl req -x509 -newkey rsa:2048 -nodes \
 rm -f pebble.csr pebble.ext
 
 # Consumers run as assorted UIDs (Pebble as root, the origin as python's user).
-# Nothing here is secret — it is a throwaway PKI on an isolated network.
+# Nothing here is secret - it is a throwaway PKI on an isolated network.
 chmod 0644 ./*.pem
 
 echo "certgen: done"

@@ -2,7 +2,7 @@
  * Handing agents what they need to reach the services that live with the controller.
  *
  * Travels as part of desired state, so it is sent when an agent attaches and again whenever the
- * settings behind it change — an agent that came up while the controller was down would otherwise
+ * settings behind it change - an agent that came up while the controller was down would otherwise
  * sit with stale credentials until something else happened to touch it.
  */
 
@@ -25,8 +25,8 @@ export async function currentFleetConfig(): Promise<FleetConfig> {
  *
  * Now just desired state: the fleet config travels with the ports, modules and services in one
  * frame, so there is nothing left here but the recompute-and-broadcast every other setting does.
- * Kept as its own function because a dozen callers name it, and what they mean — "the analytics
- * credentials changed" — is still true.
+ * Kept as its own function because a dozen callers name it, and what they mean - "the analytics
+ * credentials changed" - is still true.
  *
  * Never throws. An agent that is not attached gets the whole state the moment it reconnects.
  */

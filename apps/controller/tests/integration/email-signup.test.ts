@@ -2,7 +2,7 @@
  * Email self-registration through Better Auth, against a real PostgreSQL database.
  *
  * The e2e suite covers this at :3001 and was the only thing that did, so a failure took a full
- * stack build to see and produced nothing but a 422 — Better Auth reports an adapter error and the
+ * stack build to see and produced nothing but a 422 - Better Auth reports an adapter error and the
  * underlying database message never reaches the response. Booting the same code here surfaces it.
  */
 import { afterEach, describe, expect, it } from 'bun:test';

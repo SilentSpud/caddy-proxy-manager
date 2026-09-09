@@ -2,7 +2,7 @@
 
 /**
  * Which plugin-backed features are on, in context for the dashboard's client components. Honesty,
- * not enforcement — config generation already refuses handlers for absent modules.
+ * not enforcement - config generation already refuses handlers for absent modules.
  */
 
 import { createContext, useContext, type ReactNode } from "react";
@@ -20,8 +20,8 @@ export type ModuleGateState = {
   pendingRebuild: boolean;
 };
 
-// Defaulting to "everything on" keeps components usable outside the provider — tests, storybook
-// and the login shell — instead of silently disabling every control.
+// Defaulting to "everything on" keeps components usable outside the provider - tests, storybook
+// and the login shell - instead of silently disabling every control.
 const FALLBACK: ModuleGateState = {
   features: { l4: true, geoblock: true, waf: true, tailscale: true, dns01: true },
   moduleNames: { l4: "", geoblock: "", waf: "", tailscale: "", dns01: "" },
@@ -57,7 +57,7 @@ export function useFeatureEnabled(feature: CaddyFeatureId): boolean {
   return useModuleGate().features[feature] ?? true;
 }
 
-/** The sentence shown when a feature is off — names the module. Null when it is available. */
+/** The sentence shown when a feature is off - names the module. Null when it is available. */
 export function useDisabledReason(feature: CaddyFeatureId): string | null {
   const gate = useModuleGate();
   if (gate.features[feature] ?? true) return null;

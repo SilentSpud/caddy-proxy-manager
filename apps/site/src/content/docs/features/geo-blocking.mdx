@@ -32,7 +32,7 @@ that should still get through.
 
 ## Fail-closed
 
-If the GeoIP database cannot answer — it is missing, or the lookup fails — fail-closed mode rejects
+If the GeoIP database cannot answer - it is missing, or the lookup fails - fail-closed mode rejects
 the request rather than letting it past. Off by default, because the safer choice for most
 deployments is that a broken database does not take the site down; on when the block list is a
 security control rather than a nuisance filter.
@@ -61,6 +61,6 @@ geoblock trusted-proxy list, so the two cannot silently disagree.
 
 </Steps>
 
-On a stack with an [agent](../agent/) that is the whole setup — saving starts the `geoipupdate`
+On a stack with an [agent](../agent/) that is the whole setup - saving starts the `geoipupdate`
 container. Turning the toggle off stops it again and hides country matching from the host forms.
 Without an agent, put the credentials in `.env` and start the compose profile by hand.

@@ -48,7 +48,7 @@ test.describe
       expect(res.body).toBe('Forbidden');
     });
 
-    test('blocked path is terminal — request never reaches the upstream', async () => {
+    test('blocked path is terminal - request never reaches the upstream', async () => {
       const res = await httpGet(DOMAIN, '/dns-query');
       // whoami-server echoes "GET /dns-query HTTP/..." when proxied. The block
       // returns a static_response, so that echo must NOT appear in the body.

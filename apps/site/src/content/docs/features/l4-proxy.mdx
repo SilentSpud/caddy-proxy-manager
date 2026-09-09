@@ -1,6 +1,6 @@
 ---
 title: L4 TCP/UDP proxy
-description: Layer 4 stream proxying — SNI matching, PROXY protocol, health checks and port management.
+description: Layer 4 stream proxying - SNI matching, PROXY protocol, health checks and port management.
 ---
 
 import Demo from "../../../components/Demo.astro";
@@ -15,14 +15,14 @@ an SSH endpoint, anything that speaks its own protocol.
 
 ## What it can match on
 
-- **Port** — the listening port on the Caddy host.
-- **TLS SNI** — several TLS backends can share one port, routed by the name in the handshake. This
+- **Port** - the listening port on the Caddy host.
+- **TLS SNI** - several TLS backends can share one port, routed by the name in the handshake. This
   works without terminating TLS, so the certificate stays with the backend.
 
 ## PROXY protocol
 
 Both v1 and v2, so the backend sees the real client address instead of Caddy's. The backend has to
-be configured to expect it — sending PROXY protocol to something that is not listening for it
+be configured to expect it - sending PROXY protocol to something that is not listening for it
 breaks the connection outright.
 
 ## Load balancing and health
@@ -38,7 +38,7 @@ send, so a blocked connection is closed rather than answered.
 ## Ports are managed for you
 
 A published port has to exist on the container, and container ports are fixed when the container is
-created. Adding an L4 host therefore needs the Caddy container recreated — the [agent](../agent/)
+created. Adding an L4 host therefore needs the Caddy container recreated - the [agent](../agent/)
 writes a compose override with the new port list and recreates Caddy, so the port appears without
 you editing a compose file. The dashboard shows when a port change is pending a recreate.
 

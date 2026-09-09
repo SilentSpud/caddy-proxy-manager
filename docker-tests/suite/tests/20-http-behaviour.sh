@@ -65,7 +65,7 @@ sts=$(header_value strict-transport-security)
 t_contains "HSTS is still set" "max-age=63072000" "$sts"
 t_not_contains "subdomains are not claimed unless asked for" "includeSubDomains" "$sts"
 
-# Turning HSTS off must remove the header entirely — a stale max-age would keep
+# Turning HSTS off must remove the header entirely - a stale max-age would keep
 # browsers pinned to HTTPS long after the operator changed their mind.
 no_hsts=$(domain_for "hsts-off")
 create_host_or_fail "a host with HSTS switched off can be created" "$(jq -nc --arg d "$no_hsts" '{

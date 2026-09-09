@@ -33,7 +33,7 @@ describe('analytics map palette', () => {
     for (const color of paintColors(paletteFor(mode))) {
       expect(color).not.toBe('');
       // MapLibre paints in WebGL and cannot resolve CSS custom properties or a
-      // light-dark() pair — an unresolved token would reach the GPU as garbage
+      // light-dark() pair - an unresolved token would reach the GPU as garbage
       // and silently paint nothing.
       expect(color).not.toContain('light-dark');
       expect(color).not.toContain('var(');
@@ -90,7 +90,7 @@ describe('analytics map palette', () => {
     expect(fill.slice(3)).toEqual([0, p.empty, 0.001, p.ramp[0], 0.4, p.ramp[1], 1, p.ramp[2]]);
   });
 
-  it('keeps ids stable — the map queries and filters layers by name', () => {
+  it('keeps ids stable - the map queries and filters layers by name', () => {
     const p = paletteFor('light');
     expect(fillLayerFor(p).id).toBe('countries-fill');
     expect(selectedLayerFor(p).id).toBe('countries-selected');

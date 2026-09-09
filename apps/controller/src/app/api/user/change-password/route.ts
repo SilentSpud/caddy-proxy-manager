@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // No local passwords exist in OIDC-only mode — setting one would create a
+    // No local passwords exist in OIDC-only mode - setting one would create a
     // credential path around the IdP.
     if (config.auth.disableLocalUsers) {
       return NextResponse.json(
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Password verified successfully — reset rate limit counter
+    // Password verified successfully - reset rate limit counter
     resetAttempts(rateLimitKey);
 
     // Hash new password

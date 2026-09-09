@@ -13,7 +13,7 @@ export default async function proxy(req: NextRequest) {
   // step is deliberately absent: it runs after sign-in and is protected like any other page.
   //
   // Listed one path at a time rather than as `/api/setup/*`: that prefix also holds
-  // /api/setup/backup, which streams the migrated SQLite file — every account in the deployment —
+  // /api/setup/backup, which streams the migrated SQLite file - every account in the deployment -
   // and is admin-only for that reason. Each route below guards itself as well.
   const isSetupEntry =
     pathname === "/setup" ||
@@ -78,7 +78,7 @@ export default async function proxy(req: NextRequest) {
   //
   // Before the sign-in redirect, so an unconfigured deployment sends an operator somewhere they
   // can act rather than to a form nothing can answer. After authentication, so the stage can tell
-  // "has an account but has not signed in" from "signed in, still configuring" — and only for page
+  // "has an account but has not signed in" from "signed in, still configuring" - and only for page
   // requests, since an API call gets its own answer rather than a redirect to HTML.
   if (!pathname.startsWith("/api/")) {
     const { getSetupState, SETUP_PATHS } = await import("@/src/lib/setup");
@@ -87,7 +87,7 @@ export default async function proxy(req: NextRequest) {
     if (required && pathname !== destination) {
       return NextResponse.redirect(new URL(destination, req.url));
     }
-    // Setup is done; nothing should linger on its pages. /setup/done is the exception — it is the
+    // Setup is done; nothing should linger on its pages. /setup/done is the exception - it is the
     // summary a migrated deployment is shown *after* completion, and it guards itself.
     if (!required && pathname.startsWith("/setup") && pathname !== "/setup/done") {
       return NextResponse.redirect(new URL("/", req.url));

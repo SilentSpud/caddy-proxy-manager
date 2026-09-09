@@ -71,15 +71,15 @@ jobs:
         uses: docker/metadata-action@v6
         env:
           # Default is `manifest` alone, which annotates the per-arch manifests and leaves the
-          # multi-arch index bare — and the index is what GHCR reads for the package page's
+          # multi-arch index bare - and the index is what GHCR reads for the package page's
           # description and "linked repository". Both levels, so the two agree.
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
           # Per-image identity. Without these the action derives title and description from the
           # repository, so all three images would claim to be the same thing; the Dockerfiles carry
-          # the same values for local `docker compose build`. Everything else — version, revision,
-          # created, source, licenses — the action fills in from the tag and the repo.
+          # the same values for local `docker compose build`. Everything else - version, revision,
+          # created, source, licenses - the action fills in from the tag and the repo.
           labels: |
             org.opencontainers.image.title=${{ matrix.title }}
             org.opencontainers.image.description=${{ matrix.description }}

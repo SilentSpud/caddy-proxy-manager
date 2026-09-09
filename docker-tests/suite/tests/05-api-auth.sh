@@ -41,7 +41,7 @@ t_matches "the raw token is 32 bytes of hex" '^[0-9a-f]{64}$' "$throwaway_raw"
 
 with_token "$throwaway_raw" api_expect "the new token authenticates" 200 GET /api/v1/proxy-hosts
 
-# Revocation is not session-only — only creation is.
+# Revocation is not session-only - only creation is.
 api DELETE "/api/v1/tokens/$throwaway_id"
 t_eq "the token can be revoked" "200" "$API_STATUS"
 with_token "$throwaway_raw" api_expect "a revoked token no longer authenticates" 401 GET /api/v1/proxy-hosts
@@ -114,7 +114,7 @@ t_eq "a session write from a foreign Origin is refused" "403" "$cross_origin"
 # its own, so the assertion is the same one either way, and this keeps the host
 # on the teardown stack. That matters here specifically: CPM writes the row
 # before it pushes the Caddy config, so a push that fails leaves a live host
-# behind in a reply that carries no id — nothing a raw curl could have tracked,
+# behind in a reply that carries no id - nothing a raw curl could have tracked,
 # and every later file's config push would then fail on it.
 create_host "$(jq -nc --arg d "$(domain_for "bearer-csrf")" '{
   name: "docker-test-bearer-csrf", domains: [$d], upstreams: ["origin-a:8080"]

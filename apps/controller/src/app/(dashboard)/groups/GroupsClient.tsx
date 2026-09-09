@@ -217,7 +217,7 @@ export default function GroupsClient({
                     <IconButton
                       variant="ghost"
                       size="sm"
-                      label={`${t("access")} — ${group.name}`}
+                      label={`${t("access")} - ${group.name}`}
                       tooltip={t("access")}
                       icon={<ShieldCheck />}
                       onClick={() => setAccessGroup(group)}

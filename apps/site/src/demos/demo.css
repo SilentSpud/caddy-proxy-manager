@@ -14,7 +14,7 @@
 /*
  * Astryx's compiled component CSS: atomic classes only, all inside @layer astryx-base, so it
  * cannot reach any markup that does not carry those classes. The theme is @scope'd to
- * `[data-astryx-theme]`, which DemoSurface puts on its wrapper and nothing else — see the note
+ * `[data-astryx-theme]`, which DemoSurface puts on its wrapper and nothing else - see the note
  * there about why the demos do not use Astryx's own <Theme>.
  */
 @import "@astryxdesign/core/astryx.css";
@@ -23,7 +23,7 @@
 /*
  * Astryx's reset, scoped.
  *
- * The real `@astryxdesign/core/reset.css` is global and would take Starlight's prose with it —
+ * The real `@astryxdesign/core/reset.css` is global and would take Starlight's prose with it -
  * bullets, heading sizes, link colours, the lot. The rules its components actually depend on are
  * these, so they are repeated here under `.cpm-demo`. Zero-specificity `:where()` is kept, so
  * layer order alone decides: astryx-base and astryx-theme still win inside a demo.

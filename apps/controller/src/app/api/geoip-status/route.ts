@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const enabled = await geoipEnabled();
     return NextResponse.json({
       // Reported separately from the two files, so the UI can tell "switched off" from "switched
-      // on but the download has not landed" — the fix is a different one in each case.
+      // on but the download has not landed" - the fix is a different one in each case.
       enabled,
       country: enabled && existsSync(geoipDatabasePath("GeoLite2-Country")),
       asn: enabled && existsSync(geoipDatabasePath("GeoLite2-ASN")),

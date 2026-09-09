@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Anti-clickjacking headers on public pages. The login and portal forms shipped with none — headers
- * were set only on the authenticated branch — so both X-Frame-Options and frame-ancestors are now
+ * Anti-clickjacking headers on public pages. The login and portal forms shipped with none - headers
+ * were set only on the authenticated branch - so both X-Frame-Options and frame-ancestors are now
  * required.
  */
 

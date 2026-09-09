@@ -16,7 +16,7 @@ const ATTEMPTS = new Map<string, RateLimitEntry>();
  * change the throttle without a restart. The settings module caches, so this is a map lookup after
  * the first read.
  *
- * Imported lazily for the same reason the config module always was — a static import would read
+ * Imported lazily for the same reason the config module always was - a static import would read
  * process.env before a test's hoisted block could set it.
  */
 async function limits(): Promise<{ maxAttempts: number; windowMs: number; blockMs: number }> {

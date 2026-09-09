@@ -33,7 +33,7 @@ import {
 interface OAuthProvidersSectionProps {
   initialProviders: OAuthProviderView[];
   baseUrl: string;
-  /** True when AUTH_DISABLE_LOCAL_USERS=true — SSO is the only way in. */
+  /** True when AUTH_DISABLE_LOCAL_USERS=true - SSO is the only way in. */
   localUsersDisabled?: boolean;
 }
 
@@ -115,7 +115,7 @@ export default function OAuthProvidersSection({
     [baseUrl],
   );
 
-  // One URL for every provider — the logout token names its own issuer, which is what picks the
+  // One URL for every provider - the logout token names its own issuer, which is what picks the
   // provider it gets verified against.
   const backchannelLogoutUrl = useMemo(() => oidcBackchannelLogoutUrl(baseUrl), [baseUrl]);
 
@@ -621,7 +621,7 @@ export default function OAuthProvidersSection({
             </VStack>
           )}
 
-          {/* Optional, and only meaningful once the provider is saved — but it belongs beside the
+          {/* Optional, and only meaningful once the provider is saved - but it belongs beside the
               callback URL, which is the other value being copied into the IdP's own form. */}
           <VStack gap={1}>
             <Text type="label" size="xsm" color="secondary">

@@ -13,7 +13,7 @@ const DEFAULT_APP_NAME = "Caddy Proxy Manager";
 
 /**
  * Display name in the sidebar, on the login card, and as the page-title suffix. A page opts out
- * with `title: { absolute: ... }` — see app/layout.tsx.
+ * with `title: { absolute: ... }` - see app/layout.tsx.
  */
 const APP_NAME = process.env.APP_NAME?.trim() || DEFAULT_APP_NAME;
 
@@ -104,7 +104,7 @@ function resolveSessionSecret(): string {
  *
  * Absent credentials are no longer a startup failure. They mean the deployment has not been
  * configured yet, and the app answers that by running first-run setup (./setup.ts) rather than
- * refusing to start — which is the whole reason for having a setup flow. There is no development
+ * refusing to start - which is the whole reason for having a setup flow. There is no development
  * default either: admin/admin was a way to get a usable instance without configuring one, and
  * setup is now the better answer to that in every environment.
  *
@@ -203,7 +203,7 @@ export const config = {
     allowSelfRegistration:
       !LOCAL_USERS_DISABLED && process.env.AUTH_ALLOW_SELF_REGISTRATION === "true",
     // Separate from credential self-registration: gates whether an OAuth sign-in may implicitly
-    // create a brand-new account. Defaults closed — except in OIDC-only mode, where the IdP is
+    // create a brand-new account. Defaults closed - except in OIDC-only mode, where the IdP is
     // the only way an account can exist, so it defaults open unless explicitly refused.
     allowOauthRegistration: LOCAL_USERS_DISABLED
       ? process.env.AUTH_ALLOW_OAUTH_REGISTRATION !== "false"
@@ -247,7 +247,7 @@ export function validateProductionConfig() {
   if (isRuntimeProduction) {
     // Access the config values to force validation; throws if defaults are used in production
     void config.sessionSecret;
-    // Admin credentials are validated only when local users exist at all —
+    // Admin credentials are validated only when local users exist at all -
     // resolveAdminCredentials() short-circuits in OIDC-only mode.
     void config.adminUsername;
     void config.adminPassword;

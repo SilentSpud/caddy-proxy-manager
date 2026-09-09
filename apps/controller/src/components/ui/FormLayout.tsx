@@ -4,7 +4,7 @@
  * The card, alert and submit primitives every settings-shaped form in the app is built from.
  *
  * These lived inside SettingsClient.tsx until the setup flow needed the same shapes. Extracted
- * rather than copied so the two stay identical — a setup page that looks subtly unlike the
+ * rather than copied so the two stay identical - a setup page that looks subtly unlike the
  * settings page it is about to hand over to reads as a different application.
  */
 import type { ReactNode } from "react";
@@ -40,7 +40,7 @@ export function FormCard({
     <Card padding={4}>
       <VStack gap={4}>
         {title && (
-          // level 2 because every caller renders these under the page's own h1 — the Settings
+          // level 2 because every caller renders these under the page's own h1 - the Settings
           // detail pane and each setup step. Its own stack, and a tighter gap than the card's, so
           // the rule reads as part of the heading rather than as the first row of content.
           <VStack gap={2}>

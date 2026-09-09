@@ -2,8 +2,8 @@
  * What the agent is doing, and the one place that decides it.
  *
  * Three states, and the transitions between them are the whole feature: an agent installed on a
- * host has nowhere to fetch a configuration from, so it comes up `idle` — Caddy stopped, ports 80
- * and 443 shut — and stays there until an operator runs `cpm-agent --pair`. Only once it has a
+ * host has nowhere to fetch a configuration from, so it comes up `idle` - Caddy stopped, ports 80
+ * and 443 shut - and stays there until an operator runs `cpm-agent --pair`. Only once it has a
  * controller does it start Caddy, which makes "paired" and "serving traffic" the same state rather
  * than two an operator has to reconcile.
  *
@@ -53,7 +53,7 @@ export type LifecycleDeps = {
  * How often an idle agent looks for a bootstrap token the controller has not written yet.
  *
  * Frequent enough that a stack coming up together pairs itself in seconds, slow enough that an
- * agent which will never have one — every remote agent — spends nothing worth measuring on it.
+ * agent which will never have one - every remote agent - spends nothing worth measuring on it.
  */
 const BOOTSTRAP_POLL_MS = 3_000;
 
@@ -113,7 +113,7 @@ export class AgentLifecycle {
 
     // The bundled stack starts the agent and the controller together, and the controller writes
     // the bootstrap token as it boots. Reading it once meant losing that race left the agent idle
-    // *forever* — Caddy never started, and the only clue was "No pairing code" on a stack the
+    // *forever* - Caddy never started, and the only clue was "No pairing code" on a stack the
     // operator never had to pair by hand. So keep looking while there is a controller to pair
     // with. A remote agent has no such file and this finds nothing, which costs one `existsSync`
     // a few seconds and is the state it is already sitting in.
@@ -139,7 +139,7 @@ export class AgentLifecycle {
       this.clearBootstrapWatch();
       void this.pairWith(controllerUrl, token).then((outcome) => {
         if (outcome.ok) return;
-        // Redeeming a token can fail for a reason a retry fixes — the controller still starting —
+        // Redeeming a token can fail for a reason a retry fixes - the controller still starting -
         // so go back to watching rather than giving up the way the old single read did.
         console.warn(`[agent] ${outcome.error}`);
         if (!this.stopped && this.lifecycle === "idle") this.watchForBootstrapToken(controllerUrl);
@@ -159,7 +159,7 @@ export class AgentLifecycle {
    * the controller's volume, which is the same host and the same trust boundary. An agent on
    * another host has no such file and pairs with a code an operator carries instead.
    *
-   * Not treated as a failure when absent — that is the normal state for every remote agent.
+   * Not treated as a failure when absent - that is the normal state for every remote agent.
    */
   private readBootstrapToken(): string | null {
     const path = join(this.deps.config.dataDir, AGENT_BOOTSTRAP_FILE);
@@ -174,7 +174,7 @@ export class AgentLifecycle {
   }
 
   /**
-   * Hand a running agent its controller and code — what `cpm-agent --pair` reaches.
+   * Hand a running agent its controller and code - what `cpm-agent --pair` reaches.
    *
    * Validation happens here rather than in the CLI so that a bad address is refused the same way
    * whether it arrived from a flag, an environment variable, or the local route.
@@ -290,8 +290,8 @@ export class AgentLifecycle {
    * Stay attached to the controller, reconnecting for as long as the agent runs.
    *
    * Only a 401 breaks the loop: the controller has forgotten this agent, so the stored secret is
-   * dead and retrying with it is a request that can never start succeeding. Everything else — a
-   * controller being restarted, a network that came and went — is a reconnect with backoff, and
+   * dead and retrying with it is a request that can never start succeeding. Everything else - a
+   * controller being restarted, a network that came and went - is a reconnect with backoff, and
    * Caddy keeps serving the configuration it already has throughout.
    */
   private async run(): Promise<void> {
@@ -370,7 +370,7 @@ export class AgentLifecycle {
       }
 
       const appliedModules = store.appliedCaddyModules();
-      // Null means "never rebuilt", which the controller reads as the shipped image's catalog —
+      // Null means "never rebuilt", which the controller reads as the shipped image's catalog -
       // not an empty list. Rebuilding on that would recompile Caddy on every fresh install.
       if (appliedModules !== null && !sameList(state.caddyModules, appliedModules)) {
         operations.applyCaddyBuild(state.caddyModules);

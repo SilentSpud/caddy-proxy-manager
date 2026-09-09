@@ -5,7 +5,7 @@ Web interface for managing [Caddy Server](https://caddyserver.com/) reverse prox
 > **3.0 changes how this is configured.** Most settings now live in the database and are entered
 > through a first-run setup flow in the browser, not in `.env`. PostgreSQL replaces SQLite, and an
 > existing pre-3.0 installation is migrated in-app rather than by hand. See [First Run](#first-run)
-> and [The Database](#the-database). It is a substantial change and the 3.0 line is still in beta —
+> and [The Database](#the-database). It is a substantial change and the 3.0 line is still in beta -
 > take a backup before upgrading.
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://mit-license.org)
@@ -38,7 +38,7 @@ chmod 600 .env
 docker compose up -d
 ```
 
-Then open `http://localhost:3000` and follow [First Run](#first-run) — every URL redirects there
+Then open `http://localhost:3000` and follow [First Run](#first-run) - every URL redirects there
 until setup is finished. There is no administrator to sign in as until you create one.
 
 Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-data`, `caddy-data`,
@@ -51,14 +51,14 @@ Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-
 A fresh install has no accounts and nothing configured. The first request lands on `/setup`, and
 the app serves nothing else until the flow finishes.
 
-1. **Controller or agent.** Agents are set up from their own host and paired later — choosing it
+1. **Controller or agent.** Agents are set up from their own host and paired later - choosing it
    here just says so. See [The Agent](#the-agent).
 2. **Create the first administrator**, or configure an OAuth provider instead of a local account.
 3. **Sign in.** Deliberately before anything else is entered: a mistyped password or a wrong OAuth
    client secret is otherwise only discovered after the whole configuration has been filled in, and
    the only way out is deleting the database.
-4. **Settings.** Everything that used to live in `.env` — public URL, analytics, GeoIP credentials,
-   authentication policy — pre-filled with whatever the environment already provides, each field
+4. **Settings.** Everything that used to live in `.env` - public URL, analytics, GeoIP credentials,
+   authentication policy - pre-filled with whatever the environment already provides, each field
    showing where its value came from. **Save** writes them to the database and opens the dashboard.
    Nothing is stored before Save.
 
@@ -69,7 +69,7 @@ where it left off and the back button cannot desynchronise it. Setup is one-way:
 Two things skip the flow entirely:
 
 - **An existing pre-3.0 installation.** A SQLite database found on the host is offered for
-  migration *before* account creation — you want its accounts, not a new one alongside them. You
+  migration *before* account creation - you want its accounts, not a new one alongside them. You
   choose which parts to bring; leaving the users out continues to account creation rather than the
   login page. See [Upgrading from a pre-3.0 install](#upgrading-from-a-pre-30-install-which-used-sqlite).
 - **A deployment that predates the flow.** If `ADMIN_USERNAME`/`ADMIN_PASSWORD` or `OAUTH_ENABLED`
@@ -83,7 +83,7 @@ It becomes a proxy host CPM maintains for you, so a new install is serving somet
 before you have created anything.
 
 The domain comes from `DASHBOARD_DOMAIN` if you set it, and otherwise from the hostname in
-`BASE_URL` — the address you are already reaching CPM at. A localhost address says nothing about
+`BASE_URL` - the address you are already reaching CPM at. A localhost address says nothing about
 how the instance will be reached, so that leaves the host switched off with the field ready.
 
 It comes up on **HTTP**. Forcing HTTPS before the domain reaches you would mean a fresh install's
@@ -98,7 +98,7 @@ The check sends a request to the domain and looks for a signature only this inst
 | The domain resolves but the request arrived elsewhere | HTTPS off, with the address it currently points at |
 | Nothing answers for the name | HTTPS off. Create the record, then check again |
 
-Nothing is asked of a third party — no IP-echo service, no external resolver. The trade-off is
+Nothing is asked of a third party - no IP-echo service, no external resolver. The trade-off is
 that the request is made from this deployment, so two situations it cannot see through: a resolver
 inside your network that points the name here while public DNS does not (passes, and ACME still
 fails), and a network that will not let a request leave and come back by its own public address
@@ -111,7 +111,7 @@ It is also placed ahead of every other route, so a host somebody creates for the
 cannot shadow the one the dashboard is reached through.
 
 **You cannot lock yourself out with it.** The controller publishes its own port, so
-`http://<host>:3000` reaches this dashboard whatever the route is doing — including when you turn
+`http://<host>:3000` reaches this dashboard whatever the route is doing - including when you turn
 the host off, which the settings page warns about first if you are reading it through that very
 domain.
 
@@ -131,17 +131,17 @@ bun run dev
 The web image does not need Bun installed, and does not contain the Bun CLI. What it
 runs is `cpm-server`, a single executable produced by `bun build --compile`, holding
 the Bun runtime and the production server. The application bundle itself stays on disk
-beside the binary, in `dist/` — vinext loads it with a runtime `import()`, which Bun's
+beside the binary, in `dist/` - vinext loads it with a runtime `import()`, which Bun's
 embedded-asset filesystem cannot serve, so it cannot be compiled in.
 
 There is one runtime image, and the end-to-end suite runs that same image rather than a
 variant with extra tooling, so what the tests exercise is what ships. Since the image
 has no interpreter to execute a script with, the suite seeds its fixtures through the
-`db-seed` container in `apps/controller/tests/docker-compose.test.yml` — a throwaway `oven/bun:1-slim`
+`db-seed` container in `apps/controller/tests/docker-compose.test.yml` - a throwaway `oven/bun:1-slim`
 that mounts the same data volume. See `apps/controller/tests/helpers/seed.ts`.
 
 The container health check is `cpm-server --healthcheck`, which probes `/api/health`
-from inside the image — the runtime has no shell HTTP client to call instead.
+from inside the image - the runtime has no shell HTTP client to call instead.
 
 ---
 
@@ -163,7 +163,7 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **User Management** - Admin page for managing users: edit roles, status, profiles; disable or delete accounts; search and filter
 - **Groups** - Organize users into groups for forward auth access control. Assign groups to proxy hosts to grant access to all members at once
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
-- **Tailscale** - Serve a proxy host privately on your tailnet, gate it on the caller's Tailscale identity, or reach a backend that only exists on the tailnet. A Tailscale node runs inside the Caddy container — no `tailscaled` on the host, no TUN device, no published ports — and `*.ts.net` certificates come from Tailscale rather than ACME
+- **Tailscale** - Serve a proxy host privately on your tailnet, gate it on the caller's Tailscale identity, or reach a backend that only exists on the tailnet. A Tailscale node runs inside the Caddy container - no `tailscaled` on the host, no TUN device, no published ports - and `*.ts.net` certificates come from Tailscale rather than ACME
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
 - **GraphQL API** - Every resource under `/api/graphql`, with Bearer token authentication. One endpoint, one schema, introspectable by any GraphQL client. The agent protocol lives in the same schema as a subscription, separated by which credential a field requires
 - **REST API (deprecated)** - `/api/v1/` still works exactly as it did, with Bearer token authentication and interactive OpenAPI 3.1.0 docs at `/api-docs`. It is no longer the documented path and will be removed in a later release; new integrations should use GraphQL
@@ -172,15 +172,15 @@ from inside the image — the runtime has no shell HTTP client to call instead.
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.). Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins) and OIDC-only mode, which disables local accounts entirely
 - **DNS Providers** - Multi-provider DNS-01 challenge support for ACME certificates: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, and ClouDNS. Credentials encrypted at rest. Per-certificate provider override supported. Configurable DNS propagation delay/timeout per provider (netcup ships with slow-propagation defaults)
 - **Caddy Build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI. Settings that depend on a disabled module are greyed out and say which module to turn back on
-- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format — plus everything that used to be in `.env`, stored in the database and editable without a restart
+- **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format - plus everything that used to be in `.env`, stored in the database and editable without a restart
 - **First-run Setup** - Browser flow that creates the first administrator (or configures OAuth), proves the credentials work, and collects the rest of the configuration. No admin password in `.env`
-- **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported — accounts, hosts, certificates and settings. Secrets encrypted with the old installation's `SESSION_SECRET` are re-encrypted under this deployment's own, so the old key is entered once and never needed again. Ends with a backup of the old file and a paste-ready command to clear the migrated variables out of `.env`
+- **In-app Migration** - A pre-3.0 SQLite installation is detected, verified against the expected schema, and imported - accounts, hosts, certificates and settings. Secrets encrypted with the old installation's `SESSION_SECRET` are re-encrypted under this deployment's own, so the old key is entered once and never needed again. Ends with a backup of the old file and a paste-ready command to clear the migrated variables out of `.env`
 - **Agent Fleet** - Any number of Caddy hosts, paired by one-time code, all serving one configuration. Every apply lands on all of them or none, and names the host that refused
 - **Update Check** - Settings reports when a newer release has been published to the registry this deployment pulls from. The only request the app makes to the internet on its own, and it can be switched off
 - **Audit Log** - Searchable configuration change history with user attribution and pagination
 - **Search & Pagination** - Server-side search and pagination on all data tables
 - **Dark Mode** - Full dark/light theme support with system preference detection
-- **Internationalization** - Every string in the interface comes from a message catalog rather than the code, so translating the app is adding one JSON file. The language follows the browser's `Accept-Language` (refined by `navigator.languages`) unless one is picked explicitly, and the choice is remembered in a cookie — no `/en/` in front of every URL. English ships today; a language picker appears in the sidebar as soon as a second catalog is present
+- **Internationalization** - Every string in the interface comes from a message catalog rather than the code, so translating the app is adding one JSON file. The language follows the browser's `Accept-Language` (refined by `navigator.languages`) unless one is picked explicitly, and the choice is remembered in a cookie - no `/en/` in front of every URL. English ships today; a language picker appears in the sidebar as soon as a second catalog is present
 - **Mobile UI** - Fully responsive interface optimised for iPhone and other narrow viewports
 
 ---
@@ -199,7 +199,7 @@ migration nothing is stored, every setting resolves from the variable it always 
 is unchanged. Once a value is stored it wins, and the variable can be deleted from your `.env`.
 Each field on the Settings page shows which layer its current value came from.
 
-A stored value that no longer validates — because a range was tightened, say — is ignored with a
+A stored value that no longer validates - because a range was tightened, say - is ignored with a
 warning and falls through to the environment and the default, rather than taking the app down.
 
 ### Stored in the database
@@ -209,7 +209,7 @@ is still honoured as an override until a value is stored.
 
 | Setting | Variable | Default |
 | ------- | -------- | ------- |
-| Application name — sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
+| Application name - sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
 | Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy:2019` |
 | Gravatar fallback for user icons. Off keeps every avatar lookup off the network | `AVATAR_GRAVATAR` | `true` |
@@ -232,7 +232,7 @@ is still honoured as an override until a value is stored.
 | Collect traffic and WAF events. Leave unset to decide from whether a password is set | `ANALYTICS_ENABLED` | Unset |
 | ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
 | ClickHouse user | `CLICKHOUSE_USER` | `cpm` |
-| ClickHouse password. Required for analytics — the container will not start without one. Encrypted at rest | `CLICKHOUSE_PASSWORD` | None |
+| ClickHouse password. Required for analytics - the container will not start without one. Encrypted at rest | `CLICKHOUSE_PASSWORD` | None |
 | ClickHouse database | `CLICKHOUSE_DB` | `analytics` |
 | Days of analytics kept. Lowering it migrates the tables' TTL on the next start | `CLICKHOUSE_RETENTION_DAYS` | `30` |
 | Use GeoIP for country lookups and geo blocking. Leave unset to decide from whether the databases are present | `GEOIP_ENABLED` | Unset |
@@ -243,7 +243,7 @@ is still honoured as an override until a value is stored.
 > to provision the `clickhouse` and `geoipupdate` containers. **With an agent running the stack you
 > do not need to keep them in `.env`**: the agent starts those containers itself and passes the
 > saved values to Compose. Without an agent, Docker is the only thing that can start them and it
-> cannot read the database — so there they must stay in `.env`.
+> cannot read the database - so there they must stay in `.env`.
 
 ### Stays in `.env`
 
@@ -253,29 +253,29 @@ is still honoured as an override until a value is stored.
 | `POSTGRES_PASSWORD` | Password for the database. Provisions the bundled `postgres` service and is what the app authenticates with. Any characters; it is never put through a URL | None | **Yes** |
 | `POSTGRES_USER` / `POSTGRES_DB` | Role and database the bundled `postgres` service creates, and what the app connects as | `cpm` / `cpm` | No |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | Where the app looks for PostgreSQL. Set these to use a server other than the bundled one | `postgres` / `5432` | No |
-| `POSTGRES_SSL` | Whether the app connects with TLS. On/off only — anything finer wants `DATABASE_URL` | `false` | No |
+| `POSTGRES_SSL` | Whether the app connects with TLS. On/off only - anything finer wants `DATABASE_URL` | `false` | No |
 | `DATABASE_URL` | A full connection string, which overrides every `POSTGRES_*` above. Only needed for what the fields cannot express. A password in it must be percent-encoded. See [The Database](#the-database) | Unset | No |
-| `DATABASE_POOL_MAX` | Connections the pool may open — it sizes what reads the database, so it cannot be read from it. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance | `10` | No |
+| `DATABASE_POOL_MAX` | Connections the pool may open - it sizes what reads the database, so it cannot be read from it. Requests beyond it queue. Keep the server's own `max_connections` above the total across every instance | `10` | No |
 | `NODE_ENV` | Read at module load, before any query. `production` enforces the password policy | `production` in the image | No |
 | `HOST` / `PORT` | The socket binds before anything can be read. `::` is dual-stack and accepts IPv4 too; `0.0.0.0` binds IPv4 only | `::` / `3000` | No |
 | `CPM_APP_ROOT` / `CPM_HEALTHCHECK_URL` | Bootstrap paths for the `cpm-server` binary, used before the app starts | Executable's directory / `http://127.0.0.1:${PORT}/api/health` | No |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.0 did. **Not required** — [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely | None | No |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Seeds an administrator at startup, as releases before 3.0 did. **Not required** - [First Run](#first-run) creates the first account instead. Setting both skips the setup flow entirely | None | No |
 | `OAUTH_*` | An OAuth provider configured by environment. Synced into the `oauth_providers` table at startup rather than into the settings registry, so there is one source of truth per provider. See [OAuth Authentication](#oauth-authentication) | None | No |
 | `CERTS_DIRECTORY` | Where generated certificates are written | `./data/certs` | No |
 | `ACME_CA_ROOT_DIR` | Directory holding a custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
 | `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
 | `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
-| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent — with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
+| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent - with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
-| `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard — see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
+| `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard - see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 | `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Compose-only. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 
 ### The agent's environment
 
 The agent has no database to read configuration from until it has one, and none of this is
-changeable at runtime — it describes the host the agent is bolted to. So it stays environment-only.
+changeable at runtime - it describes the host the agent is bolted to. So it stays environment-only.
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
@@ -291,7 +291,7 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
 | `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`, `geoipupdate`) is abandoned. Generous because the first start pulls the image | `900` |
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
-| `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs. `COMPOSE_HOST_DIR` is only needed where the project directory cannot be worked out from the compose labels — a UNC path, or a Docker Desktop old enough to expose drives at `/host_mnt/<letter>`; the agent logs a warning naming it when that happens | Auto-detected |
+| `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs. `COMPOSE_HOST_DIR` is only needed where the project directory cannot be worked out from the compose labels - a UNC path, or a Docker Desktop old enough to expose drives at `/host_mnt/<letter>`; the agent logs a warning naming it when that happens | Auto-detected |
 | `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` / `GEOIP_DIR` / `GEOIP_DB` | Where the agent reads Caddy's logs and the GeoLite2 databases from | Container paths |
 | `NODE_EXTRA_CA_CERTS` | A CA bundle to trust in addition to the system store, for a controller behind TLS from a private CA. See [Connecting agents over Tailscale or Headscale](#connecting-agents-over-tailscale-or-headscale) | Unset |
 
@@ -299,11 +299,11 @@ changeable at runtime — it describes the host the agent is bolted to. So it st
 
 - `SESSION_SECRET`: 32+ characters (`openssl rand -base64 32`)
 - Any password you set, whether through setup or `ADMIN_PASSWORD`: 12+ chars with uppercase,
-  lowercase, numbers, and special characters — not required when OIDC-only mode is on
+  lowercase, numbers, and special characters - not required when OIDC-only mode is on
 
 There is no longer a development default: setting neither variable is not an error in any
 environment, it means the deployment runs [First Run](#first-run) instead of seeding an account.
-The password policy above — including the refusal of `admin` itself — is enforced only when
+The password policy above - including the refusal of `admin` itself - is enforced only when
 `NODE_ENV=production`, so a development instance may set whatever it likes.
 
 ---
@@ -318,13 +318,13 @@ curl -sX POST https://cpm.example.com/api/graphql   -H "Authorization: Bearer $C
 ```
 
 Tokens are created from **Profile → API Tokens** in an authenticated dashboard session, with an
-optional expiry — an existing bearer token cannot mint replacement credentials, so a leaked one
+optional expiry - an existing bearer token cannot mint replacement credentials, so a leaked one
 cannot extend its own life.
 
 ### What is a field and what is JSON
 
 Stable, queryable things are fields: ids, names, domains, timestamps, foreign keys. Configuration
-the model layer owns — load balancing, WAF and geoblock overrides, location rules, mTLS — travels
+the model layer owns - load balancing, WAF and geoblock overrides, location rules, mTLS - travels
 as a `JSON` scalar, reachable through `config` on a host and passed back as `input` on a mutation.
 
 That split is deliberate. Those shapes change with the product and are validated by functions that
@@ -334,7 +334,7 @@ beside it hand identical input to identical validation, which is what makes them
 
 ### Roles
 
-A token carries its owner's role, and the management fields are **admin-only** — including for an
+A token carries its owner's role, and the management fields are **admin-only** - including for an
 operator, because a [group grant](#groups-and-delegated-management) delegates the dashboard rather
 than the API. `apiTokens` is the exception: every signed-in role manages its own.
 
@@ -358,8 +358,8 @@ POSTGRES_PASSWORD=$(openssl rand -base64 32)
 Those reach the app as discrete fields rather than folded into a connection string, and that is
 deliberate: a password only has to be escaped when it goes into a URL, and Compose interpolates
 without escaping anything. `openssl rand -base64 32` emits a `/` about half the time, and a `/` in
-a URL's password ends the authority early — `postgres://cpm:pa/ss@postgres:5432/cpm` names the host
-`cpm:pa` — so the app would fail to reach a server nobody had configured. As fields there is no
+a URL's password ends the authority early - `postgres://cpm:pa/ss@postgres:5432/cpm` names the host
+`cpm:pa` - so the app would fail to reach a server nobody had configured. As fields there is no
 delimiter to collide with, and any password works as typed.
 
 To use a server you already run, point the same fields at it:
@@ -369,7 +369,7 @@ POSTGRES_HOST=db.internal POSTGRES_USER=cpm POSTGRES_PASSWORD=secret POSTGRES_DB
 ```
 
 `POSTGRES_PORT` (5432) and `POSTGRES_SSL` (off) are there too. `DATABASE_URL` still overrides all
-of them, for a server needing something the fields cannot express — an `sslmode` beyond on/off, a
+of them, for a server needing something the fields cannot express - an `sslmode` beyond on/off, a
 `search_path`, a libpq connection option:
 
 ```bash
@@ -393,7 +393,7 @@ next start the app finds the old SQLite file, checks it against the schema it ex
 to migrate it. If several candidate files are found, it asks which one; `LEGACY_SQLITE_PATH` pins
 one instead of scanning.
 
-The offer comes **before** account creation — an operator with an old database wants its accounts,
+The offer comes **before** account creation - an operator with an old database wants its accounts,
 not a new one alongside them. By default it copies everything: proxy hosts, certificates, access
 lists, users and their credentials, groups, tokens, agents, the audit log, and the settings blobs.
 You then sign in with an account it just imported, using the password you already had, which is
@@ -402,16 +402,16 @@ what proves the credential rows arrived intact.
 Each of those is a checkbox, so an installation changing hands can take the configuration and leave
 the people behind. Two rules keep a partial choice honest:
 
-- A proxy host references a certificate and an access list, and both references are nullable — so
+- A proxy host references a certificate and an access list, and both references are nullable - so
   importing hosts without them would succeed and quietly publish a host that used to sit behind a
   password. Those groups come along with proxy hosts, shown ticked and locked.
 - Everything else is resolved from the foreign keys rather than a list. A reference into a group
-  you left behind is emptied when the column allows it (`createdBy`, `ownerUserId` — provenance
+  you left behind is emptied when the column allows it (`createdBy`, `ownerUserId` - provenance
   nothing authorises against) and the row is dropped when it does not (an API token cannot exist
   without its user).
 
 Leaving the users out means nothing can sign in yet, so the flow continues to account creation
-instead of the login page — the same screen a fresh install sees, offering a first administrator or
+instead of the login page - the same screen a fresh install sees, offering a first administrator or
 an identity provider, and saying that your data arrived without its accounts.
 
 ### If the old installation used a different SESSION_SECRET
@@ -422,7 +422,7 @@ generates its own, so the old database's secrets are usually unreadable by it.
 
 The migration screen notices and asks for the old value. Enter it, and every encrypted value is
 decrypted with it and re-encrypted under the secret this deployment already uses, as the rows are
-copied. The old secret is used for that one import and nothing stores it — you do not have to keep
+copied. The old secret is used for that one import and nothing stores it - you do not have to keep
 it, and you do not have to change `SESSION_SECRET` to match the old installation.
 
 The key is checked before anything is written, and the whole database is converted in memory before
@@ -433,7 +433,7 @@ so an upgrade that kept its `SESSION_SECRET` never sees this step.
 Migrating without the key is not offered: the ciphertext would arrive intact and unreadable, and
 every affected credential would have to be entered again by hand.
 
-Your existing environment is read too — whatever your `.env` or your Compose file puts there.
+Your existing environment is read too - whatever your `.env` or your Compose file puts there.
 Anything in it that is now a database setting is carried into the [settings step](#first-run)
 pre-filled and marked as having come from the environment, so you can see what is being taken over
 before agreeing to it.
@@ -441,29 +441,29 @@ before agreeing to it.
 Setup finishes on a summary rather than the dashboard, because a deployment that has just replaced
 its database is owed three things first: a download of the old SQLite file, the path it was read
 from, and the variables that have moved into the database. The old database file is read, never
-moved or deleted — take the backup before you clean anything up.
+moved or deleted - take the backup before you clean anything up.
 
 Those variables come with a `sed` you can paste, which comments them out of the `.env` beside your
 `docker-compose.yml` and leaves a `.env.bak` next to it. The command is generated rather than the
 file rewritten, because the app cannot see that file: its environment arrives from Compose, and on
 another deployment it might arrive from Swarm or Kubernetes secrets or a systemd unit instead.
-Comments rather than deletes, so you keep the values — some of them are the only copy of a secret
+Comments rather than deletes, so you keep the values - some of them are the only copy of a secret
 you have. Cleaning up is optional either way: a variable that is still set is ignored once a value
 is stored.
 
-The variables Compose itself reads — `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DB`,
-`GEOIPUPDATE_ACCOUNT_ID`, `GEOIPUPDATE_LICENSE_KEY` — are held back from that command and listed
+The variables Compose itself reads - `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DB`,
+`GEOIPUPDATE_ACCOUNT_ID`, `GEOIPUPDATE_LICENSE_KEY` - are held back from that command and listed
 separately, because removing them is a two-step change the command cannot make on its own. Without
 an agent they stay: Docker is the only thing that can start those two containers, and it cannot read
 the database. With an agent they can go too, as long as you drop `clickhouse` and `geoipupdate` from
-`COMPOSE_PROFILES` in the same pass — see [Pick one owner](#enabling-and-disabling-analytics).
+`COMPOSE_PROFILES` in the same pass - see [Pick one owner](#enabling-and-disabling-analytics).
 
 Starting with a SQLite `DATABASE_URL` still set fails immediately, with a message saying so. That
 is deliberate: silently starting against an empty database would look like total data loss.
 
 ### Working on the schema
 
-`apps/controller/src/lib/db/schema.pg.ts` is the source of truth — hand-edited, since the SQLite
+`apps/controller/src/lib/db/schema.pg.ts` is the source of truth - hand-edited, since the SQLite
 schema it used to be generated from is gone. After changing it:
 
 ```bash
@@ -478,7 +478,7 @@ generates into it; it stays so the migration flow's tests can build a realistic 
 `bun run test` starts a throwaway PostgreSQL container, runs the suite against it, and removes it.
 Docker is the only prerequisite. Each test gets its own schema, so nothing leaks between them.
 
-To use a server of your own instead, set `TEST_POSTGRES_URL` — the suite will use it and start no
+To use a server of your own instead, set `TEST_POSTGRES_URL` - the suite will use it and start no
 container. Anything in it may be dropped, so do not point it at something you care about.
 
 ```bash
@@ -509,7 +509,7 @@ Then create the administrator through [First Run](#first-run). Nothing needs a p
 
 **Limitations:**
 - In-memory rate limiting (not suitable for multi-instance deployments)
-- `SESSION_SECRET` encrypts every secret the database holds — DNS credentials, private keys, agent
+- `SESSION_SECRET` encrypts every secret the database holds - DNS credentials, private keys, agent
   secrets. Rotating it makes all of them unreadable
 
 ---
@@ -535,7 +535,7 @@ New users default to the **user** role. The first administrator is created in [F
 
 **Operator** is the delegating role: its baseline is nothing, and it reaches exactly what
 [group grants](#groups-and-delegated-management) name. Viewer and user are unchanged and gain
-nothing from a grant, so adding one never widens an existing account — someone has to be given the
+nothing from a grant, so adding one never widens an existing account - someone has to be given the
 operator role deliberately.
 
 The management endpoints under `/api/v1/` remain **admin-only**. Grants apply to the dashboard;
@@ -545,22 +545,22 @@ API tokens can only be created from an authenticated dashboard session; an
 existing bearer token cannot mint replacement credentials. Viewer and user
 tokens are restricted to the same user-scoped API capabilities as their owner.
 
-> **Forward Auth access** is separate from role — all roles must be explicitly granted access to each protected host via the forward auth access list.
+> **Forward Auth access** is separate from role - all roles must be explicitly granted access to each protected host via the forward auth access list.
 
 ---
 
 ## Groups and delegated management
 
-Groups are lists of users. They do two jobs: they gate access to forward-auth-protected apps, and —
-with the **Access** button on a group — they decide what an **Operator** may manage.
+Groups are lists of users. They do two jobs: they gate access to forward-auth-protected apps, and -
+with the **Access** button on a group - they decide what an **Operator** may manage.
 
 ### Granting management
 
 Open **Groups → Access** on a group and tick the proxy hosts, layer-4 hosts and agents it should
 reach, then choose the capability:
 
-- **Manage** — edit, enable, disable and delete those resources.
-- **View only** — see them in the lists, change nothing.
+- **Manage** - edit, enable, disable and delete those resources.
+- **View only** - see them in the lists, change nothing.
 
 The rules, stated once:
 
@@ -568,7 +568,7 @@ The rules, stated once:
   them; a user and a viewer manage nothing and gain nothing from one.
 - An operator sees empty lists until something is granted, and the pages stay in their navigation
   so the emptiness is explainable.
-- **Creating** a host is not grantable — a grant names a resource that already exists. Operators
+- **Creating** a host is not grantable - a grant names a resource that already exists. Operators
   ask an admin for a new host, and can then be granted it.
 - Two groups reaching the same host give the more permissive of the two capabilities.
 - A grant disappears with the resource it named: deleting a host takes its grants with it.
@@ -621,7 +621,7 @@ Geo blocking is configured per proxy host. It requires MaxMind GeoLite2 database
 | CIDR | `91.98.150.0/24` | IP range in CIDR notation |
 | IP | `91.98.150.103` | Exact IP address |
 
-Rules can be **block** or **allow**. Allow rules take precedence over block rules — you can block an entire continent and then allow specific IPs or ASNs through.
+Rules can be **block** or **allow**. Allow rules take precedence over block rules - you can block an entire continent and then allow specific IPs or ASNs through.
 
 ### GeoIP Setup
 
@@ -631,7 +631,7 @@ Geo blocking requires MaxMind GeoLite2 Country and/or ASN databases. Use the bun
 2. Generate a license key with `GeoLite2-Country` and `GeoLite2-ASN` permissions
 3. Open **Settings → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and licence key
 
-That is the whole setup on a stack with an agent — saving starts the `geoipupdate` container, no
+That is the whole setup on a stack with an agent - saving starts the `geoipupdate` container, no
 Compose profile needed. Turning the toggle off stops it again and hides country matching from the
 proxy-host forms.
 
@@ -652,13 +652,13 @@ The databases are stored in the `geoip-data` Docker volume and shared between th
 
 ## Analytics
 
-Analytics uses a bundled ClickHouse instance for storing and querying traffic events and WAF events. Data is retained for **30 days** by default via ClickHouse's TTL. Change the window with the `CLICKHOUSE_RETENTION_DAYS` environment variable — on the next startup the existing tables' TTL is migrated to the new value and expired data is purged.
+Analytics uses a bundled ClickHouse instance for storing and querying traffic events and WAF events. Data is retained for **30 days** by default via ClickHouse's TTL. Change the window with the `CLICKHOUSE_RETENTION_DAYS` environment variable - on the next startup the existing tables' TTL is migrated to the new value and expired data is purged.
 
 ### Enabling and disabling analytics
 
 Open **Settings → Analytics**, tick **Collect analytics**, and set a ClickHouse password. Saving
 starts the `clickhouse` container; unticking stops it. Nothing needs to change in `.env`, and no
-Compose profile has to be listed — the agent runs `docker compose --profile clickhouse up -d
+Compose profile has to be listed - the agent runs `docker compose --profile clickhouse up -d
 clickhouse` on your behalf, passing the saved credentials through.
 
 Three things to expect:
@@ -669,11 +669,11 @@ Three things to expect:
   survives, and turning it back on picks up where it left off.
 - **Pick one owner.** Once the credentials live in Settings, drop `clickhouse` from
   `COMPOSE_PROFILES` and delete `CLICKHOUSE_PASSWORD` from `.env`. Leaving both in place means your
-  own `docker compose up -d` also creates the container — from the `.env` values, which are now the
+  own `docker compose up -d` also creates the container - from the `.env` values, which are now the
   stale copy. The controller repairs it on its next start, but the window is avoidable. A fresh
   install already starts this way: `.env.example` ships both commented out.
 
-Without an agent — a standalone binary, or a stack you assemble yourself — Docker is the only thing
+Without an agent - a standalone binary, or a stack you assemble yourself - Docker is the only thing
 that can start ClickHouse, so it is the profile as before:
 
 ```env
@@ -708,14 +708,14 @@ The WAF is powered by [Coraza](https://coraza.io/) and integrates the OWASP Core
 
 Enable globally in **WAF → Settings**, then optionally override per proxy host. Two modes:
 
-- **Block** — requests matching rules are rejected with 403
-- **Detect** — requests are logged but not blocked
+- **Block** - requests matching rules are rejected with 403
+- **Detect** - requests are logged but not blocked
 
 **OWASP CRS** covers SQLi, XSS, LFI, RCE, and more (enabled by default when WAF is on).
 
-**Rule suppression** — suppress noisy rules globally or per host from the event detail drawer or the Suppressed Rules tab.
+**Rule suppression** - suppress noisy rules globally or per host from the event detail drawer or the Suppressed Rules tab.
 
-**Custom directives** — any ModSecurity SecLang syntax is accepted, e.g.:
+**Custom directives** - any ModSecurity SecLang syntax is accepted, e.g.:
 
 ```text
 SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"
@@ -734,7 +734,7 @@ Both families, everywhere, by default.
 - `caddy-network` is created with `enable_ipv6`, without which a proxy host with an IPv6 upstream
   has no route to it however the containers themselves are configured.
 - Layer-4 listen addresses and upstreams accept `[2001:db8::1]:5432`. **The brackets are
-  required**: unbracketed, `2001:db8::1` ends in `:1`, which is indistinguishable from a port — so
+  required**: unbracketed, `2001:db8::1` ends in `:1`, which is indistinguishable from a port - so
   it is rejected rather than silently read as one.
 - Trusted proxies, geo-blocking allow/block lists and access lists already took IPv6 addresses and
   CIDR ranges.
@@ -742,7 +742,7 @@ Both families, everywhere, by default.
 ## The Agent
 
 Publishing a layer-4 port and changing Caddy's compiled-in plugins both need the Caddy *container*
-recreated, not just its config reloaded. The controller has no Docker access — deliberately — so a
+recreated, not just its config reloaded. The controller has no Docker access - deliberately - so a
 second container does that work and the two talk over a small REST API.
 
 Every request is signed with a shared secret using HMAC-SHA256 over the method, path, timestamp and
@@ -751,7 +751,7 @@ read cannot be replayed as a write.
 
 ### Analytics are written by the agent
 
-Caddy's access and WAF logs are files on the agent's host — a controller elsewhere cannot read them
+Caddy's access and WAF logs are files on the agent's host - a controller elsewhere cannot read them
 at all. So the agent parses them and inserts the events into ClickHouse itself, using credentials
 the controller pushes to it. ClickHouse still lives with the controller; only the write path moved.
 
@@ -770,34 +770,34 @@ licence key of its own, checking daily and downloading only when the copy it has
 It writes them where Caddy reads them, so geo-blocking works on every host in the fleet.
 
 This is the only request that runs agent-to-controller, and it is signed with the same pairing
-secret — no extra credential. It does mean a remote agent has to be able to reach `BASE_URL`. An
+secret - no extra credential. It does mean a remote agent has to be able to reach `BASE_URL`. An
 agent that cannot keeps using whatever database it already has.
 
 ### One controller, many configurations
 
-Everything a proxy serves — hosts, certificates, access lists, published ports, compiled-in
-plugins — belongs to this controller's database, not to any host. What each agent runs is computed
+Everything a proxy serves - hosts, certificates, access lists, published ports, compiled-in
+plugins - belongs to this controller's database, not to any host. What each agent runs is computed
 from that database and sent to it: **a document per agent**, not one for the fleet. A change is
-applied to every agent or to none — if one rejects the config or cannot be reached, the whole apply
+applied to every agent or to none - if one rejects the config or cannot be reached, the whole apply
 fails and names that agent, rather than leaving one proxy serving the new configuration and another
 serving the old.
 
 **Assigning hosts to agents.** Each proxy host and layer-4 host has an *Agents* section listing
 every paired agent. Tick none and the host is served by all of them, which is what every host did
 before assignment existed and what a new host defaults to. Tick one or more and only those agents
-receive it — useful for a host that only one site can reach, or a pair of edge nodes sharing a
+receive it - useful for a host that only one site can reach, or a pair of edge nodes sharing a
 domain.
 
 **Per-agent Caddy builds.** Settings → Caddy Build has a *Module selection for* picker: the fleet
 default, or one named agent. An agent with no selection of its own follows the fleet default, so
 enabling a module for everyone still reaches the agents nobody configured separately. Give an agent
-its own selection when it needs a plugin the rest do not — a DNS provider only it can reach — and
+its own selection when it needs a plugin the rest do not - a DNS provider only it can reach - and
 switch *Follow the fleet default* back on to put it back on the shared list.
 
 Two consequences worth knowing:
 
 - **Plugins are per agent, and a document only names what that agent has.** Caddy rejects a
-  document naming a module it lacks — wholesale, taking every host on that instance down with it —
+  document naming a module it lacks - wholesale, taking every host on that instance down with it -
   so generation is gated on what each agent reports having actually built. Rebuild an agent before
   a newly enabled module takes effect on it.
 - **Ports follow the assignment.** A layer-4 host's port is opened on the agents that serve it, and
@@ -811,7 +811,7 @@ The agent dials the controller, never the other way round. It opens one long-liv
 subscription** at `/api/graphql`, delivered as SSE, and holds it open: the controller pushes desired
 state, Caddy admin calls, and a periodic `ping` down it, and the agent reports status and command
 results back as mutations to the same endpoint. So an agent on a NAT'd or firewalled host needs
-**no inbound port** — only outbound reach to the controller.
+**no inbound port** - only outbound reach to the controller.
 
 Every one of those calls is signed with the secret agreed at pairing, over the request body. Pairing
 itself is the one thing still on a plain REST route, because it runs before that secret exists.
@@ -820,10 +820,10 @@ An agent that has never been paired does nothing, and **leaves Caddy stopped**. 
 Compose profile precisely so that `docker compose up` will not start it: a host nobody has finished
 installing must not answer on 80 and 443 with a default page. Pairing is what starts it.
 
-### Same host — nothing to enter
+### Same host - nothing to enter
 
 The bundled stack pairs itself. The controller leaves a single-use token on the shared data volume
-both containers already mount, and an idle agent that finds one pairs with it — so `docker compose
+both containers already mount, and an idle agent that finds one pairs with it - so `docker compose
 up` gives you a working install with no code typed anywhere.
 
 The boundary is the volume: reaching that file already means being inside the stack. It is the same
@@ -833,7 +833,7 @@ single-use and is rotated the moment it is redeemed, so a copy someone else read
 Caddy still waits for first-run setup to finish, because until then there is no configuration to
 serve. Reach the dashboard on `:3000` to complete it, and Caddy starts on its own.
 
-### A different host — pairing
+### A different host - pairing
 
 An agent on another host cannot mount that volume, so it pairs with a code you carry.
 
@@ -848,7 +848,7 @@ docker exec caddy-proxy-manager-agent cpm-agent --pair --host 10.0.0.5 --code AB
 two exchange a secret, which is stored encrypted on the controller and in the agent's own database,
 and the code is never used again. The agent then pulls its configuration and starts Caddy.
 
-`--pair` talks to the agent already running on that host rather than doing the work itself — the
+`--pair` talks to the agent already running on that host rather than doing the work itself - the
 running process is the one holding the database the secret lands in and the stream it will open.
 Start the agent first; pairing a stopped one is an error, not a wait.
 
@@ -859,7 +859,7 @@ place after a successful pair is ignored rather than burned again on every resta
 ### Connecting agents over Tailscale or Headscale
 
 An agent needs one thing from the network: an outbound route to the controller. It dials out and
-holds a GraphQL subscription open, and the controller never dials back — so a tailnet is a natural fit,
+holds a GraphQL subscription open, and the controller never dials back - so a tailnet is a natural fit,
 and CPM needs no Tailscale-specific configuration to use one. Point `CONTROLLER_URL` (or
 `--host`) at the controller's tailnet address and everything else is unchanged.
 
@@ -876,11 +876,11 @@ https address means something in front of it is terminating TLS. A bare host or 
 address with no port still means 3000. `--port` overrides either.
 
 **Getting the agent onto the tailnet.** If the agent's host is already on it, there is nothing to
-do. Otherwise put the container on the tailnet however you normally would — a `tailscale/tailscale`
+do. Otherwise put the container on the tailnet however you normally would - a `tailscale/tailscale`
 sidecar sharing the agent's network namespace works, and so does joining the host itself. CPM has
 no opinion about it: the agent only needs an outbound route to `CONTROLLER_URL`.
 
-This path is tested — an agent reaching its controller across a real tailnet pairs, streams, and
+This path is tested - an agent reaching its controller across a real tailnet pairs, streams, and
 serves exactly as it does on a flat network.
 
 Pairing is unchanged: generate a code under **Settings → Agents** and run
@@ -893,24 +893,24 @@ docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm-contro
 control server hands out. Headscale deployments usually have no `.ts.net` certificate, so the
 plain `http://<tailnet-ip>:3000` or MagicDNS form is the normal one. If you do put TLS in front of
 the controller using a private CA, mount the CA into the agent and set `NODE_EXTRA_CA_CERTS` to
-its path — the agent's HTTP client reads it, and without it the connection is refused as
+its path - the agent's HTTP client reads it, and without it the connection is refused as
 `unable to verify the first certificate`.
 
 Two things worth knowing:
 
 - **An agent that starts before tailscaled is up is fine.** A controller it cannot resolve is an
   ordinary unreachable controller: the agent retries with backoff and keeps Caddy serving whatever
-  it already had. Only a 401 — the controller having forgotten this agent — ends the loop.
+  it already had. Only a 401 - the controller having forgotten this agent - ends the loop.
 - **The stream is long-lived, and `tailscale serve` neither buffers it nor times it out.**
   Verified against a real tailnet: frames arrive as they are sent rather than batched at the end,
-  and a stream held open for five and a half minutes still carried data at the end of it — even
+  and a stream held open for five and a half minutes still carried data at the end of it - even
   one sent nothing at all in between, so the agent's 20-second keepalive has margin to spare
   rather than being the only thing holding the connection up.
 
 ### Unpairing
 
 Unpairing revokes the secret. The agent's next call is refused, it drops back to idle, and **it
-stops Caddy** — so unpairing takes that host out of service. Pair it again with a fresh code to
+stops Caddy** - so unpairing takes that host out of service. Pair it again with a fresh code to
 bring it back.
 
 ---
@@ -928,8 +928,8 @@ behaves exactly as it did before this page existed.
 
 Each supported plugin has a toggle. Turning one off has two effects:
 
-- The app stops generating config that uses it, immediately. This is safe — the
-  handler simply stops being emitted — and it is what lets you remove a plugin
+- The app stops generating config that uses it, immediately. This is safe - the
+  handler simply stops being emitted - and it is what lets you remove a plugin
   without Caddy rejecting the stored config on the way out.
 - Every setting that depends on it is disabled in the UI, with a tooltip naming
   the module. Global geoblocking and per-host geoblock rules follow the Request
@@ -938,13 +938,13 @@ Each supported plugin has a toggle. Turning one off has two effects:
   tailnet option follow caddy-tailscale; and each DNS provider follows its own
   `caddy-dns` module, so disabling Cloudflare leaves Route 53 alone.
 
-A module still in use cannot be switched off — the save is refused and names
+A module still in use cannot be switched off - the save is refused and names
 what is using it (for example "3 enabled L4 proxy hosts need the Layer 4 Proxy
 module"). That check covers global WAF and geoblocking, per-host WAF and
 geoblock rules, enabled L4 hosts, and every DNS provider with credentials on
 file. Turn the feature off first.
 
-Per-host **Custom Caddyfile** snippets cannot be checked the same way — they are
+Per-host **Custom Caddyfile** snippets cannot be checked the same way - they are
 free-form text, and only Caddy's adapter knows what a directive resolves to, for
 the binary running *now* rather than the one a rebuild would produce. Saving a
 module change while any host has a snippet therefore adds an advisory note
@@ -967,7 +967,7 @@ Every `replace` directive in that `go.mod` is passed through to the build, so a
 plugin can be pointed at a fork carrying a fix its upstream has not merged. Each
 one says why it exists in a comment beside itself, and the resolved list below
 records them, so an image never hides which source a plugin actually came from.
-`caddy-tailscale` is on one now — see [The plugin is on a
+`caddy-tailscale` is on one now - see [The plugin is on a
 fork](#the-plugin-is-on-a-fork).
 
 You can see exactly what an image was built with, without rebuilding it:
@@ -980,7 +980,7 @@ docker run --rm ghcr.io/silentspud/caddy-proxy-manager/caddy:latest cat /etc/cad
 
 Any Caddy plugin published as a Go module can be added by path, with an optional
 tag, branch, or commit. It is compiled from source at build time, so a module
-that does not build fails the rebuild — the running container is left untouched
+that does not build fails the rebuild - the running container is left untouched
 when that happens.
 
 Custom modules are compiled into the proxy binary and run with its privileges.
@@ -1002,11 +1002,11 @@ build harmless:
 
 | | Owned by | Holds |
 | --- | --- | --- |
-| the selection | the controller's database | the *desired* module list — the build's input |
+| the selection | the controller's database | the *desired* module list - the build's input |
 | the applied set | the agent, recorded only after the build succeeds and Caddy is healthy | what the running binary *actually* contains |
 
 If a build fails, the applied set is left alone, so the app keeps generating
-config the current binary can load. Nothing needs cleaning up by hand — fix the
+config the current binary can load. Nothing needs cleaning up by hand - fix the
 selection and click Rebuild again. If the agent is restarted mid-build (a host
 reboot, say), it clears the stale "building" state on startup and the button
 becomes available again.
@@ -1033,7 +1033,7 @@ The same selection is available under `/api/v1/caddy/modules`:
 - `PUT` replaces the selection. It applies the same refusal as the UI, returning
   `409` and naming what is still using a module you tried to disable.
 
-Saving over the API does not rebuild — same as the UI. The rebuild trigger and
+Saving over the API does not rebuild - same as the UI. The rebuild trigger and
 its progress live at `POST` / `GET /api/caddy-build`, which take the same admin
 Bearer token but sit outside the versioned `/api/v1` contract: they back the
 Settings panel and may change without a version bump. Prefer the button.
@@ -1041,13 +1041,13 @@ Settings panel and may change without a version bump. Prefer the button.
 ### Per-host Caddyfile
 
 Each proxy host also has a **Custom Caddyfile** field for raw Caddyfile
-directives. They are adapted to JSON by the running Caddy — the same binary, with
-the same plugin set, that will execute them — and inserted before that host's
+directives. They are adapted to JSON by the running Caddy - the same binary, with
+the same plugin set, that will execute them - and inserted before that host's
 reverse proxy, as a `subroute` so each directive keeps its own matcher.
 
 A snippet Caddy cannot parse is rejected when you save, with Caddy's own error
-naming the line. A snippet that stops adapting later — because it referenced a
-plugin you have since removed — is skipped with a warning in the web container's
+naming the line. A snippet that stops adapting later - because it referenced a
+plugin you have since removed - is skipped with a warning in the web container's
 logs rather than failing the whole config, so one stale snippet cannot take the
 other hosts down with it.
 
@@ -1086,14 +1086,14 @@ HTTP upstreams in the same handler are still eligible for pinning.
 ## Tailscale
 
 A proxy host can be served on your [tailnet](https://tailscale.com/) instead of, or as well as, the
-public internet — and it does not need anything else on the host. The
+public internet - and it does not need anything else on the host. The
 [caddy-tailscale](https://github.com/tailscale/caddy-tailscale) plugin runs a Tailscale node in
 userspace inside the Caddy process: no `tailscaled`, no `/dev/net/tun`, no extra published ports,
 and no change to `docker-compose.yml`.
 
 Turn it on in **Settings → Tailscale**. The one thing it needs is a reusable auth key from the
 Tailscale admin console. If you would rather not store the key in the database, put a Caddy
-placeholder in the field instead — `{env.TS_AUTHKEY}` is passed through untouched, and Caddy
+placeholder in the field instead - `{env.TS_AUTHKEY}` is passed through untouched, and Caddy
 resolves it from the container's environment.
 
 | Setting | What it does |
@@ -1102,7 +1102,7 @@ resolves it from the container's environment.
 | **Default node name** | The tailnet machine name a host inherits when it names none. Several hosts can share one node. |
 | **Tags** | ACL tags applied at registration. Most reusable auth keys require at least one, e.g. `tag:caddy`. |
 | **Control server URL** | Point at Headscale or another coordination server. Empty uses Tailscale's own. |
-| **State directory** | Where each node keeps its identity, one subdirectory per node. Defaults to `/data/tailscale`, which is on the `caddy-data` volume — keep it on a volume, or every restart registers a new machine. |
+| **State directory** | Where each node keeps its identity, one subdirectory per node. Defaults to `/data/tailscale`, which is on the `caddy-data` volume - keep it on a volume, or every restart registers a new machine. |
 | **Ephemeral** | Nodes leave the tailnet when Caddy stops instead of lingering as offline machines. |
 | **Check the auth key** | Verify the key against the Tailscale API before saving. Off by default; see [Checking the auth key](#checking-the-auth-key). |
 
@@ -1110,12 +1110,12 @@ resolves it from the container's environment.
 
 **Proxy Host → Tailscale** carries three things.
 
-**Serve on tailnet.** The host's routes move to a listener on the chosen node. **Tailnet only** —
-on by default — keeps them off the public `:80`/`:443` listener entirely, so the service exists
+**Serve on tailnet.** The host's routes move to a listener on the chosen node. **Tailnet only** -
+on by default - keeps them off the public `:80`/`:443` listener entirely, so the service exists
 only for devices on your tailnet; turn it off to publish in both places.
 
 Routing is still by `Host` header, so add the node's MagicDNS name (`<node>.<tailnet>.ts.net`) to
-the host's **Domains**. Caddy gets the certificate for that name from Tailscale — no ACME, no DNS
+the host's **Domains**. Caddy gets the certificate for that name from Tailscale - no ACME, no DNS
 provider, and nothing to configure. A `.ts.net` domain is never sent to a public CA, which could
 not validate it anyway.
 
@@ -1133,16 +1133,16 @@ request:
 | `X-Tailscale-Profile-Picture` | Profile picture URL |
 
 Any such header sent by the client is stripped before the request is proxied, on every route,
-including ones that bypass the identity check — so an upstream can trust what it receives.
+including ones that bypass the identity check - so an upstream can trust what it receives.
 
 Tagged devices are refused: a tag has no user behind it, so there is no identity to forward.
-Identity authentication needs the host to be served on the tailnet, and is dropped if it is not —
+Identity authentication needs the host to be served on the tailnet, and is dropped if it is not -
 the authenticator finds its node through the listener the request arrived on.
 
 **Reach upstreams over the tailnet.** Independent of the other two: a host published on the public
 internet can still proxy to a machine that only exists on your tailnet. Name a node to dial through
 and put a MagicDNS name or tailnet IP in **Upstreams**. Upstream DNS pinning and custom DNS
-resolvers do not apply to these — names are resolved by MagicDNS on the far side, which this
+resolvers do not apply to these - names are resolved by MagicDNS on the far side, which this
 container's resolver knows nothing about.
 
 A node named only here is never listened on: it exists so Caddy has something to dial out through,
@@ -1151,7 +1151,7 @@ and it stays idle until a request goes through it.
 ### Checking the auth key
 
 A node that cannot register is a listener that never comes up, and Caddy refuses a configuration it
-cannot start — so a missing or rejected auth key fails the apply for **every** host on **every**
+cannot start - so a missing or rejected auth key fails the apply for **every** host on **every**
 agent, with an error naming Tailscale rather than whatever was being edited. Two things guard
 against that.
 
@@ -1164,7 +1164,7 @@ the Tailscale API* in **Settings → Tailscale**. A revoked, expired or mistyped
 at the point you paste it, with the reason, instead of surfacing at the next config apply.
 
 This needs a second credential. An auth key (`tskey-auth-…`) authenticates a device registration and
-nothing else — only an API access token (`tskey-api-…`) can call the API — so the check asks for one,
+nothing else - only an API access token (`tskey-api-…`) can call the API - so the check asks for one,
 and is off by default because it is the only thing in this app that reaches Tailscale on its own.
 Read access to keys is enough. The tailnet field is `-` for the token's own tailnet, which is right
 unless you administer several.
@@ -1174,8 +1174,8 @@ unless you administer several.
 > trade: an outbound request to Tailscale on save, against discovering a dead key at the worst
 > moment.
 
-Some keys cannot be checked even with it on — an older `tskey-<secret>` key, a Headscale key, or a
-Caddy placeholder — because none of them carries an id the API can address. Those save with a note
+Some keys cannot be checked even with it on - an older `tskey-<secret>` key, a Headscale key, or a
+Caddy placeholder - because none of them carries an id the API can address. Those save with a note
 in the log rather than being refused: the format is not a documented contract, and guessing wrong
 would reject a key that works. If the API cannot be reached at all, the save **is** refused, since
 letting it through would quietly defeat the point of turning the check on.
@@ -1191,14 +1191,14 @@ is not used until the first request goes through it. Releasing one in that state
 inside `tsnet`: `tailscaleNode.Destruct` calls `tsnet.(*Server).Close`, which is documented as unsafe
 before `Start` and dereferences state that only `start()` creates. Caddy releases the previous
 configuration's modules after every reload and again on shutdown, so a single host dialling over the
-tailnet took the admin API down on the apply that stopped using it — reporting failure across the
-fleet when the configuration had in fact been applied — and turned every container stop into a
+tailnet took the admin API down on the apply that stopped using it - reporting failure across the
+fleet when the configuration had in fact been applied - and turned every container stop into a
 crash. `CertDomains` had the same flaw, reached on every TLS handshake, so one idle node would break
 certificates for all of them.
 
 The commit records whether `Start` ever returned successfully and consults that in both places. With
 it, four previously-crashing cases are clean: the reload that stops using a node, shutdown, `caddy
-validate`, and a load that fails on a bad auth key — which now exits 1 with the Tailscale error
+validate`, and a load that fails on a bad auth key - which now exits 1 with the Tailscale error
 instead of 2 with a stack trace.
 
 Nothing else guards against this, so keep the `replace` directive until the PR merges.
@@ -1207,12 +1207,12 @@ Nothing else guards against this, so keep the `replace` directive until the PR m
 ### What happens if the module is missing
 
 Tailscale is a Caddy plugin, so it has to be in the binary. It is in the default image, but if it is
-switched off in **Settings → Caddy Build** — or switched back on and not rebuilt yet — a host set to
+switched off in **Settings → Caddy Build** - or switched back on and not rebuilt yet - a host set to
 **tailnet only** is dropped from the configuration entirely rather than published on the public
 listener. Serving something privately-intended to the internet is the one failure mode worth an
 outage; the reason is logged, and everything else keeps serving.
 
-L4 proxy hosts are not on the tailnet — only HTTP proxy hosts are.
+L4 proxy hosts are not on the tailnet - only HTTP proxy hosts are.
 
 ---
 
@@ -1270,7 +1270,7 @@ OAuth login appears on the login page alongside credentials.
 
 ### Back-channel logout
 
-CPM implements [OIDC Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html), so an identity provider can end a user's CPM sessions when it ends their SSO session — an administrator revoking access, a sign-out at another application, or a disabled account.
+CPM implements [OIDC Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html), so an identity provider can end a user's CPM sessions when it ends their SSO session - an administrator revoking access, a sign-out at another application, or a disabled account.
 
 Register this as the provider's **back-channel logout URL**:
 
@@ -1280,7 +1280,7 @@ Register this as the provider's **back-channel logout URL**:
 
 It is also shown in **Settings → OAuth Providers**, beside the callback URL. One URL serves every configured provider: the logout token names its own issuer, and that selects the provider whose client ID and signing keys it is checked against.
 
-The endpoint is optional — nothing else changes if you do not configure it — and unauthenticated by design, because the caller is the provider's server rather than a browser. The signed token is the whole of the authentication, so it is rejected unless it verifies against the issuer's published JWKS, carries that provider's client ID as its audience, names a back-channel logout in its `events` claim, carries no `nonce`, was issued within the last five minutes, and has a `jti` that has not been seen before.
+The endpoint is optional - nothing else changes if you do not configure it - and unauthenticated by design, because the caller is the provider's server rather than a browser. The signed token is the whole of the authentication, so it is rejected unless it verifies against the issuer's published JWKS, carries that provider's client ID as its audience, names a back-channel logout in its `events` claim, carries no `nonce`, was issued within the last five minutes, and has a `jti` that has not been seen before.
 
 What gets ended:
 
@@ -1288,7 +1288,7 @@ What gets ended:
 - A token carrying only a `sub` ends every CPM session for that identity, because there is nothing finer to go on.
 - Either way, the user's **forward-auth sessions** for proxied hosts are dropped too. Those are minted from a CPM session but outlive it, so a proxied host would otherwise keep letting the user in after their SSO session ended.
 
-Failures answer `400` with an `error_description` naming the check that failed. A token for someone who was never signed in answers `200` — there is nothing to do, and reporting that as an error would have the provider retry indefinitely.
+Failures answer `400` with an `error_description` naming the check that failed. A token for someone who was never signed in answers `200` - there is nothing to do, and reporting that as an error would have the provider retry indefinitely.
 
 **Account linking:**
 
@@ -1348,7 +1348,7 @@ left unset falls back to it. So `OAUTH_GROUP_PREFIX=CPM_` together with
 the rest still come from `CPM_Operator`, `CPM_User` and `CPM_Viewer`.
 
 Where two of a user's groups map to different roles the more privileged one wins, in the order
-admin, operator, user, viewer — so losing the admin group demotes an account to operator rather
+admin, operator, user, viewer - so losing the admin group demotes an account to operator rather
 than all the way down.
 
 `OAUTH_DEFAULT_ROLE` decides the role for users in none of the role groups.
@@ -1373,8 +1373,8 @@ Notes:
 ### Mirroring Groups
 
 With `OAUTH_SYNC_GROUPS=true` (or the **Mirror groups into CPM groups** switch), the
-remaining prefixed groups become CPM groups with the prefix stripped —
-`CPM_Devs` → `Devs` — so IdP groups can drive [forward auth](#forward-auth-portal)
+remaining prefixed groups become CPM groups with the prefix stripped -
+`CPM_Devs` → `Devs` - so IdP groups can drive [forward auth](#forward-auth-portal)
 access control. Membership of these groups is reconciled on every sign-in. Groups
 you created yourself keep `source=ui` and are never modified by the sync; if a
 mirrored name matches one of them, the user is added to it but never removed.
@@ -1384,7 +1384,7 @@ mirrored name matches one of them, the user is added to it but never removed.
 Set `AUTH_DISABLE_LOCAL_USERS=true` to hand identity entirely to your IdP:
 
 - No bootstrap admin is created, and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are no
-  longer required at startup — even in production.
+  longer required at startup - even in production.
 - Credential sign-in is turned off in Better Auth, and the username/password form
   disappears from both the login page and the forward auth portal.
 - Creating local users and setting or changing passwords is rejected in the UI and
@@ -1412,7 +1412,7 @@ OAUTH_ROLE_MAPPING=true
 
 ## Forward Auth Portal
 
-CPM includes a built-in forward auth identity provider — no external IdP (Authentik, Authelia, etc.) required.
+CPM includes a built-in forward auth identity provider - no external IdP (Authentik, Authelia, etc.) required.
 
 ### How it works
 
@@ -1427,7 +1427,7 @@ Create groups on the **Groups** page to organise users. When you grant a group a
 
 ### Per-host access control
 
-Each forward-auth-protected host has its own access list of allowed users and/or groups. Access is separate from the user's role — even admins must be explicitly granted access.
+Each forward-auth-protected host has its own access list of allowed users and/or groups. Access is separate from the user's role - even admins must be explicitly granted access.
 
 ---
 
@@ -1447,7 +1447,7 @@ Contributions welcome:
 4. Push to branch (`git push origin feature/name`)
 5. Open a Pull Request
 
-- Follow the existing code style — `bun run lint` and `bun run format` run Biome, which is the formatter here
+- Follow the existing code style - `bun run lint` and `bun run format` run Biome, which is the formatter here
 - Add tests for new features when applicable
 - Update documentation for user-facing changes
 - Keep commits focused and write clear commit messages

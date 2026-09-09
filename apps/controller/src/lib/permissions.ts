@@ -14,7 +14,7 @@
  *   existing user's access.
  * - `operator` starts with nothing and gains only what a group it belongs to was granted.
  *
- * So grants are additive in the strict sense — every existing account keeps exactly the access it
+ * So grants are additive in the strict sense - every existing account keeps exactly the access it
  * had, and an operator is something someone has to deliberately create.
  */
 
@@ -34,7 +34,7 @@ export type Access = {
   role: string;
   /** True for an admin: every check below short-circuits to allowed. */
   isAdmin: boolean;
-  /** True for an operator — the only non-admin role grants apply to. */
+  /** True for an operator - the only non-admin role grants apply to. */
   isOperator: boolean;
   grants: EffectiveGrants;
 };
@@ -97,7 +97,7 @@ export function canManage(access: Access, kind: ResourceKind, id: number): boole
 }
 
 /**
- * Whether this viewer may create resources of a kind, or reach anything not tied to one — global
+ * Whether this viewer may create resources of a kind, or reach anything not tied to one - global
  * settings, certificates, users.
  *
  * Admins only, and deliberately so: a grant names a resource that already exists, so there is
@@ -116,7 +116,7 @@ export function visibleIds(access: Access, kind: ResourceKind, ids: number[]): n
   return ids.filter((id) => granted.has(id));
 }
 
-/** The ids this viewer may see, or null meaning "no restriction" — an admin. */
+/** The ids this viewer may see, or null meaning "no restriction" - an admin. */
 export function visibleIdFilter(access: Access, kind: ResourceKind): Set<number> | null {
   if (access.isAdmin) return null;
   if (!access.isOperator) return new Set();
@@ -144,8 +144,8 @@ export async function requireAccess(): Promise<Access> {
 /**
  * Whether this role has any management surface at all.
  *
- * What the dashboard navigation is gated on. An operator with no grants still gets the pages —
- * empty — rather than a redirect, because "you have no hosts yet" is a more useful answer than a
+ * What the dashboard navigation is gated on. An operator with no grants still gets the pages -
+ * empty - rather than a redirect, because "you have no hosts yet" is a more useful answer than a
  * missing menu item they cannot explain.
  */
 export function hasManagementSurface(role: string | undefined): boolean {

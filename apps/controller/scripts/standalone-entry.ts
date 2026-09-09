@@ -15,7 +15,7 @@ function resolveAppRoot(): string {
   return process.env.CPM_APP_ROOT?.trim() || dirname(process.execPath);
 }
 
-/** `--healthcheck` for the container HEALTHCHECK — no curl in the image, so it self-probes. */
+/** `--healthcheck` for the container HEALTHCHECK - no curl in the image, so it self-probes. */
 function runHealthCheck(port: number): void {
   const url = process.env.CPM_HEALTHCHECK_URL ?? `http://127.0.0.1:${port}/api/health`;
   fetch(url, { signal: AbortSignal.timeout(5_000) })
@@ -25,7 +25,7 @@ function runHealthCheck(port: number): void {
 
 /**
  * `hideBin` is correct for the compiled binary too: `bun build --compile` keeps argv's two-element
- * prefix. The version is the workspace manifest's, bundled at compile time — a release image's tag
+ * prefix. The version is the workspace manifest's, bundled at compile time - a release image's tag
  * reaches the UI through a Vite `define` that never runs over this file, so the two can differ on a
  * tagged build.
  */

@@ -80,7 +80,7 @@ test.describe
       expect(event.host).toContain(DOMAIN);
       expect(event.method).toBe('GET');
       // Rule attribution must be populated. A null rule id means the event landed
-      // without knowing which rule fired — the failure mode behind #233, and the
+      // without knowing which rule fired - the failure mode behind #233, and the
       // reason attribution now comes from the audit entry's own `messages` array.
       expect(event.ruleId).not.toBeNull();
       expect(event.ruleMessage).toBeTruthy();
@@ -105,7 +105,7 @@ test.describe
       // Give the parser a couple of cycles, then confirm the clean request never
       // showed up. Coraza audit-logs some non-matching transactions (part of
       // SecAuditLogRelevantStatus covers 4xx/5xx), and those must stay out of the
-      // WAF table — the parser drops entries with no rule and no interruption.
+      // WAF table - the parser drops entries with no rule and no interruption.
       await new Promise((r) => setTimeout(r, 70_000));
 
       const events = await fetchWafEvents(page);

@@ -2,7 +2,7 @@
  * What the agent makes of a GraphQL answer.
  *
  * GraphQL replies 200 with an `errors` array where REST replied with a status code, and the rest
- * of the agent still reasons in status codes — the lifecycle drops to idle on a 401 and retries on
+ * of the agent still reasons in status codes - the lifecycle drops to idle on a 401 and retries on
  * anything else. So the translation between the two is load-bearing, and wrong in either direction
  * is bad: a 401 flattened to 400 loops forever against a secret that will never be accepted, and
  * anything else raised to 401 throws away a working pairing over a transient fault.

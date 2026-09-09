@@ -2,7 +2,7 @@
  * L4 port management.
  *
  * A layer-4 proxy host needs its port published on the Caddy container, and published ports are
- * fixed when a container is created — so this cannot be done over the Caddy admin API the way
+ * fixed when a container is created - so this cannot be done over the Caddy admin API the way
  * everything else is. The controller works out which ports the enabled hosts need and asks the
  * agent to republish them; the agent owns the Docker socket and does the recreate.
  */
@@ -29,7 +29,7 @@ export type L4PortsDiff = {
  * The ports that must be published on the Caddy container for every enabled L4 proxy host.
  *
  * Scoped to one agent when `agentRowId` is given, so a host pinned to a different agent does not
- * make this one publish a port it will never answer on — and, more to the point, does not make it
+ * make this one publish a port it will never answer on - and, more to the point, does not make it
  * recreate its Caddy container to open one.
  */
 export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]> {
@@ -68,7 +68,7 @@ export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]>
 /**
  * The ports the Caddy container currently publishes, as the agent reports them.
  *
- * Empty when there is no agent — which reads as "nothing is published", and makes every enabled L4
+ * Empty when there is no agent - which reads as "nothing is published", and makes every enabled L4
  * host show as needing an apply. That is the honest answer: without an agent nothing can be
  * published, and saying so is better than implying the ports are already up.
  */

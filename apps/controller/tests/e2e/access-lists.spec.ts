@@ -1,5 +1,5 @@
 /**
- * E2E: Access Lists page — load, rail navigation, search, sort, create dialog, members, settings,
+ * E2E: Access Lists page - load, rail navigation, search, sort, create dialog, members, settings,
  * used-by, keyboard shortcuts, empty states. Runs as admin.
  */
 import { test, expect, type Page } from '@playwright/test';
@@ -37,7 +37,7 @@ async function apiDeleteList(page: Page, id: number) {
 
 // ── Page load / structure ────────────────────────────────────────────────────
 
-test.describe('Access Lists — page load', () => {
+test.describe('Access Lists - page load', () => {
   test('page loads without redirecting to login', async ({ page }) => {
     await page.goto('/access-lists');
     await expect(page).not.toHaveURL(/login/);
@@ -72,7 +72,7 @@ test.describe('Access Lists — page load', () => {
 
 // ── Empty state ──────────────────────────────────────────────────────────────
 
-test.describe('Access Lists — empty state', () => {
+test.describe('Access Lists - empty state', () => {
   test('shows "Select an access list" when no list is selected', async ({ page }) => {
     // Delete all lists first to ensure empty state
     const res = await page.request.get(API);
@@ -88,7 +88,7 @@ test.describe('Access Lists — empty state', () => {
 
 // ── Create dialog ────────────────────────────────────────────────────────────
 
-test.describe('Access Lists — create dialog', () => {
+test.describe('Access Lists - create dialog', () => {
   test('clicking New opens the create dialog', async ({ page }) => {
     await page.goto('/access-lists');
     await page.getByRole('button', { name: /^new$/i }).first().click();
@@ -113,7 +113,7 @@ test.describe('Access Lists — create dialog', () => {
     await expect(dialog.getByRole('button', { name: /create list/i })).toBeDisabled();
   });
 
-  test('create list with name only — appears in rail', async ({ page }) => {
+  test('create list with name only - appears in rail', async ({ page }) => {
     const listName = `E2E Create ${Date.now()}`;
     await page.goto('/access-lists');
     await page.getByRole('button', { name: /^new$/i }).first().click();
@@ -134,7 +134,7 @@ test.describe('Access Lists — create dialog', () => {
     if (created) await apiDeleteList(page, created.id);
   });
 
-  test('create list with description — description shows in detail pane', async ({ page }) => {
+  test('create list with description - description shows in detail pane', async ({ page }) => {
     const listName = `E2E Desc ${Date.now()}`;
     await page.goto('/access-lists');
     await page.getByRole('button', { name: /^new$/i }).first().click();
@@ -154,7 +154,7 @@ test.describe('Access Lists — create dialog', () => {
     if (created) await apiDeleteList(page, created.id);
   });
 
-  test('create list with seed members — members count shows', async ({ page }) => {
+  test('create list with seed members - members count shows', async ({ page }) => {
     const listName = `E2E Seed ${Date.now()}`;
     await page.goto('/access-lists');
     await page.getByRole('button', { name: /^new$/i }).first().click();
@@ -212,9 +212,9 @@ test.describe('Access Lists — create dialog', () => {
   });
 });
 
-// ── Rail — selection, search, sort ───────────────────────────────────────────
+// ── Rail - selection, search, sort ───────────────────────────────────────────
 
-test.describe('Access Lists — rail interaction', () => {
+test.describe('Access Lists - rail interaction', () => {
   let listA: { id: number; name: string };
   let listB: { id: number; name: string };
 
@@ -276,7 +276,7 @@ test.describe('Access Lists — rail interaction', () => {
     await page.goto('/access-lists');
     const search = page.getByPlaceholder(/search lists or members/i);
     // Wait for the rail to be populated before typing. The search input exists in the
-    // server-rendered markup, so filling it can land before hydration wires up onChange — the value
+    // server-rendered markup, so filling it can land before hydration wires up onChange - the value
     // sticks but no filtering happens, and an absence-driven assertion can never retry into being.
     await expect(page.locator('ul').getByText(listA.name)).toBeVisible();
     await search.fill('zzz-nonexistent-zzz');
@@ -318,7 +318,7 @@ test.describe('Access Lists — rail interaction', () => {
     await page.goto('/access-lists');
     await page.getByRole('radio', { name: 'Members', exact: true }).click();
 
-    // listB has 2 members, listA has 1 — listB should appear before listA
+    // listB has 2 members, listA has 1 - listB should appear before listA
     const items = page.locator('ul > li');
     const count = await items.count();
     const texts: string[] = [];
@@ -333,9 +333,9 @@ test.describe('Access Lists — rail interaction', () => {
   });
 });
 
-// ── Detail pane — tabs ───────────────────────────────────────────────────────
+// ── Detail pane - tabs ───────────────────────────────────────────────────────
 
-test.describe('Access Lists — detail pane tabs', () => {
+test.describe('Access Lists - detail pane tabs', () => {
   let list: { id: number; name: string };
 
   test.beforeEach(async ({ page }) => {
@@ -389,7 +389,7 @@ test.describe('Access Lists — detail pane tabs', () => {
 
 // ── Members tab ──────────────────────────────────────────────────────────────
 
-test.describe('Access Lists — members tab', () => {
+test.describe('Access Lists - members tab', () => {
   let list: { id: number; name: string; entries: { id: number; username: string }[] };
 
   test.beforeEach(async ({ page }) => {
@@ -423,7 +423,7 @@ test.describe('Access Lists — members tab', () => {
     await expect(page.getByPlaceholder(/auto-generate or paste/i)).toBeVisible();
   });
 
-  test('add a new member — appears in the table', async ({ page }) => {
+  test('add a new member - appears in the table', async ({ page }) => {
     await page.getByRole('button', { name: /add member/i }).click();
     await page.getByPlaceholder('alice.chen').fill('newmember');
     await page.getByPlaceholder(/auto-generate or paste/i).fill('NewPassword!123');
@@ -434,7 +434,7 @@ test.describe('Access Lists — members tab', () => {
     await expect(page.getByText('3 members').first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('add member — duplicate username shows error toast', async ({ page }) => {
+  test('add member - duplicate username shows error toast', async ({ page }) => {
     await page.getByRole('button', { name: /add member/i }).click();
     await page.getByPlaceholder('alice.chen').fill('memuser1');
     await page.getByPlaceholder(/auto-generate or paste/i).fill('SomePass!123');
@@ -444,7 +444,7 @@ test.describe('Access Lists — members tab', () => {
     await expect(page.getByText(/username already exists/i)).toBeVisible({ timeout: 5_000 });
   });
 
-  test('add member — generate password button fills the field', async ({ page }) => {
+  test('add member - generate password button fills the field', async ({ page }) => {
     await page.getByRole('button', { name: /add member/i }).click();
 
     const pwInput = page.getByPlaceholder(/auto-generate or paste/i);
@@ -456,7 +456,7 @@ test.describe('Access Lists — members tab', () => {
     expect(val.length).toBeGreaterThanOrEqual(16);
   });
 
-  test('add member — password strength indicator appears', async ({ page }) => {
+  test('add member - password strength indicator appears', async ({ page }) => {
     await page.getByRole('button', { name: /add member/i }).click();
     const pwInput = page.getByPlaceholder(/auto-generate or paste/i);
 
@@ -470,7 +470,7 @@ test.describe('Access Lists — members tab', () => {
     await expect(page.getByText(/^(strong|excellent)$/i)).toBeVisible();
   });
 
-  test('add member — Cancel closes the add form', async ({ page }) => {
+  test('add member - Cancel closes the add form', async ({ page }) => {
     await page.getByRole('button', { name: /add member/i }).click();
     await expect(page.getByPlaceholder('alice.chen')).toBeVisible();
 
@@ -552,9 +552,9 @@ test.describe('Access Lists — members tab', () => {
   });
 });
 
-// ── Members tab — empty state ────────────────────────────────────────────────
+// ── Members tab - empty state ────────────────────────────────────────────────
 
-test.describe('Access Lists — members empty state', () => {
+test.describe('Access Lists - members empty state', () => {
   let list: { id: number; name: string };
 
   test.beforeEach(async ({ page }) => {
@@ -587,7 +587,7 @@ test.describe('Access Lists — members empty state', () => {
 
 /**
  * The settings tab's Name / Description inputs. The "New access list" dialog is a native <dialog>
- * that stays in the DOM when closed, so a bare getByLabel is ambiguous — only one pair is visible.
+ * that stays in the DOM when closed, so a bare getByLabel is ambiguous - only one pair is visible.
  */
 function settingsNameField(page: Page) {
   return page.getByLabel(/^Name/).filter({ visible: true });
@@ -597,7 +597,7 @@ function settingsDescField(page: Page) {
   return page.getByLabel(/^Description/).filter({ visible: true });
 }
 
-test.describe('Access Lists — settings tab', () => {
+test.describe('Access Lists - settings tab', () => {
   let list: { id: number; name: string };
 
   test.beforeEach(async ({ page }) => {
@@ -686,7 +686,7 @@ test.describe('Access Lists — settings tab', () => {
 // Used-by tab
 // ---------------------------------------------------------------------------
 
-test.describe('Access Lists — used-by tab', () => {
+test.describe('Access Lists - used-by tab', () => {
   let list: { id: number; name: string };
 
   test.beforeEach(async ({ page }) => {
@@ -742,7 +742,7 @@ test.describe('Access Lists — used-by tab', () => {
 // Keyboard shortcuts
 // ---------------------------------------------------------------------------
 
-test.describe('Access Lists — keyboard shortcuts', () => {
+test.describe('Access Lists - keyboard shortcuts', () => {
   test('pressing N opens the create dialog', async ({ page }) => {
     await page.goto('/access-lists');
     await page.locator('body').click();
@@ -776,7 +776,7 @@ test.describe('Access Lists — keyboard shortcuts', () => {
 // Cross-tab state
 // ---------------------------------------------------------------------------
 
-test.describe('Access Lists — cross-tab consistency', () => {
+test.describe('Access Lists - cross-tab consistency', () => {
   let list: { id: number; name: string };
 
   test.beforeEach(async ({ page }) => {
@@ -815,7 +815,7 @@ test.describe('Access Lists — cross-tab consistency', () => {
 // Unauthenticated access
 // ---------------------------------------------------------------------------
 
-test.describe('Access Lists — unauthenticated', () => {
+test.describe('Access Lists - unauthenticated', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('unauthenticated access to /access-lists redirects to /login', async ({ page }) => {

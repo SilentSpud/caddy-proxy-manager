@@ -1,6 +1,6 @@
 /*
  * The frame a live demo sits in, and the surface behind it. Both are drawn in Starlight's own
- * tokens, because they belong to the page rather than to the product — what goes inside the frame
+ * tokens, because they belong to the page rather than to the product - what goes inside the frame
  * is styled by Astryx, out of src/demos/demo.css, which only pages with a demo on them load.
  *
  * Unlayered: these selectors reach nothing but the elements Demo.astro and DemoSurface write.
@@ -30,7 +30,7 @@
   font-weight: 600;
 }
 
-/* Says the thing is real rather than a picture — the one claim the frame has to make. */
+/* Says the thing is real rather than a picture - the one claim the frame has to make. */
 .cpm-demo-badge {
   background: var(--sl-color-accent-low);
   border-radius: 999px;
@@ -88,7 +88,7 @@
 
 /*
  * The surface a demo's card sits on. Astryx's Card is near-black in dark mode and white in light,
- * so one colour cannot sit behind both — the light override is what keeps a white card from
+ * so one colour cannot sit behind both - the light override is what keeps a white card from
  * vanishing into a white page.
  */
 .cpm-demo {

@@ -4,7 +4,7 @@
 # host move, does a disabled or deleted host stop being served.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
-banner "proxy hosts — CRUD and basic proxying"
+banner "proxy hosts - CRUD and basic proxying"
 
 domain=$(domain_for "basic")
 
@@ -51,7 +51,7 @@ t_contains "X-Forwarded-For carries the client address" "$CLIENT_IP" \
 t_eq "X-Forwarded-Host carries the requested host" "$domain" \
   "$(fetch_json '.headers["x-forwarded-host"]')"
 
-# The origin sees Caddy, not the client — proof the connection really is proxied
+# The origin sees Caddy, not the client - proof the connection really is proxied
 # rather than the DNS entry pointing at the backend.
 t_eq "the upstream's peer is Caddy" "$CADDY_IP" "$(fetch_json '.peer')"
 

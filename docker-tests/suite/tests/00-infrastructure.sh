@@ -21,7 +21,7 @@ t_ok "origin container names resolve" getent hosts origin-a
 # ── Network restriction ─────────────────────────────────────────────────────
 #
 # The compose network is `internal: true`. Nothing in the rig may reach the
-# internet — which is also what proves the ACME tests are talking to Pebble and
+# internet - which is also what proves the ACME tests are talking to Pebble and
 # not accidentally to a public CA.
 
 t_fails "the client cannot route to a public address" \
@@ -63,7 +63,7 @@ t_eq "the health payload is well formed" "ok" "$(fetch_json '.status')"
 # Caddy's admin API pins the origins it accepts, which is what stops a page in the operator's
 # browser reconfiguring the proxy. The Host header is not part of that check: binding to 0.0.0.0
 # (needed so the web container can reach it) makes Caddy skip Host validation, so the Origin check
-# is all that remains — and all that is pinned here.
+# is all that remains - and all that is pinned here.
 admin_code=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' \
   -H 'Origin: http://attacker.example' "http://caddy:2019/config/" 2>/dev/null)
 t_eq "the Caddy admin API refuses a foreign Origin" "403" "$admin_code"

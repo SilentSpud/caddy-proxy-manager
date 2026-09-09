@@ -1,5 +1,5 @@
 /**
- * Integration: the session model behind the profile's "Active sessions" view — list, revoke one
+ * Integration: the session model behind the profile's "Active sessions" view - list, revoke one
  * (ownership-scoped), revoke all others.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';

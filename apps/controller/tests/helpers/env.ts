@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// apps/controller — the dotenv files Bun reads sit at the repo root, two levels further up.
+// apps/controller - the dotenv files Bun reads sit at the repo root, two levels further up.
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
 /**
@@ -11,7 +11,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.
  */
 export const TEST_ENV: Record<string, string> = {
   // src/lib/db/connection.ts resolves this at module load and throws on anything but PostgreSQL,
-  // so it has to be set before the first import — not in a beforeEach. scripts/with-test-db.ts
+  // so it has to be set before the first import - not in a beforeEach. scripts/with-test-db.ts
   // provides the server.
   DATABASE_URL: process.env.TEST_POSTGRES_URL ?? '',
   // What `:memory:` used to signal: a database with no deployment history, so the one-time data
@@ -27,12 +27,12 @@ export const TEST_ENV: Record<string, string> = {
 /** The dotenv files Bun reads on startup, in the order it applies them. */
 const DOTENV_FILES = ['.env', '.env.local', '.env.test', '.env.test.local'];
 
-/** `KEY=`, `export KEY=` — enough to recover the names, which is all we need. */
+/** `KEY=`, `export KEY=` - enough to recover the names, which is all we need. */
 const ASSIGNMENT = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
 
 /**
  * Removes the repository's dotenv values from process.env. Bun loads .env automatically where Node
- * did not, so a developer's local .env changes the defaults under test —
+ * did not, so a developer's local .env changes the defaults under test -
  * AUTH_ALLOW_OAUTH_REGISTRATION alone fails config-local-users-disabled.test.ts. `--env-file` does
  * not help: `bun run test` already loaded it. What the suite needs is in TEST_ENV.
  */

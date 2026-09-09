@@ -14,7 +14,7 @@ type Example = { label: string; query: string; response: string };
 /**
  * Three queries against the shape the schema actually has: fields for the stable things, a `JSON`
  * scalar for the configuration the model layer owns. The responses are what this deployment would
- * answer — no request leaves the page.
+ * answer - no request leaves the page.
  */
 const EXAMPLES: Record<string, Example> = {
   hosts: {

@@ -65,7 +65,7 @@ t_eq "unmatched paths are proxied normally" "200" "$FETCH_CODE"
 # ── Prefix rewrite ──────────────────────────────────────────────────────────
 #
 # The prefix is prepended to every request URI before it leaves for the
-# upstream — the usual shape for an app mounted under a sub-path.
+# upstream - the usual shape for an app mounted under a sub-path.
 
 rw=$(domain_for "prefix-rewrite")
 create_host_or_fail "a host with a prefix rewrite can be created" "$(jq -nc --arg d "$rw" '{

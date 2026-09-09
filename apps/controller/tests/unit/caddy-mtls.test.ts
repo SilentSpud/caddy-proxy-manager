@@ -192,7 +192,7 @@ describe('buildClientAuthentication', () => {
       issuedClientCertMap,
       cAsWithAnyIssuedCerts,
     );
-    // Must NOT return null — returns a valid but unsatisfiable client_authentication
+    // Must NOT return null - returns a valid but unsatisfiable client_authentication
     expect(result).not.toBeNull();
     expect(result!.mode).toBe('require_and_verify');
     expect(result!.trusted_ca_certs).toEqual(['CA_A']);
@@ -270,7 +270,7 @@ describe('groupMtlsDomainsByCaSet', () => {
     expect(group).toContain('app2.example.com');
   });
 
-  it('separates domains with different CA sets — the cross-CA isolation test', () => {
+  it('separates domains with different CA sets - the cross-CA isolation test', () => {
     // This is the core bug scenario: two hosts with different CAs must each get
     // their own TLS policy so CA_B certs cannot authenticate against the CA_A host.
     const mTlsDomainMap = new Map([
@@ -362,19 +362,19 @@ describe('mTLS per-host CA isolation (regression test for cross-CA bug)', () => 
   const caCertMap = makeCaCertMap([1, 'CA_A'], [2, 'CA_B']);
 
   it('before the fix (union): calling buildClientAuthentication with both domains together gives both CAs', () => {
-    // This documents the OLD behavior — the caller should NOT do this.
+    // This documents the OLD behavior - the caller should NOT do this.
     const mTlsDomainMap = new Map([
       ['app.example.com', [1]],
       ['api.example.com', [2]],
     ]);
     const result = buildClientAuthentication(
-      ['app.example.com', 'api.example.com'], // both domains in one call — wrong
+      ['app.example.com', 'api.example.com'], // both domains in one call - wrong
       mTlsDomainMap,
       caCertMap,
       new Map(),
       new Set(),
     );
-    // Both CAs end up trusted — this is the unsafe behavior
+    // Both CAs end up trusted - this is the unsafe behavior
     expect(result!.trusted_ca_certs).toContain('CA_A');
     expect(result!.trusted_ca_certs).toContain('CA_B');
   });

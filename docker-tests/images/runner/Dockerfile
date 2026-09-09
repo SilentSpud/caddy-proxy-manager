@@ -1,4 +1,4 @@
-# The simulated client. Deliberately has no application code from the project —
+# The simulated client. Deliberately has no application code from the project -
 # it only speaks HTTP/TLS/TCP/UDP, exactly as an outside user would.
 FROM alpine:3.21
 

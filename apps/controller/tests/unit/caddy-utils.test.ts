@@ -1,6 +1,6 @@
 /**
  * Unit tests for src/lib/caddy-utils.ts
- * Pure functions only — no DB, network, or filesystem.
+ * Pure functions only - no DB, network, or filesystem.
  */
 import { describe, it, expect } from 'bun:test';
 import {

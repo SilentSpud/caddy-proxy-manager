@@ -23,7 +23,7 @@ const EMPTY_GEOBLOCK = {
 };
 
 /**
- * RFC 5737 TEST-NET ranges — routable nowhere, so they won't block real
+ * RFC 5737 TEST-NET ranges - routable nowhere, so they won't block real
  * traffic when applied to Caddy during tests (unlike 0.0.0.0/0).
  */
 const SAFE_BLOCK_CIDR = '198.51.100.0/24'; // TEST-NET-2
@@ -44,7 +44,7 @@ function cidrInput(
   return parent.locator(`div:has(> input[name="${name}"])`).locator('input[type="text"]');
 }
 
-test.describe('Geo Blocking — form persistence', () => {
+test.describe('Geo Blocking - form persistence', () => {
   /**
    * Mutating v1 API calls are same-origin checked, so one without an Origin header 403s. This reset
    * silently did nothing while it lacked one, leaving tests running against the persisted volume.
@@ -68,7 +68,7 @@ test.describe('Geo Blocking — form persistence', () => {
 
   /**
    * Regression: Radix Tabs unmount inactive content, so only the visible tab's hidden inputs were
-   * submitted — saving on "Block Rules" wiped every allow rule. Uses RFC 5737 ranges.
+   * submitted - saving on "Block Rules" wiped every allow rule. Uses RFC 5737 ranges.
    */
   test('saving block rules does not wipe allow rules', async ({ page }) => {
     const geoSection = page.locator('form', {
@@ -96,7 +96,7 @@ test.describe('Geo Blocking — form persistence', () => {
 
     // Check what actually landed before reloading. The banner also shows for
     // the "saved, but could not apply to Caddy" path, so a green message is not
-    // proof the config persisted — and separating the two tells a persistence
+    // proof the config persisted - and separating the two tells a persistence
     // bug apart from a stale render.
     const saved = await (await page.request.get(API_GEOBLOCK)).json();
     expect(saved, 'geoblock config was not persisted by the save').toMatchObject({
@@ -112,7 +112,7 @@ test.describe('Geo Blocking — form persistence', () => {
     });
 
     // The rule tabs only exist while geoblocking is enabled, so assert that the
-    // enabled state survived the reload first — otherwise a persistence failure
+    // enabled state survived the reload first - otherwise a persistence failure
     // shows up as an opaque timeout hunting for a tab that was never rendered.
     await expect(fresh.getByRole('switch')).toBeChecked();
 
@@ -125,7 +125,7 @@ test.describe('Geo Blocking — form persistence', () => {
 
   /**
    * Regression: the tag inputs call onEnter without preventing the keypress default, so adding a
-   * CIDR also submitted the form — persisting a half-finished config and re-applying Caddy.
+   * CIDR also submitted the form - persisting a half-finished config and re-applying Caddy.
    */
   test('adding a rule with Enter does not submit the form', async ({ page }) => {
     const geoSection = page.locator('form', {
@@ -204,7 +204,7 @@ test.describe('Geo Blocking — form persistence', () => {
     }
 
     // Collapsible now defaults to open (defaultIsOpen ?? true), so drive it by
-    // aria-expanded rather than assuming a starting state — this test is
+    // aria-expanded rather than assuming a starting state - this test is
     // specifically about saving while the section is *collapsed*.
     const advancedTrigger = geoSection
       .locator('button[aria-expanded]')
@@ -249,7 +249,7 @@ test.describe('Geo Blocking — form persistence', () => {
   /**
    * Regression (#241): after saving, the form appeared to revert to the pre-save values until a
    * manual browser refresh. revalidatePath delivers fresh props, but the form state was seeded
-   * from useState and never re-synced. The form must show the saved values immediately — no
+   * from useState and never re-synced. The form must show the saved values immediately - no
    * page reload.
    */
   test('form reflects saved values immediately without reload', async ({ page }) => {
@@ -278,7 +278,7 @@ test.describe('Geo Blocking — form persistence', () => {
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
     await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
 
-    // No page.reload() here — the visible form must already reflect the save.
+    // No page.reload() here - the visible form must already reflect the save.
     await expect(geoSection.locator('input[name="geoblockRedirectUrl"]')).toHaveValue(
       'https://example.com/no-refresh',
       { timeout: 10_000 },
@@ -287,7 +287,7 @@ test.describe('Geo Blocking — form persistence', () => {
   });
 
   /**
-   * Tests the LAN Only (RFC1918) preset — values must survive tab switching.
+   * Tests the LAN Only (RFC1918) preset - values must survive tab switching.
    * This test does NOT save, so no Caddy config is affected.
    */
   test('LAN Only preset: values survive tab switching', async ({ page }) => {

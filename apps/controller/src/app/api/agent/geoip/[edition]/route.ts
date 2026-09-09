@@ -1,5 +1,5 @@
 /**
- * GET /api/agent/geoip/:edition — a MaxMind database, for a paired agent.
+ * GET /api/agent/geoip/:edition - a MaxMind database, for a paired agent.
  *
  * The controller holds the subscription and the files; an agent reaches them through here rather
  * than each host needing a licence key of its own. An agent sharing the controller's volume has the
@@ -27,7 +27,7 @@ export async function GET(
   // verify: every failure below this point looks identical from outside.
   if (!(GEOIP_EDITIONS as readonly string[]).includes(edition)) return notFound();
 
-  // GET, so the signed body is the empty string — the same value the agent hashed.
+  // GET, so the signed body is the empty string - the same value the agent hashed.
   const verified = await verifyAgentRequest(request, "");
   const agent = verified.ok ? verified.agent : null;
   if (!agent) return notFound();

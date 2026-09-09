@@ -22,7 +22,7 @@ services:
       - caddy-network
 
   # Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI or shell
-  # runtime — deliberately, so the tests run the image that ships — so seeding happens in this
+  # runtime - deliberately, so the tests run the image that ships - so seeding happens in this
   # throwaway container, which mounts the same data volume and opens the same SQLite file.
   # `profiles` keeps it out of `docker compose up`; see tests/helpers/seed.ts.
   db-seed:
@@ -53,7 +53,7 @@ services:
       OAUTH_TOKEN_URL: http://dex:5556/dex/token
       OAUTH_USERINFO_URL: http://dex:5556/dex/userinfo
       OAUTH_ALLOW_AUTO_LINKING: "true"
-      # Allow OAuth sign-in to create new accounts — the OAuth e2e tests
+      # Allow OAuth sign-in to create new accounts - the OAuth e2e tests
       # (forward-auth-oauth, oauth-role-injection) exercise federated signup.
       # Closed by default in production (see config.auth.allowOauthRegistration).
       AUTH_ALLOW_OAUTH_REGISTRATION: "true"
@@ -107,7 +107,7 @@ services:
     ports:
       - "8123:8123"
   # Still behind the `caddy` profile it inherits from docker-compose.yml, so `up` does not start
-  # it — the agent does, once it has paired and the controller has a configuration to serve. That
+  # it - the agent does, once it has paired and the controller has a configuration to serve. That
   # is production behaviour and the suite follows it: starting Caddy here instead had the agent
   # immediately stop it for being unpaired, which `up --wait` then reported as a container that
   # exited. global-setup waits for Caddy separately, after the agent has had its say.
@@ -143,7 +143,7 @@ services:
   # ── First-run setup, on instances that have never been set up ────────────────
   # Two more, rather than resetting the main one: setup is single-use by design, so an instance
   # that has completed it cannot show those screens again. They are deliberately pointed at a dead
-  # Caddy admin address — the setup screens never touch Caddy, and sharing the suite's Caddy would
+  # Caddy admin address - the setup screens never touch Caddy, and sharing the suite's Caddy would
   # let an empty database's startup apply wipe the routes the other tests just created.
   web-setup:
     container_name: caddy-proxy-manager-web-setup

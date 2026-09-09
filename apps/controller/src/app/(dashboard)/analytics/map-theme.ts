@@ -5,13 +5,13 @@ import type {
 } from "maplibre-gl";
 
 /**
- * The map's palette, resolved from Astryx tokens for the mode in effect — MapLibre takes concrete
+ * The map's palette, resolved from Astryx tokens for the mode in effect - MapLibre takes concrete
  * colour strings, as the charts do. The choropleth ramp must *invert* between modes ("more traffic"
  * is darker on a light ocean), so the direction is chosen here and the stops come from the ramp.
  */
 export interface MapPalette {
   ocean: string;
-  /** Land with no traffic — must stay distinct from the ocean in both modes. */
+  /** Land with no traffic - must stay distinct from the ocean in both modes. */
   empty: string;
   /** Ramp stops for "any traffic" → "most traffic". */
   ramp: [string, string, string];

@@ -2,7 +2,7 @@
  * Keeping this host's MaxMind databases in step with the controller's.
  *
  * The controller holds the subscription and the files. An agent on another host fetches them
- * through it rather than needing a licence key of its own — and the agent, not just the parsers,
+ * through it rather than needing a licence key of its own - and the agent, not just the parsers,
  * is what needs them: Caddy reads the same directory for geo-blocking.
  *
  * Pulled rather than pushed because these are tens of megabytes. It is the only request that runs
@@ -120,7 +120,7 @@ async function syncEdition(
  * Bring every edition the controller offers up to date.
  *
  * Never throws: a controller this agent cannot reach, or a database it cannot write, must not stop
- * it recreating containers — which is the job it exists for.
+ * it recreating containers - which is the job it exists for.
  */
 export async function syncGeoipDatabases(
   store: AgentStore,

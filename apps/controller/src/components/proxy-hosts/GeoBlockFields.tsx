@@ -64,13 +64,13 @@ function GeoIpStatus() {
         ? "GeoIP missing"
         : "GeoIP partial";
   const tooltip = off
-    ? "GeoIP is switched off in Settings → GeoIP Databases — country, continent and ASN blocking will not work."
+    ? "GeoIP is switched off in Settings → GeoIP Databases - country, continent and ASN blocking will not work."
     : noneLoaded
-      ? "GeoIP databases not found — country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → GeoIP Databases."
+      ? "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → GeoIP Databases."
       : !status?.country
-        ? "GeoLite2-Country database missing — country/continent blocking disabled"
+        ? "GeoLite2-Country database missing - country/continent blocking disabled"
         : !status?.asn
-          ? "GeoLite2-ASN database missing — ASN blocking disabled"
+          ? "GeoLite2-ASN database missing - ASN blocking disabled"
           : "GeoLite2-Country and GeoLite2-ASN databases loaded";
 
   return (
@@ -344,7 +344,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
         label={t("asns")}
         initialValues={asns.map(String)}
         placeholder="13335, 15169…"
-        helperText="Autonomous System Numbers — press Enter to add"
+        helperText="Autonomous System Numbers - press Enter to add"
         validate={(v) => /^\d+$/.test(v)}
       />
 
@@ -486,7 +486,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
 
         {/* Deliberately NOT gated on moduleDisabledReason. The hidden
             `geoblockPresent` marker above always submits, and the parser treats
-            a missing rule input as an empty list — so unmounting these while the
+            a missing rule input as an empty list - so unmounting these while the
             module is off would silently erase every stored rule on the next
             save of an unrelated field. The Switch above is what stays locked. */}
         {enabled && (

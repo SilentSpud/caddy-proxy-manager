@@ -1,7 +1,7 @@
 /**
  * The password rule is defined once and enforced in four places (admin env validation,
- * change-password, the forced-reset screen, .p12 export). These pin the rule itself, and — through
- * the real English catalog — the sentence it is reported as.
+ * change-password, the forced-reset screen, .p12 export). These pin the rule itself, and - through
+ * the real English catalog - the sentence it is reported as.
  */
 import { describe, it, expect } from 'bun:test';
 import messages from '../../messages/en.json';

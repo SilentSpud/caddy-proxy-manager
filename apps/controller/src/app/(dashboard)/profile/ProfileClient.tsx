@@ -144,7 +144,7 @@ export default function ProfileClient({
   avatar,
 }: ProfileClientProps) {
   const t = useTranslations("profile");
-  // Unscoped as well, for the password rule — it is shared with every other password field.
+  // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);

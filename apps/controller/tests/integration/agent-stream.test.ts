@@ -46,7 +46,7 @@ function status(agentId: string): AgentStatus {
 /**
  * Attach an agent and start collecting the events the controller sends it.
  *
- * The registry deals in events rather than SSE bytes now — framing is the GraphQL server's job —
+ * The registry deals in events rather than SSE bytes now - framing is the GraphQL server's job -
  * so this collects what the subscription would publish, with no parser in between.
  */
 function connect(agentId: string, name = agentId) {
@@ -93,7 +93,7 @@ describe('attaching', () => {
     const second = connect('a1');
     await Bun.sleep(5);
 
-    // One entry, and the *new* stream is the live one — a second connection after a partition must
+    // One entry, and the *new* stream is the live one - a second connection after a partition must
     // not leave the old one attached, or every command would be sent twice.
     expect(connectedAgents()).toHaveLength(1);
     await broadcastDesiredState(async () => ({ ...STATE, caddyEnabled: false }));

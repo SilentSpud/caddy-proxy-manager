@@ -1,4 +1,4 @@
-/* Layer order first — see layers.css for why it is a separate file. */
+/* Layer order first - see layers.css for why it is a separate file. */
 @import "./layers.css";
 
 /* Tailwind v4, split so preflight and utilities land in the right layers.
@@ -18,7 +18,7 @@
 
 @layer base {
   /**
-   * Colour and radius come from Astryx's Tailwind bridge above — one set of light-dark() tokens
+   * Colour and radius come from Astryx's Tailwind bridge above - one set of light-dark() tokens
    * resolved by `color-scheme`, no `.dark` block. See src/lib/theme-mode.ts.
    */
   * {

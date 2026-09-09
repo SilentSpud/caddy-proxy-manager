@@ -2,7 +2,7 @@
  * Syntax tokenizers for the config languages this app edits.
  *
  * Astryx's own tokenizer covers JSON and HTML. It does not know Caddyfile, SecLang or Dockerfile,
- * and there is no upstream grammar for the first two worth pulling in — so they are described here
+ * and there is no upstream grammar for the first two worth pulling in - so they are described here
  * as a short list of patterns, in the same shape `CodeBlock` accepts for a custom tokenizer.
  *
  * This is readability, not validation: Caddy's adapter and Coraza's parser are what decide whether
@@ -30,14 +30,14 @@ export const LANGUAGE_LABELS: Record<CodeEditorLanguage, string> = {
 };
 
 /**
- * A pattern and the token type it paints. Types are Astryx's — anything else renders unstyled.
+ * A pattern and the token type it paints. Types are Astryx's - anything else renders unstyled.
  *
  * Rules are tried in order at each position and the first match wins, so the ones that swallow
  * other syntax (comments, strings) have to come first. Every group inside a pattern must be
  * non-capturing: the rules are compiled into one alternation and the group index is what identifies
  * which rule matched.
  *
- * A rule that has to sit at the start of its line matches the indentation as well — `^[ \t]*…`
+ * A rule that has to sit at the start of its line matches the indentation as well - `^[ \t]*…`
  * rather than a `(?<=^[ \t]*)` lookbehind, which is not supported in every engine and would throw
  * where the pattern is built rather than where it is used. Those rules are marked `indented`, and
  * the scanner moves the token past the whitespace so the highlight still starts on the first glyph.
@@ -48,7 +48,7 @@ const CADDYFILE: readonly Rule[] = [
   [/#.*/, "comment"],
   [/"(?:[^"\\]|\\.)*"/, "string"],
   [/`[^`]*`/, "string"],
-  // {env.FOO}, {http.request.uri}, {args[0]} — the source of most Caddyfile confusion, so they are
+  // {env.FOO}, {http.request.uri}, {args[0]} - the source of most Caddyfile confusion, so they are
   // coloured apart from the strings they usually sit inside.
   [/\{[^}\s]*\}/, "variable"],
   [/@[\w.-]+/, "type"],
@@ -62,7 +62,7 @@ const SECLANG: readonly Rule[] = [
   [/"(?:[^"\\]|\\.)*"/, "string"],
   [/'(?:[^'\\]|\\.)*'/, "string"],
   [/^[ \t]*Sec[A-Za-z]+/, "keyword", "indented"],
-  // @contains, @ipMatch, @rx — the operator is the part of a rule people scan for.
+  // @contains, @ipMatch, @rx - the operator is the part of a rule people scan for.
   [/@[A-Za-z]+/, "operator"],
   // REQUEST_URI, REQUEST_HEADERS:User-Agent, ARGS. Screaming case is how SecLang spells a variable.
   [/\b[A-Z][A-Z0-9_]{2,}(?::[\w.-]+)?\b/, "variable"],
@@ -103,7 +103,7 @@ const SOURCES: Partial<Record<CodeEditorLanguage, [readonly Rule[], string]>> = 
 /**
  * Compiled on first use rather than at module scope. A `RegExp` this file cannot build would
  * otherwise throw while the module was being imported, which no caller can catch and which would
- * take the whole editor down rather than only its colour — `tokenizeCode` catches it here instead.
+ * take the whole editor down rather than only its colour - `tokenizeCode` catches it here instead.
  */
 const cache = new Map<CodeEditorLanguage, Compiled>();
 
@@ -154,7 +154,7 @@ function scan(code: string, compiled: Compiled): { type: string; start: number; 
 }
 
 /**
- * Tokens for one snippet, per line, with line-relative offsets — the shape Astryx's own
+ * Tokens for one snippet, per line, with line-relative offsets - the shape Astryx's own
  * `CodeBlock` works in. Empty for plaintext, and for anything that fails to tokenize: a field
  * that renders as unhighlighted text is a far better outcome than one that throws.
  */

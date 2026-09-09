@@ -24,7 +24,7 @@ function deriveKeyLegacy(sessionSecret: string = config.sessionSecret): Buffer {
  *
  * Both derivations are tried, for the same reason `decryptSecret` tries both: a database old
  * enough to predate the HKDF change holds values under the SHA-256 key, and one that was upgraded
- * part-way holds a mixture. No grace-period check here — the cutoff exists to push a running
+ * part-way holds a mixture. No grace-period check here - the cutoff exists to push a running
  * deployment off the legacy key, and refusing to read a legacy value during the one operation that
  * would re-encrypt it has it exactly backwards.
  *

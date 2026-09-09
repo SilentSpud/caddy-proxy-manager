@@ -36,7 +36,7 @@ function readStepCaRoot(timeoutMs = 60_000): string {
 /** Open a TLS connection to Caddy with the given SNI and return the leaf cert issuer. */
 function getLeafIssuer(servername: string): Promise<tls.PeerCertificate> {
   return new Promise((resolve, reject) => {
-    // rejectUnauthorized:false is deliberate and safe here — this test only
+    // rejectUnauthorized:false is deliberate and safe here - this test only
     // INSPECTS the served leaf to confirm Step-CA issued it; no data is sent and
     // the client root isn't installed, so chain validation would just get in the way.
     const socket = tls.connect(
@@ -79,7 +79,7 @@ async function waitForStepCaCert(
 }
 
 test.describe
-  .serial('Custom ACME directory — real issuance via Step-CA', () => {
+  .serial('Custom ACME directory - real issuance via Step-CA', () => {
     let hostId: number | undefined;
 
     test.beforeAll(async ({ browser }) => {

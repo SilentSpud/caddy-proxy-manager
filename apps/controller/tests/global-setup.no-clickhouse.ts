@@ -13,7 +13,7 @@ export const AUTH_DIR = resolve(moduleDir, '.auth');
 export const AUTH_FILE = resolve(AUTH_DIR, 'admin.json');
 const MAX_WAIT_MS = 180_000;
 const POLL_INTERVAL_MS = 3_000;
-// No COMPOSE_PROFILES — the clickhouse container never starts, which is what disables
+// No COMPOSE_PROFILES - the clickhouse container never starts, which is what disables
 // analytics. The password in tests/e2e.env only satisfies interpolation; web's own value
 // comes from tests/docker-compose.test.yml either way.
 const ENV = { ...process.env };
@@ -74,7 +74,7 @@ async function waitForCaddyHealthy(): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
-  console.warn('[global-setup-no-ch] Caddy health wait timed out — proceeding anyway.');
+  console.warn('[global-setup-no-ch] Caddy health wait timed out - proceeding anyway.');
 }
 
 async function seedAuthState(): Promise<void> {

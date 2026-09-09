@@ -1,6 +1,6 @@
 ---
 title: Reverse proxy
-description: Proxy hosts — upstreams, load balancing, health checks, location rules, redirects and DNS controls.
+description: Proxy hosts - upstreams, load balancing, health checks, location rules, redirects and DNS controls.
 ---
 
 import HostEditorDemo from "../../../demos/samples/HostEditorDemo";
@@ -31,8 +31,8 @@ round-robin, least-connections, weighted, and hashing by IP, query, header or co
 
 Health checks come in both forms:
 
-- **Active** — CPM asks the upstream on an interval and takes failures out of rotation.
-- **Passive** — failures on real requests count against an upstream, with a configurable number of
+- **Active** - CPM asks the upstream on an interval and takes failures out of rotation.
+- **Passive** - failures on real requests count against an upstream, with a configurable number of
   failures and a duration to keep it out.
 
 Retries let a failed request try another upstream rather than surfacing the error.
@@ -57,7 +57,7 @@ its own upstreams, load balancing and health checks.
 
 ## Redirects and rewrites
 
-Per-host redirect rules with a status of 301, 302, 307 or 308 — 307 and 308 preserve the request
+Per-host redirect rules with a status of 301, 302, 307 or 308 - 307 and 308 preserve the request
 method, which matters for anything but a GET. Path prefix rewriting happens before the request
 reaches the upstream.
 

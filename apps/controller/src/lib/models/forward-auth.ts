@@ -14,7 +14,7 @@ import { domainError } from "../domain-error";
 
 const DEFAULT_SESSION_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 const EXCHANGE_CODE_TTL = 60; // 60 seconds
-const REDIRECT_INTENT_TTL = 10 * 60; // 10 minutes — covers login + OAuth flow time
+const REDIRECT_INTENT_TTL = 10 * 60; // 10 minutes - covers login + OAuth flow time
 
 function hashToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
@@ -257,7 +257,7 @@ export async function createExchangeCode(
     proxyHostId: audience.proxyHostId,
     audienceOrigin: audience.origin,
     codeHash,
-    sessionToken: "[pending]", // placeholder — fresh token generated at redemption
+    sessionToken: "[pending]", // placeholder - fresh token generated at redemption
     redirectUri,
     expiresAt,
     used: false,
@@ -403,7 +403,7 @@ export async function checkHostAccessByDomain(
     return { hasAccess, proxyHostId: wildcardMatch.id };
   }
 
-  // Host not found in any proxy host — deny by default
+  // Host not found in any proxy host - deny by default
   return { hasAccess: false, proxyHostId: null };
 }
 
@@ -481,7 +481,7 @@ async function findForwardAuthProxyHost(host: string) {
   });
 
   // Exact-match hosts take precedence over wildcard-covered ones: if an explicit host exists for
-  // this domain, its own forward-auth setting decides and the wildcard host is never consulted —
+  // this domain, its own forward-auth setting decides and the wildcard host is never consulted -
   // mirroring the routing precedence Caddy itself applies.
   let exactMatchFound = false;
   let wildcardMatch: (typeof allHosts)[number] | null = null;

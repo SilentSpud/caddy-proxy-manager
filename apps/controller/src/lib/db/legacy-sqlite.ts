@@ -4,7 +4,7 @@
  * Nothing here runs during normal operation: SQLite stopped being an application backend in 3.0.
  * It is staged for the migration flow, which opens an upgrading deployment's old file, reads it,
  * and copies what it finds into PostgreSQL. Kept rather than deleted because the quirks it encodes
- * — which releases wrote which column names — are not recoverable from the current schema.
+ * - which releases wrote which column names - are not recoverable from the current schema.
  *
  * Schema repairs for SQLite deployments that upgraded through an older release:
  *
@@ -20,7 +20,7 @@ import type { Database } from "bun:sqlite";
 
 /**
  * A `file:` URL exposes its path with a leading slash, so a Windows absolute path arrives as
- * "/C:/data/app.db" and resolves against the drive root — drop the slash when a drive letter
+ * "/C:/data/app.db" and resolves against the drive root - drop the slash when a drive letter
  * follows. Not `fileURLToPath`, which rejects POSIX-style file URLs on Windows. Windows-only; on
  * POSIX "/C:/x" is a real path. `platform` is a parameter so tests can cover both.
  */
@@ -84,9 +84,9 @@ function fixSessionsSchema(client: Database) {
     if (cols.length === 0) return; // table doesn't exist yet
     const idCol = cols.find((c) => c.name === "id");
     if (!idCol) return;
-    // INTEGER PRIMARY KEY is an alias for rowid — auto-generates on insert
+    // INTEGER PRIMARY KEY is an alias for rowid - auto-generates on insert
     if (idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1) return;
-    // Wrong type (e.g. TEXT NOT NULL) — recreate as autoincrement
+    // Wrong type (e.g. TEXT NOT NULL) - recreate as autoincrement
     client
       .prepare(`CREATE TABLE "sessions_patch" (
       "id"        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,7 +99,7 @@ function fixSessionsSchema(client: Database) {
       "updatedAt" TEXT NOT NULL
     )`)
       .run();
-    // Sessions are short-lived — skip copying stale rows
+    // Sessions are short-lived - skip copying stale rows
     client.prepare('DROP TABLE "sessions"').run();
     client.prepare('ALTER TABLE "sessions_patch" RENAME TO "sessions"').run();
     client
@@ -129,7 +129,7 @@ const REBUILT_ACCOUNT_COLUMNS = [
 ] as const;
 
 /**
- * Ensure `accounts.id` is INTEGER PRIMARY KEY AUTOINCREMENT — some upgraded deployments have a
+ * Ensure `accounts.id` is INTEGER PRIMARY KEY AUTOINCREMENT - some upgraded deployments have a
  * NOT NULL non-rowid column, failing inserts that omit it. Accounts are durable, so preserve rows.
  */
 function fixAccountsSchema(client: Database) {
@@ -147,7 +147,7 @@ function fixAccountsSchema(client: Database) {
 
     // The whole shape the rebuild below produces, not just `id`: a table can have a sound id and
     // still be missing a column or the identity index, and returning early on `id` alone would
-    // leave it that way. `accounts_provider_account_idx` is the one that matters most — without it
+    // leave it that way. `accounts_provider_account_idx` is the one that matters most - without it
     // nothing stops two rows claiming the same (providerId, accountId).
     const columnNames = new Set(cols.map((c) => c.name));
     const hasAllColumns = REBUILT_ACCOUNT_COLUMNS.every((name) => columnNames.has(name));
@@ -294,7 +294,7 @@ export function repairLegacySqliteSchema(client: Database) {
 
   // ── accounts ─────────────────────────────────────────────────────────────────
   // 0020 should create these camelCase; older versions used snake_case, and 0021 does not
-  // rename accounts columns — fix them here.
+  // rename accounts columns - fix them here.
   renameColumnIfNeeded(client, "accounts", "user_id", "userId");
   renameColumnIfNeeded(client, "accounts", "account_id", "accountId");
   renameColumnIfNeeded(client, "accounts", "provider_id", "providerId");

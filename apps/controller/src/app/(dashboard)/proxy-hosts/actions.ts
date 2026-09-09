@@ -136,7 +136,7 @@ function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInput | un
   }
 
   // The boolean is carried by a hidden input that is always present (see FormBooleanControls), so
-  // presence no longer distinguishes on from off — only the value does.
+  // presence no longer distinguishes on from off - only the value does.
   const enabledIndicator = formData.has("cpmForwardAuthEnabledPresent");
   const enabledValue = enabledIndicator
     ? parseCheckbox(formData.get("cpmForwardAuthEnabled"))
@@ -348,7 +348,7 @@ function parseLoadBalancerConfig(formData: FormData): LoadBalancerInput | undefi
   //
   // The model already draws the line this relies on: `undefined` leaves a meta key alone and
   // `null` deletes it. Testing the value instead collapsed those two into one, so an emptied box
-  // was indistinguishable from a field the form never rendered — and no load-balancer field could
+  // was indistinguishable from a field the form never rendered - and no load-balancer field could
   // be cleared once set. A policy's fields are only rendered while that policy is selected, so
   // switching policy still leaves the old values untouched rather than wiping them.
   if (formData.has("lbPolicyHeaderField")) {
@@ -481,7 +481,7 @@ function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null } {
     return { waf: { enabled: false, waf_mode: wafMode } };
   }
 
-  // Blank means "inherit" — the global body limits (or Coraza's own defaults)
+  // Blank means "inherit" - the global body limits (or Coraza's own defaults)
   // apply. createProxyHost/updateProxyHost re-validate the resulting config.
   const requestBodyLimit = parseBodyLimitMib(
     formData.get("wafRequestBodyLimitMb"),
@@ -745,7 +745,7 @@ export async function createProxyHostAction(
         name: String(formData.get("name") ?? "Untitled"),
         domains: parseCsv(formData.get("domains")),
         upstreams: parseUpstreams(formData.get("upstreams")),
-        // No checkboxes ticked is the empty list, which means every agent — the same thing the
+        // No checkboxes ticked is the empty list, which means every agent - the same thing the
         // field being absent means, so a client that predates assignments keeps working.
         agentIds: parseAgentIds(formData.getAll("agentId")),
         certificateId: certificateId,

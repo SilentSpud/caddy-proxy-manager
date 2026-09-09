@@ -2,7 +2,7 @@
  * The agent's half of the schema.
  *
  * An agent is not a user. It authenticates by signing its request with the secret agreed at
- * pairing — `x-cpm-agent`, `x-cpm-timestamp`, `x-cpm-signature` over the body — and it holds one
+ * pairing - `x-cpm-agent`, `x-cpm-timestamp`, `x-cpm-signature` over the body - and it holds one
  * subscription open for as long as it runs. Everything the controller pushes travels down that
  * subscription; everything the agent reports comes back as a mutation.
  *
@@ -13,7 +13,7 @@
  * requires a user and rejects a signature. Nothing is reachable by both.
  *
  * **Pairing is deliberately still REST.** It runs before there is a secret to sign with, so it
- * cannot use this path — the exchange is what produces the credential everything here depends on.
+ * cannot use this path - the exchange is what produces the credential everything here depends on.
  */
 
 import {
@@ -46,7 +46,7 @@ export type VerifiedAgent = { id: number; agentId: string; name: string };
  * The agent behind this request, or a refusal.
  *
  * The body is read from a clone. Yoga has already consumed the original to parse the document, and
- * the signature covers the bytes the agent sent — verifying anything else would be verifying a
+ * the signature covers the bytes the agent sent - verifying anything else would be verifying a
  * re-serialisation that may differ in key order or spacing from what was signed.
  */
 export async function requireAgent(

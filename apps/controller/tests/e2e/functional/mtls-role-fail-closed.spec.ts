@@ -83,7 +83,7 @@ function expectMtlsBlocked(outcome: Awaited<ReturnType<typeof httpsGetOutcome>>)
   expect(outcome.error).toBeDefined();
 }
 
-test.describe('mTLS — role-based trust fails closed on revocation', () => {
+test.describe('mTLS - role-based trust fails closed on revocation', () => {
   test.setTimeout(120_000); // RSA keygen + two Caddy config reloads
 
   test("revoking the trusted role's only cert denies all clients (no fail-open)", async ({
@@ -144,7 +144,7 @@ test.describe('mTLS — role-based trust fails closed on revocation', () => {
       expect(serverResp.ok(), 'import server cert').toBeTruthy();
       ids.serverCertId = (await serverResp.json()).id;
 
-      // Host trusts the ROLE (not a specific cert / CA) — the H2 code path.
+      // Host trusts the ROLE (not a specific cert / CA) - the H2 code path.
       const hostResp = await post(API_HOSTS, {
         name: `${prefix} Host`,
         domains: [domain],
@@ -168,7 +168,7 @@ test.describe('mTLS — role-based trust fails closed on revocation', () => {
 
       // Wait for the new config to go live: the now-revoked cert must stop being
       // accepted. (With the H2 bug the host would fall open to plain TLS and the
-      // revoked cert — and no cert — would keep returning 200, so this poll would
+      // revoked cert - and no cert - would keep returning 200, so this poll would
       // never flip and the test fails.)
       await expect
         .poll(async () => (await httpsGetOutcome(domain, '/', clientIdentity)).response?.status, {

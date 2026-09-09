@@ -3,7 +3,7 @@
  *
  * Runs against `web-migrate` (port 3005): its own empty PostgreSQL database, no `ADMIN_USERNAME`,
  * and a real pre-3.0 SQLite file bind-mounted where the application scans for one. The database is
- * built from `drizzle/legacy-sqlite` — the migrations every 3.0 deployment actually ran — so what
+ * built from `drizzle/legacy-sqlite` - the migrations every 3.0 deployment actually ran - so what
  * the browser sees is a database the application discovered, not one a test injected.
  *
  * One page for the whole block, for the same reason as the setup spec: this is a sequence walked
@@ -70,7 +70,7 @@ test.describe('Migrating an existing installation', () => {
     // This endpoint is unauthenticated by necessity and names a file to open on the host, so the
     // guard has to be "one of the files this host offered" rather than "a file that parses as one
     // of our databases". Without it, anything on the filesystem was reachable as an existence
-    // check and an error message — and a planted SQLite file was reachable as an account import.
+    // check and an error message - and a planted SQLite file was reachable as an account import.
     for (const path of ['/etc/passwd', '/etc/hostname', '../../etc/passwd', '/nonexistent.db']) {
       const response = await page.request.post('/api/setup/migrate', {
         data: { path, groups: ['users'] },
@@ -104,7 +104,7 @@ test.describe('Migrating an existing installation', () => {
   test('migrating restarts the app before handing them on', async () => {
     // The restart is the point of this test, not a detail of it. The process read its
     // configuration from an empty database at boot, and the import has just replaced that
-    // database underneath it — signing in before it restarts means signing in to the old answers.
+    // database underneath it - signing in before it restarts means signing in to the old answers.
     await page.getByRole('button', { name: 'Migrate this database' }).click();
 
     // The importer copies thirty tables; the dialog is the signal it finished.
@@ -121,7 +121,7 @@ test.describe('Migrating an existing installation', () => {
     // The whole point of migrating rather than starting fresh. A user row without its credential
     // account row would leave this account existing and unusable.
     await page.goto('/login');
-    // The container restarted moments ago, so this is the coldest /login in the suite — the widest
+    // The container restarted moments ago, so this is the coldest /login in the suite - the widest
     // window between the form being painted and React attaching its onSubmit.
     await waitForHydration(page);
     await field('username').fill(LEGACY_FIXTURE.adminUsername);

@@ -1,5 +1,5 @@
 /**
- * Functional: per-path redirect rules — matched paths redirect, unmatched are proxied. The
+ * Functional: per-path redirect rules - matched paths redirect, unmatched are proxied. The
  * redirects_json field is injected directly. Domain: func-redirects.test
  */
 import { test, expect } from '@playwright/test';

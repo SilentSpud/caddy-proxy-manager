@@ -85,7 +85,7 @@ describe('REST settings runtime validation', () => {
   });
 
   // Coraza rejects a body limit above 1 GiB while Caddy loads the config, which
-  // takes down the whole document — so it has to fail at save time, with a
+  // takes down the whole document - so it has to fail at save time, with a
   // message that says which value is wrong.
   it('rejects WAF body limits Coraza would refuse', () => {
     expect(() =>

@@ -5,7 +5,7 @@
  * another host cannot read this host's Caddy log at all, and relaying every request through it
  * would put the busiest write path in the fleet through a machine with nothing to do with it.
  *
- * Insert-only on purpose. The controller owns the schema, the retention policy and every read —
+ * Insert-only on purpose. The controller owns the schema, the retention policy and every read -
  * this side knows two table names and how to append rows to them.
  */
 
@@ -41,7 +41,7 @@ export async function configureAnalytics(credentials: Credentials | null): Promi
   await closeAnalytics();
   current = credentials;
   if (!credentials) {
-    console.log("[analytics] disabled — no ClickHouse credentials");
+    console.log("[analytics] disabled - no ClickHouse credentials");
     return;
   }
   console.log(`[analytics] writing to ${credentials.url} as ${credentials.user}`);

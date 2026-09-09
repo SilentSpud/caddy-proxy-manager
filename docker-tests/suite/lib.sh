@@ -100,7 +100,7 @@ t_ok() {  # t_ok NAME CMD...
   if out=$("$@" 2>&1); then pass "$name"; else fail "$name" "command failed: $* :: $(printf '%.300s' "$out")"; fi
 }
 
-t_fails() {  # t_fails NAME CMD... — passes when the command exits non-zero
+t_fails() {  # t_fails NAME CMD... - passes when the command exits non-zero
   local name="$1"; shift
   local out
   if out=$("$@" 2>&1); then fail "$name" "command unexpectedly succeeded: $*"; else pass "$name"; fi
@@ -138,14 +138,14 @@ api() {
   rm -f "$out" "$out.err"
 }
 
-# jqr FILTER [extra jq args...] — jq over the last API response. Extra args go
+# jqr FILTER [extra jq args...] - jq over the last API response. Extra args go
 # before the filter, so `jqr '.x' --argjson y "$json"` works.
 jqr() {
   local filter="$1"; shift
   printf '%s' "$API_BODY" | jq -r "$@" "$filter" 2>/dev/null
 }
 
-# with_token TOKEN CMD... — runs CMD with a different (or empty) bearer token.
+# with_token TOKEN CMD... - runs CMD with a different (or empty) bearer token.
 # `local` gives dynamic scope in bash, so `api` several frames down sees it, and
 # the override disappears when this returns.
 with_token() {
@@ -191,7 +191,7 @@ cpm_mint_token() {
 
 # Some endpoints outside /api/v1 (waf-events, geoip-status, l4-ports) sit behind
 # the session middleware, which redirects anything without a session cookie to
-# the login page — a bearer token is not enough. Those are called with the
+# the login page - a bearer token is not enough. Those are called with the
 # admin's browser session instead, which is what the UI uses.
 api_session() {  # api_session METHOD PATH [BODY] -> API_STATUS, API_BODY
   local method="$1" path="$2" body="${3:-}"
@@ -240,7 +240,7 @@ trap cleanup_tracked EXIT
 # create_resource COLLECTION JSON
 #
 # Sets NEW_ID on success and registers the resource for teardown; non-zero on failure, with the
-# reply in API_STATUS / API_BODY. Deliberately not written to echo the id — it must run in the
+# reply in API_STATUS / API_BODY. Deliberately not written to echo the id - it must run in the
 # caller's shell so `track` mutates the caller's cleanup stack, which a $(...) subshell would lose.
 NEW_ID=
 
@@ -252,7 +252,7 @@ create_resource() {
     200|201) ;;
     *)
       # CPM writes the row first and pushes the Caddy config second, so a
-      # rejected config still leaves a live resource behind — and every later
+      # rejected config still leaves a live resource behind - and every later
       # config push would keep failing on it. Adopt any orphan so the EXIT trap
       # removes it and the next test file starts from a clean config.
       local name status_backup="$API_STATUS" body_backup="$API_BODY"
@@ -277,7 +277,7 @@ create_resource() {
 create_host() { create_resource proxy-hosts "$1"; }
 create_l4_host() { create_resource l4-proxy-hosts "$1"; }
 
-# create_host_or_fail NAME JSON — creates a host, recording a failed assertion
+# create_host_or_fail NAME JSON - creates a host, recording a failed assertion
 # and returning non-zero if the API rejected it. On success NEW_ID holds the id.
 create_host_or_fail() {
   local name="$1" body="$2"
@@ -320,7 +320,7 @@ header_value() {
 
 fetch_json() { printf '%s' "$FETCH_BODY" | jq -r "$1" 2>/dev/null; }
 
-# Just the status code, and "000" when the request never produced one — which
+# Just the status code, and "000" when the request never produced one - which
 # is how a refused TLS handshake (mTLS with no client certificate, say) shows
 # up as distinct from an HTTP-level rejection.
 http_code() {
@@ -359,11 +359,11 @@ tls_handshake_ok() {
 
 # ── Local PKI ───────────────────────────────────────────────────────────────
 #
-# Tests that need certificates CPM did not issue — imported server certs, mTLS
-# client certs — mint them here. Everything lands in $STATE_DIR, is idempotent
+# Tests that need certificates CPM did not issue - imported server certs, mTLS
+# client certs - mint them here. Everything lands in $STATE_DIR, is idempotent
 # across test files, and never leaves the container.
 
-# make_ca NAME — creates $STATE_DIR/NAME-ca.{crt,key}.pem and, for server CAs,
+# make_ca NAME - creates $STATE_DIR/NAME-ca.{crt,key}.pem and, for server CAs,
 # adds the root to the bundle `fetch` verifies against.
 make_ca() {
   local name="$1"
@@ -377,14 +377,14 @@ make_ca() {
   return 0
 }
 
-trust_ca() {  # trust_ca NAME — append a local CA to the client's trust store
+trust_ca() {  # trust_ca NAME - append a local CA to the client's trust store
   local name="$1" marker="$STATE_DIR/.trusted-$1"
   [ -e "$marker" ] && return 0
   cat "$STATE_DIR/$name-ca.crt.pem" >>"$CA_BUNDLE" && : >"$marker"
 }
 
 # issue_cert CA_NAME LEAF_NAME SUBJECT SAN PURPOSE
-#   SAN     e.g. "DNS:a.cpm.test,DNS:*.b.cpm.test" — empty for client certs
+#   SAN     e.g. "DNS:a.cpm.test,DNS:*.b.cpm.test" - empty for client certs
 #   PURPOSE serverAuth | clientAuth
 issue_cert() {
   local ca="$1" leaf="$2" subject="$3" san="$4" purpose="${5:-serverAuth}"
@@ -404,7 +404,7 @@ issue_cert() {
   return 0
 }
 
-cert_fingerprint() {  # lower-case hex, colon-free — the form Caddy compares against
+cert_fingerprint() {  # lower-case hex, colon-free - the form Caddy compares against
   openssl x509 -in "$1" -noout -fingerprint -sha256 2>/dev/null \
     | sed 's/.*=//; s/://g' | tr 'A-Z' 'a-z'
 }

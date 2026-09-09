@@ -1,4 +1,4 @@
-/** Pure helpers extracted from caddy.ts — no DB, network or filesystem, so directly testable. */
+/** Pure helpers extracted from caddy.ts - no DB, network or filesystem, so directly testable. */
 import { isIP } from "node:net";
 
 // ── Private range expansion ──────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export type HostPort = {
  * IPv6 address.
  *
  * Returns null for a bare IPv6 literal. `2001:db8::1` ends in `:1`, and reading its last group as
- * a port is how an address silently becomes a listener on port 1 — parseHostPort already refuses
+ * a port is how an address silently becomes a listener on port 1 - parseHostPort already refuses
  * it, and this is the reason why.
  */
 export function splitHostPort(value: string): HostPort | null {

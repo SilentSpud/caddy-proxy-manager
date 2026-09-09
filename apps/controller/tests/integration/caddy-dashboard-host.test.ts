@@ -5,7 +5,7 @@
  * document at all, and what happens when a stored host claims the same domain: routes are sorted
  * by host specificity, and two rows naming the same exact domain tie, so the managed one has to be
  * the one Caddy reaches first. Otherwise a host somebody creates for the dashboard's domain would
- * shadow the route the dashboard is reached through — and the page that would undo that mistake is
+ * shadow the route the dashboard is reached through - and the page that would undo that mistake is
  * the one that stops answering.
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
@@ -108,7 +108,7 @@ describe('the dashboard host in the generated config', () => {
   });
 
   it('is absent when nothing has decided yet', async () => {
-    // A database with no dashboard blob at all — every install before this feature existed.
+    // A database with no dashboard blob at all - every install before this feature existed.
     const document = (await buildCaddyDocument()) as CaddyDocument;
 
     expect(document.apps.http?.servers?.cpm).toBeUndefined();

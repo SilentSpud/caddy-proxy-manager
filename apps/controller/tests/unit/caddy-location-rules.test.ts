@@ -125,7 +125,7 @@ describe('buildLocationReverseProxy', () => {
     expect(safePath).toBe('');
   });
 
-  it('handles mixed HTTP and HTTPS upstreams — TLS transport added', () => {
+  it('handles mixed HTTP and HTTPS upstreams - TLS transport added', () => {
     const { reverseProxyHandler } = buildLocationReverseProxy(
       { path: '/mixed/*', upstreams: ['http://backend1:80', 'https://backend2:443'] },
       false,

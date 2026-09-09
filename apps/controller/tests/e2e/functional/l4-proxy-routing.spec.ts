@@ -1,5 +1,5 @@
 /**
- * Functional: L4 (TCP/UDP) proxy routing — raw connections and datagrams through Caddy to echo
+ * Functional: L4 (TCP/UDP) proxy routing - raw connections and datagrams through Caddy to echo
  * containers. Ports TCP 15432/15433, UDP 15353; upstreams tcp-echo:9000, udp-echo:9001.
  */
 import { test, expect } from '@playwright/test';
@@ -55,7 +55,7 @@ test.describe
       const res = await tcpSend('127.0.0.1', TCP_PORT, 'should-not-echo\n', 2000);
       expect(res.data).not.toContain('should-not-echo');
 
-      // Re-enable and wait for the route to actually carry data again — the
+      // Re-enable and wait for the route to actually carry data again - the
       // port keeps accepting connections throughout, so only an echo proves it.
       await row.getByRole('switch').click();
       await waitForTcpEcho('127.0.0.1', TCP_PORT);
@@ -100,7 +100,7 @@ test.describe
         listenAddress: `:${UDP_PORT}`,
         upstream: 'udp-echo:9001',
       });
-      // UDP listeners may take longer to start than TCP — use a longer timeout
+      // UDP listeners may take longer to start than TCP - use a longer timeout
       await waitForUdpRoute('127.0.0.1', UDP_PORT, 30_000);
     });
 

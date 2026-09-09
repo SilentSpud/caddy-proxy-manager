@@ -16,7 +16,7 @@ import { vi } from './helpers/vi';
 clearDotEnv();
 
 /**
- * Suppress console output from production code during tests — Bun's equivalent of Vitest's
+ * Suppress console output from production code during tests - Bun's equivalent of Vitest's
  * `onConsoleLog() { return false }`. spyOn still works; TEST_LOG=1 restores the output.
  */
 if (!process.env.TEST_LOG) {
@@ -34,7 +34,7 @@ if (!process.env.TEST_LOG) {
 installFakeCaddy();
 beforeEach(() => {
   installFakeCaddy();
-  // Registered from the preload, so it runs before any hook the test file declares — which is what
+  // Registered from the preload, so it runs before any hook the test file declares - which is what
   // makes a database created in the file's own beforeEach count as belonging to the test.
   markTestBoundary();
 });

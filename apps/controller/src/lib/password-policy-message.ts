@@ -36,7 +36,7 @@ export function passwordPolicyHint(t: Translate): string {
  * One sentence naming every failure, or null when the password passes. Reports all at once rather
  * than one per attempt, so someone retyping learns the whole rule in one go.
  *
- * `subject` names the field ("New password"), already translated by the caller — each form calls
+ * `subject` names the field ("New password"), already translated by the caller - each form calls
  * its field something different, and only the caller knows which.
  */
 export function passwordPolicyMessage(

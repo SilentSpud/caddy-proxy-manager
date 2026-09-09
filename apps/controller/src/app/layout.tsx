@@ -10,7 +10,7 @@ import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
 import { THEME_COOKIE, parseThemeMode, themeAttr } from "@/src/lib/theme-mode";
 
 // Each page sets its own `title`; the template appends APP_NAME. A page opts out with
-// `title: { absolute: "..." }` — the forward auth portal does, since it runs on someone else's
+// `title: { absolute: "..." }` - the forward auth portal does, since it runs on someone else's
 // domain and should not name the product guarding the app.
 //
 // Static, and the description is not translated: making this an async generateMetadata moves the
@@ -42,7 +42,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     // data-theme is rendered from the cookie so the first paint is already in the right mode;
     // omitted for "system", which Astryx's reset.css reads as `color-scheme: light dark`.
-    // suppressHydrationWarning stays — Astryx's Theme writes data-theme itself once mounted.
+    // suppressHydrationWarning stays - Astryx's Theme writes data-theme itself once mounted.
     <html
       lang={locale}
       dir={getLocaleDirection(locale)}

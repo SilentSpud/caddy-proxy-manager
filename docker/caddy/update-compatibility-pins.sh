@@ -10,7 +10,7 @@ cd "$script_dir"
 caddy_version="$(go list -m -f '{{.Version}}' github.com/caddyserver/caddy/v2)"
 go mod download "github.com/caddyserver/caddy/v2@${caddy_version}"
 caddy_mod_file="$(go env GOMODCACHE)/cache/download/github.com/caddyserver/caddy/v2/@v/${caddy_version}.mod"
-# cel-go's import path became cel.dev/cel-go at v0.32.0 — the GitHub repo moved to
+# cel-go's import path became cel.dev/cel-go at v0.32.0 - the GitHub repo moved to
 # cel-expr/cel-go, but the module renamed to the vanity domain rather than the new repo. Match
 # either spelling on both sides so the pin survives Caddy and the plugins migrating separately.
 cel_paths="github.com/google/cel-go cel.dev/cel-go"

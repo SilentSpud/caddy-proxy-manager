@@ -5,7 +5,7 @@
  *
  * Fields are generated rather than written out, so adding a setting to
  * src/lib/settings/registry.ts puts it on this page and on the migration screen at the same time.
- * A value that came from the environment is labelled as such — that is the operator's cue that
+ * A value that came from the environment is labelled as such - that is the operator's cue that
  * saving here is what lets them delete it from their `.env`.
  *
  * The Defaults card is the exception, and is written out by hand because it is not a registry
@@ -115,7 +115,7 @@ export default function SetupSettingsClient({
 
   // Only what is actually on screen. A hidden field is not migrated either, so counting it would
   // tell the operator a value had been copied into the database and invite them to delete it from
-  // their .env — where it is still the only copy.
+  // their .env - where it is still the only copy.
   const migratedCount = fields.filter(
     (field) => field.source === "environment" && isVisible(field),
   ).length;
@@ -185,7 +185,7 @@ export default function SetupSettingsClient({
                       />
                     )}
                     {/* Hidden rather than disabled when the gate is off: an unrendered field posts
-                        nothing, and the save skips what it was not sent — so turning analytics off
+                        nothing, and the save skips what it was not sent - so turning analytics off
                         leaves the ClickHouse password stored rather than clearing it. */}
                     {rest.filter(isVisible).map((field) => (
                       <SettingRow
@@ -215,7 +215,7 @@ export default function SetupSettingsClient({
  *
  * Its own component rather than a `kind` on SettingRow: this one is stored tri-state but must post
  * a definite yes or no. Setup is where the operator makes the choice explicit, so "leave it to be
- * inferred" is not an answer worth offering here — the switch arrives showing whatever is inferred
+ * inferred" is not an answer worth offering here - the switch arrives showing whatever is inferred
  * today, and saving pins it.
  */
 function GateSwitch({
@@ -342,7 +342,7 @@ function SettingRow({
  * Every field is optional and the whole card is skipped when the core three are blank, because a
  * deployment signing in with a local administrator has no provider to describe. Leaving it out
  * entirely was the old behaviour, and it meant the OAUTH_* half of a `.env` had no home on this
- * page at all — the account step asks about OAuth only on the branch where it is the *only* way
+ * page at all - the account step asks about OAuth only on the branch where it is the *only* way
  * in, so an operator who made a local administrator was never asked, and never told they could
  * stop setting those variables.
  *

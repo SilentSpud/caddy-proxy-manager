@@ -340,22 +340,22 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
               <MetadataList columns="multi">
                 <MetadataListItem label={t("transactionId")}>
                   <Text type="code" size="xsm">
-                    {tx.id ?? "—"}
+                    {tx.id ?? "-"}
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={t("timestamp")}>
                   <Text type="body" size="sm">
-                    {tx.timestamp ?? "—"}
+                    {tx.timestamp ?? "-"}
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={t("client")}>
                   <Text type="code" size="xsm">
-                    {tx.client_ip ?? "—"}:{tx.client_port ?? 0}
+                    {tx.client_ip ?? "-"}:{tx.client_port ?? 0}
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={t("server")}>
                   <Text type="code" size="xsm">
-                    {tx.server_id ?? "—"}:{tx.host_port ?? 0}
+                    {tx.server_id ?? "-"}:{tx.host_port ?? 0}
                   </Text>
                 </MetadataListItem>
               </MetadataList>
@@ -371,7 +371,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                         <VStack gap={2}>
                           <HStack gap={2} vAlign="center">
                             <Text type="code" size="xsm" weight="semibold">
-                              Rule {m.details?.ruleId ?? "—"}
+                              Rule {m.details?.ruleId ?? "-"}
                             </Text>
                             <SeverityChip severity={m.details?.severity ?? null} />
                           </HStack>
@@ -445,7 +445,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                           ? "warning"
                           : "success"
                     }
-                    label={String(res.status || "—")}
+                    label={String(res.status || "-")}
                   />
                   <Text type="code" size="xsm" color="secondary">
                     {res.protocol}
@@ -470,7 +470,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                   <MetadataList columns="multi">
                     <MetadataListItem label={t("ruleId")}>
                       <Text type="code" size="xsm" weight="semibold">
-                        {m.details?.ruleId ?? "—"}
+                        {m.details?.ruleId ?? "-"}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("severity")}>
@@ -483,17 +483,17 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                     </MetadataListItem>
                     <MetadataListItem label={t("logData")}>
                       <Text type="code" size="xsm">
-                        {m.details?.logdata ?? "—"}
+                        {m.details?.logdata ?? "-"}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("file")}>
                       <Text type="code" size="xsm" color="secondary">
-                        {m.details?.file ?? "—"}:{m.details?.lineNumber ?? ""}
+                        {m.details?.file ?? "-"}:{m.details?.lineNumber ?? ""}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("reference")}>
                       <Text type="code" size="xsm" color="secondary">
-                        {m.details?.reference ?? "—"}
+                        {m.details?.reference ?? "-"}
                       </Text>
                     </MetadataListItem>
                   </MetadataList>
@@ -602,7 +602,7 @@ function EventDetailPanel({
             </MetadataListItem>
             <MetadataListItem label={t("host")}>
               <Text type="code" size="sm">
-                {event.host || "—"}
+                {event.host || "-"}
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("clientIp")}>
@@ -620,17 +620,17 @@ function EventDetailPanel({
             </MetadataListItem>
             <MetadataListItem label={t("uri")}>
               <Text type="code" size="xsm" color="secondary">
-                {event.uri || "—"}
+                {event.uri || "-"}
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("ruleId")}>
               <Text type="code" size="sm" weight="semibold">
-                {event.ruleId ?? "—"}
+                {event.ruleId ?? "-"}
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("ruleMessage")}>
               <Text type="body" size="sm">
-                {event.ruleMessage ?? "—"}
+                {event.ruleMessage ?? "-"}
               </Text>
             </MetadataListItem>
           </MetadataList>
@@ -747,7 +747,7 @@ function GlobalSuppressedRules({
     return String(id).includes(q) || (messages[id] ?? "").toLowerCase().includes(q);
   });
 
-  const noDescription = "No description available — rule has not triggered yet";
+  const noDescription = "No description available - rule has not triggered yet";
 
   return (
     <VStack gap={4}>
@@ -1058,7 +1058,7 @@ export default function WafEventsClient({
           </Text>
         </HStack>
         <Text type="code" size="xsm" color="secondary">
-          {event.host || "—"}
+          {event.host || "-"}
         </Text>
         {event.ruleId && (
           <Text type="body" size="xsm" color="secondary">
@@ -1131,11 +1131,11 @@ export default function WafEventsClient({
       render: (r) => (
         <HStack gap={2} vAlign="center">
           <Text type="code" size="xsm" weight="bold" color={r.method ? "accent" : "secondary"}>
-            {r.method || "—"}
+            {r.method || "-"}
           </Text>
           <Tooltip content={r.uri ?? ""}>
             <Text type="code" size="xsm" color="secondary" maxLines={1}>
-              {r.uri || "—"}
+              {r.uri || "-"}
             </Text>
           </Tooltip>
         </HStack>
@@ -1147,7 +1147,7 @@ export default function WafEventsClient({
       width: 80,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
-          {r.ruleId ?? "—"}
+          {r.ruleId ?? "-"}
         </Text>
       ),
     },

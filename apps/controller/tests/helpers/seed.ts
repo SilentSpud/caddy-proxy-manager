@@ -1,6 +1,6 @@
 /**
- * Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI —
- * deliberately, so the suite runs the image that ships — so seeding happens in the throwaway
+ * Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI -
+ * deliberately, so the suite runs the image that ships - so seeding happens in the throwaway
  * `db-seed` container, which reaches the same PostgreSQL server the web container does.
  *
  * The scripts below are source text sent to that container, not code this file runs. They use
@@ -33,7 +33,7 @@ export function runSeedScript(script: string): string {
 
 /**
  * Create the user, or reset one to a known role, password and active state. Writes both a `users`
- * row and a `credential` account row — Better Auth reads the account, the dashboard the user.
+ * row and a `credential` account row - Better Auth reads the account, the dashboard the user.
  */
 export function ensureTestUser(username: string, password: string, role: string): void {
   runSeedScript(`

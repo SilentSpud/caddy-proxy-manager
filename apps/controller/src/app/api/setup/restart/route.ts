@@ -1,11 +1,11 @@
 import { getMigrationSource, isSetupCompleted } from "@/src/lib/setup";
 
 /**
- * POST /api/setup/restart — stop the process so the supervisor starts it again.
+ * POST /api/setup/restart - stop the process so the supervisor starts it again.
  *
  * A migration writes the database underneath a process that has already read from it. Settings are
  * resolved into a cache, the enabled OAuth providers were listed at startup, the environment
- * backfill has already decided what this deployment looks like — all of it decided against the
+ * backfill has already decided what this deployment looks like - all of it decided against the
  * empty database that existed a moment ago. Signing in against that is how an operator ends up
  * looking at a dashboard that has their proxy hosts but none of their settings, with nothing to
  * suggest a restart would fix it.
@@ -13,7 +13,7 @@ import { getMigrationSource, isSetupCompleted } from "@/src/lib/setup";
  * So the process exits and comes back reading the database it now has. Nothing here talks to
  * Docker: the container's own `restart: unless-stopped` is what brings it back, which needs no
  * socket, no agent and no privilege this process does not already hold. A deployment running
- * without a supervisor does not come back — the setup screen watches for exactly that and says so,
+ * without a supervisor does not come back - the setup screen watches for exactly that and says so,
  * rather than leaving the operator on a page that never loads.
  */
 
@@ -26,7 +26,7 @@ const EXIT_DELAY_MS = 750;
 export async function POST(): Promise<Response> {
   // The window is "a migration has run and setup is not finished", which is exactly the moment the
   // restart is for. It is deliberately not narrower: an instance in this state is unauthenticated
-  // by design — anyone who can reach it can complete its setup and own it outright — so being able
+  // by design - anyone who can reach it can complete its setup and own it outright - so being able
   // to restart it as well is not a door this opens.
   if (await isSetupCompleted()) {
     return Response.json(

@@ -50,7 +50,7 @@ async function loginAs(
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
-  // The login client does router.replace('/') on success — wait for that
+  // The login client does router.replace('/') on success - wait for that
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 60_000 });
   await page.close();
   return context;
@@ -92,7 +92,7 @@ test.describe('Role-based access control', () => {
     await viewerContext?.close();
   });
 
-  // ── "user" role — can access / and /profile ─────────────────────────
+  // ── "user" role - can access / and /profile ─────────────────────────
 
   test('user role: / loads with welcome message', async () => {
     const page = await userContext.newPage();
@@ -110,7 +110,7 @@ test.describe('Role-based access control', () => {
     try {
       await page.goto('/');
       await expect(page.getByText(/welcome back/i)).toBeVisible({ timeout: 5_000 });
-      // Non-admin gets empty stats — no Proxy Hosts / Certificates / Access Lists cards
+      // Non-admin gets empty stats - no Proxy Hosts / Certificates / Access Lists cards
       await expect(page.getByRole('link', { name: /proxy hosts/i })).not.toBeVisible({
         timeout: 3_000,
       });
@@ -146,7 +146,7 @@ test.describe('Role-based access control', () => {
     }
   });
 
-  // ── "viewer" role — can access / and /profile ───────────────────────
+  // ── "viewer" role - can access / and /profile ───────────────────────
 
   test('viewer role: / loads with welcome message', async () => {
     const page = await viewerContext.newPage();
@@ -196,7 +196,7 @@ test.describe('Role-based access control', () => {
     }
   });
 
-  // ── "user" role — blocked from admin-only pages ─────────────────────
+  // ── "user" role - blocked from admin-only pages ─────────────────────
 
   for (const path of ADMIN_ONLY_PAGES) {
     test(`user role: ${path} is blocked`, async () => {
@@ -223,7 +223,7 @@ test.describe('Role-based access control', () => {
     });
   }
 
-  // ── "viewer" role — blocked from admin-only pages ───────────────────
+  // ── "viewer" role - blocked from admin-only pages ───────────────────
 
   for (const path of ADMIN_ONLY_PAGES) {
     test(`viewer role: ${path} is blocked`, async () => {
@@ -248,7 +248,7 @@ test.describe('Role-based access control', () => {
     });
   }
 
-  // ── Admin user — can access all pages ───────────────────────────────
+  // ── Admin user - can access all pages ───────────────────────────────
 
   test('admin role: all dashboard pages are accessible', async ({ browser }, testInfo) => {
     testInfo.setTimeout(90_000);
@@ -287,7 +287,7 @@ test.describe('Role-based access control', () => {
     }
   });
 
-  // ── API endpoints — non-admin should be blocked ───────────────────────
+  // ── API endpoints - non-admin should be blocked ───────────────────────
 
   test('user role: API v1 endpoints return 401/403', async () => {
     const page = await userContext.newPage();

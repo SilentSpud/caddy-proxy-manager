@@ -40,7 +40,7 @@ test.describe
     });
 
     test('WAF still blocks attacks on the same host (bypass is scoped to WS upgrades only)', async () => {
-      // XSS <script> tag — CRS rule 941xxx. Proves the WebSocket bypass did not
+      // XSS <script> tag - CRS rule 941xxx. Proves the WebSocket bypass did not
       // disable WAF inspection for normal (non-upgrade) requests.
       const res = await httpGet(DOMAIN, '/page?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E');
       expect(res.status).toBe(403);

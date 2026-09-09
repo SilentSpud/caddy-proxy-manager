@@ -3,7 +3,7 @@
 /**
  * Form-safe wrappers around the design system's boolean controls. React 19 resets a
  * `<form action={serverAction}>` after the action, restoring each control to its *attribute*
- * default — so a toggled Switch snaps back and the next submit sends the stale value. These carry
+ * default - so a toggled Switch snaps back and the next submit sends the stale value. These carry
  * the value in a hidden input from React state. Use wherever a control submits via `htmlName`.
  */
 
@@ -24,7 +24,7 @@ function booleanFormValue(value: boolean | "indeterminate"): string {
  * The hidden input alone fixes what gets *submitted*. It does not fix what is *shown*: the reset
  * restores the real checkbox to its attribute default while React state still says otherwise, and
  * because React's own value has not changed it never writes the DOM back. The control then reads as
- * off while the app believes it is on, and the next click reports the state it is already in — so
+ * off while the app believes it is on, and the next click reports the state it is already in - so
  * it appears to do nothing, and a second click is needed to take effect.
  *
  * Remounting on the reset event rebuilds the control from state, which is the one thing a reset
@@ -61,7 +61,7 @@ function ResetSafe({
 }
 
 export function Switch({ htmlName, ...props }: SwitchProps) {
-  // A disabled control must not submit — the base components enforce that with
+  // A disabled control must not submit - the base components enforce that with
   // `name={isDisabled ? undefined : htmlName}`, so the hidden input has to honour it too.
   if (!htmlName || props.isDisabled) return <BaseSwitch {...props} />;
   return (

@@ -50,7 +50,7 @@ async function resolveConfig(): Promise<ClickHouseConfig> {
   const configured = password.trim().length > 0;
   if (toggle === true && !configured) {
     console.warn(
-      "Analytics are switched on but no ClickHouse password is set — nothing will be recorded.",
+      "Analytics are switched on but no ClickHouse password is set - nothing will be recorded.",
     );
   }
   // An unset toggle means "decide from the configuration", which is the rule this file applied
@@ -75,7 +75,7 @@ function chConfig(): Promise<ClickHouseConfig> {
  * Forget the resolved configuration, and drop a client built from the old one.
  *
  * Called when the analytics settings are saved. Without the close, a changed URL or password would
- * be ignored until the process restarted — the singleton below would keep answering with a
+ * be ignored until the process restarted - the singleton below would keep answering with a
  * connection opened under the previous credentials.
  */
 export async function invalidateClickHouseConfig(): Promise<void> {
@@ -84,7 +84,7 @@ export async function invalidateClickHouseConfig(): Promise<void> {
     await closeClickHouse();
   } catch (error) {
     // Best-effort. The settings are already saved by the time this runs, so a socket that will not
-    // close cleanly must not turn a successful save into a reported failure — and the next
+    // close cleanly must not turn a successful save into a reported failure - and the next
     // getClient rebuilds from the new configuration either way.
     console.warn("Could not close the previous ClickHouse client:", error);
     client = null;
@@ -222,7 +222,7 @@ const RETENTION_TABLES = ["traffic_events", "waf_events"] as const;
 /** Extract the retention (in days) from a table's TTL clause, if present. */
 function ttlDaysFromCreateQuery(createQuery: string): number | null {
   // ClickHouse normalizes `INTERVAL N DAY` to `toIntervalDay(N)` in create_table_query, but
-  // older servers may report the literal form — match both.
+  // older servers may report the literal form - match both.
   const match =
     createQuery.match(/TTL\s+ts\s*\+\s*toIntervalDay\((\d+)\)/i) ??
     createQuery.match(/TTL\s+ts\s*\+\s*INTERVAL\s+(\d+)\s+DAY/i);
@@ -231,7 +231,7 @@ function ttlDaysFromCreateQuery(createQuery: string): number | null {
 
 /**
  * Bring an existing table's TTL in line with CH_RETENTION_DAYS. `CREATE TABLE IF NOT EXISTS` never
- * alters one, so an explicit MODIFY TTL is needed — only when it differs, since it rewrites parts.
+ * alters one, so an explicit MODIFY TTL is needed - only when it differs, since it rewrites parts.
  */
 async function ensureRetentionTtl(
   ch: ClickHouseClient,
@@ -274,12 +274,12 @@ const DISABLED_SYSTEM_LOGS = [
 
 // Matches a disabled log table and its numbered upgrade leftovers: a ClickHouse upgrade renames the
 // old table to `<name>_<N>` and never cleans it up, so an exact-name drop misses it. Anchored to
-// names built from the trusted constant list above — no user input reaches this regex.
+// names built from the trusted constant list above - no user input reaches this regex.
 const DISABLED_SYSTEM_LOG_PATTERN = `^(${DISABLED_SYSTEM_LOGS.join("|")})(_[0-9]+)?$`;
 
 /**
  * Drop the diagnostic system-log tables we disable via config, including numbered `_<N>` leftovers.
- * Best-effort — the analytics user often lacks DROP on `system`.
+ * Best-effort - the analytics user often lacks DROP on `system`.
  */
 async function dropDisabledSystemLogs(ch: ClickHouseClient): Promise<void> {
   let names: string[];
@@ -881,7 +881,7 @@ export async function queryTopWafRulesWithHosts(
   const topRules = await queryTopWafRules(from, to, limit);
   if (topRules.length === 0) return [];
 
-  // Rule IDs come from ClickHouse query results — integers, so safe for an IN clause
+  // Rule IDs come from ClickHouse query results - integers, so safe for an IN clause
   const ruleIds = topRules.map((r) => r.ruleId);
   const tp = timeParams(from, to);
   const ruleParams: QueryParams = {};

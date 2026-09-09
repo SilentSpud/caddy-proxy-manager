@@ -1,5 +1,5 @@
 /**
- * Functional: Forward Auth with OAuth (Dex OIDC) — host creation, Dex login, allowed vs disallowed
+ * Functional: Forward Auth with OAuth (Dex OIDC) - host creation, Dex login, allowed vs disallowed
  * users, group-based access, session lifecycle. Test domains are not DNS-resolvable, so browser
  * navigation uses localhost:3000 and the callback goes through httpGet. Domain: func-fwd-oauth.test
  */
@@ -48,7 +48,7 @@ async function dexLogin(page: Page, email: string, password: string) {
   try {
     await page.waitForURL((url) => url.toString().includes('localhost:5556'), { timeout: 15_000 });
   } catch {
-    // Already redirected back — no Dex login needed (Dex has existing session)
+    // Already redirected back - no Dex login needed (Dex has existing session)
     return;
   }
 
@@ -79,7 +79,7 @@ async function freshContext(page: Page): Promise<BrowserContext> {
 
 /**
  * OAuth login through /login, verifying the user was created. Fresh browser context per user, and
- * one retry — Better Auth OAuth state can race between rapid logins.
+ * one retry - Better Auth OAuth state can race between rapid logins.
  */
 async function doOAuthLogin(page: Page, user: { email: string; password: string }) {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -90,7 +90,7 @@ async function doOAuthLogin(page: Page, user: { email: string; password: string 
       const oauthButton = p.getByRole('button', { name: /continue with dex|sign in with dex/i });
       await expect(oauthButton).toBeVisible({ timeout: 10_000 });
       await oauthButton.click();
-      // Better Auth does fetch then window.location.href — wait for Dex or error redirect
+      // Better Auth does fetch then window.location.href - wait for Dex or error redirect
       try {
         await p.waitForURL(
           (url) => {

@@ -1,7 +1,7 @@
 {
   "name": "@cpm/site",
   "version": "1.0.0",
-  "description": "Project website and documentation — Astro Starlight",
+  "description": "Project website and documentation - Astro Starlight",
   "private": true,
   "type": "module",
   "scripts": {

@@ -49,7 +49,7 @@ export function RelativeTime({
   if (validTo === null || status === null) {
     return (
       <Text type="body" size="sm" color="secondary">
-        —
+        -
       </Text>
     );
   }

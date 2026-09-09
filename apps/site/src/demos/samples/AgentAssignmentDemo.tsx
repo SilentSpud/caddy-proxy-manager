@@ -1,7 +1,7 @@
 import { AgentAssignmentFields } from "@cpm/controller/src/components/agents/AgentAssignmentFields";
 import { DemoSurface } from "../DemoSurface";
 
-/** A fleet of three, one of them offline — the case the card exists to make visible. */
+/** A fleet of three, one of them offline - the case the card exists to make visible. */
 export default function AgentAssignmentDemo() {
   return (
     <DemoSurface>

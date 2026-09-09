@@ -1,5 +1,5 @@
 /**
- * Functional: custom error pages (Caddy handle_errors) — the path the custom-JSON fields could not
+ * Functional: custom error pages (Caddy handle_errors) - the path the custom-JSON fields could not
  * reach (#168). Hosts point at `whoami-server:9999`, which resolves but never listens, so every
  * request 502s and triggers the error route. Covers status matching, catch-all, Content-Type, and
  * global-vs-per-host precedence.
@@ -54,7 +54,7 @@ async function setGlobalErrorPages(page: Page, rules: ErrorPageRule[]): Promise<
 }
 
 test.describe
-  .serial('Custom error pages — per host', () => {
+  .serial('Custom error pages - per host', () => {
     const hostIds: number[] = [];
 
     test.beforeAll(async ({ browser }) => {
@@ -73,17 +73,17 @@ test.describe
     test('serves a custom page (default text/html) when the upstream is down', async ({ page }) => {
       const domain = 'func-err-basic.test';
       hostIds.push(
-        await createHost(page, 'Error Pages — basic 502', domain, DEAD_UPSTREAM, [
-          { statuses: [502, 503, 504], body: '<h1>Maintenance — be right back</h1>' },
+        await createHost(page, 'Error Pages - basic 502', domain, DEAD_UPSTREAM, [
+          { statuses: [502, 503, 504], body: '<h1>Maintenance - be right back</h1>' },
         ]),
       );
 
-      await waitForBody(domain, 'Maintenance — be right back');
+      await waitForBody(domain, 'Maintenance - be right back');
 
       const res = await httpGet(domain);
       // The original error status code must be preserved, not replaced with 200.
       expect(res.status).toBe(502);
-      expect(res.body).toContain('<h1>Maintenance — be right back</h1>');
+      expect(res.body).toContain('<h1>Maintenance - be right back</h1>');
       // No contentType configured → defaults to text/html.
       expect(String(res.headers['content-type'])).toContain('text/html');
     });
@@ -94,7 +94,7 @@ test.describe
       const domain = 'func-err-select.test';
       // First rule targets 404 (must NOT fire on a 502), second targets 502 (must fire).
       hostIds.push(
-        await createHost(page, 'Error Pages — status select', domain, DEAD_UPSTREAM, [
+        await createHost(page, 'Error Pages - status select', domain, DEAD_UPSTREAM, [
           { statuses: [404], body: 'PAGE_FOR_404' },
           { statuses: [502], body: 'PAGE_FOR_502' },
         ]),
@@ -113,7 +113,7 @@ test.describe
     }) => {
       const domain = 'func-err-catchall.test';
       hostIds.push(
-        await createHost(page, 'Error Pages — catch-all', domain, DEAD_UPSTREAM, [
+        await createHost(page, 'Error Pages - catch-all', domain, DEAD_UPSTREAM, [
           { statuses: [], body: 'CATCH_ALL_ERROR', contentType: 'text/plain; charset=utf-8' },
         ]),
       );
@@ -129,7 +129,7 @@ test.describe
     test('does not interfere with a healthy upstream', async ({ page }) => {
       const domain = 'func-err-healthy.test';
       hostIds.push(
-        await createHost(page, 'Error Pages — healthy', domain, HEALTHY_UPSTREAM, [
+        await createHost(page, 'Error Pages - healthy', domain, HEALTHY_UPSTREAM, [
           { statuses: [], body: 'SHOULD_NOT_APPEAR' },
         ]),
       );
@@ -145,7 +145,7 @@ test.describe
   });
 
 test.describe
-  .serial('Custom error pages — global + precedence', () => {
+  .serial('Custom error pages - global + precedence', () => {
     const hostIds: number[] = [];
 
     test.beforeAll(async ({ browser }) => {
@@ -163,7 +163,7 @@ test.describe
 
     test('falls back to the global error page when a host defines none', async ({ page }) => {
       const domain = 'func-err-global.test';
-      hostIds.push(await createHost(page, 'Error Pages — global fallback', domain, DEAD_UPSTREAM));
+      hostIds.push(await createHost(page, 'Error Pages - global fallback', domain, DEAD_UPSTREAM));
 
       await waitForBody(domain, 'GLOBAL_ERROR_PAGE');
 
@@ -175,7 +175,7 @@ test.describe
     test('per-host error page takes precedence over the global one', async ({ page }) => {
       const domain = 'func-err-override.test';
       hostIds.push(
-        await createHost(page, 'Error Pages — per-host override', domain, DEAD_UPSTREAM, [
+        await createHost(page, 'Error Pages - per-host override', domain, DEAD_UPSTREAM, [
           { statuses: [], body: 'HOST_OVERRIDE_PAGE' },
         ]),
       );

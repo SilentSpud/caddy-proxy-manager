@@ -25,7 +25,7 @@ export function safeSystemErrorCode(error: unknown): string | null {
  * with nothing echoed out of it.
  *
  * Coraza builds its WAF during config load, so these validation errors reject
- * the entire document — without a reason the operator only sees every host
+ * the entire document - without a reason the operator only sees every host
  * stop updating, with no hint as to which knob did it.
  */
 const KNOWN_CADDY_REJECTIONS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [

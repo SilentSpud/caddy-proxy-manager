@@ -1,6 +1,6 @@
 /**
  * Moved here with the parser it covers: the Caddy log is a file on the agent's host, so this
- * is where it is read. The mocks the controller's copy needed are gone — these are pure
+ * is where it is read. The mocks the controller's copy needed are gone - these are pure
  * functions, and the module's imports are real dependencies of this package now.
  */
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";

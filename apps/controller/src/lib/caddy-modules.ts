@@ -2,7 +2,7 @@
  * The catalog of Caddy modules this app knows how to drive. Caddy is one static binary: a plugin
  * was either compiled in by xcaddy or does not exist. This is the one place recording that, so
  * `docker/caddy/Dockerfile` (what gets compiled), `src/lib/caddy.ts` (which handlers may be
- * emitted — an absent module makes Caddy reject the *entire* config) and the Settings UI agree.
+ * emitted - an absent module makes Caddy reject the *entire* config) and the Settings UI agree.
  * DNS provider modules derive from DNS_PROVIDERS.
  */
 
@@ -10,15 +10,15 @@ import { DNS_PROVIDERS } from "./dns-providers";
 
 /**
  * A capability the rest of the app can ask about. Features are what the UI and generation gate on,
- * modules are what the operator toggles — one module can power several features.
+ * modules are what the operator toggles - one module can power several features.
  */
 export type CaddyFeatureId =
   | "l4"
   | "geoblock"
   | "waf"
-  /** Serving and authenticating over a tailnet — the caddy-tailscale plugin. */
+  /** Serving and authenticating over a tailnet - the caddy-tailscale plugin. */
   | "tailscale"
-  /** ACME DNS-01 challenges in general — satisfied by *any* enabled DNS module. */
+  /** ACME DNS-01 challenges in general - satisfied by *any* enabled DNS module. */
   | "dns01";
 
 export type CaddyModuleCategory = "dns" | "proxy" | "security";
@@ -132,7 +132,7 @@ export type CaddyCustomModule = {
 
 /**
  * Go module paths arrive pasted from READMEs, with schemes and stray whitespace, and land verbatim
- * in a shell command in the Dockerfile — so an allowlist, not escaping.
+ * in a shell command in the Dockerfile - so an allowlist, not escaping.
  */
 const MODULE_PATH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._~/-]*[a-zA-Z0-9]$/;
 const VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._+-]*$/;

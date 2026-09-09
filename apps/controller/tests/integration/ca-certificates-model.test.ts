@@ -135,7 +135,7 @@ describe('deleteCaCertificate cascade', () => {
       .from(mtlsCertificateRoles)
       .where(eq(mtlsCertificateRoles.issuedClientCertificateId, cert.id));
     expect(mappings).toHaveLength(0);
-    // The role itself must survive — only the mapping is removed.
+    // The role itself must survive - only the mapping is removed.
     const roles = await db.select().from(mtlsRoles).where(eq(mtlsRoles.id, role.id));
     expect(roles).toHaveLength(1);
   });

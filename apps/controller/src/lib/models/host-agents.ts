@@ -3,7 +3,7 @@
  *
  * The rule this file exists to keep in one place: **a host with no assignments is served by every
  * agent**. That is the pre-assignment behaviour, so an upgrade changes nothing, and it is also the
- * only sane reading of "unassigned" — a host nobody has placed still has to be served somewhere,
+ * only sane reading of "unassigned" - a host nobody has placed still has to be served somewhere,
  * and silently serving it nowhere would take a site down the moment the feature shipped.
  *
  * Assignments name the `agents.id` row rather than the agent's self-asserted `agentId`, because a
@@ -47,8 +47,8 @@ export async function listHostAssignments(kind: HostKind): Promise<HostAssignmen
 /**
  * Whether `agentRowId` serves this host.
  *
- * `null` for the agent means "no particular agent" — the fleet-wide document a single-agent
- * deployment and every unit test build — and then every host is in.
+ * `null` for the agent means "no particular agent" - the fleet-wide document a single-agent
+ * deployment and every unit test build - and then every host is in.
  */
 export function servedByAgent(
   assignments: HostAssignments,
@@ -71,7 +71,7 @@ export async function agentIdsForHost(kind: HostKind, hostId: number): Promise<n
   return rows.map((row) => row.agentId).sort((a, b) => a - b);
 }
 
-/** The same, for a batch of hosts — one query rather than one per row on a list page. */
+/** The same, for a batch of hosts - one query rather than one per row on a list page. */
 export async function agentIdsForHosts(
   kind: HostKind,
   hostIds: number[],
@@ -97,7 +97,7 @@ export async function agentIdsForHosts(
  * Replace a host's assignments.
  *
  * Diffed rather than delete-then-insert: the two run as separate statements here, and a reader
- * between them would see the host as unassigned, which under the rule above means *every* agent —
+ * between them would see the host as unassigned, which under the rule above means *every* agent -
  * a brief fleet-wide exposure of a host being narrowed to one node. Deleting only what is leaving
  * never passes through that state.
  */
@@ -133,7 +133,7 @@ export async function setHostAgents(
 /**
  * Parse an assignment list off a form or API payload.
  *
- * Anything unparseable becomes the empty list, which is "every agent" — the same thing the field
+ * Anything unparseable becomes the empty list, which is "every agent" - the same thing the field
  * being absent means, so an older client that does not know about assignments keeps working.
  */
 export function parseAgentIds(value: unknown): number[] {

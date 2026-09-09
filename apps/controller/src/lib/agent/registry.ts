@@ -10,8 +10,8 @@
  * hands back is an async iterable of events and the framing happens above it. The keepalive moved
  * into the protocol as a `ping` event for the same reason.
  *
- * In memory, deliberately. A connection is a property of *this* process — the socket lives here or
- * nowhere — so persisting it would only produce rows describing streams that no longer exist. The
+ * In memory, deliberately. A connection is a property of *this* process - the socket lives here or
+ * nowhere - so persisting it would only produce rows describing streams that no longer exist. The
  * consequence to know about: this controller is a single container, and a second replica would
  * each hold half the fleet with no way to reach the other half. If that day comes, this is the file
  * that needs a broker behind it, not the callers.
@@ -155,7 +155,7 @@ export function attach(params: {
         waiting = resolve;
       });
     },
-    // Called when the consumer stops — the agent hung up, or the server is shutting the
+    // Called when the consumer stops - the agent hung up, or the server is shutting the
     // subscription down. Either way this connection is over.
     return() {
       detach(params.agentId);
@@ -253,7 +253,7 @@ export function recordStatus(agentId: string, status: AgentStatus): void {
  *
  * A builder rather than a state, because two agents no longer want the same thing: the hosts
  * pinned to each decide its ports, and its own module selection decides its build. Returning null
- * skips that agent — a state that could not be computed must leave the agent on the last one it
+ * skips that agent - a state that could not be computed must leave the agent on the last one it
  * had rather than replacing it with a guess.
  *
  * Sequential on purpose. Each build runs several queries, and a fleet of twenty agents all

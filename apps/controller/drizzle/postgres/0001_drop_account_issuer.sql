@@ -4,7 +4,7 @@
 --
 -- Only databases that ran 1.7.0 through 1.7.2 carry the column, but leaving it in place
 -- is not an option: it is NOT NULL and 1.7.3 never writes it, so every insert into
--- `accounts` would fail. Nothing is lost by dropping it — the issuer was derived from
+-- `accounts` would fail. Nothing is lost by dropping it - the issuer was derived from
 -- `providerId` and `oauth_providers.issuer`, both of which remain.
 --
 -- The index goes before the column, as the upgrade guide requires.

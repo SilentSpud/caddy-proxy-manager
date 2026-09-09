@@ -110,7 +110,7 @@ export async function createProxyHost(page: Page, config: ProxyHostConfig): Prom
   }
 
   if (config.accessListName) {
-    // shadcn/Radix Select — click trigger to open portal dropdown, wait for option, then click
+    // shadcn/Radix Select - click trigger to open portal dropdown, wait for option, then click
     const accessListTrigger = page.getByRole('combobox', { name: /access list/i });
     await accessListTrigger.scrollIntoViewIfNeeded();
     await accessListTrigger.click();
@@ -231,13 +231,13 @@ export async function issueClientCertificate(
   await openCertificatesTab(page, /^CA \/ mTLS/i);
   await expandCaRow(page, config.caName);
   await page.getByRole('button', { name: /^issue cert$/i }).click();
-  // Every CA row mounts its own issue dialog, and a closed native <dialog> stays in the DOM — so
+  // Every CA row mounts its own issue dialog, and a closed native <dialog> stays in the DOM - so
   // scope field lookups to the open one. (getByRole skips hidden elements; getByLabel does not.)
   const dialog = page.getByRole('dialog', { name: /issue client certificate/i });
   await expect(dialog).toBeVisible();
 
   // Required fields render their accessible name with a "Required" suffix, so
-  // an exact match can never hit them — anchor on the prefix instead.
+  // an exact match can never hit them - anchor on the prefix instead.
   await dialog.getByRole('textbox', { name: /^Common Name \(CN\)/ }).fill(config.commonName);
   if (config.validityDays !== undefined) {
     await dialog.getByRole('spinbutton', { name: /^Validity/ }).fill(String(config.validityDays));

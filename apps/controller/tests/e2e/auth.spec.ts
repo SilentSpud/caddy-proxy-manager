@@ -25,7 +25,7 @@ test.describe('Authentication', () => {
   test('/login with wrong password shows an error message', async ({ page }) => {
     await page.goto('/login');
     // This test asserts the page STAYS on /login, and a pre-hydration native submit does that on
-    // its own — without the gate it would go green whether or not the password was ever checked.
+    // its own - without the gate it would go green whether or not the password was ever checked.
     await waitForHydration(page);
     await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
     await page.getByRole('textbox', { name: /password/i }).fill('WrongPassword!');

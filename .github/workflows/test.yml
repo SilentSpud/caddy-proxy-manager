@@ -1,10 +1,10 @@
 name: Tests
 
 on:
-  # Work lands on branches that come and go — one per change set, or one bundling a release's
-  # worth of them — so this cannot name them; it names the one branch that is not work. Every
+  # Work lands on branches that come and go - one per change set, or one bundling a release's
+  # worth of them - so this cannot name them; it names the one branch that is not work. Every
   # commit reaching main does so through a pull request whose checks ran against the merge result
-  # — the same tree that lands. Running them again on the push to main would re-prove a green
+  # - the same tree that lands. Running them again on the push to main would re-prove a green
   # commit at full cost, so main is excluded here. Direct pushes to main are not a hole this
   # leaves open: they are not permitted.
   push:
@@ -17,7 +17,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Zero out GITHUB_TOKEN permissions — tests need no credentials. No secrets:
+    # Zero out GITHUB_TOKEN permissions - tests need no credentials. No secrets:
     # references in this workflow either, so no repo secrets are injected into the
     # environment. The postgres service below is a throwaway container on the
     # runner, reachable only from this job.
@@ -29,7 +29,7 @@ jobs:
     # as locally is worth more than reusing the runner's.
     services:
       # A real OIDC provider for tests/integration/oauth-flow.test.ts. OAuth is the one auth path
-      # the fast suite cannot otherwise reach — the unit tests stub betterAuth outright — and a
+      # the fast suite cannot otherwise reach - the unit tests stub betterAuth outright - and a
       # broken callback previously only surfaced in the end-to-end suite, after the push.
       # interactiveLogin:false makes /authorize issue a code directly, so no browser is involved.
       # Keep JSON_CONFIG in step with MOCK_IDP_JSON_CONFIG in tests/helpers/mock-idp.ts.

@@ -23,7 +23,7 @@ import { setHostAgents } from "./host-agents";
  */
 export async function assertWildcardIssuable(domains: string[], certificateId: number | null) {
   // An explicitly assigned certificate (imported, or managed with its own provider) is the
-  // admin's responsibility — only guard the auto-managed path.
+  // admin's responsibility - only guard the auto-managed path.
   if (certificateId != null) {
     return;
   }
@@ -44,7 +44,7 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
 }
 
 // Security: only the protocol scheme is validated (http/https). Host/IP targets are not
-// restricted — admins intentionally need to proxy to internal services, and the Caddy admin
+// restricted - admins intentionally need to proxy to internal services, and the Caddy admin
 // API (port 2019) is protected by origins checking, not network isolation.
 function validateUpstreamProtocol(upstream: string): void {
   const trimmed = upstream.trim();
@@ -138,7 +138,7 @@ export type ErrorPageRule = {
 };
 
 export type PathAllowRule = {
-  path: string; // Caddy path pattern, e.g. "/secret" — matches short-circuit the
+  path: string; // Caddy path pattern, e.g. "/secret" - matches short-circuit the
   // subroute (no block applies) and the request falls through to the
   // upstream proxy.
 };
@@ -191,7 +191,7 @@ export type LoadBalancerActiveHealthCheck = {
   /** Body to send *with* the probe, as opposed to `body`, which matches the response. */
   requestBody: string | null;
   followRedirects: boolean;
-  /** Extra probe headers, one value each — enough for a token or a routing hint. */
+  /** Extra probe headers, one value each - enough for a token or a routing hint. */
   headers: Record<string, string> | null;
 };
 
@@ -221,7 +221,7 @@ export type LoadBalancerConfig = {
    * Kept here rather than beside each upstream because `upstreams` is a flat list of dial strings
    * and always has been; a parallel array needs no migration and is the shape Caddy wants anyway.
    * A list that has drifted out of step with the upstreams is dropped at build time rather than
-   * padded — a silently reweighted backend is worse than an unweighted one.
+   * padded - a silently reweighted backend is worse than an unweighted one.
    */
   policyWeights: number[] | null;
   tryDuration: string | null;
@@ -399,7 +399,7 @@ export type MtlsConfig = {
 /**
  * Rejects per-host WAF body limits Coraza would refuse. Coraza builds its WAF
  * while Caddy loads the config, so one bad value here makes Caddy reject the
- * whole document and *every* host stops being reconfigured — worth failing the
+ * whole document and *every* host stops being reconfigured - worth failing the
  * write with a clear message instead.
  */
 function validateWafMeta(waf: WafHostConfig): WafHostConfig {
@@ -426,7 +426,7 @@ function validateWafMeta(waf: WafHostConfig): WafHostConfig {
   const badDirective = findInvalidBodyLimitDirective(waf.custom_directives);
   if (badDirective) {
     throw new ApiValidationError(
-      `waf.custom_directives has an out-of-range body limit: "${badDirective}" — ${bodyLimitRangeMessage("the byte count")}`,
+      `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
     );
   }
   return waf;
@@ -509,7 +509,7 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
  *
  * `auth` implies `serve`: the plugin's authenticator finds its tsnet server by walking the
  * listeners the request arrived on, and with none it falls back to a local tailscaled socket that
- * does not exist in this image — every request would fail. normalizeTailscaleInput drops it rather
+ * does not exist in this image - every request would fail. normalizeTailscaleInput drops it rather
  * than letting that combination reach config generation, where the failure would be a 500 per
  * request with nothing in the UI to explain it.
  */
@@ -654,13 +654,13 @@ function sanitizeTailscaleMeta(meta: TailscaleMeta | undefined): TailscaleMeta |
  * Refuse to store a host that uses Tailscale while no auth key is configured.
  *
  * A node that cannot register is a listener that never comes up, and Caddy refuses a configuration
- * it cannot start — so this one host would fail the apply for *every* host on *every* agent, with
+ * it cannot start - so this one host would fail the apply for *every* host on *every* agent, with
  * an error naming Tailscale rather than whatever was being edited. Blocking the write is the only
  * place that failure can be turned into a sentence about the thing the operator just did.
  *
  * Reads the serialized meta rather than the input so it sees the merged result: a partial update
  * that only sends `{ tailnetOnly: false }` still leaves `serve` on, and the REST API reaches the
- * same code. A stored Caddy placeholder counts as a key — whether the environment actually defines
+ * same code. A stored Caddy placeholder counts as a key - whether the environment actually defines
  * it is only knowable inside the Caddy container.
  */
 async function assertTailscaleServable(meta: string | null): Promise<void> {
@@ -679,7 +679,7 @@ async function assertTailscaleServable(meta: string | null): Promise<void> {
 
   throw new ApiValidationError(
     "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node " +
-      "cannot register, and Caddy would reject the whole configuration — every proxy host would " +
+      "cannot register, and Caddy would reject the whole configuration - every proxy host would " +
       "stop being updated, not just this one. Add an auth key in Settings → Tailscale first.",
   );
 }
@@ -803,7 +803,7 @@ export type ProxyHostInput = {
   domains: string[];
   upstreams: string[];
   /**
-   * The `agents.id` rows that serve this host. Empty — and, on update, undefined — means every
+   * The `agents.id` rows that serve this host. Empty - and, on update, undefined - means every
    * agent, which is what a host had before it could be assigned at all.
    */
   agentIds?: number[];
@@ -2619,7 +2619,7 @@ export async function listProxyHosts(): Promise<ProxyHost[]> {
 /**
  * The list filter shared by the paginated read and its count.
  *
- * `visibleIds` narrows the list to what the viewer may see — null means no restriction, which is
+ * `visibleIds` narrows the list to what the viewer may see - null means no restriction, which is
  * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
  * viewer may see nothing, and turning that into an unfiltered query would list the whole fleet.
  */

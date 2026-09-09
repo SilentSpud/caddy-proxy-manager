@@ -1,4 +1,4 @@
-/** Next.js instrumentation hook — runs once when the server starts. */
+/** Next.js instrumentation hook - runs once when the server starts. */
 export async function register() {
   // Only run on the server side
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -26,7 +26,7 @@ export async function register() {
       console.log("Database initialization complete");
     } catch (error) {
       console.error("Failed to initialize database:", error);
-      // Don't throw — let the app start; errors surface when users reach the features
+      // Don't throw - let the app start; errors surface when users reach the features
     }
 
     // After the seed, so an environment-configured deployment is recognised by the account it has
@@ -48,12 +48,12 @@ export async function register() {
         const providers = await listEnabledOAuthProviders();
         if (providers.length === 0) {
           console.error(
-            "WARNING: AUTH_DISABLE_LOCAL_USERS=true but no OAuth provider is enabled — " +
+            "WARNING: AUTH_DISABLE_LOCAL_USERS=true but no OAuth provider is enabled - " +
               "no one can sign in. Configure a provider with the OAUTH_* environment variables.",
           );
         } else {
           console.log(
-            `Local user management disabled — sign-in via ${providers.map((p) => p.name).join(", ")}`,
+            `Local user management disabled - sign-in via ${providers.map((p) => p.name).join(", ")}`,
           );
         }
       } catch (error) {
@@ -82,7 +82,7 @@ export async function register() {
       console.log("Caddy configuration applied successfully");
     } catch (error) {
       console.error("Failed to apply Caddy configuration on startup:", error);
-      // Don't throw — Caddy may not be ready yet, or the config may be applied later; this keeps
+      // Don't throw - Caddy may not be ready yet, or the config may be applied later; this keeps
       // proxy hosts working after a container restart
     }
 

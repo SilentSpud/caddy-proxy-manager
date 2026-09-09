@@ -5,7 +5,7 @@ import { auth } from "@/src/lib/auth";
 import { getMigrationSource } from "@/src/lib/setup";
 
 /**
- * GET /api/setup/backup — the SQLite file this deployment migrated from.
+ * GET /api/setup/backup - the SQLite file this deployment migrated from.
  *
  * The path is read from the database, never from the request: this streams a file off the host's
  * filesystem, and taking the path from a query parameter would make it an arbitrary file read.

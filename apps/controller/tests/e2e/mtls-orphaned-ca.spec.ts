@@ -12,7 +12,7 @@ const FAKE_KEY = '-----BEGIN PRIVATE KEY-----\nMIIBfake\n-----END PRIVATE KEY---
  * Regression: deleting a CA must also remove the certs it issued. The schema declares
  * onDelete: "cascade", but bun:sqlite leaves PRAGMA foreign_keys OFF, so orphans lingered.
  */
-test.describe('mTLS — deleted CA must not remain selectable', () => {
+test.describe('mTLS - deleted CA must not remain selectable', () => {
   test('issued certs of a deleted CA disappear from the mTLS picker', async ({ page }) => {
     await page.goto('/proxy-hosts');
     const origin = new URL(page.url()).origin;

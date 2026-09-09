@@ -25,7 +25,7 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  // OAuth connection state comes from the authoritative accounts table — the
+  // OAuth connection state comes from the authoritative accounts table - the
   // informational users.provider/subject columns are only a projection (#261).
   const linkedProviders = await listUserOAuthProviders(userId);
 

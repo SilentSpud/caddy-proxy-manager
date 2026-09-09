@@ -1,5 +1,5 @@
 /**
- * Functional: CPM Forward Auth with excluded_paths (#108) — excluded paths reach the upstream,
+ * Functional: CPM Forward Auth with excluded_paths (#108) - excluded paths reach the upstream,
  * others redirect to the portal, the callback still completes auth. Domain: func-fwd-auth-excl.test
  */
 import { test, expect } from '@playwright/test';
@@ -44,7 +44,7 @@ test.describe
       );
       expect(accessRes.status()).toBe(200);
 
-      // Wait for Caddy to pick up the config — non-excluded paths should redirect (302)
+      // Wait for Caddy to pick up the config - non-excluded paths should redirect (302)
       await waitForStatus(DOMAIN, 302, 20_000);
     });
 

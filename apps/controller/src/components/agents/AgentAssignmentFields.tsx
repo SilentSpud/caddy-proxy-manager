@@ -3,7 +3,7 @@
 /**
  * Which agents serve this host.
  *
- * Nothing ticked means every agent, which is what a host had before it could be assigned at all —
+ * Nothing ticked means every agent, which is what a host had before it could be assigned at all -
  * so the empty state is the safe one, and the banner says so out loud rather than leaving an
  * operator to guess whether an unticked list means "everywhere" or "nowhere".
  */

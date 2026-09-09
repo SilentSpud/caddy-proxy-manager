@@ -17,7 +17,7 @@ const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, impo
  *
  * It is Starlight's markdown engine, and it loads a per-platform native binding by `require`. The
  * static build inlines it into a prerender chunk, from which that require resolves upwards through
- * `dist/` — and bun keeps transitive dependencies in `node_modules/.bun/node_modules`, which is not
+ * `dist/` - and bun keeps transitive dependencies in `node_modules/.bun/node_modules`, which is not
  * on that path, so the binding is unfindable and every page carrying a Starlight component fails to
  * render. Depending on it directly puts it in `apps/site/node_modules`, which is on the path.
  * Remove it and the build breaks with "Cannot find native binding".
@@ -28,7 +28,7 @@ const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, impo
  *
  * `site` and `base` are what Pages needs and what a custom domain would change. A project site
  * lives under `https://<owner>.github.io/<repo>/`, so every absolute link and asset URL has to
- * carry that prefix — Astro does it for you, but only if `base` says so. Moving to a custom domain
+ * carry that prefix - Astro does it for you, but only if `base` says so. Moving to a custom domain
  * later is two edits: point `site` at it, set `base` to "/", and add a CNAME file to `public/`.
  */
 export default defineConfig({

@@ -38,7 +38,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     countL4ProxyHosts(search, visibleIds),
   ]);
 
-  // Only the hosts on this page — the map is for the edit dialog.
+  // Only the hosts on this page - the map is for the edit dialog.
   const [agents, assignments] = await Promise.all([
     listAgentOptions().catch(() => []),
     agentIdsForHosts(

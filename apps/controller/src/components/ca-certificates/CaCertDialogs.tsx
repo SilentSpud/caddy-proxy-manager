@@ -72,7 +72,7 @@ export function IssueClientCertDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("caCertificates");
-  // Unscoped as well, for the password rule — it is shared with every other password field.
+  // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
   const router = useRouter();
   // One dialog per CA row, and a closed native <dialog> stays in the DOM, so a shared form id would

@@ -5,7 +5,7 @@
  *
  * Rebuilding and renaming, and nothing else. Pairing, unpairing and disabling an agent decide
  * whether the controller talks to that host at all, which is a question about the fleet rather
- * than about the hosts one team runs — so those stay on Settings, behind `requireAdmin`.
+ * than about the hosts one team runs - so those stay on Settings, behind `requireAdmin`.
  */
 
 import { revalidatePath } from "next/cache";

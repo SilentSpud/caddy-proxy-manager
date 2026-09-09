@@ -1,5 +1,5 @@
 // This module is a version-pinning manifest for the Caddy build; nothing here
-// ships — xcaddy builds the real binary from these pins in its own module.
+// ships - xcaddy builds the real binary from these pins in its own module.
 // The blank imports must stay untagged and in sync with build.sh: they keep
 // `go mod tidy` (run by Dependabot on every update) from treating the
 // requirements as unused and stripping the require block from go.mod, and

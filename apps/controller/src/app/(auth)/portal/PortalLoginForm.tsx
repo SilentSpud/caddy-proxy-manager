@@ -137,7 +137,7 @@ export default function PortalLoginForm({
     setError(null);
     setOauthPending(providerId);
     // Redirect back to this portal page after OAuth, with the rid param preserved.
-    // The rid is an opaque server-side ID — the actual redirect URI is never in the URL.
+    // The rid is an opaque server-side ID - the actual redirect URI is never in the URL.
     const callbackUrl = `/portal?rid=${encodeURIComponent(rid)}`;
     authClient.signIn.social({ provider: providerId, callbackURL: callbackUrl });
   };

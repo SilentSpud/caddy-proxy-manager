@@ -24,7 +24,7 @@ export type PendingOidcSync = {
    * The claimed group names, verbatim.
    *
    * Carried as well as the mirrored list because the explicit IdP→group mappings live in the
-   * database and `mapProfileToUser` is synchronous — it cannot read them. They are resolved in
+   * database and `mapProfileToUser` is synchronous - it cannot read them. They are resolved in
    * `applyGroups`, which is already async and already the only writer of memberships.
    */
   claimedGroups: string[];
@@ -66,7 +66,7 @@ export function consumePendingOidcSync(
   return found.entry;
 }
 
-/** Exposed for tests — the registry is process-wide state. */
+/** Exposed for tests - the registry is process-wide state. */
 export function clearPendingOidcSyncs(): void {
   pending.clear();
 }
@@ -117,7 +117,7 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
   if (!entry.syncGroups) return;
 
   // Explicit mappings first, and they win: a claimed group named in one lands in the CPM group it
-  // names, and is then kept out of the prefix mirroring below — otherwise one claim would put the
+  // names, and is then kept out of the prefix mirroring below - otherwise one claim would put the
   // user in two groups, the mapped one and a mirror of its raw IdP name.
   const [explicit, explicitKeys] = await Promise.all([
     mappedGroupNames(entry.claimedGroups, entry.providerId),

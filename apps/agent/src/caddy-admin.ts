@@ -19,7 +19,7 @@ import type { CaddyAdminProxyRequest, CaddyAdminProxyResponse } from "@cpm/share
  * signed it.
  */
 const ALLOWED_PATHS: ReadonlyArray<RegExp> = [
-  /** Replace the whole config — the apply path. */
+  /** Replace the whole config - the apply path. */
   /^\/load$/,
   /** Read the running config, for the restart detector. */
   /^\/config\/?$/,

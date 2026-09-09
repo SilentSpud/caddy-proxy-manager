@@ -8,7 +8,7 @@ declare module "*?worker" {
 }
 
 /**
- * Vite's `?worker&url` — bundles the module graph like `?worker`, but resolves to the emitted
+ * Vite's `?worker&url` - bundles the module graph like `?worker`, but resolves to the emitted
  * chunk's URL rather than a constructor.
  */
 declare module "*?worker&url" {
@@ -16,7 +16,7 @@ declare module "*?worker&url" {
   export default url;
 }
 
-/** Vite's `?url` suffix — an asset's emitted URL. Declared here for the same reason as above. */
+/** Vite's `?url` suffix - an asset's emitted URL. Declared here for the same reason as above. */
 declare module "*?url" {
   const url: string;
   export default url;

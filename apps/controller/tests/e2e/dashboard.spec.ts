@@ -1,4 +1,4 @@
-/** E2E: dashboard overview — stat cards, navigation links, welcome header, recent activity. */
+/** E2E: dashboard overview - stat cards, navigation links, welcome header, recent activity. */
 import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Dashboard home page', () => {
@@ -12,7 +12,7 @@ test.describe('Dashboard home page', () => {
 
   test('shows stat cards for Proxy Hosts, Certificates, and Access Lists', async ({ page }) => {
     // Each stat card is a ClickableCard whose accessible name is built as
-    // `${label}: ${count}` — label first, then the number.
+    // `${label}: ${count}` - label first, then the number.
     await expect(page.getByRole('link', { name: /^Proxy Hosts:\s*\d+/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Certificates:\s*\d+/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Access Lists:\s*\d+/ })).toBeVisible();

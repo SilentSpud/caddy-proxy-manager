@@ -36,7 +36,7 @@ function useStarlightMode(): Mode {
  * catalog. Everything is scoped to the wrapper below, so several demos can sit on one page.
  *
  * Astryx's own `<Theme>` is deliberately not used. The first one in a tree declares itself the root
- * and syncs `data-theme` and `data-astryx-theme` onto `<html>` — which would both fight Starlight
+ * and syncs `data-theme` and `data-astryx-theme` onto `<html>` - which would both fight Starlight
  * for the page's colour mode and pull the theme's prose defaults (heading sizes, paragraph colour,
  * `hr`) over the whole documentation site. What `<Theme>` renders otherwise is this wrapper and
  * this context, so the demos render them directly and leave `<html>` alone.

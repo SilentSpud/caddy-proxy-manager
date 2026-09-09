@@ -3,7 +3,7 @@
  *
  * The resolution order is the load-bearing part. Every setting here still has a live environment
  * variable behind it, and a deployment that has not run the migration must keep reading exactly
- * what it read before — so "stored wins, else environment, else default" is the property that lets
+ * what it read before - so "stored wins, else environment, else default" is the property that lets
  * this land in pieces.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
@@ -16,7 +16,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const schemaModule = await import('@/src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('@/src/lib/db', () => ({
@@ -238,7 +238,7 @@ describe('group gates', () => {
 
   it('accepts the "on" a switch posts, and the empty string it posts when off', () => {
     // The setup form writes a definite boolean for a gate, and the Switch wrapper submits "on" or
-    // "". Only the first has to survive parse — the action turns anything else into false itself.
+    // "". Only the first has to survive parse - the action turns anything else into false itself.
     expect(registry.analyticsEnabled.parse('on')).toBe(true);
     expect(registry.analyticsEnabled.parse('')).toBeNull();
     expect(registry.geoipEnabled.parse('on')).toBe(true);

@@ -37,14 +37,14 @@ async function insertProxyHost(overrides: Partial<typeof proxyHosts.$inferInsert
 }
 
 describe('proxy-hosts integration', () => {
-  it('inserts proxy host with domains array — retrieved correctly via JSON parse', async () => {
+  it('inserts proxy host with domains array - retrieved correctly via JSON parse', async () => {
     const domains = ['example.com', 'www.example.com'];
     const host = await insertProxyHost({ domains: JSON.stringify(domains), name: 'Multi Domain' });
     const row = await db.query.proxyHosts.findFirst({ where: (t, { eq }) => eq(t.id, host.id) });
     expect(JSON.parse(row!.domains)).toEqual(domains);
   });
 
-  it('inserts proxy host with upstreams array — retrieved correctly', async () => {
+  it('inserts proxy host with upstreams array - retrieved correctly', async () => {
     const upstreams = ['app1:8080', 'app2:8080'];
     const host = await insertProxyHost({
       upstreams: JSON.stringify(upstreams),
@@ -72,7 +72,7 @@ describe('proxy-hosts integration', () => {
     expect(row).toBeUndefined();
   });
 
-  it('multiple proxy hosts — count is correct', async () => {
+  it('multiple proxy hosts - count is correct', async () => {
     await insertProxyHost({ name: 'Host 1', domains: JSON.stringify(['a.com']) });
     await insertProxyHost({ name: 'Host 2', domains: JSON.stringify(['b.com']) });
     await insertProxyHost({ name: 'Host 3', domains: JSON.stringify(['c.com']) });
@@ -162,9 +162,9 @@ describe('proxy-hosts integration', () => {
 
   it('filters out invalid redirect rules on parse', async () => {
     const redirects = [
-      { from: '', to: '/valid', status: 301 }, // missing from — invalid
-      { from: '/valid', to: '', status: 301 }, // missing to — invalid
-      { from: '/ok', to: '/dest', status: 999 }, // bad status — invalid
+      { from: '', to: '/valid', status: 301 }, // missing from - invalid
+      { from: '/valid', to: '', status: 301 }, // missing to - invalid
+      { from: '/ok', to: '/dest', status: 999 }, // bad status - invalid
       { from: '/good', to: '/dest', status: 302 }, // valid
     ];
     const host = await insertProxyHost({

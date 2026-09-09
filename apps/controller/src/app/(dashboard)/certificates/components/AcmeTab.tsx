@@ -17,7 +17,7 @@ type Props = {
   statusFilter: string | null;
 };
 
-/** "example.com +2" — the primary domain plus a count of the rest. */
+/** "example.com +2" - the primary domain plus a count of the rest. */
 function domainSummary(r: AcmeHost) {
   return r.domains.length > 1 ? `${r.domains[0]} +${r.domains.length - 1}` : r.domains[0];
 }

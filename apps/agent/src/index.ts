@@ -61,7 +61,7 @@ const argv = yargs(hideBin(process.argv))
   })
   .version(AGENT_VERSION)
   // A mistyped flag used to be ignored, which in the container's HEALTHCHECK meant starting a
-  // second agent rather than probing the first — and looking healthy while doing it.
+  // second agent rather than probing the first - and looking healthy while doing it.
   .strict()
   .help()
   .check((parsed) => {
@@ -119,7 +119,7 @@ if (argv.healthcheck) {
 if (argv.pair) {
   if (!existsSync(config.socketPath)) {
     console.error(
-      `No agent is listening on ${config.socketPath}. Start the agent first — pairing is handed ` +
+      `No agent is listening on ${config.socketPath}. Start the agent first - pairing is handed ` +
         `to the running process, not performed by this one.`,
     );
     process.exit(1);
@@ -173,8 +173,8 @@ if (existsSync(config.socketPath)) unlinkSync(config.socketPath);
 const server = Bun.serve({ unix: config.socketPath, fetch: createLocalHandler(lifecycle) });
 
 // World-writable, and it has to be: `cpm-agent --pair` may be run by any user with a shell in this
-// container, and the agent itself runs as root for Docker. The boundary is the volume — only
-// something that mounts it can reach this socket at all — not the file mode.
+// container, and the agent itself runs as root for Docker. The boundary is the volume - only
+// something that mounts it can reach this socket at all - not the file mode.
 chmodSync(config.socketPath, 0o666);
 console.log(`[agent] ${AGENT_VERSION} listening on ${config.socketPath}`);
 

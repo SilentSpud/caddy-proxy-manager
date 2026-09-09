@@ -27,7 +27,7 @@ export default function Providers({
   return (
     /* `locale` and `messages` are passed explicitly rather than inherited from the request config.
        vinext renders RSC and SSR in separate environments, and next-intl's server context does not
-       cross that boundary — left to infer them, the provider throws during the SSR pass and the
+       cross that boundary - left to infer them, the provider throws during the SSR pass and the
        page 500s with the RSC payload already rendered correctly. */
     <NextIntlClientProvider locale={locale} messages={messages}>
       {/* Holds the language preference and hands the locale to Astryx, whose own components carry
@@ -36,7 +36,7 @@ export default function Providers({
         {/* Astryx owns light/dark end to end: ThemeModeProvider holds the
             preference and passes it to Astryx's <Theme>, which sets color-scheme
             and syncs `data-theme` to <html>. The theme's tokens are light-dark()
-            pairs, so the browser resolves them — including "system". */}
+            pairs, so the browser resolves them - including "system". */}
         <ThemeModeProvider initialMode={initialThemeMode}>
           {/* Every Astryx component that renders a link (Button, Link, Tab,
               ClickableCard, ...) routes through this, so an href stays a

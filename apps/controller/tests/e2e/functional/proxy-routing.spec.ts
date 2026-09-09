@@ -1,5 +1,5 @@
 /**
- * Functional: basic reverse-proxy routing to the echo-server container. Domain: func-proxy.test —
+ * Functional: basic reverse-proxy routing to the echo-server container. Domain: func-proxy.test -
  * no DNS needed, requests go to 127.0.0.1:80 with a custom Host header.
  */
 import { test, expect } from '@playwright/test';

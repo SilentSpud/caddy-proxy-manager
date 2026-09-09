@@ -38,7 +38,7 @@ status=$(cpm_sign_in "$CPM_API" "$COOKIE_JAR" "$CPM_ADMIN_USER" "$CPM_ADMIN_PASS
 info "signed in as $CPM_ADMIN_USER"
 
 cpm_mint_token "$CPM_API" "$COOKIE_JAR" "docker-test-suite" >"$TOKEN_FILE"
-[ -s "$TOKEN_FILE" ] || die "could not mint an API token — the response carried no raw_token"
+[ -s "$TOKEN_FILE" ] || die "could not mint an API token - the response carried no raw_token"
 chmod 600 "$TOKEN_FILE"
 info "minted an API token for the suite"
 
@@ -50,7 +50,7 @@ info "minted an API token for the suite"
 
 : >"$CA_BUNDLE"
 # The bundle is rebuilt from scratch, so the "already added" markers that
-# trust_ca leaves behind have to go with it — otherwise a second run in the
+# trust_ca leaves behind have to go with it - otherwise a second run in the
 # same container would skip re-adding the local CAs and every test that relies
 # on an imported certificate would fail to verify.
 rm -f "$STATE_DIR"/.trusted-*
@@ -97,7 +97,7 @@ if [ "$API_STATUS" = "200" ]; then
   info "API surface: $(jq '[.paths[] | keys[]] | length' <"$SPEC_FILE" 2>/dev/null) documented operations"
 else
   rm -f "$SPEC_FILE"
-  info "could not fetch the OpenAPI document (HTTP $API_STATUS) — skipping API coverage"
+  info "could not fetch the OpenAPI document (HTTP $API_STATUS) - skipping API coverage"
 fi
 
 # ── 5. Prove the whole chain works before running any test ──────────────────
@@ -114,7 +114,7 @@ create_host "$(jq -nc --arg d "$probe_domain" \
 if wait_for_https "$probe_domain" 120; then
   info "end-to-end certificate issuance verified against $probe_domain"
 else
-  die "Caddy never obtained a certificate for $probe_domain — check 'docker compose logs caddy pebble'"
+  die "Caddy never obtained a certificate for $probe_domain - check 'docker compose logs caddy pebble'"
 fi
 
 printf '%sbootstrap complete%s\n' "$C_GREEN" "$C_OFF"

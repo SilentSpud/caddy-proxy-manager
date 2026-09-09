@@ -46,7 +46,7 @@ export function consumePendingSessionBinding(userId: number): PendingSessionBind
   return found.entry;
 }
 
-/** Exposed for tests — the registry is process-wide state. */
+/** Exposed for tests - the registry is process-wide state. */
 export function clearPendingSessionBindings(): void {
   pending.clear();
 }
@@ -55,7 +55,7 @@ export function clearPendingSessionBindings(): void {
  * Park the `sid` from an ID token being written to an account row.
  *
  * Called from the account hooks, where the token is still in hand. Providers that issue no `sid`
- * park nothing, and their sessions stay unbound — a logout token from one of those can only be
+ * park nothing, and their sessions stay unbound - a logout token from one of those can only be
  * honoured by subject, which is what the spec expects of it anyway.
  */
 export function recordSessionBindingFromIdToken(
@@ -101,14 +101,14 @@ export type RevocationResult = {
 /**
  * End the sessions a logout token names.
  *
- * A `sid` ends exactly the session it names, which is the whole point of the claim — and it wins
+ * A `sid` ends exactly the session it names, which is the whole point of the claim - and it wins
  * over any `sub` alongside it, which most providers send too. Reading both as "end this session,
  * and also every other one" would make session-scoped logout impossible to ask for. Only a token
  * with no `sid` at all ends every session that subject has, because then there is nothing finer to
  * go on.
  *
  * Forward-auth sessions go either way. They are minted from a CPM session but outlive it, so a
- * proxied host would keep letting the user in after their SSO session ended — and unlike CPM's own
+ * proxied host would keep letting the user in after their SSO session ended - and unlike CPM's own
  * sessions they carry no `sid` to narrow by, so all of the user's are dropped.
  */
 export async function revokeSessionsForLogoutToken(

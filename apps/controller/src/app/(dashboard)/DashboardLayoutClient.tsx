@@ -49,7 +49,7 @@ type User = {
 // resolved against the `nav` namespace at render.
 /**
  * `adminOnly` gates the pages that answer for the whole instance. `operator` marks the three an
- * operator can also open — they show only the hosts and agents that operator's groups were
+ * operator can also open - they show only the hosts and agents that operator's groups were
  * granted, and an operator with no grants sees them empty rather than not at all, because "you
  * have no hosts yet" explains itself and a missing menu item does not.
  */

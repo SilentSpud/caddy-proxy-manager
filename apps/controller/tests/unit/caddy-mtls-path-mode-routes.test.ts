@@ -1,7 +1,7 @@
 /**
- * Regression: the HTTP route shape per mTLS path mode. full-site — the TLS policy already runs
- * require_and_verify, so the catch-all is a plain proxy route. whitelist — only listed paths carry
- * a fingerprint expression. exclusion — everything but those, plus a 403 fallback. A host with mTLS
+ * Regression: the HTTP route shape per mTLS path mode. full-site - the TLS policy already runs
+ * require_and_verify, so the catch-all is a plain proxy route. whitelist - only listed paths carry
+ * a fingerprint expression. exclusion - everything but those, plus a 403 fallback. A host with mTLS
  * off resolves to "full" too, so gating the catch-all on a fingerprint would 403 every request.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
@@ -14,7 +14,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -143,7 +143,7 @@ describe('proxy host with mTLS disabled', () => {
 });
 
 describe('mTLS full-site mode', () => {
-  it('emits a plain catch-all — the TLS connection policy does the enforcing', async () => {
+  it('emits a plain catch-all - the TLS connection policy does the enforcing', async () => {
     const domain = 'mtls-full.example.com';
     await createProxyHost(
       {
@@ -184,7 +184,7 @@ describe('mTLS whitelist mode (protected_paths)', () => {
     expect(mtlsGatedRoutes(adminRoutes).length).toBeGreaterThan(0);
     expect(denyRoutes(adminRoutes).length).toBeGreaterThan(0);
 
-    // The catch-all must stay open — this is what "whitelist" means.
+    // The catch-all must stay open - this is what "whitelist" means.
     const catchAll = catchAllRoutes(routes);
     expect(catchAll).toHaveLength(1);
     expect((catchAll[0].match ?? []).every((m) => m.expression === undefined)).toBe(true);

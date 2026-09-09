@@ -13,13 +13,13 @@ applied, rather than stored as a row in Proxy Hosts. Nothing can delete it by ac
 no second copy to drift from the setting.
 
 It is also built ahead of the stored hosts. Routes are ordered by host specificity, which settles
-every overlap except one — two hosts claiming the same exact domain — and in that tie the managed
+every overlap except one - two hosts claiming the same exact domain - and in that tie the managed
 route wins. A host somebody creates for the dashboard's domain cannot shadow the route the
 dashboard is reached through.
 
 ## The domain
 
-`DASHBOARD_DOMAIN` if you set it, otherwise the hostname in `BASE_URL` — the address you are
+`DASHBOARD_DOMAIN` if you set it, otherwise the hostname in `BASE_URL` - the address you are
 already reaching CPM at. A localhost address says nothing about the name the instance will answer
 to, so that leaves the feature off with the field ready.
 
@@ -34,9 +34,9 @@ back; only yours can sign it.
 
 | What the check finds | What happens |
 | -------------------- | ------------ |
-| The request came back, signed | HTTPS on — DNS, the network and Caddy's route all work |
+| The request came back, signed | HTTPS on - DNS, the network and Caddy's route all work |
 | The domain resolves but arrives elsewhere | HTTPS off, with the address it currently points at |
-| Nothing answers for the name | HTTPS off — create the record and check again |
+| Nothing answers for the name | HTTPS off - create the record and check again |
 
 Nothing is asked of a third party. The trade-off is that the request is made from the deployment
 itself, so it cannot see through split-horizon DNS (passes, and ACME still fails) or a network

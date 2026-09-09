@@ -12,7 +12,7 @@ export async function ensureAdminUser(): Promise<void> {
   // require. Roles come from the IdP's groups.
   if (config.auth.disableLocalUsers) {
     console.log(
-      "Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true) — skipping admin user seed",
+      "Local user management is disabled (AUTH_DISABLE_LOCAL_USERS=true) - skipping admin user seed",
     );
     return;
   }
@@ -20,7 +20,7 @@ export async function ensureAdminUser(): Promise<void> {
   const adminUsername = config.adminUsername;
   const adminPassword = config.adminPassword;
   if (!adminUsername || !adminPassword) {
-    console.warn("Admin credentials are not configured — skipping admin user seed");
+    console.warn("Admin credentials are not configured - skipping admin user seed");
     return;
   }
 
@@ -38,7 +38,7 @@ export async function ensureAdminUser(): Promise<void> {
   });
 
   if (existingUser) {
-    // Admin user exists — always update the password hash so env-var changes take effect, and keep
+    // Admin user exists - always update the password hash so env-var changes take effect, and keep
     // the role at "admin".
     const now = nowIso();
     await db
@@ -89,7 +89,7 @@ export async function ensureAdminUser(): Promise<void> {
  * Move the `users.id` sequence past the row above.
  *
  * The admin is inserted with an explicit id because auth.ts hard-codes 1, and PostgreSQL does not
- * advance a `serial`'s sequence for an explicit value — so the next insert is handed 1 as well and
+ * advance a `serial`'s sequence for an explicit value - so the next insert is handed 1 as well and
  * fails on the primary key. Better Auth reports that as a bare 422, which is what the first
  * self-registration on a fresh deployment used to get.
  */

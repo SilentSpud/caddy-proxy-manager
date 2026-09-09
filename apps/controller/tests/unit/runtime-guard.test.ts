@@ -1,5 +1,5 @@
 /**
- * The guard must behave correctly in the case it exists for — a runtime that is not Bun, which is
+ * The guard must behave correctly in the case it exists for - a runtime that is not Bun, which is
  * not the one this suite runs on. Reproduced by removing `process.versions.bun` for a test.
  */
 import { afterEach, describe, expect, it } from 'bun:test';

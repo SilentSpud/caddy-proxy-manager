@@ -1,6 +1,6 @@
 /**
  * What buildCaddyDocument emits once a module is switched off. Caddy validates a posted config as
- * one document, so a handler naming an absent module takes every host offline — the handler must
+ * one document, so a handler naming an absent module takes every host offline - the handler must
  * not appear at all. The Caddyfile escape hatch is covered too: an unadaptable snippet is skipped.
  */
 import { describe, it, expect, afterEach, beforeEach } from 'bun:test';
@@ -13,7 +13,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -71,7 +71,7 @@ const GEOBLOCK: GeoBlockSettings = {
 };
 
 /**
- * Pretend a rebuild already completed with exactly these module paths — the agent's *applied* set,
+ * Pretend a rebuild already completed with exactly these module paths - the agent's *applied* set,
  * which it reports only after a build has succeeded, not the selection that requested it.
  */
 function setAppliedModules(specs: string[]) {
@@ -199,7 +199,7 @@ describe('geoblock gating', () => {
   });
 
   it('omits the blocker handler when it is selected but not yet compiled in', async () => {
-    // Enabling a module does not put it in the running binary — only a rebuild
+    // Enabling a module does not put it in the running binary - only a rebuild
     // does. Emitting the handler in between would fail the whole config.
     setAppliedModules(ALL_MODULE_PATHS.filter((p) => !p.includes('caddy-blocker-plugin')));
     await selectAllModulesExcept();
@@ -288,7 +288,7 @@ describe('per-host Caddyfile', () => {
     await createHost({ customCaddyfile: 'handle /status* {\n  respond "ok" 200\n}' });
 
     const document = await buildCaddyDocument();
-    // A subroute, not flattened handlers — the adapted route carries its own
+    // A subroute, not flattened handlers - the adapted route carries its own
     // path matcher and flattening would apply it to every request.
     expect(handlerNames(document)).toContain('subroute');
     expect(handlerNames(document)).toContain('reverse_proxy');

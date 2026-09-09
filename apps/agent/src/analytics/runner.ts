@@ -40,8 +40,8 @@ let geoipTimer: NodeJS.Timeout | null = null;
  * Idempotent: the controller pushes on every startup and whenever the settings change, and a
  * repeat of the configuration already in force must not restart a working parser.
  *
- * `controllerId` names which paired controller pushed this, so the GeoIP fetch — the one request
- * that runs the other way — can be signed with the secret shared with that controller.
+ * `controllerId` names which paired controller pushed this, so the GeoIP fetch - the one request
+ * that runs the other way - can be signed with the secret shared with that controller.
  */
 export async function applyFleetConfig(
   store: AgentStore,

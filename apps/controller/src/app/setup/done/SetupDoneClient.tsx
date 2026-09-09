@@ -36,7 +36,7 @@ export default function SetupDoneClient({
           <VStack gap={3}>
             <Text size="sm" color="secondary">
               The file at <Code>{source}</Code> was read, not modified. Download it now if you want
-              a copy — once you are satisfied the migration is correct, it can be deleted.
+              a copy - once you are satisfied the migration is correct, it can be deleted.
             </Text>
             <Banner
               status="warning"
@@ -59,8 +59,8 @@ export default function SetupDoneClient({
               </Text>
               <Code>{cleanup.command}</Code>
               <Text size="sm" color="secondary">
-                If this deployment's environment comes from somewhere else — Compose's own{" "}
-                <Code>environment:</Code> block, Swarm or Kubernetes secrets, a systemd unit —
+                If this deployment's environment comes from somewhere else - Compose's own{" "}
+                <Code>environment:</Code> block, Swarm or Kubernetes secrets, a systemd unit -
                 remove those variables from wherever you set them instead. Either way it is
                 optional: a variable that is still set is simply ignored now that a value is stored.
               </Text>
@@ -75,7 +75,7 @@ export default function SetupDoneClient({
             <Banner
               status="warning"
               title={t("composeSettingsTitle")}
-              description={`Docker Compose provisions the clickhouse and geoipupdate containers from ${cleanup.keep.join(", ")}, and it cannot read the database — so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start those containers there. With an agent the saved values are passed to Compose for you, and these lines can go as well — but drop clickhouse and geoipupdate from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the containers from the now-stale values in the file.`}
+              description={`Docker Compose provisions the clickhouse and geoipupdate containers from ${cleanup.keep.join(", ")}, and it cannot read the database - so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start those containers there. With an agent the saved values are passed to Compose for you, and these lines can go as well - but drop clickhouse and geoipupdate from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the containers from the now-stale values in the file.`}
             />
           )}
         </FormCard>

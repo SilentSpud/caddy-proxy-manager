@@ -19,7 +19,7 @@ COPY packages/shared ./packages/shared
 COPY apps/agent ./apps/agent
 
 # This stage runs on the host arch, so the binary is cross-compiled for the target. Bun names
-# targets by libc and arch, and the glibc variants match the docker:cli runtime's musl — they do
+# targets by libc and arch, and the glibc variants match the docker:cli runtime's musl - they do
 # not, which is why the runtime stage below is Debian rather than Alpine.
 ARG TARGETARCH
 RUN case "$TARGETARCH" in \

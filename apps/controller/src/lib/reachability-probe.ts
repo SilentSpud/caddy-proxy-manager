@@ -2,8 +2,8 @@
  * Proving that a domain reaches *this* instance, without asking anybody else.
  *
  * The question the dashboard host's HTTPS toggle depends on is "does this name arrive here?", and
- * the honest way to answer it is to try. The controller is already serving — the operator is
- * reading a page it rendered — so a request to the domain that comes back here is proof the path
+ * the honest way to answer it is to try. The controller is already serving - the operator is
+ * reading a page it rendered - so a request to the domain that comes back here is proof the path
  * works end to end: DNS, the port, whatever NAT sits in between, and Caddy's route.
  *
  * Comparing a DNS record against a public IP looked up from a third-party echo service was the

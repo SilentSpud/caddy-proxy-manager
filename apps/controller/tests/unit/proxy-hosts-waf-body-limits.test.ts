@@ -3,7 +3,7 @@
  * refuse them (#252).
  *
  * coraza-caddy builds its WAF while Caddy loads the config, so an out-of-range
- * limit doesn't fail just this host — Caddy rejects the entire config document
+ * limit doesn't fail just this host - Caddy rejects the entire config document
  * and every host stops being reconfigured. Failing the write keeps a bad value
  * from ever reaching the config builder.
  */
@@ -19,7 +19,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {

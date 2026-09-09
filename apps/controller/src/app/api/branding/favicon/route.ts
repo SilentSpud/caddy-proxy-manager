@@ -1,7 +1,7 @@
 /**
  * Serves the uploaded favicon, or 404 when the operator has not set one.
  *
- * Deliberately public — see the allowlist in src/proxy.ts. The login, portal and setup pages all
+ * Deliberately public - see the allowlist in src/proxy.ts. The login, portal and setup pages all
  * render before there is a session, and a favicon that redirected to /login would leave every
  * unauthenticated page without one. Nothing here is secret: a favicon is branding the browser
  * fetches for anyone who can reach the instance at all.

@@ -7,7 +7,7 @@ import Demo from "../../../components/Demo.astro";
 import AnalyticsDemo from "../../../demos/samples/AnalyticsDemo";
 
 Traffic and WAF events are written to a bundled ClickHouse instance and queried back as charts. It
-is optional — everything else works without it.
+is optional - everything else works without it.
 
 <Demo title="Traffic analytics" note="Change the range; the chart is drawn, not a picture.">
   <AnalyticsDemo client:visible />
@@ -16,7 +16,7 @@ is optional — everything else works without it.
 ## What you get
 
 - **Request volume** over a time range you pick, filterable by host.
-- **Protocol breakdown** — HTTP versions and TLS versions actually in use.
+- **Protocol breakdown** - HTTP versions and TLS versions actually in use.
 - **A country map**, from the same GeoIP databases [geo blocking](../geo-blocking/) uses.
 - **Top user agents**, which is usually how you notice a scraper.
 - **Blocked requests**, paginated and searchable, linking back to the [WAF](../waf/) rule or geo
@@ -25,7 +25,7 @@ is optional — everything else works without it.
 ## Turning it on
 
 Open **Settings → Analytics**, tick **Collect analytics**, and set a ClickHouse password. Saving
-starts the container — nothing to change in `.env`, no compose profile to list, because the
+starts the container - nothing to change in `.env`, no compose profile to list, because the
 [agent](../agent/) runs the compose command for you with the saved credentials.
 
 Three things to expect:

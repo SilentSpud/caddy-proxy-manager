@@ -3,7 +3,7 @@ import { waitForHydration } from '../helpers/hydration';
 
 /**
  * Active session management (profile "Active sessions"): list sessions, mark the
- * current one, and securely revoke another session — which logs that session out.
+ * current one, and securely revoke another session - which logs that session out.
  */
 
 const BASE_URL = 'http://localhost:3000';
@@ -42,13 +42,13 @@ test.describe('Active session management', () => {
   }) => {
     // `page` carries the admin storageState (session #1). Create a second,
     // independent session in a CLEAN context. The empty storageState is
-    // required — browser.newContext() otherwise inherits the project's admin
+    // required - browser.newContext() otherwise inherits the project's admin
     // storageState, so /login would redirect to "/" instead of showing the form.
     const ctx2 = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     await loginViaUi(ctx2);
 
     try {
-      // From ctx2's own view, its session is the current one — capture its id.
+      // From ctx2's own view, its session is the current one - capture its id.
       const list2 = (await (await ctx2.request.get(`${API}/sessions`)).json()) as SessionRow[];
       const session2 = list2.find((s) => s.current);
       expect(session2, 'fresh context should report a current session').toBeTruthy();

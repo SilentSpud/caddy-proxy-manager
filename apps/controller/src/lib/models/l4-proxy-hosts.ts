@@ -16,7 +16,7 @@ export type L4ProxyProtocolVersion = "v1" | "v2";
  *
  * Deliberately shorter than the HTTP list: header, cookie, uri_hash, query and client_ip_hash all
  * need a request to read, and layer 4 has a connection. Confirmed against `caddy list-modules`
- * rather than assumed — caddy-l4 has no client_ip_hash even though reverse_proxy does.
+ * rather than assumed - caddy-l4 has no client_ip_hash even though reverse_proxy does.
  */
 export type L4LoadBalancingPolicy =
   | "random"
@@ -172,7 +172,7 @@ export type L4ProxyHostInput = {
   listenAddress: string;
   upstreams: string[];
   /**
-   * The `agents.id` rows that serve this host. Empty — and, on update, undefined — means every
+   * The `agents.id` rows that serve this host. Empty - and, on update, undefined - means every
    * agent. Note that the port still has to be published with the usual apply: assigning a host to
    * an agent tells it what to serve, not to recreate its Caddy container on the spot.
    */
@@ -519,7 +519,7 @@ export async function listL4ProxyHosts(): Promise<L4ProxyHost[]> {
 /**
  * The list filter shared by the paginated read and its count.
  *
- * `visibleIds` narrows the list to what the viewer may see — null means no restriction, which is
+ * `visibleIds` narrows the list to what the viewer may see - null means no restriction, which is
  * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
  * viewer may see nothing, and turning that into an unfiltered query would list every host.
  */
@@ -553,7 +553,7 @@ export async function countL4ProxyHosts(
 }
 
 /**
- * Enabled hosts only — used to refuse switching caddy-l4 off while something still listens.
+ * Enabled hosts only - used to refuse switching caddy-l4 off while something still listens.
  * Disabled hosts emit no config, so they do not block the change.
  */
 /** The enabled hosts' ids, for callers that then narrow them to one agent's assignments. */

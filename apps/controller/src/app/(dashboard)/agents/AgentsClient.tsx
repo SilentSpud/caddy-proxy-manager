@@ -4,7 +4,7 @@
  * The agents this viewer may see, and the two things they may do to one.
  *
  * An admin sees every paired agent; an operator sees the ones their groups were granted. The row
- * says which hosts are pinned to the agent, but not how many it actually serves — every unassigned
+ * says which hosts are pinned to the agent, but not how many it actually serves - every unassigned
  * host lands on all of them, and a number that quietly folded those in would look wrong the moment
  * someone counted.
  */

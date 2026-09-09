@@ -21,7 +21,7 @@ test.describe('Mobile layout', () => {
   test('drawer opens and closes via hamburger', async ({ page }) => {
     await page.goto('/');
     // Drawer is closed initially. It is a native <dialog>, so its dialog role
-    // is implicit — getByRole resolves it, a [role="dialog"] CSS selector
+    // is implicit - getByRole resolves it, a [role="dialog"] CSS selector
     // would not.
     const drawerDialog = page.getByRole('dialog');
     // The dialog is hidden (not visible) before opening
@@ -49,7 +49,7 @@ test.describe('Mobile layout', () => {
     // Click a nav link inside the drawer
     await drawerNavLink.click();
     await expect(page).toHaveURL('/proxy-hosts');
-    // Drawer should close after navigation — drawer links no longer visible
+    // Drawer should close after navigation - drawer links no longer visible
     await expect(drawerDialog.getByRole('link', { name: /access lists/i })).not.toBeVisible();
   });
 
@@ -68,7 +68,7 @@ test.describe('Mobile layout', () => {
     const button = page.getByRole('button', { name: /create host/i });
     await expect(title).toBeVisible();
     await expect(button).toBeVisible();
-    // Button should be below the title — its Y coordinate should be greater
+    // Button should be below the title - its Y coordinate should be greater
     const titleBox = await title.boundingBox();
     const buttonBox = await button.boundingBox();
     expect(titleBox).not.toBeNull();
@@ -80,7 +80,7 @@ test.describe('Mobile layout', () => {
     await page.goto('/proxy-hosts');
     await openCreateHostDialog(page);
     const dialog = page.getByRole('dialog');
-    // Dialog should not overflow — check it fits in viewport
+    // Dialog should not overflow - check it fits in viewport
     const dialogBox = await dialog.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 393;
     expect(dialogBox).not.toBeNull();

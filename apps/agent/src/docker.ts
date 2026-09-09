@@ -2,8 +2,8 @@
  * Everything the agent does with Docker.
  *
  * This is the whole reason the agent exists as a separate container: the controller has no Docker
- * socket, and anything needing the Caddy *container* recreated — rather than its config reloaded
- * over the admin API — has to happen here. Two such things: published ports, which are fixed at
+ * socket, and anything needing the Caddy *container* recreated - rather than its config reloaded
+ * over the admin API - has to happen here. Two such things: published ports, which are fixed at
  * create time, and compiled-in plugins.
  */
 
@@ -38,7 +38,7 @@ async function run(
       stdout: "pipe",
       stderr: "pipe",
       signal: controller.signal,
-      // Spread, because Bun replaces the environment wholesale rather than extending it — and
+      // Spread, because Bun replaces the environment wholesale rather than extending it - and
       // `docker` needs DOCKER_HOST from ours to find the socket proxy at all.
       env: options.env ? { ...process.env, ...options.env } : undefined,
     });
@@ -125,7 +125,7 @@ export class DockerHost {
    * One compose label off this agent's own container.
    *
    * The agent is a service in the same project, so it carries the same project name and working
-   * directory as everything else — and unlike Caddy it is, by definition, running whenever this
+   * directory as everything else - and unlike Caddy it is, by definition, running whenever this
    * code executes. `/etc/hostname` is the container id inside the container, which is what the
    * daemon accepts in place of a name.
    */
@@ -161,7 +161,7 @@ export class DockerHost {
     if (this.config.composeProject) return this.config.composeProject;
     if (this.detectedProject) return this.detectedProject;
 
-    // This agent's own container first: Caddy may not exist yet — the agent is what starts it —
+    // This agent's own container first: Caddy may not exist yet - the agent is what starts it -
     // and asking a container that is not there returns nothing at all.
     const detected =
       (await this.selfLabel("com.docker.compose.project")) ||
@@ -175,7 +175,7 @@ export class DockerHost {
    *
    * The daemon resolves a relative bind mount against the project directory, and `/compose` is a
    * path inside this container. Left unset, `./docker/clickhouse/low-disk-write.yml` resolves to a
-   * host path that does not exist, and Docker silently creates an empty directory there — so the
+   * host path that does not exist, and Docker silently creates an empty directory there - so the
    * service comes up without the config it was mounted, which is a wrong container rather than a
    * failed command.
    *
@@ -189,7 +189,7 @@ export class DockerHost {
 
     // Own container first, for the reason in composeProject: the first thing the agent brings up
     // may be a managed service rather than Caddy, and reading Caddy's labels before Caddy exists
-    // answers "" — which meant no --project-directory and every relative bind resolving against a
+    // answers "" - which meant no --project-directory and every relative bind resolving against a
     // path only this container has. ClickHouse came up with an empty directory where its config
     // should have been, which is a wrong container rather than a failed command.
     //
@@ -200,14 +200,14 @@ export class DockerHost {
       (await this.caddyLabel("com.docker.compose.project.working_dir"));
 
     // A POSIX path is already what the daemon wants. A Windows one is not, and passing it raw
-    // turns every invocation into "mount denied: too many colons" — see hostPathForDaemon, which
+    // turns every invocation into "mount denied: too many colons" - see hostPathForDaemon, which
     // translates it into the path Docker Desktop exposes the drive at instead.
     const usable = detected.startsWith("/") ? detected : hostPathForDaemon(detected);
 
     if (detected && !usable) {
       // Loud, because the alternative is a container that comes up wrong. Without a project
       // directory the daemon resolves `./docker/...` against a path only this container has, and
-      // silently creates an empty directory there — the service starts, without the configuration
+      // silently creates an empty directory there - the service starts, without the configuration
       // it was supposed to be given.
       console.warn(
         `[docker] Cannot translate the compose project directory "${detected}" into a path the ` +
@@ -311,7 +311,7 @@ export class DockerHost {
 
   /**
    * Poll the Caddy healthcheck until it passes or the budget runs out, returning the last status
-   * seen. Both the port apply and the rebuild ask the same question — did it come back up — so
+   * seen. Both the port apply and the rebuild ask the same question - did it come back up - so
    * neither reports success on a container that started and immediately died.
    */
   async waitForCaddyHealth(timeoutSeconds = this.config.healthTimeoutSeconds): Promise<string> {
@@ -341,13 +341,13 @@ export class DockerHost {
    * running, and pulling in the rest would recreate containers nobody asked to touch.
    *
    * No `--pull` flag, unlike recreateCaddy: a deployment that never ran the profile has no image
-   * for it, so the implicit pull-if-missing is exactly what is wanted — and also why this takes a
+   * for it, so the implicit pull-if-missing is exactly what is wanted - and also why this takes a
    * timeout measured in minutes.
    *
    * `env` carries the credentials the compose file interpolates. Passed through the child's
    * environment rather than a generated `--env-file`, for two reasons: compose reads the process
    * environment at a higher precedence than any env file, so this overrides a stale value in the
-   * project's own `.env` without the agent needing to write to a read-only mount — and a value
+   * project's own `.env` without the agent needing to write to a read-only mount - and a value
    * passed this way needs no quoting, where an env file would need escaping that compose's parser
    * defines differently for single and double quotes. It also keeps the password off disk.
    */
@@ -369,7 +369,7 @@ export class DockerHost {
    *
    * Still takes `env`, so every invocation resolves the project to the same configuration. Compose
    * interpolates the whole file before deciding what to act on, and a deployment whose compose file
-   * still guards a credential with `${VAR:?}` — an override, or one shipped before this — would
+   * still guards a credential with `${VAR:?}` - an override, or one shipped before this - would
    * otherwise fail here on a variable belonging to a service this command is not touching.
    */
   async stopService(
@@ -416,13 +416,13 @@ export class DockerHost {
 
 export function renderL4PortsOverride(ports: string[]): string {
   if (ports.length === 0) {
-    return `# Generated by the Caddy Proxy Manager agent — L4 port mappings
+    return `# Generated by the Caddy Proxy Manager agent - L4 port mappings
 # No L4 proxy host requires an additional published port.
 services: {}
 `;
   }
   const lines = ports.map((port) => `      - "${port}"`).join("\n");
-  return `# Generated by the Caddy Proxy Manager agent — L4 port mappings
+  return `# Generated by the Caddy Proxy Manager agent - L4 port mappings
 # Do not edit: rewritten whenever the controller applies a port change.
 services:
   caddy:
@@ -432,7 +432,7 @@ ${lines}
 }
 
 export function renderCaddyBuildOverride(modules: string[]): string {
-  return `# Generated by the Caddy Proxy Manager agent — Caddy module selection
+  return `# Generated by the Caddy Proxy Manager agent - Caddy module selection
 # Do not edit: rewritten whenever the controller requests a rebuild.
 services:
   caddy:

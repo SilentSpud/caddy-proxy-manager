@@ -19,7 +19,7 @@ async function firstIssuer(acmeSettings: AcmeSettings) {
   return policies[0].issuers[0] as Record<string, unknown>;
 }
 
-describe('buildTlsAutomation — custom ACME directory', () => {
+describe('buildTlsAutomation - custom ACME directory', () => {
   let tmp: string;
 
   beforeEach(() => {
@@ -96,7 +96,7 @@ describe('buildTlsAutomation — custom ACME directory', () => {
  * Regression: DNS-01 challenges must keep their fallback resolvers. Dropping `fallbacks` leaves
  * validation with one resolver, so an unreachable primary silently breaks issuance and renewal.
  */
-describe('buildTlsAutomation — DNS-01 challenge resolvers', () => {
+describe('buildTlsAutomation - DNS-01 challenge resolvers', () => {
   const DNS_PROVIDER = {
     default: 'cloudflare',
     providers: { cloudflare: { api_token: 'test-token' } },

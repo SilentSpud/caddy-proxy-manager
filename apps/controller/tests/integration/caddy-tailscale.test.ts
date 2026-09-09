@@ -1,8 +1,8 @@
 /**
  * What buildCaddyDocument emits for a host that uses Tailscale.
  *
- * The interesting behaviour is not the handler shapes — tests/unit/caddy-tailscale.test.ts covers
- * those — but which *server* a host's routes land in, and what happens when the plugin is not
+ * The interesting behaviour is not the handler shapes - tests/unit/caddy-tailscale.test.ts covers
+ * those - but which *server* a host's routes land in, and what happens when the plugin is not
  * available: a host asked to live only on the tailnet must disappear rather than fall back to the
  * public listener, which is the one failure mode that would quietly publish a private service.
  */
@@ -59,7 +59,7 @@ function servers(document: CaddyDocument) {
   return document.apps.http?.servers ?? {};
 }
 
-/** The distinct `host` matcher values in a server's routes — one host contributes several routes. */
+/** The distinct `host` matcher values in a server's routes - one host contributes several routes. */
 function matchedHosts(server: { routes: unknown[] } | undefined): string[] {
   const found = new Set<string>();
   const walk = (node: unknown) => {
@@ -78,7 +78,7 @@ function matchedHosts(server: { routes: unknown[] } | undefined): string[] {
  * A TLS policy's subjects, if it has any.
  *
  * Narrowed rather than cast: `policies` is typed as bare records, so `policy.subjects` is
- * `unknown` and a cast tells the reader — and any analyser — nothing about what is really there.
+ * `unknown` and a cast tells the reader - and any analyser - nothing about what is really there.
  */
 function subjectsOf(policy: Record<string, unknown>): string[] {
   return Array.isArray(policy.subjects) ? (policy.subjects as string[]) : [];
@@ -262,7 +262,7 @@ describe('when Tailscale is not usable', () => {
   });
 
   it('emits nothing tailscale-shaped while the setting itself is off', async () => {
-    // Configured first, then switched off — a host cannot be stored this way from cold, because
+    // Configured first, then switched off - a host cannot be stored this way from cold, because
     // the save-time gate refuses a tailnet host while no auth key exists.
     await enableTailscale();
     await createHost({ tailscale: { serve: true, tailnetOnly: false } });
@@ -300,7 +300,7 @@ describe('identity authentication', () => {
 
     const server = servers((await buildCaddyDocument()) as CaddyDocument).cpm_tailscale_caddy;
     const routes = server.routes as { handle: Record<string, unknown>[] }[];
-    // Every route that reaches the upstream, gated or not — the HTTPS redirect route proxies
+    // Every route that reaches the upstream, gated or not - the HTTPS redirect route proxies
     // nothing, so it has no header for an upstream to believe.
     const proxying = routes.filter((route) =>
       JSON.stringify(route.handle).includes('"reverse_proxy"'),
@@ -347,7 +347,7 @@ describe('reaching an upstream over the tailnet', () => {
   });
 
   it('serves nothing on a node it only dials through', async () => {
-    // The node is registered — the transport needs the app block for its auth key — but nothing
+    // The node is registered - the transport needs the app block for its auth key - but nothing
     // listens on it. It stays unstarted until a request goes through, which the plugin fork makes
     // safe to release; see the note on the replace directive in docker/caddy/go.mod.
     await enableTailscale();
@@ -386,7 +386,7 @@ describe('the stored host config', () => {
 
   it('refuses to store a tailnet host while no auth key is configured', async () => {
     // The failure this prevents is fleet-wide: a node that cannot register is a listener that never
-    // comes up, and Caddy rejects the whole document — so every host stops being updated, with an
+    // comes up, and Caddy rejects the whole document - so every host stops being updated, with an
     // error naming Tailscale rather than whatever was being edited.
     await saveTailscaleSettings({
       ...TAILSCALE_SETTINGS,

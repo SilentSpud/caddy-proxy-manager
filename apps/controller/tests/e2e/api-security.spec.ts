@@ -1,5 +1,5 @@
 /**
- * E2E: every /api/v1/ endpoint enforces auth and RBAC — 401 unauthenticated, 403 for user/viewer
+ * E2E: every /api/v1/ endpoint enforces auth and RBAC - 401 unauthenticated, 403 for user/viewer
  * on admin-only endpoints, allowed on user endpoints, admins everywhere.
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
@@ -19,7 +19,7 @@ type Endpoint = {
   body?: Record<string, unknown>;
 };
 
-// Use real-ish IDs; 999 will return 404 after auth passes, which is fine — we only test auth.
+// Use real-ish IDs; 999 will return 404 after auth passes, which is fine - we only test auth.
 const ENDPOINTS: Endpoint[] = [
   // proxy-hosts
   { method: 'GET', path: '/proxy-hosts', auth: 'admin' },
@@ -176,7 +176,7 @@ const ENDPOINTS: Endpoint[] = [
   { method: 'PUT', path: '/users/999', auth: 'admin', body: { name: 'x' } },
   { method: 'DELETE', path: '/users/999', auth: 'admin' },
 
-  // tokens (user-level — any authenticated user can manage their own)
+  // tokens (user-level - any authenticated user can manage their own)
   { method: 'GET', path: '/tokens', auth: 'user' },
   { method: 'POST', path: '/tokens', auth: 'session', body: { name: 'x' } },
   { method: 'DELETE', path: '/tokens/999', auth: 'user' },
@@ -227,7 +227,7 @@ async function apiRequest(
 
 // ── Setup ───────────────────────────────────────────────────────────────
 
-// Don't use global auth state — we manage our own sessions
+// Don't use global auth state - we manage our own sessions
 test.use({ storageState: { cookies: [], origins: [] } });
 
 let userToken: string;
@@ -235,7 +235,7 @@ let viewerToken: string;
 let adminToken: string;
 
 test.beforeAll(async () => {
-  // Retry user creation — Docker exec can transiently fail under load
+  // Retry user creation - Docker exec can transiently fail under load
   for (let i = 0; i < 3; i++) {
     try {
       seed.ensureTestUser('apisec-user', 'ApiSecUser2026!', 'user');
@@ -402,13 +402,13 @@ test.describe('Cross-user isolation', () => {
     await request.get(`${ORIGIN}/api/auth/get-session`, {
       headers: { Authorization: `Bearer ${userToken}` },
     });
-    // Bearer tokens go through our api-auth, not Better Auth session — use a different approach
+    // Bearer tokens go through our api-auth, not Better Auth session - use a different approach
     // Just verify they CAN'T access admin user, which we tested above.
     // Self-access is covered by the user-scoped GET/DELETE token endpoints.
   });
 
   test("admin CAN access other users' profiles", async ({ request }) => {
-    // Admin reads apisec-user's profile — should work
+    // Admin reads apisec-user's profile - should work
     // We need apisec-user's ID. Use the /users list endpoint.
     const res = await request.get(`${BASE}/users`, {
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },

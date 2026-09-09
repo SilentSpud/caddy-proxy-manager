@@ -24,7 +24,7 @@ test.describe('Certificates', () => {
     await expect(page).not.toHaveURL(/login/);
   });
 
-  test('wildcard cert covers subdomain — no duplicate in ACME tab', async ({ page }) => {
+  test('wildcard cert covers subdomain - no duplicate in ACME tab', async ({ page }) => {
     const BASE_URL = 'http://localhost:3000';
     const API = `${BASE_URL}/api/v1`;
     const headers = { 'Content-Type': 'application/json', Origin: BASE_URL };
@@ -56,7 +56,7 @@ test.describe('Certificates', () => {
     const host = await hostRes.json();
 
     try {
-      // 3. Visit certificates page — the subdomain host should NOT appear in the ACME tab
+      // 3. Visit certificates page - the subdomain host should NOT appear in the ACME tab
       await page.goto('/certificates');
       await expect(page.getByRole('button', { name: /acme/i })).toBeVisible();
       await page.getByRole('button', { name: /acme/i }).click();
@@ -80,7 +80,7 @@ test.describe('Certificates', () => {
     // Auto-managed wildcard hosts require a DNS provider (ACME DNS-01 challenge).
     // Configure one for this isolated test stack and clear it afterwards.
     // GET redacts credential values, so the prior configuration cannot be read back and
-    // restored — the teardown below clears the group instead.
+    // restored - the teardown below clears the group instead.
     const dnsProviderUrl = `${API}/settings/dns-provider`;
     const setDnsRes = await page.request.put(dnsProviderUrl, {
       data: { providers: { duckdns: { api_token: 'e2e-fake-token' } }, default: 'duckdns' },
@@ -115,14 +115,14 @@ test.describe('Certificates', () => {
       expect(subHostRes.status()).toBe(201);
       subHostId = (await subHostRes.json()).id;
 
-      // 3. Visit certificates page — subdomain should be collapsed under the wildcard
+      // 3. Visit certificates page - subdomain should be collapsed under the wildcard
       await page.goto('/certificates');
       await expect(page.getByRole('button', { name: /acme/i })).toBeVisible();
       await page.getByRole('button', { name: /acme/i }).click();
 
       const acmeTab = page.getByRole('main');
       // DataTable renders both a hidden mobile card and a visible desktop table row.
-      // Mobile card is first in the DOM (block md:hidden) — use .last() to get the visible desktop row.
+      // Mobile card is first in the DOM (block md:hidden) - use .last() to get the visible desktop row.
       await expect(acmeTab.getByText(`*.${domain}`).last()).toBeVisible({ timeout: 5_000 });
       // The subdomain host should NOT appear as a separate entry
       await expect(acmeTab.getByText(`sub.${domain}`)).not.toBeVisible({ timeout: 5_000 });
@@ -228,11 +228,11 @@ test.describe('Certificates', () => {
       await drawer.getByLabel(/^name/i).fill(certName);
       await drawer.getByLabel(/^domains/i).fill(domain);
 
-      // Certificate PEM goes into a textarea — newlines preserved trivially.
+      // Certificate PEM goes into a textarea - newlines preserved trivially.
       await drawer.getByLabel(/certificate pem/i).fill(certificatePem);
 
       // Private Key PEM: paste while the field is in the default (hidden/masked)
-      // state. Regression for #157 — a <input type="password"> would silently
+      // state. Regression for #157 - a <input type="password"> would silently
       // strip the newlines from the pasted PEM, corrupting the key.
       const keyField = drawer.getByLabel(/private key pem/i);
       await keyField.click();

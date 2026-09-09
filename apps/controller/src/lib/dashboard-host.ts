@@ -9,16 +9,16 @@
  *
  * - It is synthesised into the Caddy document on every apply, from these settings. Nothing can
  *   delete it out from under the operator, and changing the domain here is the only way to change
- *   it — there is no second copy in the hosts table to drift from this one.
+ *   it - there is no second copy in the hosts table to drift from this one.
  * - It is put ahead of the stored hosts before routes are built. Routes are then sorted by host
  *   specificity, which decides every case where two hosts could match the same request except one:
  *   two rows claiming the *same* exact domain, where the sort falls back to original order. Being
  *   first is what wins that tie, so a host somebody creates for the dashboard's domain cannot
- *   shadow the route the dashboard is reached through — the page that would fix the mistake is the
+ *   shadow the route the dashboard is reached through - the page that would fix the mistake is the
  *   one that would have stopped answering.
  *
  * The escape hatch is the reason all of this is safe: the controller publishes its own port
- * (`3000:3000` in the bundled compose file), so a broken dashboard host never locks anybody out —
+ * (`3000:3000` in the bundled compose file), so a broken dashboard host never locks anybody out -
  * `http://<host>:3000` still serves the settings page that turns it off.
  */
 
@@ -54,7 +54,7 @@ export type DashboardHostSettings = {
  * The id the synthetic row carries.
  *
  * Negative so it cannot collide with a `proxy_hosts` serial, and so anything that does look this
- * up by id — an access list, a certificate, an agent assignment — finds nothing rather than
+ * up by id - an access list, a certificate, an agent assignment - finds nothing rather than
  * somebody else's host.
  */
 export const DASHBOARD_HOST_ID = -1;
@@ -85,7 +85,7 @@ function domainFromBaseUrl(): string {
  * The domain to serve the dashboard on before anybody has chosen one.
  *
  * DASHBOARD_DOMAIN first, because setting it is an explicit answer. Otherwise the hostname in
- * BASE_URL — the deployment is already being reached there, so it is the name the operator has in
+ * BASE_URL - the deployment is already being reached there, so it is the name the operator has in
  * hand, and proxying it is exactly what they came to do. Empty when neither says anything usable,
  * which leaves the feature off rather than claiming a domain nobody asked for.
  */
@@ -103,7 +103,7 @@ export function defaultDashboardSettings(): DashboardHostSettings {
  * Over HTTP, always. The check that decides HTTPS works by asking the domain for a signature only
  * this instance can produce, and at this moment there is nothing on that domain to ask: the route
  * is being created by this very call, no configuration has been applied yet, and on the bundled
- * stack Caddy may not even be running — it starts once an agent is paired. Probing here would
+ * stack Caddy may not even be running - it starts once an agent is paired. Probing here would
  * answer "unreachable" for reasons that say nothing about the operator's DNS.
  *
  * So the host comes up on HTTP and Settings -> Dashboard Host offers the check, which is
@@ -120,7 +120,7 @@ export function activateDashboardHost(): DashboardHostSettings {
  * The synthetic host, or null when there is nothing to serve.
  *
  * Returns a `ProxyHostRow` rather than a Caddy route so it travels the same path every other host
- * does — TLS automation, websocket upgrades, host-header handling, error pages. A hand-built route
+ * does - TLS automation, websocket upgrades, host-header handling, error pages. A hand-built route
  * would have to re-implement each of those and would drift from them at the first change.
  */
 export function buildDashboardHostRow(
@@ -165,7 +165,7 @@ export function buildDashboardHostRow(
  *
  * Labels of letters, digits and hyphens, separated by dots, up to the 253 characters DNS allows.
  * That excludes everything an attacker-shaped value would need: `//`, `@`, `:`, `?`, `#`, a path,
- * whitespace, or a bracketed IPv6 literal. A bare IPv4 literal passes, which is intended — an
+ * whitespace, or a bracketed IPv6 literal. A bare IPv4 literal passes, which is intended - an
  * operator may reasonably serve the dashboard on an address rather than a name.
  */
 export function isHostname(value: string): boolean {
@@ -214,7 +214,7 @@ async function resolveAddresses(name: string): Promise<string[]> {
  * Answers true only when the response carries the right signature: a server that is not this one
  * can return 200, can return `{"status":"ok"}`, and can echo the nonce, but cannot sign it.
  *
- * Plain HTTP, because this runs before HTTPS has been turned on — proving the name arrives here is
+ * Plain HTTP, because this runs before HTTPS has been turned on - proving the name arrives here is
  * the precondition for asking Caddy for a certificate, not something that can wait until after.
  */
 async function probeSelf(domain: string): Promise<boolean> {
@@ -225,7 +225,7 @@ async function probeSelf(domain: string): Promise<boolean> {
   //
   // Note what is deliberately *not* blocked: an address in private or loopback space. This is a
   // deployment probing its own domain, and plenty of legitimate installs answer on a private
-  // address — a LAN-only instance, or one reached through NAT hairpin. Refusing those would break
+  // address - a LAN-only instance, or one reached through NAT hairpin. Refusing those would break
   // the feature for the deployments most likely to use it, to prevent an administrator from
   // pointing a boolean-valued probe at their own network.
   if (!isHostname(domain)) return false;
@@ -252,7 +252,7 @@ async function probeSelf(domain: string): Promise<boolean> {
  * rendering a warning rather than handling an exception, and a resolver being slow is not a reason
  * to fail their request.
  *
- * DNS resolution is kept alongside the probe purely to tell two failures apart — a name nothing
+ * DNS resolution is kept alongside the probe purely to tell two failures apart - a name nothing
  * answers for needs a record created, a name that resolves but does not arrive here needs the
  * record or the network fixed. Both are local lookups; nothing is asked of a third party.
  */

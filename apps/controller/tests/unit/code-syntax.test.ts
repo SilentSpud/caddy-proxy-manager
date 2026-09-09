@@ -87,7 +87,7 @@ describe('SecLang', () => {
 
   it('keeps the operator inside the string it belongs to', () => {
     // The operator only reads as one when it is not already part of a quoted argument, which is
-    // where every real rule puts it — so the string wins and the whole argument is one token.
+    // where every real rule puts it - so the string wins and the whole argument is one token.
     expect(typeAt(code, 'seclang', 1, '"@beginsWith /admin"')).toBe('string');
     expect(typeAt(code, 'seclang', 2, "'@contains badbot'")).toBe('string');
   });

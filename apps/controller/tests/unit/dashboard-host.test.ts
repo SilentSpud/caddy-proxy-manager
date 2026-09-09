@@ -33,7 +33,7 @@ describe('the managed dashboard host', () => {
   });
 
   it('never carries an id a stored host could also have', () => {
-    // Serials start at 1, so a negative id cannot collide — and anything looking this host up by
+    // Serials start at 1, so a negative id cannot collide - and anything looking this host up by
     // id finds nothing rather than somebody else's access list or certificate.
     expect(DASHBOARD_HOST_ID).toBeLessThan(0);
   });
@@ -70,7 +70,7 @@ describe('the dashboard reachability check', () => {
 
   it('trusts the probe over the record', async () => {
     // The record is only a diagnostic. A name that resolves to nothing this resolver can see but
-    // still reaches us — split DNS, a hosts entry, a search domain — has answered the question.
+    // still reaches us - split DNS, a hosts entry, a search domain - has answered the question.
     const result = await checkDashboardDns('cpm.example.com', deps([], true));
 
     expect(result.ok).toBe(true);

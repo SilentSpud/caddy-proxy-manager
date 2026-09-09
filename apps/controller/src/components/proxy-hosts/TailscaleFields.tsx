@@ -27,8 +27,8 @@ export type TailscaleHostDefaults = {
  *
  * `serve` is the switch the identity options hang off, because neither works without it: the gate
  * needs a tsnet listener to ask who is calling, and "tailnet only" has nothing to be exclusive of.
- * Dialling an upstream over the tailnet is genuinely independent — a host published on the public
- * internet can still proxy to a machine that only exists on the tailnet — so it sits outside.
+ * Dialling an upstream over the tailnet is genuinely independent - a host published on the public
+ * internet can still proxy to a machine that only exists on the tailnet - so it sits outside.
  */
 export function TailscaleFields({
   tailscale,
@@ -112,7 +112,7 @@ export function TailscaleFields({
             <Banner
               status="info"
               title={t("tailscaleDomainRequirementTitle")}
-              description={`Routing is still by Host header, so a request to https://${node || placeholderNode}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale — no ACME, no DNS provider.`}
+              description={`Routing is still by Host header, so a request to https://${node || placeholderNode}.your-tailnet.ts.net only reaches this host if that name is one of its domains. Caddy gets the certificate for it from Tailscale - no ACME, no DNS provider.`}
             />
             <CheckboxInput
               label={t("tailnetOnly")}

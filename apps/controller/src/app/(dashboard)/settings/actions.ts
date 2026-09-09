@@ -379,7 +379,7 @@ async function updateAuthentikSettingsActionUnlocked(
  *
  * An empty secret field means "keep the stored one", for both the auth key and the API access
  * token: the form never receives the current value to send back, so without this every unrelated
- * edit — a tag, the control URL — would wipe the credential and every node would fail to
+ * edit - a tag, the control URL - would wipe the credential and every node would fail to
  * re-register on the next restart.
  */
 async function updateTailscaleSettingsActionUnlocked(
@@ -505,7 +505,7 @@ async function updateAvatarSettingsActionUnlocked(
       success: true,
       message: gravatarEnabled
         ? "Gravatar fallback enabled"
-        : "Gravatar fallback disabled — users without an icon show their initial",
+        : "Gravatar fallback disabled - users without an icon show their initial",
     };
   } catch (error) {
     console.error("Failed to save avatar settings:", error);
@@ -531,7 +531,7 @@ async function updateAnalyticsSettingsActionUnlocked(
     if (enabled && password.trim().length === 0 && formData.get("hasPassword") !== "yes") {
       return {
         success: false,
-        message: "Analytics need a ClickHouse password — the container will not start without one.",
+        message: "Analytics need a ClickHouse password - the container will not start without one.",
       };
     }
 
@@ -549,7 +549,7 @@ async function updateAnalyticsSettingsActionUnlocked(
     return {
       success: true,
       message: enabled
-        ? "Analytics enabled — the agent is starting ClickHouse, which can take a few minutes on first run."
+        ? "Analytics enabled - the agent is starting ClickHouse, which can take a few minutes on first run."
         : "Analytics disabled. The ClickHouse container is stopped; its data is kept.",
     };
   } catch (error) {
@@ -584,7 +584,7 @@ async function updateGeoipSettingsActionUnlocked(
       success: true,
       message:
         accountId.trim().length > 0 && hasKey
-          ? "GeoIP enabled — the agent is starting geoipupdate to download the databases."
+          ? "GeoIP enabled - the agent is starting geoipupdate to download the databases."
           : "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
     };
   } catch (error) {
@@ -660,7 +660,7 @@ async function updateUpdateSettingsActionUnlocked(
     const values: Record<string, unknown> = { [registry.updateCheckEnabled.key]: enabled };
 
     // The field is disabled while the check is off, and a disabled Astryx input drops its `name`
-    // and so submits nothing — see the note in components/ui/FormBooleanControls. Absent therefore
+    // and so submits nothing - see the note in components/ui/FormBooleanControls. Absent therefore
     // means "leave it alone": writing the empty string it looks like would wipe the repository the
     // moment someone turned the check off, and leave it unusable when they turned it back on.
     const repository = formData.get("updateImageRepository");
@@ -672,7 +672,7 @@ async function updateUpdateSettingsActionUnlocked(
 
     revalidatePath("/", "layout");
     if (!enabled) {
-      return { success: true, message: "Update checks disabled — no requests will be made." };
+      return { success: true, message: "Update checks disabled - no requests will be made." };
     }
 
     const result = await checkForUpdates();
@@ -798,8 +798,8 @@ function parseResolverList(value: string | null): string[] {
  * Save how the dashboard is served, and rebuild Caddy so the change takes effect at once.
  *
  * Switching this off is the one settings change that can remove the reader's own route to this
- * page. That is deliberate and reversible — the controller publishes its own port, so
- * `http://<host>:3000` still reaches here — and the form warns before submitting when the request
+ * page. That is deliberate and reversible - the controller publishes its own port, so
+ * `http://<host>:3000` still reaches here - and the form warns before submitting when the request
  * arrived through the domain being turned off.
  */
 async function updateDashboardSettingsActionUnlocked(
@@ -840,7 +840,7 @@ async function updateDashboardSettingsActionUnlocked(
  * Ask whether the dashboard's domain currently reaches this deployment.
  *
  * Takes no argument on purpose. It used to accept the domain typed into the form, which made an
- * administrator's keystrokes the host of a server-side request — CodeQL called that server-side
+ * administrator's keystrokes the host of a server-side request - CodeQL called that server-side
  * request forgery and was right to. It now checks the domain that is *saved*, which has been
  * through the settings validator, and is also the more truthful question: what the check reports is
  * the configuration Caddy is actually serving, not a string somebody is part-way through typing.
@@ -1520,13 +1520,13 @@ async function updateWafSettingsActionUnlocked(
 // ─── Caddy Build ─────────────────────────────────────────────────────────────
 
 /**
- * Save the module selection. Does not rebuild — plugins are compiled in — but it changes what the
+ * Save the module selection. Does not rebuild - plugins are compiled in - but it changes what the
  * config builder will emit, so applyCaddyConfig runs here: a module switched off stops producing
  * handlers at once, rather than leaving config naming a plugin about to vanish.
  *
  * `agentRowId` picks what is being edited: absent or 0 is the fleet default, which every agent
  * without a selection of its own follows. With `followFleetDefault` set the agent's own selection
- * is cleared rather than overwritten, which is the only way back to tracking the fleet — saving a
+ * is cleared rather than overwritten, which is the only way back to tracking the fleet - saving a
  * copy of today's default would leave it frozen there.
  */
 async function updateCaddyBuildSettingsActionUnlocked(
@@ -1576,7 +1576,7 @@ async function updateCaddyBuildSettingsActionUnlocked(
     const rebuildNote = diff.needsRebuild
       ? " Rebuild Caddy to apply the change to the running container."
       : "";
-    // Advisory, not a refusal — see describeCaddyfileSnippetWarning.
+    // Advisory, not a refusal - see describeCaddyfileSnippetWarning.
     const snippetWarning = await describeCaddyfileSnippetWarning(settings);
     const snippetNote = snippetWarning ? ` ${snippetWarning}` : "";
 
@@ -1712,7 +1712,7 @@ export const updateGeoipSettingsAction = serializedSettingsAction(
  * Mint (or re-read) the code an operator carries to a new agent.
  *
  * The controller issues it now, where the agent used to and the operator had to read the new host's
- * container logs to find it. The code is all that comes back — the secret it is exchanged for is
+ * container logs to find it. The code is all that comes back - the secret it is exchanged for is
  * minted at `/api/agent/v1/pair` and never leaves the server, because a server action's return
  * value is serialized to the browser.
  */
@@ -1733,7 +1733,7 @@ export async function revokePairingCodeAction(): Promise<void> {
  * Forget a paired agent.
  *
  * Removes this controller's side and, because the agent's next signed call is then refused, drops
- * it back to idle on its own host — which stops its Caddy. Unpairing takes a host out of service,
+ * it back to idle on its own host - which stops its Caddy. Unpairing takes a host out of service,
  * so the UI says so.
  */
 export async function unpairAgentAction(formData: FormData): Promise<void> {

@@ -1615,7 +1615,7 @@ const spec = {
         tags: ["Caddy"],
         summary: "Replace the Caddy module selection",
         description:
-          "Saves which plugins the Caddy image should be built with. Does not rebuild — plugins are compiled in, so the running container keeps its current set until a rebuild is triggered.",
+          "Saves which plugins the Caddy image should be built with. Does not rebuild - plugins are compiled in, so the running container keeps its current set until a rebuild is triggered.",
         operationId: "updateCaddyModules",
         requestBody: {
           required: true,
@@ -1649,7 +1649,7 @@ const spec = {
           "401": { $ref: "#/components/responses/Unauthorized" },
           "409": {
             description:
-              "A module in the selection is still in use — by an enabled L4 proxy host, a host with per-host WAF or geoblocking, or a configured DNS provider. Turn that feature off first.",
+              "A module in the selection is still in use - by an enabled L4 proxy host, a host with per-host WAF or geoblocking, or a configured DNS provider. Turn that feature off first.",
             content: {
               "application/json": {
                 schema: {
@@ -1990,7 +1990,7 @@ const spec = {
             type: "string",
             enum: ["Reject", "ProcessPartial"],
             description:
-              "SecRequestBodyLimitAction — reject oversized bodies or inspect the buffered part and forward the rest",
+              "SecRequestBodyLimitAction - reject oversized bodies or inspect the buffered part and forward the rest",
           },
         },
       },
@@ -2444,7 +2444,7 @@ const spec = {
             example: ":5432",
             description:
               "Address to listen on: ':port', 'host:port', or '[ipv6]:port'. An IPv6 literal " +
-              "must be bracketed — unbracketed, its last group is indistinguishable from a port.",
+              "must be bracketed - unbracketed, its last group is indistinguishable from a port.",
           },
           upstreams: { type: "array", items: { type: "string" }, example: ["db-server:5432"] },
           matcherType: { type: "string", enum: ["none", "tls_sni", "http_host", "proxy_protocol"] },
@@ -2876,7 +2876,7 @@ const spec = {
             type: "string",
             enum: ["Reject", "ProcessPartial"],
             description:
-              "SecRequestBodyLimitAction — reject oversized bodies or inspect the buffered part and forward the rest",
+              "SecRequestBodyLimitAction - reject oversized bodies or inspect the buffered part and forward the rest",
           },
         },
         required: ["enabled", "mode", "load_owasp_crs", "custom_directives"],

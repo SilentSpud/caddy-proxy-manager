@@ -25,7 +25,7 @@ Its baseline is nothing, and it reaches exactly what its groups were granted. Th
 makes grants safe to add: viewer and user gain nothing from a grant, so creating one can never
 widen an existing account. Someone has to be made an operator deliberately.
 
-Grants apply to the dashboard. The management endpoints under `/api/v1/` stay admin-only — an
+Grants apply to the dashboard. The management endpoints under `/api/v1/` stay admin-only - an
 operator's [API token](../rest-api/) gets the same user-scoped endpoints a user's does.
 
 ## Groups
@@ -38,14 +38,14 @@ Groups are lists of users doing two jobs:
 
 ## OAuth / SSO
 
-Any OAuth2/OIDC provider — Authentik, Keycloak, Auth0, and others. Accounts can be linked from the
+Any OAuth2/OIDC provider - Authentik, Keycloak, Auth0, and others. Accounts can be linked from the
 Profile page, so an existing local account gains SSO rather than becoming a duplicate.
 
 Two options worth knowing:
 
 - **Group-based role mapping.** Members of a claimed group become admins, operators, users or
   viewers automatically, so role changes happen in your IdP rather than here.
-- **OIDC-only mode.** Disables local accounts entirely. No bootstrap admin, no credential sign-in —
+- **OIDC-only mode.** Disables local accounts entirely. No bootstrap admin, no credential sign-in -
   every identity comes from the provider.
 
 ## Password policy

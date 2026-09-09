@@ -49,7 +49,7 @@ export const sessions = pgTable(
     ipAddress: text("ipAddress"),
     userAgent: text("userAgent"),
     // Which IdP session this one came from, when it came from one at all. OIDC back-channel
-    // logout names the session to end by its `sid`, which is only unique within an issuer — so
+    // logout names the session to end by its `sid`, which is only unique within an issuer - so
     // the provider is stored beside it rather than matching on `sid` alone. Both stay null for
     // credential sign-ins and for providers that issue no `sid`.
     oidcProviderId: text("oidcProviderId"),
@@ -188,7 +188,7 @@ export const settings = pgTable("settings", {
  *
  * No address, because the controller never dials one: agents connect inbound and hold an event
  * stream open, so whether an agent is reachable is a question about `lib/agent/registry.ts` and
- * this table cannot answer it. What lives here is the half that must outlive a restart — who the
+ * this table cannot answer it. What lives here is the half that must outlive a restart - who the
  * agent is, and the secret it signs with.
  *
  * `agentId` is the identity the agent asserts on every request and the key pairing upserts on, so
@@ -354,7 +354,7 @@ export const linkingTokens = pgTable("linking_tokens", {
   expiresAt: text("expiresAt").notNull(),
 });
 
-// traffic_events and waf_events live in ClickHouse — see src/lib/clickhouse/client.ts. The
+// traffic_events and waf_events live in ClickHouse - see src/lib/clickhouse/client.ts. The
 // parsers that fill them, and their read offsets, live in the agent: the Caddy log is a file on
 // the agent's host, which a controller elsewhere cannot read at all.
 
@@ -570,7 +570,7 @@ export const l4ProxyHosts = pgTable("l4_proxy_hosts", {
  * Which agents serve a host.
  *
  * No rows for a host means every agent serves it, which is what the whole fleet did before this
- * table existed — so an upgrade changes nothing and an operator opts in per host. Many-to-many
+ * table existed - so an upgrade changes nothing and an operator opts in per host. Many-to-many
  * rather than a column, because two edge nodes serving one host is an ordinary HA arrangement and
  * a single-valued assignment would forbid what the fleet-wide broadcast already allowed.
  */
@@ -615,7 +615,7 @@ export const l4ProxyHostAgents = pgTable(
  * IdP group names that resolve to a CPM group.
  *
  * The prefix convention on `oauth_providers` mirrors claimed groups by name, which works right up
- * until the IdP's name is not the one an operator wants to see — "AD-Infra-Proxy-Admins" against a
+ * until the IdP's name is not the one an operator wants to see - "AD-Infra-Proxy-Admins" against a
  * CPM group called "Networking". This table is that mapping written down: a CPM group can claim as
  * many external names as it likes, and the prefix convention keeps working for everything not
  * named here.
@@ -649,7 +649,7 @@ export const groupIdpMappings = pgTable(
  * What a group is allowed to manage.
  *
  * Additive, never subtractive: a grant widens what an `operator` can reach and does nothing at all
- * to an `admin`, a `user` or a `viewer`. That is what makes this safe to ship — no existing user's
+ * to an `admin`, a `user` or a `viewer`. That is what makes this safe to ship - no existing user's
  * access changes until someone is deliberately moved to the operator role.
  *
  * One nullable column per resource kind rather than a polymorphic (type, id) pair, matching

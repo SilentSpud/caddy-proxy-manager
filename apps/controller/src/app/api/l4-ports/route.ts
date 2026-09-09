@@ -3,7 +3,7 @@ import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { getL4PortsDiff, getL4PortsStatus, applyL4Ports } from "@/src/lib/l4-ports";
 
 /**
- * GET /api/l4-ports — returns current port diff and apply status.
+ * GET /api/l4-ports - returns current port diff and apply status.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/l4-ports — trigger port apply (write override + trigger file).
+ * POST /api/l4-ports - trigger port apply (write override + trigger file).
  */
 export async function POST(request: NextRequest) {
   try {

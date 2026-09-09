@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The module picker. Save records the selection; Rebuild recompiles Caddy and restarts the proxy —
+ * The module picker. Save records the selection; Rebuild recompiles Caddy and restarts the proxy -
  * hence two separately-confirmed buttons.
  */
 
@@ -93,7 +93,7 @@ export function CaddyBuildFields({
   /** Every paired agent, so one can be configured separately from the fleet. */
   agents?: { id: number; name: string; connected: boolean }[];
   /**
-   * Each agent's own selection, keyed by row id. An agent absent from here — or mapped to null —
+   * Each agent's own selection, keyed by row id. An agent absent from here - or mapped to null -
    * follows the fleet default, which is the state every agent starts in.
    */
   agentSelections?: Record<
@@ -116,7 +116,7 @@ export function CaddyBuildFields({
   );
 
   // Switching target reloads the editor from that target's stored selection. An agent with none
-  // starts from the fleet's, which is what it is actually running — so turning the switch off
+  // starts from the fleet's, which is what it is actually running - so turning the switch off
   // gives an accurate starting point rather than an empty form.
   const selectTarget = (next: number) => {
     setTarget(next);
@@ -199,7 +199,7 @@ export function CaddyBuildFields({
       );
       if (!res.ok) {
         // Not left to the status poll: these failures abort before the agent writes any status,
-        // and the poll only runs while it says pending/building — the spinner would just stop.
+        // and the poll only runs while it says pending/building - the spinner would just stop.
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setRebuildError(body?.error ?? `Rebuild could not be started (HTTP ${res.status}).`);
         return;

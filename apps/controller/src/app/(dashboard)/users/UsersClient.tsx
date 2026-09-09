@@ -60,7 +60,7 @@ const ROLE_OPTIONS = [
 /** Role tint. Admin reads as elevated privilege, the rest are informational. */
 const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
   admin: "red",
-  // Elevated, but only over what their groups were granted — not the whole instance.
+  // Elevated, but only over what their groups were granted - not the whole instance.
   operator: "blue",
   user: "blue",
   viewer: "neutral",

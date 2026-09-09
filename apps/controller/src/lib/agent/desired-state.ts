@@ -1,9 +1,9 @@
 /**
  * Everything the controller wants its agents to have, assembled from the settings that decide it.
  *
- * Computed rather than stored: each of these already has a source of truth — the proxy hosts decide
+ * Computed rather than stored: each of these already has a source of truth - the proxy hosts decide
  * the ports, the Caddy build settings decide the modules, the analytics settings decide the fleet
- * config — and a second copy would be one more thing to keep in step. Cheap enough to rebuild on
+ * config - and a second copy would be one more thing to keep in step. Cheap enough to rebuild on
  * every push, which is what makes "reconnect and re-send everything" a correct recovery path.
  */
 
@@ -17,7 +17,7 @@ import { broadcastDesiredState } from "./registry";
 
 /**
  * `agentRowId` scopes the ports and the module set to one agent. Omitted gives the fleet-wide
- * answer, which is what a caller with no agent in hand — a test, a status page — is asking for.
+ * answer, which is what a caller with no agent in hand - a test, a status page - is asking for.
  */
 export async function buildDesiredState(agentRowId?: number): Promise<AgentDesiredState> {
   const [l4Ports, buildDiff, services, fleetConfig, setupDone] = await Promise.all([
@@ -45,7 +45,7 @@ export async function buildDesiredState(agentRowId?: number): Promise<AgentDesir
  *
  * One computation per agent now, because two agents can want different ports and different
  * modules. Fire-and-forget by design: a caller saving a proxy host must not fail because one
- * agent's stream had just dropped — the agent gets the full state again the moment it reconnects.
+ * agent's stream had just dropped - the agent gets the full state again the moment it reconnects.
  * A failure computing one agent's state is caught per agent for the same reason.
  */
 export async function pushDesiredState(): Promise<void> {

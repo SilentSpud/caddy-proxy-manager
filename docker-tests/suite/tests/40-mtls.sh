@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Mutual TLS end to end: a CA registered with CPM, client certs issued against it, roles, the three
 # path modes, per-path RBAC, and revocation. The modes differ by enforcement layer:
-#   full-site  — the TLS policy runs require_and_verify, so a certless client never handshakes (000)
-#   whitelist  — TLS auth optional; only listed paths gated, certless requests get HTTP 403
-#   exclusion  — TLS auth optional; everything except the listed paths gated the same way
+#   full-site  - the TLS policy runs require_and_verify, so a certless client never handshakes (000)
+#   whitelist  - TLS auth optional; only listed paths gated, certless requests get HTTP 403
+#   exclusion  - TLS auth optional; everything except the listed paths gated the same way
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 banner "mutual TLS"

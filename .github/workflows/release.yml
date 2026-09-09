@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
-      # Dispatching the image build — see the last step.
+      # Dispatching the image build - see the last step.
       actions: write
 
     steps:
@@ -45,18 +45,18 @@ jobs:
           tag="v${version}"
 
           # A dependency bump touches package.json too, so the release turns on the version having
-          # changed across the push — not merely on the file having been written.
+          # changed across the push - not merely on the file having been written.
           if [ -n "${BEFORE:-}" ] && git rev-parse -q --verify "${BEFORE}^{commit}" >/dev/null; then
             before_version="$(git show "${BEFORE}:package.json" 2>/dev/null | jq -er .version 2>/dev/null || true)"
             if [ "$version" = "$before_version" ]; then
-              echo "Version unchanged at ${version} — nothing to release."
+              echo "Version unchanged at ${version} - nothing to release."
               echo "release=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
 
           if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            echo "${tag} already exists — nothing to release."
+            echo "${tag} already exists - nothing to release."
             echo "release=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -129,12 +129,12 @@ jobs:
             elif [ -n "$PREVIOUS" ]; then
               echo "Unchanged since ${PREVIOUS}. Pulling the images is enough."
             else
-              echo "First tagged release — take \`docker-compose.yml\` and \`.env.example\` from the archive below."
+              echo "First tagged release - take \`docker-compose.yml\` and \`.env.example\` from the archive below."
             fi
             echo
             # The archive is flat and self-contained; say so, and flag both differences from the
             # repository so nobody diffs the two and files a bug.
-            echo "The archive holds every file at its top level and deploys as it unpacks —"
+            echo "The archive holds every file at its top level and deploys as it unpacks -"
             echo "extract it into one directory and \`docker compose up -d\` needs nothing moved."
             echo "Its \`docker-compose.yml\` differs from the copy in the repository in exactly two"
             echo "ways: it mounts the ClickHouse override from beside itself rather than from"

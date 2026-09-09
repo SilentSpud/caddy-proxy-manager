@@ -8,21 +8,21 @@ A Bun workspace. Nothing but config, docs and the Compose stack lives at the roo
 
 | Path | What it is |
 | --- | --- |
-| `apps/controller` | `@cpm/controller` — the web UI, REST API, schema, migrations and the whole test suite |
-| `apps/agent` | `@cpm/agent` — manages the Caddy container on its host. Was `docker/sidecar` |
-| `apps/site` | `@cpm/site` — the project website and docs. Astro Starlight, built to static files |
-| `packages/shared` | `@cpm/shared` — contracts both the controller and the agent hard-code |
+| `apps/controller` | `@cpm/controller` - the web UI, REST API, schema, migrations and the whole test suite |
+| `apps/agent` | `@cpm/agent` - manages the Caddy container on its host. Was `docker/sidecar` |
+| `apps/site` | `@cpm/site` - the project website and docs. Astro Starlight, built to static files |
+| `packages/shared` | `@cpm/shared` - contracts both the controller and the agent hard-code |
 | `docker/` | Dockerfiles and image config. Build contexts are the repo root |
 
 Root `package.json` scripts delegate with `bun run --filter`, so `bun run test`, `bun run build` and
 `bun run typecheck` still work from the root and CI needed no new working directories. Anything
-reading a path off `process.cwd()` inside the controller now resolves against `apps/controller` —
+reading a path off `process.cwd()` inside the controller now resolves against `apps/controller` -
 the e2e suite is the exception and pins `COMPOSE_CWD` to the repo root, because Compose anchors
 every relative path in every `-f` file to the first one's directory.
 
 `bunfig.toml` pins the **isolated** installer, Bun 1.4's workspace default: a package sees only what
 its own `package.json` declares. Import something a package depends on transitively and it fails at
-typecheck rather than at runtime on a machine that hoisted differently — so an import that stops
+typecheck rather than at runtime on a machine that hoisted differently - so an import that stops
 resolving means adding the dependency, never loosening the linker. Note the layout this produces:
 the root `node_modules` holds the store (`.bun/`) plus the root's own devDependencies, and each
 workspace member gets a `node_modules` of relative symlinks into it. `docker/web/Dockerfile` copies
@@ -31,7 +31,7 @@ both trees for that reason.
 ## The site runs the controller's components
 
 `apps/site` depends on `@cpm/controller` and its docs embed the real dashboard components as React
-islands — the WAF card, the geo-block editor, the proxy host table — rather than screenshots of
+islands - the WAF card, the geo-block editor, the proxy host table - rather than screenshots of
 them. Three things make that work, and all three live in `apps/site/astro.config.mjs` and
 `apps/site/src/demos/`:
 
@@ -45,7 +45,7 @@ them. Three things make that work, and all three live in `apps/site/astro.config
   renders Astryx's theme wrapper itself instead of using `<Theme>`, which would write its
   attributes onto `<html>` and restyle the whole documentation site.
 
-A component that imports a server action or the database cannot be demoed — the import would pull
+A component that imports a server action or the database cannot be demoed - the import would pull
 the db into the browser bundle. That rules out the page clients under `(dashboard)` that import
 `./actions`; `AuditLogClient` is demoed because it does not.
 
@@ -56,7 +56,7 @@ controller never dials the agent. Three consequences worth knowing before touchi
 
 - **`lib/agent/registry.ts` is the only way to reach an agent.** It is in-memory, because a
   connection is a property of *this* process. "Configured" and "reachable" are therefore the same
-  question, and a second controller replica would each hold half the fleet — that file is where a
+  question, and a second controller replica would each hold half the fleet - that file is where a
   broker would go, not the callers.
 - **Everything is desired state except Caddy admin.** The controller pushes the full desired state
   and the agent diffs it against what it has applied, so a dropped stream costs only a reconnect.
@@ -65,16 +65,16 @@ controller never dials the agent. Three consequences worth knowing before touchi
 - **The bundled agent pairs itself.** The controller writes a single-use token to the shared data
   volume at startup (`lib/agent/bootstrap.ts`); an idle agent that finds one pairs with it, so the
   default stack needs no code typed anywhere. A remote agent has no such file and uses a six-letter
-  code. Both land in the same route and the same registry — only where the credential came from
+  code. Both land in the same route and the same registry - only where the credential came from
   differs.
 - **Caddy is behind a Compose profile and the agent starts it.** `docker compose up` deliberately
   does not. An unpaired agent leaves Caddy stopped, so a host nobody has finished installing does
-  not answer on 80 and 443. Never add a `depends_on: caddy` — the agent is what starts it, so
+  not answer on 80 and 443. Never add a `depends_on: caddy` - the agent is what starts it, so
   waiting on it deadlocks.
 
 ## Comments
 
-Terse. One line is the median here and three is already long — match that, in every language,
+Terse. One line is the median here and three is already long - match that, in every language,
 workflows and shell included. Explain *why*: a constraint, a gotcha, a decision that reads as a
 mistake without it. Never restate what the line does, and leave code that holds no surprise
 uncommented. Prefer tightening an existing comment to adding one beside it.
@@ -83,7 +83,7 @@ uncommented. Prefer tightening an existing comment to adding one beside it.
 
 Most settings live in the database, defined once in `apps/controller/src/lib/settings/registry.ts`.
 One definition carries the storage key, the environment variable it migrates from, validation, the
-default, and where it renders — the setup flow, the Settings page and the migration carry-over all
+default, and where it renders - the setup flow, the Settings page and the migration carry-over all
 read that list rather than repeating it. **A new user-facing setting is a registry entry, not a new
 environment variable.** Resolution is stored value → environment → default (`resolve.ts`).
 
@@ -94,7 +94,7 @@ whatever Compose reads on the host. The header comment on `registry.ts` lists wh
 ### When you do add, remove or rename one
 
 Never a one-file change. Update `.env.example` and the README's environment tables in the same
-commit as the code, and delete the entries when the variable goes away — a stale row is worse than
+commit as the code, and delete the entries when the variable goes away - a stale row is worse than
 a missing one, because it reads as supported.
 
 A variable the app reads must also be listed under `web.environment` in `docker-compose.yml` (or
@@ -103,7 +103,7 @@ A variable the app reads must also be listed under `web.environment` in `docker-
 development, silently ignored in production.
 
 Give Compose the real default, not `${VAR:-}`, for anything parsed as `Number(process.env.X ?? d)`
-— `??` does not catch the empty string that form produces, so the fallback lands as 0.
+- `??` does not catch the empty string that form produces, so the fallback lands as 0.
 
 ### The two optional containers
 
@@ -115,12 +115,12 @@ Analytics` and `Settings → GeoIP` drive it through `lib/agent/managed-services
 Two consequences to keep in mind when touching either:
 
 - **A credential those services need must reach Compose through the agent's child environment**, not
-  a generated env file — Compose reads the process environment at a higher precedence than any
+  a generated env file - Compose reads the process environment at a higher precedence than any
   `--env-file`, and a value passed that way needs no quoting. `MANAGED_SERVICE_ENV_KEYS` is the
   allowlist; widening it means the controller can set that variable on a spawned `docker`.
 - **Nothing in the base compose file may guard those services' variables with `${VAR:?}`.**
   Interpolation happens per file before Compose decides what to act on, so a `:?` fails every
-  invocation naming the project — including ones for unrelated services — on a deployment that
+  invocation naming the project - including ones for unrelated services - on a deployment that
   keeps the value in the database instead of `.env`.
 
 ## User-facing text
@@ -130,16 +130,16 @@ is the source catalog; adding a language is one more file there plus an entry in
 (`src/lib/locale.ts`), and nothing else.
 
 - Client components: `const t = useTranslations("<namespace>")`. Server components and route
-  handlers: `const t = await getTranslations("<namespace>")` — the hook throws outside a component.
+  handlers: `const t = await getTranslations("<namespace>")` - the hook throws outside a component.
 - Namespaces mirror the route or component folder (`waf`, `proxyHosts`, `settings`), with `common`,
   `nav`, `ui` and `passwordPolicy` shared across screens.
 - `src/types/next-intl.d.ts` types the keys off `en.json`, so a typo is a build error rather than a
-  key rendered to a user. That only works for literal keys — where a key is composed at runtime
+  key rendered to a user. That only works for literal keys - where a key is composed at runtime
   (a setting name, a validation code) a test asserts the catalog covers it instead. See
   `tests/unit/settings-messages.test.ts`.
 - **Never build a sentence by concatenation.** `` `${label} must be a number` `` cannot be
   translated, because not every language puts the subject first. Return a code and let the catalog
-  hold the whole sentence — `password-policy.ts`, the settings registry and `domain-error.ts` all
+  hold the whole sentence - `password-policy.ts`, the settings registry and `domain-error.ts` all
   do this, and their headers explain the shape.
 - Models raise `domainError("code")` rather than `new Error("sentence")`. They run for a server
   action, for `/api/v1/*` and for the agent's sync, and only the first has a reader with a language:
@@ -149,7 +149,7 @@ is the source catalog; adding a language is one more file there plus an entry in
 The locale is a cookie (`cpm-locale`), not a URL segment: `src/proxy.ts` authorizes on path
 prefixes, forward auth serves the portal on someone else's domain, and the REST API is versioned by
 path. With no cookie the locale is negotiated from `Accept-Language`, then refined on the client
-from `navigator.languages` — Chrome trims the header to one language, so the client sees choices the
+from `navigator.languages` - Chrome trims the header to one language, so the client sees choices the
 server cannot.
 
 Two things that are not obvious and will cost an afternoon:
@@ -160,7 +160,7 @@ Two things that are not obvious and will cost an afternoon:
 - **`<NextIntlClientProvider>` is given `locale` and `messages` explicitly.** next-intl documents
   them as optional in the App Router, but vinext runs RSC and SSR as separate Vite environments and
   the request config does not cross that boundary. Left to infer, the SSR pass throws and the page
-  500s with the RSC payload already correct — which makes it look like anything but the provider.
+  500s with the RSC payload already correct - which makes it look like anything but the provider.
 
 What stays in English: messages thrown before a request exists (`config.ts` validating
 `ADMIN_PASSWORD` at startup goes to the container log), and `/api/v1/*` responses, which are a
@@ -173,31 +173,31 @@ each test its own schema, and removes it afterwards; `TEST_POSTGRES_URL` points 
 own instead. Two constraints are not obvious from reading the suites:
 
 - **`mock.module` is global and leaks across files sharing a process.** The agent's tests run with
-  `--parallel` for that reason — a `node:fs` mock in one file was reaching every file that ran
+  `--parallel` for that reason - a `node:fs` mock in one file was reaching every file that ran
   after it. A test that passes alone and fails in the suite is this, not flake.
 - **Playwright specs run under Node, not Bun.** `bun:sqlite`, `Bun.password` and the rest are
   unavailable in `tests/e2e/**`. Anything needing them belongs in a script the spec spawns with
-  `bun` — see `tests/helpers/build-legacy-db.ts`.
+  `bun` - see `tests/helpers/build-legacy-db.ts`.
 
 <!-- ASTRYX:START -->
 Astryx v0.4.5 · 90+ components
 CLI: run every command as `bunx astryx <cmd>` (shown below as `astryx ...`).
 
-SETUP (once, in your app entry e.g. main.tsx) — without these, components render unstyled:
+SETUP (once, in your app entry e.g. main.tsx) - without these, components render unstyled:
   import "@astryxdesign/core/reset.css";
   import "@astryxdesign/core/astryx.css";
 
-WORKFLOW — discover, don't guess. Before writing UI:
-1. `astryx build "<idea>"` — START HERE: returns a kit (closest [page] + [block]s + [component]s). No args = full playbook.
-2. `astryx template <name> [--skeleton]` — scaffold the [page]/[block]s it named, or study their layout. Templates are reference code.
-3. `astryx component <Name>` — props + examples for every component you use.
+WORKFLOW - discover, don't guess. Before writing UI:
+1. `astryx build "<idea>"` - START HERE: returns a kit (closest [page] + [block]s + [component]s). No args = full playbook.
+2. `astryx template <name> [--skeleton]` - scaffold the [page]/[block]s it named, or study their layout. Templates are reference code.
+3. `astryx component <Name>` - props + examples for every component you use.
 
 RULES:
-- No <div> — components do all layout/spacing, page frame included.
-- Frame first: read `astryx docs layout` before writing any page or screen — page frame, region widths, breakpoint behavior.
+- No <div> - components do all layout/spacing, page frame included.
+- Frame first: read `astryx docs layout` before writing any page or screen - page frame, region widths, breakpoint behavior.
 - Dense data = rows (Table, List/Item), never Card-wrapped list items; Card is for standalone widgets. Status = StatusDot/Token; Badge = counts only.
 - Custom styling: component props first; else Tailwind utilities backed by tokens (bg-surface, text-primary, rounded-lg) via tailwind-theme.css. No raw hex/px.
-- Tokens for every value (`astryx docs tokens`). Brand/accent belongs in the theme (`astryx theme list` / `theme add <slug>`, or `astryx theme template` for a custom one) — never override --color-* in :root.
+- Tokens for every value (`astryx docs tokens`). Brand/accent belongs in the theme (`astryx theme list` / `theme add <slug>`, or `astryx theme template` for a custom one) - never override --color-* in :root.
 - SELF-CHECK before you finish: re-read the file and replace any style={{…}}, raw <div>/<span> layout, imported .css/@apply, or hardcoded/arbitrary value (e.g. bg-[#fff], p-[13px]) with the component or a token-backed utility. If unsure a component/prop exists, run `astryx component <Name>` / `astryx search "<thing>"`; don't hand-roll CSS.
 
 MORE CLI:
@@ -213,8 +213,8 @@ MORE CLI:
 
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+This version has breaking changes - APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+This block is written and re-added by `next dev` - verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->

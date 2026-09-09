@@ -7,8 +7,8 @@
  * upgrade and a bug report.
  *
  * And the field form, which exists because a URL has to encode its password and the Compose file
- * that builds one cannot. `openssl rand -base64 32` — what the .env.example tells operators to run
- * — emits `/` about half the time, and a `/` in a URL's password ends the authority early: the app
+ * that builds one cannot. `openssl rand -base64 32` - what the .env.example tells operators to run
+ * - emits `/` about half the time, and a `/` in a URL's password ends the authority early: the app
  * then tries to reach a host nobody configured. Fields have no delimiter to collide with, and the
  * tests below say so with the characters that actually broke it.
  */

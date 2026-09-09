@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The account step. Public by necessity — there is nothing to authenticate against yet — so the
+ * The account step. Public by necessity - there is nothing to authenticate against yet - so the
  * stage is re-checked here rather than trusted from the proxy, which lets this page through
  * unconditionally so an unconfigured instance can reach it.
  */
@@ -24,6 +24,6 @@ export default async function SetupPage() {
   }
 
   // A migration that left the old accounts behind lands here, and it looks exactly like a fresh
-  // install unless the page says otherwise — which reads as the migration having done nothing.
+  // install unless the page says otherwise - which reads as the migration having done nothing.
   return <SetupAccountClient migratedFrom={await getMigrationSource()} />;
 }

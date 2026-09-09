@@ -2,7 +2,7 @@
  * Migrating a real pre-3.0 SQLite database into PostgreSQL.
  *
  * The fixture is built by running the SQLite migrations every 3.0 deployment ran, then seeding it
- * the way that release would have — so this exercises the actual shapes an upgrade meets rather
+ * the way that release would have - so this exercises the actual shapes an upgrade meets rather
  * than a hand-written approximation of them.
  *
  * This is also where two tests deleted in the PostgreSQL move get their successors. They used to
@@ -26,7 +26,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const schemaModule = await import('@/src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('@/src/lib/db', () => ({
@@ -226,7 +226,7 @@ describe('import', () => {
 
   it('leaves the id sequences past the copied rows', async () => {
     // Without this, the first proxy host created after an upgrade is handed id 1 and dies on the
-    // primary key — the same failure the bootstrap admin caused before its sequence was resynced.
+    // primary key - the same failure the bootstrap admin caused before its sequence was resynced.
     await importLegacyDatabase(buildLegacyDatabase());
 
     const [created] = await ctx.db
@@ -302,7 +302,7 @@ describe('choosing what to migrate', () => {
 
   it('drops the rows that cannot exist without the user they belong to', async () => {
     // api_tokens.createdBy is not nullable. Blanking it is not an option, so the table goes with
-    // the users — and that is derived from the foreign key, not from a list.
+    // the users - and that is derived from the foreign key, not from a list.
     const report = await importLegacyDatabase(buildLegacyDatabase(), ['proxyHosts', 'settings']);
 
     expect(await ctx.db.select().from(schemaModule.apiTokens)).toHaveLength(0);
@@ -311,7 +311,7 @@ describe('choosing what to migrate', () => {
   });
 
   it('empties the ownership a migrated host had rather than failing on it', async () => {
-    // ownerUserId is provenance — nothing authorises against it — so a host that loses it is
+    // ownerUserId is provenance - nothing authorises against it - so a host that loses it is
     // still the host it was, and refusing the import over it would help nobody.
     const report = await importLegacyDatabase(buildLegacyDatabase(), ['proxyHosts']);
 
