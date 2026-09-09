@@ -240,6 +240,7 @@
     "noCustomModules": "No custom modules.",
     "rebuildCaddy": "Rebuild Caddy",
     "rebuildCouldNotStart": "Rebuild could not be started.",
+    "rebuildCouldNotStartHttp": "Rebuild could not be started (HTTP {status}).",
     "rebuildDescription": "Compiling Caddy takes several minutes. The proxy keeps serving on the current binary until the new one is ready, then restarts.",
     "rebuildFailedToStart": "Rebuild failed to start",
     "rebuildRequiredDescription": "Turning a module off stops this app from generating config for it right away. Removing it from the binary - and adding a new one - needs a rebuild, which restarts the proxy.",
