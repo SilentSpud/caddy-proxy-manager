@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { extractErrorMessage } from "@/src/lib/actions";
+import { getTranslations } from "next-intl/server";
+import { domainError } from "@/src/lib/domain-error";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { validateSettingsGroup } from "@/src/lib/settings-validation";
 import {
@@ -1617,10 +1620,11 @@ export async function rebuildCaddyAction(
     revalidatePath("/settings");
     return { success: true, message: status.message ?? "Rebuild triggered." };
   } catch (error) {
+    const t = await getTranslations();
     console.error("Failed to trigger a Caddy rebuild:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to trigger a Caddy rebuild",
+      message: extractErrorMessage(t, error, t("errors.rebuildCaddyFailed")),
     };
   }
 }
@@ -1631,7 +1635,7 @@ function parseCustomModules(raw: FormDataEntryValue | null): CaddyCustomModule[]
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("Custom modules could not be read. Try re-entering them.");
+    throw domainError("customModulesUnreadable");
   }
   if (!Array.isArray(parsed)) return [];
   return parsed as CaddyCustomModule[];

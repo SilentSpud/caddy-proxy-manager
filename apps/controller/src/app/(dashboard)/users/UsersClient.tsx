@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserCog, Trash2, Pencil, Ban, CheckCircle2, Plus } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -76,6 +77,8 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  // These actions used to fail silently: nothing caught them and nothing was shown.
+  const [error, setError] = useState<string | null>(null);
   const [createRole, setCreateRole] = useState<UserEntry["role"]>("user");
   const [createEmail, setCreateEmail] = useState("");
   const [createName, setCreateName] = useState("");
@@ -93,6 +96,8 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
   return (
     <VStack gap={6}>
       <PageHeader title={t("users")} description={t("pageDescription")} />
+
+      {error && <Banner status="error" title={t("errorTitle")} description={error} />}
 
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
         <SearchField
@@ -122,7 +127,12 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
           <form
             action={async (formData) => {
               formData.set("role", createRole);
-              await createUserAction(formData);
+              const result = await createUserAction(formData);
+              if (result.status === "error") {
+                setError(result.message ?? null);
+                return;
+              }
+              setError(null);
               setShowCreate(false);
               setCreateRole("user");
               setCreateEmail("");
@@ -200,6 +210,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
               <EditUserRow
                 user={user}
                 onClose={() => setEditUserId(null)}
+                onError={setError}
                 onSave={() => {
                   setEditUserId(null);
                   router.refresh();
@@ -209,6 +220,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
               <UserRow
                 user={user}
                 onEdit={() => setEditUserId(user.id)}
+                onError={setError}
                 onRefresh={() => router.refresh()}
               />
             )}
@@ -222,10 +234,12 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
 function UserRow({
   user,
   onEdit,
+  onError,
   onRefresh,
 }: {
   user: UserEntry;
   onEdit: () => void;
+  onError: (message: string | null) => void;
   onRefresh: () => void;
 }) {
   const t = useTranslations("users");
@@ -269,7 +283,9 @@ function UserRow({
               tooltip={t("enableUser")}
               icon={<CheckCircle2 />}
               onClick={async () => {
-                await updateUserStatusAction(user.id, "active");
+                const result = await updateUserStatusAction(user.id, "active");
+                if (result.status === "error") return onError(result.message ?? null);
+                onError(null);
                 onRefresh();
               }}
             />
@@ -306,12 +322,13 @@ function UserRow({
         }
         actionLabel={confirmKind === "delete" ? "Delete user" : "Disable user"}
         onAction={async () => {
-          if (confirmKind === "delete") {
-            await deleteUserAction(user.id);
-          } else {
-            await updateUserStatusAction(user.id, "disabled");
-          }
+          const result =
+            confirmKind === "delete"
+              ? await deleteUserAction(user.id)
+              : await updateUserStatusAction(user.id, "disabled");
           setConfirmKind(null);
+          if (result.status === "error") return onError(result.message ?? null);
+          onError(null);
           onRefresh();
         }}
       />
@@ -322,10 +339,12 @@ function UserRow({
 function EditUserRow({
   user,
   onClose,
+  onError,
   onSave,
 }: {
   user: UserEntry;
   onClose: () => void;
+  onError: (message: string | null) => void;
   onSave: () => void;
 }) {
   const t = useTranslations("users");
@@ -343,10 +362,13 @@ function EditUserRow({
       </HStack>
       <form
         action={async (formData) => {
-          await updateUserInfoAction(user.id, formData);
+          const info = await updateUserInfoAction(user.id, formData);
+          if (info.status === "error") return onError(info.message ?? null);
           if (role !== user.role) {
-            await updateUserRoleAction(user.id, role);
+            const roleResult = await updateUserRoleAction(user.id, role);
+            if (roleResult.status === "error") return onError(roleResult.message ?? null);
           }
+          onError(null);
           onSave();
         }}
       >

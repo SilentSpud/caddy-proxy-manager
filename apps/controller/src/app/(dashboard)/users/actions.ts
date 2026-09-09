@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/src/lib/auth";
+import { domainError } from "@/src/lib/domain-error";
 import {
   createUser,
   updateUserProfile,
@@ -13,15 +14,17 @@ import {
 import { logAuditEvent } from "@/src/lib/audit";
 import { config } from "@/src/lib/config";
 import { hashPassword } from "@/src/lib/password";
+import { getTranslations } from "next-intl/server";
+import { actionError, actionSuccess, type ActionState } from "@/src/lib/actions";
 
 const VALID_ROLES = new Set<User["role"]>(["admin", "user", "viewer"]);
 
-export async function createUserAction(formData: FormData) {
+async function createUserActionUntranslated(formData: FormData) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
   if (config.auth.disableLocalUsers) {
-    throw new Error("Local user creation is disabled. Users are provisioned by the OIDC provider.");
+    throw domainError("localUserCreationDisabled");
   }
 
   const email = String(formData.get("email") ?? "").trim();
@@ -33,7 +36,7 @@ export async function createUserAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    throw new Error("Email and password are required");
+    throw domainError("emailAndPasswordRequired");
   }
 
   const passwordHash = await hashPassword(password);
@@ -58,12 +61,12 @@ export async function createUserAction(formData: FormData) {
   revalidatePath("/users");
 }
 
-export async function updateUserRoleAction(userId: number, role: User["role"]) {
+async function updateUserRoleActionUntranslated(userId: number, role: User["role"]) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
   if (actorId === userId) {
-    throw new Error("Cannot change your own role");
+    throw domainError("cannotChangeOwnRole");
   }
 
   await updateUserRole(userId, role);
@@ -79,12 +82,12 @@ export async function updateUserRoleAction(userId: number, role: User["role"]) {
   revalidatePath("/users");
 }
 
-export async function updateUserStatusAction(userId: number, status: string) {
+async function updateUserStatusActionUntranslated(userId: number, status: string) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
   if (actorId === userId) {
-    throw new Error("Cannot change your own status");
+    throw domainError("cannotChangeOwnStatus");
   }
 
   await updateUserStatus(userId, status);
@@ -100,7 +103,7 @@ export async function updateUserStatusAction(userId: number, status: string) {
   revalidatePath("/users");
 }
 
-export async function updateUserInfoAction(userId: number, formData: FormData) {
+async function updateUserInfoActionUntranslated(userId: number, formData: FormData) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
@@ -120,12 +123,12 @@ export async function updateUserInfoAction(userId: number, formData: FormData) {
   revalidatePath("/users");
 }
 
-export async function deleteUserAction(userId: number) {
+async function deleteUserActionUntranslated(userId: number) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
   if (actorId === userId) {
-    throw new Error("Cannot delete your own account");
+    throw domainError("cannotDeleteOwnAccount");
   }
 
   await deleteUser(userId);
@@ -139,4 +142,71 @@ export async function deleteUserAction(userId: number) {
   });
 
   revalidatePath("/users");
+}
+
+/*
+ * Failures here used to reach the browser as an unhandled rejection and show the reader nothing.
+ * They return an ActionState now, translated on the server, which UsersClient renders - the same
+ * shape the proxy-host and L4 actions already use.
+ */
+
+export async function createUserAction(formData: FormData): Promise<ActionState> {
+  try {
+    await createUserActionUntranslated(formData);
+    return actionSuccess();
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("createUserAction failed:", error);
+    return actionError(t, error, t("errors.createUserFailed"));
+  }
+}
+
+export async function updateUserRoleAction(
+  userId: number,
+  role: User["role"],
+): Promise<ActionState> {
+  try {
+    await updateUserRoleActionUntranslated(userId, role);
+    return actionSuccess();
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("updateUserRoleAction failed:", error);
+    return actionError(t, error, t("errors.updateUserRoleFailed"));
+  }
+}
+
+export async function updateUserStatusAction(userId: number, status: string): Promise<ActionState> {
+  try {
+    await updateUserStatusActionUntranslated(userId, status);
+    return actionSuccess();
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("updateUserStatusAction failed:", error);
+    return actionError(t, error, t("errors.updateUserStatusFailed"));
+  }
+}
+
+export async function updateUserInfoAction(
+  userId: number,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    await updateUserInfoActionUntranslated(userId, formData);
+    return actionSuccess();
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("updateUserInfoAction failed:", error);
+    return actionError(t, error, t("errors.updateUserInfoFailed"));
+  }
+}
+
+export async function deleteUserAction(userId: number): Promise<ActionState> {
+  try {
+    await deleteUserActionUntranslated(userId);
+    return actionSuccess();
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("deleteUserAction failed:", error);
+    return actionError(t, error, t("errors.deleteUserFailed"));
+  }
 }

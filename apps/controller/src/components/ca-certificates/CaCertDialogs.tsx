@@ -131,7 +131,7 @@ export function IssueClientCertDialog({
         });
         router.refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to issue certificate");
+        setError(e instanceof Error ? e.message : t("issueFailed"));
       }
     });
   }
@@ -273,7 +273,7 @@ export function ManageIssuedClientCertsDialog({
         );
         router.refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to revoke certificate");
+        setError(e instanceof Error ? e.message : t("revokeFailed"));
       }
     });
   }

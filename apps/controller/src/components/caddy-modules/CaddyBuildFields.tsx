@@ -201,12 +201,12 @@ export function CaddyBuildFields({
         // Not left to the status poll: these failures abort before the agent writes any status,
         // and the poll only runs while it says pending/building - the spinner would just stop.
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        setRebuildError(body?.error ?? `Rebuild could not be started (HTTP ${res.status}).`);
+        setRebuildError(body?.error ?? t("rebuildCouldNotStartHttp", { status: res.status }));
         return;
       }
       await fetchStatus();
     } catch (error) {
-      setRebuildError(error instanceof Error ? error.message : "Rebuild could not be started.");
+      setRebuildError(error instanceof Error ? error.message : t("rebuildCouldNotStart"));
     } finally {
       setRebuilding(false);
     }
