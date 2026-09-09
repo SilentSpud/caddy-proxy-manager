@@ -5,28 +5,25 @@ sidebar:
   order: 2
 ---
 
-One compose file and one `.env`.
+One compose file and two generated secrets. Everything else is entered in the browser.
 
 ```bash
 git clone https://github.com/SilentSpud/caddy-proxy-manager.git
 cd caddy-proxy-manager
-cp .env.example .env
+
+echo "SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
+chmod 600 .env
 ```
 
-## Fill in the two required values
+That is the whole file. Those two are the only variables Compose has no default for — it declares
+them `${SESSION_SECRET:?}` and `${POSTGRES_PASSWORD:?}` and refuses to start rather than come up on
+something guessable — so they are generated rather than chosen, and nothing you would have had to
+think of ends up in the file.
 
-`.env.example` documents everything, but only two lines have no default:
-
-```bash
-# Unique per instance. Generate with: openssl rand -base64 32
-SESSION_SECRET=
-
-# The bundled PostgreSQL, or your own server
-POSTGRES_PASSWORD=
-```
-
-`SESSION_SECRET` encrypts the secrets in the database. Changing it later makes every stored
-credential unreadable, so generate it once and keep it.
+`SESSION_SECRET` is also the key every secret in the database is encrypted under: DNS provider
+credentials, imported private keys, agent secrets. It cannot live in the thing it encrypts, and
+changing it later makes all of them unreadable. Generate it once and keep it.
 
 ## Start it
 
@@ -38,6 +35,25 @@ The dashboard is on port 3000. Caddy itself does not start yet — it sits behin
 and the agent starts it once the two are paired, which happens during [first run](../first-run/).
 An unpaired host answering 80 and 443 with a default page would be worse than one not listening at
 all.
+
+## Configure it in the browser
+
+Everything else is a field on the [first run](../first-run/) setup page, and afterwards on
+Settings: the base URL, OAuth, analytics, GeoIP, the dashboard host. Those values are stored in the
+database rather than in a file, encrypted at rest where they are secrets, and they win over
+anything `.env` says.
+
+Prefer that over writing variables by hand, for reasons the file cannot match. Setup makes you sign
+in before the rest of the configuration is entered, so a mistyped password is found immediately
+rather than at the end. It shows the exact OAuth callback URL to register, which is derived and not
+guessable. And a credential saved there is handed to `docker compose` in the environment of the
+command the agent runs, instead of sitting in plaintext on the host for as long as the file exists.
+
+`.env.example` is the reference for everything else — every variable that exists, what it defaults
+to, and whether Settings owns it. Read it when you need something setup does not cover: a
+PostgreSQL server other than the bundled one, a larger connection pool, a private CA for the agent,
+a deployment with no agent at all. Append the one line you need; there is no reason to carry the
+rest.
 
 ## Ports
 
@@ -56,3 +72,23 @@ docker compose up -d
 
 Settings reports when a newer release is published to the registry you pull from. That check is the
 only request the app makes to the internet on its own, and it can be switched off.
+
+## The legacy method
+
+Before 3.0 the configuration lived in `.env`, and installing meant copying the whole reference over
+and editing it:
+
+```bash
+cp .env.example .env
+```
+
+It still works. Resolution order is stored value → `.env` → built-in default, so a variable set
+there is honoured and still beats the default — it is only overridden once the same setting is
+saved in the app, at which point the line can be deleted.
+
+But it is no longer the shape of a new install. Most settings now live in the database, so a copied
+`.env.example` is mostly commented-out lines that duplicate what the setup page will ask you for
+anyway, and every secret written into it is a plaintext copy that the Settings path would not have
+made. Use it when you are provisioning unattended and there is no browser to reach the setup page
+in — setting both `ADMIN_USERNAME` and `ADMIN_PASSWORD` seeds an administrator at startup and skips
+the flow entirely.

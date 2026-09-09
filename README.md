@@ -27,11 +27,13 @@ This project provides a web UI for Caddy Server, eliminating the need to manuall
 ```bash
 git clone https://github.com/silentspud/caddy-proxy-manager.git
 cd caddy-proxy-manager
-cp .env.example .env
 
-# The only two values a fresh install has to have
+# The only two values a fresh install has to have. That is the whole .env --
+# everything else is entered in the browser on first run. See .env.example for
+# the variables that exist, when you need one setup does not cover.
 echo "SESSION_SECRET=$(openssl rand -base64 32)" >> .env
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
+chmod 600 .env
 
 docker compose up -d
 ```
