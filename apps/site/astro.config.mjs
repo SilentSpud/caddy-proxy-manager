@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
+import starlightRosePine from "starlight-theme-rose-pine";
 
 /**
  * Absolute path inside the controller workspace, for the aliases below.
@@ -38,7 +39,23 @@ export default defineConfig({
       editLink: {
         baseUrl: "https://github.com/SilentSpud/caddy-proxy-manager/edit/main/apps/site/",
       },
-      customCss: ["./src/styles/theme.css", "./src/styles/demo.css"],
+      /*
+       * The palette. Rosé Pine restates Starlight's accent and grey ramps, which is where almost
+       * all of the site's colour comes from, so the theme carries the brand on its own and the
+       * hand-written override file it replaced is gone.
+       *
+       * `iris` is the accent nearest the indigo the old site used, and it is the same accent in
+       * both modes so the brand does not change with the reader's setting. The flavours are the
+       * defaults, named here because they are the choice worth seeing: `main` for dark, `dawn`
+       * for light.
+       */
+      plugins: [
+        starlightRosePine({
+          dark: { flavor: "main", accent: "iris" },
+          light: { flavor: "dawn", accent: "iris" },
+        }),
+      ],
+      customCss: ["./src/styles/demo.css"],
       // Written out rather than generated from the directory: the order these appear in is the
       // order someone new should meet them, which is not alphabetical and not the order the files
       // happen to sit in.
