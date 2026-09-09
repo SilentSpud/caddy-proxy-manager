@@ -2,8 +2,8 @@
 import { fileURLToPath } from "node:url";
 import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
+import catppuccin from "@catppuccin/starlight";
 import { defineConfig } from "astro/config";
-import starlightRosePine from "starlight-theme-rose-pine";
 
 /**
  * Absolute path inside the controller workspace, for the aliases below.
@@ -51,19 +51,28 @@ export default defineConfig({
         baseUrl: "https://github.com/SilentSpud/caddy-proxy-manager/edit/main/apps/site/",
       },
       /*
-       * The palette. Rosé Pine restates Starlight's accent and grey ramps, which is where almost
+       * The palette. Catppuccin restates Starlight's accent and grey ramps, which is where almost
        * all of the site's colour comes from, so the theme carries the brand on its own and the
        * hand-written override file it replaced is gone.
        *
-       * `iris` is the accent nearest the indigo the old site used, and it is the same accent in
-       * both modes so the brand does not change with the reader's setting. The flavours are the
-       * defaults, named here because they are the choice worth seeing: `main` for dark, `dawn`
-       * for light.
+       * `lavender` is the accent nearest the indigo the old site used, and it is the same accent
+       * in both modes so the brand does not change with the reader's setting. `mocha` is the
+       * darkest of the three dark flavours; `latte` is the only light one.
+       *
+       * The plugin appends its stylesheets to `customCss` rather than replacing it, so demo.css
+       * below is loaded first. That is the right way round: demo.css only ever reads --sl-color-*,
+       * so it wants the theme's definitions to land after it.
+       *
+       * It also depends on `@astrojs/starlight` outright rather than as a peer, and ships its
+       * entry as TypeScript source. Left alone that pulls a second, older Starlight into the tree
+       * and `bun run typecheck` follows the import into its uncompiled internals, which reference
+       * virtual modules that only exist for this app's own copy. The `overrides` entry in the root
+       * package.json pins one version, which is why it is there.
        */
       plugins: [
-        starlightRosePine({
-          dark: { flavor: "main", accent: "iris" },
-          light: { flavor: "dawn", accent: "iris" },
+        catppuccin({
+          dark: { flavor: "mocha", accent: "lavender" },
+          light: { flavor: "latte", accent: "lavender" },
         }),
       ],
       customCss: ["./src/styles/demo.css"],

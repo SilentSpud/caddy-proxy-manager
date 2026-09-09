@@ -55,6 +55,9 @@
     "@types/bun": "^1.4.1",
     "typescript": "^7.0.2"
   },
+  "overrides": {
+    "@astrojs/starlight": "0.42.0"
+  },
   "trustedDependencies": [
     "@astryxdesign/core",
     "@tree-sitter-grammars/tree-sitter-yaml",
