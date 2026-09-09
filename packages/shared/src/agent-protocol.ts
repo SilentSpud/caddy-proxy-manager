@@ -6,7 +6,7 @@
  * different source trees and a rename that reaches only one of them fails at runtime rather than
  * at compile time.
  *
- * Request authentication is HMAC-SHA256 over a canonical string, not a bearer token — see
+ * Request authentication is HMAC-SHA256 over a canonical string, not a bearer token - see
  * `signatureBase`. The secret is minted by the controller at pairing and never travels with a
  * request.
  */
@@ -36,7 +36,7 @@ export const AGENT_CLOCK_SKEW_MS = 60_000;
  * The exact bytes both sides sign. Newline-separated with a fixed field count, so no combination
  * of path and body can be made to produce another request's base string.
  *
- * `bodyHash` is the hex SHA-256 of the raw body — of the empty string when there is none — which
+ * `bodyHash` is the hex SHA-256 of the raw body - of the empty string when there is none - which
  * keeps the signature over the body without making the signer buffer it twice.
  */
 export function signatureBase(
@@ -80,7 +80,7 @@ export type ManagedServicesStatus = AgentOperationStatus<ManagedServicesState>;
  *
  * Both sit behind a compose profile, which is why they need an agent at all: a profile is decided
  * when the operator runs `docker compose up`, so nothing inside the stack can turn one on. The
- * agent runs the compose CLI, so it can — see `ManagedServicesRequest`.
+ * agent runs the compose CLI, so it can - see `ManagedServicesRequest`.
  */
 export const MANAGED_SERVICES = ["clickhouse", "geoipupdate"] as const;
 export type ManagedServiceName = (typeof MANAGED_SERVICES)[number];
@@ -115,7 +115,7 @@ export type AgentStatus = {
   caddyBuild: {
     /**
      * xcaddy `--with` specs the running binary was actually built with, or null when this agent
-     * has never rebuilt it — which the controller reads as the shipped image's full catalog. An
+     * has never rebuilt it - which the controller reads as the shipped image's full catalog. An
      * empty array is a different and much worse claim: "built with no plugins at all".
      */
     applied: string[] | null;
@@ -228,7 +228,7 @@ export type FleetConfig = {
    *
    * The controller holds the subscription and the files; agents reach them through it rather than
    * each host holding a licence key of its own. Pulled rather than pushed because these are tens
-   * of megabytes — the only route in the protocol that runs agent-to-controller, and the reason
+   * of megabytes - the only route in the protocol that runs agent-to-controller, and the reason
    * `AGENT_ID_HEADER` exists.
    *
    * `url` must be an address the agent can reach, which for a remote agent means the controller's
@@ -293,11 +293,11 @@ export type AgentErrorCode =
 //
 // Only one direction actually needed inventing. The agent can always dial out, so its status and
 // command results are plain POSTs; what the controller cannot do is call in, so everything it needs
-// to push — desired state, and the Caddy admin calls it blocks on — goes down one long-lived
+// to push - desired state, and the Caddy admin calls it blocks on - goes down one long-lived
 // Server-Sent Events stream the agent holds open. That keeps the whole surface inside ordinary
 // route handlers, which is why dev and the compiled server behave identically.
 //
-// `AGENT_ROUTES` above are the agent's own, and are now local control only — nothing on the
+// `AGENT_ROUTES` above are the agent's own, and are now local control only - nothing on the
 // network calls them.
 
 /** Path prefix for everything an agent calls on its controller. */
@@ -307,8 +307,8 @@ export const CONTROLLER_AGENT_ROUTES = {
   /**
    * Unauthenticated, and deliberately not GraphQL.
    *
-   * Pairing runs before there is a secret, and the secret is what every signed call — including
-   * every GraphQL one — depends on. A chicken-and-egg exchange does not belong behind the door it
+   * Pairing runs before there is a secret, and the secret is what every signed call - including
+   * every GraphQL one - depends on. A chicken-and-egg exchange does not belong behind the door it
    * is producing the key for.
    */
   pair: `${CONTROLLER_AGENT_API_PREFIX}/pair`,
@@ -316,7 +316,7 @@ export const CONTROLLER_AGENT_ROUTES = {
    * Everything else: the event subscription, the status report and the command results.
    *
    * One endpoint, because that is how GraphQL works. The agent opens a `subscription` here and
-   * holds it open — delivered as SSE, read with `fetch` rather than `EventSource` because this is
+   * holds it open - delivered as SSE, read with `fetch` rather than `EventSource` because this is
    * Bun and not a browser, so the request carries the same signature headers as every other call
    * and needs no token in a query string. Its reports go to the same URL as mutations.
    */
@@ -358,8 +358,8 @@ export const AGENT_STATUS_HEARTBEAT_MS = 60_000;
 /**
  * Filename of the bootstrap token the controller leaves on a shared data volume.
  *
- * Named here because both sides open the same file under different mounts — the controller writes
- * it under its data directory, the agent reads it under `DATA_DIR` — and a rename that reached only
+ * Named here because both sides open the same file under different mounts - the controller writes
+ * it under its data directory, the agent reads it under `DATA_DIR` - and a rename that reached only
  * one of them would silently stop the bundled stack pairing itself, with no error anywhere.
  *
  * Only meaningful for an agent sharing the controller's volume, which means the same host. A remote
@@ -395,7 +395,7 @@ export type AgentPairResponse = {
 /**
  * What the agent should have, pushed whenever it changes and once when the stream opens.
  *
- * Absolute, never incremental — the agent diffs it against its own applied state and acts only on
+ * Absolute, never incremental - the agent diffs it against its own applied state and acts only on
  * a difference, which is what makes a dropped stream cost nothing but the reconnect.
  */
 export type AgentDesiredState = {
@@ -444,7 +444,7 @@ export type AgentServerEvent =
    * telling either end. This used to be an SSE comment frame, which only worked because the
    * controller was writing the frames itself; as a GraphQL subscription the transport belongs to
    * the server library, so the keepalive has to be part of the protocol rather than under it.
-   * The agent ignores it — receiving it is the entire point.
+   * The agent ignores it - receiving it is the entire point.
    */
   | { type: "ping" };
 
@@ -503,6 +503,6 @@ export type AgentLocalPairRequest = {
 export type AgentLocalPairResponse = {
   ok: boolean;
   state: AgentLocalState;
-  /** Set when `ok` is false. Already a sentence, and already English — this goes to a terminal. */
+  /** Set when `ok` is false. Already a sentence, and already English - this goes to a terminal. */
   error?: string;
 };

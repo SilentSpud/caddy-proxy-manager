@@ -1,5 +1,5 @@
 /**
- * Turning a per-host Caddyfile snippet into JSON handlers. The translation is Caddy's own —
+ * Turning a per-host Caddyfile snippet into JSON handlers. The translation is Caddy's own -
  * `/adapt` on the admin API, so the running binary with its actual plugin set does the parsing; a
  * hand-rolled parser would drift and accept directives for plugins that are not compiled in.
  */
@@ -26,7 +26,7 @@ export class CaddyfileAdaptError extends Error {
 }
 
 /**
- * Caddy's adapter needs a complete Caddyfile, so the snippet is wrapped in a `:80` site block —
+ * Caddy's adapter needs a complete Caddyfile, so the snippet is wrapped in a `:80` site block -
  * that address produces no host matcher, and this app supplies host matching when it nests them.
  */
 function wrapSnippet(snippet: string): string {
@@ -55,7 +55,7 @@ export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCad
     method: "POST",
     body: wrapSnippet(trimmed),
     contentType: "text/caddyfile",
-    // Adaptation is pure parsing — no answer in ten seconds means something is wrong with the
+    // Adaptation is pure parsing - no answer in ten seconds means something is wrong with the
     // admin endpoint, not with the snippet.
     timeoutMs: 10_000,
   });
@@ -118,7 +118,7 @@ export async function validateCaddyfileSnippet(snippet: string): Promise<string 
     return null;
   } catch (error) {
     if (error instanceof CaddyfileAdaptError) return error.message;
-    // A transport failure is not the operator's fault and must not read as a syntax error — let
+    // A transport failure is not the operator's fault and must not read as a syntax error - let
     // the save through and let the config build warn.
     console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
     return null;

@@ -81,7 +81,7 @@ function parseL4LoadBalancerConfig(formData: FormData): Partial<L4LoadBalancerCo
   const result: Partial<L4LoadBalancerConfig> = {};
   if (enabled !== undefined) result.enabled = enabled;
   if (policy) result.policy = policy;
-  // Presence, not value — see parseLoadBalancerConfig in the proxy-hosts actions: gating on the
+  // Presence, not value - see parseLoadBalancerConfig in the proxy-hosts actions: gating on the
   // value made an emptied box indistinguishable from a field the form never rendered, so nothing
   // here could be cleared once set.
   //

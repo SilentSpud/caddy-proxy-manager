@@ -1,6 +1,6 @@
 /**
  * The auth-key check. Every branch maps to a different thing the operator has to go and fix, so
- * the point of these is that the reasons stay distinguishable — a single "validation failed" would
+ * the point of these is that the reasons stay distinguishable - a single "validation failed" would
  * send someone to the Tailscale console when the problem is their API token, or vice versa.
  */
 import { describe, it, expect } from 'bun:test';
@@ -43,7 +43,7 @@ describe('tailscaleKeyId', () => {
   });
 
   it('returns null for anything without that shape', () => {
-    // Null means "cannot check", never "invalid" — the format is not a documented contract, and
+    // Null means "cannot check", never "invalid" - the format is not a documented contract, and
     // an older key or a Headscale one is perfectly usable without an id.
     expect(tailscaleKeyId('tskey-abcdef1432341818')).toBeNull();
     expect(tailscaleKeyId('{env.TS_AUTHKEY}')).toBeNull();

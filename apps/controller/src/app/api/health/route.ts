@@ -10,7 +10,7 @@ import { MAX_NONCE_LENGTH, PROBE_PARAM, signProbe } from "@/src/lib/reachability
  * `src/lib/reachability-probe.ts`.
  *
  * Public, like the rest of this route: the probe is made through Caddy from outside any session,
- * and the signature reveals nothing — it is an HMAC of a nonce the caller already chose, and
+ * and the signature reveals nothing - it is an HMAC of a nonce the caller already chose, and
  * cannot be worked backwards into the secret.
  */
 export async function GET(request: Request) {

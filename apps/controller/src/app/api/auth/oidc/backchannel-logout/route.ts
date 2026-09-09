@@ -5,7 +5,7 @@
  *
  *   https://<cpm>/api/auth/oidc/backchannel-logout
  *
- * One URL serves every configured provider — the token names its issuer, and that is what selects
+ * One URL serves every configured provider - the token names its issuer, and that is what selects
  * the provider whose client id and signing keys it is then checked against.
  *
  * There is deliberately no CSRF or same-origin check here. The caller is the IdP's own server, not
@@ -31,7 +31,7 @@ function ok(): NextResponse {
 
 /**
  * §2.8: a failure is a 400 carrying a JSON `error`/`error_description`. The description names the
- * check that failed — this endpoint is configured by hand against a provider nobody can debug from
+ * check that failed - this endpoint is configured by hand against a provider nobody can debug from
  * here, and "invalid_request" alone would make every misconfiguration look identical.
  */
 function bad(description: string): NextResponse {
@@ -44,7 +44,7 @@ function bad(description: string): NextResponse {
 /**
  * Whether a provider row is the one that signed this token.
  *
- * Exact equality, the same comparison `jwtVerify` makes — an issuer identifier is compared as a
+ * Exact equality, the same comparison `jwtVerify` makes - an issuer identifier is compared as a
  * string (OIDC Core §2), and a trailing slash is part of it. Matching leniently here and strictly
  * a few lines later would mean two different answers to "is this the right issuer" in one request,
  * and the operator would see a JOSE error code where the real fault is a mistyped issuer.
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   }
   if (!token) return bad("no logout_token was supplied");
 
-  // The issuer is read unverified only to pick which provider to verify against — every claim is
+  // The issuer is read unverified only to pick which provider to verify against - every claim is
   // checked again, against that provider's configuration, inside verifyLogoutToken.
   const claimedIssuer = unverifiedIssuer(token);
   if (!claimedIssuer) return bad("the logout_token is not a JWT with an iss claim");
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   const providers = enabled.filter((provider) => issuedBy(provider, claimedIssuer));
   if (providers.length === 0) {
     // The mismatch is almost always a configured issuer that differs from the one the IdP sends by
-    // a trailing slash. Name both in the log, where only the operator sees them — the response
+    // a trailing slash. Name both in the log, where only the operator sees them - the response
     // stays vague because this endpoint answers anyone who can reach it.
     console.warn(
       `[backchannel-logout] No enabled provider has issuer "${claimedIssuer}". Configured: ${
@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
     return bad("no enabled provider is configured for that issuer");
   }
 
-  // More than one provider can share an issuer — two client registrations against the same
-  // Keycloak realm, say — so the token is offered to each until one accepts it by audience.
+  // More than one provider can share an issuer - two client registrations against the same
+  // Keycloak realm, say - so the token is offered to each until one accepts it by audience.
   let failure = "the logout_token could not be verified";
   for (const provider of providers) {
     const result = await verifyLogoutToken(token, provider);

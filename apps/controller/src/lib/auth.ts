@@ -68,7 +68,7 @@ export async function auth(req?: NextRequest): Promise<Session | null> {
   };
 }
 
-/** Alias for auth() — get the current session on the server. */
+/** Alias for auth() - get the current session on the server. */
 export async function getSession(): Promise<Session | null> {
   return auth();
 }
@@ -113,7 +113,7 @@ export async function requireAdmin(): Promise<Session> {
  * Require a role that manages something: an admin, or an operator with grants.
  *
  * Separate from `requireAdmin` because the two answer different questions. This one gates a page
- * an operator is allowed to open — the host list, the agent list — and what they actually see on
+ * an operator is allowed to open - the host list, the agent list - and what they actually see on
  * it is decided per resource by `lib/permissions.ts`. Everything global stays on `requireAdmin`.
  */
 export async function requireManager(): Promise<Session> {
@@ -147,7 +147,7 @@ export function checkSameOrigin(request: NextRequest): NextResponse | null {
     const originHost = new URL(origin).host;
     if (originHost === host) return null;
   } catch {
-    // unparseable origin — treat as mismatch
+    // unparseable origin - treat as mismatch
   }
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }

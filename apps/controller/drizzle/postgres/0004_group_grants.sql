@@ -1,7 +1,7 @@
 -- Groups can be mapped from an IdP by name, and granted management of specific hosts and agents.
 --
 -- Entirely additive. Both tables start empty, and a grant only widens what the new `operator` role
--- can reach — an admin, user or viewer is unaffected by every row in here, so no existing user's
+-- can reach - an admin, user or viewer is unaffected by every row in here, so no existing user's
 -- access changes on upgrade. Nobody becomes an operator until someone sets that role by hand.
 ALTER TABLE "oauth_providers" ADD COLUMN IF NOT EXISTS "operatorGroup" text;
 --> statement-breakpoint

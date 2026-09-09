@@ -5,13 +5,13 @@
  *
  * The textarea is transparent apart from its caret, and sits exactly on top of a `<pre>` rendering
  * the same text as coloured spans. So selection, undo, spellcheck-off, IME, form submission and
- * every keyboard convention are the browser's own — the only thing this component adds is colour,
+ * every keyboard convention are the browser's own - the only thing this component adds is colour,
  * line numbers and an indent key.
  *
  * The two layers agree because they share one box: identical font, padding and wrapping, computed
  * once in `textLayer` below. Change one and change the other, or the colours drift off the glyphs.
  *
- * Colours and tokens come from Astryx — `tokenize` for the languages it knows, the syntax tokens
+ * Colours and tokens come from Astryx - `tokenize` for the languages it knows, the syntax tokens
  * for the palette, so a code field matches a `<CodeBlock>` rendered beside it.
  */
 
@@ -148,7 +148,7 @@ export function CodeEditor({
   /**
    * Where the caret has to end up once the indent below has been through the parent's state and
    * come back as a new `value`. Writing a textarea's value moves its caret to the end, so anything
-   * that edits the text for the typist has to put it back — and only after React has committed,
+   * that edits the text for the typist has to put it back - and only after React has committed,
    * which is why this is a layout effect and not a callback.
    */
   const pendingCaret = useRef<number | null>(null);
@@ -162,7 +162,7 @@ export function CodeEditor({
   });
 
   /**
-   * Tab indents rather than moving focus, which is what anyone typing a config expects — Escape
+   * Tab indents rather than moving focus, which is what anyone typing a config expects - Escape
    * first, then Tab, leaves the field, so the form is still reachable from the keyboard alone.
    * `aria-keyshortcuts` and the hint under the label are what say so.
    */

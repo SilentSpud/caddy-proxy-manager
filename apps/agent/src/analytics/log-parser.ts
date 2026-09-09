@@ -2,7 +2,7 @@
  * Caddy's access log, turned into analytics rows.
  *
  * This runs on the agent rather than the controller because the log is a file on *this* host: a
- * controller elsewhere cannot read it at all. Moved here verbatim apart from its two seams — the
+ * controller elsewhere cannot read it at all. Moved here verbatim apart from its two seams - the
  * parse offset now lives in the agent's own SQLite, and the rows go straight to ClickHouse with
  * credentials the controller pushed.
  */
@@ -29,7 +29,7 @@ export function accessLogPresent(): boolean {
   return existsSync(LOG_FILE);
 }
 
-// GeoIP reader — null if mmdb not available
+// GeoIP reader - null if mmdb not available
 let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
 const geoCache = new Map<string, string | null>();
 

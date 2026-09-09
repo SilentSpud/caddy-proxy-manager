@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 /**
  * WorldMapInner imports maplibre-gl's tile worker with `?worker&url` and hands the chunk to
  * setWorkerUrl(), since the worker's own `import.meta.url` lookup does not survive bundling. These
- * fail loudly if an upgrade renames the entry — otherwise a blank map.
+ * fail loudly if an upgrade renames the entry - otherwise a blank map.
  */
 
 const require = createRequire(import.meta.url);
@@ -27,7 +27,7 @@ describe('maplibre worker wiring', () => {
   });
 
   it('imports that worker through Vite so its sibling chunks get bundled in', () => {
-    // The worker is not self-contained — it imports ./maplibre-gl-shared.mjs,
+    // The worker is not self-contained - it imports ./maplibre-gl-shared.mjs,
     // which a bare `?url` copy of the entry alone would 404 on.
     expect(readFileSync(require.resolve(WORKER_SPECIFIER), 'utf8')).toContain(
       './maplibre-gl-shared.mjs',
@@ -45,7 +45,7 @@ describe('maplibre worker wiring', () => {
   it('builds workers as ES modules, which maplibre requires', () => {
     // maplibre spawns the worker itself, as a module worker. Vite's build
     // default is iife, which that spawn would reject, so the config has to
-    // override it — if maplibre ever drops `type: "module"` this test says so.
+    // override it - if maplibre ever drops `type: "module"` this test says so.
     const maplibre = readFileSync(require.resolve('maplibre-gl/dist/maplibre-gl.mjs'), 'utf8');
     expect(maplibre.replace(/`/g, '"')).toContain('new Worker(e,{type:"module"})');
 

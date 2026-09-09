@@ -226,7 +226,7 @@ export function EditHostDialog({
   onClose: () => void;
   certificates: CertificatePickerOption[];
   accessLists: AccessList[];
-  // Required, matching CreateHostDialog — see AuthentikFields (#232).
+  // Required, matching CreateHostDialog - see AuthentikFields (#232).
   authentikDefaults: AuthentikSettings | null;
   caCertificates?: CaCertificate[];
   mtlsRoles?: MtlsRole[];

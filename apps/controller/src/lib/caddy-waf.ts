@@ -8,9 +8,9 @@ import type { WafHostConfig } from "./models/proxy-hosts";
 
 /**
  * Coraza refuses to build a WAF whose request body limit exceeds 1 GiB
- * (internal/corazawaf/waf.go — "request body limit should be at most 1GiB").
+ * (internal/corazawaf/waf.go - "request body limit should be at most 1GiB").
  * coraza-caddy constructs its WAF while Caddy is loading the config, so a
- * single out-of-range value makes Caddy reject the ENTIRE config document —
+ * single out-of-range value makes Caddy reject the ENTIRE config document -
  * every host goes unapplied, not just the offending one. Never emit a value
  * above this.
  */
@@ -47,7 +47,7 @@ export function bodyLimitRangeMessage(label: string): string {
 
 /**
  * The settings are stored in bytes (what SecLang takes), but the forms ask for
- * MiB — nobody sizes an upload limit in bytes. Anything finer stays reachable
+ * MiB - nobody sizes an upload limit in bytes. Anything finer stays reachable
  * through the custom directives.
  */
 export const BYTES_PER_MIB = 1_048_576;
@@ -58,7 +58,7 @@ export function bytesToMib(bytes: number | undefined): string {
   return typeof bytes === "number" && bytes > 0 ? String(Math.round(bytes / BYTES_PER_MIB)) : "";
 }
 
-/** Parses a MiB form field into bytes. Blank means "unset — inherit the default". */
+/** Parses a MiB form field into bytes. Blank means "unset - inherit the default". */
 export function parseBodyLimitMib(raw: unknown, label: string): number | undefined {
   if (typeof raw !== "string" || !raw.trim()) return undefined;
   const mib = Number(raw.trim());
@@ -123,7 +123,7 @@ export function resolveEffectiveWaf(
   }
 
   // Merge mode: start with global, overlay host fields.
-  // host.enabled === false is an explicit opt-out — respect it even when global is on.
+  // host.enabled === false is an explicit opt-out - respect it even when global is on.
   if (host && global) {
     if (host.enabled === false) return null;
     return {
@@ -169,7 +169,7 @@ export const WEBSOCKET_UPGRADE_MATCHER: Record<string, unknown> = {
 
 /**
  * Builds the Caddy `waf` handler. @-prefixed SecLang paths resolve from the embedded
- * coraza-coreruleset filesystem, mounted only when `load_owasp_crs` is true — so every @-include
+ * coraza-coreruleset filesystem, mounted only when `load_owasp_crs` is true - so every @-include
  * is gated on that flag, or the config load fails.
  */
 export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
@@ -210,7 +210,7 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     "SecAuditLog /logs/waf-audit.log",
     "SecAuditLogFormat JSON",
     // The audit log is caddy-owned mode 0644, so web can read but not truncate it, and the 0022
-    // umask defeats SecAuditLogFileMode — waf-log-parser treats truncation as best-effort. Part H
+    // umask defeats SecAuditLogFileMode - waf-log-parser treats truncation as best-effort. Part H
     // carries the matched rules; bodies (I, J, E) and headers (D) are omitted to avoid huge writes.
     "SecAuditLogParts ABFHZ",
     "SecResponseBodyAccess Off",
@@ -252,7 +252,7 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
       if (!trimmed || trimmed.startsWith("#")) return true;
       // Reject Include directives (prevents file inclusion from container filesystem)
       if (/^Include\s/i.test(trimmed)) return false;
-      // Body limits are allowed, but only inside the range Coraza accepts —
+      // Body limits are allowed, but only inside the range Coraza accepts -
       // an out-of-range value would make Caddy reject the whole config
       // document. Input validation reports these; dropping here is the net.
       // (SecRequestBodyNoFilesLimit parses but is not enforced by Coraza:
@@ -289,7 +289,7 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
  * not just this handler's.
  *
  * Coraza validates the FINAL parsed values, so only the last directive of each
- * kind matters. When they conflict, append a corrective in-memory line — the
+ * kind matters. When they conflict, append a corrective in-memory line - the
  * last one wins, so the config stays loadable with the user's request limit
  * intact.
  */
@@ -315,7 +315,7 @@ function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): str
  *
  * When allowWebsocket is true the WAF handler is wrapped in a non-terminal
  * subroute that only runs for NON-WebSocket requests.  WebSocket upgrades must
- * bypass the coraza handler ENTIRELY — not merely have the rule engine turned
+ * bypass the coraza handler ENTIRELY - not merely have the rule engine turned
  * off via `ctl:ruleEngine=off` (issue #195):
  *
  *   The coraza-caddy middleware wraps the response writer to inspect the
@@ -324,7 +324,7 @@ function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): str
  *   performs, so the raw WebSocket bytes leak out without the HTTP status line.
  *   The client sees a corrupt "HTTP/0.9" response and the handshake fails.
  *   Disabling only the rule engine leaves the response wrapper in place, so the
- *   connection is still mangled — routing around the handler is the only fix.
+ *   connection is still mangled - routing around the handler is the only fix.
  *
  * Because a Caddy `subroute` compiles its inner routes with the OUTER `next`
  * handler as their continuation, the WAF handler still wraps the downstream
@@ -334,7 +334,7 @@ function reconcileInMemoryBodyLimit(directives: string, crsLoaded: boolean): str
  *
  * With allowWebsocket the handler sits in a non-terminal subroute that skips upgrades. They must
  * bypass coraza entirely, not just disable the rule engine (#195): coraza-caddy wraps the response
- * writer, breaking the `101 Switching Protocols` hijack — raw bytes leak out with no status line.
+ * writer, breaking the `101 Switching Protocols` hijack - raw bytes leak out with no status line.
  * A `subroute` compiles inner routes with the OUTER `next`, so ordinary requests still get the WAF.
  */
 export function buildWafHandlerEntry(

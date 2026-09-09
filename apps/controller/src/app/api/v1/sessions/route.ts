@@ -3,7 +3,7 @@ import { requireApiUser, apiErrorResponse } from "@/src/lib/api-auth";
 import { getCurrentSessionId } from "@/src/lib/auth";
 import { listUserSessions, revokeOtherUserSessions } from "@/src/lib/models/sessions";
 
-/** GET /api/v1/sessions — list the authenticated user's active sessions. */
+/** GET /api/v1/sessions - list the authenticated user's active sessions. */
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await requireApiUser(request);
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** DELETE /api/v1/sessions — revoke all of the user's OTHER sessions. */
+/** DELETE /api/v1/sessions - revoke all of the user's OTHER sessions. */
 export async function DELETE(request: NextRequest) {
   try {
     const { userId } = await requireApiUser(request);

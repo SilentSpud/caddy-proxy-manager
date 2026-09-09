@@ -7,7 +7,7 @@ export const APP_ROLES: readonly AppRole[] = ["admin", "operator", "user", "view
 /**
  * Privilege order, most privileged first. The first match wins.
  *
- * `operator` sits above `user` and `viewer` because those two manage nothing at all — they are
+ * `operator` sits above `user` and `viewer` because those two manage nothing at all - they are
  * forward-auth identities with a dashboard that shows them their own profile. An operator manages
  * whatever their groups were granted, which is strictly more, even though the two axes are not
  * otherwise comparable.
@@ -80,8 +80,8 @@ function comparableGroupName(value: string): string {
 }
 
 /**
- * Reads a (possibly nested) claim. `path` is dot-separated, so providers that bury groups —
- * Keycloak's `resource_access.<client>.roles` — work without a bespoke option.
+ * Reads a (possibly nested) claim. `path` is dot-separated, so providers that bury groups -
+ * Keycloak's `resource_access.<client>.roles` - work without a bespoke option.
  */
 export function readClaim(claims: Record<string, unknown>, path: string): unknown {
   if (!path) return undefined;
@@ -108,7 +108,7 @@ function coerceGroupEntry(entry: unknown): string | null {
 
 /**
  * Normalises the shapes a group claim takes: string array, object array, comma-separated string,
- * or JSON-encoded array. Only commas split a string — group names contain spaces.
+ * or JSON-encoded array. Only commas split a string - group names contain spaces.
  */
 export function extractGroups(claims: Record<string, unknown>, groupsClaim: string): string[] {
   const raw = readClaim(claims, groupsClaim);
@@ -170,7 +170,7 @@ export function parseGroupNames(value: string | null): string[] {
 
 /**
  * The groups granting each role: the names configured for it, else `<groupPrefix><Role>`. The two
- * mix freely — a role with its own names ignores the prefix.
+ * mix freely - a role with its own names ignores the prefix.
  */
 export function resolveRoleGroups(cfg: GroupMappingConfig): Record<AppRole, string[]> {
   const configured: Record<AppRole, string | null> = {
@@ -190,7 +190,7 @@ export function resolveRoleGroups(cfg: GroupMappingConfig): Record<AppRole, stri
 
 /**
  * Claimed groups → role: `null` when mapping is off, `cfg.defaultRole` when on but nothing
- * matched — so an enabled mapping is authoritative and losing the admin group demotes.
+ * matched - so an enabled mapping is authoritative and losing the admin group demotes.
  */
 export function mapGroupsToRole(groups: string[], cfg: GroupMappingConfig): AppRole | null {
   if (!cfg.roleMappingEnabled) return null;

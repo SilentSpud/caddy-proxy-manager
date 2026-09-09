@@ -13,7 +13,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -98,7 +98,7 @@ describe('v1 OpenAPI schemas: no top-level snake_case', () => {
     'MtlsConfig',
     'RewriteConfig',
     'CpmForwardAuthConfig',
-    // protected_paths/excluded_paths, spelled the same as the two auth configs above — they feed
+    // protected_paths/excluded_paths, spelled the same as the two auth configs above - they feed
     // the same path-mode resolver, and one of the three reading differently is worse than snake.
     'TailscaleHostConfig',
   ]);

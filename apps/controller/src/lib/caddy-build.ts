@@ -2,13 +2,13 @@
  * Caddy image build management.
  *
  * Plugins are compiled in, so changing the module list means rebuilding the image and recreating
- * the container — which the controller cannot do itself, having no Docker socket. It sends the
+ * the container - which the controller cannot do itself, having no Docker socket. It sends the
  * selection to the agent and reads back what the agent actually built.
  *
  * *desired* is the admin's selection, which drives the UI; *applied* is what the running binary was
  * built with, which the agent reports and only after a build has succeeded and Caddy is healthy
  * again. Generation must never emit a handler outside *applied*, since Caddy rejects a config
- * naming an unknown module in full — so the two are kept apart, and generation uses the
+ * naming an unknown module in full - so the two are kept apart, and generation uses the
  * intersection.
  */
 
@@ -74,7 +74,7 @@ export function resolveModuleSpecs(settings: CaddyBuildSettings | null): string[
   return Array.from(new Set([...builtIn, ...custom])).sort();
 }
 
-/** Specs the shipped image is built with — the baseline before any rebuild. */
+/** Specs the shipped image is built with - the baseline before any rebuild. */
 export function defaultModuleSpecs(): string[] {
   return CADDY_MODULES.map((m) => m.modulePath).sort();
 }
@@ -82,10 +82,10 @@ export function defaultModuleSpecs(): string[] {
 // ─── Applied state ───────────────────────────────────────────────────────────
 
 /**
- * The module specs compiled into every running binary — the intersection across the fleet.
+ * The module specs compiled into every running binary - the intersection across the fleet.
  *
  * From what each agent reports having built, which it records only after a build has succeeded and
- * Caddy is healthy again — never from the selection. Using the selection would make applied equal
+ * Caddy is healthy again - never from the selection. Using the selection would make applied equal
  * desired the instant a rebuild was requested, so any config apply during the build would emit
  * handlers the running binary lacks, and a failed build would reject every apply after it.
  *
@@ -94,7 +94,7 @@ export function defaultModuleSpecs(): string[] {
  * means it has never rebuilt, so it is still the shipped image and carries the full catalog.
  *
  * An unreachable agent contributes nothing rather than emptying the set. It cannot be configured
- * either — the apply fails on it and says so — and stripping every plugin-backed handler from the
+ * either - the apply fails on it and says so - and stripping every plugin-backed handler from the
  * hosts that *are* reachable would turn one unreachable agent into a fleet-wide outage.
  */
 export async function getAppliedModuleSpecs(agentRowId?: number): Promise<string[]> {
@@ -177,9 +177,9 @@ export async function getCaddyBuildDiff(agentRowId?: number): Promise<CaddyBuild
 // ─── Feature gating ──────────────────────────────────────────────────────────
 
 export type CaddyModuleAvailability = {
-  /** Feature is selected by the admin — used to decide what the UI offers. */
+  /** Feature is selected by the admin - used to decide what the UI offers. */
   desired: Set<CaddyFeatureId>;
-  /** Feature is in the running binary — used to decide what config may emit. */
+  /** Feature is in the running binary - used to decide what config may emit. */
   applied: Set<CaddyFeatureId>;
   /** Module paths present in the running binary. */
   appliedPaths: Set<string>;
@@ -209,7 +209,7 @@ export async function getCaddyModuleAvailability(
       Boolean(p),
     ),
   );
-  // Custom modules are opaque — no feature mapping, but they belong in appliedPaths so a
+  // Custom modules are opaque - no feature mapping, but they belong in appliedPaths so a
   // caller checking a specific path can find one an operator added by hand.
   const appliedPaths = new Set(appliedSpecs.map((spec) => stripVersion(spec)));
   return {
@@ -261,11 +261,11 @@ export function featureModuleNames(feature: CaddyFeatureId): string {
  */
 export function generateCaddyDockerfilePreview(specs: string[]): string {
   const withLines = specs.map((spec) => `#     --with ${spec}`).join("\n");
-  return `# Generated preview — the real build uses docker/caddy/Dockerfile with
+  return `# Generated preview - the real build uses docker/caddy/Dockerfile with
 # CADDY_MODULES set to the value below.
 #
 # xcaddy build controller \\
-${withLines || "#     (no plugins — plain Caddy)"}
+${withLines || "#     (no plugins - plain Caddy)"}
 #     --output /usr/bin/caddy
 
 ARG CADDY_MODULES="${specs.join(" ")}"
@@ -287,14 +287,14 @@ export async function applyCaddyBuild(agentRowId?: number): Promise<CaddyBuildSt
 
   // Re-apply the config before the rebuild. Caddy runs with `--resume`, so a recreated container
   // reloads the last autosaved config; if that names a module the new binary lacks, the proxy stays
-  // down with no admin API to correct it. Imported lazily — caddy.ts imports this for gating.
+  // down with no admin API to correct it. Imported lazily - caddy.ts imports this for gating.
   const { applyCaddyConfig } = await import("./caddy");
   await applyCaddyConfig();
 
   return requestCaddyBuild(resolveModuleSpecs(settings));
 }
 
-/** The agent's last word on the rebuild — one named agent's, or the primary's. */
+/** The agent's last word on the rebuild - one named agent's, or the primary's. */
 export async function getCaddyBuildStatus(agentRowId?: number): Promise<CaddyBuildStatus> {
   const status =
     agentRowId === undefined ? await tryGetAgentStatus() : await getAgentStatusFor(agentRowId);
@@ -341,7 +341,7 @@ const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", 
 
 /**
  * The serializable snapshot the dashboard hands to client components. Gates on *desired*, not
- * applied — a control following applied would stay greyed out right after being switched on.
+ * applied - a control following applied would stay greyed out right after being switched on.
  */
 export async function getModuleGateState(): Promise<{
   features: Record<CaddyFeatureId, boolean>;

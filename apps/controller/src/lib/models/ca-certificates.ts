@@ -139,7 +139,7 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
     throw domainError("caCertificateNotFound");
   }
 
-  // Issued client certificates belonging to this CA, plus any mTLS roles that include them — used
+  // Issued client certificates belonging to this CA, plus any mTLS roles that include them - used
   // both to detect references below and to cascade-delete afterwards.
   const issuedCerts = await db
     .select({ id: issuedClientCertificates.id })

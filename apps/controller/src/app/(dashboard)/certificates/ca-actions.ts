@@ -183,7 +183,7 @@ export async function issueClientCertificateAction(
 
   const caPrivateKeyPem = await getCaCertificatePrivateKey(caCertId);
   if (!caPrivateKeyPem)
-    throw new Error("This CA has no stored private key — cannot issue client certificates");
+    throw new Error("This CA has no stored private key - cannot issue client certificates");
 
   const caCertRecord = await import("@/src/lib/models/ca-certificates").then((m) =>
     m.getCaCertificate(caCertId),
@@ -228,7 +228,7 @@ export async function issueClientCertificateAction(
   revalidatePath("/certificates");
 
   // AES-256 unconditionally, with forge's weak defaults (2048 iterations, 8-byte salt, SHA-1 PRF)
-  // raised — this bundle leaves the deployment as a file. `prfAlgorithm` is undeclared in
+  // raised - this bundle leaves the deployment as a file. `prfAlgorithm` is undeclared in
   // @types/node-forge but forwarded to pki.encryptPrivateKeyInfo; the PKCS#12 MAC stays SHA-1.
   const pkcs12Options = {
     algorithm: "aes256",

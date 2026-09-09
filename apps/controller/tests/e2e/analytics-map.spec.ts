@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 /**
  * "Traffic by Country" world map. maplibre-gl v6 resolves its tile worker from `import.meta.url`,
- * which the bundler cannot follow — the worker never starts and the map is empty ocean. The fix
+ * which the bundler cannot follow - the worker never starts and the map is empty ocean. The fix
  * imports it as `?worker&url` and calls setWorkerUrl(). Covers plumbing and rendered geometry.
  */
 
@@ -32,7 +32,7 @@ test.describe('Analytics world map', () => {
 
     // The worker imports a sibling ./maplibre-gl-shared.mjs, and `?worker&url`
     // bundles that into the same chunk. Seeing it arrive as a request of its own
-    // means the build went back to emitting the entry file alone — the shape
+    // means the build went back to emitting the entry file alone - the shape
     // whose relative import 404s, leaving the map an empty ocean.
     expect(
       mapRequests.filter((r) => r.url.includes('maplibre-gl-shared')),
@@ -67,7 +67,7 @@ test.describe('Analytics world map', () => {
     await expect
       .poll(async () => Math.round((await mapContainer.boundingBox())?.height ?? 0), {
         timeout: 10_000,
-        message: 'the MapLibre container collapsed to zero height — the canvas is clipped away',
+        message: 'the MapLibre container collapsed to zero height - the canvas is clipped away',
       })
       .toBeGreaterThan(100);
 
@@ -76,7 +76,7 @@ test.describe('Analytics world map', () => {
     expect(box).not.toBeNull();
     if (!box) return;
 
-    // Give the worker time to parse the source and the fill layer to paint —
+    // Give the worker time to parse the source and the fill layer to paint -
     // the canvas is visible well before any geometry exists.
     await page.waitForTimeout(3_000);
 
@@ -104,13 +104,13 @@ test.describe('Analytics world map', () => {
         popupText = await popup.innerText();
         break;
       } catch {
-        // Miss (ocean) — try the next point.
+        // Miss (ocean) - try the next point.
       }
     }
 
     expect(
       popupText,
-      `no country popup appeared over any of ${targets.length} points — the map rendered no country geometry`,
+      `no country popup appeared over any of ${targets.length} points - the map rendered no country geometry`,
     ).not.toBeNull();
     expect(popupText).toContain('Requests');
   });

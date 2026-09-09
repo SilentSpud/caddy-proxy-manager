@@ -19,7 +19,7 @@ export class ControllerAddressError extends Error {
 /**
  * Whether the operator actually typed a port, which `new URL` will not tell you.
  *
- * The URL API normalises a scheme's default port away — `new URL("https://h:443").port` is the
+ * The URL API normalises a scheme's default port away - `new URL("https://h:443").port` is the
  * empty string, indistinguishable from `https://h`. Both mean 443 here, but for http the two
  * differ: `http://h:80` asked for 80 and `http://h` did not ask for anything, and the second has
  * always meant the controller's own default.
@@ -42,7 +42,7 @@ export function normalizeControllerUrl(host: string, port?: number | null): stri
   const trimmed = host.trim();
   if (trimmed.length === 0) throw new ControllerAddressError("Enter the controller's address.");
 
-  // A bare host is the common case — an operator reads an IP off a console, not a URL.
+  // A bare host is the common case - an operator reads an IP off a console, not a URL.
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
 
   let url: URL;
@@ -57,7 +57,7 @@ export function normalizeControllerUrl(host: string, port?: number | null): stri
   }
   if (url.pathname !== "/" || url.search || url.hash) {
     throw new ControllerAddressError(
-      "Enter only the controller's host and port, with no path — for example 10.0.0.5:3000.",
+      "Enter only the controller's host and port, with no path - for example 10.0.0.5:3000.",
     );
   }
   if (!url.hostname) throw new ControllerAddressError("A controller address needs a host.");
@@ -70,12 +70,12 @@ export function normalizeControllerUrl(host: string, port?: number | null): stri
   }
 
   // An explicit --port wins, then a port in the address, then the scheme's own default where the
-  // operator committed to one — and only then the controller's default.
+  // operator committed to one - and only then the controller's default.
   //
   // `https://` is the case that matters: the controller serves plain HTTP, so an https address
   // means something is terminating TLS in front of it, and that thing listens on 443. This is how
-  // a Tailscale or Headscale deployment addresses its controller — `tailscale serve` publishes it
-  // at `https://<machine>.<tailnet>.ts.net` with no port to type — and defaulting that to 3000
+  // a Tailscale or Headscale deployment addresses its controller - `tailscale serve` publishes it
+  // at `https://<machine>.<tailnet>.ts.net` with no port to type - and defaulting that to 3000
   // dialled a port nothing was listening on. `http://` keeps meaning 3000 without an explicit
   // port, which is what every existing deployment relies on.
   const typedPort = authorityHasExplicitPort(trimmed);

@@ -54,7 +54,7 @@ test.describe
     test('original path without prefix is NOT sent to the upstream', async () => {
       const res = await httpGet(DOMAIN, '/users');
       expect(res.status).toBe(200);
-      // The upstream must NOT see the bare /users path — it should see /api/users
+      // The upstream must NOT see the bare /users path - it should see /api/users
       expect(res.body).not.toMatch(/^GET \/users /m);
     });
   });

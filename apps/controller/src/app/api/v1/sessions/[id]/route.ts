@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireApiUser, apiErrorResponse } from "@/src/lib/api-auth";
 import { revokeUserSession } from "@/src/lib/models/sessions";
 
-/** DELETE /api/v1/sessions/[id] — revoke one of the user's own sessions. */
+/** DELETE /api/v1/sessions/[id] - revoke one of the user's own sessions. */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

@@ -6,7 +6,7 @@
  * Requests go through an agent, not to an address of this app's own. The agent is the only thing
  * that knows where its Caddy is, and a controller that dialled `CADDY_API_URL` itself would
  * configure a Caddy on *this* host while a paired remote agent recreated the container on
- * *another* — which is exactly the split brain the fan-out exists to prevent. `CADDY_API_URL` is
+ * *another* - which is exactly the split brain the fan-out exists to prevent. `CADDY_API_URL` is
  * the agent's setting now; `httpCaddyAdminTransport` remains only for a deployment running Caddy
  * with no agent at all.
  */
@@ -47,7 +47,7 @@ async function caddyAdminUrl(path: string): Promise<string> {
 }
 
 /**
- * Real transport: a plain node:http request. Not `fetch` — that sends Sec-Fetch-* headers, which
+ * Real transport: a plain node:http request. Not `fetch` - that sends Sec-Fetch-* headers, which
  * trigger Caddy's CORS origin enforcement.
  */
 export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
@@ -59,11 +59,11 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
 }) => {
   // Backstop for the guard installed by tests/setup.bun.ts: if a test swaps the real transport
   // back in, fail loudly instead of quietly opening a socket to whatever is listening on the
-  // admin port. CPM_TEST is set by tests/helpers/env.ts — `bun test` sets no marker of its own.
+  // admin port. CPM_TEST is set by tests/helpers/env.ts - `bun test` sets no marker of its own.
   if (process.env.CPM_TEST) {
     throw new Error(
       "The real Caddy admin transport was used inside a test. Tests must install an " +
-        "in-memory adapter via setCaddyAdminTransport() — see tests/helpers/caddy-admin.ts.",
+        "in-memory adapter via setCaddyAdminTransport() - see tests/helpers/caddy-admin.ts.",
     );
   }
 

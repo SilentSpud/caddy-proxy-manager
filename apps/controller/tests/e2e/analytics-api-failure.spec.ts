@@ -8,7 +8,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 const ANALYTICS_API = '**/api/analytics/**';
 
-/** Collects uncaught render errors — the symptom of the original crash. */
+/** Collects uncaught render errors - the symptom of the original crash. */
 function trackPageErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));

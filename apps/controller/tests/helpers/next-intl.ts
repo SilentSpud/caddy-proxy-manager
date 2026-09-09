@@ -1,7 +1,7 @@
 /**
  * A translator over the real English catalog, for tests that call a server action directly.
  *
- * `getTranslations` needs a request scope, and a unit test has none — next-intl resolves to its
+ * `getTranslations` needs a request scope, and a unit test has none - next-intl resolves to its
  * client build and throws. Mocking it with the real catalog rather than an identity function keeps
  * the assertions honest: a test still fails if the message it expects is renamed or deleted.
  */

@@ -13,7 +13,7 @@ import {
 import { logAuditEvent } from "@/src/lib/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 
-/** Forward auth login — validates credentials and starts the exchange flow, given a rid. */
+/** Forward auth login - validates credentials and starts the exchange flow, given a rid. */
 export async function POST(request: NextRequest) {
   const t = await getTranslations("auth.apiErrors");
   try {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("missingRedirectIntent") }, { status: 400 });
     }
 
-    // Rate limiting — prefer x-real-ip (set by reverse proxy) over x-forwarded-for
+    // Rate limiting - prefer x-real-ip (set by reverse proxy) over x-forwarded-for
     const ip =
       lastHeaderValue(request.headers.get("x-real-ip")) ||
       lastHeaderValue(request.headers.get("x-forwarded-for")) ||
@@ -82,10 +82,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("invalidCredentials") }, { status: 401 });
     }
 
-    // Successful credential check — reset rate limiter for this IP
+    // Successful credential check - reset rate limiter for this IP
     resetAttempts(ip);
 
-    // Consume the redirect intent — returns the server-stored redirect URI.
+    // Consume the redirect intent - returns the server-stored redirect URI.
     // This is a one-time operation: the intent is deleted after consumption.
     const intent = await consumeRedirectIntent(rid);
     if (!intent) {

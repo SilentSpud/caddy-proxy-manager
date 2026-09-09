@@ -1,7 +1,7 @@
 /**
  * Which language the UI renders in. Deliberately no `/[locale]` URL segment: `src/proxy.ts`
  * authorizes on path prefixes, forward auth runs the portal on someone else's domain, and the
- * REST API is versioned by path — a locale prefix would have to be threaded through all three.
+ * REST API is versioned by path - a locale prefix would have to be threaded through all three.
  * The preference is a cookie instead, exactly like the colour mode in `theme-mode.ts`.
  */
 
@@ -15,7 +15,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /**
  * Cookie rather than localStorage, for the same reason the theme is: the server picks the catalog
  * and renders `<html lang>` on the first paint, so it has to know the choice before React runs.
- * Not HttpOnly — the switcher writes it from the client, and a language needs no guarding.
+ * Not HttpOnly - the switcher writes it from the client, and a language needs no guarding.
  *
  * The value is a locale the user picked, or one prefixed `auto:` that the browser was detected as
  * preferring. Both render the same; the prefix is what lets a later visit re-detect instead of
@@ -40,7 +40,7 @@ export function parseLocale(value: string | undefined): Locale | undefined {
 
 /**
  * What the locale cookie means: nothing stored, a language the browser was detected as wanting, or
- * one the user picked. Only the last is authoritative — the others are re-negotiated per request.
+ * one the user picked. Only the last is authoritative - the others are re-negotiated per request.
  */
 export type LocalePreference =
   | { source: "unset" }
@@ -71,7 +71,7 @@ export function preferenceCookieValue(preference: LocalePreference): string | nu
 }
 
 /**
- * The best supported match for one BCP 47 tag, walking up the subtag chain — `pt-BR` tries `pt`
+ * The best supported match for one BCP 47 tag, walking up the subtag chain - `pt-BR` tries `pt`
  * before giving up, so a region we ship no catalog for still lands on the right language.
  */
 function matchTag(tag: string): Locale | undefined {
@@ -88,7 +88,7 @@ function matchTag(tag: string): Locale | undefined {
 }
 
 /**
- * Pick a locale from an ordered list of tags — `navigator.languages`, or an `Accept-Language`
+ * Pick a locale from an ordered list of tags - `navigator.languages`, or an `Accept-Language`
  * header already sorted by weight. Returns undefined rather than the default so callers can tell
  * "asked for nothing we have" from "asked for English".
  */

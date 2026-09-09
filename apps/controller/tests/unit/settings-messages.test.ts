@@ -1,6 +1,6 @@
 /**
  * The Settings and setup screens look their labels up by setting name, and validation errors by
- * code — both at runtime, so TypeScript cannot check those keys against the catalog the way it
+ * code - both at runtime, so TypeScript cannot check those keys against the catalog the way it
  * checks a literal `t("...")`. These do it instead: a setting added to the registry without a
  * message here fails the build rather than rendering its raw key to an operator.
  */

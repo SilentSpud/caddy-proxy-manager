@@ -1,5 +1,5 @@
 /**
- * Integration: L4 Caddy config generation — the data in l4_proxy_hosts produces the caddy-l4 JSON
+ * Integration: L4 Caddy config generation - the data in l4_proxy_hosts produces the caddy-l4 JSON
  * shape buildL4Servers() would, reconstructed here from DB rows.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
@@ -142,7 +142,7 @@ describe('L4 Caddy config generation', () => {
     expect(buildExpectedL4Config(rows)).toBeNull();
   });
 
-  it('simple TCP proxy — catch-all, single upstream', async () => {
+  it('simple TCP proxy - catch-all, single upstream', async () => {
     await insertL4Host({
       name: 'PostgreSQL',
       listenAddress: ':5432',
@@ -223,7 +223,7 @@ describe('L4 Caddy config generation', () => {
     expect(route.match).toEqual([{ proxy_protocol: {} }]);
   });
 
-  it('full handler chain — proxy_protocol receive + TLS + proxy with PP v1', async () => {
+  it('full handler chain - proxy_protocol receive + TLS + proxy with PP v1', async () => {
     await insertL4Host({
       name: 'Secure IMAP',
       listenAddress: '0.0.0.0:993',
@@ -352,7 +352,7 @@ describe('L4 Caddy config generation', () => {
     expect((config.l4_server_0 as any).listen).toEqual([':5432']);
   });
 
-  it('UDP proxy — correct listen address', async () => {
+  it('UDP proxy - correct listen address', async () => {
     await insertL4Host({
       name: 'DNS Proxy',
       protocol: 'udp',

@@ -108,7 +108,7 @@ describe('deciding whether to tell the operator', () => {
     expect(isNewer('3.0.0', '3.0.1')).toBe(true);
     expect(isNewer('3.0.0-beta.2', '3.0.0')).toBe(true);
     expect(isNewer('3.0.0', '3.0.0')).toBe(false);
-    // The running build is ahead of anything published — a dev or locally built image.
+    // The running build is ahead of anything published - a dev or locally built image.
     expect(isNewer('3.1.0', '3.0.0')).toBe(false);
   });
 
@@ -171,7 +171,7 @@ describe('following registry pagination', () => {
 
   it('refuses a link to another host rather than fetching it', () => {
     // new URL(value, base) ignores the base as soon as the value is absolute, so this would
-    // otherwise be a server-side fetch of whatever the registry named — carrying the bearer token
+    // otherwise be a server-side fetch of whatever the registry named - carrying the bearer token
     // the caller is holding.
     expect(() =>
       nextPageUrl('<http://169.254.169.254/latest/meta-data/>; rel="next"', 'ghcr.io'),
@@ -231,7 +231,7 @@ describe('what the status reports', () => {
 
   it('knows nothing while checks are off, rather than repeating a stale answer', async () => {
     // The Settings page reads `latest` as authoritative. Left in, it would go on saying "9.9.9 is
-    // the newest release published" from a check that stopped running — and "Check now" is
+    // the newest release published" from a check that stopped running - and "Check now" is
     // disabled along with the setting, so there is no way to refresh it.
     store.cache = CACHED;
     store.enabled = false;

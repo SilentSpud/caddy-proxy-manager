@@ -1,6 +1,6 @@
 /**
- * E2E: disabling a user blocks them — existing session redirects to /login, credential login
- * fails, the API token returns 401 — and re-enabling restores access.
+ * E2E: disabling a user blocks them - existing session redirects to /login, credential login
+ * fails, the API token returns 401 - and re-enabling restores access.
  */
 import { test, expect, type BrowserContext } from '@playwright/test';
 import * as seed from '../helpers/seed';
@@ -87,7 +87,7 @@ test.describe('Disabled user enforcement', () => {
     // Disable user
     setUserStatus('disabled');
 
-    // Existing session should now be rejected — page should redirect to /login
+    // Existing session should now be rejected - page should redirect to /login
     const page2 = await context.newPage();
     await page2.goto(BASE);
     await expect(page2).toHaveURL(/\/login/, { timeout: 15_000 });
@@ -105,7 +105,7 @@ test.describe('Disabled user enforcement', () => {
 
     await page.goto(`${BASE}/login`);
     // Not just flake insurance: this test passes if the URL stays on /login, and a pre-hydration
-    // native submit does exactly that — it would go green without ever attempting a login.
+    // native submit does exactly that - it would go green without ever attempting a login.
     await waitForHydration(page);
     await page.getByLabel('Username').fill(TEST_USERNAME);
     await page.getByLabel('Password').fill(TEST_PASSWORD);

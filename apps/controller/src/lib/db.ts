@@ -109,7 +109,7 @@ async function runBetterAuthDataMigration() {
   console.log("Better Auth data migration complete: populated accounts table");
 }
 
-/** Sync OAUTH_* env vars into oauthProviders. Raw Drizzle — this runs at module load. */
+/** Sync OAUTH_* env vars into oauthProviders. Raw Drizzle - this runs at module load. */
 async function runEnvProviderSync() {
   if (isEphemeral) return;
 

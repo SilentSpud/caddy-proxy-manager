@@ -85,7 +85,7 @@ export async function waitForTcpEcho(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      // tcpSend rejects (rather than resolving) when the socket errors before it ever connects —
+      // tcpSend rejects (rather than resolving) when the socket errors before it ever connects -
       // ECONNREFUSED while the caddy container is being recreated, for one. That is exactly the
       // window this helper exists to wait through, so treat it as "not ready yet" and keep polling.
       const res = await tcpSend(host, port, `${probe}\n`, 2_000);

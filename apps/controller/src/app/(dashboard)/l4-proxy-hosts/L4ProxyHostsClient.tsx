@@ -35,7 +35,7 @@ type Props = {
   agents?: AgentOption[];
   /** Host id → the agent rows it is pinned to. A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
-  /** False for an operator — see ProxyHostsClient. */
+  /** False for an operator - see ProxyHostsClient. */
   canCreate?: boolean;
 };
 
@@ -56,13 +56,13 @@ function ProtocolBadge({ protocol }: { protocol: string }) {
   return <Badge variant={protocol === "tcp" ? "info" : "warning"} label={protocol.toUpperCase()} />;
 }
 
-/** "10.0.0.1:443 +2" — the primary upstream plus a count of the rest. */
+/** "10.0.0.1:443 +2" - the primary upstream plus a count of the rest. */
 function summarizeUpstreams(upstreams: string[]) {
   return upstreams.length > 1 ? `${upstreams[0]} +${upstreams.length - 1}` : upstreams[0];
 }
 
 /**
- * The enable switch plus the row menu, shared by table and cards. At module scope — nesting it
+ * The enable switch plus the row menu, shared by table and cards. At module scope - nesting it
  * would make a new component type each render, remounting the menu mid-use.
  */
 function HostActions({
@@ -118,7 +118,7 @@ export default function L4ProxyHostsClient({
   const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<L4ProxyHost | null>(null);
   const [deleteHost, setDeleteHost] = useState<L4ProxyHost | null>(null);
-  // Bumped on every open so CreateL4HostDialog remounts and its useActionState starts clean —
+  // Bumped on every open so CreateL4HostDialog remounts and its useActionState starts clean -
   // otherwise the previous save's "success" state closes the freshly reopened dialog (#241).
   const [dialogKey, setDialogKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -267,7 +267,7 @@ export default function L4ProxyHostsClient({
 
   return (
     <VStack gap={6}>
-      {/* Existing hosts stay listed and editable while the module is off — they
+      {/* Existing hosts stay listed and editable while the module is off - they
           are simply not emitted into the config. Hiding them would make hosts
           that still exist look deleted. */}
       {l4DisabledReason && (

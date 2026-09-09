@@ -1,18 +1,21 @@
 ---
 title: Caddy Proxy Manager
-description: A modern web interface for Caddy Server — reverse proxy, WAF, automatic HTTPS, mTLS, forward auth, geo blocking, L4 TCP/UDP proxying, traffic analytics and a GraphQL API.
+description: A modern web interface for Caddy Server - reverse proxy, WAF, automatic HTTPS, mTLS, forward auth, geo blocking, L4 TCP/UDP proxying, traffic analytics and a GraphQL API.
 template: splash
+# A splash page is a landing page, not a document someone is going to correct a typo in, so it
+# does not carry the edit link the rest of the site does.
+editUrl: false
 # Starlight appends the site title to every page title, which on this page is the same
 # string twice. Overriding the tag outright is the only way to say it once.
 head:
   - tag: title
-    content: Caddy Proxy Manager — control every edge
+    content: Caddy Proxy Manager - control every edge
 hero:
   tagline: Control every edge. The modern web interface for Caddy Server.
   # No hero image: the dashboard below is the real one, running, which is a better first
   # impression than a picture of it and cannot go stale.
   actions:
-    - text: Install it
+    - text: Install
       link: start/install/
       icon: right-arrow
     - text: View source
@@ -25,12 +28,12 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import Demo from '../../components/Demo.astro';
 import OverviewDemo from '../../demos/samples/OverviewDemo';
 
-<Demo title="The dashboard" note="Every page on this site works like this one.">
+<Demo title="Dashboard" note="Every page on this site works like this one.">
   <OverviewDemo client:visible />
 </Demo>
 
 Caddy is a web server that gets TLS right by default. Caddy Proxy Manager is a UI in front of it, so
-the things Caddy can do — reverse proxying, certificates, a WAF, layer‑4 streams — become things you
+the things Caddy can do - reverse proxying, certificates, a WAF, layer-4 streams - become things you
 configure and watch rather than things you write into a config file and hope about.
 
 ## What it does
@@ -45,7 +48,7 @@ configure and watch rather than things you write into a config file and hope abo
     HTTP.
   </Card>
   <Card title="Automatic HTTPS" icon="approve-check">
-    ACME through Let's Encrypt or any directory you point it at, DNS‑01 across twenty providers,
+    ACME through Let's Encrypt or any directory you point it at, DNS-01 across twenty providers,
     plus a built-in CA for mutual TLS.
   </Card>
   <Card title="WAF" icon="warning">

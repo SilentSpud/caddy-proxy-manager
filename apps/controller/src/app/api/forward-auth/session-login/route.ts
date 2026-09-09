@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("missingRedirectIntent") }, { status: 400 });
     }
 
-    // Consume the redirect intent — returns the server-stored redirect URI
+    // Consume the redirect intent - returns the server-stored redirect URI
     const intent = await consumeRedirectIntent(rid);
     if (!intent) {
       return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });

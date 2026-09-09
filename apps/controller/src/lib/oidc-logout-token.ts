@@ -1,11 +1,11 @@
 /**
  * Validation of an OIDC Back-Channel Logout token (OpenID Connect Back-Channel Logout 1.0, §2.4).
  *
- * The IdP POSTs this JWT to CPM when it ends a session its own way — an admin revoking access, a
+ * The IdP POSTs this JWT to CPM when it ends a session its own way - an admin revoking access, a
  * sign-out at another relying party, an account being disabled. It arrives server-to-server with
  * no browser and no cookie, so the token's signature is the only thing vouching for it: every
  * check below is load-bearing, and a token failing any of them tells us nothing about who to log
- * out. That is why this returns a reason rather than throwing — the caller answers 400 and says
+ * out. That is why this returns a reason rather than throwing - the caller answers 400 and says
  * which check failed, which is the difference between debugging an IdP integration in minutes and
  * staring at an opaque rejection.
  */
@@ -35,7 +35,7 @@ export type LogoutTokenResult =
 /** JWKS fetching is cached by `jose`; one set per URI keeps that cache alive across requests. */
 const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
-/** Exposed for tests — the JWKS sets are process-wide state. */
+/** Exposed for tests - the JWKS sets are process-wide state. */
 export function clearJwksCache(): void {
   jwksCache.clear();
 }
@@ -78,7 +78,7 @@ export async function verifyLogoutToken(
   try {
     const verified = await jwtVerify(token, jwksFor(jwksUri), {
       // Exactly as configured, trailing slash and all. An issuer identifier is compared by simple
-      // string equality (OIDC Core §2), and several providers — Authentik among them — issue an
+      // string equality (OIDC Core §2), and several providers - Authentik among them - issue an
       // `iss` that ends in one: trimming it here rejected every token they send.
       issuer: provider.issuer,
       audience: provider.clientId,
@@ -128,7 +128,7 @@ export async function verifyLogoutToken(
  * on could still verify.
  *
  * In memory, like the discovery and pending-sync caches beside it. Replaying a logout token can
- * only log someone out a second time — it grants nothing — so the cost of a second app instance
+ * only log someone out a second time - it grants nothing - so the cost of a second app instance
  * keeping its own set is a duplicated revocation, not a hole. Returns false when the jti was
  * already seen.
  */
@@ -145,7 +145,7 @@ export function rememberLogoutJti(issuer: string, jti: string): boolean {
   return true;
 }
 
-/** Exposed for tests — the replay set is process-wide state. */
+/** Exposed for tests - the replay set is process-wide state. */
 export function clearLogoutJtis(): void {
   seenJtis.clear();
 }

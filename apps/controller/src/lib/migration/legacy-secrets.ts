@@ -1,8 +1,8 @@
 /**
  * Carrying a pre-3.0 database's encrypted values across a change of `SESSION_SECRET`.
  *
- * Secrets in the old database — certificate private keys, DNS provider credentials, OAuth client
- * secrets, agent secrets, the Tailscale auth key — are ciphertext bound to the `SESSION_SECRET`
+ * Secrets in the old database - certificate private keys, DNS provider credentials, OAuth client
+ * secrets, agent secrets, the Tailscale auth key - are ciphertext bound to the `SESSION_SECRET`
  * that installation ran with. The importer copies rows verbatim, so before this the only way to
  * read them afterwards was to adopt the old secret on the new deployment: change `SESSION_SECRET`
  * to match, restart, migrate. That is a bad trade. It makes the old value permanent, and an
@@ -14,8 +14,8 @@
  *
  * Two shapes have to be handled, because two shapes exist in the schema:
  *
- * - A column that *is* a secret — `certificates.privateKeyPem`, `agents.secret`.
- * - A column holding JSON with secrets inside it — the `settings` rows, where a registry secret is
+ * - A column that *is* a secret - `certificates.privateKeyPem`, `agents.secret`.
+ * - A column holding JSON with secrets inside it - the `settings` rows, where a registry secret is
  *   a JSON-encoded string and the Tailscale blob is an object with an `authKey` field.
  *
  * Both are handled by looking for the `enc:v1:` marker rather than by naming columns: the prefix is
@@ -35,7 +35,7 @@ export type LegacySecretProbe = {
   /**
    * Whether this deployment's own `SESSION_SECRET` reads them.
    *
-   * True is the ordinary upgrade — the same secret carried over — and needs no key from anyone.
+   * True is the ordinary upgrade - the same secret carried over - and needs no key from anyone.
    */
   readableWithCurrentKey: boolean;
   /** A few tokens, kept so a key the operator types can be checked before the import starts. */
@@ -71,7 +71,7 @@ export function verifyLegacyKey(probe: LegacySecretProbe, sessionSecret: string)
  * A function that rewrites one column value for the destination database.
  *
  * Throws on a value it cannot read. The importer runs it over every row before writing anything,
- * so a wrong key fails the whole migration before it has written a row — rather than partway
+ * so a wrong key fails the whole migration before it has written a row - rather than partway
  * through, which would leave a half-populated database the operator is told not to retry against.
  */
 export type Rekeyer = (value: string) => string;

@@ -9,8 +9,8 @@ export type ReloadedDb = {
 /**
  * Re-evaluate the database layer against whatever DATABASE_URL currently says.
  *
- * Three modules have to move together. src/lib/db.ts opens nothing itself — src/lib/db/connection.ts
- * creates the driver and runs migrations — and src/lib/db/schema.ts re-exports the table objects
+ * Three modules have to move together. src/lib/db.ts opens nothing itself - src/lib/db/connection.ts
+ * creates the driver and runs migrations - and src/lib/db/schema.ts re-exports the table objects
  * connection.ts handed that driver. Putting a `?fresh=` suffix on db.ts alone reuses the cached
  * connection and schema, so the "reloaded" module would still be pointed at whichever database the
  * very first import opened, holding that dialect's tables.

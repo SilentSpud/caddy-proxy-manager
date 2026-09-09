@@ -1,7 +1,7 @@
 /**
  * Reading headers a reverse proxy sets in front of this app. Bun 1.4 joins duplicate request
  * headers with `", "` instead of keeping the last, so a client-supplied `X-Forwarded-Host` now
- * shows up ahead of Caddy's. The trailing segment — what the nearest proxy wrote — is the one to
+ * shows up ahead of Caddy's. The trailing segment - what the nearest proxy wrote - is the one to
  * trust.
  */
 

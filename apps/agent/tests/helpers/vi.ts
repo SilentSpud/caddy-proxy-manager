@@ -3,7 +3,7 @@ import { type Mock, vi as bunVi } from "bun:test";
 /**
  * The `vi` object the suite imports, in place of Vitest's. Bun's `bun:test` alias covers
  * fn/spyOn/mock/timers but not `mocked`, `hoisted`, `stubEnv` or `unstubAllEnvs`, and its type
- * cannot be merged declaratively — hence a wrapper. `resetModules` and `doMock` are deliberately
+ * cannot be merged declaratively - hence a wrapper. `resetModules` and `doMock` are deliberately
  * absent: Bun cannot drop a module from the registry, so a no-op would leave tests asserting
  * against a cached one.
  */

@@ -2,8 +2,8 @@
  * The GraphQL endpoint over HTTP, rather than the schema underneath it.
  *
  * This exists because of a bug the other GraphQL tests could not have found. They call `graphql()`
- * and `subscribe()` directly with a hand-built context, which means the transport — Yoga, the
- * route handler, and the request body they share — was never exercised. The agent's signature is
+ * and `subscribe()` directly with a hand-built context, which means the transport - Yoga, the
+ * route handler, and the request body they share - was never exercised. The agent's signature is
  * checked against the bytes it sent, and reading those bytes needs a clone taken *before* Yoga
  * parses the document; a clone taken afterwards throws "Body is disturbed or locked" from inside
  * the resolver. Every unit test passed. The agent could not connect, so Caddy never started, and

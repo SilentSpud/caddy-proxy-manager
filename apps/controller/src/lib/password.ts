@@ -1,6 +1,6 @@
 /**
  * Password hashing on Bun's natives. User passwords use argon2id: memory-hard, and it consumes the
- * whole password rather than bcrypt's first 72 bytes. Access list passwords must stay bcrypt —
+ * whole password rather than bcrypt's first 72 bytes. Access list passwords must stay bcrypt -
  * Caddy's `http_basic` verifies those itself. Neither blocks the event loop, unlike the pure-JS
  * bcryptjs this replaced. `verifyPassword` detects the algorithm, so old rows need no migration.
  */
@@ -15,7 +15,7 @@ export const DEFAULT_BCRYPT_COST = 12;
 
 /**
  * bcryptjs silently truncated at 72 bytes while Bun.password hashes the full input, so a longer
- * password would stop matching its stored hash. By bytes, and only for bcrypt — clamping argon2id
+ * password would stop matching its stored hash. By bytes, and only for bcrypt - clamping argon2id
  * would throw away real material.
  */
 function clampToBcryptLimit(password: string): string | Uint8Array {
@@ -23,7 +23,7 @@ function clampToBcryptLimit(password: string): string | Uint8Array {
   return bytes.byteLength <= BCRYPT_MAX_BYTES ? password : bytes.subarray(0, BCRYPT_MAX_BYTES);
 }
 
-/** True for a bcrypt hash — i.e. one written before the argon2id switch. */
+/** True for a bcrypt hash - i.e. one written before the argon2id switch. */
 export function isLegacyPasswordHash(hash: string | null | undefined): boolean {
   return typeof hash === "string" && BCRYPT_PREFIX.test(hash);
 }
@@ -33,7 +33,7 @@ export async function hashPassword(password: string): Promise<string> {
   return Bun.password.hash(password, { algorithm: "argon2id" });
 }
 
-/** Hashes with bcrypt — only for hashes verified outside this app (Caddy basicauth). */
+/** Hashes with bcrypt - only for hashes verified outside this app (Caddy basicauth). */
 export async function hashBcrypt(
   password: string,
   cost: number = DEFAULT_BCRYPT_COST,
@@ -41,7 +41,7 @@ export async function hashBcrypt(
   return Bun.password.hash(clampToBcryptLimit(password), { algorithm: "bcrypt", cost });
 }
 
-/** Verifies against argon2id or bcrypt, returning false — never throwing — for an unusable hash. */
+/** Verifies against argon2id or bcrypt, returning false - never throwing - for an unusable hash. */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   if (!hash) return false;
   try {

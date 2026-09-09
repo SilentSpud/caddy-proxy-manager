@@ -8,8 +8,8 @@ import type { SettingDefinition } from '@/src/lib/settings/registry';
  *
  * The client resolves its configuration through `getSetting` now rather than reading `process.env`
  * at module load, so these tests would otherwise need a schema each just to reach the environment
- * fallback. This reproduces resolve.ts's environment layer exactly — nothing stored, so every
- * setting falls through to its variable and then its default — which is what `stubEnv` below is
+ * fallback. This reproduces resolve.ts's environment layer exactly - nothing stored, so every
+ * setting falls through to its variable and then its default - which is what `stubEnv` below is
  * setting up. Whether a *stored* value wins is resolve.ts's own business, and tested there.
  */
 vi.mock('@/src/lib/settings/resolve', () => ({
@@ -169,7 +169,7 @@ describe('clickhouse client analytics enablement', () => {
 
   // Behaviour change: this used to throw at import and take the process down. Retention is a
   // registry setting now, and the registry's rule is that an unusable value is ignored with a
-  // warning rather than being fatal — a typo in one environment variable must not be the reason
+  // warning rather than being fatal - a typo in one environment variable must not be the reason
   // the proxy stops serving. Falls back to the default, exactly as every other setting does.
   it('falls back to the default when CLICKHOUSE_RETENTION_DAYS is not a positive integer', async () => {
     vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
@@ -243,7 +243,7 @@ describe('clickhouse client analytics enablement', () => {
         'backup_log|histogram_metric_log)(_[0-9]+)?$',
     );
 
-    // Exactly the tables that exist are dropped — the _N leftovers included.
+    // Exactly the tables that exist are dropped - the _N leftovers included.
     for (const name of liveTables) {
       expect(calls.command).toContain(`DROP TABLE IF EXISTS system.${name} SYNC`);
     }

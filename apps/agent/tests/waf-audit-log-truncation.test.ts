@@ -4,7 +4,7 @@
  * size threshold; these pin that.
  *
  * Moved here with the parser. The offsets now go through the agent's own store, so this uses a real
- * one on a temp file rather than the shape-mocked data layer the controller's copy needed —
+ * one on a temp file rather than the shape-mocked data layer the controller's copy needed -
  * round-tripping through real SQLite is the point, since a test spanning two passes proves nothing
  * if each starts from a blank slate.
  */
@@ -106,7 +106,7 @@ describe("waf-audit.log truncation", () => {
   });
 
   // Regression (issue #233): Coraza creates waf-audit.log owned by the caddy
-  // user with mode 0644, so the web container — a different UID — gets EACCES
+  // user with mode 0644, so the web container - a different UID - gets EACCES
   // here. The truncate used to run *before* the offsets were persisted, so the
   // throw aborted the pass and froze them, making every later pass re-read and
   // re-insert the same tail forever. Progress must survive a failed truncate.
@@ -134,7 +134,7 @@ describe("waf-audit.log truncation", () => {
     expect(stateValue("waf_audit_log_offset")).toBe("5000");
 
     // File is deleted and recreated, then grows past the previously stored
-    // size — so the shrink check alone would never notice the replacement.
+    // size - so the shrink check alone would never notice the replacement.
     fsState.auditInode = 43;
     fsState.auditSize = 9_000;
     await parseNewWafLogEntries();

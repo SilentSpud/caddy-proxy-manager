@@ -1,5 +1,5 @@
 /**
- * The Caddy module registry and custom-module validation — the contract between the Dockerfile that
+ * The Caddy module registry and custom-module validation - the contract between the Dockerfile that
  * compiles the binary, the config builder, and the UI, none of which can check each other.
  */
 import { describe, it, expect } from 'bun:test';
@@ -75,7 +75,7 @@ describe('caddy module registry', () => {
 
   it('pins every catalog module in the Caddy build go.mod', () => {
     // build.sh resolves a bare path to `path@version` by looking it up here. A module missing a
-    // pin still compiles, but floats to whatever is latest at build time — which is the
+    // pin still compiles, but floats to whatever is latest at build time - which is the
     // reproducibility hole go.mod exists to close, and it fails silently.
     const pinned = pinnedModulePaths();
     const unpinned = CADDY_MODULES.map((m) => m.modulePath).filter((p) => !pinned.has(p));

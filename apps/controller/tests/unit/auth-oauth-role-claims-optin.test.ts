@@ -20,7 +20,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -45,7 +45,7 @@ vi.mock('better-auth/plugins', () => ({
 }));
 
 // The flag above is read through the config module, and config snapshots
-// process.env when it is first evaluated — which has already happened by the
+// process.env when it is first evaluated - which has already happened by the
 // time this file's body runs. Evaluate a second copy now that the env is set
 // and point the plain specifier at it, so auth-server reads the right value.
 const freshConfig = await import(`../../src/lib/config${fresh()}`);
@@ -65,7 +65,7 @@ describe('OAuth role-from-claims opt-in (AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true)
       status: 'active',
     });
 
-    expect(result.data.role).toBe('admin'); // claim honored — not forced to "user"
+    expect(result.data.role).toBe('admin'); // claim honored - not forced to "user"
     expect(result.data.status).toBe('active');
   });
 });

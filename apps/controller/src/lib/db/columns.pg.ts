@@ -7,7 +7,7 @@ import { customType } from "drizzle-orm/pg-core";
  * (nowIso()). Better Auth's drizzle adapter writes Date objects instead, and a plain `text` column
  * binds its value straight through to the driver. bun:sqlite rejects a Date outright ("Binding
  * expected string, TypedArray, boolean, number, bigint or null"), failing every sign-in, while
- * Bun.SQL quietly serializes it — so without this the defect reaches SQLite only. Normalizing on
+ * Bun.SQL quietly serializes it - so without this the defect reaches SQLite only. Normalizing on
  * write keeps both backends storing the same thing.
  *
  * Storage and DDL are unchanged (still TEXT), so no migration is involved, and reads still return

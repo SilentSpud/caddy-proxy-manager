@@ -3,9 +3,9 @@
  *
  * Two rules decide whether something is a field or a `JSON` blob:
  *
- * - **A field** when the shape is stable and worth querying — an id, a name, a domain list, a
+ * - **A field** when the shape is stable and worth querying - an id, a name, a domain list, a
  *   timestamp, a foreign key. These are what a client filters, sorts and displays on.
- * - **`JSON`** when the model layer owns the shape — load-balancer settings, WAF overrides,
+ * - **`JSON`** when the model layer owns the shape - load-balancer settings, WAF overrides,
  *   geoblock rules, mTLS configuration. Those change with the product and are validated by
  *   functions that already exist; restating them here would be thousands of lines of schema that
  *   can drift out of step with the validator, while looking authoritative.
@@ -114,7 +114,7 @@ export const typeDefs = /* GraphQL */ `
   }
 
   """
-  A user. The password hash and the OAuth subject are absent by construction — the resolver
+  A user. The password hash and the OAuth subject are absent by construction - the resolver
   projects the fields below rather than returning the model row, so a field cannot be added here
   by accident and start leaking one.
   """
@@ -271,7 +271,7 @@ export const typeDefs = /* GraphQL */ `
   The controller's half of the agent conversation.
 
   One long-lived subscription per agent, carrying desired state, commands, an opening hello and a
-  periodic ping. Delivered over SSE, which is what the agent already spoke — the difference is
+  periodic ping. Delivered over SSE, which is what the agent already spoke - the difference is
   that the framing now belongs to the GraphQL server rather than to the registry.
   """
   type Subscription {

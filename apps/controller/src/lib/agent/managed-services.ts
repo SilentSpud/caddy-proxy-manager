@@ -2,14 +2,14 @@
  * Starting and stopping the two optional containers from the Settings page.
  *
  * ClickHouse and geoipupdate sit behind Compose profiles, so whether they exist at all is decided
- * by `COMPOSE_PROFILES` on the host — outside the stack, before anything in it runs. Nothing the
+ * by `COMPOSE_PROFILES` on the host - outside the stack, before anything in it runs. Nothing the
  * controller can reach changes that, but the agent runs the Compose CLI, and `--profile` on one
  * invocation enables a profile for that invocation. That is the whole trick: the agent turns a
  * stored setting into `docker compose --profile clickhouse up -d clickhouse`.
  *
  * The credentials travel with the request because Compose interpolates them from the host `.env`,
  * which the agent mounts read-only and the controller has no access to at all. Sending them lets an
- * operator configure MaxMind and ClickHouse in one place — the Settings page — instead of keeping
+ * operator configure MaxMind and ClickHouse in one place - the Settings page - instead of keeping
  * the database and a file on the host in step by hand.
  */
 
@@ -60,7 +60,7 @@ export async function desiredManagedServices(): Promise<ManagedServicesRequest> 
  * function because the callers name what changed, not how it is delivered.
  *
  * Never throws. An agent that is not attached gets the whole state the moment it reconnects, which
- * is also the answer for a deployment whose agent has not started — the operator manages those
+ * is also the answer for a deployment whose agent has not started - the operator manages those
  * containers themselves there, which is what COMPOSE_PROFILES is still for.
  */
 export async function applyManagedServices(): Promise<void> {

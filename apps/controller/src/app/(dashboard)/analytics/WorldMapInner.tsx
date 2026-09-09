@@ -26,7 +26,7 @@ import atlasUrl from "world-atlas/countries-50m.json?url";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useTranslations } from "next-intl";
 
-// maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling —
+// maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling -
 // the worker never starts and the map is empty ocean. `?worker&url` bundles its module graph into
 // one chunk and returns the path. Needs `worker.format: "es"` and CSP `worker-src 'self'`.
 if (typeof window !== "undefined") {
@@ -437,7 +437,7 @@ function flag(code: string): string {
 
 // Unwrap polygon rings so consecutive vertices never jump more than 180° in longitude, which stops
 // MapLibre drawing giant artifacts for countries crossing ±180° (Russia, Fiji). Coordinates
-// outside [-180, 180] are intentional — MapLibre renders them via world-copy tiling.
+// outside [-180, 180] are intentional - MapLibre renders them via world-copy tiling.
 function cutAntimeridian(fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection {
   function unwrapRing(ring: GeoJSON.Position[]): GeoJSON.Position[] {
     if (ring.length === 0) return ring;
@@ -496,7 +496,7 @@ export default function WorldMapInner({
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
   // `tokens` is memoized on theme + mode, so every layer spec below stays referentially stable
-  // until the mode actually flips — react-map-gl diffs these against the live style, and a new
+  // until the mode actually flips - react-map-gl diffs these against the live style, and a new
   // object each render would make it re-apply paint properties continuously.
   const { mode, tokens } = useTheme();
   const palette = useMemo(
@@ -640,7 +640,7 @@ export default function WorldMapInner({
           `inset: 0` rather than `height: 100%`: this wrapper is a flex item, and a
           percentage height resolved against a flex-determined height collapses to
           zero here. MapLibre's own container carries `overflow: hidden`, so a
-          collapsed height clips the canvas away completely — the map still runs
+          collapsed height clips the canvas away completely - the map still runs
           and answers queryRenderedFeatures, but paints nothing and hit-tests
           nothing. */}
       <div className="relative rounded-lg overflow-hidden border border-border flex-1 min-h-[280px] min-w-[400px] w-full">
@@ -665,7 +665,7 @@ export default function WorldMapInner({
         >
           <Source id="countries" type="geojson" data={geojson}>
             <Layer {...fillLayer} source="countries" />
-            {/* Selected: data-driven via isSelected property baked into geojson — reliable on click */}
+            {/* Selected: data-driven via isSelected property baked into geojson - reliable on click */}
             <Layer
               {...selectedLayer}
               source="countries"
@@ -764,8 +764,8 @@ export default function WorldMapInner({
           <Text type="body" size="xsm" color="secondary">
             {t("low")}{" "}
           </Text>
-          {/* Mirrors the map's own fill-colour interpolation — same stops, same
-              order — so the key stays true to the map after a theme flip
+          {/* Mirrors the map's own fill-colour interpolation - same stops, same
+              order - so the key stays true to the map after a theme flip
               inverts the ramp. */}
           <div
             style={{

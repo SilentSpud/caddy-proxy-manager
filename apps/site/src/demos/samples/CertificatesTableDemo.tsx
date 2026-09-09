@@ -13,7 +13,7 @@ type Row = {
   status: "active" | "warning" | "error";
 };
 
-/** One healthy, one close to expiry, one that has failed — what the page is watched for. */
+/** One healthy, one close to expiry, one that has failed - what the page is watched for. */
 const CERTS: Row[] = [
   {
     id: 1,
@@ -35,7 +35,7 @@ const CERTS: Row[] = [
     id: 3,
     domain: "vpn.example.com",
     issuer: "Internal CA",
-    challenge: "—",
+    challenge: "-",
     expires: "expired",
     status: "error",
   },

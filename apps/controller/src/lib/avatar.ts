@@ -66,7 +66,7 @@ export function isNonRoutableEmail(email: string | null | undefined): boolean {
 
 /**
  * Gravatar's identifier: SHA-256 of the trimmed, lowercased address; null when it cannot have one.
- * `d=404` is deliberate — Gravatar 404s an unknown address, so the caller falls back to the initial.
+ * `d=404` is deliberate - Gravatar 404s an unknown address, so the caller falls back to the initial.
  */
 export function gravatarUrl(email: string | null | undefined, size = 160): string | null {
   const normalized = normalizeEmail(email);
@@ -87,7 +87,7 @@ export function avatarInitial(user: AvatarUser): string {
 export type ResolveAvatarOptions = {
   /**
    * Whether the Gravatar fallback may be used. When false no Gravatar URL is produced at all, so
-   * the browser never contacts gravatar.com — see isGravatarEnabled() for where this comes from.
+   * the browser never contacts gravatar.com - see isGravatarEnabled() for where this comes from.
    */
   gravatar?: boolean;
 };

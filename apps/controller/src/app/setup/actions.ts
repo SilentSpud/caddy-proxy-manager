@@ -4,7 +4,7 @@
  * The first-run setup actions.
  *
  * Every one of these re-checks the stage before it writes. The pages guard too, but a page guard is
- * a redirect and these are the endpoints that actually create an administrator — an unauthenticated
+ * a redirect and these are the endpoints that actually create an administrator - an unauthenticated
  * POST to a setup action on a configured instance would otherwise be a way to mint one.
  */
 import { redirect } from "next/navigation";

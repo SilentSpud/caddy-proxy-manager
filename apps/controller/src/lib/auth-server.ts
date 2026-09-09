@@ -39,7 +39,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
   // Ownership of an existing CPM account is asserted by the operator through the provider's
   // auto-link switch, never by the IdP alone. Reporting the claim only for auto-link providers
   // keeps a provider that merely returns `email_verified: true` from attaching itself to a local
-  // account. Every mapProfileToUser below must report it — better-auth otherwise falls back to
+  // account. Every mapProfileToUser below must report it - better-auth otherwise falls back to
   // the raw profile's own emailVerified, which is exactly the ungated claim.
   const mapEmailVerified = (profile: Record<string, unknown>) => ({
     emailVerified: p.autoLink === true && profileEmailVerified(profile),
@@ -69,7 +69,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
   const mapping = toGroupMappingConfig(p);
   if (needsGroupClaims(mapping)) {
     // Resolve claims ourselves so the group claim is found whether the IdP puts it in the ID
-    // token or only on userinfo — better-auth stops at the ID token once it has sub and email.
+    // token or only on userinfo - better-auth stops at the ID token once it has sub and email.
     cfg.getUserInfo = async (tokens) => {
       const claims = await fetchOidcClaims(
         { issuer: p.issuer, userinfoUrl: p.userinfoUrl },
@@ -114,7 +114,7 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
  * Park the IdP session id from an account row's ID token, ignoring anything that goes wrong.
  *
  * Both account hooks call this, and neither may fail over it: a provider that issues no `sid`,
- * or a token this cannot decode, costs precision on a future logout and nothing else — refusing
+ * or a token this cannot decode, costs precision on a future logout and nothing else - refusing
  * the sign-in over it would be far worse.
  */
 function rememberIdpSession(account: {
@@ -177,7 +177,7 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
     cachedTrustedProviderIds = providers.filter((p) => p.autoLink).map((p) => p.id);
     providersLoadedSuccessfully = true;
   } catch (e) {
-    // DB not ready yet — start with empty, will retry on next getAuth() call
+    // DB not ready yet - start with empty, will retry on next getAuth() call
     if (!cachedProviders) cachedProviders = [];
     console.warn("[auth-server] Failed to load OAuth providers (will retry):", e);
   }
@@ -196,7 +196,7 @@ export function enforceSafeUserDefaults<T extends object>(
   return { ...user, role: "user", status: "active" };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above — the return type depends on a plugin list only known at runtime
+// biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above - the return type depends on a plugin list only known at runtime
 async function createAuth(): Promise<any> {
   const oauthConfigs = await loadProviders();
   const trustedProviderIds = [...cachedTrustedProviderIds];
@@ -204,7 +204,7 @@ async function createAuth(): Promise<any> {
   return betterAuth({
     // `schema` is the whole module: the adapter resolves each model by the `modelName` configured
     // below, and those names already match the exported table bindings. Rows written by the
-    // previous Kysely path stay readable — tests/integration/auth-adapter-compat.test.ts signs in
+    // previous Kysely path stay readable - tests/integration/auth-adapter-compat.test.ts signs in
     // as a user created that way.
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -260,7 +260,7 @@ async function createAuth(): Promise<any> {
     },
     verification: { modelName: "verifications" },
     emailAndPassword: {
-      // OIDC-only mode turns credential sign-in off entirely — there are no local accounts.
+      // OIDC-only mode turns credential sign-in off entirely - there are no local accounts.
       enabled: !config.auth.disableLocalUsers,
       disableSignUp: !config.auth.allowSelfRegistration,
       password: {
@@ -276,7 +276,7 @@ async function createAuth(): Promise<any> {
       user: {
         create: {
           // By default, never let an external IdP set privileged fields (role/status) on a newly
-          // federated user — see enforceSafeUserDefaults above. Operators who trust their IdP to
+          // federated user - see enforceSafeUserDefaults above. Operators who trust their IdP to
           // manage roles can opt out with AUTH_ALLOW_OAUTH_ROLE_FROM_CLAIMS=true.
           before: async (user: Record<string, unknown>) => {
             if (config.auth.allowOauthRoleFromClaims) {
@@ -297,7 +297,7 @@ async function createAuth(): Promise<any> {
           },
           after: async (account) => {
             // The ID token is in hand here and the session row does not exist yet, so its `sid`
-            // is parked for the session hook below — that is what a back-channel logout naming a
+            // is parked for the session hook below - that is what a back-channel logout naming a
             // single IdP session has to match against.
             rememberIdpSession(account);
 
@@ -313,7 +313,7 @@ async function createAuth(): Promise<any> {
                 await syncUserOAuthIdentity(userId);
               }
             } catch (e) {
-              // Informational columns only — never break authentication over them.
+              // Informational columns only - never break authentication over them.
               console.warn("[auth-server] Failed to sync users.provider/subject from accounts:", e);
             }
           },

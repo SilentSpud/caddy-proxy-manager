@@ -34,7 +34,7 @@ const SEVERITY_VARIANTS = {
 
 /**
  * A morning's traffic against one small deployment: two real attacks blocked, one scanner walking
- * the tree, and one false positive from an application posting HTML in a form — which is the event
+ * the tree, and one false positive from an application posting HTML in a form - which is the event
  * the suppression flow in the prose exists for.
  */
 const EVENTS: Event[] = [
@@ -101,7 +101,7 @@ const EVENTS: Event[] = [
     severity: "NOTICE",
     host: "wiki.example.com",
     clientIp: "10.0.4.18",
-    countryCode: "—",
+    countryCode: "-",
     method: "POST",
     uri: "/api/pages/42",
     ruleId: 941160,
@@ -129,7 +129,7 @@ const EVENTS: Event[] = [
     severity: "NOTICE",
     host: "wiki.example.com",
     clientIp: "10.0.4.18",
-    countryCode: "—",
+    countryCode: "-",
     method: "POST",
     uri: "/api/pages/17",
     ruleId: 941160,
@@ -245,7 +245,7 @@ export default function WafEventLogDemo() {
           <Text type="code" size="xsm">
             {r.clientIp}
           </Text>
-          {r.countryCode !== "—" && <Badge label={r.countryCode} />}
+          {r.countryCode !== "-" && <Badge label={r.countryCode} />}
         </HStack>
       ),
     },

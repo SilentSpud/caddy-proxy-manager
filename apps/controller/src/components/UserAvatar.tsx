@@ -7,7 +7,7 @@ import type { ResolvedAvatar } from "@/src/lib/avatar";
 interface UserAvatarProps {
   /** Sources and initial, resolved on the server by resolveAvatar(). */
   avatar: ResolvedAvatar;
-  /** Display name — drives the initials, the alt text, and the tooltip. */
+  /** Display name - drives the initials, the alt text, and the tooltip. */
   alt?: string;
   size?: AvatarSize;
   /** Omit the built-in tooltip where the name is already visible beside it. */

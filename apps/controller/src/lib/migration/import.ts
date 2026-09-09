@@ -10,9 +10,9 @@
  * 2. **Booleans.** SQLite stored them as 0/1 and PostgreSQL will not accept an integer in a
  *    boolean column. The columns that need converting are read off the drizzle schema.
  * 3. **Sequences.** Rows keep their ids so foreign keys stay intact, and PostgreSQL does not
- *    advance a `serial` for an explicit id — so every sequence is resynced afterwards. Skipping
+ *    advance a `serial` for an explicit id - so every sequence is resynced afterwards. Skipping
  *    this is the bug that made the first post-migration insert fail with a duplicate key.
- * 4. **Selection.** An operator can leave a group behind — most usefully the old accounts. A
+ * 4. **Selection.** An operator can leave a group behind - most usefully the old accounts. A
  *    table nobody chose is not copied, and the references into it are resolved from the foreign
  *    keys too: a nullable one is nulled, and a table that cannot exist without its parent is
  *    dropped along with it. Neither decision is a list, so a new table gets them for free.
@@ -43,7 +43,7 @@ export type ImportReport = {
   excludedBySelection: string[];
   /**
    * Columns emptied because what they pointed at was not migrated, as `table.column`. All of them
-   * are provenance — who created a row, who owned it — never something that grants access.
+   * are provenance - who created a row, who owned it - never something that grants access.
    */
   clearedReferences: string[];
   totalRows: number;
@@ -111,7 +111,7 @@ function describeTables(): Described[] {
 /**
  * Tables ordered so every reference is satisfied before the table that makes it.
  *
- * A self-reference is ignored rather than treated as a cycle — a table pointing at itself only
+ * A self-reference is ignored rather than treated as a cycle - a table pointing at itself only
  * constrains row order within it, which the source database already satisfied.
  */
 function inFkOrder(tables: Described[]): Described[] {
@@ -154,8 +154,8 @@ function sqliteColumns(source: Database, table: string): Set<string> {
 /**
  * Convert one SQLite row into what the PostgreSQL column expects.
  *
- * Only booleans actually differ. Everything else — text, integers, the JSON this app keeps in text
- * columns — round-trips as-is, and coercing it would risk changing values that were already right.
+ * Only booleans actually differ. Everything else - text, integers, the JSON this app keeps in text
+ * columns - round-trips as-is, and coercing it would risk changing values that were already right.
  *
  * `cleared` names columns whose target table is not being migrated. They are emptied rather than
  * carried, because an id pointing into a table that stayed behind is a foreign key violation.
@@ -192,7 +192,7 @@ function convertRow(
  *
  * A group left behind takes more with it than its own tables: `api_tokens.createdBy` is not
  * nullable, so an API token cannot exist without the user it belongs to. Rather than enumerate
- * that, this closes over the required references until nothing more falls out — so a table added
+ * that, this closes over the required references until nothing more falls out - so a table added
  * later is handled by its own foreign key, not by someone remembering to add it to a list.
  */
 function resolveIncluded(tables: Described[], chosen: Set<string>): Set<string> {
@@ -226,8 +226,8 @@ function clearedColumns(table: Described, included: Set<string>): Set<string> {
 /**
  * Copy the chosen groups from `sqlitePath` into the connected PostgreSQL database.
  *
- * The destination is expected to be empty — this runs during setup, before anything else has been
- * created — so rows keep their ids and conflicts are skipped rather than merged. Merging two
+ * The destination is expected to be empty - this runs during setup, before anything else has been
+ * created - so rows keep their ids and conflicts are skipped rather than merged. Merging two
  * populated databases is a different problem, and guessing at it would silently pick a winner.
  *
  * `groups` defaults to everything, which is both the previous behaviour and the one the setup page
@@ -265,7 +265,7 @@ export async function importLegacyDatabase(
     // Conversion is where a secret encrypted under the old deployment's SESSION_SECRET is
     // re-encrypted under this one's, and where a wrong key is discovered. Doing that up front is
     // the difference between a migration that refuses to start and one that stops halfway with a
-    // partly populated database — which the operator is told never to retry against. A legacy
+    // partly populated database - which the operator is told never to retry against. A legacy
     // database is small enough to hold in memory; that is the whole cost of the guarantee.
     const prepared: Array<{ table: Described; rows: Array<Record<string, unknown>> }> = [];
 

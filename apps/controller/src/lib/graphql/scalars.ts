@@ -1,7 +1,7 @@
 /**
  * The two scalars the schema needs beyond the built-ins.
  *
- * `JSON` carries the free-form configuration blobs — a proxy host's load-balancer settings, WAF
+ * `JSON` carries the free-form configuration blobs - a proxy host's load-balancer settings, WAF
  * overrides, geoblock rules, location rules. Those are validated by the model layer against shapes
  * that change with the product, and mirroring each of them as GraphQL input types would be several
  * thousand lines that must be kept in step with validators that already exist. Worse, it would
@@ -60,7 +60,7 @@ export const JSONScalar = new GraphQLScalarType({
  * An ISO 8601 timestamp, as a string.
  *
  * The database stores these as text already, so this documents the format rather than converting
- * anything — a Date round-tripped through JSON would arrive as a string regardless.
+ * anything - a Date round-tripped through JSON would arrive as a string regardless.
  */
 export const DateTimeScalar = new GraphQLScalarType<string, string>({
   name: "DateTime",

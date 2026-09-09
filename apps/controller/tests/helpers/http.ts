@@ -48,7 +48,7 @@ export function httpGet(
 }
 
 /**
- * Poll until the route responds with a status other than 502/503/504 — what Caddy returns while a
+ * Poll until the route responds with a status other than 502/503/504 - what Caddy returns while a
  * config reload is in flight or the upstream is not wired up yet.
  */
 export async function waitForRoute(domain: string, timeoutMs = 15_000): Promise<void> {
@@ -60,7 +60,7 @@ export async function waitForRoute(domain: string, timeoutMs = 15_000): Promise<
       lastStatus = res.status;
       if (res.status !== 502 && res.status !== 503 && res.status !== 504) return;
     } catch {
-      // Connection refused — Caddy not ready yet
+      // Connection refused - Caddy not ready yet
     }
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -86,7 +86,7 @@ export async function waitForStatus(
       lastStatus = res.status;
       if (res.status === expectedStatus) return;
     } catch {
-      // Connection refused — not ready yet
+      // Connection refused - not ready yet
     }
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -115,7 +115,7 @@ export async function waitForBody(
       lastBody = res.body;
       if (res.body.includes(substring)) return;
     } catch {
-      // Connection refused — Caddy not ready yet
+      // Connection refused - Caddy not ready yet
     }
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -199,7 +199,7 @@ export function wsHandshake(
       }
     });
 
-    // Server closed without a complete header block — the mangled-response case.
+    // Server closed without a complete header block - the mangled-response case.
     socket.on('end', () => {
       clearTimeout(timer);
       finish();

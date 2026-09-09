@@ -1,5 +1,5 @@
 /**
- * Functional: custom WAF path rule — global WAF on, per-host WAF merging, and a custom SecRule on
+ * Functional: custom WAF path rule - global WAF on, per-host WAF merging, and a custom SecRule on
  * REQUEST_URI blocking /admin.
  */
 import { test, expect } from '@playwright/test';

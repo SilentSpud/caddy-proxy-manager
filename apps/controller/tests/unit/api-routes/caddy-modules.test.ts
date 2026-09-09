@@ -92,7 +92,7 @@ describe('PUT /api/v1/caddy/modules', () => {
 
     expect(response.status).toBe(409);
     expect(data.error).toMatch(/Layer 4 Proxy module/);
-    // Nothing is written — the refusal has to be total, not cosmetic.
+    // Nothing is written - the refusal has to be total, not cosmetic.
     expect(mockSave).not.toHaveBeenCalled();
     expect(mockApply).not.toHaveBeenCalled();
   });

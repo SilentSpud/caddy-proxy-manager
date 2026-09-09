@@ -12,7 +12,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -83,7 +83,7 @@ async function createHostWithRuleLb() {
   );
 }
 
-describe('location rule load balancer — model round-trip', () => {
+describe('location rule load balancer - model round-trip', () => {
   it('hydrates the nested load balancer on read', async () => {
     const host = await createHostWithRuleLb();
     const fetched = (await getProxyHost(host.id))!;

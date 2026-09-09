@@ -1,6 +1,6 @@
 /**
  * The legacy-password gate end to end. Unit tests cover the decision; only a real browser shows the
- * redirect terminates — if /password-change moved inside the dashboard group, they would bounce.
+ * redirect terminates - if /password-change moved inside the dashboard group, they would bounce.
  */
 import { test, expect } from '@playwright/test';
 import {
@@ -24,7 +24,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 async function signIn(page: import('@playwright/test').Page, password: string) {
   await page.goto('/login');
   // The sign-in form submits natively until React attaches its onSubmit, so a fill or a click that
-  // lands first is either dropped or turned into a GET to /login?username=...&password=... — the
+  // lands first is either dropped or turned into a GET to /login?username=...&password=... - the
   // shape CI caught this helper failing in, on the second sign-in below.
   await waitForHydration(page);
   await page.getByRole('textbox', { name: /username/i }).fill(USERNAME);

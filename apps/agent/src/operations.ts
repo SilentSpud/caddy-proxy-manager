@@ -2,7 +2,7 @@
  * The two long-running operations, and the rule that only one may run at a time.
  *
  * Both end in `docker compose up caddy`, so overlapping them would have two recreates racing for
- * the same container — one of which would win with the other's overrides half-written. The lock is
+ * the same container - one of which would win with the other's overrides half-written. The lock is
  * process-wide because the agent is the only writer of these files on its host.
  */
 
@@ -45,8 +45,8 @@ export class Operations {
   /**
    * Clear a status left mid-flight by a killed agent.
    *
-   * Without this the UI spins forever on an operation that is provably not running — this process
-   * has just started, so nothing it launched can still be in progress — with its button disabled
+   * Without this the UI spins forever on an operation that is provably not running - this process
+   * has just started, so nothing it launched can still be in progress - with its button disabled
    * and no way back except editing the database by hand.
    */
   clearStaleStatuses(): void {
@@ -81,7 +81,7 @@ export class Operations {
   /**
    * Reconcile the published ports with the ones this agent last applied.
    *
-   * This runs at startup and is not bookkeeping — it is the only thing that keeps layer-4 routing
+   * This runs at startup and is not bookkeeping - it is the only thing that keeps layer-4 routing
    * alive across a host reboot. The operator's `docker compose up` starts Caddy from the base
    * files, which do not include the generated port override, so a restarted stack comes up with
    * every L4 port unpublished. Nothing else would notice until someone opened the UI.
@@ -231,7 +231,7 @@ export class Operations {
         // plugin the new binary no longer has, which Caddy refuses wholesale.
         const message =
           `Caddy was rebuilt but its health check reports "${health}". Check the Caddy ` +
-          `container logs — a config referencing a removed module will fail to load.`;
+          `container logs - a config referencing a removed module will fail to load.`;
         this.store.setCaddyBuildStatus({
           state: "failed",
           message,
@@ -317,7 +317,7 @@ export class Operations {
           applied[name] = enable;
           continue;
         }
-        // Each service is independent, so one failing must not leave the other unattempted —
+        // Each service is independent, so one failing must not leave the other unattempted -
         // a missing MaxMind subscription should not also take analytics down.
         const detail = result.timedOut
           ? `abandoned after ${this.config.serviceTimeoutSeconds}s`
@@ -331,7 +331,7 @@ export class Operations {
         const detail = failures.join("; ");
         this.store.setManagedServicesStatus({
           state: "failed",
-          message: `Could not apply every optional service — ${detail}`,
+          message: `Could not apply every optional service - ${detail}`,
           triggeredAt,
           error: detail,
         });

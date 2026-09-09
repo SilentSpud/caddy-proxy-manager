@@ -33,8 +33,8 @@ export type SetupSettingsState = { error: string | null };
 /**
  * Save the configuration collected by the last setup step, then mark setup finished.
  *
- * Whoever completes setup is the administrator. A signed-in session is required — this step runs
- * after the sign-in setup insists on, so there is a real user by now — but demanding that they
+ * Whoever completes setup is the administrator. A signed-in session is required - this step runs
+ * after the sign-in setup insists on, so there is a real user by now - but demanding that they
  * already *be* an admin made the OAuth branch of the account step a dead end: it stores a provider
  * and no user, so the user row is created by Better Auth's callback with `role: "user"`, and the
  * only place group-to-role mapping can be turned on is this very step. Promoting here rather than
@@ -54,7 +54,7 @@ export async function saveSetupSettings(
   }
 
   // Before the writes below, so the rest of this action runs as an administrator. A no-op when
-  // the account step already made one, which is every local-account setup — and for a second,
+  // the account step already made one, which is every local-account setup - and for a second,
   // ordinary user reaching this step, which is what the check below still refuses.
   const promoted = await promoteFirstSetupAdmin(Number(session.user.id));
   if (!promoted && session.user.role !== "admin") {
@@ -79,7 +79,7 @@ export async function saveSetupSettings(
     }
 
     if (typeof definition.default === "boolean") {
-      // Nothing posted means the field was not rendered — a gated group whose switch is off. Left
+      // Nothing posted means the field was not rendered - a gated group whose switch is off. Left
       // alone rather than written false, which is what keeps a stored credential from being
       // cleared by turning its feature off.
       if (raw === null) continue;
@@ -149,7 +149,7 @@ export async function saveSetupSettings(
 
   // Analytics and GeoIP decide whether a container runs, and the operator has just chosen. Without
   // this, setup would finish with ClickHouse still stopped and the client still holding whatever it
-  // resolved before the form was filled in. Never throws — see the function's own note.
+  // resolved before the form was filled in. Never throws - see the function's own note.
   await propagateOptionalFeatureSettings();
 
   const providerError = await createProviderFromForm(formData);
@@ -158,7 +158,7 @@ export async function saveSetupSettings(
   // CPM proxies its own dashboard from here on, so the operator's first look at the product is a
   // working host rather than an empty list. Over HTTP: whether HTTPS would work is a question only
   // the reachability check can answer, and it cannot answer it until the route is live. Best-effort
-  // on purpose — a settings write failing is not a reason to refuse a setup that has already saved
+  // on purpose - a settings write failing is not a reason to refuse a setup that has already saved
   // everything it was asked to.
   try {
     await saveDashboardSettings(activateDashboardHost());
@@ -180,7 +180,7 @@ export async function saveSetupSettings(
  * with the rest of their configuration already saved rather than losing the page.
  *
  * Blank is the ordinary answer: a deployment signing in with a local administrator has no provider
- * to describe, and the card is optional for that reason. Partly filled is not — a name with no
+ * to describe, and the card is optional for that reason. Partly filled is not - a name with no
  * client secret is a provider that cannot work, and silently skipping it would leave the operator
  * believing they had configured single sign-on.
  */
@@ -196,7 +196,7 @@ async function createProviderFromForm(formData: FormData): Promise<string | null
   const filled = [name, clientId, clientSecret, issuer].filter((value) => value !== "");
   if (filled.length === 0) return null;
   if (filled.length < 4) {
-    return "An identity provider needs a display name, issuer URL, client ID and client secret — or leave all four blank to skip it.";
+    return "An identity provider needs a display name, issuer URL, client ID and client secret - or leave all four blank to skip it.";
   }
   if (!/^https?:\/\/\S+$/.test(issuer)) {
     return "The issuer must be a URL starting with http:// or https://.";

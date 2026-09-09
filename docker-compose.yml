@@ -46,7 +46,7 @@ services:
       POSTGRES_SSL: ${POSTGRES_SSL:-}
 
       # Overrides all of the above when set, for a server that needs something a URL can say and
-      # the fields cannot — an sslmode, a search_path, a connection option. Remember that a
+      # the fields cannot - an sslmode, a search_path, a connection option. Remember that a
       # password inside a URL has to be percent-encoded. An existing SQLite file is migrated
       # through the in-app migration flow, not by pointing this at it.
       DATABASE_URL: ${DATABASE_URL:-}
@@ -104,7 +104,7 @@ services:
       LOGIN_WINDOW_MS: ${LOGIN_WINDOW_MS:-300000}
       LOGIN_BLOCK_MS: ${LOGIN_BLOCK_MS:-900000}
 
-      # Optional OAuth2/OIDC — Authentik, Authelia, Keycloak, and similar.
+      # Optional OAuth2/OIDC - Authentik, Authelia, Keycloak, and similar.
       OAUTH_ENABLED: ${OAUTH_ENABLED:-false}
       OAUTH_PROVIDER_NAME: ${OAUTH_PROVIDER_NAME:-OAuth2}
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-}
@@ -133,7 +133,7 @@ services:
       UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/silentspud/caddy-proxy-manager}
 
       # Optional analytics and GeoIP. Both are Settings toggles now: a stored value wins over the
-      # variable, and the agent starts or stops the container to match — so neither the profile nor
+      # variable, and the agent starts or stops the container to match - so neither the profile nor
       # these need setting on a stack with an agent. They remain for a first start, and for a
       # deployment with no agent, where Docker is the only thing that can start those services.
       # Unset means "decide from whether the credentials below are configured", which is what
@@ -187,7 +187,7 @@ services:
         PUID: ${PUID:-10000}
         PGID: ${PGID:-10000}
     # Behind a profile so `docker compose up` does not start it. The agent does, once it is paired
-    # and the controller has a configuration to serve — an unpaired host must not answer 80 and 443
+    # and the controller has a configuration to serve - an unpaired host must not answer 80 and 443
     # with a default page. `restart: unless-stopped` still applies once the agent has started it,
     # so a reboot brings it back without waiting for the agent to notice.
     profiles: ["caddy"]
@@ -263,7 +263,7 @@ services:
       # agent is the only thing that knows where its Caddy is. This is that address.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
       # Analytics: the agent parses this host's Caddy logs and writes the events itself, using
-      # credentials the controller pushes. Nothing to configure here — the controller decides
+      # credentials the controller pushes. Nothing to configure here - the controller decides
       # whether analytics are on at all.
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
@@ -292,7 +292,7 @@ services:
       - caddy-network
 
   # The controller's database. No profile: unlike clickhouse and geoipupdate this is not optional,
-  # since SQLite support was removed. Unpublished on purpose — nothing outside the compose network
+  # since SQLite support was removed. Unpublished on purpose - nothing outside the compose network
   # needs it, and publishing 5432 is how a database ends up on the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
@@ -325,7 +325,7 @@ services:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-cpm}
       # `:-` rather than `:?`, because the agent supplies this from the Settings page by putting it
-      # in the environment of the `docker compose` it runs — and interpolation happens while this
+      # in the environment of the `docker compose` it runs - and interpolation happens while this
       # file is parsed, so a `:?` here fails every invocation that so much as mentions the project,
       # `stop` included, on a deployment that keeps its password in the database instead of .env.
       # An empty value still cannot start ClickHouse; the controller refuses to enable analytics

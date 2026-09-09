@@ -8,8 +8,8 @@ One script, five modes, chosen by argv[1]:
     tcp   PORT              raw TCP line echo, no protocol awareness
     udp   PORT              raw UDP datagram echo
 
-The HTTP origin reflects everything the proxy did to a request — the Host it
-forwarded, every header it added, the address it connected from — so the test
+The HTTP origin reflects everything the proxy did to a request - the Host it
+forwarded, every header it added, the address it connected from - so the test
 suite can assert on proxy behaviour rather than just on reachability.
 
 Only the standard library is used, WebSocket framing included, so the image

@@ -29,7 +29,7 @@ import { useTranslations } from "next-intl";
 
 /**
  * Schedule onClose after a successful action exactly once. Without the ref guard the effect
- * re-arms on every parent render — onClose is a new function identity each time — while status
+ * re-arms on every parent render - onClose is a new function identity each time - while status
  * stays "success", so a stray onClose closes a dialog the user has just reopened (#241).
  */
 function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
@@ -63,14 +63,14 @@ function matcherOptions(t: Translator) {
 function proxyProtocolOptions(t: Translator) {
   return [
     { value: "__none__", label: t("optProxyProtocolNone") },
-    // Version identifiers, not prose — nothing to translate.
+    // Version identifiers, not prose - nothing to translate.
     { value: "v1", label: "v1" },
     { value: "v2", label: "v2" },
   ];
 }
 
 /**
- * What `layer4.proxy.selection_policies.*` registers — a strict subset of the HTTP list.
+ * What `layer4.proxy.selection_policies.*` registers - a strict subset of the HTTP list.
  *
  * No header, cookie, uri_hash, query or client_ip_hash: each needs a request to read, and layer 4
  * has a connection. Checked against the shipped binary, not assumed from the HTTP side.

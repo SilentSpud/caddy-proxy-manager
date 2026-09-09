@@ -2,7 +2,7 @@
 /**
  * The frame around a live demo.
  *
- * The demo itself is a React island in the default slot — the controller's own component, running,
+ * The demo itself is a React island in the default slot - the controller's own component, running,
  * not a screenshot of it. This wrapper is deliberately dumb: it names what is on screen, says that
  * it is real, and draws a border so a dark form does not bleed into a dark page. Everything about
  * how the component looks belongs to Astryx, and is set up in DemoSurface and demo.css.
@@ -19,7 +19,7 @@ const { title, note } = Astro.props;
 /**
  * Astro has no `useId`, and the badge and its tooltip have to agree on one. This markup is
  * rendered once at build time and never hydrated, so a random id is stable in the output and
- * cannot collide with the second demo on a page — which a title slug could.
+ * cannot collide with the second demo on a page - which a title slug could.
  */
 const hintID = `cpm-demo-hint-${crypto.randomUUID().slice(0, 8)}`;
 ---
@@ -35,3 +35,48 @@ const hintID = `cpm-demo-hint-${crypto.randomUUID().slice(0, 8)}`;
   </figcaption>
   <slot />
 </figure>
+
+<script>
+  /*
+   * Takes the app's own links back out of the demos.
+   *
+   * The components in here are the product's, so they link where they link in the product:
+   * `/analytics` on the overview's traffic card, `#` on the stat cards beside it. Those are the
+   * dashboard's routes, and this is not the dashboard - following one leaves the documentation
+   * site for a URL that does not exist. Links with a scheme are left alone, because those go
+   * somewhere real and are part of what the component is showing: the Caddy Build demo lists every
+   * plugin it can compile in, each linked to its repository, and that is worth keeping.
+   *
+   * Dropping `href` rather than swallowing the click is what makes it stop being a link - no
+   * pointer cursor, no status bar preview, and not announced as one. The `tabindex` goes with it,
+   * or a keyboard would still stop on a card that no longer does anything; Astryx's ClickableCard
+   * sets that explicitly, so losing the href is not enough on its own. The card keeps its hover
+   * styling and still looks like the thing it is a picture of.
+   *
+   * This runs against the server-rendered markup before React ever hydrates, and the observer
+   * reapplies it to whatever each island renders afterwards. Removing the attributes retriggers
+   * the observer once, finds nothing left to change, and settles.
+   */
+  function deLink(root: ParentNode) {
+    const anchors = root.querySelectorAll<HTMLAnchorElement>("a[href], a[data-cpm-demo-delinked]");
+    for (const anchor of anchors) {
+      const href = anchor.getAttribute("href");
+      if (href !== null && /^[a-z][a-z0-9+.-]*:/i.test(href)) continue;
+      anchor.removeAttribute("href");
+      // Assigned, not removed: React sets tabIndex as a property, which survives the attribute
+      // going away. -1 is the value that takes it out of the tab order while leaving the card
+      // reachable by script, and writing it back is what the observer watches for.
+      if (anchor.tabIndex !== -1) anchor.tabIndex = -1;
+      anchor.dataset.cpmDemoDelinked = "";
+    }
+  }
+
+  for (const frame of document.querySelectorAll(".cpm-demo-frame")) {
+    deLink(frame);
+    new MutationObserver(() => deLink(frame)).observe(frame, {
+      attributeFilter: ["href", "tabindex"],
+      childList: true,
+      subtree: true,
+    });
+  }
+</script>

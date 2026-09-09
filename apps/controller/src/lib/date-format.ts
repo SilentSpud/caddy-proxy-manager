@@ -4,10 +4,10 @@
  * `Date#toLocaleString()` resolves locale and timezone from the runtime
  * environment, so the Node server (container: en-US, UTC) and the browser
  * (user's locale/timezone, e.g. de-DE, Europe/Berlin) render the same
- * timestamp differently — "9/3/2026, 10:23:46 AM" vs "03.09.2026, 12:23:46".
+ * timestamp differently - "9/3/2026, 10:23:46 AM" vs "03.09.2026, 12:23:46".
  * That made timestamps flip between slashes and dots depending on whether a
  * page was server-rendered (refresh) or reached via client-side navigation
- * (login) — see issue #233 — and caused hydration text mismatches.
+ * (login) - see issue #233 - and caused hydration text mismatches.
  *
  * These helpers pin both locale and timezone so server and client render
  * byte-identical output. Event/audit timestamps are shown in UTC.

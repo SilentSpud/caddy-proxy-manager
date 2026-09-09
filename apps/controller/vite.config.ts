@@ -13,13 +13,13 @@ export default defineConfig({
   plugins: [tailwindcss(), vinext()],
 
   // Read through src/lib/app-version.ts. Inlining the string keeps the rest of
-  // package.json — dependency names, scripts — out of the client bundle.
+  // package.json - dependency names, scripts - out of the client bundle.
   define: {
     "process.env.NEXT_PUBLIC_APP_VERSION": JSON.stringify(appVersion),
   },
 
   // maplibre-gl constructs its tile worker with `{ type: "module" }`, so the
   // chunk `?worker&url` emits for it (see WorldMapInner.tsx) has to be an ES
-  // module — Vite's build default is iife, which that worker would reject.
+  // module - Vite's build default is iife, which that worker would reject.
   worker: { format: "es" },
 });

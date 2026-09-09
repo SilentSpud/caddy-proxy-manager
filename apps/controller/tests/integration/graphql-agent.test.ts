@@ -4,7 +4,7 @@
  * The transport changed; the conversation did not. An agent subscribes and receives `hello`, then
  * desired state, then commands and pings; it reports back with mutations. These tests drive the
  * schema directly rather than over HTTP, because what is worth pinning is the protocol and the
- * gate — the SSE framing belongs to the GraphQL server and is its to get right.
+ * gate - the SSE framing belongs to the GraphQL server and is its to get right.
  *
  * The gate is the part that would be quiet if it broke. Agent fields and operator fields live in
  * one schema, separated only by which credential the resolver insists on, so "a user token cannot
@@ -203,7 +203,7 @@ describe('the two credentials do not cross over', () => {
   });
 
   it('refuses operator fields to an agent', async () => {
-    // The agent context carries no user at all, so the ordinary API is closed to it — an agent
+    // The agent context carries no user at all, so the ordinary API is closed to it - an agent
     // secret is not a way to read the configuration of every host.
     const result = await graphql({
       schema,

@@ -3,7 +3,7 @@
 /**
  * The first two decisions of setup: what this instance is, and how anyone signs in to it.
  *
- * The role question comes first and is not persisted anywhere — an agent has no database of its
+ * The role question comes first and is not persisted anywhere - an agent has no database of its
  * own to record it in, and answering "agent" ends the flow with a pointer to its own instructions
  * rather than continuing. Only a controller has anything further to configure here.
  *

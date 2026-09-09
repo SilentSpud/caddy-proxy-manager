@@ -7,8 +7,8 @@
  * There are two ways to say it, and the second exists because of the first's one sharp edge. A URL
  * has to encode its password, and the place these deployments build one is a Compose file, where
  * the password arrives by shell interpolation and nothing encodes anything. A password containing
- * `/` ends the authority early — `postgres://cpm:pa/ss@postgres:5432/cpm` is a URL whose host is
- * `cpm:pa` and whose path is `/ss@postgres:5432/cpm` — and what the operator sees is a connection
+ * `/` ends the authority early - `postgres://cpm:pa/ss@postgres:5432/cpm` is a URL whose host is
+ * `cpm:pa` and whose path is `/ss@postgres:5432/cpm` - and what the operator sees is a connection
  * failure naming a host they never configured. `@`, `#` and `?` each break it differently.
  *
  * So POSTGRES_* are read as discrete fields and handed to the driver as fields, where no character
@@ -16,7 +16,7 @@
  * can carry options the fields cannot.
  *
  * PostgreSQL only. SQLite was supported through 3.0 and is now reached exclusively by the
- * migration flow, which opens the old file read-only through ./legacy-sqlite.ts — never as the
+ * migration flow, which opens the old file read-only through ./legacy-sqlite.ts - never as the
  * application's own database.
  */
 
@@ -77,7 +77,7 @@ const MISSING_MESSAGE =
   "POSTGRES_USER and POSTGRES_DB as needed), or DATABASE_URL for a full connection string. " +
   "PostgreSQL only.";
 
-/** Trimmed, or undefined for a variable that is unset or blank — which .env files produce easily. */
+/** Trimmed, or undefined for a variable that is unset or blank - which .env files produce easily. */
 function read(env: Record<string, string | undefined>, name: string): string | undefined {
   const value = env[name]?.trim();
   return value ? value : undefined;
@@ -164,7 +164,7 @@ export function resolveDatabaseTarget(
  * The target as the driver's own options.
  *
  * `kind` is the only field that is ours rather than the driver's, so dropping it is all this does
- * — but doing it here means neither the connection nor drizzle.config has to know that.
+ * - but doing it here means neither the connection nor drizzle.config has to know that.
  */
 export function driverOptions(
   target: DatabaseTarget,

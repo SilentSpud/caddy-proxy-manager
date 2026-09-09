@@ -57,7 +57,7 @@ describe('l4-proxy-hosts integration', () => {
     expect(row).toBeUndefined();
   });
 
-  it('multiple L4 hosts — count is correct', async () => {
+  it('multiple L4 hosts - count is correct', async () => {
     await insertL4Host({ name: 'PG', listenAddress: ':5432' });
     await insertL4Host({ name: 'MySQL', listenAddress: ':3306' });
     await insertL4Host({ name: 'Redis', listenAddress: ':6379' });

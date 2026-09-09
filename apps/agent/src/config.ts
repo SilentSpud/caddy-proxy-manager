@@ -2,7 +2,7 @@
  * Everything the agent reads from its environment, resolved once at startup.
  *
  * The agent has no database to read configuration from until it has one, and nothing here is
- * changeable at runtime — it describes the host the agent is bolted to, not a preference — so this
+ * changeable at runtime - it describes the host the agent is bolted to, not a preference - so this
  * stays environment-only rather than moving to the controller's settings registry.
  */
 

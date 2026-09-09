@@ -81,7 +81,7 @@ async function waitForCaddyHealthy(): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
-  console.warn('[global-setup] Caddy health wait timed out — proceeding anyway.');
+  console.warn('[global-setup] Caddy health wait timed out - proceeding anyway.');
 }
 
 async function seedAuthState(): Promise<void> {

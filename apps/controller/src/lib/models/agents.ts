@@ -189,7 +189,7 @@ export async function recordAgentContact(
  * This agent's own module selection, or null when it follows the fleet default.
  *
  * Unparseable JSON reads as null rather than throwing. The column is written by this module alone,
- * so bad content means someone edited the row by hand — and falling back to the fleet selection
+ * so bad content means someone edited the row by hand - and falling back to the fleet selection
  * keeps that agent building something, which is better than a page that will not render.
  */
 export async function getAgentBuildSettings(id: number): Promise<CaddyBuildSettings | null> {

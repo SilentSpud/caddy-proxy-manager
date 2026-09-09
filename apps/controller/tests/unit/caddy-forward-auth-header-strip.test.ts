@@ -13,7 +13,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -65,7 +65,7 @@ function isCpmStrip(h: unknown): boolean {
   // Compared case-insensitively on purpose. What matters is that these headers
   // are deleted; Caddy's delete goes through Go's canonicalising Header.Del, so
   // the spelling in the config is free to change (and did, so the copy-back
-  // placeholder would resolve — see caddy-forward-auth-copy-headers.test.ts).
+  // placeholder would resolve - see caddy-forward-auth-copy-headers.test.ts).
   const lowered = del.map((name) => name.toLowerCase());
   return CPM_HEADERS.every((name) => lowered.includes(name.toLowerCase()));
 }

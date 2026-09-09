@@ -15,7 +15,7 @@ import {
 interface LocaleContextValue {
   /** The locale actually rendering, whatever chose it. */
   locale: Locale;
-  /** What the cookie says — "unset"/"detected" both render as automatic in the switcher. */
+  /** What the cookie says - "unset"/"detected" both render as automatic in the switcher. */
   preference: LocalePreference;
   /** Pick a language, or pass null to go back to following the browser. */
   setLocale: (locale: Locale | null) => void;
@@ -33,7 +33,7 @@ export function useLocalePreference(): LocaleContextValue {
 
 function persist(value: string | null) {
   const base = `${LOCALE_COOKIE}=`;
-  /* biome-ignore lint/suspicious/noDocumentCookie: same reasoning as ThemeModeProvider —
+  /* biome-ignore lint/suspicious/noDocumentCookie: same reasoning as ThemeModeProvider -
      the Cookie Store API is Chromium-only and its async set would let router.refresh()
      race the write. */
   document.cookie =
@@ -86,7 +86,7 @@ export function LocaleProvider({
       persist(preferenceCookieValue({ source: "detected", locale: detected }));
       router.refresh();
     } else if (preference.source === "unset" || preference.locale !== detected) {
-      // Already rendering the right language — record it without a round trip.
+      // Already rendering the right language - record it without a round trip.
       persist(preferenceCookieValue({ source: "detected", locale: detected }));
     }
   }, [locale, preference, router]);

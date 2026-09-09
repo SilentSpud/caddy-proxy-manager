@@ -2,7 +2,7 @@
 # Layer 4 proxying: raw TCP and UDP streams with no HTTP awareness, plus the
 # connection matchers that let several services share one listener.
 #
-# The client reaches these on Caddy's own address rather than a test domain —
+# The client reaches these on Caddy's own address rather than a test domain -
 # an L4 listener has no virtual hosting, it is just a port.
 . "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
@@ -51,7 +51,7 @@ reply=$(tcp_probe caddy "$TCP_PORT" "ping-through-l4")
 t_contains "the TCP stream reaches the destination" "HELLO origin-tcp" "$reply"
 t_contains "the TCP stream carries data both ways" "ECHO origin-tcp ping-through-l4" "$reply"
 
-# Several exchanges on one connection — a stream proxy must not close after the
+# Several exchanges on one connection - a stream proxy must not close after the
 # first line the way a request/response proxy would.
 multi=$(printf 'one\ntwo\nthree\nQUIT\n' | timeout 12 socat -t3 - "TCP:caddy:$TCP_PORT" 2>/dev/null)
 t_contains "a long-lived connection stays open (first)" "ECHO origin-tcp one" "$multi"

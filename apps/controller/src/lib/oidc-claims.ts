@@ -1,6 +1,6 @@
 /**
  * Claim resolution for OIDC providers driving group-based roles. better-auth's `getUserInfo` stops
- * once the ID token has `sub` and `email`, so groups exposed only on userinfo never surface — with
+ * once the ID token has `sub` and `email`, so groups exposed only on userinfo never surface - with
  * group mapping on we read the ID token and fall back to userinfo.
  */
 
@@ -27,7 +27,7 @@ export type DiscoveredEndpoints = {
 
 const discoveryCache = new Map<string, { endpoints: DiscoveredEndpoints; expiresAt: number }>();
 
-/** Exposed for tests — discovery results are process-wide state. */
+/** Exposed for tests - discovery results are process-wide state. */
 export function clearDiscoveryCache(): void {
   discoveryCache.clear();
 }
@@ -49,7 +49,7 @@ export function decodeJwtPayload(token: string | null | undefined): Record<strin
   }
 }
 
-/** Decoded, never verified — it came over the back-channel exchange, as better-auth trusts it. */
+/** Decoded, never verified - it came over the back-channel exchange, as better-auth trusts it. */
 async function discover(issuer: string): Promise<DiscoveredEndpoints> {
   const discoveryUrl = `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
   const cached = discoveryCache.get(discoveryUrl);
@@ -80,7 +80,7 @@ export async function resolveUserinfoUrl(cfg: ClaimSourceConfig): Promise<string
 }
 
 /**
- * Where to fetch the issuer's signing keys. Discovery only — unlike userinfo there is no column to
+ * Where to fetch the issuer's signing keys. Discovery only - unlike userinfo there is no column to
  * configure it by hand, because a provider that cannot be discovered cannot sign a logout token
  * this app is able to verify either.
  */

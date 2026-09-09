@@ -30,8 +30,8 @@ We will respond within 48 hours and provide regular updates on the fix progress.
 Our CI/CD pipeline implements multiple security layers:
 
 1. **Nothing published from a pull request**: images are built and pushed by one workflow
-   (`docker-build-trusted.yml`), which runs only on a `v*` tag or a manual dispatch. A pull request —
-   from a fork or otherwise — runs the test and end-to-end suites and never touches the registry, so
+   (`docker-build-trusted.yml`), which runs only on a `v*` tag or a manual dispatch. A pull request -
+   from a fork or otherwise - runs the test and end-to-end suites and never touches the registry, so
    there is no build-and-push path for untrusted code to reach.
 2. **The version bump is the gate**: `release.yml` tags a release only when `package.json`'s version
    changes on `main`, and only that tag triggers an image build.
@@ -57,13 +57,13 @@ with, and add their own. Two consequences are worth stating plainly:
   the proxy's privileges on every request. Treat adding one exactly as you would
   treat merging code into this repository. Module paths are validated against a
   strict allowlist before they reach the build (see `validateCustomModule`), so
-  a path cannot inject shell into the Dockerfile — but a *valid* path to a
+  a path cannot inject shell into the Dockerfile - but a *valid* path to a
   malicious repository is still malicious.
 
 - **Rebuilding widens the Docker API surface.** The `docker-socket-proxy`
   service ships with `BUILD: 1` so the agent can run `docker compose build
   caddy`. The socket proxy still denies `EXEC`, `SWARM`, `AUTH`, and `SECRETS`,
-  and only the agent is attached to that isolated network — but image builds
+  and only the agent is attached to that isolated network - but image builds
   are a meaningful capability. Set `BUILD: 0` to opt out; the rest of the
   application is unaffected and images can be built by hand instead.
 
@@ -72,7 +72,7 @@ Only admins can reach either surface.
 ### First-run Setup
 
 An installation with no accounts serves nothing but the setup flow, and that flow is necessarily
-public — there is no account to authenticate against yet. **Whoever reaches a fresh deployment
+public - there is no account to authenticate against yet. **Whoever reaches a fresh deployment
 first becomes its administrator.** Complete setup before the instance is reachable from anywhere
 you do not control, or set `ADMIN_USERNAME`/`ADMIN_PASSWORD`, which seeds an admin at startup and
 skips the flow entirely.
@@ -94,7 +94,7 @@ hash of the body:
 **Pairing.** An agent on another host prints a six-letter code valid for five minutes, burned on
 first use and refused after ten wrong guesses. The two exchange a secret, which is encrypted with
 `encryptSecret` before it reaches a row and is never returned to the browser, logged, or included
-in any view type. Unpairing forgets the controller's side only — restart the agent as well if you
+in any view type. Unpairing forgets the controller's side only - restart the agent as well if you
 are removing one you no longer trust.
 
 **The agent's Caddy admin proxy is an allowlist**, not a sanitiser: `/load`, `/config/`, `/adapt`
@@ -103,7 +103,7 @@ the server outright, so a request for anything else is treated as not having com
 application, whatever signed it.
 
 **Agent-to-controller** runs on exactly one route, the GeoLite2 download, signed with the same
-pairing secret. Every refusal on it answers `404` — unsigned, unknown agent id, stale timestamp,
+pairing secret. Every refusal on it answers `404` - unsigned, unknown agent id, stale timestamp,
 disabled agent, unknown database edition are all identical from outside, so nothing can learn the
 route exists or which agent ids are real without already holding a secret.
 
@@ -147,7 +147,7 @@ No workflow publishes anything from a pull request, so review is about what merg
 rather than what the run itself can do:
 
 1. Review the PR code thoroughly for malicious content
-2. Check for suspicious file modifications — workflow files and `docker/` especially, since those
+2. Check for suspicious file modifications - workflow files and `docker/` especially, since those
    decide what a later release builds and pushes
 3. Verify no secrets or credentials are exposed
 

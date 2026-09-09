@@ -7,7 +7,7 @@
  *
  * **CSRF is the one place GraphQL cannot copy REST.** The REST helper only same-origin-checks a
  * session request when the method mutates, which works because REST puts the verb in the method.
- * Every GraphQL request is a POST, and whether it mutates is inside the document — so a session
+ * Every GraphQL request is a POST, and whether it mutates is inside the document - so a session
  * request is checked unconditionally. A cross-origin page can still send a Bearer token it already
  * has, which is not CSRF; what it must not do is ride the reader's cookie.
  */
@@ -28,7 +28,7 @@ export type GraphQLContext = {
    * Captured by the route *before* the GraphQL server reads the request, not here. A clone has to
    * be taken while the body is still untouched: asking for one afterwards throws "Body is
    * disturbed or locked", which is a resolver-time failure that no test driving the schema
-   * directly can reproduce. Re-serialising the parsed document would not do either — the signature
+   * directly can reproduce. Re-serialising the parsed document would not do either - the signature
    * covers the bytes the agent sent, and a round trip can change key order or spacing.
    */
   rawBody: () => Promise<string>;

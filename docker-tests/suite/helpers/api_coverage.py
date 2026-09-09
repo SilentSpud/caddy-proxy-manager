@@ -3,7 +3,7 @@
 
     api_coverage.py OPENAPI_JSON CALLS_TSV
 
-Line coverage is not reachable here — the application under test is a bundled
+Line coverage is not reachable here - the application under test is a bundled
 standalone server in another container, and instrumenting it would mean testing
 something other than the artefact that ships. What *is* measurable, and is the
 useful question for a black-box suite, is how much of the declared REST surface
@@ -16,7 +16,7 @@ which segments are identifiers. Calls that match nothing are reported
 separately: they are either endpoints missing from the document or a typo in a
 test, and both are worth seeing.
 
-Exit status is always 0. This is a report, not a gate — a filtered run
+Exit status is always 0. This is a report, not a gate - a filtered run
 (`./run.sh mtls`) or one with an optional group disabled legitimately touches
 less of the surface, so a threshold here would fail for the wrong reasons.
 """
@@ -124,7 +124,7 @@ def main(argv):
     print()
     print("%sAPI surface coverage%s %s(documented operations driven over the wire)%s"
           % (BOLD, OFF, DIM, OFF))
-    print("  %s%d/%d operations — %.0f%%%s"
+    print("  %s%d/%d operations - %.0f%%%s"
           % (colour, len(covered), len(operations), percent, OFF))
 
     if missed:

@@ -13,7 +13,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -32,7 +32,7 @@ vi.mock('../../src/lib/db', () => {
 // Stub better-auth so importing auth-server doesn't pull in the full runtime
 // (which fails to resolve fully under the test runner). `betterAuth` returns the raw
 // options object, so getAuth().options is exactly the config createAuth() built
-// — including our real databaseHooks — which is what we want to assert on.
+// - including our real databaseHooks - which is what we want to assert on.
 vi.mock('better-auth', () => ({
   betterAuth: (options: any) => ({ options }),
 }));
@@ -105,7 +105,7 @@ describe('better-auth user.create.before hook (wired into the real config)', () 
   });
 });
 
-describe('mapOAuthProvider — OAuth self-registration gating (M2)', () => {
+describe('mapOAuthProvider - OAuth self-registration gating (M2)', () => {
   const sampleProvider: OAuthProvider = {
     id: 'p1',
     name: 'Some IdP',

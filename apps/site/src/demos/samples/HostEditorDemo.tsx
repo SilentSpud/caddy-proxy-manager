@@ -2,7 +2,7 @@ import { AdvancedConfigFields } from "@cpm/controller/src/components/proxy-hosts
 import { DemoSurface } from "../DemoSurface";
 
 /**
- * The three raw-config escape hatches at the bottom of the host editor — the part of the form that
+ * The three raw-config escape hatches at the bottom of the host editor - the part of the form that
  * has no equivalent anywhere else, and the reason a screenshot of it was never enough.
  */
 export default function HostEditorDemo() {

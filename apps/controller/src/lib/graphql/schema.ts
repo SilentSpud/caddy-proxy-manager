@@ -13,7 +13,7 @@ import { typeDefs } from "./typedefs";
 /**
  * Merged by hand rather than with a merge helper: there are exactly two sources and the only
  * overlap is `Mutation`, so a dependency to express that would cost more than the three lines it
- * saves — and it would hide the fact that the agent contributes mutations at all.
+ * saves - and it would hide the fact that the agent contributes mutations at all.
  */
 export const schema = createSchema({
   typeDefs,

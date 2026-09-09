@@ -4,8 +4,8 @@
  * A standalone script rather than a function the spec imports: Playwright runs specs under Node,
  * which cannot load `bun:sqlite` or reach `Bun.password` at all. The spec spawns this with `bun`.
  *
- * The schema comes from `drizzle/legacy-sqlite` — the migrations every 3.0 deployment actually ran
- * — so the file the browser sees is one the application discovered, not one a test invented.
+ * The schema comes from `drizzle/legacy-sqlite` - the migrations every 3.0 deployment actually ran
+ * - so the file the browser sees is one the application discovered, not one a test invented.
  *
  *   bun tests/helpers/build-legacy-db.ts <password>
  */

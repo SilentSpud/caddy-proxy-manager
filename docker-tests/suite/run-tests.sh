@@ -52,7 +52,7 @@ fi
 # ── Bootstrap ───────────────────────────────────────────────────────────────
 
 if ! bash "$SUITE_DIR/bootstrap.sh"; then
-  printf '\n%sbootstrap failed — no tests were run%s\n' "$C_RED" "$C_OFF" >&2
+  printf '\n%sbootstrap failed - no tests were run%s\n' "$C_RED" "$C_OFF" >&2
   exit 3
 fi
 
@@ -100,11 +100,11 @@ fi
 # ── API surface coverage ────────────────────────────────────────────────────
 #
 # Informational. A filtered run touches less of the surface by definition, so
-# this is never a gate — see helpers/api_coverage.py.
+# this is never a gate - see helpers/api_coverage.py.
 if [ "$#" -eq 0 ] && [ -s "$STATE_DIR/openapi.json" ]; then
   python3 "$SUITE_DIR/helpers/api_coverage.py" "$STATE_DIR/openapi.json" "$CALLS_FILE" || true
 elif [ "$#" -gt 0 ]; then
-  printf '%sAPI surface coverage skipped — a filtered run does not measure the whole surface%s\n\n' \
+  printf '%sAPI surface coverage skipped - a filtered run does not measure the whole surface%s\n\n' \
     "$C_DIM" "$C_OFF"
 fi
 

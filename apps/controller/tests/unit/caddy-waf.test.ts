@@ -1,6 +1,6 @@
 /**
  * src/lib/caddy-waf.ts. Key regression: with WAF on but OWASP CRS not loaded, the directives must
- * contain no @-prefixed Include paths — those resolve only from the embedded coraza-coreruleset
+ * contain no @-prefixed Include paths - those resolve only from the embedded coraza-coreruleset
  * filesystem, mounted when load_owasp_crs=true, so including them fails the config load.
  */
 import { describe, it, expect } from 'bun:test';
@@ -21,10 +21,10 @@ const baseWaf = {
 };
 
 // SecRuleEngine mode is interpolated into the directive block and WAF settings are persisted
-// without validation, so an unrecognised mode must never reach the config — it would smuggle in
+// without validation, so an unrecognised mode must never reach the config - it would smuggle in
 // SecLang past the custom_directives allowlist.
 
-describe('buildWafHandler — SecRuleEngine mode sanitising', () => {
+describe('buildWafHandler - SecRuleEngine mode sanitising', () => {
   function directives(mode: string): string {
     const handler = buildWafHandler({
       ...baseWaf,
@@ -64,7 +64,7 @@ describe('buildWafHandler — SecRuleEngine mode sanitising', () => {
 // Regression: @-prefixed paths must not appear without load_owasp_crs
 // ---------------------------------------------------------------------------
 
-describe('buildWafHandler — without OWASP CRS', () => {
+describe('buildWafHandler - without OWASP CRS', () => {
   it('does NOT include @coraza.conf-recommended when load_owasp_crs is false', () => {
     const handler = buildWafHandler({ ...baseWaf, load_owasp_crs: false });
     expect(handler.directives).not.toContain('@coraza.conf-recommended');
@@ -123,7 +123,7 @@ describe('buildWafHandler — without OWASP CRS', () => {
   });
 
   // Coraza refuses to build a WAF above 1 GiB, and coraza-caddy builds it while
-  // Caddy loads the config — so an out-of-range value doesn't just fail this
+  // Caddy loads the config - so an out-of-range value doesn't just fail this
   // host, it makes Caddy reject the whole document.
   it('drops body limits Coraza would refuse rather than breaking the config load', () => {
     const handler = buildWafHandler({
@@ -170,7 +170,7 @@ describe('buildWafHandler — without OWASP CRS', () => {
 // With OWASP CRS enabled
 // ---------------------------------------------------------------------------
 
-describe('buildWafHandler — with OWASP CRS', () => {
+describe('buildWafHandler - with OWASP CRS', () => {
   it('includes @coraza.conf-recommended when load_owasp_crs is true', () => {
     const handler = buildWafHandler({ ...baseWaf, load_owasp_crs: true });
     expect(handler.directives).toContain('Include @coraza.conf-recommended');
@@ -204,7 +204,7 @@ describe('buildWafHandler — with OWASP CRS', () => {
 // Excluded rule IDs
 // ---------------------------------------------------------------------------
 
-describe('buildWafHandler — excluded_rule_ids', () => {
+describe('buildWafHandler - excluded_rule_ids', () => {
   it('emits SecRuleRemoveById with single ID', () => {
     const handler = buildWafHandler({ ...baseWaf, excluded_rule_ids: [941100] });
     expect(handler.directives).toContain('SecRuleRemoveById 941100');
@@ -230,7 +230,7 @@ describe('buildWafHandler — excluded_rule_ids', () => {
 // Handler structure
 // ---------------------------------------------------------------------------
 
-describe('buildWafHandler — handler structure', () => {
+describe('buildWafHandler - handler structure', () => {
   it('always sets handler="waf"', () => {
     expect(buildWafHandler(baseWaf).handler).toBe('waf');
   });
@@ -261,7 +261,7 @@ const globalWaf = {
     'SecRule REQUEST_HEADERS:User-Agent "@contains leakix.net" "id:9002,phase:1,deny,status:403,log"',
 };
 
-describe('resolveEffectiveWaf — no per-host config', () => {
+describe('resolveEffectiveWaf - no per-host config', () => {
   it('returns null when both global and host are null', () => {
     expect(resolveEffectiveWaf(null, null)).toBeNull();
   });
@@ -284,7 +284,7 @@ describe('resolveEffectiveWaf — no per-host config', () => {
   });
 });
 
-describe('resolveEffectiveWaf — merge mode (regression: host.enabled=false must opt out)', () => {
+describe('resolveEffectiveWaf - merge mode (regression: host.enabled=false must opt out)', () => {
   it('returns null when host explicitly disables WAF in merge mode (the bug fix)', () => {
     // This was the bug: host.enabled=false in merge mode was ignored and global WAF applied anyway
     const result = resolveEffectiveWaf(globalWaf, { enabled: false, waf_mode: 'merge' });
@@ -328,7 +328,7 @@ describe('resolveEffectiveWaf — merge mode (regression: host.enabled=false mus
   });
 });
 
-describe('resolveEffectiveWaf — override mode', () => {
+describe('resolveEffectiveWaf - override mode', () => {
   it('returns null when host.enabled=false in override mode', () => {
     const result = resolveEffectiveWaf(globalWaf, { enabled: false, waf_mode: 'override' });
     expect(result).toBeNull();
@@ -356,9 +356,9 @@ describe('resolveEffectiveWaf — override mode', () => {
   });
 });
 
-// ── buildWafHandlerEntry — WebSocket bypass (issue #195) ─────────────────────
+// ── buildWafHandlerEntry - WebSocket bypass (issue #195) ─────────────────────
 // Enabling WAF mangled WebSocket connections into a corrupt "HTTP/0.9" response: coraza wraps the
-// response writer, breaking the 101 connection hijack. `ctl:ruleEngine=off` did not help — it only
+// response writer, breaking the 101 connection hijack. `ctl:ruleEngine=off` did not help - it only
 // disables rule evaluation, leaving the wrapper. The fix routes upgrades around the handler.
 
 // Pull a deeply-nested handler tree apart for assertions
@@ -372,7 +372,7 @@ function subrouteOf(entry: Record<string, unknown>) {
   };
 }
 
-describe('buildWafHandlerEntry — WebSocket bypass', () => {
+describe('buildWafHandlerEntry - WebSocket bypass', () => {
   it('returns the bare WAF handler when allowWebsocket=false', () => {
     const entry = buildWafHandlerEntry(baseWaf, false);
     expect(entry.handler).toBe('waf');
@@ -396,7 +396,7 @@ describe('buildWafHandlerEntry — WebSocket bypass', () => {
   it('subroute matches everything EXCEPT WebSocket upgrade requests', () => {
     const entry = subrouteOf(buildWafHandlerEntry(baseWaf, true));
     const match = entry.routes[0].match[0];
-    // A `not` matcher on the WebSocket upgrade headers — WAF runs for non-WS only
+    // A `not` matcher on the WebSocket upgrade headers - WAF runs for non-WS only
     const not = match.not as Array<Record<string, unknown>>;
     expect(Array.isArray(not)).toBe(true);
     const header = not[0].header as Record<string, string[]>;
@@ -445,7 +445,7 @@ describe('buildWafHandlerEntry — WebSocket bypass', () => {
 // whole config document, leaving every host unapplied.
 // ---------------------------------------------------------------------------
 
-describe('buildWafHandler — request body limit settings', () => {
+describe('buildWafHandler - request body limit settings', () => {
   it('emits the configured limits as SecLang directives', () => {
     const handler = buildWafHandler({
       ...baseWaf,
@@ -521,7 +521,7 @@ describe('buildWafHandler — request body limit settings', () => {
   });
 });
 
-describe('resolveEffectiveWaf — body limits', () => {
+describe('resolveEffectiveWaf - body limits', () => {
   const globalWaf = {
     enabled: true,
     mode: 'On' as const,

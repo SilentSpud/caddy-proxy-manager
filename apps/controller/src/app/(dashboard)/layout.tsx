@@ -31,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   // shows a module-backed control needs the same answer, and it only changes
   // when an admin saves Settings → Caddy Build.
   const moduleGate = await getModuleGateState();
-  // A cache read, and a background refresh when it has gone stale — never a network round trip on
+  // A cache read, and a background refresh when it has gone stale - never a network round trip on
   // the render path. See lib/updates.ts.
   const updates = await getUpdateStatus();
   return (

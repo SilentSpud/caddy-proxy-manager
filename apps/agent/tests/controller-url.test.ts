@@ -2,8 +2,8 @@
  * Turning what an operator types into an origin the agent dials.
  *
  * The port rules carry the weight here. An address with no port is the normal case in two very
- * different deployments — `10.0.0.5`, where the controller's own 3000 is meant, and
- * `https://cpm.tailnet.ts.net`, where Tailscale is terminating TLS on 443 — and one default
+ * different deployments - `10.0.0.5`, where the controller's own 3000 is meant, and
+ * `https://cpm.tailnet.ts.net`, where Tailscale is terminating TLS on 443 - and one default
  * cannot be right for both. Every case below was checked against a real tailnet node.
  */
 import { describe, expect, it } from "bun:test";
@@ -51,7 +51,7 @@ describe("an https address means whatever is terminating TLS, not the controller
 
   it("keeps an explicitly typed 443 rather than discarding it", () => {
     // `new URL` normalises a scheme's default port away, so the explicit :443 vanished and the
-    // old rule fell through to 3000 — silently sending the agent somewhere it was not told to.
+    // old rule fell through to 3000 - silently sending the agent somewhere it was not told to.
     expect(normalizeControllerUrl("https://cpm.tailnet-1234.ts.net:443")).toBe(
       "https://cpm.tailnet-1234.ts.net:443",
     );

@@ -3,16 +3,16 @@
  *
  * The importer works in tables; nobody upgrading thinks in tables. So the schema's thirty-odd
  * names are gathered into eight groups, each of which is a thing someone would actually decide
- * about — "bring my proxy hosts, leave the old accounts behind".
+ * about - "bring my proxy hosts, leave the old accounts behind".
  *
  * Two rules keep a partial selection from quietly producing a broken or less-safe database:
  *
  * 1. **`requires`.** A proxy host points at a certificate and an access list, and both references
- *    are nullable — so importing hosts without them would succeed and silently publish a host
+ *    are nullable - so importing hosts without them would succeed and silently publish a host
  *    that used to sit behind a password. Those groups come along whether or not they were ticked.
  * 2. **Everything else is nulled or dropped by the importer**, from the foreign keys themselves
  *    rather than from a list here. The remaining cross-group references are `createdBy`,
- *    `ownerUserId` and `audit_events.userId` — provenance that nothing authorises against, so a
+ *    `ownerUserId` and `audit_events.userId` - provenance that nothing authorises against, so a
  *    row that loses it is still the row it was.
  */
 
@@ -32,7 +32,7 @@ export type MigrationGroup = {
   label: string;
   /** One sentence on what is and is not in it, shown under the label. */
   description: string;
-  /** The schema table names — the `pgTable` name, not the exported identifier. */
+  /** The schema table names - the `pgTable` name, not the exported identifier. */
   tables: string[];
   /** Groups that cannot be left behind when this one is taken. */
   requires: MigrationGroupId[];
@@ -58,7 +58,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       // The two tables that say what a group is mapped from and what it may manage. Here rather
       // than with the hosts because they belong to the group: leaving the hosts behind clears the
       // resource column (see clearedColumns in migration/import.ts), and a grant naming nothing
-      // grants nothing — which is the safe direction for a privilege that lost its subject.
+      // grants nothing - which is the safe direction for a privilege that lost its subject.
       "group_idp_mappings",
       "group_grants",
       "forward_auth_access",
@@ -82,7 +82,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "l4_proxy_host_agents",
     ],
     // Agents, for the same reason as access lists: a placement that lost its agent rows would not
-    // fail, it would read as "no assignment" — which means *every* agent. Dropping the table
+    // fail, it would read as "no assignment" - which means *every* agent. Dropping the table
     // would quietly widen a host pinned to one node into one served fleet-wide.
     requires: ["certificates", "accessLists", "agents"],
   },
@@ -128,7 +128,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     id: "settings",
     label: "Settings",
     description:
-      "The stored configuration the Settings page writes — primary domain, ACME details, and the " +
+      "The stored configuration the Settings page writes - primary domain, ACME details, and the " +
       "rest.",
     tables: ["settings"],
     requires: [],

@@ -1,6 +1,6 @@
 /**
  * Moved here with the parser it covers: the Caddy log is a file on the agent's host, so this
- * is where it is read. The mocks the controller's copy needed are gone — these are pure
+ * is where it is read. The mocks the controller's copy needed are gone - these are pure
  * functions, and the module's imports are real dependencies of this package now.
  */
 import { describe, it, expect } from "bun:test";
@@ -12,7 +12,7 @@ import {
 
 /**
  * Regression (#233): rule attribution must come from the audit entry's own `messages` array (part
- * H), not a join against waf-rules.log — that only lands when both lines fall in the same 30s parse
+ * H), not a join against waf-rules.log - that only lands when both lines fall in the same 30s parse
  * tick, and when it misses `parseLine` dropped the whole event unless blocked. Each test here
  * passes an EMPTY ruleMap to simulate the miss.
  */
@@ -160,12 +160,12 @@ describe("parseLine host header contract", () => {
     });
   }
 
-  it("stores host header verbatim — bare hostname has no port", () => {
+  it("stores host header verbatim - bare hostname has no port", () => {
     const row = parseLine(makeAuditLine("example.com"), ruleMap);
     expect(row?.host).toBe("example.com");
   });
 
-  it("stores host header verbatim — port suffix is preserved (downstream must strip)", () => {
+  it("stores host header verbatim - port suffix is preserved (downstream must strip)", () => {
     // Some HTTPS clients (e.g. HTTP/2 :authority, explicit "Host: foo:443" header)
     // include the port. Suppression code in settings/actions.ts must normalize.
     const row = parseLine(makeAuditLine("app.example.com:443"), ruleMap);

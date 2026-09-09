@@ -144,13 +144,13 @@ const FEATURES: ReadonlyArray<{
   },
 ];
 
-/** "example.com +2" — the primary entry plus a count of the rest. */
+/** "example.com +2" - the primary entry plus a count of the rest. */
 function summarize(values: string[]) {
   return values.length > 1 ? `${values[0]} +${values.length - 1}` : values[0];
 }
 
 /**
- * The enable switch plus the row menu, shared by table and cards. At module scope — nesting it
+ * The enable switch plus the row menu, shared by table and cards. At module scope - nesting it
  * would make a new component type each render, remounting the menu mid-use.
  */
 function HostActions({

@@ -67,7 +67,7 @@ const EVENTS = [
  * The audit log page itself, searching and paging for real.
  *
  * In the app the server answers each new query string; here this component does, off the rows
- * above. Nothing else changes — the search field, the table and the pager are the ones shipped.
+ * above. Nothing else changes - the search field, the table and the pager are the ones shipped.
  */
 export default function AuditLogDemo() {
   const params = useSearchParams();

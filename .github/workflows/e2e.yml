@@ -2,7 +2,7 @@ name: End-to-end tests
 
 on:
   # Pull requests only. This suite builds the whole Compose stack and runs single-worker against a
-  # live Caddy, so it is the expensive check by a wide margin — running it on every push to a work
+  # live Caddy, so it is the expensive check by a wide margin - running it on every push to a work
   # branch spends that on commits nobody is ready to merge, and running it again on the push to main
   # re-proved a tree the pull request had already tested. The run against the merge result is the
   # one that decides whether the code lands, and it is the one kept.
@@ -57,7 +57,7 @@ jobs:
       #
       # Every playwright step below runs from apps/controller, which is the workspace
       # that declares @playwright/test, so bunx resolves the pinned CLI. From the repo
-      # root it resolves nothing locally and downloads the latest from npm instead —
+      # root it resolves nothing locally and downloads the latest from npm instead -
       # which installed 1.63.0's browsers for a suite running 1.62.1, leaving the
       # tests looking for a revision that was never downloaded. Do not "simplify"
       # these back to the root.

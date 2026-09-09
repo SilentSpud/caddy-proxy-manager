@@ -39,7 +39,7 @@
   "linter": {
     "enabled": true,
     // Domains replace the per-plugin rule lists eslint needed. `drizzle` is the
-    // notable gain over the old setup — it catches things like an update or
+    // notable gain over the old setup - it catches things like an update or
     // delete with no `where`, which this codebase is full of opportunities for.
     "domains": {
       "next": "recommended",

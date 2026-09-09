@@ -13,7 +13,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -223,7 +223,7 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
     const policy = policyForDomain(doc, domain);
 
     expect(policy, 'domain must still have a policy').toBeDefined();
-    // Must fail closed (drop) — NOT trust sibling cert B via a whole-CA fallback.
+    // Must fail closed (drop) - NOT trust sibling cert B via a whole-CA fallback.
     expect(policy!.drop).toBe(true);
     expect(JSON.stringify(policy)).not.toContain('CERTIFICATE'); // no trusted leaf/CA certs leaked in
   });

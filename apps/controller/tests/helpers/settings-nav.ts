@@ -6,7 +6,7 @@
  * and the caller waits out its timeout on a heading that will never appear. Six specs had written
  * this navigation out by hand, so the race had six places to surface and each CI round fixed one.
  *
- * Same race `openCreateHostDialog` rides out in ./proxy-api.ts, and the same answer — retry the
+ * Same race `openCreateHostDialog` rides out in ./proxy-api.ts, and the same answer - retry the
  * click rather than inflate a timeout and call it fixed.
  */
 import { expect, type Page } from '@playwright/test';
@@ -17,7 +17,7 @@ export const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings naviga
  * Click a settings section and wait until it is really showing.
  *
  * The wait is on the section's own level-1 heading, which `DetailHeader` renders from the active
- * item's name — the one thing that cannot be true while the click is still unhandled. Card titles
+ * item's name - the one thing that cannot be true while the click is still unhandled. Card titles
  * inside a section are level 2, so a section whose name matches one of them is unambiguous.
  *
  * `expectHeading` is for the two sections whose heading is not their nav label.
@@ -32,7 +32,7 @@ export async function goToSettingsSection(
 }
 
 /**
- * The same, for a page already on /settings — after a reload, say, where navigating again would
+ * The same, for a page already on /settings - after a reload, say, where navigating again would
  * throw away what the test just did.
  */
 export async function clickSettingsSection(

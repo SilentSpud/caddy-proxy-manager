@@ -5,7 +5,7 @@ import { getTrustedForwardAuthOrigin } from "@/src/lib/forward-auth-trust";
 const COOKIE_NAME = "_cpm_fa";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 
-/** Forward auth callback — redeems an exchange code and sets the session cookie. */
+/** Forward auth callback - redeems an exchange code and sets the session cookie. */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {

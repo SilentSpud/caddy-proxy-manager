@@ -2,7 +2,7 @@
  * Checking an auth key against the Tailscale API, before Caddy has to find out the hard way.
  *
  * Why this exists: a node that cannot register is a listener that never comes up, and Caddy refuses
- * a configuration it cannot start — so one dead auth key fails the apply for *every* host on
+ * a configuration it cannot start - so one dead auth key fails the apply for *every* host on
  * *every* agent, with an error that names Tailscale rather than the host anyone was editing. There
  * is no cheaper way to learn this. A key is only proved good by registering with it, and the app
  * cannot do that: tsnet lives inside Caddy, not here.
@@ -11,7 +11,7 @@
  * authenticates nothing but a device registration; only an access token (`tskey-api-…`) can call
  * the API. That second credential is the reason the whole check is opt-in.
  *
- * Kept apart from caddy-tailscale.ts so that file stays pure — it is on the config-generation path,
+ * Kept apart from caddy-tailscale.ts so that file stays pure - it is on the config-generation path,
  * which must never make a network call.
  */
 
@@ -26,7 +26,7 @@ export type TailscaleKeyCheck =
   /** The key exists, is not revoked, and has not expired. */
   | { status: "ok" }
   /**
-   * Nothing was learned, and that is not the key's fault — it has no id to look up. Callers must
+   * Nothing was learned, and that is not the key's fault - it has no id to look up. Callers must
    * let the save through: refusing here would block a Headscale key or an `{env.…}` placeholder,
    * both of which are legitimate.
    */
@@ -80,7 +80,7 @@ export async function checkTailscaleAuthKey(options: {
     return {
       status: "unknown",
       reason:
-        "the key does not carry an id the API can address — this is normal for an older key or a Headscale one",
+        "the key does not carry an id the API can address - this is normal for an older key or a Headscale one",
     };
   }
 
@@ -106,7 +106,7 @@ export async function checkTailscaleAuthKey(options: {
     return {
       status: "rejected",
       reason:
-        "Tailscale refused the API access token. Check the token itself — this says nothing about the auth key.",
+        "Tailscale refused the API access token. Check the token itself - this says nothing about the auth key.",
     };
   }
   if (response.status === 404) {

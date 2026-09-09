@@ -49,7 +49,7 @@ export default async function LinkAccountPage({ searchParams }: LinkAccountPageP
     redirect(`/login?error=${encodeURIComponent(t("tokenExpired"))}`);
   }
 
-  // Pass only the opaque linkingId to the client — the raw JWT never leaves the server
+  // Pass only the opaque linkingId to the client - the raw JWT never leaves the server
   return (
     <LinkAccountClient
       provider={tokenPayload.provider}

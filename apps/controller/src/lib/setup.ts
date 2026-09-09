@@ -40,7 +40,7 @@ const MIGRATION_DECLINED_KEY = "setup:migration_declined";
 
 /**
  * The legacy file a completed migration read from. Recorded so the final screen can offer it as a
- * backup and name it in the instructions — and so that screen is only reachable by a deployment
+ * backup and name it in the instructions - and so that screen is only reachable by a deployment
  * that actually migrated.
  */
 const MIGRATION_SOURCE_KEY = "setup:migrated_from";
@@ -113,7 +113,7 @@ export async function isMigrationDeclined(): Promise<boolean> {
  *
  * Declining is one way. Having migrated is the other, and it has to be checked separately now that
  * a migration can leave the old accounts behind: the old test was "can anything sign in yet",
- * which such a migration does not satisfy — so the operator would be offered the same file again
+ * which such a migration does not satisfy - so the operator would be offered the same file again
  * on their way to creating an account, and importing it twice is not something the flow supports.
  */
 export async function isMigrationSettled(): Promise<boolean> {
@@ -144,17 +144,17 @@ export async function hasAnySignIn(): Promise<boolean> {
  * Make a federated user an administrator if setup is unfinished and nobody else is one yet.
  *
  * Called by the settings step as it saves, so the rule is "whoever completes setup is the
- * administrator" — a deliberate act, rather than a privilege handed out by the act of signing in.
+ * administrator" - a deliberate act, rather than a privilege handed out by the act of signing in.
  *
  * It exists because the account step has two branches and only one of them produced an admin.
  * `createFirstAdmin` writes `role: "admin"` outright, but the OAuth branch only stores a provider
- * — the user row is then created by Better Auth's callback, where `enforceSafeUserDefaults`
+ * - the user row is then created by Better Auth's callback, where `enforceSafeUserDefaults`
  * (correctly) pins every federated sign-up to `role: "user"`. Group-to-role mapping cannot cover
  * the gap either: it is configured in the settings step, which is the very step that demanded an
  * admin session. So an instance set up against an IdP had no way to finish setup at all.
  *
  * All three guards matter. Setup being unfinished bounds this to the window the account step
- * already hands out administrator rights in. Requiring that no admin exists means it fires once —
+ * already hands out administrator rights in. Requiring that no admin exists means it fires once -
  * a second, ordinary user reaching this step is refused rather than promoted, as is anyone at all
  * once the flow is finished. And requiring a federated account keeps it to the branch that is
  * actually broken: a credential sign-in during setup can only be the admin `createFirstAdmin`
@@ -190,7 +190,7 @@ export async function promoteFirstSetupAdmin(userId: number): Promise<boolean> {
     entityId: userId,
     summary: `User ${userId} became the first administrator by signing in during setup`,
   });
-  console.log(`Setup completed by user ${userId} — promoted to administrator`);
+  console.log(`Setup completed by user ${userId} - promoted to administrator`);
   return true;
 }
 
@@ -225,7 +225,7 @@ export const SETUP_PATHS: Record<SetupStage, string> = {
 };
 
 /**
- * True when the environment still configures a way in — which is what "this deployment predates
+ * True when the environment still configures a way in - which is what "this deployment predates
  * the setup flow" actually means.
  *
  * This is the whole test for the backfill below, and it has to be the environment rather than
@@ -250,5 +250,5 @@ export async function backfillSetupCompletion(): Promise<void> {
   if (!(await hasAnySignIn())) return;
 
   await markSetupCompleted();
-  console.log("Sign-in is configured from the environment — first-run setup marked complete");
+  console.log("Sign-in is configured from the environment - first-run setup marked complete");
 }

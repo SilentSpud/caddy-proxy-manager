@@ -3,8 +3,8 @@
  *
  * The plugin runs tsnet inside the Caddy process, which is what makes this worth having: a
  * `tailscale/<node>` listener puts a site on the tailnet with no tailscaled on the host and no TUN
- * device, so nothing in the Compose stack changes. Three of its modules are used — the listener
- * network, the `tailscale` authentication provider, and the reverse-proxy transport — and this
+ * device, so nothing in the Compose stack changes. Three of its modules are used - the listener
+ * network, the `tailscale` authentication provider, and the reverse-proxy transport - and this
  * file is the JSON each of them wants, split from caddy.ts so the shapes stay unit-testable
  * without a database.
  *
@@ -15,7 +15,7 @@
 
 /**
  * Local rather than imported from settings-validation, which reaches back here to validate the
- * REST settings group — one direction only, as caddy-default-response.ts does.
+ * REST settings group - one direction only, as caddy-default-response.ts does.
  */
 function hasForbiddenControlCharacter(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
@@ -30,7 +30,7 @@ export const TAILSCALE_DOMAIN_SUFFIX = ".ts.net";
 
 /**
  * Where each node's tsnet state lands, one subdirectory per node. `/data` is the `caddy-data`
- * volume the image already owns, so a node keeps its identity across a container recreate — without
+ * volume the image already owns, so a node keeps its identity across a container recreate - without
  * this the node re-registers on every restart and the tailnet fills with duplicates.
  */
 export const TAILSCALE_DEFAULT_STATE_DIR = "/data/tailscale";
@@ -71,11 +71,11 @@ export function validateNodeName(name: string, label = "Tailscale node name"): s
 /**
  * The key id inside a Tailscale key, or null.
  *
- * Keys are `tskey-<type>-<id>-<secret>` — the documented example is
- * `tskey-api-abcDEF1CNTRL-091234567890ABCDEF` — and the id is what the API addresses a key by.
+ * Keys are `tskey-<type>-<id>-<secret>` - the documented example is
+ * `tskey-api-abcDEF1CNTRL-091234567890ABCDEF` - and the id is what the API addresses a key by.
  * Null for anything that does not have that shape: an older `tskey-<secret>` key, a Caddy
  * placeholder like `{env.TS_AUTHKEY}`, or a Headscale key, none of which this can look up. Callers
- * must treat null as "cannot check", never as "invalid" — the format is not a documented contract
+ * must treat null as "cannot check", never as "invalid" - the format is not a documented contract
  * and guessing wrong would refuse a key that works.
  */
 export function tailscaleKeyId(key: string): string | null {
@@ -102,7 +102,7 @@ export function isCaddyPlaceholder(value: string): boolean {
 export type TailscaleSettings = {
   enabled: boolean;
   /**
-   * Auth key used to register each node. Stored encrypted, and passed to Caddy verbatim — the
+   * Auth key used to register each node. Stored encrypted, and passed to Caddy verbatim - the
    * plugin runs it through Caddy's replacer, so `{env.TS_AUTHKEY}` works and keeps the key out of
    * the database entirely.
    */
@@ -121,7 +121,7 @@ export type TailscaleSettings = {
    * Check the auth key against the Tailscale API before saving it.
    *
    * Off by default, because it is the only thing in this app that reaches Tailscale on its own and
-   * it needs a second credential to do it — an auth key cannot authenticate to the API, only an
+   * it needs a second credential to do it - an auth key cannot authenticate to the API, only an
    * access token can. With it off there is no way to tell a revoked key from a good one until
    * Caddy tries to register the node, and that failure rejects the whole configuration.
    */
@@ -167,7 +167,7 @@ function asStringArray(value: unknown): string[] {
 /**
  * Validate and fill in a stored or submitted settings blob. Throws rather than silently correcting:
  * a node name Caddy cannot parse becomes a listener address it rejects, and Caddy rejects the whole
- * document — every other host goes down with it.
+ * document - every other host goes down with it.
  */
 export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
   const input = (value ?? {}) as Partial<Record<keyof TailscaleSettings, unknown>>;
@@ -261,7 +261,7 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
  * plugin derives each node's hostname from the name in its listener address, so an entry here
  * would only be a second place for the same string to drift.
  *
- * `authKey` arrives decrypted — the caller owns that, since only it knows whether the value came
+ * `authKey` arrives decrypted - the caller owns that, since only it knows whether the value came
  * from the database or from a Caddy placeholder that must be passed through untouched.
  */
 export function buildTailscaleApp(
@@ -295,7 +295,7 @@ export function buildTailscaleAuthHandler(): Record<string, unknown> {
  * Identity the plugin puts on the authenticated user, and the header each is forwarded as.
  *
  * The placeholder keys are Caddy's `http.auth.user.<metadata key>`, so they have to match the
- * plugin's Authenticate() exactly — a typo forwards an empty header rather than failing. Header
+ * plugin's Authenticate() exactly - a typo forwards an empty header rather than failing. Header
  * names are in Go's canonical MIME casing for the same reason the CPM forward-auth ones are:
  * Caddy looks them up literally.
  */
@@ -333,7 +333,7 @@ export function buildTailscaleIdentityHeadersHandler(): Record<string, unknown> 
 
 /**
  * Auth and the identity headers as one handler, so callers that place a single "auth handler" in a
- * route chain — the shared path-mode builder — get both or neither.
+ * route chain - the shared path-mode builder - get both or neither.
  */
 export function buildTailscaleAuthSubroute(forwardIdentity: boolean): Record<string, unknown> {
   const handle = forwardIdentity
@@ -349,7 +349,7 @@ export function buildTailscaleAuthSubroute(forwardIdentity: boolean): Record<str
  *
  * A node named only here is never started until the first request goes through it. Releasing one in
  * that state used to crash Caddy from inside tsnet, which is why docker/caddy/go.mod pins the
- * plugin to a fork — see the note there before moving that pin.
+ * plugin to a fork - see the note there before moving that pin.
  */
 export function buildTailscaleTransport(
   node: string,
@@ -362,7 +362,7 @@ export function buildTailscaleTransport(
  * An automation policy that serves `.ts.net` names from Tailscale instead of ACME.
  *
  * Caddy provisions no issuers for a policy whose subjects are all `.ts.net` and whose managers
- * include this one, so there is deliberately no `issuers` key — adding one would put the policy
+ * include this one, so there is deliberately no `issuers` key - adding one would put the policy
  * back on ACME for names no public CA can validate.
  */
 export function buildTailscaleAutomationPolicy(subjects: string[]): Record<string, unknown> {

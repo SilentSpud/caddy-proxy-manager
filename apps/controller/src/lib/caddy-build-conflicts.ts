@@ -28,7 +28,7 @@ export async function describeModuleConflicts(
 
   // Scoped to what this agent actually serves. A host pinned to a different agent has no bearing
   // on whether *this* binary needs a module, and counting it would refuse a legitimate selection
-  // with a reason the operator cannot act on — the host is not on this agent to turn off.
+  // with a reason the operator cannot act on - the host is not on this agent to turn off.
   const [httpAssignments, l4Assignments] =
     agentRowId === undefined
       ? [null, null]
@@ -86,7 +86,7 @@ export async function describeModuleConflicts(
       }
     }
     if (tailscaleOff) {
-      // Worth refusing rather than warning: a tailnet-only host stops being served at all — the
+      // Worth refusing rather than warning: a tailnet-only host stops being served at all - the
       // config drops it rather than publishing it, which looks like the host simply vanished.
       const count = hosts.filter((h) => h.enabled && h.tailscale?.serve).length;
       if (count > 0) {
@@ -116,7 +116,7 @@ export async function describeModuleConflicts(
 
 /**
  * A non-blocking heads-up about per-host Caddyfile snippets, or null. Only Caddy's adapter could
- * say which plugin a snippet needs, and only for the binary running now — so warn, don't refuse.
+ * say which plugin a snippet needs, and only for the binary running now - so warn, don't refuse.
  */
 export async function describeCaddyfileSnippetWarning(
   settings: CaddyBuildSettings,
@@ -134,5 +134,5 @@ export async function describeCaddyfileSnippetWarning(
     .map((h) => h.name)
     .join(", ");
   const more = withSnippets.length > 3 ? `, and ${withSnippets.length - 3} more` : "";
-  return `${withSnippets.length} proxy host${withSnippets.length === 1 ? "" : "s"} (${names}${more}) use custom Caddyfile directives, which may reference a module you just switched off. Review them before rebuilding — a snippet Caddy can no longer adapt is skipped silently.`;
+  return `${withSnippets.length} proxy host${withSnippets.length === 1 ? "" : "s"} (${names}${more}) use custom Caddyfile directives, which may reference a module you just switched off. Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently.`;
 }

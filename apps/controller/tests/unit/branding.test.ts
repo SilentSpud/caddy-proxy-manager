@@ -2,7 +2,7 @@
  * Favicon validation.
  *
  * The load-bearing part is type sniffing. The stored type is what the favicon route hands back as
- * `Content-Type`, and the browser's claim about an upload is attacker-controlled — so a file that
+ * `Content-Type`, and the browser's claim about an upload is attacker-controlled - so a file that
  * could be stored as one thing and served as another is the bug worth pinning here.
  */
 import { describe, expect, it } from 'bun:test';

@@ -1,5 +1,5 @@
 /**
- * The one definition of what makes a password acceptable — previously duplicated between config.ts
+ * The one definition of what makes a password acceptable - previously duplicated between config.ts
  * and the change-password route. Dependency-free, so config.ts can load it at module scope and
  * client components can give the same feedback the server will.
  *

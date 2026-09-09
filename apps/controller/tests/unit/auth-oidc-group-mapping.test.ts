@@ -12,7 +12,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -88,11 +88,11 @@ beforeEach(() => {
   clearPendingOidcSyncs();
 });
 
-describe('mapOAuthProvider — group mapping hooks', () => {
+describe('mapOAuthProvider - group mapping hooks', () => {
   it('attaches no claim hooks for a provider that does not use groups', () => {
     const cfg = mapOAuthProvider(provider());
     expect(cfg.getUserInfo).toBeUndefined();
-    // mapProfileToUser is always present — it reports emailVerified for the auto-link gate — so
+    // mapProfileToUser is always present - it reports emailVerified for the auto-link gate - so
     // what matters here is that it derives nothing from the group claim.
     expect(cfg.mapProfileToUser?.({ groups: ['CPM_Admin'] } as never)).toEqual({
       emailVerified: false,
@@ -226,8 +226,8 @@ describe('mapOAuthProvider — group mapping hooks', () => {
 });
 
 /**
- * The returning user is the case the wiring exists for: better-auth calls `getUserInfo` — and so
- * `mapProfileToUser` — on every callback, new account or not, so a group change at the IdP takes
+ * The returning user is the case the wiring exists for: better-auth calls `getUserInfo` - and so
+ * `mapProfileToUser` - on every callback, new account or not, so a group change at the IdP takes
  * effect at the next sign-in rather than being frozen at the role the account was created with.
  */
 describe('a repeat sign-in re-reads the group claim', () => {

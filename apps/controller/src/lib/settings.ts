@@ -221,7 +221,7 @@ export async function saveAvatarSettings(settings: AvatarSettings): Promise<void
 /**
  * Whether icons may fall back to Gravatar.
  *
- * Resolution is the registry first — a stored value, then AVATAR_GRAVATAR — and only then the
+ * Resolution is the registry first - a stored value, then AVATAR_GRAVATAR - and only then the
  * older JSON blob the Settings page used to write. The blob stays in the chain for deployments
  * that have not been through the migration, which is what lifts it into the registry key; without
  * that fallback, upgrading would silently reset the toggle.
@@ -250,7 +250,7 @@ export async function savePasswordPolicySettings(settings: PasswordPolicySetting
  * Whether a bcrypt-hashed user must change their password.
  *
  * Same order as isGravatarEnabled: the registry (stored, then the environment variable), then the
- * older JSON blob for deployments that have not migrated yet. This one is tri-state — null means
+ * older JSON blob for deployments that have not migrated yet. This one is tri-state - null means
  * "no opinion", which is why an unset registry value has to fall through rather than read as false.
  */
 export async function isLegacyPasswordChangeRequired(): Promise<boolean> {
@@ -360,7 +360,7 @@ export type WafSettings = {
   excluded_rule_ids?: number[];
   // Request body limits, in bytes. Unset means Coraza's own default applies
   // (12.5 MiB from @coraza.conf-recommended when load_owasp_crs is on, else
-  // 128 MiB). Coraza caps both at 1 GiB — see CORAZA_MAX_BODY_LIMIT.
+  // 128 MiB). Coraza caps both at 1 GiB - see CORAZA_MAX_BODY_LIMIT.
   request_body_limit?: number;
   request_body_in_memory_limit?: number;
   // ProcessPartial inspects the leading bytes and forwards the rest instead of
@@ -393,7 +393,7 @@ export async function saveErrorPagesSettings(s: ErrorPagesSettings): Promise<voi
 // ─── Tailscale ───────────────────────────────────────────────────────────────
 
 /**
- * Tailscale node defaults. The auth key comes back exactly as stored — encrypted — because this is
+ * Tailscale node defaults. The auth key comes back exactly as stored - encrypted - because this is
  * also what the Settings page reads; decrypting here would put the key one careless prop away from
  * the browser. Config generation decrypts it explicitly.
  */

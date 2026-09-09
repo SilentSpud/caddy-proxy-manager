@@ -121,7 +121,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
         )}
 
         {/* Unmounted when off, so the fields below are neither focusable nor
-            submitted — the old max-h-0 wrapper left them in the tab order. */}
+            submitted - the old max-h-0 wrapper left them in the tab order. */}
         {/* Not gated on moduleDisabledReason: WafRuleExclusions carries the
             hidden wafExcludedRuleIds input, and parseWafConfig reads a missing
             one as "no exclusions". Unmounting it here would wipe the operator's

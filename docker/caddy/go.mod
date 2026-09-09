@@ -3,14 +3,14 @@
 // flags, so a rebuild a month from now produces the same binary and go.sum authenticates each
 // module. Which of them are compiled in is a separate question, answered at build time by
 // CADDY_MODULES (Settings -> Caddy Build). Every module in src/lib/caddy-modules.ts must appear
-// here — tests/unit/caddy-modules.test.ts asserts that.
+// here - tests/unit/caddy-modules.test.ts asserts that.
 //
 // tools.go is what makes this survive `go mod tidy`: nothing here ships, so without its blank
 // imports tidy considers every requirement unused and empties the block. Dependabot runs tidy, so
 // deleting that file turns each dependency PR into a go.mod wipe. Its imports are deliberately
 // untagged, which also gives CodeQL a buildable package to analyse.
 //
-// xcaddy itself is deliberately absent — it comes from the caddy:<version>-builder image the
+// xcaddy itself is deliberately absent - it comes from the caddy:<version>-builder image the
 // Dockerfile pins, not from here, so there is only one place its version lives.
 
 module github.com/fuomag9/caddy-proxy-manager/docker/caddy
@@ -292,7 +292,7 @@ require (
 replace github.com/google/cel-go => github.com/google/cel-go v0.28.1
 
 // Temporarily a fork, for a crash upstream has not merged. caddy-tailscale releases a tsnet node
-// without checking whether it was ever started, and tsnet.Server.Close panics there — so a host
+// without checking whether it was ever started, and tsnet.Server.Close panics there - so a host
 // that dials over the tailnet took down the admin API on the apply that stopped using it, and
 // turned every container stop into a crash (exit 2, not 0).
 //

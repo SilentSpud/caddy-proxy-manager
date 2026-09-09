@@ -10,7 +10,7 @@ import type { ApexOptions } from "apexcharts";
  * pair to the value in effect, and re-resolves on mode change.
  */
 export interface ChartTheme {
-  /** Resolved mode — ApexCharts has its own light/dark defaults keyed off this. */
+  /** Resolved mode - ApexCharts has its own light/dark defaults keyed off this. */
   mode: "light" | "dark";
   /** Shared chart chrome: background, grid, tooltip, axis label styling. */
   base: ApexOptions;

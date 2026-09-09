@@ -54,7 +54,7 @@ export default async function SetupSettingsPage() {
       generatable: definition.generatable === true,
       gate: definition.gate === true,
       // A gate is stored tri-state but rendered as a switch, so an unset one has to arrive as the
-      // answer the app is currently acting on rather than as `null` — which a switch would show as
+      // answer the app is currently acting on rather than as `null` - which a switch would show as
       // off, offering to disable something that is already running.
       value: definition.gate
         ? (gates[definition.key] ?? false)
@@ -84,13 +84,13 @@ export default async function SetupSettingsPage() {
  *
  * A provider is a row in `oauth_providers`, not a registry setting, so this is the one part of the
  * page not generated from the registry. It is here because the account step only asks about OAuth
- * on the branch where it is the *only* way in — an operator who created a local administrator was
+ * on the branch where it is the *only* way in - an operator who created a local administrator was
  * never offered it, and had to find Settings afterwards.
  *
  * The prefill is the same bargain the rest of the page makes: values are read out of the
  * environment, and saving is what moves them into the database so the variables can be deleted.
  * The client secret is prefilled too, unlike every other secret here, because a provider cannot be
- * created without one — and it is precisely the value the operator is about to be able to delete
+ * created without one - and it is precisely the value the operator is about to be able to delete
  * from the file it currently lives in.
  */
 function oauthCard(existing: string[]) {
@@ -98,7 +98,7 @@ function oauthCard(existing: string[]) {
 
   // What decides is a client ID, or the switch being on. Not the provider name: config.ts gives
   // that one a fallback of "OAuth2" whether or not anything is configured, and carrying that into
-  // the form made a card nobody had touched look half filled — which the save then refused,
+  // the form made a card nobody had touched look half filled - which the save then refused,
   // stopping setup on a deployment that had never mentioned OAuth at all.
   const fromEnvironment = oauth.enabled || !!oauth.clientId;
 
@@ -161,7 +161,7 @@ function oauthCard(existing: string[]) {
  * deployment reached at localhost that is genuinely the name, and proposing nothing there would
  * hand exactly the deployments used for trying this out an empty required field.
  *
- * BASE_URL has a default, so there is always something to read — the fallback covers a stored
+ * BASE_URL has a default, so there is always something to read - the fallback covers a stored
  * value that somehow is not a URL, not the ordinary case.
  */
 function domainFromBaseUrl(value: unknown): string {

@@ -2,7 +2,7 @@
  * A complete OAuth sign-in against a real OIDC provider, in the fast suite.
  *
  * This exists because of a regression that reached main. `advanced.database.joins` was enabled to
- * let Better Auth fetch a session and its user in one query instead of two. It worked — getSession
+ * let Better Auth fetch a session and its user in one query instead of two. It worked - getSession
  * dropped to a single statement, and a test proved it. But Better Auth builds a *different* join
  * during the OAuth callback, and that one failed:
  *
@@ -12,14 +12,14 @@
  *
  * The drizzle adapter derives the many-side join key by appending "s" to the model name. This
  * app's model names are already plural (`accounts`, configured in auth-server.ts), so it asked for
- * `accountss` and drizzle had no such relation. `usePlural: true` is not the fix — it pluralizes
+ * `accountss` and drizzle had no such relation. `usePlural: true` is not the fix - it pluralizes
  * every model name, so `verifications` becomes `verificationss` and startup fails outright. The
  * only working spelling was to name the relations `accountss`/`sessionss`, which depends on an
  * adapter quirk rather than anything documented, so joins stay off.
  *
  * Nothing in the fast suites could see it. The unit auth tests stub `betterAuth` and assert the
  * options object, so no adapter code runs; the other integration tests drive the adapter directly
- * and never build the queries a callback builds. Only the end-to-end suite caught it — after the
+ * and never build the queries a callback builds. Only the end-to-end suite caught it - after the
  * push, 14 minutes later. This closes that gap: it exercises the real callback in about a second.
  *
  * Needs the mock IdP running (see tests/helpers/mock-idp.ts); skips with a note when it is not.
@@ -40,7 +40,7 @@ import {
 const IDP_AVAILABLE = await isMockIdpReachable();
 if (!IDP_AVAILABLE) {
   console.log(
-    `[oauth-flow] mock IdP not reachable at ${MOCK_IDP_ISSUER} — skipping. ` +
+    `[oauth-flow] mock IdP not reachable at ${MOCK_IDP_ISSUER} - skipping. ` +
       'See tests/helpers/mock-idp.ts for the one-line docker command.',
   );
 }

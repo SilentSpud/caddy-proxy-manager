@@ -1,4 +1,4 @@
-/** E2E: Users page — listing, search, edit, disable/enable, delete, create. Runs as admin. */
+/** E2E: Users page - listing, search, edit, disable/enable, delete, create. Runs as admin. */
 import { test, expect } from '@playwright/test';
 import { getUserRecord } from '../helpers/seed';
 
@@ -175,7 +175,7 @@ test.describe('Users page', () => {
     await expect(page.getByTestId('create-email')).not.toBeVisible();
     await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
     // The row name renders through Text maxLines, which also mounts a hidden
-    // truncation tooltip carrying the same string — filter to the visible one.
+    // truncation tooltip carrying the same string - filter to the visible one.
     await expect(
       page.getByText('New Test User', { exact: true }).filter({ visible: true }),
     ).toBeVisible({ timeout: 5000 });
@@ -232,7 +232,7 @@ test.describe('Users page', () => {
   });
 });
 
-test.describe('Users page — unauthenticated access', () => {
+test.describe('Users page - unauthenticated access', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('unauthenticated access to /users redirects to /login', async ({ page }) => {
@@ -243,7 +243,7 @@ test.describe('Users page — unauthenticated access', () => {
 
 // ── API v1 create user tests ─────────────────────────────────────────────
 
-test.describe('Users API v1 — create user (POST)', () => {
+test.describe('Users API v1 - create user (POST)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page).not.toHaveURL(/\/login/);
@@ -365,7 +365,7 @@ test.describe('Users API v1 — create user (POST)', () => {
   });
 });
 
-test.describe('Users API v1 — create user (POST) — non-admin blocked', () => {
+test.describe('Users API v1 - create user (POST) - non-admin blocked', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('unauthenticated POST is blocked', async ({ request }) => {

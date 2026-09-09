@@ -2,10 +2,10 @@
 # Compile Caddy with the requested plugins at the versions go.mod pins.
 #
 # Two inputs, deliberately separate:
-#   * CADDY_MODULES — *which* plugins, a whitespace-separated list the app generates from the
+#   * CADDY_MODULES - *which* plugins, a whitespace-separated list the app generates from the
 #     operator's selection in Settings -> Caddy Build. Bare paths, or path@version for a custom
 #     module the operator supplied a version for.
-#   * go.mod        — *which version* of each known plugin, plus Caddy itself and the cel-go
+#   * go.mod        - *which version* of each known plugin, plus Caddy itself and the cel-go
 #     compatibility replacement. Updated by Dependabot and update-compatibility-pins.sh.
 #
 # Resolving versions here rather than in CADDY_MODULES keeps the app's desired/applied diff
@@ -13,7 +13,7 @@
 # code change rather than something that makes the UI claim a rebuild is pending.
 set -eu
 
-# The pinned version of a module, or empty when go.mod does not carry it — which is the normal case
+# The pinned version of a module, or empty when go.mod does not carry it - which is the normal case
 # for a custom module the operator pasted in.
 #
 # Deliberately the version the module is *required* at, not the one it resolves to: a replaced
@@ -46,7 +46,7 @@ for spec in ${CADDY_MODULES:-}; do
                 with="$spec@$version"
             else
                 # A custom module outside the catalog. Floats to latest, as it did before go.mod
-                # existed — flagged in the build log so an unpinned build is not a silent one.
+                # existed - flagged in the build log so an unpinned build is not a silent one.
                 with="$spec"
                 unpinned="$unpinned $spec"
             fi
@@ -64,7 +64,7 @@ done
 # carrying a fix that upstream has not merged. Each says why it exists in go.mod, next to itself.
 #
 # Not a `while read` loop: that runs in a subshell, and the positional arguments it appended would
-# be discarded with it. Replacements to a local directory are skipped — they have no version, and
+# be discarded with it. Replacements to a local directory are skipped - they have no version, and
 # nothing in a reproducible image build should depend on a path outside it.
 replacements="$(go list -m -f '{{if and .Replace .Replace.Version}}{{.Path}}={{.Replace.Path}}@{{.Replace.Version}}{{end}}' all 2>/dev/null | grep . || true)"
 for replacement in $replacements; do

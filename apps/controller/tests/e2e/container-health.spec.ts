@@ -1,5 +1,5 @@
 /**
- * E2E: every container in the test stack is running and healthy — catches permission errors,
+ * E2E: every container in the test stack is running and healthy - catches permission errors,
  * missing dependencies, and Dockerfiles that make agents crash-loop.
  */
 import { test, expect } from '@playwright/test';
@@ -72,7 +72,7 @@ test.describe('Container health', () => {
     const ch = containers.find((c) => c.service === 'clickhouse');
     test.skip(
       !ch,
-      'ClickHouse container not started (profile not active — analytics disabled run)',
+      'ClickHouse container not started (profile not active - analytics disabled run)',
     );
     expect(ch!.health, `clickhouse container health: ${ch!.health}`).toBe('healthy');
   });
@@ -91,7 +91,7 @@ test.describe('Container health', () => {
       },
     ).trim();
     const restartCount = Number(inspect);
-    expect(restartCount, `agent has restarted ${restartCount} time(s) — likely crash-looping`).toBe(
+    expect(restartCount, `agent has restarted ${restartCount} time(s) - likely crash-looping`).toBe(
       0,
     );
   });

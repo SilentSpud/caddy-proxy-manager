@@ -1,7 +1,7 @@
 /**
  * Plants the Bun runtime check atop the standalone server entry. `vinext build` gives
  * dist/standalone/server.js a `node` shebang, and running it that way fails with
- * ERR_UNSUPPORTED_ESM_URL_SCHEME from `bun:sqlite` while the module graph is still linking — before
+ * ERR_UNSUPPORTED_ESM_URL_SCHEME from `bun:sqlite` while the module graph is still linking - before
  * any application code, so runtime-guard.ts cannot catch it. Re-run each build.
  */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -12,7 +12,7 @@ const entry = resolve(import.meta.dirname, "..", "dist", "standalone", "server.j
 const MARKER = "// caddy-proxy-manager:runtime-guard";
 
 const guard = `${MARKER}
-// Injected by scripts/inject-runtime-guard.mjs — keep in sync with src/lib/runtime-guard.ts.
+// Injected by scripts/inject-runtime-guard.mjs - keep in sync with src/lib/runtime-guard.ts.
 if (!process.versions.bun) {
   const runtime = process.versions.node ? \`Node.js \${process.versions.node}\` : "an unknown runtime";
   console.error(${JSON.stringify(BUN_REQUIRED_MESSAGE)}.replace("{runtime}", runtime));
@@ -33,13 +33,13 @@ if (source.includes(MARKER)) {
   process.exit(0);
 }
 
-// The guard must precede every import, and the shebang must stay on line 1 —
+// The guard must precede every import, and the shebang must stay on line 1 -
 // so retarget the shebang at Bun and slot the check in directly beneath it.
 const lines = source.split("\n");
 const hasShebang = lines[0]?.startsWith("#!");
 if (!hasShebang) {
   console.error(
-    "[runtime-guard] dist/standalone/server.js has no shebang — the generated entry changed shape, " +
+    "[runtime-guard] dist/standalone/server.js has no shebang - the generated entry changed shape, " +
       "so the guard was not injected. Update scripts/inject-runtime-guard.mjs.",
   );
   process.exit(1);

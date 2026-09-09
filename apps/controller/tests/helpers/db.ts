@@ -10,7 +10,7 @@ import * as schema from '../../src/lib/db/schema.pg';
  * Per-test isolation is a PostgreSQL *schema*, not a database. Both were measured: creating a
  * database from a migrated template costs about the same as creating a schema and replaying the
  * DDL (~25ms either way, 32-way concurrent), but `DROP DATABASE` forces a checkpoint and fsyncs
- * the file deletions — 14.5s to drop 32, against 0.4s for 32 `DROP SCHEMA`s. Dropping is not
+ * the file deletions - 14.5s to drop 32, against 0.4s for 32 `DROP SCHEMA`s. Dropping is not
  * optional: a test file creates a database per test, and leaking them exhausts max_connections
  * long before the suite ends.
  */
@@ -32,7 +32,7 @@ function adminUrl(): string {
 }
 
 /**
- * Every migration, in the order drizzle's journal records — not just the initial one. The journal
+ * Every migration, in the order drizzle's journal records - not just the initial one. The journal
  * is the source of truth rather than a directory glob, so a test schema is built exactly the way a
  * deployment is. Reading the one file was correct while `0000_initial` was the only migration, and
  * silently wrong the moment a second one existed.
@@ -74,8 +74,8 @@ let adminPool: SQL | undefined;
 
 /**
  * Where the current test's schemas start in `live`. Everything before it was created while the
- * test file was being imported — the `vi.mock('src/lib/db')` files build one database for the
- * whole file and clear tables between tests — and dropping those after the first test would take
+ * test file was being imported - the `vi.mock('src/lib/db')` files build one database for the
+ * whole file and clear tables between tests - and dropping those after the first test would take
  * the rest of the file down with it.
  */
 let testBoundary = 0;
@@ -87,7 +87,7 @@ function admin(): SQL {
 
 /**
  * A fresh, fully migrated PostgreSQL schema with all tables. Each call is isolated from every
- * other. `max: 1` because the handle's `search_path` is per connection — a pool would hand later
+ * other. `max: 1` because the handle's `search_path` is per connection - a pool would hand later
  * queries a connection still pointed at public.
  */
 export async function createTestDb(): Promise<TestDb> {
@@ -103,7 +103,7 @@ export async function createTestDb(): Promise<TestDb> {
 
 /**
  * A fresh, empty PostgreSQL *database* and the URL that reaches it, for the handful of tests that
- * boot the real src/lib/db module rather than mocking it — that module reads DATABASE_URL and
+ * boot the real src/lib/db module rather than mocking it - that module reads DATABASE_URL and
  * connects itself, so it cannot be pointed at one of the schemas above.
  *
  * Migrations are not applied: a caller booting the db module gets them from its own startup, and a
@@ -118,7 +118,7 @@ export async function createTestDatabase(): Promise<{ url: string; drop: () => P
   return {
     url: url.toString(),
     // Slow (DROP DATABASE fsyncs), so this is deliberately not wired into the afterEach that
-    // handles schemas — the few callers drop their own, and the throwaway server dies with the run.
+    // handles schemas - the few callers drop their own, and the throwaway server dies with the run.
     drop: async () => {
       await admin().unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
     },

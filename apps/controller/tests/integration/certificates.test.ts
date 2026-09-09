@@ -31,7 +31,7 @@ async function insertCertificate(overrides: Partial<typeof certificates.$inferIn
 }
 
 describe('certificates integration', () => {
-  it('inserts managed certificate with domainNames array — retrieved correctly', async () => {
+  it('inserts managed certificate with domainNames array - retrieved correctly', async () => {
     const domains = ['example.com', '*.example.com'];
     const cert = await insertCertificate({ domainNames: JSON.stringify(domains) });
     const row = await db.query.certificates.findFirst({ where: (t, { eq }) => eq(t.id, cert.id) });

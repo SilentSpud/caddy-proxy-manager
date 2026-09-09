@@ -126,7 +126,7 @@ function acmeCaRootFile(): string {
 
 /**
  * Persist (or clear) the custom ACME CA root PEM and return the path Caddy should reference, or
- * null — leaving the issuer without `trusted_roots_pem_files` rather than a missing file.
+ * null - leaving the issuer without `trusted_roots_pem_files` rather than a missing file.
  */
 function syncAcmeCaRootFile(caRootPem: string | undefined): string | null {
   const file = acmeCaRootFile();
@@ -744,7 +744,7 @@ export function resolveEffectiveGeoBlock(
     return hostConfig.enabled ? hostConfig : null;
   }
 
-  // Host merge mode: only enabled host config alters global behavior — a disabled host
+  // Host merge mode: only enabled host config alters global behavior - a disabled host
   // geoblock means "no per-host geoblock".
   if (hostConfig?.enabled && globalConfig) {
     return mergeGeoBlockSettings(globalConfig, hostConfig);
@@ -867,7 +867,7 @@ export function buildServerTrustedProxies(settings: TrustedProxiesSettings | nul
 
 /**
  * Tailscale as generation sees it. Resolved once per document because every host asks the same two
- * questions — is the feature on, and is the plugin actually in the running binary — and the answer
+ * questions - is the feature on, and is the plugin actually in the running binary - and the answer
  * decides whether a `tailscale/...` listener may appear at all.
  */
 type TailscaleRuntime = {
@@ -891,8 +891,8 @@ type TailscaleRouteConfig = {
 
 /**
  * What one host's stored Tailscale block means once the global settings are applied. Null whenever
- * nothing tailscale-shaped may be emitted for it — the feature is off, the plugin is missing, or
- * the host simply does not use it — so callers have one thing to check rather than three.
+ * nothing tailscale-shaped may be emitted for it - the feature is off, the plugin is missing, or
+ * the host simply does not use it - so callers have one thing to check rather than three.
  */
 function parseTailscaleConfig(
   meta: TailscaleMeta | undefined,
@@ -929,7 +929,7 @@ type CaddyBuildContext = {
    * whole, so one handler naming an uncompiled module takes every host offline.
    */
   moduleAvailability: CaddyModuleAvailability;
-  /** Null outside buildCaddyDocument — callers exercising route shapes have no settings to read. */
+  /** Null outside buildCaddyDocument - callers exercising route shapes have no settings to read. */
   tailscale?: TailscaleRuntime | null;
   mtlsRbac?: {
     roleFingerprintMap: Map<number, Set<string>>;
@@ -1273,7 +1273,7 @@ function appendMtlsPathModeRoutes(options: {
     }
 
     // Full-site mode: no path carve-outs to enforce. Hosts with mTLS disabled land here too,
-    // so nothing may be gated ahead of the catch-all — the catch-all (or its RBAC subroutes)
+    // so nothing may be gated ahead of the catch-all - the catch-all (or its RBAC subroutes)
     // decides the requirement.
     appendLocationRoutes({
       hostRoutes,
@@ -1319,7 +1319,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
   const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
 
   // Adapt every host's snippet up front, concurrently: each adapt is an admin-API round trip on
-  // every config apply, so the cost becomes the slowest rather than the sum. Not cached — a cache
+  // every config apply, so the cost becomes the slowest rather than the sum. Not cached - a cache
   // outliving a rebuild would hand back routes for a module that is gone.
   const adaptedCaddyfiles = new Map<number, Awaited<ReturnType<typeof adaptCaddyfileSnippet>>>();
   await Promise.all(
@@ -1334,7 +1334,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         } catch (error) {
           // Left absent in the map; the loop below reports it per host.
           console.warn(
-            `Skipping the custom Caddyfile for host "${row.name}" — Caddy could not adapt it:`,
+            `Skipping the custom Caddyfile for host "${row.name}" - Caddy could not adapt it:`,
             error instanceof Error ? error.message : error,
           );
         }
@@ -1373,7 +1373,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     // The host was configured to exist only on the tailnet, and it cannot be: Tailscale is off in
     // settings, or the plugin is not in the running binary yet. Publishing it on the public
     // listener instead would expose a service deliberately kept private, so it is left out
-    // entirely — the same fail-closed choice mTLS makes when its trust set resolves to nothing.
+    // entirely - the same fail-closed choice mTLS makes when its trust set resolves to nothing.
     if (!tailscale?.serve && meta.tailscale?.serve && meta.tailscale.tailnet_only) {
       console.warn(
         `Skipping proxy host "${row.name}": it is set to serve only on the tailnet, but Tailscale ` +
@@ -1438,7 +1438,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     }
 
     // Path blocks (terminal static_response) and rewrites (URI rewrite). Allows are not standalone
-    // routes — a terminal match with an empty handle returns an empty 200 — so each allow pattern
+    // routes - a terminal match with an empty handle returns an empty 200 - so each allow pattern
     // is folded into every block's matcher as a `not` clause. Rewrites keep their own matchers.
     const pathAllows = meta.path_allows ?? [];
     const pathBlocks = meta.path_blocks ?? [];
@@ -1491,7 +1491,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       }
     }
 
-    // Structured redirects — emitted before auth so .well-known paths work without login
+    // Structured redirects - emitted before auth so .well-known paths work without login
     if (meta.redirects && meta.redirects.length > 0) {
       const redirectRoutes = meta.redirects.map((rule) => ({
         match: [{ path: [rule.from] }],
@@ -1531,7 +1531,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     const hostDnsResolutionConfig = parseUpstreamDnsResolutionConfig(meta.upstream_dns_resolution);
     // Pinning resolves the upstream here and writes the address into the config. Through a tailnet
     // node the name has to be resolved by MagicDNS on the other side, and this container's resolver
-    // knows nothing about it — so the pin is skipped rather than baked in wrong.
+    // knows nothing about it - so the pin is skipped rather than baked in wrong.
     const effectiveDnsResolution = tailscale?.upstreamNode
       ? { enabled: false as const, family: "both" as const }
       : resolveEffectiveUpstreamDnsResolution(
@@ -1682,7 +1682,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     }
 
     // Security: this field lets admins inject arbitrary Caddy reverse_proxy config, which is
-    // intentional — admins have full control of the proxy configuration. mergeDeep blocks
+    // intentional - admins have full control of the proxy configuration. mergeDeep blocks
     // __proto__/constructor/prototype, so prototype pollution is not reachable.
     const customReverseProxy = parseOptionalJson(meta.custom_reverse_proxy_json);
     if (customReverseProxy) {
@@ -1709,7 +1709,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     }
 
     // Security: this field lets admins inject arbitrary Caddy HTTP handlers before the
-    // reverse_proxy. Intentional — admins can add any handler (file_server, rewrite, etc.).
+    // reverse_proxy. Intentional - admins can add any handler (file_server, rewrite, etc.).
     const customHandlers = parseCustomHandlers(meta.custom_pre_handlers_json);
     if (customHandlers.length > 0) {
       handlers.push(...customHandlers);
@@ -1744,7 +1744,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
       // Add header copying for each configured header. The name is canonicalised because the
       // placeholder that reads the value back is matched literally against Go's canonical
-      // header key — see upstreamHeaderPlaceholder.
+      // header key - see upstreamHeaderPlaceholder.
       for (const rawHeaderName of authentik.copyHeaders) {
         const headerName = canonicalHeaderName(rawHeaderName);
         const placeholder = upstreamHeaderPlaceholder(headerName);
@@ -1843,7 +1843,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
         // "X-CPM-User" resolves to nothing and every upstream sees an anonymous request.
         const CPM_COPY_HEADERS = ["X-Cpm-User", "X-Cpm-Email", "X-Cpm-Groups", "X-Cpm-User-Id"];
 
-        // Security: strip client-supplied CPM identity headers inbound — CPM sets these only from
+        // Security: strip client-supplied CPM identity headers inbound - CPM sets these only from
         // the verify response, so accepting them lets a caller spoof identity. Must run on EVERY
         // route: unauthenticated ones have nothing else to remove them, and the copy step below
         // only overwrites when the verify value is non-empty.
@@ -1879,7 +1879,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           });
         }
 
-        // Forward auth handler — subrequest to CPM verify endpoint
+        // Forward auth handler - subrequest to CPM verify endpoint
         const cpmForwardAuthHandler: Record<string, unknown> = {
           handler: "reverse_proxy",
           upstreams: [{ dial: cpmDialAddress }],
@@ -1932,7 +1932,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
           ],
         };
 
-        // Callback route — unprotected, so it goes before forward_auth
+        // Callback route - unprotected, so it goes before forward_auth
         const cpmCallbackRoute: CaddyHttpRoute = {
           match: [{ path: ["/.cpm-auth/callback"] }],
           handle: [
@@ -1983,7 +1983,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       // ask the caller to sign in twice.
       //
       // The strip handler goes on the shared chain rather than beside the authenticator, so it
-      // runs on excluded and whitelisted paths too — those authenticate nothing, and without it a
+      // runs on excluded and whitelisted paths too - those authenticate nothing, and without it a
       // caller could set X-Tailscale-User themselves and the upstream could not tell the
       // difference. Setting the headers stays inside the auth subroute, where a user exists.
       const tailscaleHandlers = tailscale.forwardIdentity
@@ -2128,7 +2128,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
 
       // Full-site mode. RBAC rules, when present, carry their own per-path allow/deny, and
       // requireValidClientCertByDefault stays false so unruled paths are proxied rather than
-      // denied. With no RBAC rules — including hosts with mTLS off entirely — the host is open.
+      // denied. With no RBAC rules - including hosts with mTLS off entirely - the host is open.
       const buildDefaultCatchAll = (domainGroup: string[]): CaddyHttpRoute[] => {
         if (hasMtlsRbac) {
           const rbacSubroutes = buildMtlsRbacSubroutes(
@@ -2263,7 +2263,7 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
           if (mTlsAuth) {
             policies.push({ match: { sni: priorityGroup }, client_authentication: mTlsAuth });
           } else {
-            // All CAs have all certs revoked — drop connections rather than allow through without mTLS
+            // All CAs have all certs revoked - drop connections rather than allow through without mTLS
             policies.push({ match: { sni: priorityGroup }, drop: true });
           }
         }
@@ -2352,7 +2352,7 @@ type TlsAutomationContext = {
     dnsProviderSettings?: DnsProviderSettings | null;
     acmeSettings?: AcmeSettings | null;
     /**
-     * Omitted means "do not gate" — callers exercising only ACME policy shapes have no module
+     * Omitted means "do not gate" - callers exercising only ACME policy shapes have no module
      * selection. buildCaddyDocument always passes it, so the real config path is always gated.
      */
     moduleAvailability?: CaddyModuleAvailability;
@@ -2593,7 +2593,7 @@ async function buildL4Servers(
   agentRowId?: number,
 ): Promise<Record<string, unknown> | null> {
   // The entire layer4 app comes from caddy-l4. Without it there is no `layer4` key to
-  // unmarshal, so emitting one would fail the whole config — HTTP hosts included.
+  // unmarshal, so emitting one would fail the whole config - HTTP hosts included.
   if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
 
   const allL4Hosts = await db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true));
@@ -2609,7 +2609,7 @@ async function buildL4Servers(
 
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
 
-  // Group hosts by listen address — multiple hosts on the same port share routes in one server
+  // Group hosts by listen address - multiple hosts on the same port share routes in one server
   const serverMap = new Map<string, typeof l4Hosts>();
   for (const host of l4Hosts) {
     const key = host.listenAddress;
@@ -2670,7 +2670,7 @@ async function buildL4Servers(
                 body: null,
                 passes: lbMeta.active_health_check.passes ?? null,
                 fails: lbMeta.active_health_check.fails ?? null,
-                // No HTTP probe at layer 4 — the check is a dial, so there is no method, body,
+                // No HTTP probe at layer 4 - the check is a dial, so there is no method, body,
                 // redirect to follow or header to send.
                 method: null,
                 requestBody: null,
@@ -2781,7 +2781,7 @@ async function buildL4Servers(
       route.handle = handlers;
 
       // Geo blocking: a blocking route BEFORE the proxy route. At L4 the blocker is a matcher
-      // (layer4.matchers.blocker) — blocked connections match this route and are closed, the
+      // (layer4.matchers.blocker) - blocked connections match this route and are closed, the
       // rest fall through to the proxy route.
       const effectiveGeoBlock = resolveEffectiveGeoBlock(context.globalGeoBlock ?? null, {
         geoblock: meta.geoblock ?? null,
@@ -2823,8 +2823,8 @@ async function buildL4Servers(
  * Build the configuration for one agent, or for the fleet.
  *
  * `agentRowId` scopes the document to what that agent should serve: the hosts pinned to it plus
- * every unpinned host, and the modules its own binary carries. Omitted — which is what every unit
- * test and the single-agent path do — nothing is filtered and the module gate falls back to the
+ * every unpinned host, and the modules its own binary carries. Omitted - which is what every unit
+ * test and the single-agent path do - nothing is filtered and the module gate falls back to the
  * fleet-wide intersection, which is exactly the document this function produced before hosts could
  * be assigned at all.
  */
@@ -2926,7 +2926,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
   // CPM's own dashboard, served by the Caddy it manages. Synthesised rather than stored, and ahead
   // of the stored rows: sortRoutesByHostPriority settles every other overlap by specificity, but
   // two rows claiming the same exact domain tie and fall back to this order. Winning that tie is
-  // the point — a host someone creates for the dashboard's domain must not shadow the route the
+  // the point - a host someone creates for the dashboard's domain must not shadow the route the
   // dashboard is reached through. Absent entirely when the setting is off, the domain is blank, or
   // the dial address could not be worked out.
   const dashboardRow = buildDashboardHostRow(await getDashboardSettings(), getCpmDialAddress());
@@ -3012,7 +3012,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
     }
 
     if (allCertIds.size > 0) {
-      // New model: pin trust to the explicitly-selected client certs — derive their CAs for
+      // New model: pin trust to the explicitly-selected client certs - derive their CAs for
       // chain validation and collect the leaf PEMs for pinning.
       const derivedCaIds = new Set<number>();
       const leafPems: string[] = [];
@@ -3223,7 +3223,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
   }
 
   // One server per tailnet node. Separate from `cpm` rather than extra listen addresses on it,
-  // because "tailnet only" has to mean the routes are absent from the public server — sharing one
+  // because "tailnet only" has to mean the routes are absent from the public server - sharing one
   // server would publish every host on every address. The default-response route is deliberately
   // not repeated here: an unmatched request arriving over the tailnet is a misconfiguration, and
   // Caddy's own 404 says so more usefully than a catch-all meant for the open internet.
@@ -3271,7 +3271,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
       : {};
 
   // Build logging configuration. Roll settings are spelled out rather than left to Caddy's
-  // file-writer defaults — those silently stopped rotating (no compression, no cleanup of old
+  // file-writer defaults - those silently stopped rotating (no compression, no cleanup of old
   // rolled files) on the deployed build and filled the host disk.
   const rollSettings = {
     roll: true,
@@ -3283,7 +3283,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
   const loggingLogs: Record<string, unknown> = {
     // WAF rule match logs. Modern Coraza puts matched rules in the audit log (part H), which
     // waf-log-parser reads; this file is a fallback for older builds plus a human-readable trail.
-    // Do not make ingestion depend on it — correlating two files dropped non-blocked events (#233).
+    // Do not make ingestion depend on it - correlating two files dropped non-blocked events (#233).
     waf_rules: {
       writer: { output: "file", filename: "/logs/waf-rules.log", mode: "0640", ...rollSettings },
       encoder: { format: "json" },
@@ -3369,7 +3369,7 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
  *
  * A document per agent, not one for the fleet. The controller's database is still the single
  * source of truth, but what any given agent should be running is now a question with a different
- * answer per agent — the hosts pinned to it, and the modules its own binary was built with — so
+ * answer per agent - the hosts pinned to it, and the modules its own binary was built with - so
  * each one gets the document computed for it. A rejection anywhere fails the whole apply and says
  * which host rejected it: a partial apply is a state to report, not to succeed at.
  */
@@ -3437,7 +3437,7 @@ function getCpmDialAddress(): string | null {
       caddyUrl.hostname !== "127.0.0.1" &&
       caddyUrl.hostname !== "::1"
     ) {
-      // Caddy is on a Docker network — CPM is the "web" service on port 3000
+      // Caddy is on a Docker network - CPM is the "web" service on port 3000
       return "web:3000";
     }
   } catch {
@@ -3676,7 +3676,7 @@ function activeCount(value: unknown): number | null {
 /**
  * Layer 4's load balancing, which is a strict subset of the HTTP one.
  *
- * caddy-l4 accepts `selection_policy` and nothing else here — no retries, no try_duration, no
+ * caddy-l4 accepts `selection_policy` and nothing else here - no retries, no try_duration, no
  * try_interval. Emitting one is not ignored: Caddy refuses the whole document with `unknown field`,
  * so a single L4 host with retries set would take down every route in the config, not just its own.
  * Verified against `caddy validate` on the shipped image rather than inferred from the HTTP shape.
@@ -3704,8 +3704,8 @@ function buildL4LoadBalancingConfig(
 /**
  * Layer 4's health checks: `port`/`interval`/`timeout` active, `fail_duration`/`max_fails` passive.
  *
- * Everything else the HTTP checks carry — uri, expected status and body, passes, fails,
- * unhealthy_latency, unhealthy_request_count — is an HTTP concept caddy-l4 does not define, and
+ * Everything else the HTTP checks carry - uri, expected status and body, passes, fails,
+ * unhealthy_latency, unhealthy_request_count - is an HTTP concept caddy-l4 does not define, and
  * would be rejected the same way. There is no request at layer 4, only a dial.
  */
 function buildL4HealthChecksConfig(
@@ -3737,7 +3737,7 @@ function buildL4HealthChecksConfig(
 
 /**
  * `upstreamCount` is only read by `weighted_round_robin`, whose weights are positional against the
- * upstream list. A list that has drifted — an upstream added without a weight beside it — is
+ * upstream list. A list that has drifted - an upstream added without a weight beside it - is
  * dropped rather than padded, because a backend silently reweighted to 0 stops receiving traffic
  * and nothing in the UI would say so.
  */

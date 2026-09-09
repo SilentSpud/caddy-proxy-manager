@@ -26,7 +26,7 @@ async function findEvilUser(
   return users.find((u) => u.email === EVIL_EMAIL);
 }
 
-test.describe('OAuth — a hostile IdP cannot inject a privileged role', () => {
+test.describe('OAuth - a hostile IdP cannot inject a privileged role', () => {
   test.setTimeout(90_000);
 
   test('role:"admin" claim from the IdP does not create an admin account', async ({
@@ -68,7 +68,7 @@ test.describe('OAuth — a hostile IdP cannot inject a privileged role', () => {
     try {
       // 2. Complete an OAuth sign-in in a CLEAN context (no admin session), so
       //    we exercise real federated signup, not the admin session. The empty
-      //    storageState is required — browser.newContext() otherwise inherits
+      //    storageState is required - browser.newContext() otherwise inherits
       //    the project's admin storageState and /login redirects to "/".
       const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       const oauthPage = await ctx.newPage();

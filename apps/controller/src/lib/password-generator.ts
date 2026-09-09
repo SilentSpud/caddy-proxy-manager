@@ -1,5 +1,5 @@
 /**
- * Generating a password the app itself chooses — a ClickHouse password, a PKCS#12 export password,
+ * Generating a password the app itself chooses - a ClickHouse password, a PKCS#12 export password,
  * the credential an administrator hands to a new user.
  *
  * Dependency-free and `crypto.getRandomValues`-only, so it runs unchanged in a client component and
@@ -9,7 +9,7 @@
 import { MIN_PASSWORD_LENGTH, isPasswordAcceptable } from "./password-policy";
 
 /**
- * Ambiguous glyphs are left out — I, l, 1, O, 0 — because these are read off a screen and typed
+ * Ambiguous glyphs are left out - I, l, 1, O, 0 - because these are read off a screen and typed
  * somewhere else, and a password nobody can transcribe gets replaced by a weak one. The symbols are
  * the punctuation that survives a shell, a YAML file and a connection string without quoting.
  */
@@ -48,8 +48,8 @@ function randomString(length: number): string {
  * A password that satisfies {@link isPasswordAcceptable}.
  *
  * Acceptability is reached by discarding candidates rather than by composing one character per
- * required class. Composing would bias the result — a fixed digit position is a position an
- * attacker does not have to guess — and, worse, it would silently stop matching the policy the day
+ * required class. Composing would bias the result - a fixed digit position is a position an
+ * attacker does not have to guess - and, worse, it would silently stop matching the policy the day
  * a rule is added. Rejection stays correct because it asks the policy itself.
  *
  * At the default length a candidate is rejected roughly once in a thousand, so the loop is not a

@@ -16,7 +16,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -115,8 +115,8 @@ describe('the unassigned rule', () => {
   });
 
   it('includes everything when there is no agent in hand at all', () => {
-    // The fleet-wide document — a single-agent deployment, and every test that builds config
-    // without an agent — must not start filtering because a host was pinned somewhere.
+    // The fleet-wide document - a single-agent deployment, and every test that builds config
+    // without an agent - must not start filtering because a host was pinned somewhere.
     expect(servedByAgent(new Map([[7, [AGENT_A]]]), 7, null)).toBe(true);
   });
 });

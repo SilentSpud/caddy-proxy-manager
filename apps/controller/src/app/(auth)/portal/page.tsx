@@ -39,7 +39,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         rid = await createRedirectIntent(redirectUri);
       }
     } catch {
-      // invalid URL — portal will show a generic message
+      // invalid URL - portal will show a generic message
     }
   }
 

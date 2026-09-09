@@ -1,4 +1,4 @@
-/** E2E: Groups page — creation, member management, deletion. Runs as admin. */
+/** E2E: Groups page - creation, member management, deletion. Runs as admin. */
 import { test, expect } from '@playwright/test';
 
 test.describe('Groups page', () => {
@@ -57,7 +57,7 @@ test.describe('Groups page', () => {
     await expect(page.getByText('Add a user to this group')).toBeVisible();
 
     // The available-users list renders as ListItems inside the add-member
-    // panel — the old '.border.rounded-md' container class is not emitted any
+    // panel - the old '.border.rounded-md' container class is not emitted any
     // more, so scope to the panel that owns the prompt text instead.
     const addPanel = page
       .locator('div.astryx-stack')
@@ -111,7 +111,7 @@ test.describe('Groups page', () => {
   });
 });
 
-test.describe('Groups page — unauthenticated access', () => {
+test.describe('Groups page - unauthenticated access', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('unauthenticated access to /groups redirects to /login', async ({ page }) => {

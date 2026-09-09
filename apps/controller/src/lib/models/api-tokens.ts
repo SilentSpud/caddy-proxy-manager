@@ -140,7 +140,7 @@ export async function validateToken(
     return null;
   }
 
-  // Check expiry — reject tokens with invalid or past expiry dates
+  // Check expiry - reject tokens with invalid or past expiry dates
   if (row.expiresAt) {
     const expiresAt = new Date(row.expiresAt);
     if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {

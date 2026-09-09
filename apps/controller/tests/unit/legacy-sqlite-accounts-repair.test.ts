@@ -1,7 +1,7 @@
 /**
  * The readiness check in fixAccountsSchema decides whether a legacy `accounts` table is rebuilt.
  * It is the only thing standing between an upgraded deployment and a table with no unique index
- * on (providerId, accountId) — which is what stops two rows claiming one identity — so the cases
+ * on (providerId, accountId) - which is what stops two rows claiming one identity - so the cases
  * below pin both directions: a wrong shape is repaired, and a correct one is left alone.
  */
 import { Database } from 'bun:sqlite';

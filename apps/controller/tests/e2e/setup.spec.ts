@@ -6,7 +6,7 @@
  * out of context.
  *
  * One page for the whole block, created once. Setup is a sequence an operator walks through in a
- * single session — Playwright's default of a fresh context per test would sign them out between
+ * single session - Playwright's default of a fresh context per test would sign them out between
  * every step, which is neither what happens nor what is worth pinning.
  *
  * The integration tests already cover the state machine. What only a browser shows is that the
@@ -65,7 +65,7 @@ test.describe('First-run setup', () => {
     await page.getByRole('radio', { name: 'Agent' }).click();
 
     await expect(page.getByText('Agents are set up separately')).toBeVisible();
-    // And there is a way back — a dead end here would leave an operator with no route to finishing.
+    // And there is a way back - a dead end here would leave an operator with no route to finishing.
     await page.getByRole('button', { name: 'Back to controller setup' }).click();
     await expect(page.getByRole('button', { name: /create account and sign in/i })).toBeVisible();
   });
@@ -125,7 +125,7 @@ test.describe('First-run setup', () => {
 
   test('the defaults a first certificate needs are asked for here, not afterwards', async () => {
     // The ACME contact is the address Let's Encrypt warns about an expiring certificate at, and it
-    // was previously only reachable once setup had finished — by which time the first certificate
+    // was previously only reachable once setup had finished - by which time the first certificate
     // may already have been issued with nobody to tell.
     await expect(page.getByRole('textbox', { name: 'ACME contact email' })).toBeVisible();
 
@@ -160,7 +160,7 @@ test.describe('First-run setup', () => {
   });
 
   test('the optional containers are switches, with their settings behind them', async () => {
-    // This instance runs with an empty CLICKHOUSE_PASSWORD, so analytics infer off — and the whole
+    // This instance runs with an empty CLICKHOUSE_PASSWORD, so analytics infer off - and the whole
     // point of the gate is that the rest of the group is not asked about until it is on.
     const analytics = page.getByRole('switch', { name: 'Enable analytics' });
     await expect(analytics).toBeVisible();

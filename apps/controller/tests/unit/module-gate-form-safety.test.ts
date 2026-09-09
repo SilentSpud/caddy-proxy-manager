@@ -1,7 +1,7 @@
 /**
  * Module gating must never remove a value from a form submission. The form actions read an absent
  * field as "empty", not "unchanged", while the `wafPresent` / `geoblockPresent` markers submit
- * unconditionally — so the parser always runs and always writes. Unmounting a rule editor, or
+ * unconditionally - so the parser always runs and always writes. Unmounting a rule editor, or
  * disabling a field, would silently erase tuned WAF suppressions and geo allow-lists. So gating
  * locks the *enable* switch and leaves every value-carrying input mounted.
  */
@@ -47,7 +47,7 @@ describe('GeoBlockFields', () => {
   });
 
   it('still locks the enable switch and says why', () => {
-    // Gating has to remain visible — this is the half that is safe to do.
+    // Gating has to remain visible - this is the half that is safe to do.
     expect(geoBlockFields).toMatch(/isDisabled=\{Boolean\(moduleDisabledReason\)\}/);
     expect(geoBlockFields).toContain('<ModuleGated feature="geoblock">');
   });
@@ -81,7 +81,7 @@ describe('global WAF settings form', () => {
 
   it('gates the directives editor read-only, never disabled', () => {
     // CodeEditor drops its hidden input when isDisabled, matching native form
-    // behaviour — correct in general, fatal for a field whose absence means
+    // behaviour - correct in general, fatal for a field whose absence means
     // "empty". isReadOnly blocks editing and still submits.
     const editorBlock = wafEventsClient.slice(
       wafEventsClient.indexOf('htmlName="wafCustomDirectives"'),

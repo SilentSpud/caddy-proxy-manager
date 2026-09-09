@@ -26,8 +26,8 @@ export const target = resolveDatabaseTarget(process.env);
 
 /**
  * Connections the pool may open. Bun.SQL defaults to 10 and says so nowhere; measured, 30
- * concurrent queries against a default client run in three batches. SQLite had no such ceiling —
- * it was in-process — so this limit arrived with PostgreSQL rather than being chosen, and an
+ * concurrent queries against a default client run in three batches. SQLite had no such ceiling -
+ * it was in-process - so this limit arrived with PostgreSQL rather than being chosen, and an
  * instance serving more concurrent work than this queues behind it.
  *
  * Stays an environment variable rather than a stored setting: the pool has to exist before

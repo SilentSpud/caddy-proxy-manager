@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
   // An operator reaches this page too; what they see on it is decided per host. Null from
-  // visibleIdFilter is an admin — no restriction — which is why it is not `?? []`.
+  // visibleIdFilter is an admin - no restriction - which is why it is not `?? []`.
   const access = await requireAccess();
   const visible = visibleIdFilter(access, "proxyHost");
   const visibleIds = visible === null ? null : [...visible];

@@ -1,6 +1,6 @@
 /**
  * The Tailscale JSON shapes and the settings normalizer. Caddy rejects a posted config as a whole,
- * so a listener address or a module name that is wrong here takes every host offline — these are
+ * so a listener address or a module name that is wrong here takes every host offline - these are
  * the pieces that decide those strings, checked without a database.
  */
 import { describe, it, expect } from 'bun:test';
@@ -230,7 +230,7 @@ describe('buildTailscaleTransport', () => {
 
   it('omits tls entirely for a plain http upstream', () => {
     // Any non-nil TLS config makes the plugin speak https, so an empty object is not the same as
-    // absent — it would turn an http upstream into an https one.
+    // absent - it would turn an http upstream into an https one.
     expect(buildTailscaleTransport('edge', null)).toEqual({ protocol: 'tailscale', name: 'edge' });
   });
 });

@@ -63,7 +63,7 @@ function makeClientCert(ca: ReturnType<typeof makeCa>, commonName: string) {
  * Regression: a CA must not be deletable while a host trusts one of its issued certs. The original
  * guard checked only the deprecated `mtls.ca_certificate_ids`. Exercises the real DELETE.
  */
-test.describe('mTLS — CA delete guard (in-use protection)', () => {
+test.describe('mTLS - CA delete guard (in-use protection)', () => {
   // RSA keygen via node-forge is CPU-heavy; give the test room.
   test.setTimeout(60_000);
 

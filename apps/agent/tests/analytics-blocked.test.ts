@@ -2,7 +2,7 @@
  * How a caddy-blocker "request blocked" line is matched to the "handled request" row it belongs to.
  *
  * Moved here with the parser: the Caddy log is a file on the agent's host. The mocks the
- * controller's copy needed are gone — these are pure functions, and the module's imports are real
+ * controller's copy needed are gone - these are pure functions, and the module's imports are real
  * dependencies of this package now.
  */
 import { describe, it, expect } from "bun:test";

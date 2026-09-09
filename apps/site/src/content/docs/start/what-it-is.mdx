@@ -26,9 +26,9 @@ is what lets a Caddy host sit behind NAT with no inbound port.
 
 Configuration lives in PostgreSQL, not in a Caddyfile. Caddy's running configuration is generated
 from the database on every apply, so the database is the source of truth and the Caddy config is
-derived — editing Caddy directly will be overwritten on the next apply.
+derived - editing Caddy directly will be overwritten on the next apply.
 
-Secrets — DNS provider credentials, private keys, auth keys — are encrypted at rest under the
+Secrets - DNS provider credentials, private keys, auth keys - are encrypted at rest under the
 deployment's `SESSION_SECRET`.
 
 ## What it is not

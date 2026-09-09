@@ -1,6 +1,6 @@
 /**
  * Per-host Caddyfile snippets through the admin API. The adapter is Caddy's, so what matters is the
- * framing, the extraction and the failure reporting — a silently dropped snippet is the worst case.
+ * framing, the extraction and the failure reporting - a silently dropped snippet is the worst case.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 
@@ -84,7 +84,7 @@ describe('adaptCaddyfileSnippet', () => {
   });
 
   it('reports app keys it cannot honour at host scope', async () => {
-    // A `tls` directive in a per-host snippet does nothing — TLS is configured
+    // A `tls` directive in a per-host snippet does nothing - TLS is configured
     // at the server level. Saying so beats leaving the operator to wonder.
     installAdapter(() => adaptedOk([], { tls: { automation: {} } }));
 

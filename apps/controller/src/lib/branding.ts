@@ -4,7 +4,7 @@
  * Held in the database rather than on disk, for the same reason the rest of the configuration is:
  * a deployment's data volume is per-instance and per-host, while the database is the one thing
  * every instance already shares. It is a `settings` blob rather than a registry entry because the
- * registry is scalars migrating out of `.env` — a base64 image was never an environment variable,
+ * registry is scalars migrating out of `.env` - a base64 image was never an environment variable,
  * and `resolveAllSettings` loads every registry key at once, so putting one there would drag the
  * image into every page that reads any setting.
  */
@@ -17,7 +17,7 @@ const BRANDING_KEY = "branding";
 /**
  * Largest favicon accepted, before base64.
  *
- * Far above anything a favicon needs — a 180×180 PNG is around 20 KB — and far below the 2 MB
+ * Far above anything a favicon needs - a 180×180 PNG is around 20 KB - and far below the 2 MB
  * server-action body limit, so the failure an operator hits is this message rather than a request
  * the framework rejected with none.
  */
@@ -26,7 +26,7 @@ export const MAX_FAVICON_BYTES = 256 * 1024;
 export type FaviconAsset = {
   /** The file exactly as uploaded, base64-encoded. */
   data: string;
-  /** The type sniffed from the bytes. Never the browser's claim — see sniffFaviconType. */
+  /** The type sniffed from the bytes. Never the browser's claim - see sniffFaviconType. */
   type: string;
   /** Content hash, served as the ETag so replacing the icon invalidates the cached one at once. */
   hash: string;
@@ -55,7 +55,7 @@ function ascii(text: string): number[] {
  *
  * The uploaded `File.type` is attacker-controlled: it comes from the client, and this value is what
  * the favicon route later hands back as `Content-Type`. Sniffing means a file cannot be stored as
- * one thing and served as another — which is the whole trick behind serving an "image" that the
+ * one thing and served as another - which is the whole trick behind serving an "image" that the
  * browser is willing to treat as a document.
  */
 export function sniffFaviconType(bytes: Uint8Array): string | null {
@@ -66,7 +66,7 @@ export function sniffFaviconType(bytes: Uint8Array): string | null {
   if (startsWith(bytes, ascii("GIF87a")) || startsWith(bytes, ascii("GIF89a"))) return "image/gif";
   if (startsWith(bytes, ascii("RIFF")) && startsWith(bytes, ascii("WEBP"), 8)) return "image/webp";
 
-  // SVG has no magic number, so it is identified by its root element — after stripping whatever
+  // SVG has no magic number, so it is identified by its root element - after stripping whatever
   // prologue precedes it. Each of the declaration, comments and the doctype is optional and may
   // repeat, so they come off in a loop rather than in one pattern trying to spell every ordering.
   // TextDecoder strips a leading BOM itself when ignoreBOM is left at its default, so a UTF-8 SVG

@@ -4,7 +4,7 @@
  * compose makes.
  *
  * This used to say "must run after l4-proxy-routing.spec.ts", which was true and enforced by
- * nothing but the alphabet — the file was called sidecar.spec.ts and sorted after it. Renaming it
+ * nothing but the alphabet - the file was called sidecar.spec.ts and sorted after it. Renaming it
  * to agent.spec.ts moved it in front, so the port under test had not been created yet, the apply
  * succeeded against an empty override, and only the TCP assertion noticed. It now creates the host
  * itself when it is missing.
@@ -46,7 +46,7 @@ async function fetchL4Status(page: Page): Promise<L4StatusResponse> {
 
 /**
  * Poll /api/l4-ports until the state is "applied" or "failed". Pass `newerThan` (ISO timestamp) to
- * confirm a *new* apply completed — lexicographic comparison is correct for ISO-8601.
+ * confirm a *new* apply completed - lexicographic comparison is correct for ISO-8601.
  */
 async function waitForL4Terminal(
   page: Page,
@@ -104,7 +104,7 @@ test.describe
       expect(res.data).toContain('agent-apply-check');
     });
 
-    test('auto-applies on agent container restart — regression #117', async ({ page }) => {
+    test('auto-applies on agent container restart - regression #117', async ({ page }) => {
       // Container restart + republish + Caddy's health check can take ~60 s total;
       // waitForL4Terminal polls for up to 90 s. Override to avoid the 60 s global cap.
       test.setTimeout(180_000);
@@ -116,7 +116,7 @@ test.describe
       await page.waitForTimeout(1_500);
 
       // On startup the agent compares what Caddy publishes against what it last applied and
-      // republishes on a mismatch — which is what keeps L4 routing alive across a host reboot,
+      // republishes on a mismatch - which is what keeps L4 routing alive across a host reboot,
       // since the base compose files carry no port override. With NETWORKS: 0 that always failed,
       // since compose needs GET /networks/{id} to inspect caddy-network before reconnecting.
       execFileSync('docker', ['restart', AGENT_CONTAINER], {

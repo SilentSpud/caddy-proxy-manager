@@ -8,12 +8,12 @@ import { test, expect } from '@playwright/test';
  * `users.subject` columns. Three symptoms were reported:
  *
  *   1. OAuth auto-link created a working accounts row but left
- *      users.provider/subject empty — OAuth sign-in worked while the Profile
+ *      users.provider/subject empty - OAuth sign-in worked while the Profile
  *      page claimed the account was NOT linked.
  *   2. "Link <provider>" from the Profile page completed at the IdP but was
  *      never reflected in the Profile UI (same staleness).
  *   3. "Unlink OAuth Account" deleted the accounts rows but left
- *      users.provider/subject populated — the Profile page kept claiming the
+ *      users.provider/subject populated - the Profile page kept claiming the
  *      account was linked.
  *
  * The hostile IdP is `mock-oauth2-server` (interactiveLogin:false) with three
@@ -186,7 +186,7 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     await expect(linkButton).toBeVisible({ timeout: 15_000 });
     await linkButton.click();
 
-    // The IdP auto-issues and the callback returns to /profile — now linked.
+    // The IdP auto-issues and the callback returns to /profile - now linked.
     await expect(page.getByText(/your account is linked to/i)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(provider.name).first()).toBeVisible();
 
@@ -225,7 +225,7 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     expect(adminUser.subject, 'users.subject must be cleared').toBeNull();
 
     // OAuth sign-in with the unlinked identity must NOT silently re-link while
-    // auto-link remains on — actually it may re-link (trusted provider), which
+    // auto-link remains on - actually it may re-link (trusted provider), which
     // is by design; what matters is the unlink itself fully unlinked the
     // identity at unlink time, which the assertions above verify.
   });

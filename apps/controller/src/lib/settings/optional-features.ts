@@ -80,7 +80,7 @@ export async function geoipView(): Promise<GeoipView> {
 /**
  * The effective on/off for every gated feature, keyed by setting.
  *
- * A form showing a switch needs a boolean, and the stored value for these is tri-state — unset
+ * A form showing a switch needs a boolean, and the stored value for these is tri-state - unset
  * meaning "infer it". Resolving that here is what makes the setup form open with analytics already
  * on for a deployment that arrived with a ClickHouse password in its `.env`, rather than presenting
  * a switch that is off and inviting the operator to turn off something already running.
@@ -122,7 +122,7 @@ export async function propagateOptionalFeatureSettings(): Promise<void> {
  * Save the analytics settings.
  *
  * An empty password means "leave the stored one alone", because the form never receives the current
- * value to send back — the alternative is a page that wipes the credential every time someone
+ * value to send back - the alternative is a page that wipes the credential every time someone
  * changes the retention.
  */
 export async function saveAnalyticsSettings(input: {

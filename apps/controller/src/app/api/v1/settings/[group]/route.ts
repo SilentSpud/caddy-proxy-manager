@@ -149,7 +149,7 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
   },
   tailscale: {
     // Defaulted rather than null, so a GET before anything is saved still describes the shape a
-    // PUT has to send — the node name in particular, which hosts inherit.
+    // PUT has to send - the node name in particular, which hosts inherit.
     get: async () => (await getTailscaleSettings()) ?? defaultTailscaleSettings(),
     save: saveTailscaleSettings as (data: never) => Promise<void>,
     storageKey: "tailscale",

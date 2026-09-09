@@ -21,7 +21,7 @@ const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb }));
 const schemaModule = await import('@/src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('@/src/lib/db', () => ({
@@ -218,7 +218,7 @@ describe('the migration offer', () => {
 
   /**
    * bun:sqlite's plain `close()` releases the file only once its statements are finalized, which
-   * happens on collection — and Windows refuses the removal until then. `close(true)` above
+   * happens on collection - and Windows refuses the removal until then. `close(true)` above
    * finalizes them there and then, so this can just delete the directory.
    */
   function discard(directory: string): void {
@@ -278,7 +278,7 @@ describe('the migration offer', () => {
 /**
  * The OAuth branch of the account step stores a provider and nothing else: the user row is created
  * later, by Better Auth's callback, which pins every federated sign-up to `role: "user"`. Without
- * this promotion an instance set up against an IdP could never finish setup — the settings step
+ * this promotion an instance set up against an IdP could never finish setup - the settings step
  * demanded an admin session, and the only place group-to-role mapping can be configured is that
  * same step. `saveSetupSettings` calls this as it saves, so completing setup is what confers it.
  */

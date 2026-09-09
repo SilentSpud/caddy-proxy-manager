@@ -3,7 +3,7 @@
  *
  * Node-safe on purpose: Playwright runs specs under Node, which cannot load `bun:sqlite`. Building
  * the file needs Bun, so that half lives in ./build-legacy-db.ts and is spawned rather than
- * imported — everything in this module has to be loadable from a spec.
+ * imported - everything in this module has to be loadable from a spec.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -31,8 +31,8 @@ export const LEGACY_FIXTURE = {
 /**
  * Build the database, by running the Bun half of this helper.
  *
- * Bun is not optional here — it is what the whole repository is built and tested with, and CI
- * installs it before Playwright runs — so a missing one is a broken environment, not a case to
+ * Bun is not optional here - it is what the whole repository is built and tested with, and CI
+ * installs it before Playwright runs - so a missing one is a broken environment, not a case to
  * degrade around.
  */
 export function buildLegacyDatabase(password: string): void {

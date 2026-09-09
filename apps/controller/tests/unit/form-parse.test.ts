@@ -212,7 +212,7 @@ describe('parseCertificateId', () => {
 });
 
 // ---------------------------------------------------------------------------
-// parseAccessListId — identical rules to parseCertificateId
+// parseAccessListId - identical rules to parseCertificateId
 // ---------------------------------------------------------------------------
 
 describe('parseAccessListId', () => {

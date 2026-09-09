@@ -1,13 +1,13 @@
 /**
- * Pairing, and the standing grant it creates — now minted here rather than by the agent.
+ * Pairing, and the standing grant it creates - now minted here rather than by the agent.
  *
  * A row in `agents` lets whoever holds its secret run Caddy admin calls on another host, so the
  * properties worth pinning are about what the exchange refuses and what it never lets out: the
  * secret must not be stored in the clear, the code must work exactly once, and guessing must be
  * bounded.
  *
- * The route is exercised directly. There is no agent to stand up any more — the agent's side of
- * pairing is one unsigned POST — which is most of why this file is a third of its old length.
+ * The route is exercised directly. There is no agent to stand up any more - the agent's side of
+ * pairing is one unsigned POST - which is most of why this file is a third of its old length.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -19,7 +19,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({

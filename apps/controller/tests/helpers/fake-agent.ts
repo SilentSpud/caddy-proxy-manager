@@ -1,8 +1,8 @@
 /**
  * An agent, as the controller now sees one: an entry in the connection registry holding a stream.
  *
- * This used to be a real HTTP server the controller dialled. It cannot be any more — the controller
- * does not dial — so the fake attaches itself the way a real agent does, reads the frames the
+ * This used to be a real HTTP server the controller dialled. It cannot be any more - the controller
+ * does not dial - so the fake attaches itself the way a real agent does, reads the frames the
  * controller pushes, and answers commands. Which makes it a smaller lie than the old one: there is
  * no transport to simulate, only the protocol.
  */
@@ -74,7 +74,7 @@ function defaultState(overrides: Partial<FakeAgent['state']>): FakeAgent['state'
  * Attach a fake agent and start reading what the controller pushes it.
  *
  * The stream is drained in the background, exactly as the real agent's reader loop does. Frames are
- * logged, and a command is answered immediately from `state.caddyAdmin` — a real agent would take a
+ * logged, and a command is answered immediately from `state.caddyAdmin` - a real agent would take a
  * network round trip, but nothing here is testing latency.
  */
 export async function startFakeAgent(
@@ -87,7 +87,7 @@ export async function startFakeAgent(
 
   /**
    * Mutating `state` re-reports, so a test can write `agent.state.l4Status = …` and the controller
-   * sees it — which is how the old fake behaved when the controller polled it over HTTP. Status is
+   * sees it - which is how the old fake behaved when the controller polled it over HTTP. Status is
    * pushed now, so without this every such assignment would land in an object nothing reads again.
    */
   const state = new Proxy(raw, {
@@ -149,7 +149,7 @@ export async function startFakeAgent(
     },
   });
 
-  // The registry hands back events now rather than SSE bytes — the framing belongs to the GraphQL
+  // The registry hands back events now rather than SSE bytes - the framing belongs to the GraphQL
   // server. So this helper consumes what the real agent consumes once its transport is unwrapped,
   // and no longer reimplements a frame parser to do it.
   let reading = true;

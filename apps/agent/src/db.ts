@@ -2,8 +2,8 @@
  * The agent's own store: a SQLite file beside its socket.
  *
  * Deliberately small and deliberately local. It holds the two things that must survive a restart
- * and cannot be recovered from anywhere else — which controllers this agent trusts, and what the
- * last operation did — and nothing that the controller is the authority on. Anything the controller
+ * and cannot be recovered from anywhere else - which controllers this agent trusts, and what the
+ * last operation did - and nothing that the controller is the authority on. Anything the controller
  * knows is asked for again rather than cached here, so a divergence is impossible by construction.
  */
 
@@ -138,7 +138,7 @@ export class AgentStore {
    *
    * In `state` rather than a column on `controllers`: the table predates this and adding a column
    * would need a migration path for every agent database already on disk, for one row that is now
-   * always singular — an agent polls exactly one controller.
+   * always singular - an agent polls exactly one controller.
    */
   pairedControllerUrl(): string | null {
     return this.readState(CONTROLLER_URL_KEY);

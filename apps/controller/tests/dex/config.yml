@@ -9,7 +9,7 @@ web:
   http: 0.0.0.0:5556
 
 oauth2:
-  # Speed up tests — short-lived tokens
+  # Speed up tests - short-lived tokens
   responseTypes: ["code"]
   skipApprovalScreen: true
 
@@ -23,13 +23,13 @@ staticClients:
 enablePasswordDB: true
 
 staticPasswords:
-  # Primary test user — will be granted forward auth access
+  # Primary test user - will be granted forward auth access
   - email: "alice@test.local"
     # password: "password"
     hash: "$2a$10$95mdmT5F.icxrUmXEC9Jf.pX2RWgMO0FD6.yqrrVnRwTzA/UrT7g2"
     username: "alice"
     userID: "alice-001"
-  # Secondary test user — will NOT be granted forward auth access (for denial tests)
+  # Secondary test user - will NOT be granted forward auth access (for denial tests)
   - email: "bob@test.local"
     # password: "password"
     hash: "$2a$10$95mdmT5F.icxrUmXEC9Jf.pX2RWgMO0FD6.yqrrVnRwTzA/UrT7g2"

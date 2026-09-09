@@ -9,7 +9,7 @@ import { describe, expect, it } from 'bun:test';
  * line that is not there, and the search silently stops matching what they type.
  *
  * `.env.example` is the list of variables this deployment documents, so it is what the tokens are
- * checked against. Nothing here asserts the reverse — most variables configure something with no
+ * checked against. Nothing here asserts the reverse - most variables configure something with no
  * settings page at all.
  */
 
@@ -20,7 +20,7 @@ const settingsClient = readFileSync(
 
 const envExample = readFileSync(join(process.cwd(), '../../.env.example'), 'utf8');
 
-/** Every `NAME=` in `.env.example`, commented-out lines included — those are documentation too. */
+/** Every `NAME=` in `.env.example`, commented-out lines included - those are documentation too. */
 const documented = new Set(
   Array.from(envExample.matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm), (m) => m[1]),
 );

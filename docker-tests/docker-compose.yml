@@ -19,7 +19,7 @@ volumes:
   cpm-data:      # web: certificates and shared state
   caddy-data:    # caddy: certificate storage
   caddy-config:  # caddy: autosave.json
-  caddy-logs:    # shared: access log + coraza audit log. Nothing here reads them — that moved to
+  caddy-logs:    # shared: access log + coraza audit log. Nothing here reads them - that moved to
                  # the agent, which this rig does not run. Mounted so the paths the controller
                  # writes into Caddy's config exist.
   acme-ca:       # shared: web writes the ACME CA root PEM, caddy reads it
@@ -155,7 +155,7 @@ services:
       AUTH_ALLOW_OAUTH_REGISTRATION: "false"
       AUTH_DISABLE_LOCAL_USERS: "false"
       OAUTH_ENABLED: "false"
-      # No ClickHouse in the rig — an empty password disables analytics.
+      # No ClickHouse in the rig - an empty password disables analytics.
       CLICKHOUSE_PASSWORD: ""
     volumes:
       - cpm-data:/app/data
@@ -171,7 +171,7 @@ services:
         ipv4_address: 172.28.0.11
     healthcheck:
       # The image's own probe. It cannot be a shell one-liner: the runtime stage is Debian with the
-      # compiled binary and nothing else — no Bun CLI, no curl, no wget.
+      # compiled binary and nothing else - no Bun CLI, no curl, no wget.
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
       timeout: 5s

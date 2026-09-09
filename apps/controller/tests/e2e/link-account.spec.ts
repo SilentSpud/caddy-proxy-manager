@@ -32,7 +32,7 @@ test.describe('Link Account page', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
 
-    // Now visit link-account — should redirect to /
+    // Now visit link-account - should redirect to /
     await page.goto('/link-account?error=LINKING_REQUIRED:some-token');
     await expect(page).toHaveURL(/^\/$|\/(?!link-account)/, { timeout: 10_000 });
   });

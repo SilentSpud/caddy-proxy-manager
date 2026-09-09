@@ -1,11 +1,11 @@
 /**
- * POST /api/agent/v1/pair — exchange a one-time code for a shared secret.
+ * POST /api/agent/v1/pair - exchange a one-time code for a shared secret.
  *
  * The only unauthenticated route an agent calls, because there is nothing to authenticate with
  * yet: the code stands in for the secret, which is why it is six letters, lives five minutes, and
  * is burned on use.
  *
- * Unlike the GeoIP route this answers 400/401 rather than 404. Hiding it would buy nothing — an
+ * Unlike the GeoIP route this answers 400/401 rather than 404. Hiding it would buy nothing - an
  * operator has to be told the difference between "wrong code" and "wrong address", and the code's
  * own rate limiting is what bounds guessing.
  */
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
   // Two ways in, and the shape says which. A bootstrap token is proof the caller can read this
   // controller's data volume, which is a stronger claim than a six-letter code an operator carried
-  // across the room — so it is checked the same way and burned just as hard.
+  // across the room - so it is checked the same way and burned just as hard.
   if (looksLikeBootstrapToken(code)) {
     if (!redeemBootstrapToken(code)) return bad("That bootstrap token is not valid.", 401);
   } else {

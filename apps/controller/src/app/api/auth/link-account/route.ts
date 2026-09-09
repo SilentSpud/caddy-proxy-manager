@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("missingRequiredFields") }, { status: 400 });
     }
 
-    // Retrieve and consume the linking token server-side — the raw JWT never reaches the browser
+    // Retrieve and consume the linking token server-side - the raw JWT never reaches the browser
     const rawToken = await retrieveLinkingToken(linkingId);
     if (!rawToken) {
       return NextResponse.json({ error: t("authenticationFailed") }, { status: 401 });
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("authenticationFailed") }, { status: 401 });
     }
 
-    // Success — clear rate limit for this user
+    // Success - clear rate limit for this user
     resetAttempts(rateLimitKey);
 
     await createAuditEvent({

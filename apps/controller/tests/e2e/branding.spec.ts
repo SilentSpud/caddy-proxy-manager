@@ -1,8 +1,8 @@
 /**
  * The custom favicon: upload, serve, remove.
  *
- * The interesting half is the route rather than the form. It is deliberately public — every
- * unauthenticated page declares the icon — and it hands back a Content-Type derived from the bytes
+ * The interesting half is the route rather than the form. It is deliberately public - every
+ * unauthenticated page declares the icon - and it hands back a Content-Type derived from the bytes
  * rather than from what the browser claimed on upload, which is what stops a file being stored as
  * an image and served as a document.
  */
@@ -30,7 +30,7 @@ async function removeIfPresent(page: Page) {
   }
 }
 
-test.describe('Branding — custom favicon', () => {
+test.describe('Branding - custom favicon', () => {
   test.afterEach(async ({ page }) => {
     // Shared stack: leave no icon behind for the specs that assert on unauthenticated pages.
     await goToBranding(page);
@@ -85,7 +85,7 @@ test.describe('Branding — custom favicon', () => {
 
   test('a file that only claims to be an image is refused', async ({ page }) => {
     // The property the sniffing exists for. The browser's mimeType is attacker-controlled, and the
-    // stored type is what the route later serves — so believing this claim would let someone put a
+    // stored type is what the route later serves - so believing this claim would let someone put a
     // document behind an image URL on the app's own origin.
     await goToBranding(page);
     await page.locator('input[type="file"]').setInputFiles({

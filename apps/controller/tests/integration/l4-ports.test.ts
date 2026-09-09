@@ -1,7 +1,7 @@
 /**
  * Integration: port computation, and the round trip through the agent that publishes them.
  *
- * The agent here is a real HTTP server speaking the real protocol, not a mock of the client — see
+ * The agent here is a real HTTP server speaking the real protocol, not a mock of the client - see
  * tests/helpers/fake-agent.ts. Every assertion about what the controller sent is
  * therefore also an assertion that it signed the request correctly, which is the half of this seam
  * that fails silently.
@@ -20,7 +20,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {

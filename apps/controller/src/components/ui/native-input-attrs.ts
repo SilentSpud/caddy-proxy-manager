@@ -1,7 +1,7 @@
 /**
  * Native <input> attributes Astryx forwards but does not type, so they need a cast. Dropping them
  * changes behaviour: `autoComplete` (password managers), `minLength` (sometimes the only
- * enforcement), `required` — `isRequired` only sets `aria-required`.
+ * enforcement), `required` - `isRequired` only sets `aria-required`.
  */
 type NativeAttrs = Record<string, string | number | boolean>;
 

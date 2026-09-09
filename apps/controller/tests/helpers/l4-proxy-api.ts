@@ -20,7 +20,7 @@ export interface L4ProxyHostConfig {
  * Create the host only if nothing is already listening on that address.
  *
  * Two spec files need the same TCP host and either may run first, so an unconditional create in
- * both produces two rows with the same name — which fails the table assertion in
+ * both produces two rows with the same name - which fails the table assertion in
  * createL4ProxyHost under Playwright's strict mode rather than anywhere near the cause.
  */
 export async function ensureL4ProxyHost(page: Page, config: L4ProxyHostConfig): Promise<void> {

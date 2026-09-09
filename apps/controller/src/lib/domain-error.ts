@@ -3,7 +3,7 @@
  *
  * The models cannot translate: they run for a server action, for `/api/v1/*` and for the agent's
  * own sync, and only the first of those has a reader with a language. So they raise a code and an
- * English sentence — the action layer renders the code, and everything else keeps the sentence,
+ * English sentence - the action layer renders the code, and everything else keeps the sentence,
  * which is what the REST contract already documents.
  *
  * Same shape and same reasoning as `SettingValidationError`; see the note there.

@@ -3,7 +3,7 @@
  *
  * Every one of these calls the same model function the matching `/api/v1/` route calls. That is
  * the whole design: validation, audit logging, permission checks and error shapes are the model
- * layer's, so GraphQL and REST cannot disagree about what a mutation does — and the parity tests
+ * layer's, so GraphQL and REST cannot disagree about what a mutation does - and the parity tests
  * can assert it rather than trust it.
  *
  * Two things are projected rather than returned whole:

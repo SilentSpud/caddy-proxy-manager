@@ -2,7 +2,7 @@
 
 A complete, self-contained caddy-proxy-manager deployment on an isolated Docker
 network, driven from a separate client container that exercises the proxy the
-way a real user would — over DNS, TLS, HTTP, WebSockets, and raw TCP/UDP.
+way a real user would - over DNS, TLS, HTTP, WebSockets, and raw TCP/UDP.
 
 Nothing here mocks anything. The Caddy under test is the project's own image,
 the web app is the project's own image, certificates are issued by a real ACME
@@ -17,12 +17,12 @@ The first run builds Caddy from source with its plugin set and can take several
 minutes. Afterwards a full pass is a couple of minutes.
 
 A full run is several hundred assertions, all green. Its first run
-was not — see [What the rig has caught](#what-the-rig-has-caught).
+was not - see [What the rig has caught](#what-the-rig-has-caught).
 
 ## What the rig looks like
 
 Everything lives on one bridge network, `172.28.0.0/24`, declared
-`internal: true` — the containers can reach each other and nothing else. No host
+`internal: true` - the containers can reach each other and nothing else. No host
 ports are published. That restriction is not incidental: it is what proves the
 certificate tests are talking to the in-network CA rather than quietly reaching
 a public one, and the suite asserts the isolation before it asserts anything
@@ -31,28 +31,28 @@ else.
 | Container    | Address       | Role                                                        |
 | ------------ | ------------- | ----------------------------------------------------------- |
 | `certgen`    | `172.28.0.4`  | one-shot: mints the rig's fixed PKI, then exits              |
-| `dns`        | `172.28.0.5`  | dnsmasq — `*.cpm.test` → Caddy, everything else → Docker DNS |
-| `caddy`      | `172.28.0.10` | **system under test** — the project's Caddy image            |
-| `web`        | `172.28.0.11` | **system under test** — the project's CPM image              |
-| `postgres`   | DHCP          | the controller's database — the only backend since 3.0       |
+| `dns`        | `172.28.0.5`  | dnsmasq - `*.cpm.test` → Caddy, everything else → Docker DNS |
+| `caddy`      | `172.28.0.10` | **system under test** - the project's Caddy image            |
+| `web`        | `172.28.0.11` | **system under test** - the project's CPM image              |
+| `postgres`   | DHCP          | the controller's database - the only backend since 3.0       |
 | `origin-a`   | `172.28.0.20` | L7 HTTP origin                                               |
 | `origin-b`   | `172.28.0.21` | L7 HTTP origin, second identity for load-balancing tests     |
 | `origin-tls` | `172.28.0.22` | L7 HTTPS origin with a deliberately mismatched certificate   |
-| `origin-tcp` | `172.28.0.23` | L4 TCP echo — no HTTP awareness at all                       |
+| `origin-tcp` | `172.28.0.23` | L4 TCP echo - no HTTP awareness at all                       |
 | `origin-udp` | `172.28.0.24` | L4 UDP echo                                                  |
 | `pebble`     | `172.28.0.30` | ACME certificate authority                                   |
-| `runner`     | `172.28.0.40` | **simulated client** — the only container that runs tests    |
+| `runner`     | `172.28.0.40` | **simulated client** - the only container that runs tests    |
 
 ### The destinations
 
 caddy-proxy-manager proxies at two layers, and the rig provides a destination
 for each:
 
-- **Layer 7** — `origin-a`, `origin-b` and `origin-tls` speak HTTP. They reflect
+- **Layer 7** - `origin-a`, `origin-b` and `origin-tls` speak HTTP. They reflect
   the request back as JSON: the `Host` they were given, every header the proxy
   added, the address the connection came from, the body. That is what lets a
   test assert *how* a request was proxied, not merely that it arrived.
-- **Layer 4** — `origin-tcp` and `origin-udp` are byte-level echo servers with
+- **Layer 4** - `origin-tcp` and `origin-udp` are byte-level echo servers with
   no notion of HTTP. They exist so the stream proxy can be tested for what it
   actually is: a socket relay, with no request/response framing to lean on.
 
@@ -66,7 +66,7 @@ and CPM is pointed at it through the ACME settings the product already exposes
 (`caUrl` + `caRootPem`). Pebble is told to validate challenges on ports 80 and
 443 against Caddy, and to resolve names through the same dnsmasq the client
 uses. Certificate issuance in this suite is therefore a genuine ACME order with
-a genuine challenge — the only thing that is fake is who signs it.
+a genuine challenge - the only thing that is fake is who signs it.
 
 Two CAs are in play, and they are unrelated:
 
@@ -101,7 +101,7 @@ iterate without restarting anything:
 docker compose exec runner bash /suite/run-tests.sh 25
 ```
 
-Test files are ordinary bash. Editing one on the host takes effect immediately —
+Test files are ordinary bash. Editing one on the host takes effect immediately -
 `/suite` is a bind mount.
 
 ## What is covered
@@ -131,12 +131,12 @@ upstream request as `X-CPM-User`, `X-CPM-Email`, `X-CPM-Groups` and
 `X-CPM-User-Id`. The verify endpoint returned all four correctly; Caddy copied
 none of them. The generated `handle_response` block read each value back through
 `{http.reverse_proxy.header.X-CPM-User}`, and that placeholder does not
-resolve — Go canonicalises the stored header key to `X-Cpm-User`, and Caddy
+resolve - Go canonicalises the stored header key to `X-Cpm-User`, and Caddy
 indexes the map with the literal name from the placeholder. Probing the running
 config from inside the rig showed `{http.reverse_proxy.header.X-Cpm-User}`
 returning the username while the all-caps spelling came back as its own literal
 text. The `not vars … ""` guard around each copy then matched the empty string,
-the route was skipped, and nothing was set at all — so every application behind
+the route was skipped, and nothing was set at all - so every application behind
 CPM forward auth saw an anonymous request.
 
 Fixed in `apps/controller/src/lib/caddy.ts` by canonicalising the placeholder for
@@ -147,9 +147,9 @@ both the CPM and Authentik copy lists, and pinned at the unit level in
 and 2026-09-04 this one could not come up at all: `web`'s healthcheck ran `bun`,
 which the runtime image stopped containing when its final stage became Debian
 with `cpm-server` and nothing else. `runner` waits on that healthcheck, so the
-whole run hung. Two suite files had drifted from the API in the meantime —
+whole run hung. Two suite files had drifted from the API in the meantime -
 tokens became session-only to mint, and the geoblock settings group gained
-required fields — and neither was noticed, because nothing was running. The
+required fields - and neither was noticed, because nothing was running. The
 healthcheck is now the image's own probe, the same one `docker-compose.yml`
 uses. Run it after anything that changes the images.
 
@@ -180,15 +180,15 @@ a change to either is deliberate:
   endpoint answers, not that a specific event was ingested.
 - The **agent** is not run. `web` is pointed straight at Caddy's admin API with
   `CADDY_API_URL`, which is the no-agent path the controller keeps for exactly
-  this shape of deployment. What the agent adds — republishing host ports when
+  this shape of deployment. What the agent adds - republishing host ports when
   L4 hosts change, rebuilding the binary when the module selection changes,
   parsing this host's logs into ClickHouse, and fanning one configuration out to
-  several hosts — is therefore not exercised here. The client is on the same
+  several hosts - is therefore not exercised here. The client is on the same
   network as Caddy, so it reaches stream listeners directly.
 - **First-run setup and migration** are not reachable: `web` is given
   `ADMIN_USERNAME`/`ADMIN_PASSWORD`, so the setup flow is marked complete at
   startup, which is what every pre-3.0 deployment does. Those flows are covered
-  in a browser instead — `apps/controller/tests/e2e/setup.spec.ts` and
+  in a browser instead - `apps/controller/tests/e2e/setup.spec.ts` and
   `setup-migrate.spec.ts`, each against its own empty database.
 
 ## How a test file is written
@@ -227,7 +227,7 @@ Useful helpers, all in `suite/lib.sh`:
 | `jqr EXPR [jq args]`              | jq over the last API response                                  |
 | `create_host` / `create_l4_host`  | create and register for teardown; sets `NEW_ID`                |
 | `fetch URL [curl args]`           | request through Caddy; sets `FETCH_CODE` / `FETCH_BODY` / …     |
-| `http_code URL [curl args]`       | status only — `000` when the TLS handshake itself was refused  |
+| `http_code URL [curl args]`       | status only - `000` when the TLS handshake itself was refused  |
 | `wait_for_https DOMAIN`           | block until a certificate has been issued and verifies         |
 | `make_ca` / `issue_cert`          | local PKI for imported certificates and mTLS clients           |
 | `t_eq` / `t_contains` / `t_ok` / …| assertions that record rather than abort                       |
@@ -238,7 +238,7 @@ A full run ends with an API surface coverage report:
 
 ```
 API surface coverage (documented operations driven over the wire)
-  42/70 operations — 60%
+  42/70 operations - 60%
 
   not exercised:
     GET    /api/v1/certificates
@@ -258,7 +258,7 @@ Line coverage is deliberately not attempted here. The application under test is
 a bundled standalone server in another container; instrumenting it would mean
 measuring something other than the artefact that ships. The useful question for
 a black-box suite is how much of the declared REST surface it actually drove,
-which is what this measures — against the running instance's own
+which is what this measures - against the running instance's own
 `/api/v1/openapi.json`, so the report always describes the build under test.
 
 Every call made through `api` or `api_session` is recorded and matched back to a
@@ -267,7 +267,7 @@ path template, so `/api/v1/proxy-hosts/42` counts towards
 they are either endpoints missing from the OpenAPI document or a typo in a test,
 and both are worth seeing.
 
-It is a report, not a gate — `./run.sh mtls` legitimately touches less of the
+It is a report, not a gate - `./run.sh mtls` legitimately touches less of the
 surface, so a threshold would fail for the wrong reason. The report is skipped
 entirely on a filtered run.
 
@@ -275,7 +275,7 @@ The second list is worth reading as carefully as the first. On its first run it
 showed that `POST /api/v1/users`, `DELETE /api/v1/users/{id}`, the whole
 `/api/v1/proxy-hosts/{id}/mtls-access-rules` path, `/api/v1/dns-providers` and
 `/api/v1/oauth-providers` are all implemented and exercised but absent from the
-OpenAPI document — i.e. the published API contract understates what the API
+OpenAPI document - i.e. the published API contract understates what the API
 does. `/api/v1/oauth-providers` has since been documented; the rest are still
 there. (`/api/geoip-status`, `/api/l4-ports` and `/api/waf-events` also appear,
 but those are UI-support endpoints and are meant to be undocumented.)

@@ -8,7 +8,7 @@
  *
  * Deliberately not here:
  *
- * - `OAUTH_*`. Those already have a home — the `oauth_providers` table, which `runEnvProviderSync`
+ * - `OAUTH_*`. Those already have a home - the `oauth_providers` table, which `runEnvProviderSync`
  *   writes them into at startup. Adding them would create a second source of truth for the same
  *   provider.
  * - `CERTS_DIRECTORY`, `ACME_CA_ROOT_DIR`, `L4_PORTS_DIR`. Container paths describing where Caddy's
@@ -80,7 +80,7 @@ export type SettingValidationCode =
 
 /**
  * Carries a code rather than only a sentence, because a translated one cannot be built by pasting
- * the field's name in front of a predicate — see the note on `password-policy.ts`. `message` stays
+ * the field's name in front of a predicate - see the note on `password-policy.ts`. `message` stays
  * English for logs and for the paths that validate before any request exists (environment parsing
  * at startup); a caller that has a locale renders `code` instead.
  */
@@ -89,7 +89,7 @@ export class SettingValidationError extends Error {
     readonly settingKey: string,
     readonly code: SettingValidationCode,
     /**
-     * ICU arguments for the message, `label` included — that one is the English label, which is
+     * ICU arguments for the message, `label` included - that one is the English label, which is
      * what builds the fallback `message` below. A renderer with a locale replaces it with the
      * translated label before formatting; see `settingValidationMessage`.
      */
@@ -183,7 +183,7 @@ export function stringSetting(
 
 /**
  * `generatable` says the value is the deployment's to choose, so the UI may offer to generate one.
- * A secret that has to match something outside this app — a licence key, an OAuth client secret —
+ * A secret that has to match something outside this app - a licence key, an OAuth client secret -
  * leaves it off, because there a generated value is simply wrong.
  */
 export function secretSetting(
@@ -216,7 +216,7 @@ export function numberSetting(
 /**
  * A tri-state toggle: true, false, or null meaning "no opinion, let the stored policy decide".
  *
- * Several `AUTH_*` variables work this way today — unset defers to a Settings toggle, and setting
+ * Several `AUTH_*` variables work this way today - unset defers to a Settings toggle, and setting
  * them pins the policy and locks it. Migrating them into the database is what finally removes the
  * distinction, but until then the shape has to survive the move.
  */
@@ -335,7 +335,7 @@ export const updateImageRepository = stringSetting({
   group: "application",
   label: "Image repository",
   description:
-    "Where this deployment's images come from, without the image name — the update check reads " +
+    "Where this deployment's images come from, without the image name - the update check reads " +
     "its tags. Point it at your own namespace if you run a fork, or it will report releases you " +
     "cannot pull.",
   default: "ghcr.io/silentspud/caddy-proxy-manager",
@@ -494,7 +494,7 @@ export const analyticsEnabled = optionalBooleanSetting({
   label: "Enable analytics",
   description:
     "Collect traffic and WAF events. With an agent running the stack, turning this on also starts " +
-    "the ClickHouse container — no Compose profile needed. Leave unset to decide from whether a " +
+    "the ClickHouse container - no Compose profile needed. Leave unset to decide from whether a " +
     "password is configured below.",
 });
 

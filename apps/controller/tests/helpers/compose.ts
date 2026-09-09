@@ -1,8 +1,8 @@
 /**
  * The single definition of how the end-to-end stack is addressed on the docker CLI.
  *
- * This lived as six copies — two global setups, two teardowns, container-health.spec.ts and
- * seed.ts — and they drifted the moment one of them changed: adding `--env-file` to four left the
+ * This lived as six copies - two global setups, two teardowns, container-health.spec.ts and
+ * seed.ts - and they drifted the moment one of them changed: adding `--env-file` to four left the
  * other two still reading whatever .env the developer happened to have.
  *
  * `--env-file` REPLACES the repo-root .env rather than layering onto it, so the suite behaves the
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * Every docker command runs from here, not from process.cwd(). Compose resolves the relative paths
- * inside a compose file against the *project directory* — the directory of the first `-f` file —
+ * inside a compose file against the *project directory* - the directory of the first `-f` file -
  * so build contexts, bind mounts and `--env-file` all stay anchored to the repo root even though
  * the suite itself now lives under apps/controller.
  */

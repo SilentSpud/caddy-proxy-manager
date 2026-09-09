@@ -422,7 +422,7 @@ describe('cross-table relationships', () => {
       createdAt: now,
     });
 
-    // Delete the CA — should cascade: CA → issued certs → cert_roles
+    // Delete the CA - should cascade: CA → issued certs → cert_roles
     await db.delete(caCertificates).where(eq(caCertificates.id, ca.id));
 
     const remainingCerts = await db.select().from(issuedClientCertificates);
@@ -497,7 +497,7 @@ describe('cross-table relationships', () => {
       updatedAt: now,
     });
 
-    // Delete the role — the access rule should still exist (JSON array, no FK)
+    // Delete the role - the access rule should still exist (JSON array, no FK)
     await db.delete(mtlsRoles).where(eq(mtlsRoles.id, role.id));
 
     const rules = await db.select().from(mtlsAccessRules);

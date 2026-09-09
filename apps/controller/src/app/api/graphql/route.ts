@@ -1,7 +1,7 @@
 /**
  * The GraphQL endpoint.
  *
- * One URL for the whole API, plus the agent protocol's subscription — see
+ * One URL for the whole API, plus the agent protocol's subscription - see
  * `src/lib/graphql/agent.ts` for why the agent lives in the same schema rather than a second one.
  *
  * GraphiQL is served in development only. In production it would be an unauthenticated HTML page
@@ -34,7 +34,7 @@ const yoga = createYoga<ServerContext>({
 /**
  * Capture the body before Yoga touches it.
  *
- * The agent signs the bytes it sent, so verifying its signature needs those bytes — and a clone
+ * The agent signs the bytes it sent, so verifying its signature needs those bytes - and a clone
  * can only be taken while the body is still untouched. Yoga reads it to parse the document, and a
  * clone attempted after that throws "Body is disturbed or locked" from inside the resolver, where
  * it surfaces as a failed subscription rather than as an obvious error.

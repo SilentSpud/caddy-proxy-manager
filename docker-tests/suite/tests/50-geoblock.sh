@@ -14,7 +14,7 @@ fi
 
 # The group's PUT rejects a missing key as hard as an unknown one, so every field goes in every
 # time. This is the whole document at its defaults; each assertion starts from it and overrides
-# only what it is about. A field added to the group fails here first, which is the intent — a
+# only what it is about. A field added to the group fails here first, which is the intent - a
 # partial payload would otherwise be rejected wherever it happened to be sent.
 geoblock_defaults='{
   "enabled": false,
@@ -24,7 +24,7 @@ geoblock_defaults='{
   "response_status": 403, "response_body": "Forbidden", "response_headers": {}, "redirect_url": ""
 }'
 
-# geoblock_with FILTER [jq args...] — the default document with FILTER applied.
+# geoblock_with FILTER [jq args...] - the default document with FILTER applied.
 geoblock_with() {
   local filter="$1"; shift
   printf '%s' "$geoblock_defaults" | jq -c "$@" "$filter"
@@ -53,7 +53,7 @@ host_body=$(jq -nc --arg d "$blocked" --arg ip "$CLIENT_IP" '{
 }')
 
 if ! create_host "$host_body"; then
-  skip "IP blocking" "the blocker handler rejected the config (HTTP $API_STATUS) — likely no GeoIP database in this rig"
+  skip "IP blocking" "the blocker handler rejected the config (HTTP $API_STATUS) - likely no GeoIP database in this rig"
   finish
 fi
 pass "a host with an IP block rule can be created"

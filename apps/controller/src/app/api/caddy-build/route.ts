@@ -3,7 +3,7 @@ import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { applyCaddyBuild, getCaddyBuildDiff, getCaddyBuildStatus } from "@/src/lib/caddy-build";
 
 /**
- * GET /api/caddy-build — the module diff plus the agent's rebuild status. Polled by the settings
+ * GET /api/caddy-build - the module diff plus the agent's rebuild status. Polled by the settings
  * panel: compiling Caddy takes minutes, too long for a server action to hold open.
  */
 export async function GET(request: NextRequest) {
@@ -27,7 +27,7 @@ function parseAgentRowId(raw: string | null): number | undefined {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-/** POST /api/caddy-build — write the build override and trigger the agent. */
+/** POST /api/caddy-build - write the build override and trigger the agent. */
 export async function POST(request: NextRequest) {
   try {
     await requireApiAdmin(request);

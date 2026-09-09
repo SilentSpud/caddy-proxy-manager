@@ -3,7 +3,7 @@
  *
  * The MaxMind databases are tens of megabytes, so agents pull them rather than having them pushed.
  * The pairing secret is symmetric, so the agent signs with it and the controller verifies against
- * the row it stored — no second credential, and nothing to leak.
+ * the row it stored - no second credential, and nothing to leak.
  *
  * Every refusal is a 404 rather than a 401, so nothing can learn that this route exists, or which
  * agent ids are real, without already holding a secret. The tests below are mostly about that.
@@ -28,7 +28,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({

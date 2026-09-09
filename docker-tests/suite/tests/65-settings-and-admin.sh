@@ -16,7 +16,7 @@ for group in general acme dns dns-provider upstream-dns geoblock waf error-pages
   fi
 done
 
-# The rig's ACME configuration must be exactly what bootstrap installed — every
+# The rig's ACME configuration must be exactly what bootstrap installed - every
 # certificate assertion in the suite depends on it.
 api GET /api/v1/settings/acme
 t_contains "the ACME directory points at the in-network CA" "pebble" "$(jqr '.caUrl')"
@@ -45,7 +45,7 @@ t_eq "DNS resolver settings can be saved" "200" "$API_STATUS"
 api GET /api/v1/settings/dns
 t_eq "the configured resolver round-trips" "172.28.0.5" "$(jqr '.resolvers[0]')"
 
-# With a resolver configured, a host must still work end to end — the resolver
+# With a resolver configured, a host must still work end to end - the resolver
 # lands in the reverse-proxy transport and a bad one breaks every upstream.
 dnsdomain=$(domain_for "custom-resolver")
 create_host_or_fail "a host can be created with a custom DNS resolver in effect" "$(jq -nc --arg d "$dnsdomain" '{

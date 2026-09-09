@@ -1,7 +1,7 @@
 /**
  * Regression: the identity headers a forward-auth host copies onto the upstream must use Go's
  * canonical MIME casing. Caddy resolves `{http.reverse_proxy.header.<name>}` by literal lookup, so
- * `X-CPM-User` resolves to nothing — and the `not vars <placeholder> ""` guard then skips the copy
+ * `X-CPM-User` resolves to nothing - and the `not vars <placeholder> ""` guard then skips the copy
  * route entirely, so every app behind forward auth sees an anonymous request.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
@@ -14,7 +14,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -115,7 +115,7 @@ describe('canonicalHeaderName', () => {
   });
 });
 
-describe('CPM forward auth — identity header copy', () => {
+describe('CPM forward auth - identity header copy', () => {
   it('reads every header back through a canonically spelled placeholder', async () => {
     await createProxyHost(
       {
@@ -176,7 +176,7 @@ describe('CPM forward auth — identity header copy', () => {
   });
 });
 
-describe('Authentik forward auth — identity header copy', () => {
+describe('Authentik forward auth - identity header copy', () => {
   it('canonicalises operator-supplied header names', async () => {
     await createProxyHost(
       {

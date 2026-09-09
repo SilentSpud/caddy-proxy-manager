@@ -6,7 +6,7 @@
  * is that hand-off, plus the healthcheck the container runs against itself.
  *
  * Unauthenticated on purpose. It binds a Unix socket inside the data volume, so reaching it already
- * means being inside the container or mounting its volume — the same boundary the shared secret
+ * means being inside the container or mounting its volume - the same boundary the shared secret
  * used to sit behind, and one no in-band credential would tighten.
  */
 

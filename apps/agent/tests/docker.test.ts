@@ -138,7 +138,7 @@ describe("compose invocation", () => {
     const argv = lastCompose();
     expect(argv[argv.indexOf("-p") + 1]).toBe("pinned");
     // With both pinned it never asks Docker at all, so a stopped Caddy container does not stop a
-    // recreate. Neither lookup is load-bearing on its own — see the two tests below.
+    // recreate. Neither lookup is load-bearing on its own - see the two tests below.
     expect(spawned.some((a) => a[1] === "inspect")).toBe(false);
   });
 
@@ -158,7 +158,7 @@ describe("compose invocation", () => {
   it("detects --project-directory from the host path the operator's compose recorded", async () => {
     // The daemon resolves a relative bind mount against this. Without it, a service mounting
     // ./docker/... gets an empty directory Docker silently created at a path that does not exist
-    // on the host — a container that comes up wrong rather than a command that fails.
+    // on the host - a container that comes up wrong rather than a command that fails.
     hostDirLabel = "/srv/cpm";
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
@@ -169,7 +169,7 @@ describe("compose invocation", () => {
   it("translates a Windows project directory into the path the daemon can resolve", async () => {
     // Docker Desktop for Windows records the label as a drive path, which means nothing to the
     // daemon. It mounts each shared drive in its VM at /run/desktop/mnt/host/<letter>, and a bind
-    // resolved through that prefix reaches the real file — where the untranslated form gets an
+    // resolved through that prefix reaches the real file - where the untranslated form gets an
     // empty directory Docker created at a path the host does not have.
     hostDirLabel = "C:\\deploy\\cpm";
     results.push({ exitCode: 0, stdout: "proj" });
@@ -323,7 +323,7 @@ describe("operations", () => {
 
   it("leaves the running container alone when the build fails", async () => {
     // A failed xcaddy compile is routine, and the old image keeps serving. The status has to say so
-    // — the operator's first question is whether the proxy just went down.
+    // - the operator's first question is whether the proxy just went down.
     results.push({ exitCode: 0, stdout: "proj" });
     results.push({ exitCode: 1, stdout: "go: module not found" });
 
@@ -345,8 +345,8 @@ describe("operations", () => {
   });
 
   it("clears a status left mid-flight by a killed agent", async () => {
-    // The UI would otherwise spin forever on an operation that provably is not running — this
-    // process has just started — with its button disabled and no way back.
+    // The UI would otherwise spin forever on an operation that provably is not running - this
+    // process has just started - with its button disabled and no way back.
     store.setCaddyBuildStatus({ state: "building", message: "compiling" });
     store.setL4PortsStatus({ state: "applying", message: "recreating" });
 
@@ -422,7 +422,7 @@ describe("optional services", () => {
   }
 
   it("enables the profile explicitly rather than relying on compose to infer it", async () => {
-    // These services sit behind a profile, so without this compose reports "no such service" —
+    // These services sit behind a profile, so without this compose reports "no such service" -
     // and on the versions that do infer it, the behaviour arrived partway through v2.
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).startService("clickhouse");
@@ -447,7 +447,7 @@ describe("optional services", () => {
 
   it("passes the credentials through the child's environment, not a file on disk", async () => {
     // Compose reads the process environment at a higher precedence than any env file, so this
-    // overrides a stale value in the project's own .env — which the agent mounts read-only and
+    // overrides a stale value in the project's own .env - which the agent mounts read-only and
     // cannot rewrite. It also keeps the password off the agent's data volume, and sidesteps the
     // quoting rules an env file would need.
     writeFileSync(join(dir, ".env"), "CLICKHOUSE_PASSWORD=stale\n");

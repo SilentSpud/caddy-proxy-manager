@@ -99,7 +99,7 @@ function PaginationBar({ page, perPage, total }: { page: number; perPage: number
 }
 
 /**
- * A column heading that toggles sort order through the URL — this app sorts server-side, so the
+ * A column heading that toggles sort order through the URL - this app sorts server-side, so the
  * heading just pushes a new URL.
  */
 function SortableHeader<T>({

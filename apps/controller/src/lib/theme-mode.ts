@@ -1,5 +1,5 @@
 /**
- * Colour-mode preference: what the user picked, not the mode in effect — "system" stays "system".
+ * Colour-mode preference: what the user picked, not the mode in effect - "system" stays "system".
  * Astryx handles it natively: `<Theme mode="system">` leaves `data-theme` off `<html>`, which its
  * reset.css maps to `color-scheme: light dark`, so no JS and no media-query listener.
  */
@@ -8,11 +8,11 @@ export type ThemeMode = "light" | "dark" | "system";
 /**
  * Cookie rather than localStorage: the server must know the mode to render `<html data-theme>` on
  * the first paint, which is why the old next-themes setup needed a render-blocking inline script.
- * Not HttpOnly — the toggle writes it from the client, and a display preference needs no guarding.
+ * Not HttpOnly - the toggle writes it from the client, and a display preference needs no guarding.
  */
 export const THEME_COOKIE = "cpm-theme";
 
-/** A year — long enough that the preference outlives ordinary session churn. */
+/** A year - long enough that the preference outlives ordinary session churn. */
 export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 export function isThemeMode(value: unknown): value is ThemeMode {
@@ -26,7 +26,7 @@ export function parseThemeMode(value: string | undefined): ThemeMode {
 
 /**
  * The `data-theme` value for `<html>`, or undefined to leave it off. Astryx's reset.css reads a
- * missing attribute as `color-scheme: light dark`, so "system" must omit it — the server cannot
+ * missing attribute as `color-scheme: light dark`, so "system" must omit it - the server cannot
  * know the OS preference, and guessing causes a flash.
  */
 export function themeAttr(mode: ThemeMode): "light" | "dark" | undefined {

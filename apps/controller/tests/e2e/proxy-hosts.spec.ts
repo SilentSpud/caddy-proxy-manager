@@ -19,7 +19,7 @@ test.describe('Proxy Hosts', () => {
     await expect(page.getByLabel(/^domains/i)).toBeVisible();
   });
 
-  test('create a proxy host — appears in the table', async ({ page }) => {
+  test('create a proxy host - appears in the table', async ({ page }) => {
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -60,7 +60,7 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression (#119): Advanced Options were not saved — the form used camelCase field names while
+   * Regression (#119): Advanced Options were not saved - the form used camelCase field names while
    * the server action expected snake_case.
    */
   test('advanced options are saved and persist after edit (#119)', async ({ page }) => {
@@ -310,7 +310,7 @@ test.describe('Proxy Hosts', () => {
 
   /**
    * Regression (#232): Authentik defaults reached the create dialog but not the edit one, which
-   * never accepted an `authentikDefaults` prop — so the required Outpost fields stayed blank.
+   * never accepted an `authentikDefaults` prop - so the required Outpost fields stayed blank.
    */
   test('edit host Authentik fields are prefilled from global defaults (#232)', async ({ page }) => {
     const origin = new URL(page.url()).origin;
@@ -470,7 +470,7 @@ test.describe('Proxy Hosts', () => {
   });
 
   /**
-   * Regression: the per-host geoblock "Override global" toggle was dropped — `parseGeoBlockConfig`
+   * Regression: the per-host geoblock "Override global" toggle was dropped - `parseGeoBlockConfig`
    * returned `geoblock_mode` while ProxyHostInput uses `geoblockMode`, so the spread lost it.
    */
   test('per-host geoblock override mode persists after save', async ({ page }) => {
@@ -489,7 +489,7 @@ test.describe('Proxy Hosts', () => {
     await geoSwitch.click();
     await expect(geoSwitch).toBeChecked();
 
-    // Mode is a SegmentedControl — a radiogroup, not a pair of tiles.
+    // Mode is a SegmentedControl - a radiogroup, not a pair of tiles.
     await geoCard.getByRole('radio', { name: 'Override global' }).click();
 
     await dialog.getByRole('button', { name: /^create$/i }).click();
@@ -596,7 +596,7 @@ test.describe('Proxy Hosts', () => {
     };
     expect(withHost.cpmForwardAuth?.enabled).toBe(true);
 
-    // Host WITHOUT forward auth — used to confirm the badge is conditional
+    // Host WITHOUT forward auth - used to confirm the badge is conditional
     const withoutResp = await page.request.post(API_PROXY_HOSTS, {
       headers: { Origin: origin },
       data: {
@@ -664,7 +664,7 @@ test.describe('Proxy Hosts', () => {
     await expect(addresses.nth(1)).toHaveValue('third:3333');
 
     // The surviving rows must still be the elements they were typed into. With
-    // index keys these read ['probe-0', 'probe-1'] — rows 2 and 3 rendered into
+    // index keys these read ['probe-0', 'probe-1'] - rows 2 and 3 rendered into
     // the nodes that belonged to rows 1 and 2.
     const probes = await addresses.evaluateAll((nodes) =>
       nodes.map((node) => (node as HTMLElement & { __rowProbe?: string }).__rowProbe ?? null),

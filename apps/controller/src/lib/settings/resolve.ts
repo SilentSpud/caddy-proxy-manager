@@ -8,7 +8,7 @@
  * the `.env`.
  *
  * Values are cached for the process. The settings table is small and read on nearly every request,
- * and a write goes through ./resolve.ts's own save path, which clears the cache — so the only way
+ * and a write goes through ./resolve.ts's own save path, which clears the cache - so the only way
  * to see a stale value is to write to the table directly.
  */
 import { eq, inArray } from "drizzle-orm";
@@ -45,7 +45,7 @@ function decode(definition: SettingDefinition, raw: string): SettingValue | unde
   try {
     return definition.parse(value);
   } catch (error) {
-    // A stored value that no longer validates — a tightened range, say — must not take the app
+    // A stored value that no longer validates - a tightened range, say - must not take the app
     // down. Fall through to the environment and the default, and say so once.
     console.warn(`Ignoring invalid stored value for ${definition.key}:`, error);
     return undefined;
@@ -174,7 +174,7 @@ export async function clearStoredSetting(key: string): Promise<void> {
   invalidateSettingsCache();
 }
 
-/** True once anything has been stored — i.e. the deployment has been through setup or migration. */
+/** True once anything has been stored - i.e. the deployment has been through setup or migration. */
 export async function hasStoredSettings(): Promise<boolean> {
   return (await load()).size > 0;
 }

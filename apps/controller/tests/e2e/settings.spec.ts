@@ -10,7 +10,7 @@ const SETTINGS_ORIGIN = 'http://localhost:3000';
  * Opens the settings command palette by keyboard.
  *
  * The shortcut binds to `window` in a useEffect, and the control waited for below is
- * server-rendered — so it can be visible a moment before the handler exists, and a single press
+ * server-rendered - so it can be visible a moment before the handler exists, and a single press
  * lands on nothing. Retrying the press is the only way to wait for a listener with no DOM of its
  * own; waiting harder before the first one just moves the race.
  */
@@ -27,7 +27,7 @@ const goToSection = goToSettingsSection;
 
 // ─── Page load & layout ──────────────────────────────────────────────────────
 
-test.describe('Settings — page load & layout', () => {
+test.describe('Settings - page load & layout', () => {
   test('settings page loads without redirecting to login', async ({ page }) => {
     await page.goto('/settings');
     await expect(page).not.toHaveURL(/login/);
@@ -80,7 +80,7 @@ test.describe('Settings — page load & layout', () => {
 
 // ─── Sidebar navigation ─────────────────────────────────────────────────────
 
-test.describe('Settings — sidebar navigation', () => {
+test.describe('Settings - sidebar navigation', () => {
   test('clicking a nav item switches the detail pane', async ({ page }) => {
     await page.goto('/settings');
     // Default: General
@@ -152,7 +152,7 @@ test.describe('Settings — sidebar navigation', () => {
 
 // ─── Cmd-K palette ───────────────────────────────────────────────────────────
 
-test.describe('Settings — Cmd-K palette', () => {
+test.describe('Settings - Cmd-K palette', () => {
   test('Cmd+K opens the command palette', async ({ page }) => {
     await page.goto('/settings');
     await openPaletteWithKeyboard(page);
@@ -221,7 +221,7 @@ test.describe('Settings — Cmd-K palette', () => {
 
 // ─── General section ─────────────────────────────────────────────────────────
 
-test.describe('Settings — General', () => {
+test.describe('Settings - General', () => {
   // FormRow uses <div> labels (not <Label htmlFor>), so we target inputs by name attribute
   test('shows primary domain and ACME email fields', async ({ page }) => {
     await goToSection(page, 'General');
@@ -260,7 +260,7 @@ test.describe('Settings — General', () => {
   test('a changed text field still reads as changed after the save', async ({ page }) => {
     // The text-field half of the form-reset question the toggle test covers, and the answer is that
     // text is already safe: React re-asserts a controlled input's value on every commit, so the
-    // reset that strands a checkbox is written straight back here. Pinned rather than assumed —
+    // reset that strands a checkbox is written straight back here. Pinned rather than assumed -
     // it is the reason ui/FormBooleanControls repairs only the boolean controls, and a change that
     // made TextInput manage its own value the way the base Switch does would silently break it.
     // Deliberately no reload before the assertion: the test above reloads, which repopulates from
@@ -289,9 +289,9 @@ test.describe('Settings — General', () => {
   });
 });
 
-// ─── Default Response section (unknown hosts — issue #241) ──────────────────
+// ─── Default Response section (unknown hosts - issue #241) ──────────────────
 
-test.describe('Settings — Default Response', () => {
+test.describe('Settings - Default Response', () => {
   test('shows all supported behaviors and conditional custom fields', async ({ page }) => {
     await goToSection(page, 'Default Response');
     const behavior = page.getByRole('combobox', { name: 'Behavior' });
@@ -346,9 +346,9 @@ test.describe('Settings — Default Response', () => {
   });
 });
 
-// ─── ACME Server section (custom ACME directory URL — issue #192) ─────────────
+// ─── ACME Server section (custom ACME directory URL - issue #192) ─────────────
 
-test.describe('Settings — ACME Server', () => {
+test.describe('Settings - ACME Server', () => {
   const API_SETTINGS_ACME = 'http://localhost:3000/api/v1/settings/acme';
   const CUSTOM_DIR = 'https://ca.internal.example.com/acme/acme/directory';
 
@@ -400,7 +400,7 @@ test.describe('Settings — ACME Server', () => {
 
 // ─── DNS Providers section ───────────────────────────────────────────────────
 
-test.describe('Settings — DNS Providers', () => {
+test.describe('Settings - DNS Providers', () => {
   test('shows provider selector and add form', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
     await expect(page.getByRole('heading', { name: 'DNS Providers' })).toBeVisible();
@@ -411,7 +411,7 @@ test.describe('Settings — DNS Providers', () => {
   test('selecting a provider reveals its credential fields', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
     // Click the provider select and pick one (Cloudflare or first available)
-    // Selector runs with hasSearch, so the trigger is deliberately NOT a combobox — the popup's
+    // Selector runs with hasSearch, so the trigger is deliberately NOT a combobox - the popup's
     // search input owns that role. The trigger is the form's only listbox-opening button.
     const providerSelect = page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]');
 
@@ -426,7 +426,7 @@ test.describe('Settings — DNS Providers', () => {
     // Most providers have at least one field (API token, etc.)
     const formInputs = page.locator(
       // The Selector's own popover search box is a text input inside the form, so exclude
-      // comboboxes — otherwise `.first()` picks the hidden search field, not a credential field.
+      // comboboxes - otherwise `.first()` picks the hidden search field, not a credential field.
       'form#dnsp-add-form input[type="text"]:not([role="combobox"]), form#dnsp-add-form input[type="password"]',
     );
     await expect(formInputs.first()).toBeVisible({ timeout: 3000 });
@@ -435,7 +435,7 @@ test.describe('Settings — DNS Providers', () => {
 
 // ─── DNS Resolvers section ───────────────────────────────────────────────────
 
-test.describe('Settings — DNS Resolvers', () => {
+test.describe('Settings - DNS Resolvers', () => {
   test('shows enable checkbox and resolver textareas', async ({ page }) => {
     await goToSection(page, 'DNS Resolvers');
     await expect(page.getByRole('heading', { name: 'DNS Resolvers' })).toBeVisible();
@@ -453,7 +453,7 @@ test.describe('Settings — DNS Resolvers', () => {
 
 // ─── Upstream DNS Pinning section ────────────────────────────────────────────
 
-test.describe('Settings — Upstream DNS Pinning', () => {
+test.describe('Settings - Upstream DNS Pinning', () => {
   test('shows enable checkbox and address family selector', async ({ page }) => {
     await goToSection(page, 'Upstream DNS Pinning');
     await expect(page.getByRole('heading', { name: 'Upstream DNS Pinning' })).toBeVisible();
@@ -471,7 +471,7 @@ test.describe('Settings — Upstream DNS Pinning', () => {
 
   test('a changed toggle still reads as changed after the save', async ({ page }) => {
     // React 19 resets the form once the action returns, restoring every control to the value it
-    // mounted with — after the last render, so nothing writes the DOM back. The toggle the operator
+    // mounted with - after the last render, so nothing writes the DOM back. The toggle the operator
     // just changed snaps visually back to its old position while the new value is what actually
     // got saved, and the next click then reports the state React already holds, so it appears dead.
     // See ui/FormBooleanControls. Changing it *before* saving is what makes this reproducible: a
@@ -501,7 +501,7 @@ test.describe('Settings — Upstream DNS Pinning', () => {
 
 // ─── Authentik Defaults section ──────────────────────────────────────────────
 
-test.describe('Settings — Authentik Defaults', () => {
+test.describe('Settings - Authentik Defaults', () => {
   test('shows outpost domain, upstream, and auth endpoint fields', async ({ page }) => {
     await goToSection(page, 'Authentik Defaults');
     await expect(page.getByRole('heading', { name: 'Authentik Defaults' })).toBeVisible();
@@ -526,7 +526,7 @@ test.describe('Settings — Authentik Defaults', () => {
 
 // ─── OAuth Providers section ─────────────────────────────────────────────────
 
-test.describe('Settings — OAuth Providers', () => {
+test.describe('Settings - OAuth Providers', () => {
   test('section renders with Add Provider button', async ({ page }) => {
     await goToSection(page, 'OAuth Providers');
     await expect(page.getByRole('heading', { name: 'OAuth Providers' })).toBeVisible();
@@ -550,7 +550,7 @@ test.describe('Settings — OAuth Providers', () => {
     await dialog.getByLabel(/^name/i).fill('E2E Test Provider');
     await dialog.getByLabel(/client id/i).fill('test-client-id-12345');
     await dialog.getByLabel(/client secret/i).fill('test-client-secret-12345');
-    // Skip issuer URL — it's optional and avoids potential OIDC discovery issues
+    // Skip issuer URL - it's optional and avoids potential OIDC discovery issues
     await dialog.getByRole('button', { name: /create provider/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
@@ -642,7 +642,7 @@ test.describe('Settings — OAuth Providers', () => {
 
 // ─── Global Geoblocking section ──────────────────────────────────────────────
 
-test.describe('Settings — Global Geoblocking', () => {
+test.describe('Settings - Global Geoblocking', () => {
   test('section renders with save button', async ({ page }) => {
     await goToSection(page, 'Global Geoblocking');
     await expect(page.getByRole('heading', { name: 'Global Geoblocking' })).toBeVisible();
@@ -652,7 +652,7 @@ test.describe('Settings — Global Geoblocking', () => {
 
 // ─── Metrics & Monitoring section ────────────────────────────────────────────
 
-test.describe('Settings — Metrics & Monitoring', () => {
+test.describe('Settings - Metrics & Monitoring', () => {
   test('shows enable checkbox and port field', async ({ page }) => {
     await goToSection(page, 'Metrics & Monitoring');
     await expect(page.getByRole('heading', { name: 'Metrics & Monitoring' })).toBeVisible();
@@ -674,7 +674,7 @@ test.describe('Settings — Metrics & Monitoring', () => {
 
 // ─── Access Logging section ──────────────────────────────────────────────────
 
-test.describe('Settings — Access Logging', () => {
+test.describe('Settings - Access Logging', () => {
   test('shows enable checkbox and format selector', async ({ page }) => {
     await goToSection(page, 'Access Logging');
     await expect(page.getByRole('heading', { name: 'Access Logging' })).toBeVisible();
@@ -697,7 +697,7 @@ test.describe('Settings — Access Logging', () => {
 
 // ─── Updates section ─────────────────────────────────────────────────────────
 
-test.describe('Settings — Updates', () => {
+test.describe('Settings - Updates', () => {
   test('shows the running version, the toggle and the repository', async ({ page }) => {
     await goToSection(page, 'Updates');
     await expect(page.getByRole('heading', { name: 'Release updates' })).toBeVisible();
@@ -733,7 +733,7 @@ test.describe('Settings — Updates', () => {
 
 // ─── Cross-section navigation ────────────────────────────────────────────────
 
-test.describe('Settings — cross-section navigation', () => {
+test.describe('Settings - cross-section navigation', () => {
   test('rapid section switching renders correct content each time', async ({ page }) => {
     await page.goto('/settings');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
@@ -773,7 +773,7 @@ test.describe('Settings — cross-section navigation', () => {
 
 // ─── Mobile layout ───────────────────────────────────────────────────────────
 
-test.describe('Settings — mobile layout', () => {
+test.describe('Settings - mobile layout', () => {
   test.use({ viewport: { width: 393, height: 852 } });
 
   test('sidebar is hidden on mobile', async ({ page }) => {
@@ -834,7 +834,7 @@ test.describe('Settings — mobile layout', () => {
 
 // ─── Form submissions via API ────────────────────────────────────────────────
 
-test.describe('Settings — form data round-trip via API', () => {
+test.describe('Settings - form data round-trip via API', () => {
   const API_SETTINGS_GENERAL = 'http://localhost:3000/api/v1/settings/general';
   const API_SETTINGS_METRICS = 'http://localhost:3000/api/v1/settings/metrics';
   const API_SETTINGS_LOGGING = 'http://localhost:3000/api/v1/settings/logging';
@@ -905,7 +905,7 @@ test.describe('Settings — form data round-trip via API', () => {
 
 // ─── Detail header ───────────────────────────────────────────────────────────
 
-test.describe('Settings — detail header', () => {
+test.describe('Settings - detail header', () => {
   test('header shows description text for each section', async ({ page }) => {
     await goToSection(page, 'General');
     await expect(page.getByText('Primary domain and ACME contact email')).toBeVisible();

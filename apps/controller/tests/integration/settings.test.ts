@@ -38,7 +38,7 @@ describe('settings integration', () => {
     expect(value).toBeNull();
   });
 
-  it('set key — stored in db', async () => {
+  it('set key - stored in db', async () => {
     await setSetting('test-key', 'test-value');
     const row = await db.query.settings.findFirst({ where: (t, { eq }) => eq(t.key, 'test-key') });
     expect(row).toBeDefined();

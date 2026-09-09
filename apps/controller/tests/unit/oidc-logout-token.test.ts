@@ -3,7 +3,7 @@
  *
  * Every case here is a check standing between an unauthenticated POST and other people's sessions
  * being deleted, so the tokens are really signed and really verified against a JWKS rather than
- * stubbed at the module boundary — a mock of `jwtVerify` would pass whatever the implementation
+ * stubbed at the module boundary - a mock of `jwtVerify` would pass whatever the implementation
  * asked it to.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
@@ -193,7 +193,7 @@ describe('verifyLogoutToken', () => {
 
   // Authentik and friends issue an `iss` ending in a slash. Trimming it before handing it to
   // jwtVerify made an exact-match comparison fail against itself, and every token they sent was
-  // refused — so the issuer goes through exactly as the operator configured it.
+  // refused - so the issuer goes through exactly as the operator configured it.
   it('accepts a token from an issuer whose identifier ends in a slash', async () => {
     const slashed = `${ISSUER}/`;
     const token = await signLogoutToken({ sub: 'user-1', jti: 'jti-1', iss: slashed });

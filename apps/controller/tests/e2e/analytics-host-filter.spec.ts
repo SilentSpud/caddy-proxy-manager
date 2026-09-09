@@ -34,7 +34,7 @@ test.describe('Analytics host filter (#171)', () => {
     let proxyHostId: number | undefined;
 
     try {
-      // A configured proxy host (SQLite) — always present in the dropdown.
+      // A configured proxy host (SQLite) - always present in the dropdown.
       const createRes = await page.request.post(API_PROXY_HOSTS, {
         headers: { Origin: ORIGIN },
         data: {
@@ -46,7 +46,7 @@ test.describe('Analytics host filter (#171)', () => {
       expect(createRes.ok(), `create proxy host failed: ${createRes.status()}`).toBeTruthy();
       proxyHostId = (await createRes.json()).id;
 
-      // A traffic-only host (ClickHouse) — present in the dropdown but not a proxy host.
+      // A traffic-only host (ClickHouse) - present in the dropdown but not a proxy host.
       await ch.insert({
         table: 'traffic_events',
         format: 'JSONEachRow',
@@ -83,7 +83,7 @@ test.describe('Analytics host filter (#171)', () => {
       const unconfiguredOption = page.getByRole('option', { name: unconfiguredHost });
 
       // Open the hosts selector. In `hasSearch` mode the MultiSelector trigger is deliberately NOT
-      // a combobox — the popup's search input owns that role — so it is a plain listbox-opening
+      // a combobox - the popup's search input owns that role - so it is a plain listbox-opening
       // button, the only one on the page.
       const openHostList = async () => {
         await page.locator('button[aria-haspopup="listbox"]').click();
@@ -96,7 +96,7 @@ test.describe('Analytics host filter (#171)', () => {
       await expect(unconfiguredOption).not.toBeVisible();
 
       // The toggle lives outside the popover, so activating it light-dismisses
-      // the listbox — reopen and re-search before checking the widened list.
+      // the listbox - reopen and re-search before checking the widened list.
       await page.keyboard.press('Escape');
       await page.getByRole('checkbox', { name: /include unconfigured hosts/i }).click();
 

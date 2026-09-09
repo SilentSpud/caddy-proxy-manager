@@ -25,7 +25,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => ({
@@ -120,7 +120,7 @@ beforeAll(async () => {
   await seedProvider('prov-b', 'https://b.example');
 });
 
-describe('#261 — account.create.after keeps users.provider/subject in sync', () => {
+describe('#261 - account.create.after keeps users.provider/subject in sync', () => {
   it('syncs provider/subject when Better Auth links an OAuth identity to an existing user', async () => {
     const user = await createUser({
       email: 'autolink@example.com',
@@ -139,7 +139,7 @@ describe('#261 — account.create.after keeps users.provider/subject in sync', (
 
   it('syncs provider/subject for brand-new federated sign-ups too', async () => {
     // Better Auth creates the user first (provider/subject default to ""), then
-    // the accounts row — the after-hook must still fix the columns.
+    // the accounts row - the after-hook must still fix the columns.
     const user = await createUser({
       email: 'federated@example.com',
       name: 'Federated',
@@ -214,7 +214,7 @@ describe('#261 — account.create.after keeps users.provider/subject in sync', (
   });
 });
 
-describe('#261 — syncUserOAuthIdentity', () => {
+describe('#261 - syncUserOAuthIdentity', () => {
   it('prefers the latest OAuth account when several identities exist', async () => {
     const user = await createUser({
       email: 'multi@example.com',
@@ -291,7 +291,7 @@ describe('#261 — syncUserOAuthIdentity', () => {
   });
 });
 
-describe('#261 — unlink API re-derives identity from the accounts table', () => {
+describe('#261 - unlink API re-derives identity from the accounts table', () => {
   it('resets users.provider/subject after the OAuth rows are deleted', async () => {
     const { POST } = await import('../../src/app/api/user/unlink-oauth/route');
 
@@ -326,7 +326,7 @@ describe('#261 — unlink API re-derives identity from the accounts table', () =
   });
 });
 
-describe('#261 — profile connection state is derived from the accounts table', () => {
+describe('#261 - profile connection state is derived from the accounts table', () => {
   it('lists linked OAuth providers from accounts, not from users.provider', async () => {
     const user = await createUser({
       email: 'derived@example.com',

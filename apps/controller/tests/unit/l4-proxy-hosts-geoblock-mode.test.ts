@@ -13,7 +13,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 vi.mock('../../src/lib/db', () => {
@@ -98,7 +98,7 @@ describe('L4 proxy host geoblockMode persistence', () => {
     );
     expect((await getL4ProxyHost(host.id))?.geoblockMode).toBe('merge');
 
-    // Update only touches geoblockMode — must still go through the meta branch.
+    // Update only touches geoblockMode - must still go through the meta branch.
     await updateL4ProxyHost(host.id, { geoblockMode: 'override' }, 1);
     expect((await getL4ProxyHost(host.id))?.geoblockMode).toBe('override');
   });

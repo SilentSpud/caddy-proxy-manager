@@ -1,5 +1,5 @@
 /**
- * Branding: APP_NAME is the single knob — the sidebar, the login card, and the page-title suffix.
+ * Branding: APP_NAME is the single knob - the sidebar, the login card, and the page-title suffix.
  * A page opts out per page with `title: { absolute: ... }`; the forward auth portal is the one.
  */
 import { afterEach, describe, expect, it } from 'bun:test';

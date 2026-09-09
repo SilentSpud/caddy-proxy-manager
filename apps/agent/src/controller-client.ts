@@ -2,8 +2,8 @@
  * The agent's side of the wire: everything it says to its controller, and the one stream it listens
  * on.
  *
- * The agent dials, always. That is the whole point of the inversion — a host behind NAT needs no
- * inbound port and the controller needs no address for it — and it is why this file exists at all,
+ * The agent dials, always. That is the whole point of the inversion - a host behind NAT needs no
+ * inbound port and the controller needs no address for it - and it is why this file exists at all,
  * where the same traffic used to arrive as inbound requests to `server.ts`.
  *
  * Requests are signed with the same HMAC primitive the controller used to sign its own, over the
@@ -33,7 +33,7 @@ const PAIR_TIMEOUT_MS = 15_000;
 const POST_TIMEOUT_MS = 15_000;
 
 /**
- * Hex SHA-256 of a request body — of the empty string when there is none.
+ * Hex SHA-256 of a request body - of the empty string when there is none.
  *
  * Part of the signature base, so the signature covers the body without the signer having to buffer
  * it twice. Lived in `auth.ts` until the agent stopped verifying anything and only signs.
@@ -125,7 +125,7 @@ export class ControllerClient {
    *
    * GraphQL answers 200 with an `errors` array where REST answered a status code, so a caller that
    * only checked `response.ok` would treat "that agent is not connected" as success. The status is
-   * still checked first — an unauthenticated request never reaches the resolver — and then the
+   * still checked first - an unauthenticated request never reaches the resolver - and then the
    * body.
    */
   private async operation<T>(
@@ -189,7 +189,7 @@ export class ControllerClient {
    * Open the event subscription and yield events until it ends or `signal` aborts.
    *
    * No overall timeout: this request is meant to stay open for as long as the agent runs. Liveness
-   * is the protocol's `ping` event instead — a subscription that has said nothing at all is the one
+   * is the protocol's `ping` event instead - a subscription that has said nothing at all is the one
    * case a timeout could not tell apart from a healthy idle fleet.
    */
   async *events(secret: string, signal: AbortSignal): AsyncGenerator<AgentServerEvent> {
@@ -242,8 +242,8 @@ export class ControllerClient {
   /**
    * Sign and send. `secret` null means an unsigned call, which only pairing is.
    *
-   * The signature covers method, path, timestamp and a hash of the body — the same base string the
-   * controller verifies — so a captured request cannot be replayed against a different endpoint,
+   * The signature covers method, path, timestamp and a hash of the body - the same base string the
+   * controller verifies - so a captured request cannot be replayed against a different endpoint,
    * and goes stale within `AGENT_CLOCK_SKEW_MS` regardless.
    */
   private async send(
@@ -290,7 +290,7 @@ type GraphQLErrorShape = { message?: string; extensions?: { code?: unknown } };
  * The controller tags its refusals with `extensions.code`, and this is where those become the
  * codes the rest of the agent already reasons about. 401 is the one that matters: the lifecycle
  * treats it as "the controller has forgotten this agent" and drops to idle, where every other code
- * means retry. Getting this wrong in either direction is bad — a mapped-down 401 loops forever
+ * means retry. Getting this wrong in either direction is bad - a mapped-down 401 loops forever
  * against a secret that will never work, and a mapped-up anything-else throws away a pairing over
  * a transient fault.
  *
@@ -335,7 +335,7 @@ function parseFrame(frame: string): AgentServerEvent | null {
 
   // A subscription delivers execution results, so each frame is `{"data":{"agentEvents":…}}`
   // rather than the event itself. An `errors` frame is a resolver that failed mid-stream: nothing
-  // to act on, and the subscription carries on — the controller closes it if it is really over.
+  // to act on, and the subscription carries on - the controller closes it if it is really over.
   if (payload.errors?.length) {
     const failure = payload.errors[0] ?? {};
     // A refusal can arrive inside a frame rather than as a status, and it means the same thing:

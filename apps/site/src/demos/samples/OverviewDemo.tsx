@@ -3,7 +3,7 @@ import { DemoSurface } from "../DemoSurface";
 
 /**
  * The dashboard's own landing page, which is what the product looks like on an ordinary morning.
- * It takes every number as a prop and imports no server action, so it runs here unchanged — the
+ * It takes every number as a prop and imports no server action, so it runs here unchanged - the
  * stat cards, the traffic bar and the activity list are the components that ship.
  */
 export default function OverviewDemo() {

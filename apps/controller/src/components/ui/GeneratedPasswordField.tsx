@@ -36,7 +36,7 @@ interface GeneratedPasswordFieldProps {
 
 /**
  * A password input with a generate button, for values the app chooses rather than values that have
- * to match something outside it — a ClickHouse password, not a Tailscale auth key.
+ * to match something outside it - a ClickHouse password, not a Tailscale auth key.
  *
  * Reveal and copy come with it because they are what makes generating usable: a random string in a
  * masked field that nobody can read is only useful for a secret no human ever needs again, and most

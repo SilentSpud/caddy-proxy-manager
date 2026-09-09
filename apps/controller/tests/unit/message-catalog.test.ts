@@ -3,7 +3,7 @@
  *
  * These exist because the first extraction pass broke all of them: prose lifted out of JSX kept the
  * source's line breaks and indentation, and the HTML entities JSX had been resolving at compile
- * time became literal `&apos;` once the text was a JSON string. Neither fails a build — they render
+ * time became literal `&apos;` once the text was a JSON string. Neither fails a build - they render
  * to the user and look like typos.
  */
 import { describe, expect, it } from 'bun:test';

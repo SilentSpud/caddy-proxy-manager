@@ -16,7 +16,7 @@ coverageSkipTestFiles = true
 randomize = true
 
 # Scoped to the code this suite is responsible for: the server-side library and
-# the API route handlers. The dashboard UI is deliberately out of scope — it is
+# the API route handlers. The dashboard UI is deliberately out of scope - it is
 # exercised by Playwright (`bun run test:e2e`) and by the docker suite, and
 # folding hundreds of untested component lines in here would turn the number
 # into noise rather than a signal.
@@ -39,6 +39,6 @@ coveragePathIgnorePatterns = [
 ]
 
 # No coverageThreshold here on purpose. Bun evaluates it against each file
-# individually, which cannot express the repository's ratchet — a floor under
+# individually, which cannot express the repository's ratchet - a floor under
 # the whole suite. scripts/coverage-ratchet.ts enforces that instead, from the
 # lcov report this run writes.

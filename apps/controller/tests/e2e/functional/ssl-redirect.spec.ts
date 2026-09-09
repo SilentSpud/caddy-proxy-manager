@@ -1,5 +1,5 @@
 /**
- * Functional: HTTP→HTTPS redirect with ssl_forced enabled — plain HTTP gets a 308.
+ * Functional: HTTP→HTTPS redirect with ssl_forced enabled - plain HTTP gets a 308.
  * Domain: func-ssl.test
  */
 import { test, expect } from '@playwright/test';
@@ -21,7 +21,7 @@ test.describe
       await page.getByLabel(/^domains/i).fill(DOMAIN);
       await page.getByPlaceholder('10.0.0.5:8080').fill('echo-server:8080');
 
-      // Inject ssl_forced=true (default form behavior — no override)
+      // Inject ssl_forced=true (default form behavior - no override)
       await injectFormFields(page, {
         sslForcedPresent: 'on',
         sslForced: 'on', // checkbox checked → ssl_forced = true

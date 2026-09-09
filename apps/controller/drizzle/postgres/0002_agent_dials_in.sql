@@ -8,7 +8,7 @@
 -- Every existing row is deleted. This is not data loss that can be avoided: those rows hold secrets
 -- agreed under the old handshake, where the controller proved itself to the agent. Under the new
 -- one the agent proves itself to the controller with a secret the controller minted, so an old
--- secret cannot be carried forward — every agent has to be paired again with a fresh code.
+-- secret cannot be carried forward - every agent has to be paired again with a fresh code.
 DELETE FROM "agents";
 
 DROP INDEX IF EXISTS "agents_address_unique";

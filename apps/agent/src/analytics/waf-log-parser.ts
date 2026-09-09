@@ -1,6 +1,6 @@
 /**
  * Coraza's audit log, turned into WAF events. Runs on the agent for the same reason the access-log
- * parser does: the file is on this host. Its two seams are the same — the parse offset lives in the
+ * parser does: the file is on this host. Its two seams are the same - the parse offset lives in the
  * agent's SQLite, and the rows go straight to ClickHouse.
  */
 import { existsSync, statSync, truncateSync } from "node:fs";
@@ -158,7 +158,7 @@ export function ruleInfoFromAuditEntry(entry: CorazaAuditEntry): RuleInfo | null
     const msg = m.error_message || m.message || "";
     if (!msg) continue;
     const info = ruleInfoFromMessage(msg);
-    // Keep looking past anomaly-evaluation rules — a real attack rule usually
+    // Keep looking past anomaly-evaluation rules - a real attack rule usually
     // precedes them, but ordering is not guaranteed.
     if (info && info.ruleId !== null) return info;
   }
@@ -235,7 +235,7 @@ async function resetAuditLogState(): Promise<void> {
   await setState("waf_audit_log_inode", "0");
 }
 
-// Warn once per episode so a deleted audit log — or one we are never allowed to truncate —
+// Warn once per episode so a deleted audit log - or one we are never allowed to truncate -
 // doesn't spam a line every 30s, while still surfacing the condition instead of failing
 // silently the way this used to.
 let warnedAuditLogMissing = false;
@@ -259,12 +259,12 @@ export async function parseNewWafLogEntries(): Promise<void> {
   if (stopped) return;
 
   // Coraza holds the audit log open, so a deleted file keeps receiving writes on the unlinked inode
-  // and is never recreated — returning silently left ingestion dead with no trace. Surface it, and
+  // and is never recreated - returning silently left ingestion dead with no trace. Surface it, and
   // clear the stale offset so a recreated file is read from the start.
   if (!existsSync(AUDIT_LOG)) {
     if (!warnedAuditLogMissing) {
       console.warn(
-        `[waf-log-parser] ${AUDIT_LOG} is missing — WAF events cannot be ingested until Caddy recreates it (restart the caddy container).`,
+        `[waf-log-parser] ${AUDIT_LOG} is missing - WAF events cannot be ingested until Caddy recreates it (restart the caddy container).`,
       );
       warnedAuditLogMissing = true;
       await resetAuditLogState();
@@ -314,7 +314,7 @@ export async function parseNewWafLogEntries(): Promise<void> {
     const startOffset = currentSize < storedSize || replaced ? 0 : storedOffset;
     if (replaced) {
       console.warn(
-        "[waf-log-parser] waf-audit.log was replaced (new inode) — re-reading from the start",
+        "[waf-log-parser] waf-audit.log was replaced (new inode) - re-reading from the start",
       );
     }
 
@@ -331,7 +331,7 @@ export async function parseNewWafLogEntries(): Promise<void> {
     }
 
     // Persist progress BEFORE truncating. Truncation is a best-effort disk guard that fails with
-    // EACCES when web and caddy run as different UIDs, and doing it first froze these offsets — so
+    // EACCES when web and caddy run as different UIDs, and doing it first froze these offsets - so
     // every later pass re-read and re-inserted the same tail forever.
     await setState("waf_audit_log_offset", String(newOffset));
     await setState("waf_audit_log_size", String(currentSize));
@@ -342,7 +342,7 @@ export async function parseNewWafLogEntries(): Promise<void> {
     if (newOffset === currentSize && currentSize > AUDIT_LOG_TRUNCATE_THRESHOLD) {
       try {
         truncateSync(AUDIT_LOG, 0);
-        // Same inode, now empty — keep tracking it, just rewind.
+        // Same inode, now empty - keep tracking it, just rewind.
         await setState("waf_audit_log_offset", "0");
         await setState("waf_audit_log_size", "0");
         warnedTruncateFailed = false;

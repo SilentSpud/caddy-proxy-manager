@@ -1,4 +1,4 @@
-/** E2E: L4 Proxy Hosts page — navigation, list, create/edit/delete dialogs. */
+/** E2E: L4 Proxy Hosts page - navigation, list, create/edit/delete dialogs. */
 import { test, expect, type Page } from '@playwright/test';
 
 const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';
@@ -6,7 +6,7 @@ const ORIGIN = 'http://localhost:3000';
 
 /**
  * The sortable column headers only exist once the table has rows. These tests used to rely on
- * hosts left by the functional L4 specs, making them order-dependent — own the fixture instead.
+ * hosts left by the functional L4 specs, making them order-dependent - own the fixture instead.
  */
 async function createFixtureHost(page: Page, name: string, listenAddress: string) {
   const res = await page.request.post(API_L4_HOSTS, {
@@ -138,7 +138,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
   /**
    * Regression (#241): creating multiple L4 hosts back-to-back left the table
-   * stale until a manual browser refresh — the create dialog's form state
+   * stale until a manual browser refresh - the create dialog's form state
    * survived between opens and revalidation raced the close. Each save must
    * be reflected in the table with no reload, even on rapid successive saves.
    */
@@ -148,7 +148,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.goto('/l4-proxy-hosts');
 
     for (let i = 1; i <= 3; i++) {
-      // Re-open the dialog each iteration — this is what exercised the stale
+      // Re-open the dialog each iteration - this is what exercised the stale
       // useActionState bug (dialog remount now resets form state).
       await page.getByRole('button', { name: /create l4 host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
@@ -158,7 +158,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
       await page.getByRole('button', { name: /^create$/i }).click();
 
-      // Dialog closes on success, host appears in table — no page.reload()
+      // Dialog closes on success, host appears in table - no page.reload()
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
       // exact: the row's switch is labelled `Enable <name>`, which contains the name.
       await expect(
@@ -184,7 +184,7 @@ test.describe('L4 Proxy Hosts page', () => {
     const rowSwitch = row.getByRole('switch').first();
     await expect(row).toBeVisible();
 
-    // Toggle off — the row must show the new status without a reload
+    // Toggle off - the row must show the new status without a reload
     await expect(rowSwitch).toBeChecked();
     await rowSwitch.click();
     await expect(rowSwitch).not.toBeChecked({ timeout: 10_000 });
@@ -206,8 +206,8 @@ test.describe('L4 Proxy Hosts page', () => {
 
   /**
    * Swept through the API rather than the UI, and unconditionally: the tests above create their
-   * hosts through the dialog, and a failure part-way would otherwise leave hosts — and their
-   * listen ports — behind for every later test in the suite.
+   * hosts through the dialog, and a failure part-way would otherwise leave hosts - and their
+   * listen ports - behind for every later test in the suite.
    */
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();

@@ -22,7 +22,7 @@ const { createTestDb } = await import('../helpers/db');
 const schemaModule = await import('../../src/lib/db/schema');
 
 // Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
-// synchronous — an async one never resolves and the file hangs.
+// synchronous - an async one never resolves and the file hangs.
 ctx.db = await createTestDb();
 
 const now = '2026-01-01T00:00:00.000Z';
@@ -134,7 +134,7 @@ async function mapProfile(provider: OAuthProvider, profile: Record<string, unkno
   return await mapper!(profile as any);
 }
 
-describe('mapOAuthProvider — email_verified claim mapping', () => {
+describe('mapOAuthProvider - email_verified claim mapping', () => {
   it('reports the OIDC claim for an auto-link provider', async () => {
     const mapped = await mapProfile(
       { ...baseProvider, autoLink: true },
@@ -190,7 +190,7 @@ describe('better-auth account.accountLinking (wired into the real config)', () =
 
   it('does not gate on a local emailVerified flag CPM can never set', () => {
     // CPM has no email-verification flow, so the Better Auth default of `true`
-    // refuses every link regardless of provider trust — the #247 symptom.
+    // refuses every link regardless of provider trust - the #247 symptom.
     expect(options.account.accountLinking.requireLocalEmailVerified).toBe(false);
   });
 

@@ -36,7 +36,7 @@ body=$(http_body "https://$domain/open/health")
 t_contains "the excluded path reaches the upstream" "origin-a" "$body"
 
 # Identity headers are injected by CPM alone. A client that supplies its own
-# must not have them reach the upstream — on any route, authenticated or not.
+# must not have them reach the upstream - on any route, authenticated or not.
 spoof=$(http_body "https://$domain/open/spoof" \
   -H 'X-CPM-User: mallory' -H 'X-CPM-Email: mallory@evil.example' -H 'X-CPM-Groups: admins')
 t_not_contains "a spoofed identity header is stripped (user)" "mallory" "$spoof"
@@ -65,7 +65,7 @@ portal_login() {  # portal_login USERNAME PASSWORD -> prints the callback URL
     LAST_LOGIN_RESPONSE="$response"
     local target; target=$(printf '%s' "$response" | jq -r '.redirectTo // empty' 2>/dev/null)
     if [ -n "$target" ]; then printf '%s' "$target"; return 0; fi
-    # A 403 means the credentials were fine but the grant is missing — that is
+    # A 403 means the credentials were fine but the grant is missing - that is
     # a real answer, not a wrong rid, so stop trying other candidates.
     case "$response" in *"do not have access"*) return 1 ;; esac
   done
@@ -108,7 +108,7 @@ t_eq "it reaches the upstream" "origin-a" "$(fetch_json '.origin')"
 
 # Regression: these four were red on the rig's first run, against a real defect. The generated
 # handle_response block read values back through `{http.reverse_proxy.header.X-CPM-User}`, which
-# does not resolve — Go canonicalises the key to `X-Cpm-User`. The empty-value guard then matched,
+# does not resolve - Go canonicalises the key to `X-Cpm-User`. The empty-value guard then matched,
 # the copy route was skipped, and every upstream received an anonymous request. Fixed by
 # canonicalising the placeholder in caddy.ts; also pinned in caddy-forward-auth-copy-headers.test.ts.
 t_eq "the upstream is told who the user is" "$CPM_ADMIN_USER" "$(fetch_json '.headers["x-cpm-user"]')"

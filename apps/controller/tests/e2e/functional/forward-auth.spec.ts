@@ -1,5 +1,5 @@
 /**
- * Functional: CPM Forward Auth (credential login) — unauthenticated requests redirect to the portal
+ * Functional: CPM Forward Auth (credential login) - unauthenticated requests redirect to the portal
  * with ?rd=, non-forward-auth domains are rejected, a successful login completes the redirect, the
  * _cpm_fa cookie reaches the upstream, an invalid one redirects again. Domain: func-fwd-auth.test
  */
@@ -61,7 +61,7 @@ test.describe
     });
 
     test('portal shows login form when ?rd= points to forward auth domain', async ({ page }) => {
-      // Use fresh context — admin session triggers auto-redirect on the portal
+      // Use fresh context - admin session triggers auto-redirect on the portal
       const ctx = await page
         .context()
         .browser()!

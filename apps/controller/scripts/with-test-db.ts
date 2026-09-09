@@ -5,7 +5,7 @@
  *
  * The controller dropped SQLite, so there is no in-process database left to test against and the
  * suite needs a real server. Starting one here rather than asking for it keeps `bun run test`
- * working on a fresh clone — the same bargain the e2e suite already makes, and Docker is already
+ * working on a fresh clone - the same bargain the e2e suite already makes, and Docker is already
  * required for that.
  *
  * An externally supplied TEST_POSTGRES_URL wins and nothing is started: that is how CI runs, where
@@ -24,7 +24,7 @@ const READY_TIMEOUT_MS = 60_000;
  * `halt-at-non-option` is what keeps this a wrapper rather than a parser: everything from the first
  * bare word on belongs to the child, so `bun test --parallel` reaches Bun with its flag intact
  * instead of yargs claiming `--parallel` for itself. Positional numbers stay strings for the same
- * reason — an argument like `007` must not arrive as `7`.
+ * reason - an argument like `007` must not arrive as `7`.
  */
 const command = yargs(hideBin(process.argv))
   .scriptName("with-test-db")

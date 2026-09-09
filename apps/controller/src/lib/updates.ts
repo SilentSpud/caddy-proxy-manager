@@ -3,7 +3,7 @@
  *
  * The check reads the tag list of the registry the deployment pulls from, so it reports what could
  * actually be deployed rather than what has been tagged in git. The repository is a setting because
- * a fork publishes to its own namespace — a hard-coded `ghcr.io/silentspud/...` would tell everyone
+ * a fork publishes to its own namespace - a hard-coded `ghcr.io/silentspud/...` would tell everyone
  * running `ghcr.io/theirname/...` about releases they cannot pull.
  *
  * Nothing here runs on a schedule: there is no scheduler in this process. A read refreshes a stale
@@ -19,7 +19,7 @@ const CACHE_KEY = "update_check";
 /**
  * The image the version is read from.
  *
- * `web` is the controller itself — the thing APP_VERSION describes. caddy and agent are released
+ * `web` is the controller itself - the thing APP_VERSION describes. caddy and agent are released
  * from the same tags, so checking one is checking all three.
  */
 const VERSIONED_IMAGE = "web";
@@ -91,7 +91,7 @@ export function compareSemver(a: Semver, b: Semver): number {
   if (a.minor !== b.minor) return a.minor - b.minor;
   if (a.patch !== b.patch) return a.patch - b.patch;
 
-  // 3.0.0-beta.2 precedes 3.0.0. An absent prerelease is the higher version, not the lower one —
+  // 3.0.0-beta.2 precedes 3.0.0. An absent prerelease is the higher version, not the lower one -
   // getting this backwards would announce an "update" to the beta an operator just moved off.
   if (a.prerelease.length === 0 && b.prerelease.length === 0) return 0;
   if (a.prerelease.length === 0) return 1;
@@ -121,8 +121,8 @@ export function newestRelease(tags: string[]): string | null {
  * Split `ghcr.io/owner/name` into its host and path, with or without a trailing slash.
  *
  * Forced to https and required to look like a registry reference. This value becomes a URL the
- * *server* fetches, and while only an admin can set it — an admin who already configures Caddy
- * upstreams and DNS credentials — there is no reason to let it name a scheme or a shape that is
+ * *server* fetches, and while only an admin can set it - an admin who already configures Caddy
+ * upstreams and DNS credentials - there is no reason to let it name a scheme or a shape that is
  * not a registry.
  */
 export function parseRepository(repository: string): { host: string; path: string } | null {
@@ -142,7 +142,7 @@ export function parseRepository(repository: string): { host: string; path: strin
  *
  * The link is refused unless it stays on the host the check was pointed at. `new URL(value, base)`
  * ignores the base the moment the value is absolute, so without this a registry could name any
- * host it liked in a `Link` header and have this server fetch it — carrying the bearer token
+ * host it liked in a `Link` header and have this server fetch it - carrying the bearer token
  * `listTags` is holding at the time. A real registry pages with a relative link, which is
  * unaffected; anything else is reported rather than followed, because a check that quietly stopped
  * paging could go on reporting "up to date" from half a tag list.
@@ -164,7 +164,7 @@ export function nextPageUrl(header: string | null, host: string): string | null 
   // this text is what an operator is shown, and "somewhere else" would not tell them where.
   if (next.origin !== expected.origin) {
     throw new Error(
-      `The registry paginated to ${next.origin}, not ${expected.origin} — this check will not follow that`,
+      `The registry paginated to ${next.origin}, not ${expected.origin} - this check will not follow that`,
     );
   }
   return next.toString();
@@ -257,7 +257,7 @@ let inFlight: Promise<CachedCheck> | null = null;
  * Query the registry and store the result, whether it succeeded or not.
  *
  * A failure is cached too, so a registry that is unreachable is retried on the same schedule as a
- * success rather than on every page load — and so the operator can be told *why* the answer is
+ * success rather than on every page load - and so the operator can be told *why* the answer is
  * missing instead of being shown a check that silently never happened.
  */
 export async function checkForUpdates(): Promise<CachedCheck> {
@@ -306,15 +306,15 @@ export async function checkForUpdates(): Promise<CachedCheck> {
 /**
  * What to show, refreshing behind the caller when the stored answer has gone stale.
  *
- * Never awaits the network. A page that renders this gets whatever is already known — including
- * nothing at all, on the first load after enabling it — and the next render has the answer.
+ * Never awaits the network. A page that renders this gets whatever is already known - including
+ * nothing at all, on the first load after enabling it - and the next render has the answer.
  */
 export async function getUpdateStatus(): Promise<UpdateStatus> {
   const { enabled, repository } = await settings();
 
   // Nothing is known while the check is off, and the cached answer is not an exception. Reporting
   // it let the Settings page say "3.0.0 is the newest release published, so this is up to date"
-  // from a check that stopped running months ago — with no way to refresh it, since "Check now"
+  // from a check that stopped running months ago - with no way to refresh it, since "Check now"
   // is disabled along with the setting. The cache row is left alone, so re-enabling shows the last
   // answer again immediately rather than waiting for the first refresh.
   if (!enabled) {
@@ -357,8 +357,8 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
 /**
  * Whether `latest` is a release beyond `current`.
  *
- * False whenever the comparison cannot be made — an unknown current version, a build ahead of the
- * registry — because the cost of a wrong "yes" is an operator chasing an update that is not there.
+ * False whenever the comparison cannot be made - an unknown current version, a build ahead of the
+ * registry - because the cost of a wrong "yes" is an operator chasing an update that is not there.
  */
 export function isNewer(current: string, latest: string | null): boolean {
   if (!latest) return false;

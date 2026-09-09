@@ -87,6 +87,7 @@
         "@astrojs/starlight": "^0.42.0",
         "@astryxdesign/core": "^0.5.3",
         "@astryxdesign/theme-neutral": "^0.5.3",
+        "@catppuccin/starlight": "^2.1.0",
         "@cpm/controller": "workspace:*",
         "apexcharts": "^7.1.0",
         "astro": "^7.3.1",
@@ -94,6 +95,7 @@
         "react": "^19.2.8",
         "react-apexcharts": "^2.1.1",
         "react-dom": "^19.2.8",
+        "satteri": "^0.10.5",
         "sharp": "^0.35.4",
         "use-intl": "^4.14.2",
       },
@@ -113,6 +115,9 @@
     "@astryxdesign/core",
     "core-js-pure",
   ],
+  "overrides": {
+    "@astrojs/starlight": "0.42.0",
+  },
   "packages": {
     "@ai-sdk/gateway": ["@ai-sdk/gateway@4.0.75", "", { "dependencies": { "@ai-sdk/provider": "4.0.10", "@ai-sdk/provider-utils": "5.0.36", "@vercel/oidc": "3.2.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-HOnhw3oXtBnboBF7kAKipjToCN6+5w6EuukiUKiULcxBitS+vbHRRv9IUBcq+Z1wkXcJjfywKrt5r++I6OYyXg=="],
 
@@ -259,6 +264,8 @@
     "@bruits/satteri-win32-x64-msvc": ["@bruits/satteri-win32-x64-msvc@0.10.5", "", { "os": "win32", "cpu": "x64" }, "sha512-C3IfPvfvMXmlzBxaMPKFS1XiuV9pu2mC7YqkPk7PSvTgPZ8gbdASIpHpztDLvTTQjqZ0z1Ol8tK5X+V6XXC0wQ=="],
 
     "@capsizecss/unpack": ["@capsizecss/unpack@4.0.1", "", { "dependencies": { "fontkitten": "^1.0.3" } }, "sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ=="],
+
+    "@catppuccin/starlight": ["@catppuccin/starlight@2.1.0", "", { "dependencies": { "@astrojs/starlight": "^0.41.1" }, "peerDependencies": { "astro": "^6.0.0 || ^7.0.0" } }, "sha512-S5zr0WMHUZgsKzoAebj48DAT5r96jRgJSNftNEIoSi9Nk9KatxP5IUntYqmX5B2L5PGfvKO/oEjINuLLaiRn0g=="],
 
     "@clack/core": ["@clack/core@1.4.3", "", { "dependencies": { "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-/kr3UWNtdJfxZtPgDqUOmG2pvwlmcLGheex5yiZKdwbzZJxhV+HMNR9QNmyY5cGwTNV6LrR7Jtp+KjhUAP1qBQ=="],
 
