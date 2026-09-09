@@ -18,7 +18,10 @@ Everything the dashboard does, it does through an API you can use too.
 groups, agents, settings, the audit log, and a Caddy apply.
 
 ```bash
-curl -sX POST https://cpm.example.com/api/graphql   -H "Authorization: Bearer $CPM_TOKEN"   -H 'content-type: application/json'   -d '{"query":"{ proxyHosts { id name domains enabled } }"}'
+curl -sX POST https://cpm.example.com/api/graphql \
+  -H "Authorization: Bearer $CPM_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"query":"{ proxyHosts { id name domains enabled } }"}'
 ```
 
 The schema is introspectable by any authenticated GraphQL client, so your tooling can discover it

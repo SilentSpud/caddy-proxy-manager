@@ -13,6 +13,17 @@ import starlightRosePine from "starlight-theme-rose-pine";
 const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, import.meta.url));
 
 /**
+ * `satteri` in this app's dependencies is not imported by anything here, and is not cruft.
+ *
+ * It is Starlight's markdown engine, and it loads a per-platform native binding by `require`. The
+ * static build inlines it into a prerender chunk, from which that require resolves upwards through
+ * `dist/` — and bun keeps transitive dependencies in `node_modules/.bun/node_modules`, which is not
+ * on that path, so the binding is unfindable and every page carrying a Starlight component fails to
+ * render. Depending on it directly puts it in `apps/site/node_modules`, which is on the path.
+ * Remove it and the build breaks with "Cannot find native binding".
+ */
+
+/**
  * The project site, built as static files and served from GitHub Pages.
  *
  * `site` and `base` are what Pages needs and what a custom domain would change. A project site

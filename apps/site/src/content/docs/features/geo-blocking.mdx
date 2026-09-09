@@ -3,6 +3,7 @@ title: Geo blocking
 description: Block or allow by country, continent, ASN, CIDR or exact IP, per host, with allow rules taking precedence.
 ---
 
+import { Steps } from "@astrojs/starlight/components";
 import Demo from "../../../components/Demo.astro";
 import GeoBlockDemo from "../../../demos/samples/GeoBlockDemo";
 
@@ -50,9 +51,15 @@ geoblock trusted-proxy list, so the two cannot silently disagree.
 
 ## Getting the databases
 
+<Steps>
+
 1. Register for a free account at [maxmind.com](https://www.maxmind.com/).
+
 2. Generate a licence key with `GeoLite2-Country` and `GeoLite2-ASN` permissions.
+
 3. Open **Settings → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and key.
+
+</Steps>
 
 On a stack with an [agent](../agent/) that is the whole setup — saving starts the `geoipupdate`
 container. Turning the toggle off stops it again and hides country matching from the host forms.
