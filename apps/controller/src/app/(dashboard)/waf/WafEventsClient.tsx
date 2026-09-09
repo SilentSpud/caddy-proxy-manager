@@ -49,6 +49,7 @@ import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
 import { withRowIds } from "@/lib/row-id";
 import { useTranslations } from "next-intl";
+import { useEmptyValue } from "@/components/ui/empty-value";
 import {
   suppressWafRuleGloballyAction,
   suppressWafRuleForHostAction,
@@ -297,6 +298,7 @@ function MatchTags({ tags }: { tags: string[] }) {
 
 function AuditPanel({ rawData }: { rawData: string | null }) {
   const t = useTranslations("waf");
+  const emptyValue = useEmptyValue();
   const [innerTab, setInnerTab] = useState("overview");
 
   // Parsed once per event instead of on every render. The matched rules get their row ids here, so
@@ -340,22 +342,22 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
               <MetadataList columns="multi">
                 <MetadataListItem label={t("transactionId")}>
                   <Text type="code" size="xsm">
-                    {tx.id ?? "-"}
+                    {tx.id ?? emptyValue}
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={t("timestamp")}>
                   <Text type="body" size="sm">
-                    {tx.timestamp ?? "-"}
+                    {tx.timestamp ?? emptyValue}
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={t("client")}>
                   <Text type="code" size="xsm">
-                    {tx.client_ip ?? "-"}:{tx.client_port ?? 0}
+                    {tx.client_ip ?? emptyValue}:{tx.client_port ?? 0}
                   </Text>
                 </MetadataListItem>
                 <MetadataListItem label={t("server")}>
                   <Text type="code" size="xsm">
-                    {tx.server_id ?? "-"}:{tx.host_port ?? 0}
+                    {tx.server_id ?? emptyValue}:{tx.host_port ?? 0}
                   </Text>
                 </MetadataListItem>
               </MetadataList>
@@ -371,7 +373,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                         <VStack gap={2}>
                           <HStack gap={2} vAlign="center">
                             <Text type="code" size="xsm" weight="semibold">
-                              Rule {m.details?.ruleId ?? "-"}
+                              Rule {m.details?.ruleId ?? emptyValue}
                             </Text>
                             <SeverityChip severity={m.details?.severity ?? null} />
                           </HStack>
@@ -445,7 +447,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                           ? "warning"
                           : "success"
                     }
-                    label={String(res.status || "-")}
+                    label={String(res.status || emptyValue)}
                   />
                   <Text type="code" size="xsm" color="secondary">
                     {res.protocol}
@@ -470,7 +472,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                   <MetadataList columns="multi">
                     <MetadataListItem label={t("ruleId")}>
                       <Text type="code" size="xsm" weight="semibold">
-                        {m.details?.ruleId ?? "-"}
+                        {m.details?.ruleId ?? emptyValue}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("severity")}>
@@ -483,17 +485,17 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                     </MetadataListItem>
                     <MetadataListItem label={t("logData")}>
                       <Text type="code" size="xsm">
-                        {m.details?.logdata ?? "-"}
+                        {m.details?.logdata ?? emptyValue}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("file")}>
                       <Text type="code" size="xsm" color="secondary">
-                        {m.details?.file ?? "-"}:{m.details?.lineNumber ?? ""}
+                        {m.details?.file ?? emptyValue}:{m.details?.lineNumber ?? ""}
                       </Text>
                     </MetadataListItem>
                     <MetadataListItem label={t("reference")}>
                       <Text type="code" size="xsm" color="secondary">
-                        {m.details?.reference ?? "-"}
+                        {m.details?.reference ?? emptyValue}
                       </Text>
                     </MetadataListItem>
                   </MetadataList>
@@ -545,6 +547,7 @@ function EventDetailPanel({
   onSuppressHost: (ruleId: number, host: string) => void;
 }) {
   const t = useTranslations("waf");
+  const emptyValue = useEmptyValue();
   const [pending, startTransition] = useTransition();
 
   const eventHostBare = event.host ? event.host.replace(/:\d+$/, "") : "";
@@ -602,7 +605,7 @@ function EventDetailPanel({
             </MetadataListItem>
             <MetadataListItem label={t("host")}>
               <Text type="code" size="sm">
-                {event.host || "-"}
+                {event.host || emptyValue}
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("clientIp")}>
@@ -620,17 +623,17 @@ function EventDetailPanel({
             </MetadataListItem>
             <MetadataListItem label={t("uri")}>
               <Text type="code" size="xsm" color="secondary">
-                {event.uri || "-"}
+                {event.uri || emptyValue}
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("ruleId")}>
               <Text type="code" size="sm" weight="semibold">
-                {event.ruleId ?? "-"}
+                {event.ruleId ?? emptyValue}
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("ruleMessage")}>
               <Text type="body" size="sm">
-                {event.ruleMessage ?? "-"}
+                {event.ruleMessage ?? emptyValue}
               </Text>
             </MetadataListItem>
           </MetadataList>
@@ -926,6 +929,7 @@ export default function WafEventsClient({
   globalWaf,
 }: Props) {
   const t = useTranslations("waf");
+  const emptyValue = useEmptyValue();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -1058,7 +1062,7 @@ export default function WafEventsClient({
           </Text>
         </HStack>
         <Text type="code" size="xsm" color="secondary">
-          {event.host || "-"}
+          {event.host || emptyValue}
         </Text>
         {event.ruleId && (
           <Text type="body" size="xsm" color="secondary">
@@ -1131,11 +1135,11 @@ export default function WafEventsClient({
       render: (r) => (
         <HStack gap={2} vAlign="center">
           <Text type="code" size="xsm" weight="bold" color={r.method ? "accent" : "secondary"}>
-            {r.method || "-"}
+            {r.method || emptyValue}
           </Text>
           <Tooltip content={r.uri ?? ""}>
             <Text type="code" size="xsm" color="secondary" maxLines={1}>
-              {r.uri || "-"}
+              {r.uri || emptyValue}
             </Text>
           </Tooltip>
         </HStack>
@@ -1147,7 +1151,7 @@ export default function WafEventsClient({
       width: 80,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
-          {r.ruleId ?? "-"}
+          {r.ruleId ?? emptyValue}
         </Text>
       ),
     },

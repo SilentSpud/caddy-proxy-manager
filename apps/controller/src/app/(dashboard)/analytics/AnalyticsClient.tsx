@@ -35,6 +35,7 @@ import { formatDateTimeUtc } from "@/src/lib/date-format";
 
 import { useChartTheme } from "./chart-theme";
 import { useTranslations } from "next-intl";
+import { useEmptyValue } from "@/components/ui/empty-value";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
@@ -365,6 +366,7 @@ function asArray<T>(value: unknown): T[] {
 
 export default function AnalyticsClient() {
   const t = useTranslations("analytics");
+  const emptyValue = useEmptyValue();
   const [interval, setIntervalVal] = useState<DisplayInterval>("1h");
   const [selectedHosts, setSelectedHosts] = useState<string[]>([]);
   const [allHosts, setAllHosts] = useState<AnalyticsHost[]>([]);
@@ -618,7 +620,7 @@ export default function AnalyticsClient() {
       width: pixel(80),
       renderCell: (row) => (
         <Text type="body" size="sm" color={row.waf > 0 ? "primary" : "secondary"} hasTabularNumbers>
-          {row.waf > 0 ? row.waf.toLocaleString() : "-"}
+          {row.waf > 0 ? row.waf.toLocaleString() : emptyValue}
         </Text>
       ),
     },
@@ -706,7 +708,7 @@ export default function AnalyticsClient() {
       width: pixel(100),
       renderCell: (row) => (
         <Text type="body" size="sm">
-          {row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : "-"}
+          {row.countryCode ? `${countryFlag(row.countryCode)} ${row.countryCode}` : emptyValue}
         </Text>
       ),
     },
@@ -716,7 +718,7 @@ export default function AnalyticsClient() {
       width: pixel(160),
       renderCell: (row) => (
         <Text type="body" size="sm" maxLines={1}>
-          {row.host || "-"}
+          {row.host || emptyValue}
         </Text>
       ),
     },
@@ -777,7 +779,7 @@ export default function AnalyticsClient() {
           </Tooltip>
         ) : (
           <Text type="body" size="sm" color="secondary">
-            -
+            {emptyValue}
           </Text>
         ),
     },

@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { useEmptyValue } from "@/components/ui/empty-value";
 import type { CertExpiryStatus } from "../page";
 
 function formatRelative(validTo: string): string {
@@ -46,10 +47,12 @@ export function RelativeTime({
   validTo: string | null;
   status: CertExpiryStatus | null;
 }) {
+  const emptyValue = useEmptyValue();
+
   if (validTo === null || status === null) {
     return (
       <Text type="body" size="sm" color="secondary">
-        -
+        {emptyValue}
       </Text>
     );
   }

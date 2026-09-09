@@ -48,6 +48,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
+import { useEmptyValue } from "@/components/ui/empty-value";
 import { generatePassword } from "@/src/lib/password-generator";
 import {
   createAccessListAction,
@@ -77,8 +78,8 @@ function fmtRelative(iso: string | null): string {
   return `${Math.floor(diff / 86400 / 365)}y ago`;
 }
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "-";
+function fmtDate(iso: string | null, emptyValue: string): string {
+  if (!iso) return emptyValue;
   return new Date(iso).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -126,6 +127,7 @@ function MembersTab({
   onListUpdated: (list: AccessList) => void;
 }) {
   const t = useTranslations("accessLists");
+  const emptyValue = useEmptyValue();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({ username: "", password: "" });
@@ -242,7 +244,7 @@ function MembersTab({
       width: pixel(140),
       renderCell: (row) => (
         <Text type="body" size="xsm" color="secondary">
-          {fmtDate(row.createdAt)}
+          {fmtDate(row.createdAt, emptyValue)}
         </Text>
       ),
     },
@@ -400,6 +402,7 @@ function SettingsTab({
   onDeleted: () => void;
 }) {
   const t = useTranslations("accessLists");
+  const emptyValue = useEmptyValue();
   const [name, setName] = useState(list.name);
   const [desc, setDesc] = useState(list.description || "");
   const [confirm, setConfirm] = useState("");
@@ -481,7 +484,9 @@ function SettingsTab({
 
       <Card padding={3}>
         <MetadataList>
-          <MetadataListItem label={t("created")}>{fmtDate(list.createdAt)}</MetadataListItem>
+          <MetadataListItem label={t("created")}>
+            {fmtDate(list.createdAt, emptyValue)}
+          </MetadataListItem>
           <MetadataListItem label={t("lastUpdated")}>
             {fmtRelative(list.updatedAt)}
           </MetadataListItem>

@@ -13,6 +13,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
+import { useEmptyValue } from "@/components/ui/empty-value";
 
 /** Icons the overview can show, keyed by name so the server can name one. */
 const STAT_ICONS = {
@@ -109,6 +110,7 @@ export default function OverviewClient({
   isAdmin?: boolean;
 }) {
   const t = useTranslations("overview");
+  const emptyValue = useEmptyValue();
   return (
     <VStack gap={8}>
       <VStack gap={1}>
@@ -139,7 +141,7 @@ export default function OverviewClient({
           <ClickableCard label={t("trafficCardLabel")} href="/analytics" variant="cyan" padding={5}>
             <StatTile
               icon={<Icon icon={BarChart2} />}
-              value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : "-"}
+              value={trafficSummary ? trafficSummary.totalRequests.toLocaleString() : emptyValue}
               label={t("traffic24h")}
             >
               {trafficSummary && trafficSummary.totalRequests > 0 && (
