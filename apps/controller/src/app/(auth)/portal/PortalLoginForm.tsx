@@ -85,16 +85,17 @@ export default function PortalLoginForm({
           if (data.redirectTo) {
             window.location.href = data.redirectTo;
           } else {
-            setError(data.error ?? "Failed to authorize access.");
+            setError(data.error ?? t("authorizeFailed"));
             setPending(false);
           }
         })
         .catch(() => {
-          setError("An unexpected error occurred.");
+          setError(t("unexpectedError"));
           setPending(false);
         });
     }
-  }, [existingSession, rid]);
+    // `t` is stable for a given locale, so it does not re-run this on every render.
+  }, [existingSession, rid, t]);
 
   const handleCredentialSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,7 +107,7 @@ export default function PortalLoginForm({
     const trimmedUsername = username.trim();
 
     if (!trimmedUsername || !password) {
-      setError("Username and password are required.");
+      setError(t("login.credentialsRequired"));
       setPending(false);
       return;
     }
@@ -121,14 +122,14 @@ export default function PortalLoginForm({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "Login failed.");
+        setError(data.error ?? t("login.failed"));
         setPending(false);
         return;
       }
 
       window.location.href = data.redirectTo;
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      setError(t("unexpectedErrorTryAgain"));
       setPending(false);
     }
   };
@@ -173,7 +174,7 @@ export default function PortalLoginForm({
             Sign in to access <strong>{targetDomain}</strong>
           </>
         ) : (
-          "Sign in to continue"
+          t("signInToContinue")
         )
       }
     >
@@ -233,7 +234,7 @@ export default function PortalLoginForm({
             />
             <Button
               type="submit"
-              label={pending ? "Signing in..." : "Sign in"}
+              label={pending ? t("login.submitPending") : t("login.submit")}
               isLoading={pending}
               isDisabled={disabled}
               width="100%"

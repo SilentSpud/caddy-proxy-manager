@@ -47,9 +47,20 @@ interface ActiveSession {
   current: boolean;
 }
 
-/** Best-effort friendly device label from a User-Agent string. */
-function describeDevice(ua: string | null): string {
-  if (!ua) return "Unknown device";
+type DeviceWords = {
+  unknown: string;
+  browser: string;
+  onOs: (browser: string, os: string) => string;
+};
+
+/**
+ * Best-effort friendly device label from a User-Agent string.
+ *
+ * Module-level, so the three words that are prose rather than product names are passed in. The
+ * browser and OS names are not: they are what those things are called in every language.
+ */
+function describeDevice(ua: string | null, words: DeviceWords): string {
+  if (!ua) return words.unknown;
   const browser = /Edg\//.test(ua)
     ? "Edge"
     : /Chrome\//.test(ua)
@@ -58,7 +69,7 @@ function describeDevice(ua: string | null): string {
         ? "Firefox"
         : /Safari\//.test(ua)
           ? "Safari"
-          : "Browser";
+          : words.browser;
   const os = /Windows/.test(ua)
     ? "Windows"
     : /Mac OS X|Macintosh/.test(ua)
@@ -70,7 +81,7 @@ function describeDevice(ua: string | null): string {
           : /Linux/.test(ua)
             ? "Linux"
             : "";
-  return os ? `${browser} on ${os}` : browser;
+  return os ? words.onOs(browser, os) : browser;
 }
 
 function relativeTime(iso: string): string {
@@ -146,6 +157,11 @@ export default function ProfileClient({
   const t = useTranslations("profile");
   // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
+  const deviceWords: DeviceWords = {
+    unknown: t("deviceUnknown"),
+    browser: t("deviceBrowser"),
+    onOs: (browser, os) => t("deviceOnOs", { browser, os }),
+  };
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -160,7 +176,7 @@ export default function ProfileClient({
   const [tokenExpiresAt, setTokenExpiresAt] = useState<ISODateTimeString | undefined>(undefined);
 
   const getProviderName = (provider: string) => {
-    if (provider === "credentials") return "Username/Password";
+    if (provider === "credentials") return t("providerCredentials");
     if (provider === "oauth2") return "OAuth2";
     if (provider === "authentik") return "Authentik";
     return provider;
@@ -181,7 +197,7 @@ export default function ProfileClient({
     setSuccess(null);
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("passwordsDoNotMatch"));
       return;
     }
 
@@ -210,26 +226,26 @@ export default function ProfileClient({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to change password");
+        setError(data.error || t("passwordChangeFailed"));
         setLoading(false);
         return;
       }
 
-      setSuccess("Password changed successfully");
+      setSuccess(t("passwordChanged"));
       setPasswordDialogOpen(false);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       setLoading(false);
     } catch {
-      setError("An error occurred while changing password");
+      setError(t("passwordChangeError"));
       setLoading(false);
     }
   };
 
   const handleUnlinkOAuth = async () => {
     if (!hasPassword) {
-      setError("Cannot unlink OAuth: You must set a password first");
+      setError(t("unlinkPasswordRequired"));
       return;
     }
 
@@ -246,19 +262,19 @@ export default function ProfileClient({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to unlink OAuth");
+        setError(data.error || t("unlinkFailed"));
         setLoading(false);
         return;
       }
 
-      setSuccess("OAuth account unlinked successfully. Reloading...");
+      setSuccess(t("oauthUnlinked"));
       setUnlinkDialogOpen(false);
       setLoading(false);
 
       // Reload page to reflect changes
       setTimeout(() => window.location.reload(), 1500);
     } catch {
-      setError("An error occurred while unlinking OAuth");
+      setError(t("unlinkError"));
       setLoading(false);
     }
   };
@@ -278,15 +294,12 @@ export default function ProfileClient({
       });
 
       if (linkError) {
-        setError(
-          linkError.message ||
-            'Failed to start OAuth linking. Enable "Auto-link accounts" for this provider first.',
-        );
+        setError(linkError.message || t("linkStartFailed"));
         setLoading(false);
       }
       // On success the client follows the provider redirect.
     } catch {
-      setError("An error occurred while linking OAuth");
+      setError(t("linkError"));
       setLoading(false);
     }
   };
@@ -297,13 +310,13 @@ export default function ProfileClient({
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      setError("Please upload an image file");
+      setError(t("avatarMustBeImage"));
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      setError("Image must be smaller than 2MB");
+      setError(t("avatarTooLarge"));
       return;
     }
 
@@ -325,13 +338,13 @@ export default function ProfileClient({
         const data = await response.json();
 
         if (!response.ok) {
-          setError(data.error || "Failed to upload avatar");
+          setError(data.error || t("avatarUploadFailed"));
           setLoading(false);
           return;
         }
 
         setAvatarUrl(base64);
-        setSuccess("Avatar updated successfully. Refreshing...");
+        setSuccess(t("avatarUpdated"));
         setLoading(false);
 
         setTimeout(() => window.location.reload(), 1000);
@@ -339,7 +352,7 @@ export default function ProfileClient({
 
       reader.readAsDataURL(file);
     } catch {
-      setError("An error occurred while uploading avatar");
+      setError(t("avatarUploadError"));
       setLoading(false);
     }
   };
@@ -358,18 +371,18 @@ export default function ProfileClient({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to delete avatar");
+        setError(data.error || t("avatarDeleteFailed"));
         setLoading(false);
         return;
       }
 
       setAvatarUrl(null);
-      setSuccess("Avatar removed successfully. Refreshing...");
+      setSuccess(t("avatarRemoved"));
       setLoading(false);
 
       setTimeout(() => window.location.reload(), 1000);
     } catch {
-      setError("An error occurred while deleting avatar");
+      setError(t("avatarDeleteError"));
       setLoading(false);
     }
   };
@@ -382,7 +395,7 @@ export default function ProfileClient({
       setError(result.error);
     } else {
       setNewToken(result.rawToken);
-      setSuccess("API token created successfully");
+      setSuccess(t("apiTokenCreated"));
       setTokenName("");
       setTokenExpiresAt(undefined);
     }
@@ -467,7 +480,7 @@ export default function ProfileClient({
 
             <MetadataList>
               <MetadataListItem label={t("email")}>{user.email}</MetadataListItem>
-              <MetadataListItem label={t("name")}>{user.name || "Not set"}</MetadataListItem>
+              <MetadataListItem label={t("name")}>{user.name || t("notSet")}</MetadataListItem>
               <MetadataListItem label={t("role")}>
                 <Badge label={user.role} />
               </MetadataListItem>
@@ -543,7 +556,7 @@ export default function ProfileClient({
                 <ListItem
                   key={s.id}
                   startContent={<Icon icon={Monitor} size="sm" color="secondary" />}
-                  label={describeDevice(s.userAgent)}
+                  label={describeDevice(s.userAgent, deviceWords)}
                   description={
                     <HStack gap={3} wrap="wrap" vAlign="center">
                       <Text type="body" size="xsm" color="secondary">
@@ -568,7 +581,9 @@ export default function ProfileClient({
                           type="submit"
                           variant="ghost"
                           size="sm"
-                          label={`Revoke session on ${describeDevice(s.userAgent)}`}
+                          label={t("revokeSessionOn", {
+                            device: describeDevice(s.userAgent, deviceWords),
+                          })}
                           tooltip={t("revokeSession")}
                           icon={<Trash2 />}
                         />
@@ -668,11 +683,11 @@ export default function ProfileClient({
                             Created {formatDate(token.createdAt)}
                           </Text>
                           <Text type="body" size="xsm" color="secondary">
-                            Used {formatDate(token.lastUsedAt)}
+                            {t("used", { when: formatDate(token.lastUsedAt) })}
                           </Text>
                           {token.expiresAt && (
                             <Text type="body" size="xsm" color="secondary">
-                              {expired ? "Expired" : "Expires"} {formatDate(token.expiresAt)}
+                              {expired ? t("expired") : t("expires")} {formatDate(token.expiresAt)}
                             </Text>
                           )}
                         </HStack>
@@ -744,9 +759,9 @@ export default function ProfileClient({
       <AppDialog
         open={passwordDialogOpen}
         onClose={() => setPasswordDialogOpen(false)}
-        title={hasPassword ? "Change Password" : "Set Password"}
+        title={hasPassword ? t("changePassword") : t("setPassword")}
         maxWidth="sm"
-        submitLabel={hasPassword ? "Change Password" : "Set Password"}
+        submitLabel={hasPassword ? t("changePassword") : t("setPassword")}
         onSubmit={handlePasswordChange}
         isSubmitting={loading}
       >
