@@ -7,6 +7,9 @@ import {
   queryProtocols,
   queryUserAgents,
   queryBlocked,
+  queryTrafficEvents,
+  queryStatusClasses,
+  queryWafCount,
   queryDistinctHosts,
   isAnalyticsEnabled,
   type AnalyticsSummary as CHSummary,
@@ -16,9 +19,22 @@ import {
   type UAStats,
   type BlockedEvent,
   type BlockedPage,
+  type TrafficEvent,
+  type TrafficEventFilter,
+  type StatusClassCounts,
 } from "./clickhouse/client";
 
-export type { TimelineBucket, CountryStats, ProtoStats, UAStats, BlockedEvent, BlockedPage };
+export type {
+  TimelineBucket,
+  CountryStats,
+  ProtoStats,
+  UAStats,
+  BlockedEvent,
+  BlockedPage,
+  TrafficEvent,
+  TrafficEventFilter,
+  StatusClassCounts,
+};
 
 export type Interval = "1h" | "12h" | "24h" | "7d" | "30d";
 
@@ -113,6 +129,43 @@ export async function getAnalyticsBlocked(
   page: number,
 ): Promise<BlockedPage> {
   return queryBlocked(from, to, hosts, page);
+}
+
+// ── Overview ─────────────────────────────────────────────────────────────────
+
+export interface OverviewAnalytics {
+  summary: AnalyticsSummary;
+  statusClasses: StatusClassCounts;
+  wafBlocked: number;
+  timeline: TimelineBucket[];
+  events: TrafficEvent[];
+}
+
+/**
+ * Everything the overview draws, in one round trip.
+ *
+ * The page changes all three of its bands together - tiles, chart and log all follow
+ * the same range - so splitting this across the existing per-widget routes would put
+ * three requests on every range change and let the bands disagree while they land.
+ *
+ * `limit` is the log's screenful; the rows are a sample of the window, not a page to
+ * walk through, which is why there is no pagination here.
+ */
+export async function getOverviewAnalytics(
+  from: number,
+  to: number,
+  hosts: string[],
+  filter: TrafficEventFilter,
+  limit: number,
+): Promise<OverviewAnalytics> {
+  const [summary, statusClasses, wafBlocked, timeline, events] = await Promise.all([
+    getAnalyticsSummary(from, to, hosts),
+    queryStatusClasses(from, to, hosts),
+    queryWafCount(from, to),
+    queryTimeline(from, to, hosts),
+    queryTrafficEvents(from, to, hosts, filter, limit),
+  ]);
+  return { summary, statusClasses, wafBlocked, timeline, events };
 }
 
 // ── Hosts ────────────────────────────────────────────────────────────────────
