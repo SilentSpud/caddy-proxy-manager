@@ -3,13 +3,11 @@ import { requireUser } from "@/src/lib/auth";
 import OverviewClient from "./OverviewClient";
 import { accessLists, auditEvents, certificates, proxyHosts, users } from "@/src/lib/db/schema";
 import { count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
-import { listAgents } from "@/src/lib/models/agents";
-import { connectedAgents } from "@/src/lib/agent/registry";
 import { getAnalyticsSummary } from "@/src/lib/analytics-db";
 import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
 import type { Metadata } from "next";
 
-import type { FleetStatus, StatCard } from "./OverviewClient";
+import type { StatCard } from "./OverviewClient";
 import { getTranslations } from "next-intl/server";
 
 async function loadStats(): Promise<StatCard[]> {
@@ -102,32 +100,6 @@ async function loadStats(): Promise<StatCard[]> {
   ];
 }
 
-/**
- * The agents, and whether each is answering.
- *
- * Paused is kept distinct from offline: "an operator switched it off" and "it stopped
- * responding" are different problems, and only one of them is an incident.
- */
-async function loadAgents(): Promise<FleetStatus> {
-  const paired = await listAgents();
-  // Routing is by row id everywhere, so the live registry is keyed the same way.
-  const live = new Map(connectedAgents().map((agent) => [agent.agentRowId, agent]));
-
-  return {
-    agents: paired.map((agent) => {
-      const status = live.get(agent.id)?.status ?? null;
-      return {
-        id: agent.id,
-        name: agent.name,
-        isPaused: !agent.enabled,
-        isConnected: live.has(agent.id),
-        mode: status?.mode ?? null,
-        version: status?.version ?? null,
-      };
-    }),
-  };
-}
-
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
   return { title: t("overview") };
@@ -143,7 +115,6 @@ export default async function OverviewPage() {
       <OverviewClient
         userName={session.user.name ?? session.user.email ?? "User"}
         stats={[]}
-        fleet={null}
         trafficSummary={null}
         recentEvents={[]}
         isAdmin={false}
@@ -151,17 +122,16 @@ export default async function OverviewPage() {
     );
   }
 
-  const [stats, fleet, trafficSummary, recentEventsRaw, serverEventCountRows] = await Promise.all([
+  const [stats, trafficSummary, recentEventsRaw, serverEventCountRows] = await Promise.all([
     loadStats(),
-    loadAgents(),
     getAnalyticsSummary(
       Math.floor(Date.now() / 1000) - 86400,
       Math.floor(Date.now() / 1000),
       [],
     ).catch(() => null),
-    // The server-event pane. Rendered on the server because it is the one band that
-    // does not follow the range control - and the one that has something to show on
-    // an install where access logging was never switched on.
+    // The server-event log. Rendered on the server because it is the one band that does
+    // not follow the range control - and the one with something to show on an install
+    // where access logging was never switched on.
     db
       .select({
         id: auditEvents.id,
@@ -188,7 +158,6 @@ export default async function OverviewPage() {
     <OverviewClient
       userName={session.user.name ?? session.user.email ?? "Admin"}
       stats={stats}
-      fleet={fleet}
       trafficSummary={trafficSummary}
       isAdmin={true}
       serverEventCount={serverEventCountRows[0]?.value ?? 0}

@@ -22,7 +22,11 @@ const TIMELINE: OverviewPayload["timeline"] = (() => {
   }));
 })();
 
-/** Rows as `traffic_events` stores them - no upstream and no duration, because it holds neither. */
+/**
+ * Rows as `traffic_events` stores them - no upstream and no duration, because it holds
+ * neither. The audit timestamps below are interleaved with these on purpose: the log
+ * blends both, and a demo where every change sorted above every request would not show it.
+ */
 const EVENTS: OverviewPayload["events"] = [
   {
     ts: 1770811200,
@@ -119,9 +123,9 @@ const PREVIEW: OverviewPayload = {
  * The dashboard's own landing page, which is what the product looks like on an ordinary morning.
  *
  * It takes every number as a prop - including the traffic window, which the real page fetches -
- * and imports no server action, so it runs here unchanged. The tiles, the chart, the agents card
- * and both logs are the components that ship; selecting a tile re-plots the chart and re-filters
- * the request log exactly as it does in the product.
+ * and imports no server action, so it runs here unchanged. The tiles, the chart and the log are
+ * the components that ship: the chart overlays every series until a tile is picked, and picking
+ * one re-plots it and re-filters the log exactly as it does in the product.
  */
 export default function OverviewDemo() {
   return (
@@ -133,26 +137,6 @@ export default function OverviewDemo() {
           { label: "Certificates", icon: "certificates", count: 9, href: "#" },
           { label: "Access lists", icon: "accessLists", count: 3, href: "#" },
         ]}
-        fleet={{
-          agents: [
-            {
-              id: 1,
-              name: "edge-01",
-              isPaused: false,
-              isConnected: true,
-              mode: "managed",
-              version: "3.0.0-beta.8",
-            },
-            {
-              id: 2,
-              name: "edge-fra",
-              isPaused: false,
-              isConnected: false,
-              mode: null,
-              version: null,
-            },
-          ],
-        }}
         trafficSummary={{ totalRequests: 68_620, blockedPercent: 0.6 }}
         serverEventCount={17}
         previewPayload={PREVIEW}
@@ -163,7 +147,7 @@ export default function OverviewDemo() {
             entityType: "proxy_host",
             actor: "avery",
             summary: "Enabled the WAF on grafana.example.com",
-            createdAt: "2026-02-11T16:42:07.000Z",
+            createdAt: "2026-02-11T11:59:59.000Z",
           },
           {
             id: 8,
@@ -171,7 +155,7 @@ export default function OverviewDemo() {
             entityType: "proxy_host",
             actor: "avery",
             summary: "Added upstream http://app-2:8080 to app.example.com",
-            createdAt: "2026-02-11T11:20:31.000Z",
+            createdAt: "2026-02-11T11:59:56.000Z",
           },
           {
             id: 7,
@@ -179,7 +163,7 @@ export default function OverviewDemo() {
             entityType: "l4_proxy_host",
             actor: "avery",
             summary: "Created L4 proxy host postgres (5432/tcp)",
-            createdAt: "2026-02-10T19:55:02.000Z",
+            createdAt: "2026-02-11T11:59:50.000Z",
           },
           {
             id: 6,
@@ -187,7 +171,7 @@ export default function OverviewDemo() {
             entityType: "certificate",
             actor: null,
             summary: "Issued client certificate backup-runner",
-            createdAt: "2026-02-10T14:12:48.000Z",
+            createdAt: "2026-02-11T11:59:46.000Z",
           },
           {
             id: 5,
@@ -195,7 +179,7 @@ export default function OverviewDemo() {
             entityType: "access_list",
             actor: "avery",
             summary: "Removed old-laptop from the Staging access list",
-            createdAt: "2026-02-09T09:31:10.000Z",
+            createdAt: "2026-02-11T11:59:42.000Z",
           },
         ]}
       />

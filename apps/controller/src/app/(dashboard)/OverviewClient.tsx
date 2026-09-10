@@ -1,17 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ApexOptions } from "apexcharts";
-import {
-  ArrowLeftRight,
-  BarChart2,
-  Gauge,
-  History,
-  KeyRound,
-  Server,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowLeftRight, BarChart2, Gauge, History, KeyRound, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -22,7 +14,6 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
 import { Link as AstryxLink } from "@astryxdesign/core/Link";
-import { List, ListItem } from "@astryxdesign/core/List";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { SelectableCard } from "@astryxdesign/core/SelectableCard";
 import { Spinner } from "@astryxdesign/core/Spinner";
@@ -32,7 +23,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
-import { useChartTheme } from "./analytics/chart-theme";
+import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
 
 // ApexCharts renders on the client only, for the reason given in AnalyticsClient: v7's
 // server entry is an async Server Component this file cannot reach, and there is nothing
@@ -69,21 +60,6 @@ export type RecentEvent = {
   actor: string | null;
   summary: string;
   createdAt: string;
-};
-
-export type FleetAgent = {
-  id: number;
-  name: string;
-  /** Paired but switched off by an operator, which is not the same as unreachable. */
-  isPaused: boolean;
-  isConnected: boolean;
-  /** Null until the agent has reported, which a paused or offline one never has. */
-  mode: string | null;
-  version: string | null;
-};
-
-export type FleetStatus = {
-  agents: FleetAgent[];
 };
 
 type TrafficSummary = {
@@ -138,7 +114,7 @@ type Interval = (typeof INTERVALS)[number];
 
 type MetricKey =
   | "requests"
-  | "serverLog"
+  | "serverEvents"
   | "serverErrors"
   | "clientErrors"
   | "bandwidth"
@@ -151,10 +127,15 @@ type MetricKey =
  * the chart plots - both drawn from the same window, so a tile's number, its line and
  * its rows are always the same population.
  *
- * `serverLog` is the exception: it has no traffic series of its own, so it leaves the
- * chart and the request pane alone and highlights the server-event pane instead. Audit
- * rows are not bucketed over time anywhere in the schema, and inventing a series for
- * them would be the only fabricated thing on this page.
+ * With no tile selected every series is plotted at once, which is the page's resting
+ * state; selecting one narrows the chart and the log to it, and selecting it again
+ * returns to the overlay. `color` is fixed per metric rather than per position so a
+ * series keeps the same colour whether it is alone or one line among five.
+ *
+ * `serverEvents` is the exception: it has no traffic series of its own, so it narrows
+ * the log to controller changes and leaves the chart on the overlay. Audit rows are not
+ * bucketed over time anywhere in the schema, and inventing a series for them would be
+ * the only fabricated thing on this page.
  */
 type MetricDef = {
   key: MetricKey;
@@ -163,31 +144,45 @@ type MetricDef = {
     | keyof Pick<TimelineBucket, "total" | "blocked" | "clientErrors" | "serverErrors" | "bytes">
     | null;
   format: "count" | "bytes";
+  /** Set on every metric that has a series; there is one colour per line in the overlay. */
+  color?: keyof ChartTheme["series"];
 };
 
 const METRICS: MetricDef[] = [
-  { key: "requests", filter: "all", series: "total", format: "count" },
-  { key: "serverLog", filter: "all", series: null, format: "count" },
+  { key: "requests", filter: "all", series: "total", format: "count", color: "blue" },
+  { key: "serverEvents", filter: "all", series: null, format: "count" },
   {
     key: "serverErrors",
     filter: "server-errors",
     series: "serverErrors",
     format: "count",
+    color: "red",
   },
   {
     key: "clientErrors",
     filter: "client-errors",
     series: "clientErrors",
     format: "count",
+    color: "orange",
   },
   {
     key: "bandwidth",
     filter: "largest",
     series: "bytes",
     format: "bytes",
+    color: "purple",
   },
-  { key: "blocked", filter: "blocked", series: "blocked", format: "count" },
+  { key: "blocked", filter: "blocked", series: "blocked", format: "count", color: "cyan" },
 ];
+
+/** The metrics the chart can draw - everything except the one with no series. */
+type PlottedMetric = MetricDef & {
+  series: NonNullable<MetricDef["series"]>;
+  color: NonNullable<MetricDef["color"]>;
+};
+const PLOTTABLE: PlottedMetric[] = METRICS.filter(
+  (m): m is PlottedMetric => m.series !== null && m.color !== undefined,
+);
 
 /** Bytes as the log shows them, so a row and its tile agree on the unit. */
 function formatBytes(bytes: number): string {
@@ -196,16 +191,6 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return new Date(iso).toLocaleDateString();
 }
 
 /** A bucket label short enough for an axis, at the resolution the range implies. */
@@ -248,20 +233,13 @@ function matchesFilter(filter: MetricDef["filter"]): (event: TrafficEvent) => bo
   }
 }
 
-/** StatusDot carries a label as well as colour, so the change kind reaches screen readers. */
-function getEventStatus(action: string): {
-  variant: "success" | "error" | "accent";
-  label: string;
-} {
-  const lower = action.toLowerCase();
-  if (lower.startsWith("delete") || lower.startsWith("remove")) {
-    return { variant: "error", label: "Removal" };
-  }
-  if (lower.startsWith("create") || lower.startsWith("add")) {
-    return { variant: "success", label: "Creation" };
-  }
-  return { variant: "accent", label: "Change" };
-}
+/** Audit actions, coloured the way the status codes beside them are. */
+const AUDIT_VARIANT: Record<string, "success" | "error" | "info"> = {
+  create: "success",
+  add: "success",
+  delete: "error",
+  remove: "error",
+};
 
 function Tile({
   label,
@@ -294,7 +272,6 @@ function Tile({
 export default function OverviewClient({
   userName,
   stats,
-  fleet,
   trafficSummary,
   recentEvents,
   serverEventCount = 0,
@@ -303,8 +280,6 @@ export default function OverviewClient({
 }: {
   userName: string;
   stats: StatCard[];
-  /** Null for a non-admin, who is not shown the fleet card at all. */
-  fleet: FleetStatus | null;
   trafficSummary: TrafficSummary;
   recentEvents: RecentEvent[];
   /** Audit rows in the last 24 hours, for the Server log tile. */
@@ -324,31 +299,43 @@ export default function OverviewClient({
   const chartTheme = useChartTheme();
 
   const [interval, setIntervalValue] = useState<Interval>("24h");
-  const [metricKey, setMetricKey] = useState<MetricKey>("requests");
+  // Null is the resting state: no tile is picked out, so the chart carries every series
+  // and the log carries everything the server did.
+  const [metricKey, setMetricKey] = useState<MetricKey | null>(null);
   const [payload, setPayload] = useState<OverviewPayload | null>(previewPayload ?? null);
   const [isLoading, setIsLoading] = useState(isAdmin && !previewPayload);
   const [hasFailed, setHasFailed] = useState(false);
 
-  const metric = METRICS.find((m) => m.key === metricKey) ?? METRICS[0];
+  const metric = metricKey === null ? null : (METRICS.find((m) => m.key === metricKey) ?? null);
+  const filter = metric?.filter ?? "all";
+  // The one tile whose rows come from Postgres rather than the traffic window.
+  const isEventsOnly = metricKey === "serverEvents";
+  // Requests, and the unfiltered view it is the tile for, are the whole log: traffic and
+  // controller changes interleaved. Every other traffic tile is a slice of the requests,
+  // which a controller change is not part of.
+  const blendsEvents = metricKey === null || metricKey === "requests";
 
   // next-intl types t() against the catalog, so the key has to be a literal here
   // rather than carried on the metric definition.
-  const metricLabel = (key: MetricKey): string => {
-    switch (key) {
-      case "requests":
-        return t("metricRequests");
-      case "serverLog":
-        return t("metricServerLog");
-      case "serverErrors":
-        return t("metricServerErrors");
-      case "clientErrors":
-        return t("metricClientErrors");
-      case "bandwidth":
-        return t("metricBandwidth");
-      case "blocked":
-        return t("metricBlocked");
-    }
-  };
+  const metricLabel = useCallback(
+    (key: MetricKey): string => {
+      switch (key) {
+        case "requests":
+          return t("metricRequests");
+        case "serverEvents":
+          return t("metricServerEvents");
+        case "serverErrors":
+          return t("metricServerErrors");
+        case "clientErrors":
+          return t("metricClientErrors");
+        case "bandwidth":
+          return t("metricBandwidth");
+        case "blocked":
+          return t("metricBlocked");
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -361,7 +348,7 @@ export default function OverviewClient({
     }
     const abort = new AbortController();
     setIsLoading(true);
-    const params = new URLSearchParams({ interval, filter: metric.filter, limit: "40" });
+    const params = new URLSearchParams({ interval, filter, limit: "40" });
     fetch(`/api/analytics/overview?${params.toString()}`, { signal: abort.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
       .then((json: OverviewPayload) => {
@@ -377,34 +364,50 @@ export default function OverviewClient({
         setIsLoading(false);
       });
     return () => abort.abort();
-  }, [isAdmin, interval, metric.filter, previewPayload]);
+  }, [isAdmin, interval, filter, previewPayload]);
 
   const rangeSeconds = RANGE_SECONDS[interval];
   const timeline = payload?.timeline ?? [];
 
-  // Resolved outside the memo: metricLabel is rebuilt every render, so depending on it
-  // would make the memo recompute every time anyway.
-  const seriesName = metric.series ? metricLabel(metric.key) : t("metricRequests");
-  const chartSeries = useMemo(() => {
-    const field = metric.series ?? "total";
-    return [{ name: seriesName, data: timeline.map((b) => b[field]) }];
-  }, [metric.series, timeline, seriesName]);
+  /**
+   * The series on the chart: the selected tile's alone, or all of them.
+   *
+   * A tile with no series of its own leaves the overlay up rather than blanking the
+   * chart - the log is what that tile is really for.
+   */
+  const plotted = useMemo<PlottedMetric[]>(() => {
+    const selected = PLOTTABLE.find((m) => m.key === metricKey);
+    return selected ? [selected] : PLOTTABLE;
+  }, [metricKey]);
+  const isOverlay = plotted.length > 1;
 
-  const chartOptions: ApexOptions = useMemo(
-    () => ({
+  const chartSeries = useMemo(
+    () =>
+      plotted.map((m) => ({
+        name: metricLabel(m.key),
+        data: timeline.map((b) => b[m.series]),
+      })),
+    [plotted, timeline, metricLabel],
+  );
+
+  const chartOptions: ApexOptions = useMemo(() => {
+    // Every count series reads off one axis, so a glance compares them honestly. Bytes
+    // cannot share that scale, so bandwidth takes the right-hand one instead.
+    const countAxis = chartSeries[plotted.findIndex((m) => m.format === "count")]?.name;
+    return {
       ...chartTheme.base,
-      chart: { ...chartTheme.base.chart, type: "area", stacked: false, id: "overview" },
-      colors: [
-        metric.key === "serverErrors" || metric.key === "blocked"
-          ? chartTheme.series.red
-          : metric.key === "clientErrors"
-            ? chartTheme.series.orange
-            : chartTheme.series.blue,
-      ],
-      fill: {
-        type: "gradient",
-        gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 },
+      chart: {
+        ...chartTheme.base.chart,
+        // Five filled areas on top of each other is mud; alone, the fill is what makes
+        // the shape readable at 220px.
+        type: isOverlay ? "line" : "area",
+        stacked: false,
+        id: "overview",
       },
+      colors: plotted.map((m) => chartTheme.series[m.color]),
+      fill: isOverlay
+        ? { type: "solid" }
+        : { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 } },
       stroke: { curve: "smooth", width: 2 },
       dataLabels: { enabled: false },
       xaxis: {
@@ -413,25 +416,70 @@ export default function OverviewClient({
         axisBorder: { show: false },
         axisTicks: { show: false },
       },
-      yaxis: {
+      // One entry per series, which is how ApexCharts pairs them. Pointing the count
+      // series at a single `seriesName` is what makes them share a scale rather than
+      // each getting its own.
+      yaxis: plotted.map((m, index) => ({
+        opposite: m.format === "bytes",
+        seriesName: m.format === "bytes" ? chartSeries[index]?.name : countAxis,
+        show: m.format === "bytes" || chartSeries[index]?.name === countAxis,
         labels: {
           style: { colors: chartTheme.labelColor },
           formatter: (value: number) =>
-            metric.format === "bytes" ? formatBytes(value) : Math.round(value).toLocaleString(),
+            m.format === "bytes" ? formatBytes(value) : Math.round(value).toLocaleString(),
+        },
+      })),
+      legend: {
+        show: isOverlay,
+        position: "bottom",
+        horizontalAlign: "left",
+        labels: { colors: chartTheme.labelColor },
+        // Two axes means two series groups, which ApexCharts otherwise stacks as separate
+        // legend blocks - five names down the side of a 260px chart. One flat row instead.
+        clusterGroupedSeries: false,
+      },
+      tooltip: {
+        theme: chartTheme.mode,
+        shared: true,
+        intersect: false,
+        // Shared tooltip, mixed units: the formatter has to ask which series it is on.
+        y: {
+          formatter: (value: number, opts?: { seriesIndex: number }) =>
+            plotted[opts?.seriesIndex ?? 0]?.format === "bytes"
+              ? formatBytes(value)
+              : Math.round(value).toLocaleString(),
         },
       },
-      legend: { show: false },
-      tooltip: { theme: chartTheme.mode, shared: true, intersect: false },
-    }),
-    [chartTheme, metric, timeline, rangeSeconds],
-  );
+    };
+  }, [chartTheme, plotted, chartSeries, isOverlay, timeline, rangeSeconds]);
 
-  const eventColumns: TableColumn<TrafficEvent & { id: string }>[] = useMemo(
+  /**
+   * One row of the server log, whichever store it came from.
+   *
+   * The two are interleaved rather than shown side by side, so "what was the server
+   * doing when this broke" is one read: a config change and the 502s that followed it
+   * land next to each other instead of in two panes with different clocks.
+   */
+  type LogRow =
+    | ({ kind: "traffic"; id: string } & TrafficEvent)
+    | {
+        kind: "event";
+        id: string;
+        ts: number;
+        action: string;
+        entityType: string;
+        actor: string | null;
+        summary: string;
+      };
+
+  const logColumns: TableColumn<LogRow>[] = useMemo(
     () => [
       {
         key: "ts",
         header: t("logTime"),
-        width: pixel(96),
+        // Wide enough for a 12-hour clock with seconds and a meridiem, which is the
+        // longest this renders in any locale; below that the "AM" wraps to its own line.
+        width: pixel(116),
         renderCell: (row) => (
           <Text type="code" size="sm" color="secondary">
             {new Date(row.ts * 1000).toLocaleTimeString()}
@@ -439,68 +487,93 @@ export default function OverviewClient({
         ),
       },
       {
-        key: "status",
+        // One column for "what happened": an HTTP status, or the kind of change.
+        key: "what",
         header: t("logStatus"),
-        width: pixel(76),
-        renderCell: (row) => (
-          <HStack gap={1} vAlign="center">
-            <Badge
-              variant={row.status >= 500 ? "error" : row.status >= 400 ? "warning" : "success"}
-              label={String(row.status)}
-            />
-            {row.isBlocked && <StatusDot variant="error" label={t("logBlocked")} />}
-          </HStack>
-        ),
+        width: pixel(104),
+        renderCell: (row) =>
+          row.kind === "traffic" ? (
+            <HStack gap={1} vAlign="center">
+              <Badge
+                variant={row.status >= 500 ? "error" : row.status >= 400 ? "warning" : "success"}
+                label={String(row.status)}
+              />
+              {row.isBlocked && <StatusDot variant="error" label={t("logBlocked")} />}
+            </HStack>
+          ) : (
+            <Badge variant={AUDIT_VARIANT[row.action] ?? "info"} label={row.action} />
+          ),
       },
       {
-        key: "method",
-        header: t("logMethod"),
-        width: pixel(64),
-        renderCell: (row) => (
-          <Text type="code" size="sm" color="secondary">
-            {row.method}
-          </Text>
-        ),
-      },
-      {
-        key: "request",
-        header: t("logRequest"),
+        key: "detail",
+        header: t("logDetail"),
         width: proportional(1),
-        renderCell: (row) => (
-          <VStack gap={0}>
-            <Text type="code" size="sm" maxLines={1}>
-              {row.host}
-              {row.uri}
-            </Text>
-            {/* The rest of what traffic_events stores. On one line because the pane
-                shares its row with the server-event log and cannot carry nine columns. */}
-            <Text type="body" size="xsm" color="secondary" maxLines={1}>
-              {formatBytes(row.bytesSent)} &middot; {row.proto || emptyValue} &middot;{" "}
-              {row.countryCode ?? emptyValue} &middot; {row.clientIp}
-            </Text>
-          </VStack>
-        ),
+        renderCell: (row) =>
+          row.kind === "traffic" ? (
+            <VStack gap={0}>
+              <Text type="code" size="sm" maxLines={1}>
+                {row.method} {row.host}
+                {row.uri}
+              </Text>
+              {/* The rest of what traffic_events stores, on one line: nine columns will
+                  not fit a table that also has to carry audit rows. */}
+              <Text type="body" size="xsm" color="secondary" maxLines={1}>
+                {formatBytes(row.bytesSent)} &middot; {row.proto || emptyValue} &middot;{" "}
+                {row.countryCode ?? emptyValue} &middot; {row.clientIp}
+              </Text>
+            </VStack>
+          ) : (
+            <VStack gap={0}>
+              <Text type="body" size="sm" maxLines={1}>
+                {row.summary}
+              </Text>
+              <Text type="body" size="xsm" color="secondary" maxLines={1}>
+                {row.actor ?? t("actorSystem")} &middot; {row.entityType}
+              </Text>
+            </VStack>
+          ),
       },
     ],
     [t, emptyValue],
   );
 
-  const eventRows = useMemo(() => {
-    let rows = payload?.events ?? [];
+  const logRows = useMemo<LogRow[]>(() => {
+    let traffic = isEventsOnly ? [] : (payload?.events ?? []);
     // A supplied window arrives whole, so the tile's slice is taken here instead of by
     // the query that would otherwise have applied it. Without this the docs demo would
     // retitle the pane on a tile change and then show the same rows underneath.
-    if (previewPayload) {
-      rows = rows.filter(matchesFilter(metric.filter));
-      if (metric.filter === "largest") {
-        rows = [...rows].sort((a, b) => b.bytesSent - a.bytesSent);
+    if (previewPayload && !isEventsOnly) {
+      traffic = traffic.filter(matchesFilter(filter));
+      if (filter === "largest") {
+        traffic = [...traffic].sort((a, b) => b.bytesSent - a.bytesSent);
       }
     }
-    return rows.map((event, index) => ({ ...event, id: `${event.ts}-${index}` }));
-  }, [payload, previewPayload, metric.filter]);
+    const trafficRows: LogRow[] = traffic.map((event, index) => ({
+      ...event,
+      kind: "traffic",
+      id: `t-${event.ts}-${index}`,
+    }));
+
+    if (!blendsEvents && !isEventsOnly) return trafficRows;
+
+    const eventRows: LogRow[] = recentEvents.map((event) => ({
+      kind: "event",
+      id: `e-${event.id}`,
+      ts: Math.floor(new Date(event.createdAt).getTime() / 1000),
+      action: event.action,
+      entityType: event.entityType,
+      actor: event.actor,
+      summary: event.summary,
+    }));
+    if (isEventsOnly) return eventRows;
+
+    // Largest-first is a bandwidth question, not a timeline one, and that tile never
+    // blends; everything that reaches here is newest first.
+    return [...trafficRows, ...eventRows].sort((a, b) => b.ts - a.ts);
+  }, [payload, previewPayload, filter, isEventsOnly, blendsEvents, recentEvents]);
 
   const tileValue = (key: MetricKey): string => {
-    if (key === "serverLog") return serverEventCount.toLocaleString();
+    if (key === "serverEvents") return serverEventCount.toLocaleString();
     if (!payload) return emptyValue;
     switch (key) {
       case "requests":
@@ -607,171 +680,79 @@ export default function OverviewClient({
             label={metricLabel(m.key)}
             value={tileValue(m.key)}
             isSelected={m.key === metricKey}
-            onSelect={() => setMetricKey(m.key)}
+            // Selecting the tile that is already on clears it, which puts the chart back
+            // on every series and the log back on everything.
+            onSelect={() => setMetricKey((current) => (current === m.key ? null : m.key))}
           />
         ))}
       </Grid>
 
-      {/* The chart, and the agents answering for it. An empty chart with every agent
-          connected is a quiet day; an empty chart with one offline is an incident.
-
-          A flex row rather than a Grid: Astryx's Grid only lays out equal columns, and the
-          chart needs two thirds against the agent list's one. Growing from a zero basis is
-          what makes the split exactly 2:1 - with a non-zero basis the ratio only applies to
-          the leftover space - and the min-widths are what make the pair wrap to full width
-          on a narrow viewport instead of crushing the list. */}
-      <HStack gap={3} vAlign="stretch" wrap="wrap">
-        <div style={{ flex: "2 1 0%", minWidth: 420, display: "flex", flexDirection: "column" }}>
-          <Card padding={5} height="100%">
-            <VStack gap={3}>
-              <HStack justify="between" vAlign="center" gap={2}>
-                <HStack gap={2} vAlign="center">
-                  <Icon
-                    icon={metric.key === "bandwidth" ? Gauge : BarChart2}
-                    size="sm"
-                    color="accent"
-                  />
-                  <Heading level={2} accessibilityLevel={2}>
-                    {metric.series ? metricLabel(metric.key) : t("metricRequests")}
-                  </Heading>
-                </HStack>
-                <HStack gap={3} vAlign="center">
-                  {isLoading && <Spinner label={t("loading")} size="sm" />}
-                  {/* The overview answers "is anything off"; the analytics page is where a
-                  question this chart raises gets followed up. */}
-                  <AstryxLink href="/analytics">{t("viewAnalytics")}</AstryxLink>
-                </HStack>
-              </HStack>
-              {timeline.length === 0 ? (
-                <EmptyState title={t("periodEmptyTitle")} isCompact />
-              ) : (
-                <div style={{ overflowX: "auto", width: "100%" }}>
-                  <ReactApexChart
-                    type="area"
-                    series={chartSeries}
-                    options={chartOptions}
-                    height={220}
-                  />
-                </div>
-              )}
-            </VStack>
-          </Card>
-        </div>
-
-        <div style={{ flex: "1 1 0%", minWidth: 260, display: "flex", flexDirection: "column" }}>
-          {/* height 100% on both cards: the columns are already stretched to the row, but a
-              card only fills its column if told to, and a short agent list would otherwise
-              leave the card floating with dead space under it. */}
-          <Card padding={5} height="100%">
-            <VStack gap={3}>
-              <HStack gap={2} vAlign="center">
-                <Icon icon={Server} size="sm" color="accent" />
-                <Heading level={2} accessibilityLevel={2}>
-                  {t("agentsTitle")}
-                </Heading>
-              </HStack>
-              {fleet && fleet.agents.length === 0 ? (
-                <EmptyState title={t("agentsEmpty")} isCompact />
-              ) : (
-                <List hasDividers>
-                  {(fleet?.agents ?? []).map((agent) => (
-                    <ListItem
-                      key={agent.id}
-                      startContent={
-                        <StatusDot
-                          variant={
-                            agent.isPaused ? "neutral" : agent.isConnected ? "success" : "error"
-                          }
-                          label={
-                            agent.isPaused
-                              ? t("agentPaused")
-                              : agent.isConnected
-                                ? t("agentConnected")
-                                : t("agentOffline")
-                          }
-                        />
-                      }
-                      label={agent.name}
-                      // A paused or offline agent has never reported, so there is no mode or
-                      // version to show for one - say why it is quiet instead.
-                      description={
-                        agent.isPaused
-                          ? t("agentPaused")
-                          : agent.isConnected
-                            ? [agent.mode, agent.version].filter(Boolean).join(" · ")
-                            : t("agentOffline")
-                      }
-                    />
-                  ))}
-                </List>
-              )}
-            </VStack>
-          </Card>
-        </div>
-      </HStack>
-
-      {/* Two logs side by side: proxied traffic, and what changed on this controller. */}
-      <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
-        <Card padding={5}>
-          <VStack gap={3}>
-            <HStack justify="between" vAlign="center" gap={2}>
+      {/* The series the selected tile plots, then the rows behind it. Each takes a
+          row of its own: the chart wants width to be read, and the log wants it more. */}
+      <Card padding={5}>
+        <VStack gap={3}>
+          <HStack justify="between" vAlign="center" gap={2}>
+            <HStack gap={2} vAlign="center">
+              <Icon icon={metricKey === "bandwidth" ? Gauge : BarChart2} size="sm" color="accent" />
               <Heading level={2} accessibilityLevel={2}>
-                {t("requestLog")}
+                {isOverlay ? t("metricAll") : metricLabel(plotted[0].key)}
               </Heading>
-              <Badge variant="neutral" label={metricLabel(metric.key)} />
             </HStack>
-            {eventRows.length === 0 ? (
-              <EmptyState title={t("requestLogEmptyTitle")} isCompact />
-            ) : (
-              <div style={{ overflowX: "auto", width: "100%" }}>
-                <Table data={eventRows} columns={eventColumns} idKey="id" />
-              </div>
-            )}
-            <Text type="body" size="xsm" color="secondary">
-              {t("requestLogSource")}
-            </Text>
-          </VStack>
-        </Card>
+            <HStack gap={3} vAlign="center">
+              {isLoading && <Spinner label={t("loading")} size="sm" />}
+              {/* The overview answers "is anything off"; the analytics page is where a
+              question this chart raises gets followed up. */}
+              <AstryxLink href="/analytics">{t("viewAnalytics")}</AstryxLink>
+            </HStack>
+          </HStack>
+          {timeline.length === 0 ? (
+            <EmptyState title={t("periodEmptyTitle")} isCompact />
+          ) : (
+            <ReactApexChart
+              type={isOverlay ? "line" : "area"}
+              series={chartSeries}
+              options={chartOptions}
+              height={isOverlay ? 260 : 220}
+            />
+          )}
+        </VStack>
+      </Card>
 
-        <Card padding={5}>
-          <VStack gap={3}>
-            <HStack justify="between" vAlign="center" gap={2}>
-              <HStack gap={2} vAlign="center">
-                <Icon icon={History} size="sm" color="accent" />
-                <Heading level={2} accessibilityLevel={2}>
-                  {t("serverEvents")}
-                </Heading>
-              </HStack>
-              {metricKey === "serverLog" && <Badge variant="info" label={t("metricServerLog")} />}
+      {/* One log for the whole server: requests and controller changes interleaved, with
+          the tile row picking which of them it holds. */}
+      <Card padding={5}>
+        <VStack gap={3}>
+          <HStack justify="between" vAlign="center" gap={2}>
+            <HStack gap={2} vAlign="center">
+              <Icon icon={History} size="sm" color="accent" />
+              <Heading level={2} accessibilityLevel={2}>
+                {t("logTitle")}
+              </Heading>
             </HStack>
-            {recentEvents.length === 0 ? (
-              <EmptyState title={t("activityEmptyMessage")} isCompact />
-            ) : (
-              <List hasDividers>
-                {recentEvents.map((event) => {
-                  const status = getEventStatus(event.action);
-                  return (
-                    <ListItem
-                      key={event.id}
-                      startContent={<StatusDot variant={status.variant} label={status.label} />}
-                      label={event.summary}
-                      description={`${event.actor ?? t("actorSystem")} · ${event.entityType}`}
-                      endContent={
-                        <Text type="body" size="xsm" color="secondary" hasTabularNumbers>
-                          {formatRelativeTime(event.createdAt)}
-                        </Text>
-                      }
-                    />
-                  );
-                })}
-              </List>
-            )}
-            <Text type="body" size="xsm" color="secondary">
-              {t("serverEventsSource")}
-            </Text>
-          </VStack>
-        </Card>
-      </Grid>
+            <Badge variant="neutral" label={metricKey ? metricLabel(metricKey) : t("metricAll")} />
+          </HStack>
+          {logRows.length === 0 ? (
+            <EmptyState
+              title={isEventsOnly ? t("activityEmptyMessage") : t("requestLogEmptyTitle")}
+              isCompact
+            />
+          ) : (
+            // Table brings its own scroll wrapper, and its two fixed columns and truncating
+            // third come to a 320px minimum, so it fits any card it can be read in. Wrapping
+            // it again in an overflow-x box only added a second scroller - and one axis set
+            // to `auto` turns the other from `visible` into `auto` too, which is where the
+            // stray vertical scrollbar came from.
+            <Table data={logRows} columns={logColumns} idKey="id" />
+          )}
+          <Text type="body" size="xsm" color="secondary">
+            {isEventsOnly
+              ? t("logSourceEvents")
+              : blendsEvents
+                ? t("logSourceBoth")
+                : t("logSourceTraffic")}
+          </Text>
+        </VStack>
+      </Card>
 
       {/* Kept so the 24h headline stays on the page even when a longer range is selected. */}
       {trafficSummary && trafficSummary.totalRequests > 0 && (
