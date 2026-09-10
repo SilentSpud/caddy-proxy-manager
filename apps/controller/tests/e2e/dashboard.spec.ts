@@ -96,16 +96,14 @@ test.describe('Dashboard home page', () => {
     await expect(page.getByText(/Recorded whether or not access logging is on/i)).toBeVisible();
   });
 
-  test('shows the hosts and agents card between the two logs', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Hosts and agents', level: 2 })).toBeVisible();
-    // Scoped to main: the sidebar has its own "Proxy Hosts" link.
-    await expect(page.getByRole('main').getByText('L4 proxy hosts', { exact: true })).toBeVisible();
-    // Counts render whether or not anything is configured, so this holds on a fresh stack.
+  test('shows the agents card beside the chart', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Agents', level: 2 })).toBeVisible();
+  });
+
+  test('the Proxy Hosts shortcut counts enabled against the total', async ({ page }) => {
+    // A disabled host still exists, so the card names both numbers.
     await expect(
-      page
-        .getByRole('main')
-        .getByText(/^\d+ of \d+ enabled$/)
-        .first(),
+      page.getByRole('link', { name: /^Proxy Hosts:\s*\d+ of \d+ enabled$/ }),
     ).toBeVisible();
   });
 

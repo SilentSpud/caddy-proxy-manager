@@ -1,14 +1,7 @@
 import db, { toIso } from "@/src/lib/db";
 import { requireUser } from "@/src/lib/auth";
 import OverviewClient from "./OverviewClient";
-import {
-  accessLists,
-  auditEvents,
-  certificates,
-  l4ProxyHosts,
-  proxyHosts,
-  users,
-} from "@/src/lib/db/schema";
+import { accessLists, auditEvents, certificates, proxyHosts, users } from "@/src/lib/db/schema";
 import { count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { listAgents } from "@/src/lib/models/agents";
 import { connectedAgents } from "@/src/lib/agent/registry";
@@ -20,32 +13,37 @@ import type { FleetStatus, StatCard } from "./OverviewClient";
 import { getTranslations } from "next-intl/server";
 
 async function loadStats(): Promise<StatCard[]> {
-  const [proxyHostCountResult, acmeRows, certRows, importedCertCountResult, accessListCountResult] =
-    await Promise.all([
-      db.select({ value: count() }).from(proxyHosts),
-      // All proxy hosts with no explicit cert (for ACME deduplication)
-      db
-        .select({ domains: proxyHosts.domains })
-        .from(proxyHosts)
-        .where(isNull(proxyHosts.certificateId)),
-      // All certs (for wildcard coverage check)
-      db
-        .select({
-          id: certificates.id,
-          type: certificates.type,
-          domainNames: certificates.domainNames,
-          certificatePem: certificates.certificatePem,
-        })
-        .from(certificates),
-      // Imported certs with actual PEM data (valid, user-managed)
-      db
-        .select({ value: count() })
-        .from(certificates)
-        .where(
-          sql`${certificates.type} = 'imported' AND ${certificates.certificatePem} IS NOT NULL`,
-        ),
-      db.select({ value: count() }).from(accessLists),
-    ]);
+  const [
+    proxyHostCountResult,
+    proxyHostEnabledResult,
+    acmeRows,
+    certRows,
+    importedCertCountResult,
+    accessListCountResult,
+  ] = await Promise.all([
+    db.select({ value: count() }).from(proxyHosts),
+    db.select({ value: count() }).from(proxyHosts).where(eq(proxyHosts.enabled, true)),
+    // All proxy hosts with no explicit cert (for ACME deduplication)
+    db
+      .select({ domains: proxyHosts.domains })
+      .from(proxyHosts)
+      .where(isNull(proxyHosts.certificateId)),
+    // All certs (for wildcard coverage check)
+    db
+      .select({
+        id: certificates.id,
+        type: certificates.type,
+        domainNames: certificates.domainNames,
+        certificatePem: certificates.certificatePem,
+      })
+      .from(certificates),
+    // Imported certs with actual PEM data (valid, user-managed)
+    db
+      .select({ value: count() })
+      .from(certificates)
+      .where(sql`${certificates.type} = 'imported' AND ${certificates.certificatePem} IS NOT NULL`),
+    db.select({ value: count() }).from(accessLists),
+  ]);
 
   // Build cert domain map for wildcard coverage checks
   const certDomainMap = new Map<number, string[]>();
@@ -85,7 +83,15 @@ async function loadStats(): Promise<StatCard[]> {
   // The icon travels as a name, not an element: a component cannot cross the
   // server/client boundary, and an element would carry its styling with it.
   return [
-    { label: "Proxy Hosts", icon: "proxyHosts", count: proxyHostsCount, href: "/proxy-hosts" },
+    {
+      label: "Proxy Hosts",
+      icon: "proxyHosts",
+      // A disabled host still holds its domain and still shows in the list, so the
+      // headline is what is actually being served and the total sits beside it.
+      count: proxyHostEnabledResult[0]?.value ?? 0,
+      total: proxyHostsCount,
+      href: "/proxy-hosts",
+    },
     {
       label: "Certificates",
       icon: "certificates",
@@ -97,29 +103,17 @@ async function loadStats(): Promise<StatCard[]> {
 }
 
 /**
- * What is configured and what is answering, for the fleet card.
+ * The agents, and whether each is answering.
  *
- * Deliberately only facts this controller already holds: how many hosts exist and how
- * many are switched on, and which paired agents currently have a live connection. Host
- * reachability is not among them - nothing in the schema records whether an upstream
- * answered, and asking every agent to probe on a dashboard render would be a fan-out of
- * subprocesses per page view.
+ * Paused is kept distinct from offline: "an operator switched it off" and "it stopped
+ * responding" are different problems, and only one of them is an incident.
  */
-async function loadFleet(): Promise<FleetStatus> {
-  const [httpTotal, httpEnabled, l4Total, l4Enabled, paired] = await Promise.all([
-    db.select({ value: count() }).from(proxyHosts),
-    db.select({ value: count() }).from(proxyHosts).where(eq(proxyHosts.enabled, true)),
-    db.select({ value: count() }).from(l4ProxyHosts),
-    db.select({ value: count() }).from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true)),
-    listAgents(),
-  ]);
-
+async function loadAgents(): Promise<FleetStatus> {
+  const paired = await listAgents();
   // Routing is by row id everywhere, so the live registry is keyed the same way.
   const live = new Map(connectedAgents().map((agent) => [agent.agentRowId, agent]));
 
   return {
-    proxyHosts: { total: httpTotal[0]?.value ?? 0, enabled: httpEnabled[0]?.value ?? 0 },
-    l4Hosts: { total: l4Total[0]?.value ?? 0, enabled: l4Enabled[0]?.value ?? 0 },
     agents: paired.map((agent) => {
       const status = live.get(agent.id)?.status ?? null;
       return {
@@ -159,7 +153,7 @@ export default async function OverviewPage() {
 
   const [stats, fleet, trafficSummary, recentEventsRaw, serverEventCountRows] = await Promise.all([
     loadStats(),
-    loadFleet(),
+    loadAgents(),
     getAnalyticsSummary(
       Math.floor(Date.now() / 1000) - 86400,
       Math.floor(Date.now() / 1000),

@@ -49,7 +49,14 @@ const STAT_ICONS = {
 export type StatCard = {
   label: string;
   icon: keyof typeof STAT_ICONS;
+  /** The headline number. Where `total` is set this is the enabled subset of it. */
   count: number;
+  /**
+   * The whole set, when "how many are switched on" is a different question from "how
+   * many exist" - a disabled proxy host still occupies a domain and still shows in the
+   * list, so a bare count would overstate what is being served.
+   */
+  total?: number;
   href: string;
 };
 
@@ -76,8 +83,6 @@ export type FleetAgent = {
 };
 
 export type FleetStatus = {
-  proxyHosts: { total: number; enabled: number };
-  l4Hosts: { total: number; enabled: number };
   agents: FleetAgent[];
 };
 
@@ -112,7 +117,7 @@ type TrafficEvent = {
   isBlocked: boolean;
 };
 
-type OverviewPayload = {
+export type OverviewPayload = {
   summary: {
     totalRequests: number;
     uniqueIps: number;
@@ -222,6 +227,27 @@ const RANGE_SECONDS: Record<Interval, number> = {
   "30d": 30 * 86400,
 };
 
+/**
+ * The tile filters, as a predicate.
+ *
+ * Only the preview path needs this - in the product the same slice is a WHERE clause in
+ * `queryTrafficEvents`, and the two are kept deliberately in step.
+ */
+function matchesFilter(filter: MetricDef["filter"]): (event: TrafficEvent) => boolean {
+  switch (filter) {
+    case "server-errors":
+      return (event) => event.status >= 500;
+    case "client-errors":
+      return (event) => event.status >= 400 && event.status < 500;
+    case "blocked":
+      return (event) => event.isBlocked;
+    case "largest":
+      return (event) => event.bytesSent > 0;
+    default:
+      return () => true;
+  }
+}
+
 /** StatusDot carries a label as well as colour, so the change kind reaches screen readers. */
 function getEventStatus(action: string): {
   variant: "success" | "error" | "accent";
@@ -253,7 +279,7 @@ function Tile({
   return (
     <SelectableCard label={label} isSelected={isSelected} onChange={onSelect} padding={4}>
       <VStack gap={1}>
-        <Text type="body" size="xsm" weight="semibold" color="secondary" maxLines={1}>
+        <Text type="body" size="sm" weight="semibold" color="secondary" maxLines={1}>
           {label}
         </Text>
         <Text type="large" weight="semibold" hasTabularNumbers>
@@ -272,6 +298,7 @@ export default function OverviewClient({
   trafficSummary,
   recentEvents,
   serverEventCount = 0,
+  previewPayload,
   isAdmin = true,
 }: {
   userName: string;
@@ -282,6 +309,14 @@ export default function OverviewClient({
   recentEvents: RecentEvent[];
   /** Audit rows in the last 24 hours, for the Server log tile. */
   serverEventCount?: number;
+  /**
+   * A window supplied by the caller instead of fetched.
+   *
+   * The docs site renders this component directly, with no API behind it. Without a way
+   * in, the demo would show the load-failure banner - and the alternative, a copy of this
+   * page kept in the docs, is exactly the thing that goes stale silently.
+   */
+  previewPayload?: OverviewPayload;
   isAdmin?: boolean;
 }) {
   const t = useTranslations("overview");
@@ -290,8 +325,8 @@ export default function OverviewClient({
 
   const [interval, setIntervalValue] = useState<Interval>("24h");
   const [metricKey, setMetricKey] = useState<MetricKey>("requests");
-  const [payload, setPayload] = useState<OverviewPayload | null>(null);
-  const [isLoading, setIsLoading] = useState(isAdmin);
+  const [payload, setPayload] = useState<OverviewPayload | null>(previewPayload ?? null);
+  const [isLoading, setIsLoading] = useState(isAdmin && !previewPayload);
   const [hasFailed, setHasFailed] = useState(false);
 
   const metric = METRICS.find((m) => m.key === metricKey) ?? METRICS[0];
@@ -317,6 +352,13 @@ export default function OverviewClient({
 
   useEffect(() => {
     if (!isAdmin) return;
+    // A supplied window is the whole dataset; there is nothing to fetch and nothing the
+    // range or tile controls could load, so they act on what is already here.
+    if (previewPayload) {
+      setPayload(previewPayload);
+      setIsLoading(false);
+      return;
+    }
     const abort = new AbortController();
     setIsLoading(true);
     const params = new URLSearchParams({ interval, filter: metric.filter, limit: "40" });
@@ -335,7 +377,7 @@ export default function OverviewClient({
         setIsLoading(false);
       });
     return () => abort.abort();
-  }, [isAdmin, interval, metric.filter]);
+  }, [isAdmin, interval, metric.filter, previewPayload]);
 
   const rangeSeconds = RANGE_SECONDS[interval];
   const timeline = payload?.timeline ?? [];
@@ -443,14 +485,19 @@ export default function OverviewClient({
     [t, emptyValue],
   );
 
-  const eventRows = useMemo(
-    () =>
-      (payload?.events ?? []).map((event, index) => ({
-        ...event,
-        id: `${event.ts}-${index}`,
-      })),
-    [payload],
-  );
+  const eventRows = useMemo(() => {
+    let rows = payload?.events ?? [];
+    // A supplied window arrives whole, so the tile's slice is taken here instead of by
+    // the query that would otherwise have applied it. Without this the docs demo would
+    // retitle the pane on a tile change and then show the same rows underneath.
+    if (previewPayload) {
+      rows = rows.filter(matchesFilter(metric.filter));
+      if (metric.filter === "largest") {
+        rows = [...rows].sort((a, b) => b.bytesSent - a.bytesSent);
+      }
+    }
+    return rows.map((event, index) => ({ ...event, id: `${event.ts}-${index}` }));
+  }, [payload, previewPayload, metric.filter]);
 
   const tileValue = (key: MetricKey): string => {
     if (key === "serverLog") return serverEventCount.toLocaleString();
@@ -522,17 +569,28 @@ export default function OverviewClient({
         {stats.map((stat) => (
           <ClickableCard
             key={stat.label}
-            label={`${stat.label}: ${stat.count}`}
+            label={
+              stat.total === undefined
+                ? `${stat.label}: ${stat.count}`
+                : `${stat.label}: ${t("statEnabledOf", { enabled: stat.count, total: stat.total })}`
+            }
             href={stat.href}
             padding={4}
           >
             <HStack gap={3} vAlign="center">
               <Icon icon={STAT_ICONS[stat.icon]} />
               <VStack gap={0}>
-                <Text type="display-3" hasTabularNumbers>
-                  {String(stat.count)}
-                </Text>
-                <Text type="body" size="xsm" color="secondary">
+                <HStack gap={1} vAlign="end">
+                  <Text type="display-3" hasTabularNumbers>
+                    {String(stat.count)}
+                  </Text>
+                  {stat.total !== undefined && (
+                    <Text type="body" size="sm" color="secondary" hasTabularNumbers>
+                      {t("statOfTotal", { total: stat.total })}
+                    </Text>
+                  )}
+                </HStack>
+                <Text type="body" size="sm" color="secondary">
                   {stat.label}
                 </Text>
               </VStack>
@@ -554,43 +612,106 @@ export default function OverviewClient({
         ))}
       </Grid>
 
-      <Card padding={5}>
-        <VStack gap={3}>
-          <HStack justify="between" vAlign="center" gap={2}>
-            <HStack gap={2} vAlign="center">
-              <Icon
-                icon={metric.key === "bandwidth" ? Gauge : BarChart2}
-                size="sm"
-                color="accent"
-              />
-              <Heading level={2} accessibilityLevel={2}>
-                {metric.series ? metricLabel(metric.key) : t("metricRequests")}
-              </Heading>
-            </HStack>
-            <HStack gap={3} vAlign="center">
-              {isLoading && <Spinner label={t("loading")} size="sm" />}
-              {/* The overview answers "is anything off"; the analytics page is where a
+      {/* The chart, and the agents answering for it. An empty chart with every agent
+          connected is a quiet day; an empty chart with one offline is an incident.
+
+          A flex row rather than a Grid: Astryx's Grid only lays out equal columns, and the
+          chart needs two thirds against the agent list's one. Growing from a zero basis is
+          what makes the split exactly 2:1 - with a non-zero basis the ratio only applies to
+          the leftover space - and the min-widths are what make the pair wrap to full width
+          on a narrow viewport instead of crushing the list. */}
+      <HStack gap={3} vAlign="stretch" wrap="wrap">
+        <div style={{ flex: "2 1 0%", minWidth: 420, display: "flex", flexDirection: "column" }}>
+          <Card padding={5} height="100%">
+            <VStack gap={3}>
+              <HStack justify="between" vAlign="center" gap={2}>
+                <HStack gap={2} vAlign="center">
+                  <Icon
+                    icon={metric.key === "bandwidth" ? Gauge : BarChart2}
+                    size="sm"
+                    color="accent"
+                  />
+                  <Heading level={2} accessibilityLevel={2}>
+                    {metric.series ? metricLabel(metric.key) : t("metricRequests")}
+                  </Heading>
+                </HStack>
+                <HStack gap={3} vAlign="center">
+                  {isLoading && <Spinner label={t("loading")} size="sm" />}
+                  {/* The overview answers "is anything off"; the analytics page is where a
                   question this chart raises gets followed up. */}
-              <AstryxLink href="/analytics">{t("viewAnalytics")}</AstryxLink>
-            </HStack>
-          </HStack>
-          {timeline.length === 0 ? (
-            <EmptyState title={t("periodEmptyTitle")} isCompact />
-          ) : (
-            <div style={{ overflowX: "auto", width: "100%" }}>
-              <ReactApexChart
-                type="area"
-                series={chartSeries}
-                options={chartOptions}
-                height={220}
-              />
-            </div>
-          )}
-        </VStack>
-      </Card>
+                  <AstryxLink href="/analytics">{t("viewAnalytics")}</AstryxLink>
+                </HStack>
+              </HStack>
+              {timeline.length === 0 ? (
+                <EmptyState title={t("periodEmptyTitle")} isCompact />
+              ) : (
+                <div style={{ overflowX: "auto", width: "100%" }}>
+                  <ReactApexChart
+                    type="area"
+                    series={chartSeries}
+                    options={chartOptions}
+                    height={220}
+                  />
+                </div>
+              )}
+            </VStack>
+          </Card>
+        </div>
+
+        <div style={{ flex: "1 1 0%", minWidth: 260, display: "flex", flexDirection: "column" }}>
+          {/* height 100% on both cards: the columns are already stretched to the row, but a
+              card only fills its column if told to, and a short agent list would otherwise
+              leave the card floating with dead space under it. */}
+          <Card padding={5} height="100%">
+            <VStack gap={3}>
+              <HStack gap={2} vAlign="center">
+                <Icon icon={Server} size="sm" color="accent" />
+                <Heading level={2} accessibilityLevel={2}>
+                  {t("agentsTitle")}
+                </Heading>
+              </HStack>
+              {fleet && fleet.agents.length === 0 ? (
+                <EmptyState title={t("agentsEmpty")} isCompact />
+              ) : (
+                <List hasDividers>
+                  {(fleet?.agents ?? []).map((agent) => (
+                    <ListItem
+                      key={agent.id}
+                      startContent={
+                        <StatusDot
+                          variant={
+                            agent.isPaused ? "neutral" : agent.isConnected ? "success" : "error"
+                          }
+                          label={
+                            agent.isPaused
+                              ? t("agentPaused")
+                              : agent.isConnected
+                                ? t("agentConnected")
+                                : t("agentOffline")
+                          }
+                        />
+                      }
+                      label={agent.name}
+                      // A paused or offline agent has never reported, so there is no mode or
+                      // version to show for one - say why it is quiet instead.
+                      description={
+                        agent.isPaused
+                          ? t("agentPaused")
+                          : agent.isConnected
+                            ? [agent.mode, agent.version].filter(Boolean).join(" · ")
+                            : t("agentOffline")
+                      }
+                    />
+                  ))}
+                </List>
+              )}
+            </VStack>
+          </Card>
+        </div>
+      </HStack>
 
       {/* Two logs side by side: proxied traffic, and what changed on this controller. */}
-      <Grid columns={{ minWidth: 280, max: 3 }} gap={3}>
+      <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
         <Card padding={5}>
           <VStack gap={3}>
             <HStack justify="between" vAlign="center" gap={2}>
@@ -609,81 +730,6 @@ export default function OverviewClient({
             <Text type="body" size="xsm" color="secondary">
               {t("requestLogSource")}
             </Text>
-          </VStack>
-        </Card>
-
-        {/* Between the two logs: what is configured, and what is answering. Neither log
-            says whether an agent has gone quiet, and a silent agent is the reason a
-            request pane can be empty while nothing is actually wrong with the hosts. */}
-        <Card padding={5}>
-          <VStack gap={3}>
-            <HStack gap={2} vAlign="center">
-              <Icon icon={Server} size="sm" color="accent" />
-              <Heading level={2} accessibilityLevel={2}>
-                {t("fleetStatus")}
-              </Heading>
-            </HStack>
-
-            <VStack gap={2}>
-              <HStack justify="between" vAlign="center" gap={2}>
-                <Text type="body" size="sm" color="secondary">
-                  {t("fleetProxyHosts")}
-                </Text>
-                <Text type="body" size="sm" hasTabularNumbers>
-                  {t("fleetEnabledOf", {
-                    enabled: fleet?.proxyHosts.enabled ?? 0,
-                    total: fleet?.proxyHosts.total ?? 0,
-                  })}
-                </Text>
-              </HStack>
-              <HStack justify="between" vAlign="center" gap={2}>
-                <Text type="body" size="sm" color="secondary">
-                  {t("fleetL4Hosts")}
-                </Text>
-                <Text type="body" size="sm" hasTabularNumbers>
-                  {t("fleetEnabledOf", {
-                    enabled: fleet?.l4Hosts.enabled ?? 0,
-                    total: fleet?.l4Hosts.total ?? 0,
-                  })}
-                </Text>
-              </HStack>
-            </VStack>
-
-            {fleet && fleet.agents.length === 0 ? (
-              <EmptyState title={t("fleetNoAgents")} isCompact />
-            ) : (
-              <List hasDividers>
-                {(fleet?.agents ?? []).map((agent) => (
-                  <ListItem
-                    key={agent.id}
-                    startContent={
-                      <StatusDot
-                        variant={
-                          agent.isPaused ? "neutral" : agent.isConnected ? "success" : "error"
-                        }
-                        label={
-                          agent.isPaused
-                            ? t("fleetAgentPaused")
-                            : agent.isConnected
-                              ? t("fleetAgentConnected")
-                              : t("fleetAgentOffline")
-                        }
-                      />
-                    }
-                    label={agent.name}
-                    // A paused or offline agent has never reported, so there is no mode or
-                    // version to show for one - say why it is quiet instead.
-                    description={
-                      agent.isPaused
-                        ? t("fleetAgentPaused")
-                        : agent.isConnected
-                          ? [agent.mode, agent.version].filter(Boolean).join(" · ")
-                          : t("fleetAgentOffline")
-                    }
-                  />
-                ))}
-              </List>
-            )}
           </VStack>
         </Card>
 
