@@ -38,10 +38,12 @@ jobs:
         # Compose interpolates the whole file before it builds anything, and
         # docker-compose.yml declares these two with `:?`. A runner has no .env, so without
         # them this aborts before the caddy build it is meant to verify. Values are never
-        # used -- nothing here starts a container.
+        # used -- nothing here starts a container. Keep this list in step with every `:?` in
+        # docker-compose.yml: the step only runs when the pins move, so a missing one stays
+        # hidden behind weeks of green "no changes" runs.
         env:
           SESSION_SECRET: pin-verify-interpolation-placeholder
-          CLICKHOUSE_PASSWORD: pin-verify-interpolation-placeholder
+          POSTGRES_PASSWORD: pin-verify-interpolation-placeholder
         run: docker compose build caddy
 
       - name: Open compatibility-pin pull request
