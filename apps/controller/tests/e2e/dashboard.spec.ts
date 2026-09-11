@@ -11,10 +11,28 @@
  * access logging was ever switched on.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
+
+/**
+ * Select a metric tile the way a pointer does: on the card surface, which SelectableCard's
+ * useClickableContainer forwards to its hidden checkbox. Returns the checkbox for assertions.
+ *
+ * Not `checkbox.click({ force: true })`. The checkbox is a 1px clipped sr-only input, and for
+ * the first tens of milliseconds after load Chromium cannot compute its content quads - which
+ * Playwright reports as "not visible" and, under `force`, throws on instead of retrying. The
+ * card is a real box, so an unforced click waits out that window like any other.
+ */
+async function selectTile(page: Page, name: string) {
+  const checkbox = page.getByRole('checkbox', { name, exact: true });
+  await checkbox.locator('xpath=..').click();
+  return checkbox;
+}
 
 test.describe('Dashboard home page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    // The tiles are plain markup until React attaches the card's click handler.
+    await waitForHydration(page);
   });
 
   test('displays welcome header with user name', async ({ page }) => {
@@ -77,10 +95,7 @@ test.describe('Dashboard home page', () => {
   });
 
   test('selecting a tile drives the chart below it', async ({ page }) => {
-    const tile = page.getByRole('checkbox', { name: '5xx responses', exact: true });
-    // SelectableCard's input is visually hidden under the card surface, the same way
-    // ClickableCard hides its <a>: a plain click is intercepted by the card's own text.
-    await tile.click({ force: true });
+    const tile = await selectTile(page, '5xx responses');
     await expect(tile).toBeChecked();
     // The chart is titled by whichever tile is selected, so the heading is the visible
     // proof that the selection reached the bands below.
@@ -88,11 +103,10 @@ test.describe('Dashboard home page', () => {
   });
 
   test('selecting the active tile again returns to the overlay', async ({ page }) => {
-    const tile = page.getByRole('checkbox', { name: '4xx responses', exact: true });
-    await tile.click({ force: true });
+    const tile = await selectTile(page, '4xx responses');
     await expect(page.getByRole('heading', { name: '4xx responses', level: 2 })).toBeVisible();
 
-    await tile.click({ force: true });
+    await selectTile(page, '4xx responses');
     await expect(tile).not.toBeChecked();
     await expect(page.getByRole('heading', { name: 'All metrics', level: 2 })).toBeVisible();
   });
@@ -116,7 +130,7 @@ test.describe('Dashboard home page', () => {
     // The log keeps its name; what changes is the population and the source note.
     await expect(page.getByRole('heading', { name: 'Server log', level: 2 })).toBeVisible();
 
-    await page.getByRole('checkbox', { name: 'Server events', exact: true }).click({ force: true });
+    await selectTile(page, 'Server events');
 
     await expect(page.getByRole('heading', { name: 'Server log', level: 2 })).toBeVisible();
     await expect(page.getByText(/Recorded whether or not access logging is on/i)).toBeVisible();
@@ -134,12 +148,12 @@ test.describe('Dashboard home page', () => {
     await expect(page.getByText(/No traffic in this range/i)).toBeVisible();
 
     // A tile that asks only for requests has nothing to show.
-    await page.getByRole('checkbox', { name: '5xx responses', exact: true }).click({ force: true });
+    await selectTile(page, '5xx responses');
     await expect(page.getByText(/No requests match this tile/i)).toBeVisible();
 
     // The audit log is recorded regardless, so the same log still has the sign-in that
     // got us here once the tile asks for it. That difference is why the tile exists.
-    await page.getByRole('checkbox', { name: 'Server events', exact: true }).click({ force: true });
+    await selectTile(page, 'Server events');
     await expect(page.getByRole('main').getByRole('row').nth(1)).toBeVisible();
   });
 });
