@@ -107,7 +107,12 @@ export default function CertificatesClient({
             id: "imported",
             label: t("imported"),
             value: importedCerts.length,
-            note: t("importedNote", { count: nextExpiry ?? 0 }),
+            note:
+              nextExpiry === null
+                ? t("importedNoneNote")
+                : nextExpiry < 0
+                  ? t("importedExpiredNote")
+                  : t("importedNote", { count: nextExpiry }),
             accent:
               expired > 0
                 ? { label: t("expiredAccent", { count: expired }), variant: "error" as const }
