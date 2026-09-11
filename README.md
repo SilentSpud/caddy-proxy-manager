@@ -386,6 +386,35 @@ MySQL, MariaDB and the rest are rejected by name at startup rather than half-wor
 to some of them, but Drizzle's Bun driver only builds PostgreSQL, and several write paths here
 depend on `RETURNING`.
 
+### Upgrading from PostgreSQL 17
+
+The bundled `postgres` service moved from 17 to 18 during the 3.0 beta. A major version cannot read
+another's data files, so if your `docker-compose.yml` still says `image: postgres:17-alpine`, this
+upgrade is a dump and restore. Getting the order wrong loses nothing: 18 refuses to start on a
+volume holding a 17 cluster, and the data stays put. If you already updated the compose file, put
+back `image: postgres:17-alpine` and the volume mount at `/var/lib/postgresql/data` for step 1.
+
+```bash
+# 1. On the old compose file: stop the app, dump the database from the 17 server
+docker compose stop web
+docker compose exec postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --file=/tmp/cpm.dump'
+docker compose cp postgres:/tmp/cpm.dump ./cpm.dump
+
+# 2. Update the compose file (git pull), then drop the containers and the 17 volume only
+docker compose down
+docker volume rm caddy-proxy-manager_postgres-data   # <project>_postgres-data - see `docker volume ls`
+
+# 3. Start 18, restore, bring everything back
+docker compose up -d --wait postgres
+docker compose cp ./cpm.dump postgres:/tmp/cpm.dump
+docker compose exec postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error /tmp/cpm.dump && rm /tmp/cpm.dump'
+docker compose up -d
+```
+
+The dump is copied out with `docker compose cp` rather than redirected, so it survives any shell -
+PowerShell's `>` re-encodes it. Keep `cpm.dump` until you have signed in again. A server you run
+yourself through `POSTGRES_HOST` is unaffected; the app works with 17 and 18 alike.
+
 ### Upgrading from a pre-3.0 install, which used SQLite
 
 Leave the old `.env` alone and stand up PostgreSQL first, then point `DATABASE_URL` at it. On the

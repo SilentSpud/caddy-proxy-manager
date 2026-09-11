@@ -96,13 +96,14 @@ services:
 
   # ── System under test ───────────────────────────────────────────────────
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: cpm
       POSTGRES_PASSWORD: docker-tests
       POSTGRES_DB: cpm
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # The parent directory, as the 18+ images expect - see the root docker-compose.yml.
+      - postgres-data:/var/lib/postgresql
     networks:
       - cpm-test
     healthcheck:

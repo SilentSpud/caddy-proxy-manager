@@ -15,7 +15,7 @@ import { SQL } from "bun";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
-const IMAGE = "postgres:17-alpine";
+const IMAGE = "postgres:18-alpine";
 const CONTAINER = `cpm-test-db-${process.pid}`;
 const PASSWORD = "cpm-test";
 const READY_TIMEOUT_MS = 60_000;
@@ -71,8 +71,10 @@ async function startContainer(): Promise<string> {
     "POSTGRES_DB=cpm_test",
     "-p",
     "0:5432",
+    // The parent directory: 18+ images keep the cluster in a versioned subdirectory of it, and
+    // refuse to start with a separate mount at the old /var/lib/postgresql/data.
     "--tmpfs",
-    "/var/lib/postgresql/data",
+    "/var/lib/postgresql",
     IMAGE,
     // Bun runs test files in parallel processes, and each one that imports src/lib/db opens a
     // pool of its own on top of the per-test connections. The default of 100 is exhausted well

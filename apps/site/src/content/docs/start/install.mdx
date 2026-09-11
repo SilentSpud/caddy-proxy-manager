@@ -89,6 +89,59 @@ docker compose up -d
 Settings reports when a newer release is published to the registry you pull from. That check is the
 only request the app makes to the internet on its own, and it can be switched off.
 
+### From PostgreSQL 17
+
+The bundled database moved from PostgreSQL 17 to 18 during the 3.0 beta. PostgreSQL does not read
+another major version's data files, so this one upgrade is a dump and restore rather than a pull.
+It applies if your `docker-compose.yml` still says `image: postgres:17-alpine`.
+
+Nothing is lost by getting the order wrong. The 18 service refuses to start on a volume that still
+holds a 17 cluster - it restarts with an error naming the version, and the data stays where it was.
+If you already updated the compose file, put the two old lines back for the first step:
+`image: postgres:17-alpine`, and the volume mounted at `/var/lib/postgresql/data`.
+
+<Steps>
+
+1. With the old compose file, stop the app and dump its database from the 17 server:
+
+   ```bash
+   docker compose stop web
+   docker compose exec postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --file=/tmp/cpm.dump'
+   docker compose cp postgres:/tmp/cpm.dump ./cpm.dump
+   ```
+
+   The dump is copied out rather than redirected to a file, so it arrives intact from any shell -
+   PowerShell's `>` re-encodes what passes through it. Keep `cpm.dump` until you have signed in
+   afterwards.
+
+2. Update the compose file (`git pull` in a clone), then remove the containers and the 17 volume:
+
+   ```bash
+   docker compose down
+   docker volume rm caddy-proxy-manager_postgres-data
+   ```
+
+   `down` without `-v` leaves every other volume alone, certificates included. The database volume
+   is named after the Compose project, which is the directory the compose file is in unless
+   `COMPOSE_PROJECT_NAME` says otherwise - `docker volume ls` shows it.
+
+3. Start PostgreSQL 18, restore into it, and bring the rest back:
+
+   ```bash
+   docker compose up -d --wait postgres
+   docker compose cp ./cpm.dump postgres:/tmp/cpm.dump
+   docker compose exec postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error /tmp/cpm.dump && rm /tmp/cpm.dump'
+   docker compose up -d
+   ```
+
+   Accounts, hosts, certificates and settings come back as they were, and you sign in with the same
+   password. Migrations that already ran are recorded in the dump, so none of them run again.
+
+</Steps>
+
+A server you run yourself (`POSTGRES_HOST`) is unaffected: the app supports 17 and 18 alike, and
+when to upgrade it is yours to decide.
+
 ## The legacy method
 
 Before 3.0 the configuration lived in `.env`, and installing meant copying the whole reference over
