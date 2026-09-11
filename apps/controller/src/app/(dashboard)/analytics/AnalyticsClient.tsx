@@ -36,6 +36,8 @@ import { formatDateTimeUtc } from "@/src/lib/date-format";
 import { useChartTheme } from "./chart-theme";
 import { useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { CountryBreakdown } from "./CountryBreakdown";
+import type { MapMetric } from "./WorldMapInner";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
@@ -60,6 +62,8 @@ const WorldMap = dynamic(() => import("./WorldMapInner"), {
 }) as React.ComponentType<{
   data: import("./WorldMapInner").CountryStats[];
   selectedCountry?: string | null;
+  metric?: import("./WorldMapInner").MapMetric;
+  onSelectCountry?: (alpha2: string | null) => void;
 }>;
 
 // ── Types (mirrored from analytics-db - can't import server-only code) ────────
@@ -94,6 +98,7 @@ interface CountryStats {
   countryCode: string;
   total: number;
   blocked: number;
+  uniqueIps: number;
 }
 interface ProtoStats {
   proto: string;
@@ -133,8 +138,8 @@ type CountryRow = {
   countryCode: string;
   total: number;
   blocked: number;
+  uniqueIps: number;
   waf: number;
-  allowed: number;
   [k: string]: unknown;
 };
 type ProtoRow = ProtoStats & { [k: string]: unknown };
@@ -385,6 +390,7 @@ export default function AnalyticsClient() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [mapMetric, setMapMetric] = useState<MapMetric>("total");
 
   /** How many seconds the current selection spans - used for chart axis labels */
   const rangeSeconds = useMemo(() => {
@@ -551,8 +557,8 @@ export default function AnalyticsClient() {
     countryCode: c.countryCode,
     total: c.total,
     blocked: c.blocked,
+    uniqueIps: c.uniqueIps,
     waf: wafByCountry.get(c.countryCode) ?? 0,
-    allowed: Math.max(0, c.total - c.blocked),
   }));
 
   // Replaces a hand-tinted row background, which signalled selection by colour alone and was
@@ -575,8 +581,8 @@ export default function AnalyticsClient() {
           size="sm"
           label={
             row.countryCode === selectedCountry
-              ? `Clear map filter for ${row.countryCode}`
-              : `Filter map to ${row.countryCode}`
+              ? t("closeCountryBreakdown", { code: row.countryCode })
+              : t("openCountryBreakdown", { code: row.countryCode })
           }
           onClick={() =>
             setSelectedCountry((cur) => (cur === row.countryCode ? null : row.countryCode))
@@ -603,13 +609,13 @@ export default function AnalyticsClient() {
       ),
     },
     {
-      key: "allowed",
-      header: "Allowed",
+      key: "uniqueIps",
+      header: t("uniqueIps"),
       align: "end",
-      width: pixel(90),
+      width: pixel(104),
       renderCell: (row) => (
         <Text type="body" size="sm" hasTabularNumbers>
-          {row.allowed.toLocaleString()}
+          {row.uniqueIps.toLocaleString()}
         </Text>
       ),
     },
@@ -900,7 +906,7 @@ export default function AnalyticsClient() {
       {!loading && summary && (
         <>
           {/* Stats row */}
-          <Grid columns={{ minWidth: 150, max: 5 }} gap={3}>
+          <Grid columns={{ minWidth: 150, max: 5 }} gap={3} data-testid="analytics-stats">
             <StatCard label={t("totalRequests")} value={summary.totalRequests.toLocaleString()} />
             <StatCard label={t("uniqueIps")} value={summary.uniqueIps.toLocaleString()} />
             <StatCard
@@ -955,11 +961,36 @@ export default function AnalyticsClient() {
           {/* World map + Countries */}
           <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>
             <Card padding={5}>
-              <VStack gap={2} minHeight={280}>
-                <Text type="body" size="sm" weight="semibold">
-                  {t("trafficByCountry")}
-                </Text>
-                <WorldMap data={countries} selectedCountry={selectedCountry} />
+              {/* Full height, so the map grows to match the country table beside it instead of
+                  leaving the bottom of its card empty. */}
+              <VStack gap={2} minHeight={280} height="100%">
+                <HStack gap={3} vAlign="center" justify="between" wrap="wrap">
+                  <Text type="body" size="sm" weight="semibold">
+                    {t("trafficByCountry")}
+                  </Text>
+                  {/* One map, recoloured: the ramp is normalised against the chosen metric, so
+                      Blocked lights up the countries that block most rather than the busiest. */}
+                  <SegmentedControl
+                    label={t("mapMetric")}
+                    size="sm"
+                    value={mapMetric}
+                    onChange={(value) => setMapMetric(value as MapMetric)}
+                  >
+                    <SegmentedControlItem value="total" label={t("metricRequests")} />
+                    <SegmentedControlItem value="blocked" label={t("metricBlocked")} />
+                    <SegmentedControlItem value="uniqueIps" label={t("uniqueIps")} />
+                  </SegmentedControl>
+                </HStack>
+                <WorldMap
+                  data={countries}
+                  selectedCountry={selectedCountry}
+                  metric={mapMetric}
+                  onSelectCountry={(code) =>
+                    setSelectedCountry((current) =>
+                      code === null || code === current ? null : code,
+                    )
+                  }
+                />
               </VStack>
             </Card>
             <Card padding={4}>
@@ -981,6 +1012,15 @@ export default function AnalyticsClient() {
               </VStack>
             </Card>
           </Grid>
+
+          {selectedCountry && (
+            <CountryBreakdown
+              code={selectedCountry}
+              query={buildParams()}
+              totalRequests={summary?.totalRequests ?? 0}
+              onClose={() => setSelectedCountry(null)}
+            />
+          )}
 
           {/* Protocols + User Agents */}
           <Grid columns={{ minWidth: 320, max: 2 }} gap={3}>

@@ -311,3 +311,115 @@ describe('clickhouse client analytics enablement', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('per-country analytics', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /**
+   * A client whose query() answers by what the SQL asks for, so the three grouped queries the
+   * breakdown fires in parallel each get their own rows regardless of which lands first.
+   */
+  function clientAnswering(answers: { match: RegExp; rows: unknown[] }[]) {
+    const calls: { query: string; query_params: Record<string, unknown> }[] = [];
+    const query = vi.fn(async (args: { query: string; query_params: Record<string, unknown> }) => {
+      calls.push(args);
+      const hit = answers.find((a) => a.match.test(args.query));
+      return { json: async () => hit?.rows ?? [] };
+    });
+    vi.mock('@clickhouse/client', () => ({
+      createClient: vi.fn(() => ({ query, command: vi.fn(), insert: vi.fn(), close: vi.fn() })),
+    }));
+    return calls;
+  }
+
+  it('reports unique client IPs per country beside requests and blocks', async () => {
+    vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
+    clientAnswering([
+      {
+        match: /GROUP BY country_code/,
+        rows: [
+          { country_code: 'DE', total: '120', blocked: '2', unique_ips: '31' },
+          { country_code: null, total: '4', blocked: '0', unique_ips: '3' },
+        ],
+      },
+    ]);
+
+    const { queryCountries } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+
+    await expect(queryCountries(0, 1, [])).resolves.toEqual([
+      { countryCode: 'DE', total: 120, blocked: 2, uniqueIps: 31 },
+      // Unplaced rows keep their "XX" code, which the breakdown then has to understand.
+      { countryCode: 'XX', total: 4, blocked: 0, uniqueIps: 3 },
+    ]);
+  });
+
+  it('breaks one country down into hosts, response classes and user agents', async () => {
+    vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
+    const calls = clientAnswering([
+      {
+        match: /uniqExact\(client_ip\)/,
+        rows: [
+          {
+            total: '100',
+            blocked: '3',
+            unique_ips: '12',
+            ok: '80',
+            redirects: '5',
+            client_errors: '12',
+            server_errors: '3',
+          },
+        ],
+      },
+      {
+        match: /GROUP BY host/,
+        rows: [
+          { host: 'media.example.com', count: '60' },
+          { host: '', count: '40' },
+        ],
+      },
+      { match: /GROUP BY user_agent/, rows: [{ user_agent: 'curl/8.7.1', count: '9' }] },
+    ]);
+
+    const { queryCountryBreakdown } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+
+    await expect(queryCountryBreakdown(0, 1, [], 'DE')).resolves.toEqual({
+      countryCode: 'DE',
+      total: 100,
+      blocked: 3,
+      uniqueIps: 12,
+      hosts: [
+        { host: 'media.example.com', count: 60 },
+        { host: 'Unknown', count: 40 },
+      ],
+      statusClasses: { ok: 80, redirects: 5, clientErrors: 12, serverErrors: 3 },
+      userAgents: [{ userAgent: 'curl/8.7.1', count: 9 }],
+    });
+
+    // The code is bound as a parameter on every query, never spliced into the SQL.
+    expect(calls).toHaveLength(3);
+    for (const call of calls) {
+      expect(call.query).toContain('country_code = {country:String}');
+      expect(call.query_params.country).toBe('DE');
+      expect(call.query).not.toContain("'DE'");
+    }
+  });
+
+  it('selects the unplaced rows for XX instead of matching a literal code', async () => {
+    vi.stubEnv('CLICKHOUSE_PASSWORD', 'test-clickhouse-password');
+    const calls = clientAnswering([]);
+
+    const { queryCountryBreakdown } = await import(`@/src/lib/clickhouse/client${fresh()}`);
+    const result = await queryCountryBreakdown(0, 1, [], 'XX');
+
+    // "XX" is what queryCountries calls requests GeoIP could not place; matching it literally
+    // would open an empty breakdown for the one row that is guaranteed to have traffic.
+    for (const call of calls) {
+      expect(call.query).toContain('country_code IS NULL');
+      expect(call.query).not.toContain('{country:String}');
+    }
+    expect(result.total).toBe(0);
+    expect(result.hosts).toEqual([]);
+  });
+});

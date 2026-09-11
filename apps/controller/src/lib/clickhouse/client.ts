@@ -589,6 +589,7 @@ export interface CountryStats {
   countryCode: string;
   total: number;
   blocked: number;
+  uniqueIps: number;
 }
 
 export async function queryCountries(
@@ -599,12 +600,18 @@ export async function queryCountries(
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const rows = await queryRows<{ country_code: string | null; total: string; blocked: string }>(
+  const rows = await queryRows<{
+    country_code: string | null;
+    total: string;
+    blocked: string;
+    unique_ips: string;
+  }>(
     `
     SELECT
       country_code,
       count() AS total,
-      countIf(is_blocked) AS blocked
+      countIf(is_blocked) AS blocked,
+      uniqExact(client_ip) AS unique_ips
     FROM traffic_events
     WHERE ${timeFilter()}${hf.sql}
     GROUP BY country_code
@@ -617,7 +624,109 @@ export async function queryCountries(
     countryCode: r.country_code ?? "XX",
     total: Number(r.total),
     blocked: Number(r.blocked),
+    uniqueIps: Number(r.unique_ips),
   }));
+}
+
+export interface CountryBreakdown {
+  countryCode: string;
+  total: number;
+  blocked: number;
+  uniqueIps: number;
+  hosts: { host: string; count: number }[];
+  statusClasses: { ok: number; redirects: number; clientErrors: number; serverErrors: number };
+  userAgents: { userAgent: string; count: number }[];
+}
+
+/** How many rows each list in the country breakdown carries. */
+const COUNTRY_BREAKDOWN_LIMIT = 5;
+
+/**
+ * One country's slice of the access log: where it went, how it was answered, and what sent it.
+ *
+ * "XX" is the code queryCountries gives rows GeoIP could not place, so it selects the NULLs here
+ * rather than matching a literal - otherwise the unplaced row in the table would open an empty
+ * breakdown. Three small grouped queries rather than one: each is a different GROUP BY, and
+ * ClickHouse runs them in parallel from here.
+ */
+export async function queryCountryBreakdown(
+  from: number,
+  to: number,
+  hosts: string[],
+  countryCode: string,
+): Promise<CountryBreakdown> {
+  const hf = hostFilter(hosts);
+  const tp = timeParams(from, to);
+  const countrySql =
+    countryCode === "XX" ? " AND country_code IS NULL" : " AND country_code = {country:String}";
+  const params = { ...tp, ...hf.params, country: countryCode };
+  const where = `${timeFilter()}${hf.sql}${countrySql}`;
+
+  const [totals, hostRows, uaRows] = await Promise.all([
+    queryRow<{
+      total: string;
+      blocked: string;
+      unique_ips: string;
+      ok: string;
+      redirects: string;
+      client_errors: string;
+      server_errors: string;
+    }>(
+      `
+      SELECT
+        count() AS total,
+        countIf(is_blocked) AS blocked,
+        uniqExact(client_ip) AS unique_ips,
+        countIf(status < 300) AS ok,
+        countIf(status >= 300 AND status < 400) AS redirects,
+        countIf(status >= 400 AND status < 500) AS client_errors,
+        countIf(status >= 500) AS server_errors
+      FROM traffic_events
+      WHERE ${where}
+    `,
+      params,
+    ),
+    queryRows<{ host: string; count: string }>(
+      `
+      SELECT host, count() AS count
+      FROM traffic_events
+      WHERE ${where}
+      GROUP BY host
+      ORDER BY count DESC
+      LIMIT ${COUNTRY_BREAKDOWN_LIMIT}
+    `,
+      params,
+    ),
+    queryRows<{ user_agent: string; count: string }>(
+      `
+      SELECT user_agent, count() AS count
+      FROM traffic_events
+      WHERE ${where}
+      GROUP BY user_agent
+      ORDER BY count DESC
+      LIMIT ${COUNTRY_BREAKDOWN_LIMIT}
+    `,
+      params,
+    ),
+  ]);
+
+  return {
+    countryCode,
+    total: Number(totals?.total ?? 0),
+    blocked: Number(totals?.blocked ?? 0),
+    uniqueIps: Number(totals?.unique_ips ?? 0),
+    hosts: hostRows.map((r) => ({ host: r.host || "Unknown", count: Number(r.count) })),
+    statusClasses: {
+      ok: Number(totals?.ok ?? 0),
+      redirects: Number(totals?.redirects ?? 0),
+      clientErrors: Number(totals?.client_errors ?? 0),
+      serverErrors: Number(totals?.server_errors ?? 0),
+    },
+    userAgents: uaRows.map((r) => ({
+      userAgent: r.user_agent || "Unknown",
+      count: Number(r.count),
+    })),
+  };
 }
 
 export interface ProtoStats {

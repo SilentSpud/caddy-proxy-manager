@@ -4,6 +4,7 @@ import {
   querySummary,
   queryTimeline,
   queryCountries,
+  queryCountryBreakdown,
   queryProtocols,
   queryUserAgents,
   queryBlocked,
@@ -16,6 +17,7 @@ import {
   type AnalyticsSummary as CHSummary,
   type TimelineBucket,
   type CountryStats,
+  type CountryBreakdown,
   type ProtoStats,
   type UAStats,
   type BlockedEvent,
@@ -28,6 +30,7 @@ import {
 export type {
   TimelineBucket,
   CountryStats,
+  CountryBreakdown,
   ProtoStats,
   UAStats,
   BlockedEvent,
@@ -99,6 +102,16 @@ export async function getAnalyticsCountries(
   hosts: string[],
 ): Promise<CountryStats[]> {
   return queryCountries(from, to, hosts);
+}
+
+/** One country's hosts, response classes and user agents, for the drill-down under the map. */
+export async function getAnalyticsCountryBreakdown(
+  from: number,
+  to: number,
+  hosts: string[],
+  countryCode: string,
+): Promise<CountryBreakdown> {
+  return queryCountryBreakdown(from, to, hosts, countryCode);
 }
 
 // ── Protocols ────────────────────────────────────────────────────────────────

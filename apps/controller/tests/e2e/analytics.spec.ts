@@ -16,10 +16,14 @@ test.describe('Analytics', () => {
 
   test('analytics page shows summary stat cards', async ({ page }) => {
     await page.goto('/analytics');
-    // These card headers are rendered by AnalyticsClient
-    await expect(page.getByText('Total Requests', { exact: true })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Unique IPs', { exact: true })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Blocked Requests', { exact: true })).toBeVisible({
+    // These card headers are rendered by AnalyticsClient. Scoped to the stat row: the same words
+    // label the map's metric switch and the country table's columns.
+    const stats = page.getByTestId('analytics-stats');
+    await expect(stats.getByText('Total Requests', { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(stats.getByText('Unique IPs', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(stats.getByText('Blocked Requests', { exact: true })).toBeVisible({
       timeout: 10000,
     });
   });
