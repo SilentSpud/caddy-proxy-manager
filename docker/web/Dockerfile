@@ -47,7 +47,7 @@ COPY . .
 # `build` emits dist/standalone; `build:binary` compiles scripts/standalone-entry.ts and the vinext
 # production server into dist/standalone/cpm-server. This stage runs on the host arch, so the binary
 # is cross-compiled for the target - Bun names targets by libc and arch, and the glibc variants
-# match the debian:bookworm-slim runtime. BUN_COMPILE_TARGET feeds the package.json script.
+# match the debian:trixie-slim runtime. BUN_COMPILE_TARGET feeds the package.json script.
 RUN case "$TARGETARCH" in \
       amd64) export BUN_COMPILE_TARGET=bun-linux-x64 ;; \
       arm64) export BUN_COMPILE_TARGET=bun-linux-arm64 ;; \
@@ -57,10 +57,12 @@ RUN case "$TARGETARCH" in \
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package manager
-# and Bun CLI would be dead weight. Bookworm matches oven/bun:1-slim's base, so the glibc matches.
+# and Bun CLI would be dead weight. Trixie matches oven/bun:1-slim's base, so the glibc matches -
+# check `docker run --rm oven/bun:1-slim cat /etc/debian_version` when either moves, since the
+# standalone node_modules copied below were installed there and may carry native binaries.
 # The only runtime stage - the e2e suite runs this same image, seeding through the `db-seed`
 # container rather than executing code here.
-FROM debian:bookworm-slim AS runner
+FROM debian:trixie-slim AS runner
 ARG PUID=10001
 ARG PGID=10001
 
@@ -111,7 +113,7 @@ LABEL org.opencontainers.image.title="Caddy Proxy Manager Web Dashboard" \
       org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
       org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
       org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
-      org.opencontainers.image.base.name="docker.io/library/debian:bookworm-slim"
+      org.opencontainers.image.base.name="docker.io/library/debian:trixie-slim"
 
 EXPOSE 3000
 USER cpm

@@ -32,7 +32,7 @@ RUN case "$TARGETARCH" in \
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than docker:cli, whose Alpine base is musl: the compiled binary carries its own
 # glibc-linked Bun runtime and will not start there.
-FROM debian:bookworm-slim AS runner
+FROM debian:trixie-slim AS runner
 
 # docker-ce-cli and the compose plugin from Docker's own repository. `docker compose` is invoked
 # for every operation this container exists to perform, so its absence is a startup failure rather
@@ -44,7 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
     && chmod a+r /etc/apt/keyrings/docker.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-       https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list \
+       https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list \
     && apt-get update && apt-get install -y --no-install-recommends \
       docker-ce-cli docker-compose-plugin \
     && apt-get purge -y gnupg && apt-get autoremove -y \
@@ -67,7 +67,7 @@ LABEL org.opencontainers.image.title="Caddy Proxy Manager Builder Agent" \
       org.opencontainers.image.url="https://github.com/SilentSpud/caddy-proxy-manager" \
       org.opencontainers.image.source="https://github.com/SilentSpud/caddy-proxy-manager" \
       org.opencontainers.image.documentation="https://github.com/SilentSpud/caddy-proxy-manager#readme" \
-      org.opencontainers.image.base.name="docker.io/library/debian:bookworm-slim"
+      org.opencontainers.image.base.name="docker.io/library/debian:trixie-slim"
 
 ENV DATA_DIR=/data
 ENV COMPOSE_DIR=/compose
