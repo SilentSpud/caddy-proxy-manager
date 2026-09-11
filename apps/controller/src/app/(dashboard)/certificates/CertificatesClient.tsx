@@ -6,6 +6,7 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
+import { StatTiles } from "@/components/ui/StatTiles";
 import type {
   AcmeHost,
   CaCertificateView,
@@ -58,6 +59,16 @@ export default function CertificatesClient({
   const { expired, expiringSoon, healthy: importedHealthy } = countExpiry(importedStatuses);
   const healthy = importedHealthy + healthyAcmeTotal;
 
+  // Days until the next imported certificate lapses. ACME certificates are renewed by Caddy on the
+  // agent and their notAfter never reaches this controller, so they cannot join this count - the
+  // tile is deliberately about the ones whose expiry is ours to watch.
+  const nextExpiry = importedCerts.reduce<number | null>((soonest, cert) => {
+    if (!cert.validTo) return soonest;
+    const days = Math.ceil((new Date(cert.validTo).getTime() - Date.now()) / 86_400_000);
+    if (!Number.isFinite(days)) return soonest;
+    return soonest === null || days < soonest ? days : soonest;
+  }, null);
+
   const search =
     activeTab === "acme"
       ? searchAcme
@@ -83,6 +94,44 @@ export default function CertificatesClient({
   return (
     <VStack gap={6}>
       <PageHeader title={t("sslTlsCertificates")} description={t("automaticHttpsDescription")} />
+
+      <StatTiles
+        tiles={[
+          {
+            id: "acme",
+            label: t("acme"),
+            value: acmePagination.total,
+            note: t("acmeNote", { count: healthyAcmeTotal }),
+          },
+          {
+            id: "imported",
+            label: t("imported"),
+            value: importedCerts.length,
+            note: t("importedNote", { count: nextExpiry ?? 0 }),
+            accent:
+              expired > 0
+                ? { label: t("expiredAccent", { count: expired }), variant: "error" as const }
+                : expiringSoon > 0
+                  ? {
+                      label: t("expiringAccent", { count: expiringSoon }),
+                      variant: "warning" as const,
+                    }
+                  : undefined,
+          },
+          {
+            id: "ca",
+            label: t("caMtls"),
+            value: caCertificates.length,
+            note: t("caNote", { count: issuedClientCerts.length }),
+          },
+          {
+            id: "roles",
+            label: t("roles"),
+            value: mtlsRoles.length,
+            note: t("rolesNote"),
+          },
+        ]}
+      />
 
       {/* Status summary filter chips */}
       <StatusSummaryBar
