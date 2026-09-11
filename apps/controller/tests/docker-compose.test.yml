@@ -223,7 +223,7 @@ services:
 
   # Dex OIDC provider for OAuth E2E tests
   dex:
-    image: dexidp/dex:v2.41.1
+    image: dexidp/dex:v2.45.1
     command: ["dex", "serve", "/etc/dex/config.yml"]
     volumes:
       - ./apps/controller/tests/dex/config.yml:/etc/dex/config.yml:ro
@@ -237,7 +237,7 @@ services:
   # fields. Browser reaches it at localhost:5557; the web container reaches it at
   # mock-oidc:8080 (which is also the token `iss`, matching the provider issuer).
   mock-oidc:
-    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.2
     environment:
       JSON_CONFIG_PATH: /config.json
     volumes:
@@ -291,7 +291,7 @@ services:
   # service for HTTP-01 / TLS-ALPN-01 challenge validation.
   step-ca:
     container_name: caddy-proxy-manager-step-ca
-    image: smallstep/step-ca:0.27.4
+    image: smallstep/step-ca:0.30.2
     environment:
       DOCKER_STEPCA_INIT_NAME: "CPM E2E Step-CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
