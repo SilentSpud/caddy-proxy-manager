@@ -5,6 +5,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { ClickableCard } from "@astryxdesign/core/ClickableCard";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { useTranslations } from "next-intl";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
@@ -81,76 +82,94 @@ const MEMBER_COLUMNS: Column<Member>[] = [
  * The two-pane shape of the access lists page: pick a list on the left, and its members and the
  * hosts it protects fill the right. Passwords are bcrypt-hashed on save, so nothing here shows one.
  */
-export default function AccessListDemo() {
+function AccessListDemoContent() {
+  const t = useTranslations("accessLists");
   const [selectedId, setSelectedId] = useState(1);
   const [tab, setTab] = useState("members");
   const selected = LISTS.find((list) => list.id === selectedId) ?? LISTS[0];
   if (!selected) return null;
 
   return (
-    <DemoSurface>
-      <VStack gap={4}>
-        <VStack gap={2}>
-          {LISTS.map((list) => (
-            <ClickableCard
-              key={list.id}
-              label={list.name}
-              // The selected list is the one filling the pane below, so it takes a tint and the
-              // others sit on the plain surface.
-              variant={list.id === selectedId ? "blue" : "default"}
-              onClick={() => setSelectedId(list.id)}
-            >
-              <HStack justify="between" vAlign="center" gap={3}>
-                <VStack gap={0}>
-                  <Text type="body" size="sm" weight="semibold">
-                    {list.name}
-                  </Text>
-                  <Text type="body" size="xsm" color="secondary">
-                    {list.description}
-                  </Text>
-                </VStack>
-                <HStack gap={2} vAlign="center">
-                  <Badge label={`${list.members.length} members`} />
-                  <Badge
-                    variant={list.usedBy.length > 0 ? "info" : "neutral"}
-                    label={`${list.usedBy.length} hosts`}
-                  />
-                </HStack>
-              </HStack>
-            </ClickableCard>
-          ))}
-        </VStack>
-
-        <TabList value={tab} onChange={setTab}>
-          <Tab value="members" label="Members" />
-          <Tab value="usedBy" label="Used by" />
-        </TabList>
-
-        {tab === "members" ? (
-          <DataTable
-            columns={MEMBER_COLUMNS}
-            data={selected.members}
-            keyField="id"
-            emptyMessage="No members yet"
-          />
-        ) : (
-          <Card>
-            {selected.usedBy.length === 0 ? (
-              <Text type="body" size="sm" color="secondary">
-                No proxy hosts use this list. It can be deleted safely.
-              </Text>
-            ) : (
-              <VStack gap={2}>
-                {selected.usedBy.map((host) => (
-                  <Text key={host.id} type="code" size="sm">
-                    {host.domain}
-                  </Text>
-                ))}
+    <VStack gap={4}>
+      <VStack gap={2}>
+        {LISTS.map((list) => (
+          <ClickableCard
+            key={list.id}
+            label={list.name}
+            // The selected list is the one filling the pane below, so it takes a tint and the
+            // others sit on the plain surface.
+            variant={list.id === selectedId ? "blue" : "default"}
+            onClick={() => setSelectedId(list.id)}
+          >
+            <HStack justify="between" vAlign="center" gap={3}>
+              <VStack gap={0}>
+                <Text type="body" size="sm" weight="semibold">
+                  {list.name}
+                </Text>
+                <Text type="body" size="xsm" color="secondary">
+                  {list.description}
+                </Text>
               </VStack>
-            )}
-          </Card>
-        )}
+              <HStack gap={2} vAlign="center">
+                <Badge label={`${list.members.length} members`} />
+                <Badge
+                  variant={list.usedBy.length > 0 ? "info" : "neutral"}
+                  label={`${list.usedBy.length} hosts`}
+                />
+              </HStack>
+            </HStack>
+          </ClickableCard>
+        ))}
+        {/* The totals the page's rail ends with, for the whole set rather than the list in view. */}
+        <Text type="supporting" color="secondary">
+          {t("railSummary", {
+            lists: LISTS.length,
+            members: LISTS.reduce((sum, list) => sum + list.members.length, 0),
+          })}
+        </Text>
       </VStack>
+
+      <TabList value={tab} onChange={setTab}>
+        <Tab value="members" label="Members" />
+        <Tab value="usedBy" label="Used by" />
+      </TabList>
+
+      {tab === "members" ? (
+        <DataTable
+          columns={MEMBER_COLUMNS}
+          data={selected.members}
+          keyField="id"
+          emptyMessage="No members yet"
+        />
+      ) : (
+        <Card>
+          {selected.usedBy.length === 0 ? (
+            <Text type="body" size="sm" color="secondary">
+              No proxy hosts use this list. It can be deleted safely.
+            </Text>
+          ) : (
+            <VStack gap={2}>
+              {selected.usedBy.map((host) => (
+                <Text key={host.id} type="code" size="sm">
+                  {host.domain}
+                </Text>
+              ))}
+            </VStack>
+          )}
+        </Card>
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The content renders inside DemoSurface rather than around it: the surface is what provides the
+ * message catalog, and the content reads from it with useTranslations.
+ */
+export default function AccessListDemo() {
+  return (
+    <DemoSurface>
+      <AccessListDemoContent />
     </DemoSurface>
   );
 }

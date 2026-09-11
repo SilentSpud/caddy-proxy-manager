@@ -16,7 +16,9 @@ you what exists, and to hold the credentials that DNS challenges need.
 ## Automatic
 
 Every proxy host gets HTTPS by default through ACME - Let's Encrypt, ZeroSSL, or any directory you
-point it at. The Certificates page shows issuer, expiry and status for each one.
+point it at. Caddy renews these on the agent, so the Certificates page lists which hosts use them
+rather than an expiry date the controller never sees; imported certificates, whose PEM it holds,
+show their issuer and expiry, and the page counts down to the next one to lapse.
 
 For an internal CA, set the ACME directory URL under **Settings → ACME Server** and supply its root
 so Caddy trusts it.

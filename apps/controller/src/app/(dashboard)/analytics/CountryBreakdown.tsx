@@ -73,6 +73,12 @@ function RankedList({ title, rows, color }: { title: string; rows: Row[]; color:
   );
 }
 
+/**
+ * Fetches one country's breakdown for the page's current range and hosts, and renders it.
+ *
+ * The fetching and the drawing are separate so the docs site - which has no API behind it - can
+ * render the same view from sample data.
+ */
 export function CountryBreakdown({
   code,
   query,
@@ -86,7 +92,6 @@ export function CountryBreakdown({
   totalRequests: number;
   onClose: () => void;
 }) {
-  const t = useTranslations("analytics");
   const [data, setData] = useState<CountryBreakdownData | null>(null);
   const [error, setError] = useState(false);
 
@@ -106,6 +111,34 @@ export function CountryBreakdown({
       cancelled = true;
     };
   }, [code, query]);
+
+  return (
+    <CountryBreakdownView
+      code={code}
+      data={data}
+      error={error}
+      totalRequests={totalRequests}
+      onClose={onClose}
+    />
+  );
+}
+
+/** The breakdown itself: a header, then hosts, response classes and user agents side by side. */
+export function CountryBreakdownView({
+  code,
+  data,
+  error = false,
+  totalRequests,
+  onClose,
+}: {
+  code: string;
+  /** Null while loading. */
+  data: CountryBreakdownData | null;
+  error?: boolean;
+  totalRequests: number;
+  onClose: () => void;
+}) {
+  const t = useTranslations("analytics");
 
   // Intl rather than a hand-kept table, so the name follows the reader's locale. "XX" is the code
   // for requests GeoIP could not place, which no locale has a name for.
