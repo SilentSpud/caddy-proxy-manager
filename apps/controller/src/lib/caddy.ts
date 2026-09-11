@@ -113,6 +113,7 @@ import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { FORWARD_AUTH_PROXY_PROOF_HEADER, getForwardAuthProxyProof } from "./forward-auth-trust";
 import { decryptSecret } from "./secret";
 import { CaddyApplyError, describeCaddyRejection, logCaddyApplyFailure } from "./caddy-apply-error";
+import { currentStagingScope } from "./settings/staging-context";
 
 const CERTS_DIR = process.env.CERTS_DIRECTORY || join(process.cwd(), "data", "certs");
 mkdirSync(CERTS_DIR, { recursive: true, mode: 0o700 });
@@ -3374,6 +3375,14 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
  * which host rejected it: a partial apply is a state to report, not to succeed at.
  */
 export async function applyCaddyConfig() {
+  // While an action's writes are being staged there is nothing to push yet: the values are in the
+  // operator's change set, not the settings table, and the apply step reloads once for all of
+  // them. Actions still call this unconditionally, so the decision lives here rather than in 20
+  // call sites that would each have to remember.
+  if (currentStagingScope()?.suppressApply) {
+    return;
+  }
+
   const { broadcastCaddyAdmin, listAgentTargets } = await import("./agent/client");
   const targets = await listAgentTargets();
 

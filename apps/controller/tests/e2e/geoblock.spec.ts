@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { clickSettingsSection, goToSettingsSection } from '../helpers/settings-nav';
+import { applyStagedChanges } from '../helpers/staged-settings';
 
 /** Empty geoblock config used to reset state between tests. */
 const EMPTY_GEOBLOCK = {
@@ -92,7 +93,12 @@ test.describe('Geo Blocking - form persistence', () => {
     await expect(geoSection.locator(`text=${SAFE_BLOCK_CIDR}`)).toBeVisible();
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expect(geoSection.locator('text=/staged|saved|success/i')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // A UI save stages; applying is what writes it through, and the API reports applied values.
+    await applyStagedChanges(page);
 
     // Check what actually landed before reloading. The banner also shows for
     // the "saved, but could not apply to Caddy" path, so a green message is not
@@ -175,7 +181,9 @@ test.describe('Geo Blocking - form persistence', () => {
     await expect(geoSection.locator(`text=${SAFE_ALLOW_CIDR_2}`)).toBeVisible();
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expect(geoSection.locator('text=/staged|saved|success/i')).toBeVisible({
+      timeout: 10000,
+    });
 
     await page.reload();
     await clickSettingsSection(page, 'Global Geoblocking');
@@ -225,7 +233,9 @@ test.describe('Geo Blocking - form persistence', () => {
     await expect(redirectInput).toBeHidden();
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expect(geoSection.locator('text=/staged|saved|success/i')).toBeVisible({
+      timeout: 10000,
+    });
 
     await page.reload();
     await clickSettingsSection(page, 'Global Geoblocking');
@@ -276,7 +286,9 @@ test.describe('Geo Blocking - form persistence', () => {
     await statusInput.fill('418');
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expect(geoSection.locator('text=/staged|saved|success/i')).toBeVisible({
+      timeout: 10000,
+    });
 
     // No page.reload() here - the visible form must already reflect the save.
     await expect(geoSection.locator('input[name="geoblockRedirectUrl"]')).toHaveValue(
@@ -330,7 +342,11 @@ test.describe('Geo Blocking - form persistence', () => {
 
     await geoSection.getByRole('button', { name: /lan only/i }).click();
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expect(geoSection.locator('text=/staged|saved|success/i')).toBeVisible({
+      timeout: 10000,
+    });
+
+    await applyStagedChanges(page);
 
     // Read saved values via API, then immediately reset to stop blocking traffic
     const res = await page.request.get(API_GEOBLOCK);

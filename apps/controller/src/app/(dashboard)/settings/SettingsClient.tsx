@@ -1,42 +1,13 @@
 "use client";
 
-import { useState, useActionState, useEffect, type ReactNode } from "react";
-import {
-  Cloud,
-  Globe,
-  Pin,
-  Activity,
-  ScrollText,
-  Settings2,
-  UserCheck,
-  MapPin,
-  KeyRound,
-  Search,
-  FileWarning,
-  ShieldCheck,
-  Waypoints,
-  UserCircle,
-  Package,
-  Server,
-  Cpu,
-  BarChart2,
-  Globe2,
-  Image,
-  Network,
-  RefreshCw,
-  MonitorSmartphone,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { useState, useActionState, useEffect, useTransition, type ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
 import { AppDialog } from "@/src/components/ui/AppDialog";
-import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { Heading } from "@astryxdesign/core/Heading";
-import { Kbd } from "@astryxdesign/core/Kbd";
-import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -47,11 +18,9 @@ import {
   StatusAlert,
   WarnAlert,
 } from "@/src/components/ui/FormLayout";
-import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { createStaticSource } from "@astryxdesign/core/Typeahead/utils";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import {
   AUTOFILL_NEW_PASSWORD,
@@ -86,8 +55,9 @@ import {
 } from "@/components/caddy-modules/ModuleGate";
 import { GeoBlockFields } from "@/components/proxy-hosts/GeoBlockFields";
 import { ErrorPagesFields } from "@/components/proxy-hosts/ErrorPagesFields";
-import { useMediaQuery } from "@astryxdesign/core/hooks";
 import OAuthProvidersSection from "./OAuthProvidersSection";
+import SettingsFrame from "./SettingsFrame";
+import type { StagedView } from "@/src/lib/settings/staged-view";
 import { CheckboxInput } from "@/src/components/ui/FormBooleanControls";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
@@ -107,6 +77,7 @@ import {
   updateFaviconAction,
   updateUpdateSettingsAction,
   checkForUpdatesAction,
+  checkGeoipUpdatesAction,
   updatePasswordPolicySettingsAction,
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
@@ -123,245 +94,7 @@ import {
   unpairAgentAction,
 } from "./actions";
 
-// ─── Settings navigation catalog ─────────────────────────────────────────────
-
-type SettingItem = {
-  id: string;
-  name: string;
-  desc: string;
-  icon: LucideIcon;
-  /**
-   * Environment variables that configure this section, shown as tokens beside its name.
-   *
-   * An operator arrives here from a `.env` file, so the variable name is the handle they already
-   * have. Only variables that set a value this section shows belong here: a near-miss sends
-   * someone to a page that cannot change what they came to change. `DASHBOARD_DOMAIN` belongs to
-   * Dashboard Host and not to General, whose default domain is a starting value for new proxy
-   * hosts and is configured nowhere but the database. The ones a database setting supersedes are
-   * in `src/lib/settings/registry.ts`, which is where their precedence is defined.
-   */
-  env?: readonly string[];
-  /**
-   * Variables the search should match that are not worth showing. For a section configured by a
-   * whole family of variables, `env` carries the prefix and this carries the members, so typing
-   * any one of them still lands on the section.
-   */
-  envSearch?: readonly string[];
-};
-
-type SettingsGroup = {
-  id: string;
-  label: string;
-  items: SettingItem[];
-};
-
-const SETTINGS_GROUPS: SettingsGroup[] = [
-  {
-    id: "system",
-    label: "System",
-    items: [
-      {
-        id: "general",
-        name: "General",
-        desc: "Primary domain and ACME contact email",
-        icon: Settings2,
-      },
-      {
-        id: "acme",
-        name: "ACME Server",
-        desc: "Custom ACME directory URL for internal CAs",
-        icon: ShieldCheck,
-        env: ["ACME_CA_ROOT_DIR"],
-      },
-      {
-        id: "default-response",
-        name: "Default Response",
-        desc: "Handle requests for unknown hosts and direct IP access",
-        icon: Server,
-      },
-      {
-        id: "avatars",
-        name: "User Avatars",
-        desc: "Gravatar fallback for users without an icon",
-        icon: UserCircle,
-        env: ["AVATAR_GRAVATAR"],
-      },
-      {
-        id: "branding",
-        name: "Branding",
-        desc: "The favicon browsers show for this instance",
-        icon: Image,
-      },
-      {
-        id: "updates",
-        name: "Updates",
-        desc: "Whether to check the registry for a newer release, and which one",
-        icon: RefreshCw,
-        env: ["UPDATE_CHECK_ENABLED", "UPDATE_IMAGE_REPOSITORY"],
-      },
-      {
-        id: "caddy-build",
-        name: "Caddy Build",
-        desc: "Which plugins the Caddy image is compiled with",
-        icon: Package,
-        env: ["CADDY_BUILD_TIMEOUT"],
-      },
-      {
-        id: "dashboard",
-        name: "Dashboard Host",
-        desc: "Serve this dashboard through Caddy, on a domain of its own",
-        icon: MonitorSmartphone,
-        env: ["DASHBOARD_DOMAIN"],
-      },
-      {
-        id: "agent",
-        name: "Agent",
-        desc: "The service that recreates and rebuilds the Caddy container",
-        icon: Cpu,
-        env: ["CONTROLLER_URL", "AGENT_MODE", "PAIRING_CODE", "CADDY_API_URL"],
-      },
-    ],
-  },
-  {
-    id: "networking",
-    label: "Networking",
-    items: [
-      {
-        id: "dns-providers",
-        name: "DNS Providers",
-        desc: "Provider credentials for ACME DNS-01",
-        icon: Cloud,
-      },
-      {
-        id: "dns-resolvers",
-        name: "DNS Resolvers",
-        desc: "Custom resolvers for challenge verification",
-        icon: Globe,
-      },
-      {
-        id: "upstream-dns",
-        name: "Upstream DNS Pinning",
-        desc: "Pin upstream IPs at config-apply time",
-        icon: Pin,
-      },
-      {
-        id: "trusted-proxies",
-        name: "Trusted Proxies",
-        desc: "Resolve real client IP behind an upstream proxy",
-        icon: Waypoints,
-      },
-      {
-        id: "tailscale",
-        name: "Tailscale",
-        desc: "Node defaults for hosts served on, or reached over, your tailnet",
-        icon: Network,
-        env: ["TS_AUTHKEY"],
-      },
-    ],
-  },
-  {
-    id: "security",
-    label: "Security",
-    items: [
-      {
-        id: "geoip",
-        name: "GeoIP Databases",
-        desc: "MaxMind subscription and whether country lookups run at all",
-        icon: Globe2,
-        env: ["GEOIP_ENABLED", "GEOIPUPDATE_ACCOUNT_ID", "GEOIPUPDATE_LICENSE_KEY"],
-      },
-      {
-        id: "geoblock",
-        name: "Global Geoblocking",
-        desc: "Default geoblock rules across all hosts",
-        icon: MapPin,
-      },
-      {
-        id: "error-pages",
-        name: "Error Pages",
-        desc: "Global custom error responses (fallback for all hosts)",
-        icon: FileWarning,
-      },
-      {
-        id: "authentik",
-        name: "Authentik Defaults",
-        desc: "Forward-auth defaults for new proxy hosts",
-        icon: UserCheck,
-        env: ["FORWARD_AUTH_INTERNAL_URL"],
-      },
-      {
-        id: "oauth",
-        name: "OAuth Providers",
-        desc: "OAuth/OIDC SSO providers",
-        icon: KeyRound,
-        // A provider's whole configuration is one family of variables, and `runEnvProviderSync`
-        // reads every one of them into `oauth_providers` at startup. Nineteen tokens under the
-        // heading would drown it, so the prefix is shown and the members stay searchable.
-        env: ["OAUTH_*"],
-        envSearch: [
-          "OAUTH_ENABLED",
-          "OAUTH_PROVIDER_NAME",
-          "OAUTH_ISSUER",
-          "OAUTH_CLIENT_ID",
-          "OAUTH_CLIENT_SECRET",
-          "OAUTH_AUTHORIZATION_URL",
-          "OAUTH_TOKEN_URL",
-          "OAUTH_USERINFO_URL",
-          "OAUTH_SCOPES",
-          "OAUTH_ALLOW_AUTO_LINKING",
-          "OAUTH_DEFAULT_ROLE",
-          "OAUTH_ROLE_MAPPING",
-          "OAUTH_SYNC_GROUPS",
-          "OAUTH_GROUPS_CLAIM",
-          "OAUTH_GROUP_PREFIX",
-          "OAUTH_ADMIN_GROUP",
-          "OAUTH_OPERATOR_GROUP",
-          "OAUTH_USER_GROUP",
-          "OAUTH_VIEWER_GROUP",
-        ],
-      },
-      {
-        id: "password-policy",
-        name: "Password Policy",
-        desc: "Migrate users off older password hashes",
-        icon: KeyRound,
-        env: ["AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH"],
-      },
-    ],
-  },
-  {
-    id: "observability",
-    label: "Observability",
-    items: [
-      {
-        id: "analytics",
-        name: "Analytics",
-        desc: "Traffic and WAF event collection, and the ClickHouse it writes to",
-        icon: BarChart2,
-        env: [
-          "ANALYTICS_ENABLED",
-          "CLICKHOUSE_URL",
-          "CLICKHOUSE_USER",
-          "CLICKHOUSE_PASSWORD",
-          "CLICKHOUSE_DB",
-          "CLICKHOUSE_RETENTION_DAYS",
-        ],
-      },
-      {
-        id: "metrics",
-        name: "Metrics & Monitoring",
-        desc: "Prometheus metrics endpoint",
-        icon: Activity,
-      },
-      {
-        id: "logging",
-        name: "Access Logging",
-        desc: "HTTP access log for proxied requests",
-        icon: ScrollText,
-      },
-    ],
-  },
-];
+import { SETTINGS_GROUPS, findSettingsItem } from "./sections";
 
 const ALL_ITEMS = SETTINGS_GROUPS.flatMap((g) =>
   g.items.map((i) => ({ ...i, groupId: g.id, groupLabel: g.label })),
@@ -372,149 +105,6 @@ function findItem(id: string) {
 }
 
 // ─── Layout primitives ───────────────────────────────────────────────────────
-
-// ─── Cmd-K Palette ───────────────────────────────────────────────────────────
-
-type PaletteItem = {
-  id: string;
-  label: string;
-  auxiliaryData: { desc: string; group: string; env: readonly string[] };
-};
-
-const PALETTE_ITEMS: PaletteItem[] = ALL_ITEMS.map((item) => ({
-  id: item.id,
-  label: item.name,
-  auxiliaryData: {
-    desc: item.desc,
-    group: item.groupLabel,
-    env: [...(item.env ?? []), ...(item.envSearch ?? [])],
-  },
-}));
-
-// Keywords let a search match a setting's description or its group, as the old CommandItem
-// `value` string concatenation did - and its environment variables, so an operator who knows a
-// setting only as the line in their `.env` can search for that name and land on the page that
-// owns it.
-const PALETTE_SOURCE = createStaticSource(PALETTE_ITEMS, {
-  keywords: (item) => [
-    item.auxiliaryData.desc,
-    item.auxiliaryData.group,
-    ...item.auxiliaryData.env,
-  ],
-});
-
-function SettingsCmdK({
-  open,
-  onOpenChange,
-  onSelect,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSelect: (id: string) => void;
-}) {
-  const t = useTranslations("settings");
-  return (
-    <CommandPalette
-      isOpen={open}
-      onOpenChange={onOpenChange}
-      label={t("settingsSearchLabel")}
-      searchSource={PALETTE_SOURCE}
-      emptySearchText="No settings match your search."
-      onValueChange={(id) => {
-        onSelect(id);
-        onOpenChange(false);
-      }}
-      renderItem={(item) => (
-        <VStack gap={0}>
-          <Text type="body" size="sm" weight="medium">
-            {item.label}
-          </Text>
-          <Text type="body" size="xsm" color="secondary" maxLines={1}>
-            {item.auxiliaryData.desc}
-          </Text>
-        </VStack>
-      )}
-    />
-  );
-}
-
-// ─── Settings navigation ─────────────────────────────────────────────────────
-
-function SettingsSidebar({
-  active,
-  onSelect,
-  onSearchClick,
-}: {
-  active: string;
-  onSelect: (id: string) => void;
-  onSearchClick: () => void;
-}) {
-  const t = useTranslations("settings");
-  return (
-    <VStack gap={2} padding={3}>
-      <Button
-        variant="secondary"
-        size="sm"
-        width="100%"
-        icon={<Search />}
-        label={t("settingsSearchButtonLabel")}
-        endContent={<Kbd keys="mod+K" />}
-        onClick={onSearchClick}
-      />
-      <SideNav>
-        {SETTINGS_GROUPS.map((group) => (
-          <SideNavSection key={group.id} title={group.label}>
-            {group.items.map((item) => (
-              <SideNavItem
-                key={item.id}
-                label={item.name}
-                icon={<item.icon />}
-                isSelected={item.id === active}
-                onClick={() => onSelect(item.id)}
-              />
-            ))}
-          </SideNavSection>
-        ))}
-      </SideNav>
-    </VStack>
-  );
-}
-
-/** Narrow-screen navigation: a select naming the current section, replacing a strip of pills. */
-function MobileSettingsNav({
-  active,
-  onSelect,
-  onSearchClick,
-}: {
-  active: string;
-  onSelect: (id: string) => void;
-  onSearchClick: () => void;
-}) {
-  const t = useTranslations("settings");
-  return (
-    <VStack gap={2} data-testid="mobile-settings-nav">
-      <Button
-        variant="secondary"
-        size="sm"
-        width="100%"
-        icon={<Search />}
-        label={t("settingsSearchButtonLabel")}
-        onClick={onSearchClick}
-      />
-      <Selector
-        label={t("settingsSection")}
-        isLabelHidden
-        value={active}
-        onChange={onSelect}
-        options={SETTINGS_GROUPS.map((group) => ({
-          type: "section" as const,
-          title: group.label,
-          options: group.items.map((item) => ({ value: item.id, label: item.name })),
-        }))}
-      />
-    </VStack>
-  );
-}
 
 // ─── Detail header ───────────────────────────────────────────────────────────
 
@@ -546,7 +136,7 @@ function EnvTokens({ names }: { names?: readonly string[] }) {
   );
 }
 
-function DetailHeader({ activeId }: { activeId: string }) {
+function _DetailHeader({ activeId }: { activeId: string }) {
   const item = findItem(activeId);
   if (!item) return null;
   return (
@@ -571,6 +161,9 @@ function DetailHeader({ activeId }: { activeId: string }) {
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 type Props = {
+  /** Section the route asked for. Switching after that is client state, not navigation. */
+  initialSection: string;
+  staged: StagedView;
   general: GeneralSettings | null;
   acme: AcmeSettings | null;
   dnsProvider: DnsProviderApiStatus | null;
@@ -614,6 +207,8 @@ type Props = {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SettingsClient({
+  initialSection,
+  staged,
   general,
   acme,
   dnsProvider,
@@ -644,21 +239,11 @@ export default function SettingsClient({
   baseUrl,
   agents,
 }: Props) {
-  const t = useTranslations("settings");
-  const [active, setActive] = useState("general");
-  const [cmdkOpen, setCmdkOpen] = useState(false);
-
-  // Cmd-K keyboard shortcut
-  useEffect(() => {
-    function handler(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setCmdkOpen(true);
-      }
-    }
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  const _t = useTranslations("settings");
+  // Falls back rather than 404s: a stale bookmark to a renamed section should land somewhere
+  // useful, and every id here is also a real route. Route-derived rather than state - the rail
+  // navigates now, so there is nothing for the page to remember.
+  const active = findSettingsItem(initialSection) ? initialSection : "general";
 
   // Form action states
   const [generalState, generalFormAction] = useActionState(updateGeneralSettingsAction, null);
@@ -706,207 +291,166 @@ export default function SettingsClient({
   );
   const [tailscaleState, tailscaleFormAction] = useActionState(updateTailscaleSettingsAction, null);
 
-  // The page has two navigations - the sidebar panel and the compact picker in the content column
-  // - and neither carried a media gate, so both rendered at every width. Same breakpoint DataTable
-  // uses for its card layout.
-  const isNarrow = useMediaQuery("(max-width: 767px)");
-
   return (
-    <>
-      <Layout
-        height="fill"
-        start={
-          isNarrow ? undefined : (
-            <LayoutPanel width={260} hasDivider role="navigation" label={t("settingsNavigation")}>
-              <SettingsSidebar
-                active={active}
-                onSelect={setActive}
-                onSearchClick={() => setCmdkOpen(true)}
-              />
-            </LayoutPanel>
-          )
-        }
-        content={
-          <LayoutContent padding={5}>
-            <VStack gap={5} maxWidth={768}>
-              <DetailHeader activeId={active} />
-
-              {isNarrow && (
-                <MobileSettingsNav
-                  active={active}
-                  onSelect={setActive}
-                  onSearchClick={() => setCmdkOpen(true)}
-                />
-              )}
-
-              <VStack gap={4}>
-                {active === "general" && (
-                  <GeneralSection
-                    general={general}
-                    generalState={generalState}
-                    generalFormAction={generalFormAction}
-                  />
-                )}
-                {active === "acme" && (
-                  <AcmeSection acme={acme} acmeState={acmeState} acmeFormAction={acmeFormAction} />
-                )}
-                {active === "dashboard" && (
-                  <DashboardHostSection
-                    dashboard={dashboard}
-                    dashboardState={dashboardState}
-                    dashboardFormAction={dashboardFormAction}
-                  />
-                )}
-                {active === "default-response" && (
-                  <DefaultResponseSection
-                    defaultResponse={defaultResponse}
-                    defaultResponseState={defaultResponseState}
-                    defaultResponseFormAction={defaultResponseFormAction}
-                  />
-                )}
-                {active === "dns-providers" && (
-                  <DnsProvidersSection
-                    dnsProvider={dnsProvider}
-                    dnsProviderDefinitions={dnsProviderDefinitions}
-                    dnsProviderState={dnsProviderState}
-                    dnsProviderFormAction={dnsProviderFormAction}
-                    selectedProvider={selectedProvider}
-                    setSelectedProvider={setSelectedProvider}
-                    configuredProviders={configuredProviders}
-                  />
-                )}
-                {active === "dns-resolvers" && (
-                  <DnsResolversSection
-                    dns={dns}
-                    dnsState={dnsState}
-                    dnsFormAction={dnsFormAction}
-                  />
-                )}
-                {active === "upstream-dns" && (
-                  <UpstreamDnsSection
-                    upstreamDnsResolution={upstreamDnsResolution}
-                    upstreamDnsResolutionState={upstreamDnsResolutionState}
-                    upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
-                  />
-                )}
-                {active === "trusted-proxies" && (
-                  <TrustedProxiesSection
-                    trustedProxies={trustedProxies}
-                    trustedProxiesState={trustedProxiesState}
-                    trustedProxiesFormAction={trustedProxiesFormAction}
-                  />
-                )}
-                {active === "tailscale" && (
-                  <TailscaleSection
-                    tailscale={tailscale}
-                    tailscaleState={tailscaleState}
-                    tailscaleFormAction={tailscaleFormAction}
-                  />
-                )}
-                {active === "geoblock" && (
-                  <GeoBlockSection
-                    globalGeoBlock={globalGeoBlock}
-                    geoBlockState={geoBlockState}
-                    geoBlockFormAction={geoBlockFormAction}
-                  />
-                )}
-                {active === "error-pages" && (
-                  <ErrorPagesSection
-                    globalErrorPages={globalErrorPages}
-                    errorPagesState={errorPagesState}
-                    errorPagesFormAction={errorPagesFormAction}
-                  />
-                )}
-                {active === "authentik" && (
-                  <AuthentikSection
-                    authentik={authentik}
-                    authentikState={authentikState}
-                    authentikFormAction={authentikFormAction}
-                  />
-                )}
-                {active === "oauth" && (
-                  <OAuthSection
-                    oauthProviders={oauthProviders}
-                    localUsersDisabled={localUsersDisabled}
-                    baseUrl={baseUrl}
-                  />
-                )}
-                {active === "password-policy" && (
-                  <PasswordPolicySection
-                    passwordPolicy={passwordPolicy}
-                    passwordPolicyState={passwordPolicyState}
-                    passwordPolicyFormAction={passwordPolicyFormAction}
-                  />
-                )}
-                {active === "avatars" && (
-                  <AvatarsSection
-                    avatars={avatars}
-                    avatarsState={avatarsState}
-                    avatarsFormAction={avatarsFormAction}
-                  />
-                )}
-                {active === "branding" && (
-                  <BrandingSection
-                    hasFavicon={hasFavicon}
-                    faviconState={faviconState}
-                    faviconFormAction={faviconFormAction}
-                  />
-                )}
-                {active === "updates" && (
-                  <UpdatesSection
-                    updates={updates}
-                    updatesState={updatesState}
-                    updatesFormAction={updatesFormAction}
-                  />
-                )}
-                {active === "caddy-build" && (
-                  <CaddyBuildSection
-                    caddyBuild={caddyBuild}
-                    caddyBuildState={caddyBuildState}
-                    caddyBuildFormAction={caddyBuildFormAction}
-                    agents={agentBuildTargets}
-                    agentBuildSelections={agentBuildSelections}
-                  />
-                )}
-                {active === "agent" && <AgentSection agents={agents} />}
-                {active === "analytics" && (
-                  <AnalyticsSection
-                    analytics={analytics}
-                    canManageServices={canManageServices}
-                    analyticsState={analyticsState}
-                    analyticsFormAction={analyticsFormAction}
-                  />
-                )}
-                {active === "geoip" && (
-                  <GeoipSection
-                    geoip={geoip}
-                    canManageServices={canManageServices}
-                    geoipState={geoipState}
-                    geoipFormAction={geoipFormAction}
-                  />
-                )}
-                {active === "metrics" && (
-                  <MetricsSection
-                    metrics={metrics}
-                    metricsState={metricsState}
-                    metricsFormAction={metricsFormAction}
-                  />
-                )}
-                {active === "logging" && (
-                  <LoggingSection
-                    logging={logging}
-                    loggingState={loggingState}
-                    loggingFormAction={loggingFormAction}
-                  />
-                )}
-              </VStack>
-            </VStack>
-          </LayoutContent>
-        }
-      />
-
-      <SettingsCmdK open={cmdkOpen} onOpenChange={setCmdkOpen} onSelect={setActive} />
-    </>
+    <SettingsFrame sectionId={active} staged={staged}>
+      <VStack gap={4} maxWidth={768}>
+        {active === "general" && (
+          <GeneralSection
+            general={general}
+            generalState={generalState}
+            generalFormAction={generalFormAction}
+          />
+        )}
+        {active === "acme" && (
+          <AcmeSection acme={acme} acmeState={acmeState} acmeFormAction={acmeFormAction} />
+        )}
+        {active === "dashboard" && (
+          <DashboardHostSection
+            dashboard={dashboard}
+            dashboardState={dashboardState}
+            dashboardFormAction={dashboardFormAction}
+          />
+        )}
+        {active === "default-response" && (
+          <DefaultResponseSection
+            defaultResponse={defaultResponse}
+            defaultResponseState={defaultResponseState}
+            defaultResponseFormAction={defaultResponseFormAction}
+          />
+        )}
+        {active === "dns-providers" && (
+          <DnsProvidersSection
+            dnsProvider={dnsProvider}
+            dnsProviderDefinitions={dnsProviderDefinitions}
+            dnsProviderState={dnsProviderState}
+            dnsProviderFormAction={dnsProviderFormAction}
+            selectedProvider={selectedProvider}
+            setSelectedProvider={setSelectedProvider}
+            configuredProviders={configuredProviders}
+          />
+        )}
+        {active === "dns-resolvers" && (
+          <DnsResolversSection dns={dns} dnsState={dnsState} dnsFormAction={dnsFormAction} />
+        )}
+        {active === "upstream-dns" && (
+          <UpstreamDnsSection
+            upstreamDnsResolution={upstreamDnsResolution}
+            upstreamDnsResolutionState={upstreamDnsResolutionState}
+            upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
+          />
+        )}
+        {active === "trusted-proxies" && (
+          <TrustedProxiesSection
+            trustedProxies={trustedProxies}
+            trustedProxiesState={trustedProxiesState}
+            trustedProxiesFormAction={trustedProxiesFormAction}
+          />
+        )}
+        {active === "tailscale" && (
+          <TailscaleSection
+            tailscale={tailscale}
+            tailscaleState={tailscaleState}
+            tailscaleFormAction={tailscaleFormAction}
+          />
+        )}
+        {active === "geoblock" && (
+          <GeoBlockSection
+            globalGeoBlock={globalGeoBlock}
+            geoBlockState={geoBlockState}
+            geoBlockFormAction={geoBlockFormAction}
+          />
+        )}
+        {active === "error-pages" && (
+          <ErrorPagesSection
+            globalErrorPages={globalErrorPages}
+            errorPagesState={errorPagesState}
+            errorPagesFormAction={errorPagesFormAction}
+          />
+        )}
+        {active === "authentik" && (
+          <AuthentikSection
+            authentik={authentik}
+            authentikState={authentikState}
+            authentikFormAction={authentikFormAction}
+          />
+        )}
+        {active === "oauth" && (
+          <OAuthSection
+            oauthProviders={oauthProviders}
+            localUsersDisabled={localUsersDisabled}
+            baseUrl={baseUrl}
+          />
+        )}
+        {active === "password-policy" && (
+          <PasswordPolicySection
+            passwordPolicy={passwordPolicy}
+            passwordPolicyState={passwordPolicyState}
+            passwordPolicyFormAction={passwordPolicyFormAction}
+          />
+        )}
+        {active === "avatars" && (
+          <AvatarsSection
+            avatars={avatars}
+            avatarsState={avatarsState}
+            avatarsFormAction={avatarsFormAction}
+          />
+        )}
+        {active === "branding" && (
+          <BrandingSection
+            hasFavicon={hasFavicon}
+            faviconState={faviconState}
+            faviconFormAction={faviconFormAction}
+          />
+        )}
+        {active === "updates" && (
+          <UpdatesSection
+            updates={updates}
+            updatesState={updatesState}
+            updatesFormAction={updatesFormAction}
+          />
+        )}
+        {active === "caddy-build" && (
+          <CaddyBuildSection
+            caddyBuild={caddyBuild}
+            caddyBuildState={caddyBuildState}
+            caddyBuildFormAction={caddyBuildFormAction}
+            agents={agentBuildTargets}
+            agentBuildSelections={agentBuildSelections}
+          />
+        )}
+        {active === "agent" && <AgentSection agents={agents} />}
+        {active === "analytics" && (
+          <AnalyticsSection
+            analytics={analytics}
+            canManageServices={canManageServices}
+            analyticsState={analyticsState}
+            analyticsFormAction={analyticsFormAction}
+          />
+        )}
+        {active === "geoip" && (
+          <GeoipSection
+            geoip={geoip}
+            canManageServices={canManageServices}
+            geoipState={geoipState}
+            geoipFormAction={geoipFormAction}
+          />
+        )}
+        {active === "metrics" && (
+          <MetricsSection
+            metrics={metrics}
+            metricsState={metricsState}
+            metricsFormAction={metricsFormAction}
+          />
+        )}
+        {active === "logging" && (
+          <LoggingSection
+            logging={logging}
+            loggingState={loggingState}
+            loggingFormAction={loggingFormAction}
+          />
+        )}
+      </VStack>
+    </SettingsFrame>
   );
 }
 
@@ -2484,6 +2028,54 @@ function AnalyticsSection({
 
 // ─── Section: GeoIP ──────────────────────────────────────────────────────────
 
+/**
+ * When MaxMind was last asked for a newer database, and a way to ask now.
+ *
+ * The file's own date cannot answer "is the updater still working": geoipupdate leaves no trace of
+ * a run that found nothing new, so without this an operator cannot tell a quiet week at MaxMind
+ * from a container that died.
+ */
+function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
+  const t = useTranslations("settings");
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<string | null>(null);
+
+  const checkNow = () => {
+    setResult(null);
+    startTransition(async () => {
+      const outcome = await checkGeoipUpdatesAction();
+      setResult(outcome.message ?? null);
+    });
+  };
+
+  const behind = geoip.editionsBehind;
+  return (
+    <VStack gap={2}>
+      <HStack gap={2} vAlign="center">
+        <Text size="sm" color="secondary">
+          {geoip.lastCheckedAt
+            ? t("geoipLastChecked", { when: new Date(geoip.lastCheckedAt).toLocaleString() })
+            : t("geoipNeverChecked")}
+        </Text>
+        <Button
+          variant="secondary"
+          size="sm"
+          label={pending ? t("geoipChecking") : t("geoipCheckNow")}
+          onClick={checkNow}
+          isDisabled={pending}
+        />
+      </HStack>
+      {geoip.checkError && <WarnAlert title={geoip.checkError} />}
+      {behind.length > 0 && <WarnAlert title={t("geoipBehind", { editions: behind.join(", ") })} />}
+      {result && (
+        <Text size="sm" color="secondary">
+          {result}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
 function GeoipSection({
   geoip,
   canManageServices,
@@ -2538,6 +2130,7 @@ function GeoipSection({
               ? `Installed: ${geoip.installedEditions.join(", ")}.`
               : "No databases are installed yet."}
           </Text>
+          <GeoipUpdateCheckLine geoip={geoip} />
           <input type="hidden" name="hasLicenseKey" value={geoip.hasLicenseKey ? "yes" : "no"} />
           <TextInput
             {...AUTOFILL_OFF}
