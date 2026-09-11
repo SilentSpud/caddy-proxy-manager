@@ -12,11 +12,13 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Selector } from "@astryxdesign/core/Selector";
+import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
+import { StatTiles } from "@/components/ui/StatTiles";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
@@ -43,6 +45,8 @@ type UserEntry = {
   createdAt: string;
   updatedAt: string;
   avatar: ResolvedAvatar;
+  /** Most recent session start, or null when no session of theirs is still on file. */
+  lastSessionAt: string | null;
 };
 
 type Props = {
@@ -67,6 +71,16 @@ const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
   viewer: "neutral",
 };
 
+/**
+ * Rendered on the client on purpose: the server has no way to know the reader's timezone, and a
+ * date rendered in the server's would be wrong for everyone else.
+ */
+function formatSignIn(iso: string) {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 function userLabel(user: UserEntry) {
   return user.name ?? user.email.split("@")[0];
 }
@@ -84,7 +98,9 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
   const [createName, setCreateName] = useState("");
   const [createPassword, setCreatePassword] = useState("");
 
-  const filtered = search
+  const [roleFilter, setRoleFilter] = useState("all");
+
+  const searched = search
     ? users.filter(
         (u) =>
           u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -92,6 +108,22 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
           u.role.includes(search.toLowerCase()),
       )
     : users;
+  const filtered = roleFilter === "all" ? searched : searched.filter((u) => u.role === roleFilter);
+
+  // The tiles and the tab counts report on every account, not on what the search left behind:
+  // narrowing the list should not change what the deployment is said to hold.
+  const roleCounts = ROLE_OPTIONS.reduce(
+    (acc, role) => {
+      acc[role.value as UserEntry["role"]] = users.filter((u) => u.role === role.value).length;
+      return acc;
+    },
+    { admin: 0, operator: 0, user: 0, viewer: 0 } as Record<UserEntry["role"], number>,
+  );
+  const activeCount = users.filter((u) => u.status === "active").length;
+  const disabledCount = users.length - activeCount;
+  // "local" is the absence of an external provider, so anything else names an IdP.
+  const idpCount = users.filter((u) => u.provider && u.provider !== "local").length;
+  const withSessionCount = users.filter((u) => u.lastSessionAt).length;
 
   return (
     <VStack gap={6}>
@@ -99,13 +131,56 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
 
       {error && <Banner status="error" title={t("errorTitle")} description={error} />}
 
+      <StatTiles
+        tiles={[
+          {
+            id: "total",
+            label: t("users"),
+            value: users.length,
+            note: t("activeDisabledNote", { active: activeCount, disabled: disabledCount }),
+          },
+          {
+            id: "admins",
+            label: t("roleAdmins"),
+            value: roleCounts.admin,
+            note: t("operatorsNote", { count: roleCounts.operator }),
+          },
+          {
+            id: "idp",
+            label: t("fromIdp"),
+            value: idpCount,
+            note: t("reconciledOnSignIn"),
+          },
+          {
+            id: "sessions",
+            label: t("withSession"),
+            value: withSessionCount,
+            note: t("withSessionNote"),
+          },
+        ]}
+      />
+
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
+        <TabList value={roleFilter} onChange={setRoleFilter}>
+          <Tab value="all" label={t("filterAll")} endContent={<Badge label={users.length} />} />
+          {ROLE_OPTIONS.map((role) => (
+            <Tab
+              key={role.value}
+              value={role.value}
+              label={role.label}
+              endContent={<Badge label={roleCounts[role.value as UserEntry["role"]]} />}
+            />
+          ))}
+        </TabList>
         <SearchField
           value={search}
           onChange={setSearch}
           placeholder={t("searchPlaceholder")}
           label={t("searchLabel")}
         />
+      </HStack>
+
+      <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
         <HStack gap={3} vAlign="center">
           <Text type="body" size="sm" color="secondary">
             {filtered.length} user{filtered.length !== 1 ? "s" : ""}
@@ -259,6 +334,11 @@ function UserRow({
           </HStack>
           <Text type="body" size="xsm" color="secondary" maxLines={1}>
             {user.email} · {user.provider}
+          </Text>
+          <Text type="supporting" color="secondary" maxLines={1}>
+            {user.lastSessionAt
+              ? t("lastSignedIn", { when: formatSignIn(user.lastSessionAt) })
+              : t("noActiveSession")}
           </Text>
         </VStack>
       </HStack>

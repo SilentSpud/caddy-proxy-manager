@@ -1,7 +1,7 @@
 import db, { nowIso, toIso } from "../db";
 import type { AppRole } from "../oidc-groups";
-import { users, accounts } from "../db/schema";
-import { and, count, desc, eq, ne } from "drizzle-orm";
+import { users, accounts, sessions } from "../db/schema";
+import { and, count, desc, eq, max, ne } from "drizzle-orm";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
 
 export type User = {
@@ -286,4 +286,24 @@ export async function updateUserStatus(userId: number, status: string): Promise<
 
 export async function deleteUser(userId: number): Promise<void> {
   await db.delete(users).where(eq(users.id, userId));
+}
+
+/**
+ * The most recent session start per user, as a stand-in for "last signed in".
+ *
+ * Sessions are deleted when they expire and on sign-out, so a user who has not been back since
+ * their last session lapsed reports nothing rather than a date in the past. That is why the list
+ * says "no active session" rather than "never": the table cannot tell the two apart.
+ */
+export async function lastSessionByUser(): Promise<Map<number, string>> {
+  const rows = await db
+    .select({ userId: sessions.userId, lastSeen: max(sessions.createdAt) })
+    .from(sessions)
+    .groupBy(sessions.userId);
+  const byUser = new Map<number, string>();
+  for (const row of rows) {
+    const iso = toIso(row.lastSeen);
+    if (iso) byUser.set(row.userId, iso);
+  }
+  return byUser;
 }

@@ -1592,6 +1592,7 @@
     "viewDetails": "View details"
   },
   "users": {
+    "activeDisabledNote": "{active} active, {disabled} disabled",
     "cancel": "Cancel",
     "create": "Create",
     "createUser": "Create User",
@@ -1604,16 +1605,25 @@
     "emailPlaceholder": "user@example.com",
     "enableUser": "Enable user",
     "errorTitle": "Something went wrong",
+    "filterAll": "All",
+    "fromIdp": "From an identity provider",
+    "lastSignedIn": "Last signed in {when}",
     "name": "Name",
+    "noActiveSession": "No active session",
     "noUsersFound": "No users found.",
+    "operatorsNote": "{count} operators",
     "pageDescription": "Manage user accounts, roles, and access.",
     "password": "Password",
     "passwordPlaceholder": "Min 8 characters",
+    "reconciledOnSignIn": "Reconciled on every sign-in",
     "role": "Role",
+    "roleAdmins": "Admins",
     "save": "Save",
     "searchLabel": "Search users",
     "searchPlaceholder": "Search users...",
-    "users": "Users"
+    "users": "Users",
+    "withSession": "With a session",
+    "withSessionNote": "Signed in and not yet expired"
   },
   "waf": {
     "addRuleById": "Add Rule by ID",
