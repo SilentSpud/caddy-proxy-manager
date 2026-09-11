@@ -130,7 +130,11 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     description:
       "The stored configuration the Settings page writes - primary domain, ACME details, and the " +
       "rest.",
-    tables: ["settings"],
+    // `settings_staged` and `settings_revisions` are claimed so the schema stays fully covered,
+    // but neither can hold anything worth importing: staging arrived after the source databases
+    // this flow reads, so both are always empty in one, and a half-applied change set belongs to
+    // the operator who staged it on the old instance rather than to the new one.
+    tables: ["settings", "settings_staged", "settings_revisions"],
     requires: [],
   },
   {

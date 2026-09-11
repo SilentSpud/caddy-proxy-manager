@@ -1,36 +1,21 @@
-import { defaultDashboardSettings } from "@/src/lib/dashboard-host";
-import SettingsClient from "./SettingsClient";
-import {
-  getGeneralSettings,
-  getAcmeSettings,
-  getAuthentikSettings,
-  getMetricsSettings,
-  getLoggingSettings,
-  getDnsSettings,
-  getDnsProviderSettings,
-  getUpstreamDnsResolutionSettings,
-  getGeoBlockSettings,
-  getErrorPagesSettings,
-  getTrustedProxiesSettings,
-  getDefaultResponseSettings,
-  getAvatarSettings,
-  getPasswordPolicySettings,
-  getCaddyBuildSettings,
-  getDashboardSettings,
-  getTailscaleSettings,
-  defaultTailscaleSettings,
-} from "@/src/lib/settings";
-import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
-import { getAllAgentBuildSettings, listAgents } from "@/src/lib/models/agents";
-import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
-import { getFavicon } from "@/src/lib/branding";
-import { getUpdateStatus } from "@/src/lib/updates";
-import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
-import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
-import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
-import { config } from "@/src/lib/config";
 import { requireAdmin } from "@/src/lib/auth";
-import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
+import {
+  getAcmeSettings,
+  getCaddyBuildSettings,
+  getDefaultResponseSettings,
+  getDnsProviderSettings,
+  getGeoBlockSettings,
+  getMetricsSettings,
+  getTrustedProxiesSettings,
+} from "@/src/lib/settings";
+import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
+import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
+import { listAgents } from "@/src/lib/models/agents";
+import { listAgentOptions } from "@/src/lib/agent/client";
+import { listCertificates } from "@/src/lib/models/certificates";
+import { needsAttention, sectionHealth } from "@/src/lib/settings/health";
+import { stagedKeys, stagedView } from "@/src/lib/settings/staged-view";
+import SettingsHome from "./SettingsHome";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -39,124 +24,70 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("settings") };
 }
 
+/**
+ * The settings landing page.
+ *
+ * Reads deliberately less than a section page does: every value here feeds one line on one tile,
+ * so pulling the full settings surface to render a summary of it would make the cheapest page in
+ * the section the most expensive.
+ */
 export default async function SettingsPage() {
-  await requireAdmin();
+  const session = await requireAdmin();
+  const userId = Number(session.user.id);
 
   const [
-    general,
-    acme,
     dnsProvider,
-    authentik,
-    metrics,
-    logging,
-    dns,
-    upstreamDnsResolution,
-    globalGeoBlock,
-    globalErrorPages,
+    acme,
     trustedProxies,
     defaultResponse,
-    oauthProviders,
-    avatarSettings,
-    passwordPolicySettings,
-    caddyBuild,
-    tailscale,
-    dashboard,
-    analytics,
+    geoBlock,
     geoip,
-    favicon,
-    updates,
+    analytics,
+    metrics,
+    caddyBuild,
+    oauthProviders,
+    certificates,
+    keys,
+    staged,
   ] = await Promise.all([
-    getGeneralSettings(),
-    getAcmeSettings(),
     getDnsProviderSettings(),
-    getAuthentikSettings(),
-    getMetricsSettings(),
-    getLoggingSettings(),
-    getDnsSettings(),
-    getUpstreamDnsResolutionSettings(),
-    getGeoBlockSettings(),
-    getErrorPagesSettings(),
+    getAcmeSettings(),
     getTrustedProxiesSettings(),
     getDefaultResponseSettings(),
-    listOAuthProviders(),
-    getAvatarSettings(),
-    getPasswordPolicySettings(),
-    getCaddyBuildSettings(),
-    getTailscaleSettings(),
-    getDashboardSettings(),
-    analyticsView(),
+    getGeoBlockSettings(),
     geoipView(),
-    getFavicon(),
-    getUpdateStatus(),
+    analyticsView(),
+    getMetricsSettings(),
+    getCaddyBuildSettings(),
+    listOAuthProviders(),
+    listCertificates(),
+    stagedKeys(userId),
+    stagedView(userId),
   ]);
 
-  // Separate from the settings reads above: these go out over the network to each agent, so a slow
-  // or absent one must not hold up the rest of the page. getAllAgentStatuses reports per agent and
-  // never throws, for exactly that reason.
-  const [pairedAgents, agentStatuses, agentBuildSelections] = await Promise.all([
-    listAgents(),
-    getAllAgentStatuses(),
-    getAllAgentBuildSettings(),
-  ]);
-  const connectedAgentIds = new Set(
-    (await listAgentOptions().catch(() => [])).filter((a) => a.connected).map((a) => a.id),
-  );
+  // Agent reachability is a property of this process, so it is read separately and never allowed
+  // to fail the page: an unreachable agent is a tile that says so, not a 500.
+  const paired = await listAgents().catch(() => []);
+  const connected = await listAgentOptions()
+    .then((options) => options.filter((option) => option.connected).length)
+    .catch(() => 0);
 
-  return (
-    <SettingsClient
-      general={general}
-      acme={acme}
-      dnsProvider={dnsProvider ? redactDnsProviderSettingsForApi(dnsProvider) : null}
-      dnsProviderDefinitions={DNS_PROVIDERS}
-      authentik={authentik}
-      metrics={metrics}
-      logging={logging}
-      dns={dns}
-      upstreamDnsResolution={upstreamDnsResolution}
-      trustedProxies={trustedProxies}
-      defaultResponse={defaultResponse}
-      globalGeoBlock={globalGeoBlock}
-      globalErrorPages={globalErrorPages}
-      oauthProviders={oauthProviders}
-      localUsersDisabled={config.auth.disableLocalUsers}
-      avatars={{
-        // The stored toggle only applies when AVATAR_GRAVATAR leaves the choice open.
-        gravatarEnabled: config.avatars.gravatarFromEnv ?? avatarSettings?.gravatarEnabled ?? true,
-        fromEnv: config.avatars.gravatarFromEnv !== null,
-      }}
-      passwordPolicy={{
-        // The stored toggle only applies when the env var leaves the choice open.
-        requireChangeOnLegacyHash:
-          config.auth.requirePasswordChangeOnLegacyHashFromEnv ??
-          passwordPolicySettings?.requireChangeOnLegacyHash ??
-          false,
-        fromEnv: config.auth.requirePasswordChangeOnLegacyHashFromEnv !== null,
-      }}
-      caddyBuild={caddyBuild}
-      agentBuildTargets={pairedAgents.map((agent) => ({
-        id: agent.id,
-        name: agent.name,
-        connected: connectedAgentIds.has(agent.id),
-      }))}
-      // A Map does not survive the server/client boundary as one; the client reads it by id.
-      agentBuildSelections={Object.fromEntries(agentBuildSelections)}
-      // The auth key never leaves the server: the page ships only whether one is stored, so
-      // the form can say "leave blank to keep the current key" without shipping it.
-      tailscale={redactTailscaleSettingsForApi(tailscale ?? defaultTailscaleSettings())}
-      // Never null downstream: an unset blob means the feature has not been decided, which the
-      // form and the route builder both read as off with a domain to fill in.
-      dashboard={dashboard ?? defaultDashboardSettings()}
-      // Only whether one exists: the image itself is served by its own route, so shipping it in
-      // this page's HTML would be a couple of hundred kilobytes of base64 for nothing.
-      hasFavicon={favicon !== null}
-      updates={updates}
-      analytics={analytics}
-      geoip={geoip}
-      // Starting or stopping the optional containers needs an agent to run compose. Without one the
-      // settings still save and still gate the features; only the container management is missing.
-      canManageServices={agentStatuses.some((result) => result.ok)}
-      baseUrl={config.baseUrl}
-      agents={{ paired: pairedAgents, statuses: agentStatuses }}
-    />
-  );
+  const sections = sectionHealth({
+    dnsProvider,
+    acmeConfigured: Boolean(acme?.caUrl),
+    certificateCount: certificates.length,
+    trustedProxies,
+    defaultResponse,
+    geoBlock,
+    geoip,
+    analytics,
+    metrics,
+    caddyBuild,
+    oauthProviderCount: oauthProviders.length,
+    agentsConnected: connected,
+    agentsPaired: paired.length,
+    stagedKeys: keys,
+  });
+
+  return <SettingsHome sections={sections} attention={needsAttention(sections)} staged={staged} />;
 }

@@ -43,7 +43,7 @@ describe('browser secret boundaries', () => {
 
   it('redacts DNS settings and certificate records before client-component props', () => {
     const settingsPage = readFileSync(
-      join(process.cwd(), 'src/app/(dashboard)/settings/page.tsx'),
+      join(process.cwd(), 'src/app/(dashboard)/settings/[section]/page.tsx'),
       'utf8',
     );
     const proxyHostsPage = readFileSync(
@@ -55,5 +55,19 @@ describe('browser secret boundaries', () => {
     expect(settingsPage).not.toMatch(/dnsProvider=\{dnsProvider\}/);
     expect(proxyHostsPage).toContain('certificates.map(toCertificatePickerOption)');
     expect(proxyHostsPage).not.toMatch(/certificates=\{certificates\}/);
+  });
+
+  it('keeps the settings home from handing raw settings blobs to the client', () => {
+    // The home reads credential-bearing blobs (DNS provider tokens among them) to derive one line
+    // of status per tile. Only `sectionHealth`'s output may cross to the client component, and
+    // that carries names and counts - never the blobs it was computed from.
+    const homePage = readFileSync(
+      join(process.cwd(), 'src/app/(dashboard)/settings/page.tsx'),
+      'utf8',
+    );
+
+    const props = homePage.match(/<SettingsHome([^/]*)\/>/)?.[1] ?? '';
+    expect(props).not.toMatch(/dnsProvider|tailscale|acme=|geoip=|analytics=/);
+    expect(props).toMatch(/sections=\{sections\}/);
   });
 });

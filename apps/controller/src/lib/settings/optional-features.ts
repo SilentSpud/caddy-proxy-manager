@@ -7,7 +7,8 @@
  * That sequence is here rather than in the server action so the ordering is stated once.
  */
 
-import { geoipEnabled, installedGeoipEditions } from "../agent/geoip";
+import { geoipDatabaseAgeDays, geoipEnabled, installedGeoipDatabases } from "../agent/geoip";
+import { editionsBehind, getGeoipUpdateCheck } from "../geoip/update-check";
 import { isAnalyticsEnabled } from "../clickhouse/client";
 import * as registry from "./registry";
 import { resolveSetting, saveSettings, type SettingSource } from "./resolve";
@@ -34,6 +35,24 @@ export type GeoipView = {
   hasLicenseKey: boolean;
   /** Which MaxMind databases are on disk right now. Empty before geoipupdate's first run. */
   installedEditions: string[];
+  /**
+   * Whole days since geoipupdate last wrote a database, or null when none are installed.
+   *
+   * The number that says whether the updater is still running: MaxMind publishes GeoLite2 twice a
+   * week, so a working deployment never gets far past a few days.
+   */
+  databaseAgeDays: number | null;
+  /** When MaxMind was last asked whether anything newer exists, or null if never. */
+  lastCheckedAt: string | null;
+  /** Why the last check failed, when it did. */
+  checkError: string | null;
+  /**
+   * Editions MaxMind has rebuilt since our copy was written.
+   *
+   * The signal the file's age cannot give on its own: it separates "MaxMind has published nothing"
+   * from "the updater has stopped fetching what MaxMind published".
+   */
+  editionsBehind: string[];
 };
 
 export async function analyticsView(): Promise<AnalyticsView> {
@@ -60,11 +79,14 @@ export async function analyticsView(): Promise<AnalyticsView> {
 }
 
 export async function geoipView(): Promise<GeoipView> {
-  const [toggle, enabled, accountId, licenseKey] = await Promise.all([
+  const installed = installedGeoipDatabases();
+  const [toggle, enabled, accountId, licenseKey, check] = await Promise.all([
     resolveSetting(registry.geoipEnabled),
     geoipEnabled(),
     resolveSetting(registry.geoipAccountId),
     resolveSetting(registry.geoipLicenseKey),
+    // Refreshes behind this call when stale; never waits on MaxMind.
+    getGeoipUpdateCheck(installed.map((database) => database.edition)),
   ]);
 
   return {
@@ -73,7 +95,11 @@ export async function geoipView(): Promise<GeoipView> {
     source: toggle.source,
     accountId: accountId.value,
     hasLicenseKey: licenseKey.value.trim().length > 0,
-    installedEditions: installedGeoipEditions(),
+    installedEditions: installed.map((database) => database.edition),
+    databaseAgeDays: geoipDatabaseAgeDays(installed),
+    lastCheckedAt: check.checkedAt,
+    checkError: check.error,
+    editionsBehind: editionsBehind(check.available, installed),
   };
 }
 

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { applyStagedChanges } from '../helpers/staged-settings';
 import { goToSettingsSection, SETTINGS_SIDEBAR } from '../helpers/settings-nav';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -29,18 +30,18 @@ const goToSection = goToSettingsSection;
 
 test.describe('Settings - page load & layout', () => {
   test('settings page loads without redirecting to login', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await expect(page).not.toHaveURL(/login/);
     await expect(page.locator('body')).toBeVisible();
   });
 
   test('settings page defaults to the General section', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
   });
 
   test('sidebar is visible and shows all group headers', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     await expect(sidebar).toBeVisible();
     await expect(sidebar.getByText('System')).toBeVisible();
@@ -50,7 +51,7 @@ test.describe('Settings - page load & layout', () => {
   });
 
   test('sidebar shows settings navigation items', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     const expectedItems = [
       'General',
@@ -66,12 +67,12 @@ test.describe('Settings - page load & layout', () => {
       'Access Logging',
     ];
     for (const name of expectedItems) {
-      await expect(sidebar.getByRole('button', { name, exact: true })).toBeVisible();
+      await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
     }
   });
 
   test('sidebar search button is visible with keyboard hint', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
     await expect(sidebar.getByText('Jump to setting...')).toBeVisible();
     await expect(sidebar.locator('kbd').first()).toBeVisible();
@@ -82,13 +83,13 @@ test.describe('Settings - page load & layout', () => {
 
 test.describe('Settings - sidebar navigation', () => {
   test('clicking a nav item switches the detail pane', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     // Default: General
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
 
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('button', { name: 'ACME Server', exact: true })
+      .getByRole('link', { name: 'ACME Server', exact: true })
       .click();
     await expect(page.getByRole('heading', { name: 'ACME Server' })).toBeVisible();
     // The section it came from is gone, not merely scrolled off.
@@ -96,7 +97,7 @@ test.describe('Settings - sidebar navigation', () => {
   });
 
   test('breadcrumb shows correct group for each section', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const breadcrumb = page.getByTestId('settings-breadcrumb');
 
     // General is under System
@@ -105,14 +106,14 @@ test.describe('Settings - sidebar navigation', () => {
     // Navigate to DNS Providers under Networking
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('button', { name: 'DNS Providers', exact: true })
+      .getByRole('link', { name: 'DNS Providers', exact: true })
       .click();
     await expect(breadcrumb.getByText('Networking')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'DNS Providers' })).toBeVisible();
   });
 
   test('navigating through all sections renders correct headings', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
 
     const sections = [
@@ -129,13 +130,13 @@ test.describe('Settings - sidebar navigation', () => {
     ];
 
     for (const name of sections) {
-      await sidebar.getByRole('button', { name, exact: true }).click();
+      await sidebar.getByRole('link', { name, exact: true }).click();
       await expect(page.getByRole('heading', { name })).toBeVisible();
     }
   });
 
   test('only one section is visible at a time', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
 
     // On General, the ACME section's save button must not be in the document at all.
     await expect(page.getByRole('button', { name: /save general settings/i })).toBeVisible();
@@ -143,7 +144,7 @@ test.describe('Settings - sidebar navigation', () => {
 
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('button', { name: 'ACME Server', exact: true })
+      .getByRole('link', { name: 'ACME Server', exact: true })
       .click();
     await expect(page.getByRole('button', { name: /save acme settings/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /save general settings/i })).not.toBeVisible();
@@ -154,7 +155,7 @@ test.describe('Settings - sidebar navigation', () => {
 
 test.describe('Settings - Cmd-K palette', () => {
   test('Cmd+K opens the command palette', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -162,13 +163,13 @@ test.describe('Settings - Cmd-K palette', () => {
   });
 
   test('clicking the search button opens the command palette', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...').click();
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
   test('palette shows all settings items', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('General')).toBeVisible();
@@ -178,7 +179,7 @@ test.describe('Settings - Cmd-K palette', () => {
   });
 
   test('typing in the palette filters results', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
@@ -190,7 +191,7 @@ test.describe('Settings - Cmd-K palette', () => {
   });
 
   test('selecting a palette result navigates to that section', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     const input = dialog.getByPlaceholder(/search/i);
@@ -203,7 +204,7 @@ test.describe('Settings - Cmd-K palette', () => {
   });
 
   test('Escape closes the palette', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -211,7 +212,7 @@ test.describe('Settings - Cmd-K palette', () => {
   });
 
   test('palette shows "no match" for gibberish query', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('zzzzxyzzy');
@@ -245,7 +246,7 @@ test.describe('Settings - General', () => {
     const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('persist-test.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
 
     // Reload and navigate back
     await goToSection(page, 'General');
@@ -254,7 +255,7 @@ test.describe('Settings - General', () => {
     // Reset
     await page.locator('input[name="defaultDomain"]').fill('caddyproxymanager.com');
     await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('a changed text field still reads as changed after the save', async ({ page }) => {
@@ -272,13 +273,13 @@ test.describe('Settings - General', () => {
 
     await domain.fill('reset-check.local');
     await save.click();
-    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 15_000 });
     await expect(domain).toHaveValue('reset-check.local');
 
     // Put the stored value back, so this leaves the shared stack as it found it.
     await domain.fill(original);
     await save.click();
-    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('ACME email field accepts email input', async ({ page }) => {
@@ -322,7 +323,7 @@ test.describe('Settings - Default Response', () => {
       .locator('textarea[name="headers"]')
       .fill('Content-Type: text/plain; charset=utf-8\nX-Cpm-Ui: saved');
     await page.getByRole('button', { name: /save default response/i }).click();
-    await expect(page.getByText('Default response saved and applied successfully')).toBeVisible({
+    await expect(page.getByText('Staged. Review and apply to send it to Caddy.')).toBeVisible({
       timeout: 10_000,
     });
 
@@ -340,7 +341,7 @@ test.describe('Settings - Default Response', () => {
     await behavior.click();
     await page.getByRole('option', { name: 'Caddy native behavior' }).click();
     await page.getByRole('button', { name: /save default response/i }).click();
-    await expect(page.getByText('Default response saved and applied successfully')).toBeVisible({
+    await expect(page.getByText('Staged. Review and apply to send it to Caddy.')).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -373,7 +374,7 @@ test.describe('Settings - ACME Server', () => {
     await goToSection(page, 'ACME Server');
     await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
     await page.getByRole('button', { name: /save acme settings/i }).click();
-    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
 
     await goToSection(page, 'ACME Server');
     await expect(page.locator('input[name="caUrl"]')).toHaveValue(CUSTOM_DIR);
@@ -386,11 +387,17 @@ test.describe('Settings - ACME Server', () => {
     await expect(page.getByText(/must use HTTPS/i)).toBeVisible({ timeout: 10_000 });
   });
 
-  test('UI save is reflected in the REST API', async ({ page }) => {
+  test('UI save is reflected in the REST API once applied', async ({ page }) => {
     await goToSection(page, 'ACME Server');
     await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
     await page.getByRole('button', { name: /save acme settings/i }).click();
-    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+
+    // Staged, so the API still reports the applied value - which is the point of staging.
+    const staged = await page.request.get(API_SETTINGS_ACME);
+    expect((await staged.json()).caUrl ?? '').not.toBe(CUSTOM_DIR);
+
+    await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_ACME);
     const data = await res.json();
@@ -485,7 +492,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
     await expect(toggle).toBeChecked({ checked: !initial });
 
     await save.click();
-    await expect(page.getByText(/saved/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/staged|saved/i).first()).toBeVisible({ timeout: 15_000 });
     // The assertion the fix exists for: the save must not visually undo what was just saved.
     await expect(toggle).toBeChecked({ checked: !initial });
 
@@ -495,7 +502,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
 
     // Put the stored value back, so this leaves the shared stack as it found it.
     await save.click();
-    await expect(page.getByText(/saved/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/staged|saved/i).first()).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -571,7 +578,7 @@ test.describe('Settings - OAuth Providers', () => {
   });
 
   test('existing OAuth secrets never cross the API or React browser boundary', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const origin = new URL(page.url()).origin;
     const secret = `oauth-browser-secret-${Date.now()}`;
     const providerName = `Write-only OAuth ${Date.now()}`;
@@ -594,7 +601,7 @@ test.describe('Settings - OAuth Providers', () => {
     expect(createBody).not.toContain('clientSecret');
 
     try {
-      const navigation = await page.goto('/settings');
+      const navigation = await page.goto('/settings/general');
       const initialRscHtml = await navigation!.text();
       expect(initialRscHtml).not.toContain(secret);
       expect(initialRscHtml).not.toContain('clientSecret');
@@ -608,7 +615,7 @@ test.describe('Settings - OAuth Providers', () => {
 
       await page
         .locator(SETTINGS_SIDEBAR)
-        .getByRole('button', { name: 'OAuth Providers', exact: true })
+        .getByRole('link', { name: 'OAuth Providers', exact: true })
         .click();
       // Scoping to the card meant guessing at its classes; the button's own accessible name
       // already carries the provider name, which the timestamp makes unique.
@@ -735,25 +742,25 @@ test.describe('Settings - Updates', () => {
 
 test.describe('Settings - cross-section navigation', () => {
   test('rapid section switching renders correct content each time', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
 
     // Click General → verify heading → click Metrics → verify heading
-    await sidebar.getByRole('button', { name: 'General', exact: true }).click();
+    await sidebar.getByRole('link', { name: 'General', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
 
-    await sidebar.getByRole('button', { name: 'Metrics & Monitoring', exact: true }).click();
+    await sidebar.getByRole('link', { name: 'Metrics & Monitoring', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Metrics & Monitoring' })).toBeVisible();
 
-    await sidebar.getByRole('button', { name: 'OAuth Providers', exact: true }).click();
+    await sidebar.getByRole('link', { name: 'OAuth Providers', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'OAuth Providers' })).toBeVisible();
 
-    await sidebar.getByRole('button', { name: 'General', exact: true }).click();
+    await sidebar.getByRole('link', { name: 'General', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
   });
 
   test('Cmd-K to navigate, then sidebar to navigate back', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
 
     // Use Cmd-K to go to Access Logging
     await openPaletteWithKeyboard(page);
@@ -765,7 +772,7 @@ test.describe('Settings - cross-section navigation', () => {
     // Then use sidebar to go to General
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('button', { name: 'General', exact: true })
+      .getByRole('link', { name: 'General', exact: true })
       .click();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
   });
@@ -776,55 +783,33 @@ test.describe('Settings - cross-section navigation', () => {
 test.describe('Settings - mobile layout', () => {
   test.use({ viewport: { width: 393, height: 852 } });
 
-  test('sidebar is hidden on mobile', async ({ page }) => {
-    await page.goto('/settings');
-    // At mobile width the sidebar panel gives way to the compact section nav.
+  /**
+   * Settings no longer ships a compact section picker of its own. The rail it used to sit beside
+   * is now the application's own, so at mobile width the sections are reached exactly the way
+   * every other page's navigation is - through the app shell's mobile nav.
+   */
+  test('the settings rail is behind the app shell nav, not inline', async ({ page }) => {
+    await page.goto('/settings/general');
+    await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
+    // The rail is off-canvas at this width rather than stacked above the content.
     await expect(page.locator(SETTINGS_SIDEBAR)).not.toBeVisible();
   });
 
-  test('mobile section navigation is visible', async ({ page }) => {
-    await page.goto('/settings');
-    // The compact nav is a section dropdown, not a row of pills; it shows the
-    // active section as its value.
-    const mobileNav = page.getByTestId('mobile-settings-nav');
-    const sectionSelect = mobileNav.getByRole('combobox', { name: 'Settings section' });
-    await expect(sectionSelect).toBeVisible();
-    await expect(sectionSelect).toContainText('General');
+  test('a section route renders its own section at mobile width', async ({ page }) => {
+    await page.goto('/settings/metrics');
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Metrics & Monitoring' }),
+    ).toBeVisible();
   });
 
-  test('mobile search button is visible', async ({ page }) => {
-    await page.goto('/settings');
-    const mobileNav = page.getByTestId('mobile-settings-nav');
-    await expect(mobileNav.getByText('Jump to setting...')).toBeVisible();
-  });
-
-  test('choosing a section in the mobile nav switches the detail pane', async ({ page }) => {
-    await page.goto('/settings');
-    const mobileNav = page.getByTestId('mobile-settings-nav');
-    await mobileNav.getByRole('combobox', { name: 'Settings section' }).click();
-    await page.getByRole('option', { name: 'General', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
-  });
-
-  test('mobile search opens Cmd-K palette', async ({ page }) => {
-    await page.goto('/settings');
-    const mobileNav = page.getByTestId('mobile-settings-nav');
-    await mobileNav.getByText('Jump to setting...').click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-  });
-
-  test('Cmd-K palette works on mobile', async ({ page }) => {
-    await page.goto('/settings');
-    const mobileNav = page.getByTestId('mobile-settings-nav');
-    await mobileNav.getByText('Jump to setting...').click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByPlaceholder(/search/i).fill('metrics');
-    await dialog.getByText('Metrics & Monitoring').click();
-    await expect(page.getByRole('heading', { name: 'Metrics & Monitoring' })).toBeVisible();
+  test('the header still names the page and carries the revision', async ({ page }) => {
+    await page.goto('/settings/general');
+    const header = page.getByTestId('settings-header');
+    await expect(header.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
   });
 
   test('detail content does not overflow viewport width', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await page.waitForLoadState('networkidle');
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
     const viewportWidth = page.viewportSize()?.width ?? 393;
@@ -843,7 +828,8 @@ test.describe('Settings - form data round-trip via API', () => {
     await goToSection(page, 'General');
     await page.locator('input[name="defaultDomain"]').fill('api-roundtrip.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByText(/saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_GENERAL);
     const data = await res.json();
@@ -864,7 +850,8 @@ test.describe('Settings - form data round-trip via API', () => {
     }
     await page.locator('input[name="port"]').fill('9191');
     await page.getByRole('button', { name: /save metrics/i }).click();
-    await expect(page.getByText(/saved|success|applied/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_METRICS);
     const data = await res.json();
@@ -889,7 +876,8 @@ test.describe('Settings - form data round-trip via API', () => {
     await page.getByRole('combobox', { name: 'Format' }).click();
     await page.getByRole('option', { name: /console/i }).click();
     await page.getByRole('button', { name: /save logging/i }).click();
-    await expect(page.getByText(/saved|success|applied/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_LOGGING);
     const data = await res.json();
@@ -912,13 +900,13 @@ test.describe('Settings - detail header', () => {
 
     await page
       .locator(SETTINGS_SIDEBAR)
-      .getByRole('button', { name: 'DNS Providers', exact: true })
+      .getByRole('link', { name: 'DNS Providers', exact: true })
       .click();
     await expect(page.getByText('Provider credentials for ACME DNS-01')).toBeVisible();
   });
 
   test('header breadcrumb trail includes Settings prefix', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     const breadcrumb = page.getByTestId('settings-breadcrumb');
     await expect(breadcrumb.getByText('Settings')).toBeVisible();
   });

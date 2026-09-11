@@ -1,17 +1,18 @@
 /**
- * Opening a section of the settings page, without losing the click to hydration.
+ * Opening a section of the settings page.
  *
- * The sidebar is server-rendered, so its buttons are visible and clickable before React attaches
- * their handlers. A click landing in that window is swallowed: the detail pane stays on General
- * and the caller waits out its timeout on a heading that will never appear. Six specs had written
- * this navigation out by hand, so the race had six places to surface and each CI round fixed one.
+ * The items are real links now - each section is its own route - so a click before hydration
+ * navigates rather than being swallowed. The retry below is kept anyway: it costs nothing when the
+ * first click lands, and it still covers the case where the rail re-renders under the pointer.
  *
- * Same race `openCreateHostDialog` rides out in ./proxy-api.ts, and the same answer - retry the
- * click rather than inflate a timeout and call it fixed.
+ * Same shape as `openCreateHostDialog` in ./proxy-api.ts - retry the click rather than inflate a
+ * timeout and call it fixed.
  */
 import { expect, type Page } from '@playwright/test';
 
-export const SETTINGS_SIDEBAR = '[role="navigation"][aria-label="Settings navigation"]';
+// Settings takes the app's own rail over, so there is exactly one nav landmark on these routes -
+// the panel that used to carry an aria-label of its own is gone.
+export const SETTINGS_SIDEBAR = '[role="navigation"]';
 
 /**
  * Click a settings section and wait until it is really showing.
@@ -27,7 +28,9 @@ export async function goToSettingsSection(
   sectionName: string,
   options: { expectHeading?: string } = {},
 ): Promise<void> {
-  await page.goto('/settings');
+  // `/settings` is the tile overview and has no sidebar; the section routes are what render it.
+  // General is the cheapest one to land on, and the click below moves off it immediately.
+  await page.goto('/settings/general');
   await clickSettingsSection(page, sectionName, options);
 }
 
@@ -41,7 +44,7 @@ export async function clickSettingsSection(
   options: { expectHeading?: string } = {},
 ): Promise<void> {
   const sidebar = page.locator(SETTINGS_SIDEBAR);
-  const navButton = sidebar.getByRole('button', { name: sectionName, exact: true });
+  const navButton = sidebar.getByRole('link', { name: sectionName, exact: true });
   await expect(navButton).toBeVisible({ timeout: 10_000 });
 
   const heading = options.expectHeading

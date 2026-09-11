@@ -24,6 +24,7 @@ import {
   Server,
 } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
+import SettingsSideNav from "./settings/SettingsSideNav";
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { NavIcon } from "@astryxdesign/core/NavIcon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -162,6 +163,7 @@ export default function DashboardLayoutClient({
   avatar,
   appName,
   updateAvailable,
+  stagedKeys,
   children,
 }: {
   user: User;
@@ -169,6 +171,8 @@ export default function DashboardLayoutClient({
   appName: string;
   /** A newer release exists in the registry. Surfaced beside the version it replaces. */
   updateAvailable: boolean;
+  /** Settings keys this operator has staged, so the settings rail can mark their sections. */
+  stagedKeys: readonly string[];
   children: ReactNode;
 }) {
   const t = useTranslations("nav");
@@ -179,9 +183,27 @@ export default function DashboardLayoutClient({
     (item) => !item.adminOnly || isAdmin || (isOperator && item.operator === true),
   );
 
-  // Settings and Access Lists render their own full-bleed frame, so the shell
-  // does not add page padding on top of it.
-  const isFullBleed = pathname === "/settings" || pathname === "/access-lists";
+  // Settings renders its own header and padding; Access Lists its own full-bleed frame.
+  const inSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  const isFullBleed = inSettings || pathname === "/access-lists";
+
+  // Settings takes the rail over rather than nesting its own panel inside the page. One rail, and
+  // its first row is the way back - see ./settings/SettingsSideNav.tsx.
+  if (inSettings) {
+    return (
+      <AppShell
+        contentPadding={0}
+        sideNav={
+          <SettingsSideNav
+            footer={<UserFooter user={user} avatar={avatar} />}
+            stagedKeys={stagedKeys}
+          />
+        }
+      >
+        {children}
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
