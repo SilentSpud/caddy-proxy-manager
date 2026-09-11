@@ -1,5 +1,10 @@
 import L4ProxyHostsClient from "./L4ProxyHostsClient";
-import { listL4ProxyHostsPaginated, countL4ProxyHosts } from "@/src/lib/models/l4-proxy-hosts";
+import {
+  listL4ProxyHostsPaginated,
+  countL4ProxyHosts,
+  countL4ProxyHostsByProtocol,
+} from "@/src/lib/models/l4-proxy-hosts";
+import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
 import { canCreate, requireAccess, visibleIdFilter } from "@/src/lib/permissions";
@@ -9,7 +14,13 @@ import { getTranslations } from "next-intl/server";
 const PER_PAGE = 25;
 
 interface PageProps {
-  searchParams: Promise<{ page?: string; search?: string; sortBy?: string; sortDir?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    sortBy?: string;
+    sortDir?: string;
+    protocol?: string;
+  }>;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -26,6 +37,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     search: searchParam,
     sortBy: sortByParam,
     sortDir: sortDirParam,
+    protocol: protocolParam,
   } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
@@ -33,9 +45,15 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const sortBy = sortByParam || undefined;
   const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
 
-  const [hosts, total] = await Promise.all([
-    listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds),
-    countL4ProxyHosts(search, visibleIds),
+  // Filtering on the query rather than on the returned page, for the same reason as the HTTP list:
+  // a client-side tab would show nothing under "UDP" whenever every UDP host sat on a later page.
+  const protocol: L4Protocol | undefined =
+    protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : undefined;
+
+  const [hosts, total, counts] = await Promise.all([
+    listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, protocol),
+    countL4ProxyHosts(search, visibleIds, protocol),
+    countL4ProxyHostsByProtocol(search, visibleIds),
   ]);
 
   // Only the hosts on this page - the map is for the edit dialog.
@@ -51,6 +69,8 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     <L4ProxyHostsClient
       hosts={hosts}
       pagination={{ total, page, perPage: PER_PAGE }}
+      counts={counts}
+      activeProtocol={protocol ?? "all"}
       initialSearch={search ?? ""}
       initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
       agents={agents}

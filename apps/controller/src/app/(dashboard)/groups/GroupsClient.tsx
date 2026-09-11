@@ -18,6 +18,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { StatTiles } from "@/components/ui/StatTiles";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -102,6 +103,20 @@ export default function GroupsClient({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
+  /** What a group manages, as three numbers - the shape of the grant, without opening the dialog. */
+  function grantCounts(group: Group) {
+    const entry = access[group.id];
+    const proxyHosts = entry?.proxyHostIds.length ?? 0;
+    const l4Hosts = entry?.l4ProxyHostIds.length ?? 0;
+    const agents = entry?.agentIds.length ?? 0;
+    return { proxyHosts, l4Hosts, agents, total: proxyHosts + l4Hosts + agents };
+  }
+
+  const idpGroupCount = groups.filter((group) => group.source === "oidc").length;
+  const membershipCount = groups.reduce((sum, group) => sum + group.members.length, 0);
+  const grantedGroupCount = groups.filter((group) => grantCounts(group).total > 0).length;
+  const grantedResourceCount = groups.reduce((sum, group) => sum + grantCounts(group).total, 0);
+
   function getAvailableUsers(group: Group): UserEntry[] {
     const memberIds = new Set(group.members.map((m) => m.userId));
     return users.filter((u) => !memberIds.has(u.id));
@@ -110,6 +125,35 @@ export default function GroupsClient({
   return (
     <VStack gap={6}>
       <PageHeader title={t("groups")} description={t("pageDescription")} />
+
+      <StatTiles
+        tiles={[
+          {
+            id: "groups",
+            label: t("groups"),
+            value: groups.length,
+            note: t("idpManagedNote", { count: idpGroupCount }),
+          },
+          {
+            id: "memberships",
+            label: t("memberships"),
+            value: membershipCount,
+            note: t("membershipsNote", { count: users.length }),
+          },
+          {
+            id: "granted",
+            label: t("grants"),
+            value: grantedGroupCount,
+            note: t("grantsNote", { count: grantedResourceCount }),
+          },
+          {
+            id: "ungranted",
+            label: t("withoutGrants"),
+            value: groups.length - grantedGroupCount,
+            note: t("withoutGrantsNote"),
+          },
+        ]}
+      />
 
       <HStack justify="end">
         <Button
@@ -200,10 +244,48 @@ export default function GroupsClient({
                       </Text>
                     )}
                   </VStack>
-                  <HStack gap={2} vAlign="center">
+                  <HStack gap={2} vAlign="center" wrap="wrap">
                     <Badge
                       label={`${group.members.length} member${group.members.length !== 1 ? "s" : ""}`}
                     />
+                    {/* The grant is the point of a group, so it reads from the card rather than
+                        only from inside the dialog that edits it. */}
+                    {grantCounts(group).total === 0 ? (
+                      <Badge variant="neutral" label={t("noGrants")} />
+                    ) : (
+                      <>
+                        {grantCounts(group).proxyHosts > 0 && (
+                          <Badge
+                            variant="info"
+                            label={t("proxyHostGrants", {
+                              count: grantCounts(group).proxyHosts,
+                            })}
+                          />
+                        )}
+                        {grantCounts(group).l4Hosts > 0 && (
+                          <Badge
+                            variant="info"
+                            label={t("l4Grants", { count: grantCounts(group).l4Hosts })}
+                          />
+                        )}
+                        {grantCounts(group).agents > 0 && (
+                          <Badge
+                            variant="info"
+                            label={t("agentGrants", { count: grantCounts(group).agents })}
+                          />
+                        )}
+                        <Badge
+                          variant={
+                            access[group.id]?.capability === "manage" ? "warning" : "neutral"
+                          }
+                          label={
+                            access[group.id]?.capability === "manage"
+                              ? t("capabilityManageShort")
+                              : t("capabilityViewShort")
+                          }
+                        />
+                      </>
+                    )}
                     <IconButton
                       variant="ghost"
                       size="sm"
