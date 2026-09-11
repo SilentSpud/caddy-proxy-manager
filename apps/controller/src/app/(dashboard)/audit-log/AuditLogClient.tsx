@@ -159,7 +159,11 @@ export default function AuditLogClient({
       />
 
       <Card padding={4}>
-        <ActivityStrip buckets={activity} title={t("activityTitle")} />
+        <ActivityStrip
+          buckets={activity}
+          title={t("activityTitle")}
+          describePeak={(bucket) => t("activityPeak", { label: bucket.label, count: bucket.count })}
+        />
       </Card>
 
       <HStack gap={2} vAlign="center">

@@ -18,10 +18,14 @@ export type ActivityBucket = {
 export function ActivityStrip({
   buckets,
   title,
+  describePeak,
   height = 34,
 }: {
   buckets: ActivityBucket[];
   title: string;
+  /** The sentence naming the busiest bucket, for assistive technology. Supplied by the caller so
+   * it comes from the message catalog. */
+  describePeak: (bucket: ActivityBucket) => string;
   height?: number;
 }) {
   const peak = buckets.reduce((max, bucket) => Math.max(max, bucket.count), 0);
@@ -37,9 +41,7 @@ export function ActivityStrip({
         vAlign="end"
         style={{ height, minWidth: 0 }}
         role="img"
-        aria-label={
-          peak > 0 ? `${title}. Busiest: ${busiest.label}, ${busiest.count} events.` : title
-        }
+        aria-label={peak > 0 ? `${title}. ${describePeak(busiest)}` : title}
       >
         {buckets.map((bucket) => (
           <div

@@ -131,6 +131,7 @@
     "title": "API Docs"
   },
   "auditLog": {
+    "activityPeak": "Busiest hour: {label}, {count} events.",
     "activityTitle": "Activity, last 24 hours (UTC)",
     "actorsNote": "{count} distinct actors",
     "auditLog": "Audit Log",

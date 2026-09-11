@@ -48,18 +48,20 @@ export type AgentRow = {
 /**
  * Relative where that is the useful reading - an agent seen four hours ago is the thing worth
  * noticing - and absolute once it is old enough that "14 days ago" stops meaning anything.
- * Client-side, because the server does not know the reader's timezone.
+ * Client-side, because the server does not know the reader's timezone, and through Intl so the
+ * wording follows the reader's locale rather than being English baked into the component.
  */
 function formatLastSeen(iso: string | null): string | null {
   if (!iso) return null;
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return iso;
-  const seconds = Math.round((Date.now() - at.getTime()) / 1000);
-  if (seconds < 60) return "just now";
+  const seconds = Math.round((at.getTime() - Date.now()) / 1000);
+  const relative = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  if (Math.abs(seconds) < 60) return relative.format(seconds, "second");
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (Math.abs(minutes) < 60) return relative.format(minutes, "minute");
   const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours}h ago`;
+  if (Math.abs(hours) < 48) return relative.format(hours, "hour");
   return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
