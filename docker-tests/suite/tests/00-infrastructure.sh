@@ -27,7 +27,10 @@ t_ok "origin container names resolve" getent hosts origin-a
 t_fails "the client cannot route to a public address" \
   curl -sS --max-time 5 -o /dev/null http://1.1.1.1/
 
-external=$(dig +short +time=2 +tries=1 example.com @172.28.0.5 2>/dev/null | tail -n1)
+# `grep -v '^;'` because bind-tools 9.20 (Alpine 3.24) prints its own diagnostics, such as
+# ";; no servers could be reached", on stdout beside the answer that `+short` asks for - which is
+# the very thing being asserted absent. An address would not start with a semicolon.
+external=$(dig +short +time=2 +tries=1 example.com @172.28.0.5 2>/dev/null | grep -v '^;' | tail -n1)
 t_eq "public DNS names do not resolve" "" "$external"
 
 # ── Simulated destinations ──────────────────────────────────────────────────
