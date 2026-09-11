@@ -14,7 +14,11 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export type StagingScope = {
-  /** Consulted by `getSetting` before the table. A key present here wins, including when null. */
+  /**
+   * Consulted by `getSetting` before the table: a key present here wins. Values are serialized
+   * JSON, so a staged clear is the string `"null"` - present, so it still wins, and it parses to null
+   * rather than falling through to the stored value.
+   */
   overlay: ReadonlyMap<string, string>;
   /**
    * Where `setSetting` writes instead of the table. Absent means reads are overlaid but writes

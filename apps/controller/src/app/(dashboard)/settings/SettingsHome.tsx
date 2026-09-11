@@ -30,21 +30,29 @@ const GROUP_ORDER: SectionHealth["group"][] = ["traffic", "access", "runtime"];
 
 /**
  * Colour alone would carry the status, so each dot also gets a label for assistive technology -
- * a red and a green circle are the same circle to a screen reader.
+ * a red and a green circle are the same circle to a screen reader. The labels are catalog keys,
+ * since that label is the only way a screen reader user learns the status at all.
  */
-const STATUS_TOKEN: Record<SectionHealth["status"], { color: string; label: string }> = {
-  ok: { color: "var(--color-success)", label: "Healthy" },
-  attention: { color: "var(--color-warning)", label: "Needs attention" },
-  unset: { color: "var(--color-border-emphasized)", label: "Not configured" },
-  env: { color: "var(--color-border-emphasized)", label: "Set in the environment" },
+type StatusLabelKey =
+  | "homeStatusHealthy"
+  | "homeStatusAttention"
+  | "homeStatusUnset"
+  | "homeStatusEnv";
+
+const STATUS_TOKEN: Record<SectionHealth["status"], { color: string; labelKey: StatusLabelKey }> = {
+  ok: { color: "var(--color-success)", labelKey: "homeStatusHealthy" },
+  attention: { color: "var(--color-warning)", labelKey: "homeStatusAttention" },
+  unset: { color: "var(--color-border-emphasized)", labelKey: "homeStatusUnset" },
+  env: { color: "var(--color-border-emphasized)", labelKey: "homeStatusEnv" },
 };
 
 function StatusDot({ status }: { status: SectionHealth["status"] }) {
+  const t = useTranslations("settings");
   const token = STATUS_TOKEN[status];
   return (
     <span
       role="img"
-      aria-label={token.label}
+      aria-label={t(token.labelKey)}
       style={{
         width: 8,
         height: 8,

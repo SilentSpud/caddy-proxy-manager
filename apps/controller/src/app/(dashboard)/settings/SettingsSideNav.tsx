@@ -135,7 +135,7 @@ export default function SettingsSideNav({
         onOpenChange={setPaletteOpen}
         label={t("settingsSearchLabel")}
         searchSource={PALETTE_SOURCE}
-        emptySearchText="No settings match your search."
+        emptySearchText={t("settingsSearchEmpty")}
         onValueChange={(id) => {
           router.push(`/settings/${id}`);
           setPaletteOpen(false);

@@ -80,8 +80,10 @@ type Props = {
   agentAssignments?: Record<number, number[]>;
   /** Enabled/disabled totals across everything visible, so the tabs do not count only this page. */
   counts: { total: number; enabled: number; disabled: number };
-  /** Host id → requests in the last 24h. Absent for every host when analytics is off. */
+  /** Host id → requests in the last 24h. A host with no entry took no traffic in the window. */
   hostTraffic: Record<number, { total: number; blocked: number }>;
+  /** False when analytics is off or unreachable - then there are no numbers to show at all. */
+  trafficAvailable: boolean;
   /** Which list tab the URL asked for. */
   activeState: "all" | "enabled" | "disabled";
   /** False for an operator: a grant names a host that already exists, so creating one is an
@@ -220,6 +222,7 @@ export default function ProxyHostsClient({
   agentAssignments,
   counts,
   hostTraffic,
+  trafficAvailable,
   activeState,
   canCreate = true,
 }: Props) {
@@ -277,10 +280,9 @@ export default function ProxyHostsClient({
   const certificateNames = new Map(certificates.map((c) => [c.id, c.name]));
   const agentNames = new Map((agents ?? []).map((a) => [a.id, a.name]));
   const numberFormat = new Intl.NumberFormat();
-  // Nothing in the map means analytics is off or ClickHouse is unreachable - the difference is not
-  // one the list can act on, so the column is dropped rather than filled with zeroes that read as
-  // "no traffic".
-  const trafficKnown = Object.keys(hostTraffic).length > 0;
+  // Whether there is traffic data at all comes from the server, not from the map: with analytics on,
+  // an empty map is a quiet day, and hiding the column then would read as "analytics is off".
+  const trafficKnown = trafficAvailable;
   const trafficTotals = Object.values(hostTraffic).reduce(
     (sum, row) => ({ total: sum.total + row.total, blocked: sum.blocked + row.blocked }),
     { total: 0, blocked: 0 },
@@ -374,14 +376,7 @@ export default function ProxyHostsClient({
             align: "right" as const,
             width: 110,
             render: (host: ProxyHost) => {
-              const row = hostTraffic[host.id];
-              if (!row) {
-                return (
-                  <Text type="body" size="xsm" color="secondary">
-                    &mdash;
-                  </Text>
-                );
-              }
+              const row = hostTraffic[host.id] ?? { total: 0, blocked: 0 };
               return (
                 <VStack gap={0} hAlign="end">
                   <Text type="code" size="sm">

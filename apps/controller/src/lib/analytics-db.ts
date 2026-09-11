@@ -50,6 +50,37 @@ export const INTERVAL_SECONDS: Record<Interval, number> = {
   "30d": 30 * 86400,
 };
 
+/** A whole number of seconds since the epoch, as the analytics routes take `from` and `to`. */
+const EPOCH_SECONDS = /^\d{1,12}$/;
+
+/**
+ * The time window an analytics request asks for.
+ *
+ * An explicit `from`/`to` pair wins only when both are plain epoch seconds and `from` is before
+ * `to`. Anything else - a missing half, `abc`, `1e9`, a reversed range - falls back to the
+ * interval rather than reaching ClickHouse as NaN, which would either fail the query or, worse,
+ * quietly match nothing and render as "no traffic".
+ */
+export function resolveAnalyticsRange(
+  params: URLSearchParams,
+  defaultInterval: Interval = "1h",
+): { from: number; to: number } {
+  const fromParam = params.get("from") ?? "";
+  const toParam = params.get("to") ?? "";
+  if (EPOCH_SECONDS.test(fromParam) && EPOCH_SECONDS.test(toParam)) {
+    const from = Number(fromParam);
+    const to = Number(toParam);
+    if (from < to) return { from, to };
+  }
+  const interval = params.get("interval");
+  const seconds =
+    interval && Object.hasOwn(INTERVAL_SECONDS, interval)
+      ? INTERVAL_SECONDS[interval as Interval]
+      : INTERVAL_SECONDS[defaultInterval];
+  const to = Math.floor(Date.now() / 1000);
+  return { from: to - seconds, to };
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 export interface AnalyticsSummary extends CHSummary {
@@ -189,6 +220,16 @@ export interface HostTraffic {
   blocked: number;
 }
 
+export interface HostTrafficResult {
+  /**
+   * Whether traffic numbers exist to show at all: analytics is switched on and ClickHouse
+   * answered. Distinct from `byHost` being empty, which with analytics on just means none of these
+   * hosts took traffic in the window - a zero worth showing, not an absence to hide.
+   */
+  available: boolean;
+  byHost: Map<number, HostTraffic>;
+}
+
 /**
  * Traffic totals keyed by proxy host id, for a list that shows one number per row.
  *
@@ -197,24 +238,26 @@ export interface HostTraffic {
  * all three. Wildcards are not expanded: `*.lab.example.com` never appears as a Host header, so a
  * request to `a.lab.example.com` counts only if that exact name is also on the host.
  *
- * Returns an empty map when analytics is switched off or ClickHouse cannot be reached; the list
- * then renders without the column's numbers rather than failing.
+ * `available` is false when analytics is switched off or ClickHouse cannot be reached; the list
+ * then renders without the column rather than failing, or showing zeroes that read as "no traffic".
  */
 export async function getTrafficByProxyHost(
   from: number,
   to: number,
   hosts: { id: number; domains: string[] }[],
-): Promise<Map<number, HostTraffic>> {
+): Promise<HostTrafficResult> {
   const byHost = new Map<number, HostTraffic>();
-  if (hosts.length === 0) return byHost;
 
   let totals: Awaited<ReturnType<typeof queryHostTotals>>;
   try {
+    // Asked separately rather than read off an empty result: ClickHouse returns no rows both when
+    // analytics is off and when nothing was recorded, and only the first should hide the column.
+    if (!(await isAnalyticsEnabled())) return { available: false, byHost };
+    if (hosts.length === 0) return { available: true, byHost };
     totals = await queryHostTotals(from, to);
   } catch {
-    return byHost;
+    return { available: false, byHost };
   }
-  if (totals.length === 0) return byHost;
 
   const domainToHost = new Map<string, number[]>();
   for (const host of hosts) {
@@ -241,7 +284,7 @@ export async function getTrafficByProxyHost(
     }
   }
 
-  return byHost;
+  return { available: true, byHost };
 }
 
 // ── Hosts ────────────────────────────────────────────────────────────────────

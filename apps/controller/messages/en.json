@@ -147,6 +147,7 @@
     "activityTitle": "Activity, last 24 hours (UTC)",
     "actorsNote": "{count, plural, one {# distinct actor} other {# distinct actors}}",
     "auditLog": "Audit Log",
+    "event": "Event",
     "eventsLastDay": "Events, last 24h",
     "eventsRecorded": "Events recorded",
     "matchingNote": "Matching the current search",
@@ -155,7 +156,9 @@
     "resource": "Resource",
     "resourceKinds": "Resource kinds touched",
     "resourceKindsNote": "In the last 24 hours",
-    "searchAuditLog": "Search audit log..."
+    "searchAuditLog": "Search audit log...",
+    "timeUtc": "Time (UTC)",
+    "user": "User"
   },
   "auth": {
     "apiErrors": {
@@ -1236,6 +1239,10 @@
     "homeNotConfigured": "Not configured",
     "homeOverview": "Overview",
     "homeStagedBadge": "staged",
+    "homeStatusAttention": "Needs attention",
+    "homeStatusEnv": "Set in the environment",
+    "homeStatusHealthy": "Healthy",
+    "homeStatusUnset": "Not configured",
     "homeSubtitle": "Every card shows what this instance is doing now, not what it is allowed to do.",
     "imageRepository": "Image repository",
     "imageRepositoryHelp": "Where this deployment's images come from, without the image name. Point it at your own namespace if you run a fork, or it will report releases you cannot pull.",
@@ -1457,6 +1464,7 @@
     "setDefault": "Set default",
     "settingsNavigation": "Settings navigation",
     "settingsSearchButtonLabel": "Jump to setting...",
+    "settingsSearchEmpty": "No settings match your search.",
     "settingsSearchLabel": "Jump to a setting",
     "settingsSection": "Settings section",
     "sharedAgentConfigTitle": "Every agent runs the same configuration",

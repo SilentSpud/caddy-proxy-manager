@@ -75,7 +75,7 @@ export default function AuditLogClient({
   const columns: Column<EventRow>[] = [
     {
       id: "created_at",
-      label: "Time (UTC)",
+      label: t("timeUtc"),
       width: 180,
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
@@ -85,7 +85,7 @@ export default function AuditLogClient({
     },
     {
       id: "user",
-      label: "User",
+      label: t("user"),
       width: 160,
       render: (r) => <Badge label={r.user} />,
     },
@@ -106,7 +106,7 @@ export default function AuditLogClient({
     },
     {
       id: "summary",
-      label: "Event",
+      label: t("event"),
       render: (r) => (
         <Text type="body" size="sm">
           {r.summary}

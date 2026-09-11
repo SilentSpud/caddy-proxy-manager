@@ -99,8 +99,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   const agentAssignments = Object.fromEntries(assignments);
 
   // The header counts the whole (visible, searched) set rather than this page, and the traffic
-  // column is best-effort: with analytics off, getTrafficByProxyHost returns nothing and the
-  // column renders empty instead of the list failing.
+  // column is best-effort: with analytics off or unreachable, `available` is false and the column
+  // is dropped instead of the list failing.
   const dayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
   const [counts, traffic] = await Promise.all([
     countProxyHostsByState(search, visibleIds),
@@ -110,7 +110,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       hosts.map((host) => ({ id: host.id, domains: host.domains })),
     ),
   ]);
-  const hostTraffic = Object.fromEntries(traffic);
+  const hostTraffic = Object.fromEntries(traffic.byHost);
 
   // Build forward auth access map for hosts that have CPM forward auth enabled
   const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
@@ -173,6 +173,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       agentAssignments={agentAssignments}
       counts={counts}
       hostTraffic={hostTraffic}
+      trafficAvailable={traffic.available}
       canCreate={canCreate(access)}
     />
   );
