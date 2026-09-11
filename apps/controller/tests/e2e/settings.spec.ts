@@ -792,8 +792,15 @@ test.describe('Settings - mobile layout', () => {
   test('the settings rail is behind the app shell nav, not inline', async ({ page }) => {
     await page.goto('/settings/general');
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
-    // The rail is off-canvas at this width rather than stacked above the content.
-    await expect(page.locator(SETTINGS_SIDEBAR)).not.toBeVisible();
+
+    // At this width the shell renders the rail twice - a top bar holding the menu button, and a
+    // drawer holding the sections - so the rail's container is visible by design. What must not be
+    // is a section link stacked above the content; it has to be one menu tap away instead.
+    const section = page.getByRole('link', { name: 'DNS Providers', exact: true });
+    await expect(section).not.toBeVisible();
+
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(section).toBeVisible();
   });
 
   test('a section route renders its own section at mobile width', async ({ page }) => {
