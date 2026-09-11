@@ -11,7 +11,6 @@ import { vi } from '@/tests/helpers/vi';
 
 const queryHostTotals = vi.fn();
 
-vi.mock('../../src/lib/db', () => ({ default: {} }));
 vi.mock('../../src/lib/clickhouse/client', () => ({
   queryHostTotals,
   querySummary: vi.fn(),
