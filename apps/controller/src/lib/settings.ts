@@ -14,6 +14,7 @@ import {
   type TailscaleSettings,
 } from "./caddy-tailscale";
 import { encryptSecret } from "./secret";
+import { currentStagingScope } from "./settings/staging-context";
 
 export type { DefaultResponseSettings } from "./caddy-default-response";
 export type { TailscaleSettings } from "./caddy-tailscale";
@@ -133,25 +134,41 @@ export type GeoBlockSettings = {
 };
 
 export async function getSetting<T>(key: string): Promise<SettingValue<T>> {
-  const setting = await db.query.settings.findFirst({
-    where: (table, { eq }) => eq(table.key, key),
-  });
+  // A staged value stands in for the stored row, so the config builder and every form read the
+  // same pending state without knowing staging exists. See ./settings/staging-context.ts.
+  const staged = currentStagingScope()?.overlay.get(key);
+  const raw = staged ?? (await storedSettingValue(key));
 
-  if (!setting) {
+  if (raw === null || raw === undefined) {
     return null;
   }
 
   try {
-    return JSON.parse(setting.value) as T;
+    return JSON.parse(raw) as T;
   } catch (error) {
     console.warn(`Failed to parse setting ${key}`, error);
     return null;
   }
 }
 
+async function storedSettingValue(key: string): Promise<string | null> {
+  const setting = await db.query.settings.findFirst({
+    where: (table, { eq }) => eq(table.key, key),
+  });
+  return setting?.value ?? null;
+}
+
 export async function setSetting<T>(key: string, value: T): Promise<void> {
   const payload = JSON.stringify(value);
   const now = nowIso();
+
+  // Inside a capturing scope the write is a staged edit, not a commit. The scope belongs to one
+  // action invocation, so an action that writes several keys stages them together.
+  const capture = currentStagingScope()?.capture;
+  if (capture) {
+    capture.set(key, payload);
+    return;
+  }
 
   await db
     .insert(settings)

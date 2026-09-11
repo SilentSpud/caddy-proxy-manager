@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { goToSettingsSection } from '../helpers/settings-nav';
+import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const API_AUTHENTIK_SETTINGS = 'http://localhost:3000/api/v1/settings/authentik';
@@ -268,9 +269,10 @@ test.describe('Proxy Hosts', () => {
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);
       await page.locator('input[name="authEndpoint"]').fill(defaultSettings.authEndpoint);
       await page.getByRole('button', { name: /save authentik defaults/i }).click();
-      await expect(page.getByText(/authentik defaults saved successfully/i)).toBeVisible({
-        timeout: 10000,
-      });
+      // Settings saves stage rather than write through, and the host form prefills from the applied
+      // defaults - so the change has to be applied before the dialog can reflect it.
+      await expectStaged(page);
+      await applyStagedChanges(page);
 
       await page.goto('/proxy-hosts');
       await page.getByRole('button', { name: /create host/i }).click();

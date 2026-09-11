@@ -1,6 +1,6 @@
 ---
 title: Analytics
-description: Live traffic charts, protocol breakdown, a country map, top user agents and blocked requests, backed by ClickHouse.
+description: Live traffic charts, protocol breakdown, a country map with a per-country breakdown, top user agents and blocked requests, backed by ClickHouse.
 ---
 
 import Demo from "../../../components/Demo.astro";
@@ -9,7 +9,7 @@ import AnalyticsDemo from "../../../demos/samples/AnalyticsDemo";
 Traffic and WAF events are written to a bundled ClickHouse instance and queried back as charts. It
 is optional - everything else works without it.
 
-<Demo title="Traffic analytics" note="Change the range; the chart is drawn, not a picture.">
+<Demo title="Traffic analytics" note="Change the range, switch what the countries are ranked by, or pick a country to open its breakdown.">
   <AnalyticsDemo client:visible />
 </Demo>
 
@@ -17,7 +17,9 @@ is optional - everything else works without it.
 
 - **Request volume** over a time range you pick, filterable by host.
 - **Protocol breakdown** - HTTP versions and TLS versions actually in use.
-- **A country map**, from the same GeoIP databases [geo blocking](../geo-blocking/) uses.
+- **A country map**, from the same GeoIP databases [geo blocking](../geo-blocking/) uses. Colour it
+  by requests, blocked requests or unique IPs, and pick a country - on the map or in the table
+  beside it - to see which hosts it reached, how they answered, and which user agents it sent.
 - **Top user agents**, which is usually how you notice a scraper.
 - **Blocked requests**, paginated and searchable, linking back to the [WAF](../waf/) rule or geo
   rule that produced them.

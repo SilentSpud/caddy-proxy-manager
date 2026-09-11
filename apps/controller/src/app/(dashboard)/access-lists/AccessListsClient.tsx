@@ -954,6 +954,15 @@ function ListsRail({
           })}
         </List>
       )}
+
+      {/* The rail scrolls, so the totals go at its foot rather than above the list: they describe
+          the whole set, not the part currently in view. */}
+      <Text type="supporting" color="secondary">
+        {t("railSummary", {
+          lists: lists.length,
+          members: lists.reduce((sum, list) => sum + list.entries.length, 0),
+        })}
+      </Text>
     </VStack>
   );
 }

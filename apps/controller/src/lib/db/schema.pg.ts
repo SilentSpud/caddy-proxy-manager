@@ -184,6 +184,47 @@ export const settings = pgTable("settings", {
 });
 
 /**
+ * Settings edited but not yet applied, held per operator.
+ *
+ * Same `key` and serialized `value` as `settings`, so a staged row is a drop-in for the stored one
+ * and the read path parses both identically. Scoped by user because two admins editing at once
+ * must not see each other's half-finished work land in their own apply - the row moves into
+ * `settings` only when its owner applies.
+ */
+export const settingsStaged = pgTable(
+  "settings_staged",
+  {
+    key: text("key").notNull(),
+    userId: integer("userId")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    value: text("value").notNull(),
+    stagedAt: text("stagedAt").notNull(),
+  },
+  (table) => ({
+    pk: uniqueIndex("settings_staged_user_key_idx").on(table.userId, table.key),
+  }),
+);
+
+/**
+ * One row per apply, so an operator can see what changed and when it reached Caddy.
+ *
+ * `id` is the revision number the UI shows. `summary` is the human-readable change list rendered
+ * at apply time rather than derived later: the settings it describes have moved on by then, and a
+ * history that re-reads current values would narrate the present, not what happened.
+ */
+export const settingsRevisions = pgTable("settings_revisions", {
+  id: serial("id").primaryKey(),
+  appliedBy: integer("appliedBy").references(() => users.id, { onDelete: "set null" }),
+  appliedByName: text("appliedByName"),
+  summary: text("summary").notNull(),
+  keys: text("keys").notNull(),
+  outcome: text("outcome").notNull(),
+  error: text("error"),
+  appliedAt: text("appliedAt").notNull(),
+});
+
+/**
  * Agents this controller has paired with.
  *
  * No address, because the controller never dials one: agents connect inbound and hold an event

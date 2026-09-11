@@ -2623,8 +2623,11 @@ export async function listProxyHosts(): Promise<ProxyHost[]> {
  * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
  * viewer may see nothing, and turning that into an unfiltered query would list the whole fleet.
  */
-function proxyHostListFilter(search?: string, visibleIds?: number[] | null) {
+function proxyHostListFilter(search?: string, visibleIds?: number[] | null, enabled?: boolean) {
   const clauses = [];
+  if (enabled !== undefined) {
+    clauses.push(eq(proxyHosts.enabled, enabled));
+  }
   if (search) {
     clauses.push(
       or(
@@ -2644,12 +2647,36 @@ function proxyHostListFilter(search?: string, visibleIds?: number[] | null) {
 export async function countProxyHosts(
   search?: string,
   visibleIds?: number[] | null,
+  enabled?: boolean,
 ): Promise<number> {
   const [row] = await db
     .select({ value: count() })
     .from(proxyHosts)
-    .where(proxyHostListFilter(search, visibleIds));
+    .where(proxyHostListFilter(search, visibleIds, enabled));
   return row?.value ?? 0;
+}
+
+export type ProxyHostCounts = { total: number; enabled: number; disabled: number };
+
+/**
+ * Enabled and disabled counts across everything this viewer can see, not just the current page.
+ * The list header reports on the deployment, so paging through it must not change the numbers -
+ * and the search box must, which is why the filter is the same one the list itself uses.
+ */
+export async function countProxyHostsByState(
+  search?: string,
+  visibleIds?: number[] | null,
+): Promise<ProxyHostCounts> {
+  const [row] = await db
+    .select({
+      total: count(),
+      enabled: sql<number>`sum(case when ${proxyHosts.enabled} then 1 else 0 end)`.mapWith(Number),
+    })
+    .from(proxyHosts)
+    .where(proxyHostListFilter(search, visibleIds));
+  const total = row?.total ?? 0;
+  const enabled = row?.enabled ?? 0;
+  return { total, enabled, disabled: total - enabled };
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: a lookup of heterogeneous drizzle columns, whose union is not expressible as a useful index signature
@@ -2668,8 +2695,9 @@ export async function listProxyHostsPaginated(
   sortBy?: string,
   sortDir?: "asc" | "desc",
   visibleIds?: number[] | null,
+  enabled?: boolean,
 ): Promise<ProxyHost[]> {
-  const where = proxyHostListFilter(search, visibleIds);
+  const where = proxyHostListFilter(search, visibleIds, enabled);
   const col = (sortBy && PROXY_HOST_SORT_COLUMNS[sortBy]) || proxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db

@@ -7,6 +7,11 @@ import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/Segme
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useChartTheme } from "@cpm/controller/src/app/(dashboard)/analytics/chart-theme";
+import {
+  CountryBreakdownView,
+  type CountryBreakdownData,
+} from "@cpm/controller/src/app/(dashboard)/analytics/CountryBreakdown";
+import { useTranslations } from "next-intl";
 import { DemoSurface } from "../DemoSurface";
 
 type Range = "24h" | "7d" | "30d";
@@ -39,13 +44,48 @@ const PROTOCOLS = [
   { label: "HTTP/1.1", value: 9 },
 ];
 
+type Metric = "requests" | "blocked" | "uniqueIps";
+
 const COUNTRIES = [
-  { code: "GB", name: "United Kingdom", requests: 21400 },
-  { code: "DE", name: "Germany", requests: 12800 },
-  { code: "US", name: "United States", requests: 9600 },
-  { code: "NL", name: "Netherlands", requests: 4100 },
-  { code: "SG", name: "Singapore", requests: 1900 },
+  { code: "GB", name: "United Kingdom", requests: 21400, blocked: 38, uniqueIps: 612 },
+  { code: "DE", name: "Germany", requests: 12800, blocked: 22, uniqueIps: 419 },
+  { code: "US", name: "United States", requests: 9600, blocked: 141, uniqueIps: 388 },
+  { code: "NL", name: "Netherlands", requests: 4100, blocked: 9, uniqueIps: 97 },
+  { code: "SG", name: "Singapore", requests: 1900, blocked: 204, uniqueIps: 41 },
 ];
+
+const TOTAL_REQUESTS = COUNTRIES.reduce((sum, c) => sum + c.requests, 0);
+
+/**
+ * A plausible breakdown for one country, derived from its totals the way the page gets one from
+ * /api/analytics/country - hosts, response classes and user agents, each summing to the country.
+ */
+function breakdownFor(country: (typeof COUNTRIES)[number]): CountryBreakdownData {
+  const r = country.requests;
+  const part = (share: number) => Math.round(r * share);
+  return {
+    countryCode: country.code,
+    total: r,
+    blocked: country.blocked,
+    uniqueIps: country.uniqueIps,
+    hosts: [
+      { host: "app.example.com", count: part(0.58) },
+      { host: "grafana.example.com", count: part(0.27) },
+      { host: "cloud.example.com", count: r - part(0.58) - part(0.27) },
+    ],
+    statusClasses: {
+      ok: part(0.87),
+      redirects: part(0.06),
+      clientErrors: part(0.06),
+      serverErrors: r - part(0.87) - part(0.06) - part(0.06),
+    },
+    userAgents: [
+      { userAgent: "Chrome 141", count: part(0.49) },
+      { userAgent: "Safari 19", count: part(0.26) },
+      { userAgent: "curl/8.9", count: part(0.07) },
+    ],
+  };
+}
 
 const USER_AGENTS = [
   { name: "Chrome 141", requests: 18200 },
@@ -113,8 +153,11 @@ function Bar({
   );
 }
 
-export default function AnalyticsDemo() {
+function AnalyticsDemoContent() {
+  const t = useTranslations("analytics");
   const [range, setRange] = useState<Range>("7d");
+  const [metric, setMetric] = useState<Metric>("requests");
+  const [selected, setSelected] = useState<string | null>(null);
   const theme = useChartTheme();
   const data = SERIES[range];
 
@@ -133,66 +176,120 @@ export default function AnalyticsDemo() {
     [theme, data.labels],
   );
 
-  const maxCountry = Math.max(...COUNTRIES.map((c) => c.requests));
+  // The same switch the map carries: one ranking, recoloured - here re-sorted - by the chosen count.
+  const ranked = [...COUNTRIES].sort((a, b) => b[metric] - a[metric]);
+  const maxCountry = Math.max(...COUNTRIES.map((c) => c[metric]));
+  const selectedCountry = COUNTRIES.find((c) => c.code === selected) ?? null;
   const maxAgent = Math.max(...USER_AGENTS.map((a) => a.requests));
 
   return (
-    <DemoSurface>
-      <VStack gap={4}>
-        <SegmentedControl
-          label="Time range"
-          value={range}
-          onChange={(next) => setRange(next as Range)}
-        >
-          <SegmentedControlItem value="24h" label="24 hours" />
-          <SegmentedControlItem value="7d" label="7 days" />
-          <SegmentedControlItem value="30d" label="30 days" />
-        </SegmentedControl>
+    <VStack gap={4}>
+      <SegmentedControl
+        label="Time range"
+        value={range}
+        onChange={(next) => setRange(next as Range)}
+      >
+        <SegmentedControlItem value="24h" label="24 hours" />
+        <SegmentedControlItem value="7d" label="7 days" />
+        <SegmentedControlItem value="30d" label="30 days" />
+      </SegmentedControl>
 
-        <Panel title="Requests">
-          <ReactApexChart
-            type="area"
-            height={220}
-            options={options}
-            series={[
-              { name: "Served", data: data.ok },
-              { name: "Blocked", data: data.blocked },
-            ]}
-          />
-        </Panel>
+      <Panel title="Requests">
+        <ReactApexChart
+          type="area"
+          height={220}
+          options={options}
+          series={[
+            { name: "Served", data: data.ok },
+            { name: "Blocked", data: data.blocked },
+          ]}
+        />
+      </Panel>
 
-        <Grid columns={{ minWidth: 240, max: 2 }} gap={3}>
-          <Panel title="Protocols">
-            <VStack gap={3}>
-              {PROTOCOLS.map((protocol) => (
-                <Bar key={protocol.label} label={protocol.label} value={protocol.value} max={100} />
-              ))}
-            </VStack>
-          </Panel>
-
-          <Panel title="Top countries">
-            <VStack gap={3}>
-              {COUNTRIES.map((country) => (
-                <Bar
-                  key={country.code}
-                  badge={country.code}
-                  label={country.name}
-                  value={country.requests}
-                  max={maxCountry}
-                />
-              ))}
-            </VStack>
-          </Panel>
-        </Grid>
-
-        <Panel title="Top user agents">
+      <Grid columns={{ minWidth: 240, max: 2 }} gap={3}>
+        <Panel title="Protocols">
           <VStack gap={3}>
-            {USER_AGENTS.map((agent) => (
-              <Bar key={agent.name} label={agent.name} value={agent.requests} max={maxAgent} />
+            {PROTOCOLS.map((protocol) => (
+              <Bar key={protocol.label} label={protocol.label} value={protocol.value} max={100} />
             ))}
           </VStack>
         </Panel>
-      </VStack>
+
+        <Panel title="Top countries">
+          <VStack gap={3}>
+            <SegmentedControl
+              label={t("mapMetric")}
+              size="sm"
+              value={metric}
+              onChange={(next) => setMetric(next as Metric)}
+            >
+              <SegmentedControlItem value="requests" label={t("metricRequests")} />
+              <SegmentedControlItem value="blocked" label={t("metricBlocked")} />
+              <SegmentedControlItem value="uniqueIps" label={t("uniqueIps")} />
+            </SegmentedControl>
+            {ranked.map((country) => (
+              // The whole row opens the country's breakdown, as a click on the map does.
+              <button
+                key={country.code}
+                type="button"
+                aria-pressed={country.code === selected}
+                aria-label={
+                  country.code === selected
+                    ? t("closeCountryBreakdown", { code: country.code })
+                    : t("openCountryBreakdown", { code: country.code })
+                }
+                onClick={() => setSelected((cur) => (cur === country.code ? null : country.code))}
+                style={{
+                  all: "unset",
+                  cursor: "pointer",
+                  display: "block",
+                  borderRadius: "var(--radius-inner)",
+                  padding: "4px 6px",
+                  margin: "-4px -6px",
+                  background:
+                    country.code === selected ? "var(--color-accent-muted)" : "transparent",
+                }}
+              >
+                <Bar
+                  badge={country.code}
+                  label={country.name}
+                  value={country[metric]}
+                  max={maxCountry}
+                />
+              </button>
+            ))}
+          </VStack>
+        </Panel>
+      </Grid>
+
+      {selectedCountry && (
+        <CountryBreakdownView
+          code={selectedCountry.code}
+          data={breakdownFor(selectedCountry)}
+          totalRequests={TOTAL_REQUESTS}
+          onClose={() => setSelected(null)}
+        />
+      )}
+
+      <Panel title="Top user agents">
+        <VStack gap={3}>
+          {USER_AGENTS.map((agent) => (
+            <Bar key={agent.name} label={agent.name} value={agent.requests} max={maxAgent} />
+          ))}
+        </VStack>
+      </Panel>
+    </VStack>
+  );
+}
+
+/**
+ * The content renders inside DemoSurface rather than around it: the surface is what provides the
+ * message catalog, and the content reads from it with useTranslations.
+ */
+export default function AnalyticsDemo() {
+  return (
+    <DemoSurface>
+      <AnalyticsDemoContent />
     </DemoSurface>
   );
 }

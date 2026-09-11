@@ -528,6 +528,10 @@ export interface TimelineBucket {
   ts: number;
   total: number;
   blocked: number;
+  /** Added for the overview, whose chart follows whichever tile is selected. */
+  clientErrors: number;
+  serverErrors: number;
+  bytes: number;
 }
 
 export function bucketSizeForDuration(seconds: number): number {
@@ -547,12 +551,22 @@ export async function queryTimeline(
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const rows = await queryRows<{ bucket: string; total: string; blocked: string }>(
+  const rows = await queryRows<{
+    bucket: string;
+    total: string;
+    blocked: string;
+    client_errors: string;
+    server_errors: string;
+    bytes: string;
+  }>(
     `
     SELECT
       intDiv(toUInt32(ts), {p_bucket:UInt32}) AS bucket,
       count() AS total,
-      countIf(is_blocked) AS blocked
+      countIf(is_blocked) AS blocked,
+      countIf(status >= 400 AND status < 500) AS client_errors,
+      countIf(status >= 500) AS server_errors,
+      sum(bytes_sent) AS bytes
     FROM traffic_events
     WHERE ${timeFilter()}${hf.sql}
     GROUP BY bucket
@@ -565,6 +579,9 @@ export async function queryTimeline(
     ts: Number(r.bucket) * bucketSize,
     total: Number(r.total),
     blocked: Number(r.blocked),
+    clientErrors: Number(r.client_errors),
+    serverErrors: Number(r.server_errors),
+    bytes: Number(r.bytes),
   }));
 }
 
@@ -572,6 +589,7 @@ export interface CountryStats {
   countryCode: string;
   total: number;
   blocked: number;
+  uniqueIps: number;
 }
 
 export async function queryCountries(
@@ -582,12 +600,18 @@ export async function queryCountries(
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const rows = await queryRows<{ country_code: string | null; total: string; blocked: string }>(
+  const rows = await queryRows<{
+    country_code: string | null;
+    total: string;
+    blocked: string;
+    unique_ips: string;
+  }>(
     `
     SELECT
       country_code,
       count() AS total,
-      countIf(is_blocked) AS blocked
+      countIf(is_blocked) AS blocked,
+      uniqExact(client_ip) AS unique_ips
     FROM traffic_events
     WHERE ${timeFilter()}${hf.sql}
     GROUP BY country_code
@@ -600,7 +624,109 @@ export async function queryCountries(
     countryCode: r.country_code ?? "XX",
     total: Number(r.total),
     blocked: Number(r.blocked),
+    uniqueIps: Number(r.unique_ips),
   }));
+}
+
+export interface CountryBreakdown {
+  countryCode: string;
+  total: number;
+  blocked: number;
+  uniqueIps: number;
+  hosts: { host: string; count: number }[];
+  statusClasses: { ok: number; redirects: number; clientErrors: number; serverErrors: number };
+  userAgents: { userAgent: string; count: number }[];
+}
+
+/** How many rows each list in the country breakdown carries. */
+const COUNTRY_BREAKDOWN_LIMIT = 5;
+
+/**
+ * One country's slice of the access log: where it went, how it was answered, and what sent it.
+ *
+ * "XX" is the code queryCountries gives rows GeoIP could not place, so it selects the NULLs here
+ * rather than matching a literal - otherwise the unplaced row in the table would open an empty
+ * breakdown. Three small grouped queries rather than one: each is a different GROUP BY, and
+ * ClickHouse runs them in parallel from here.
+ */
+export async function queryCountryBreakdown(
+  from: number,
+  to: number,
+  hosts: string[],
+  countryCode: string,
+): Promise<CountryBreakdown> {
+  const hf = hostFilter(hosts);
+  const tp = timeParams(from, to);
+  const countrySql =
+    countryCode === "XX" ? " AND country_code IS NULL" : " AND country_code = {country:String}";
+  const params = { ...tp, ...hf.params, country: countryCode };
+  const where = `${timeFilter()}${hf.sql}${countrySql}`;
+
+  const [totals, hostRows, uaRows] = await Promise.all([
+    queryRow<{
+      total: string;
+      blocked: string;
+      unique_ips: string;
+      ok: string;
+      redirects: string;
+      client_errors: string;
+      server_errors: string;
+    }>(
+      `
+      SELECT
+        count() AS total,
+        countIf(is_blocked) AS blocked,
+        uniqExact(client_ip) AS unique_ips,
+        countIf(status < 300) AS ok,
+        countIf(status >= 300 AND status < 400) AS redirects,
+        countIf(status >= 400 AND status < 500) AS client_errors,
+        countIf(status >= 500) AS server_errors
+      FROM traffic_events
+      WHERE ${where}
+    `,
+      params,
+    ),
+    queryRows<{ host: string; count: string }>(
+      `
+      SELECT host, count() AS count
+      FROM traffic_events
+      WHERE ${where}
+      GROUP BY host
+      ORDER BY count DESC
+      LIMIT ${COUNTRY_BREAKDOWN_LIMIT}
+    `,
+      params,
+    ),
+    queryRows<{ user_agent: string; count: string }>(
+      `
+      SELECT user_agent, count() AS count
+      FROM traffic_events
+      WHERE ${where}
+      GROUP BY user_agent
+      ORDER BY count DESC
+      LIMIT ${COUNTRY_BREAKDOWN_LIMIT}
+    `,
+      params,
+    ),
+  ]);
+
+  return {
+    countryCode,
+    total: Number(totals?.total ?? 0),
+    blocked: Number(totals?.blocked ?? 0),
+    uniqueIps: Number(totals?.unique_ips ?? 0),
+    hosts: hostRows.map((r) => ({ host: r.host || "Unknown", count: Number(r.count) })),
+    statusClasses: {
+      ok: Number(totals?.ok ?? 0),
+      redirects: Number(totals?.redirects ?? 0),
+      clientErrors: Number(totals?.client_errors ?? 0),
+      serverErrors: Number(totals?.server_errors ?? 0),
+    },
+    userAgents: uaRows.map((r) => ({
+      userAgent: r.user_agent || "Unknown",
+      count: Number(r.count),
+    })),
+  };
 }
 
 export interface ProtoStats {
@@ -751,11 +877,175 @@ export async function queryBlocked(
   };
 }
 
+export interface StatusClassCounts {
+  /** 2xx and 3xx together: the overview treats "served" as one number. */
+  ok: number;
+  clientErrors: number;
+  serverErrors: number;
+  /** Rows the blocker handler stopped, so the tile and its log share one population. */
+  blocked: number;
+}
+
+/**
+ * Counts by status class, for the overview's error tiles.
+ *
+ * `querySummary` deliberately does not carry these - it is shared with the analytics
+ * page, which has no use for them, and widening it would make every caller pay for
+ * three more aggregates.
+ */
+export async function queryStatusClasses(
+  from: number,
+  to: number,
+  hosts: string[],
+): Promise<StatusClassCounts> {
+  const hf = hostFilter(hosts);
+  const tp = timeParams(from, to);
+  const row = await queryRow<{
+    ok: string;
+    client_errors: string;
+    server_errors: string;
+    blocked: string;
+  }>(
+    `
+    SELECT
+      countIf(status < 400) AS ok,
+      countIf(status >= 400 AND status < 500) AS client_errors,
+      countIf(status >= 500) AS server_errors,
+      countIf(is_blocked) AS blocked
+    FROM traffic_events
+    WHERE ${timeFilter()}${hf.sql}
+  `,
+    { ...tp, ...hf.params },
+  );
+  return {
+    ok: Number(row?.ok ?? 0),
+    clientErrors: Number(row?.client_errors ?? 0),
+    serverErrors: Number(row?.server_errors ?? 0),
+    blocked: Number(row?.blocked ?? 0),
+  };
+}
+
+/**
+ * Which slice of the access log the overview is asking for. Each one is a status
+ * class the tiles already count, so the log below a tile is the same population
+ * the tile's number came from.
+ */
+export type TrafficEventFilter = "all" | "server-errors" | "client-errors" | "largest" | "blocked";
+
+export interface TrafficEvent {
+  ts: number;
+  clientIp: string;
+  countryCode: string | null;
+  host: string;
+  method: string;
+  uri: string;
+  status: number;
+  proto: string;
+  bytesSent: number;
+  isBlocked: boolean;
+}
+
+const TRAFFIC_EVENT_CONDITIONS: Record<TrafficEventFilter, string> = {
+  all: "",
+  "server-errors": " AND status >= 500",
+  "client-errors": " AND status >= 400 AND status < 500",
+  largest: " AND bytes_sent > 0",
+  blocked: " AND is_blocked = true",
+};
+
+/**
+ * Recent access-log rows, newest first - or largest first for the bandwidth tile,
+ * where "what used the traffic" is the question and recency is not.
+ *
+ * Every selected column is one the parser actually writes: there is no upstream
+ * address and no request duration in `traffic_events`, so neither is offered here.
+ */
+export async function queryTrafficEvents(
+  from: number,
+  to: number,
+  hosts: string[],
+  filter: TrafficEventFilter,
+  limit: number,
+): Promise<TrafficEvent[]> {
+  if (!(await isAnalyticsEnabled())) return [];
+  const hf = hostFilter(hosts);
+  const tp = timeParams(from, to);
+  const order = filter === "largest" ? "bytes_sent DESC, ts DESC" : "ts DESC";
+
+  const rows = await queryRows<{
+    ts: string;
+    client_ip: string;
+    country_code: string | null;
+    host: string;
+    method: string;
+    uri: string;
+    status: string;
+    proto: string;
+    bytes_sent: string;
+    is_blocked: boolean;
+  }>(
+    `
+    SELECT toUInt32(ts) AS ts, client_ip, country_code, host, method, uri,
+           status, proto, bytes_sent, is_blocked
+    FROM traffic_events
+    WHERE ${timeFilter()}${hf.sql}${TRAFFIC_EVENT_CONDITIONS[filter]}
+    ORDER BY ${order}
+    LIMIT {p_limit:UInt32}
+  `,
+    { ...tp, ...hf.params, p_limit: Math.min(Math.max(1, limit), 200) },
+  );
+
+  return rows.map((r) => ({
+    ts: Number(r.ts),
+    clientIp: r.client_ip,
+    countryCode: r.country_code,
+    host: r.host,
+    method: r.method,
+    uri: r.uri,
+    status: Number(r.status),
+    proto: r.proto,
+    bytesSent: Number(r.bytes_sent),
+    isBlocked: Boolean(r.is_blocked),
+  }));
+}
+
 export async function queryDistinctHosts(): Promise<string[]> {
   const rows = await queryRows<{ host: string }>(
     `SELECT DISTINCT host FROM traffic_events WHERE host != ''`,
   );
   return rows.map((r) => r.host);
+}
+
+export interface HostTotals {
+  host: string;
+  total: number;
+  blocked: number;
+}
+
+/**
+ * Per-host request counts for the proxy host list. Grouped in one query rather than one per row:
+ * a page of twenty-five hosts would otherwise be twenty-five round trips to ClickHouse, and the
+ * list renders whether or not any of them answer.
+ */
+export async function queryHostTotals(from: number, to: number): Promise<HostTotals[]> {
+  const rows = await queryRows<{ host: string; total: string; blocked: string }>(
+    `
+    SELECT
+      host,
+      count() AS total,
+      countIf(is_blocked) AS blocked
+    FROM traffic_events
+    WHERE ${timeFilter()} AND host != ''
+    GROUP BY host
+  `,
+    timeParams(from, to),
+  );
+
+  return rows.map((r) => ({
+    host: r.host,
+    total: Number(r.total),
+    blocked: Number(r.blocked),
+  }));
 }
 
 // ── WAF analytics queries ───────────────────────────────────────────────────

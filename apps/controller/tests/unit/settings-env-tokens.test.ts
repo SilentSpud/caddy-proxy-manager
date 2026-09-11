@@ -13,8 +13,9 @@ import { describe, expect, it } from 'bun:test';
  * settings page at all.
  */
 
+// The navigation catalogue, which the sidebar and the section pane both render from.
 const settingsClient = readFileSync(
-  join(process.cwd(), 'src/app/(dashboard)/settings/SettingsClient.tsx'),
+  join(process.cwd(), 'src/app/(dashboard)/settings/sections.ts'),
   'utf8',
 );
 

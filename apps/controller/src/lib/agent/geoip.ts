@@ -42,6 +42,52 @@ export function installedGeoipEditions(): GeoipEdition[] {
   return GEOIP_EDITIONS.filter((edition) => existsSync(geoipDatabasePath(edition)));
 }
 
+export type GeoipDatabaseInfo = {
+  edition: GeoipEdition;
+  /**
+   * When geoipupdate last wrote this file.
+   *
+   * The file's own mtime, for the same reason `geoipEtag` trusts it: geoipupdate replaces a
+   * database wholesale, so the write time is when this host last took delivery of one.
+   *
+   * MaxMind stamps its own `build_epoch` inside the file, which would be the age of the *data*
+   * rather than of the download. Reading it needs a parser for the mmdb metadata section -
+   * `mmdb-lib` has one but does not export it, and its public `Reader` loads the whole database
+   * (tens of megabytes) and walks the search tree to get there. Not worth it for a line on a
+   * tile: when the updater is working these differ by hours, and when it is broken - the case the
+   * tile exists to catch - mtime is the one that stops moving.
+   */
+  updatedAt: Date;
+};
+
+/**
+ * Every edition on disk, with the date the settings page reports.
+ *
+ * Never throws: a database being swapped in underneath us is a row that drops out of the list,
+ * not a settings page that 500s.
+ */
+export function installedGeoipDatabases(): GeoipDatabaseInfo[] {
+  const databases: GeoipDatabaseInfo[] = [];
+  for (const edition of installedGeoipEditions()) {
+    try {
+      databases.push({ edition, updatedAt: statSync(geoipDatabasePath(edition)).mtime });
+    } catch {
+      // Deleted between the listing and the stat.
+    }
+  }
+  return databases;
+}
+
+/** How long ago the freshest database was written, in whole days, or null when none are present. */
+export function geoipDatabaseAgeDays(
+  databases: GeoipDatabaseInfo[],
+  now = Date.now(),
+): number | null {
+  if (databases.length === 0) return null;
+  const newest = Math.max(...databases.map((database) => database.updatedAt.getTime()));
+  return Math.max(0, Math.floor((now - newest) / 86_400_000));
+}
+
 /**
  * Whether GeoIP is switched on.
  *

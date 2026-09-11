@@ -77,6 +77,14 @@ import { config } from "@/src/lib/config";
 import { toOAuthProviderView } from "@/src/lib/oauth-provider-view";
 import { saveAnalyticsSettings, saveGeoipSettings } from "@/src/lib/settings/optional-features";
 import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
+import {
+  discardAllStaged,
+  discardStagedKey,
+  stageWrites,
+  stagedOverlay,
+} from "@/src/lib/settings/staging";
+import { withCapturedWrites } from "@/src/lib/settings/staging-context";
+import { applyStagedSettings } from "@/src/lib/settings/apply";
 import { ensurePairingCode, revokePairingCode } from "@/src/lib/agent/pairing-codes";
 import { deleteAgent, setAgentBuildSettings } from "@/src/lib/models/agents";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
@@ -85,14 +93,68 @@ import type { AppRole } from "@/src/lib/oidc-groups";
 type ActionResult = {
   success: boolean;
   message?: string;
+  /** Set by staged actions: the edit is in the change set, not applied. */
+  staged?: boolean;
 };
 
 const VALID_UPSTREAM_DNS_FAMILIES = ["ipv6", "ipv4", "both"] as const;
 
+/**
+ * Applies as soon as it is submitted, under the settings lock.
+ *
+ * Reserved for the actions staging cannot represent: ones whose real work is not a settings write
+ * at all (a favicon upload, an update check), ones that write another table (the WAF rule
+ * suppressions, which edit proxy hosts), and ones that manage containers on save (Caddy build,
+ * analytics, GeoIP). Splitting those in half - side effect now, settings blob later - would be
+ * worse than not staging them, so they keep the old behaviour.
+ */
 function serializedSettingsAction<TArgs extends unknown[], TResult>(
   action: (...args: TArgs) => Promise<TResult>,
 ): (...args: TArgs) => Promise<TResult> {
   return async (...args: TArgs) => withSettingsUpdateLock(() => action(...args));
+}
+
+/**
+ * Collects the action's settings writes into the operator's change set instead of committing them.
+ *
+ * The action body is untouched and unaware: it validates and calls `save*Settings` exactly as
+ * before, `setSetting` diverts into the capture map, and the `applyCaddyConfig()` it ends with is
+ * suppressed because there is nothing to push until the change set is applied.
+ *
+ * The lock is still taken. Staging writes one row per key per operator, and two forms submitted at
+ * once would otherwise race on the read-modify-write that composes them.
+ */
+function stagedSettingsAction<TArgs extends unknown[]>(
+  action: (...args: TArgs) => Promise<ActionResult>,
+): (...args: TArgs) => Promise<ActionResult> {
+  return async (...args: TArgs) =>
+    withSettingsUpdateLock(async () => {
+      const session = await requireAdmin();
+      const userId = Number(session.user.id);
+      const overlay = await stagedOverlay(userId);
+
+      const { result, writes } = await withCapturedWrites(overlay, () => action(...args));
+      // A failed action may still have written before it threw; staging its half-finished state
+      // would leave the operator with a change set they never asked for.
+      if (!result.success) {
+        return result;
+      }
+
+      await stageWrites(userId, writes);
+      // "layout" scope, not the default: the forms live at /settings/[section], and revalidating
+      // the bare path leaves every section route serving the values from before the edit.
+      revalidatePath("/settings", "layout");
+
+      if (writes.size === 0) {
+        return result;
+      }
+
+      // The action bodies still say "saved and applied", which is what they used to do. Nothing
+      // has been applied yet, so the wrapper that changed the meaning is the thing that corrects
+      // the wording - rather than nineteen edited messages that could drift back apart.
+      const t = await getTranslations("settings");
+      return { ...result, staged: true, message: t("stagedSaved") };
+    });
 }
 
 async function updateGeneralSettingsActionUnlocked(
@@ -1641,45 +1703,45 @@ function parseCustomModules(raw: FormDataEntryValue | null): CaddyCustomModule[]
   return parsed as CaddyCustomModule[];
 }
 
-export const updateGeneralSettingsAction = serializedSettingsAction(
+export const updateGeneralSettingsAction = stagedSettingsAction(
   updateGeneralSettingsActionUnlocked,
 );
-export const updateAcmeSettingsAction = serializedSettingsAction(updateAcmeSettingsActionUnlocked);
-export const updateCloudflareSettingsAction = serializedSettingsAction(
+export const updateAcmeSettingsAction = stagedSettingsAction(updateAcmeSettingsActionUnlocked);
+export const updateCloudflareSettingsAction = stagedSettingsAction(
   updateCloudflareSettingsActionUnlocked,
 );
-export const updateDnsProviderSettingsAction = serializedSettingsAction(
+export const updateDnsProviderSettingsAction = stagedSettingsAction(
   updateDnsProviderSettingsActionUnlocked,
 );
-export const updateAuthentikSettingsAction = serializedSettingsAction(
+export const updateAuthentikSettingsAction = stagedSettingsAction(
   updateAuthentikSettingsActionUnlocked,
 );
-export const updateMetricsSettingsAction = serializedSettingsAction(
+export const updateMetricsSettingsAction = stagedSettingsAction(
   updateMetricsSettingsActionUnlocked,
 );
-export const updateLoggingSettingsAction = serializedSettingsAction(
+export const updateLoggingSettingsAction = stagedSettingsAction(
   updateLoggingSettingsActionUnlocked,
 );
-export const updateTrustedProxiesSettingsAction = serializedSettingsAction(
+export const updateTrustedProxiesSettingsAction = stagedSettingsAction(
   updateTrustedProxiesSettingsActionUnlocked,
 );
-export const updateDashboardSettingsAction = serializedSettingsAction(
+export const updateDashboardSettingsAction = stagedSettingsAction(
   updateDashboardSettingsActionUnlocked,
 );
-export const updateDnsSettingsAction = serializedSettingsAction(updateDnsSettingsActionUnlocked);
-export const updateUpstreamDnsResolutionSettingsAction = serializedSettingsAction(
+export const updateDnsSettingsAction = stagedSettingsAction(updateDnsSettingsActionUnlocked);
+export const updateUpstreamDnsResolutionSettingsAction = stagedSettingsAction(
   updateUpstreamDnsResolutionSettingsActionUnlocked,
 );
-export const updateGeoBlockSettingsAction = serializedSettingsAction(
+export const updateGeoBlockSettingsAction = stagedSettingsAction(
   updateGeoBlockSettingsActionUnlocked,
 );
-export const updateErrorPagesSettingsAction = serializedSettingsAction(
+export const updateErrorPagesSettingsAction = stagedSettingsAction(
   updateErrorPagesSettingsActionUnlocked,
 );
-export const updateDefaultResponseSettingsAction = serializedSettingsAction(
+export const updateDefaultResponseSettingsAction = stagedSettingsAction(
   updateDefaultResponseSettingsActionUnlocked,
 );
-export const updateTailscaleSettingsAction = serializedSettingsAction(
+export const updateTailscaleSettingsAction = stagedSettingsAction(
   updateTailscaleSettingsActionUnlocked,
 );
 export const removeWafRuleGloballyAction = serializedSettingsAction(
@@ -1688,20 +1750,16 @@ export const removeWafRuleGloballyAction = serializedSettingsAction(
 export const suppressWafRuleGloballyAction = serializedSettingsAction(
   suppressWafRuleGloballyActionUnlocked,
 );
-export const updateWafSettingsAction = serializedSettingsAction(updateWafSettingsActionUnlocked);
-export const updatePasswordPolicySettingsAction = serializedSettingsAction(
+export const updateWafSettingsAction = stagedSettingsAction(updateWafSettingsActionUnlocked);
+export const updatePasswordPolicySettingsAction = stagedSettingsAction(
   updatePasswordPolicySettingsActionUnlocked,
 );
-export const updateAvatarSettingsAction = serializedSettingsAction(
-  updateAvatarSettingsActionUnlocked,
-);
+export const updateAvatarSettingsAction = stagedSettingsAction(updateAvatarSettingsActionUnlocked);
 export const updateCaddyBuildSettingsAction = serializedSettingsAction(
   updateCaddyBuildSettingsActionUnlocked,
 );
 export const updateFaviconAction = serializedSettingsAction(updateFaviconActionUnlocked);
-export const updateUpdateSettingsAction = serializedSettingsAction(
-  updateUpdateSettingsActionUnlocked,
-);
+export const updateUpdateSettingsAction = stagedSettingsAction(updateUpdateSettingsActionUnlocked);
 export const checkForUpdatesAction = serializedSettingsAction(checkForUpdatesActionUnlocked);
 export const updateAnalyticsSettingsAction = serializedSettingsAction(
   updateAnalyticsSettingsActionUnlocked,
@@ -1709,6 +1767,89 @@ export const updateAnalyticsSettingsAction = serializedSettingsAction(
 export const updateGeoipSettingsAction = serializedSettingsAction(
   updateGeoipSettingsActionUnlocked,
 );
+
+/**
+ * Ask MaxMind now whether a newer database exists.
+ *
+ * Applies immediately rather than staging: it writes only the cached check result, and staging a
+ * "have you got anything newer" would be nonsense - there is nothing for an operator to review.
+ */
+export async function checkGeoipUpdatesAction(): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const { installedGeoipEditions } = await import("@/src/lib/agent/geoip");
+    const { checkGeoipUpdates } = await import("@/src/lib/geoip/update-check");
+
+    const result = await checkGeoipUpdates(installedGeoipEditions());
+    revalidatePath("/settings", "layout");
+
+    const t = await getTranslations("settings");
+    return result.error
+      ? { success: false, message: result.error }
+      : { success: true, message: t("geoipCheckedNow") };
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to check MaxMind for updates:", error);
+    return {
+      success: false,
+      message: extractErrorMessage(t, error, t("errors.geoipCheckFailed")),
+    };
+  }
+}
+
+// ─── Staged changes ──────────────────────────────────────────────────────────
+
+/**
+ * Commit this operator's change set and reload Caddy once.
+ *
+ * Not wrapped in `serializedSettingsAction`: `applyStagedSettings` takes the lock itself, around
+ * both the commit and the push, so that no staged write lands between them.
+ */
+export async function applyStagedSettingsAction(): Promise<ActionResult> {
+  try {
+    const session = await requireAdmin();
+    const outcome = await applyStagedSettings(Number(session.user.id), session.user.name);
+    revalidatePath("/settings", "layout");
+
+    if (!outcome.ok) {
+      // The values are stored - only the push failed - so this is a partial success, and saying
+      // "failed" would invite an operator to re-enter changes that are already committed.
+      return {
+        success: true,
+        message: `Changes applied, but Caddy did not reload: ${outcome.error}`,
+      };
+    }
+    return { success: true, message: `Applied as revision #${outcome.revision}` };
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to apply staged settings:", error);
+    return {
+      success: false,
+      message: extractErrorMessage(t, error, t("errors.applyStagedFailed")),
+    };
+  }
+}
+
+export async function discardStagedSettingsAction(key?: string): Promise<ActionResult> {
+  try {
+    const session = await requireAdmin();
+    const userId = Number(session.user.id);
+    if (key) {
+      await discardStagedKey(userId, key);
+    } else {
+      await discardAllStaged(userId);
+    }
+    revalidatePath("/settings", "layout");
+    return { success: true };
+  } catch (error) {
+    const t = await getTranslations();
+    console.error("Failed to discard staged settings:", error);
+    return {
+      success: false,
+      message: extractErrorMessage(t, error, t("errors.discardStagedFailed")),
+    };
+  }
+}
 
 // ─── Agents ──────────────────────────────────────────────────────────────────
 

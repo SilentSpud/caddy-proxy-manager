@@ -101,10 +101,13 @@ test.describe('Analytics world map', () => {
       await page.mouse.move(x, y);
       try {
         await expect(popup).toBeVisible({ timeout: 1_000 });
-        popupText = await popup.innerText();
+        // Bounded like the visibility check. The two moves land 2px apart, so the first can hover
+        // a coastline and the second the sea: the popup mounts, then correctly closes, and an
+        // unbounded read would wait out the whole test for a popup that is gone. That is a miss.
+        popupText = await popup.innerText({ timeout: 1_000 });
         break;
       } catch {
-        // Miss (ocean) - try the next point.
+        // Miss (ocean, or a popup that closed as the pointer settled) - try the next point.
       }
     }
 

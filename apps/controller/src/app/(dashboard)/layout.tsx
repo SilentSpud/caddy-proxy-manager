@@ -9,6 +9,7 @@ import { ModuleGateProvider } from "@/components/caddy-modules/ModuleGate";
 import { requiresLegacyPasswordChange } from "@/src/lib/services/legacy-password";
 import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
+import { stagedKeys } from "@/src/lib/settings/staged-view";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireUser();
@@ -34,6 +35,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   // A cache read, and a background refresh when it has gone stale - never a network round trip on
   // the render path. See lib/updates.ts.
   const updates = await getUpdateStatus();
+  // Only admins reach Settings, so nobody else pays for this: one indexed read of a table that is
+  // empty unless someone is mid-edit.
+  const staged =
+    session.user.role === "admin" ? [...(await stagedKeys(Number(session.user.id)))] : [];
   return (
     <ModuleGateProvider value={moduleGate}>
       <DashboardLayoutClient
@@ -41,6 +46,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         avatar={avatar}
         appName={config.appName}
         updateAvailable={updates.updateAvailable}
+        stagedKeys={staged}
       >
         {children}
       </DashboardLayoutClient>

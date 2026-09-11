@@ -153,40 +153,60 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The row detail the app opens for an event: what fired, on what, and the two ways out. */
-function Detail({ event }: { event: Event }) {
+/**
+ * The panel the app opens beside the list for an event: what fired, on what, and the two ways
+ * out. Beside rather than over the list, so reading the next event does not mean closing this one.
+ */
+function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
   return (
-    <VStack gap={3}>
-      <VStack gap={0}>
-        <Text type="label" size="3xs" weight="bold" color="secondary">
-          Rule message
-        </Text>
-        <Text type="body" size="sm">
-          {event.ruleMessage}
-        </Text>
+    <Card padding={4}>
+      <VStack gap={3}>
+        <HStack gap={2} vAlign="center" justify="between">
+          <HStack gap={2} vAlign="center">
+            <Text type="label" weight="bold">
+              WAF Event
+            </Text>
+            {event.blocked ? (
+              <Badge variant="error" label="Blocked" />
+            ) : (
+              <Badge variant="warning" label="Detected" />
+            )}
+          </HStack>
+          <Button variant="ghost" size="sm" label="Close" onClick={onClose} />
+        </HStack>
+
+        <VStack gap={0}>
+          <Text type="label" size="3xs" weight="bold" color="secondary">
+            Rule message
+          </Text>
+          <Text type="body" size="sm">
+            {event.ruleMessage}
+          </Text>
+        </VStack>
+
+        <VStack gap={0}>
+          <Text type="label" size="3xs" weight="bold" color="secondary">
+            Matched data
+          </Text>
+          <Text type="code" size="xsm">
+            {event.matchedData}
+          </Text>
+        </VStack>
+
+        <Divider />
+
+        <HStack gap={2} wrap="wrap">
+          <Button variant="secondary" size="sm" label={`Suppress ${event.ruleId} everywhere`} />
+          <Button variant="secondary" size="sm" label={`Suppress on ${event.host}`} />
+        </HStack>
       </VStack>
-
-      <VStack gap={0}>
-        <Text type="label" size="3xs" weight="bold" color="secondary">
-          Matched data
-        </Text>
-        <Text type="code" size="xsm">
-          {event.matchedData}
-        </Text>
-      </VStack>
-
-      <Divider />
-
-      <HStack gap={2} wrap="wrap">
-        <Button variant="secondary" size="sm" label={`Suppress ${event.ruleId} everywhere`} />
-        <Button variant="secondary" size="sm" label={`Suppress on ${event.host}`} />
-      </HStack>
-    </VStack>
+    </Card>
   );
 }
 
 export default function WafEventLogDemo() {
   const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -197,6 +217,7 @@ export default function WafEventLogDemo() {
         .includes(needle),
     );
   }, [search]);
+  const selected = rows.find((event) => event.id === selectedId) ?? null;
 
   const columns: Column<Event>[] = [
     {
@@ -296,13 +317,27 @@ export default function WafEventLogDemo() {
           placeholder="Search events by host, IP, path or rule..."
         />
 
-        <DataTable
-          columns={columns}
-          data={rows}
-          keyField="id"
-          emptyMessage="No events match that search"
-          expandedRow={(row) => <Detail event={row} />}
-        />
+        {/* The same wrapping split the page uses: side by side when there is room, the panel
+            under the table when there is not. */}
+        <HStack gap={4} vAlign="start" wrap="wrap">
+          <div style={{ flexGrow: 1, flexBasis: 520, minWidth: 0 }}>
+            <DataTable
+              columns={columns}
+              data={rows}
+              keyField="id"
+              emptyMessage="No events match that search"
+              onRowClick={(row) => setSelectedId((cur) => (cur === row.id ? null : row.id))}
+              rowStatus={(row) =>
+                row.id === selectedId ? { color: "accent", label: "Selected" } : null
+              }
+            />
+          </div>
+          {selected && (
+            <div style={{ flexGrow: 1, flexBasis: 320, maxWidth: 460, minWidth: 0 }}>
+              <Detail event={selected} onClose={() => setSelectedId(null)} />
+            </div>
+          )}
+        </HStack>
       </VStack>
     </DemoSurface>
   );

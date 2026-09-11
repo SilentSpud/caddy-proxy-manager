@@ -1,0 +1,186 @@
+"use client";
+
+/**
+ * The settings landing page: what this instance is doing, and what is wrong with it.
+ *
+ * The section list it replaced could only say what each page was for. Every tile here reports a
+ * value the deployment actually holds, and anything `sectionHealth` could show is broken is lifted
+ * out of the grid into a band at the top - the question people open Settings with is "is anything
+ * wrong", and answering it should not require visiting two dozen pages.
+ */
+
+import Link from "next/link";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Card } from "@astryxdesign/core/Card";
+import { Divider } from "@astryxdesign/core/Divider";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { Text } from "@astryxdesign/core/Text";
+import { useTranslations } from "next-intl";
+import type { SectionHealth } from "@/src/lib/settings/health";
+import type { StagedView } from "@/src/lib/settings/staged-view";
+import SettingsFrame from "./SettingsFrame";
+
+type Props = {
+  sections: SectionHealth[];
+  attention: SectionHealth[];
+  staged: StagedView;
+};
+
+const GROUP_ORDER: SectionHealth["group"][] = ["traffic", "access", "runtime"];
+
+/**
+ * Colour alone would carry the status, so each dot also gets a label for assistive technology -
+ * a red and a green circle are the same circle to a screen reader. The labels are catalog keys,
+ * since that label is the only way a screen reader user learns the status at all.
+ */
+type StatusLabelKey =
+  | "homeStatusHealthy"
+  | "homeStatusAttention"
+  | "homeStatusUnset"
+  | "homeStatusEnv";
+
+const STATUS_TOKEN: Record<SectionHealth["status"], { color: string; labelKey: StatusLabelKey }> = {
+  ok: { color: "var(--color-success)", labelKey: "homeStatusHealthy" },
+  attention: { color: "var(--color-warning)", labelKey: "homeStatusAttention" },
+  unset: { color: "var(--color-border-emphasized)", labelKey: "homeStatusUnset" },
+  env: { color: "var(--color-border-emphasized)", labelKey: "homeStatusEnv" },
+};
+
+function StatusDot({ status }: { status: SectionHealth["status"] }) {
+  const t = useTranslations("settings");
+  const token = STATUS_TOKEN[status];
+  return (
+    <span
+      role="img"
+      aria-label={t(token.labelKey)}
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 999,
+        background: token.color,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+export default function SettingsHome({ sections, attention, staged }: Props) {
+  const t = useTranslations("settings");
+  const _tNav = useTranslations("nav");
+
+  const groupLabel: Record<SectionHealth["group"], string> = {
+    traffic: t("homeGroupTraffic"),
+    access: t("homeGroupAccess"),
+    runtime: t("homeGroupRuntime"),
+  };
+
+  // No page header here: the frame renders it, so the overview and every section share one.
+  return (
+    <SettingsFrame sectionId={null} staged={staged}>
+      <VStack gap={5}>
+        {attention.length > 0 && (
+          <Card padding={0}>
+            <VStack gap={0}>
+              <div
+                style={{
+                  padding: "var(--spacing-3) var(--spacing-4)",
+                  background: "var(--color-warning-muted)",
+                  borderTopLeftRadius: "var(--radius-container)",
+                  borderTopRightRadius: "var(--radius-container)",
+                }}
+              >
+                <HStack gap={2} vAlign="center">
+                  <Text type="label">{t("homeAttentionTitle")}</Text>
+                  <Text type="supporting" color="secondary">
+                    {t("homeAttentionCount", { count: attention.length })}
+                  </Text>
+                </HStack>
+              </div>
+              {attention.map((section, index) => (
+                <VStack key={section.id} gap={0}>
+                  {index > 0 && <Divider />}
+                  <div style={{ padding: "var(--spacing-3) var(--spacing-4)" }}>
+                    <HStack gap={3} vAlign="center">
+                      <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
+                        <Text type="label">{section.value}</Text>
+                        <Text type="supporting" color="secondary">
+                          {section.detail}
+                        </Text>
+                      </VStack>
+                      <Link href={`/settings/${section.id}`} style={{ flexShrink: 0 }}>
+                        <Text type="body" color="accent">
+                          {t("homeConfigure")}
+                        </Text>
+                      </Link>
+                    </HStack>
+                  </div>
+                </VStack>
+              ))}
+            </VStack>
+          </Card>
+        )}
+
+        {GROUP_ORDER.map((group) => {
+          const inGroup = sections.filter((section) => section.group === group);
+          if (inGroup.length === 0) return null;
+          return (
+            <VStack key={group} gap={3}>
+              <HStack gap={3} vAlign="center">
+                <Text type="label" size="sm" color="secondary">
+                  {groupLabel[group]}
+                </Text>
+                <div style={{ flexGrow: 1 }}>
+                  <Divider />
+                </div>
+              </HStack>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                  gap: "var(--spacing-3)",
+                }}
+              >
+                {inGroup.map((section) => (
+                  <SectionTile key={section.id} section={section} />
+                ))}
+              </div>
+            </VStack>
+          );
+        })}
+      </VStack>
+    </SettingsFrame>
+  );
+}
+
+function SectionTile({ section }: { section: SectionHealth }) {
+  const t = useTranslations("settings");
+  return (
+    <Link
+      href={`/settings/${section.id}`}
+      style={{ textDecoration: "none", color: "inherit", display: "block" }}
+      data-testid={`settings-tile-${section.id}`}
+      data-status={section.status}
+    >
+      <Card padding={3} height="100%">
+        <VStack gap={2}>
+          <HStack gap={2} vAlign="center">
+            <Text type="label" style={{ flexGrow: 1, minWidth: 0 }}>
+              {section.name}
+            </Text>
+            {section.staged && <Badge variant="warning" label={t("homeStagedBadge")} />}
+            {section.status === "env" && <Badge variant="neutral" label={t("homeEnvBadge")} />}
+            {!section.staged && section.status !== "env" && <StatusDot status={section.status} />}
+          </HStack>
+          <Text type="body" color="secondary" maxLines={1}>
+            {section.value}
+          </Text>
+          {section.detail && (
+            <Text type="supporting" color="secondary" maxLines={2}>
+              {section.detail}
+            </Text>
+          )}
+        </VStack>
+      </Card>
+    </Link>
+  );
+}

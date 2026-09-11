@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { clickSettingsSection, goToSettingsSection } from '../helpers/settings-nav';
+import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 
 /** Empty geoblock config used to reset state between tests. */
 const EMPTY_GEOBLOCK = {
@@ -48,11 +49,22 @@ test.describe('Geo Blocking - form persistence', () => {
   /**
    * Mutating v1 API calls are same-origin checked, so one without an Origin header 403s. This reset
    * silently did nothing while it lacked one, leaving tests running against the persisted volume.
+   *
+   * `Connection: close`, because the two resets bracket a test that only drives the UI: the socket
+   * the first one left in the request context's pool sits idle for five or six seconds, right at
+   * Node's default 5s keep-alive timeout, and the second reset could pick it up the moment the
+   * server closed it - "socket hang up" in CI with the test itself green. Closing after each reset
+   * leaves nothing pooled to race. The one retry covers a drop anyway; the reset is idempotent.
    */
   async function resetGeoblock(page: any) {
-    const res = await page.request.put(API_GEOBLOCK, {
-      headers: { Origin: ORIGIN },
-      data: EMPTY_GEOBLOCK,
+    const put = () =>
+      page.request.put(API_GEOBLOCK, {
+        headers: { Origin: ORIGIN, Connection: 'close' },
+        data: EMPTY_GEOBLOCK,
+      });
+    const res = await put().catch((error: Error) => {
+      if (!/socket hang up|ECONNRESET/i.test(error.message)) throw error;
+      return put();
     });
     expect(res.ok(), `geoblock reset failed: ${res.status()}`).toBe(true);
   }
@@ -92,7 +104,10 @@ test.describe('Geo Blocking - form persistence', () => {
     await expect(geoSection.locator(`text=${SAFE_BLOCK_CIDR}`)).toBeVisible();
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expectStaged(page, 10000);
+
+    // A UI save stages; applying is what writes it through, and the API reports applied values.
+    await applyStagedChanges(page);
 
     // Check what actually landed before reloading. The banner also shows for
     // the "saved, but could not apply to Caddy" path, so a green message is not
@@ -175,7 +190,7 @@ test.describe('Geo Blocking - form persistence', () => {
     await expect(geoSection.locator(`text=${SAFE_ALLOW_CIDR_2}`)).toBeVisible();
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expectStaged(page, 10000);
 
     await page.reload();
     await clickSettingsSection(page, 'Global Geoblocking');
@@ -225,7 +240,7 @@ test.describe('Geo Blocking - form persistence', () => {
     await expect(redirectInput).toBeHidden();
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expectStaged(page, 10000);
 
     await page.reload();
     await clickSettingsSection(page, 'Global Geoblocking');
@@ -276,7 +291,7 @@ test.describe('Geo Blocking - form persistence', () => {
     await statusInput.fill('418');
 
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expectStaged(page, 10000);
 
     // No page.reload() here - the visible form must already reflect the save.
     await expect(geoSection.locator('input[name="geoblockRedirectUrl"]')).toHaveValue(
@@ -330,7 +345,9 @@ test.describe('Geo Blocking - form persistence', () => {
 
     await geoSection.getByRole('button', { name: /lan only/i }).click();
     await geoSection.getByRole('button', { name: /save geoblocking settings/i }).click();
-    await expect(geoSection.locator('text=/saved|success/i')).toBeVisible({ timeout: 10000 });
+    await expectStaged(page, 10000);
+
+    await applyStagedChanges(page);
 
     // Read saved values via API, then immediately reset to stop blocking traffic
     const res = await page.request.get(API_GEOBLOCK);

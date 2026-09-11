@@ -14,6 +14,7 @@ import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 import { toggleL4ProxyHostAction } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
+import { StatTiles } from "@/components/ui/StatTiles";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
 import {
@@ -24,12 +25,16 @@ import {
 import { L4PortsApplyBanner } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
 import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { Banner } from "@astryxdesign/core/Banner";
+import { TabList, Tab } from "@astryxdesign/core/TabList";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
 
 type Props = {
   hosts: L4ProxyHost[];
   pagination: { total: number; page: number; perPage: number };
+  /** Protocol and enabled totals across everything visible, so tabs do not count only this page. */
+  counts: { total: number; tcp: number; udp: number; enabled: number };
+  activeProtocol: "all" | "tcp" | "udp";
   initialSearch: string;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
   agents?: AgentOption[];
@@ -107,6 +112,8 @@ function HostActions({
 export default function L4ProxyHostsClient({
   hosts,
   pagination,
+  counts,
+  activeProtocol,
   initialSearch,
   initialSort,
   agents,
@@ -151,6 +158,14 @@ export default function L4ProxyHostsClient({
       params.set("page", "1");
       router.push(`${pathname}?${params.toString()}`);
     }, 400);
+  }
+
+  function handleProtocolChange(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all") params.delete("protocol");
+    else params.set("protocol", value);
+    params.set("page", "1");
+    router.push(`${pathname}?${params.toString()}`);
   }
 
   const handleToggleEnabled = async (id: number, enabled: boolean) => {
@@ -294,7 +309,31 @@ export default function L4ProxyHostsClient({
         }
       />
 
-      <HStack gap={2} vAlign="center">
+      <StatTiles
+        tiles={[
+          {
+            id: "hosts",
+            label: t("l4ProxyHosts"),
+            value: counts.total,
+            note: t("enabledNote", { count: counts.enabled }),
+          },
+          { id: "tcp", label: t("tcpStreams"), value: counts.tcp, note: t("tcpNote") },
+          { id: "udp", label: t("udpStreams"), value: counts.udp, note: t("udpNote") },
+          {
+            id: "agents",
+            label: t("listeners"),
+            value: agents?.length ?? 0,
+            note: t("listenersNote"),
+          },
+        ]}
+      />
+
+      <HStack gap={4} vAlign="center" wrap="wrap" justify="between">
+        <TabList value={activeProtocol} onChange={handleProtocolChange}>
+          <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
+          <Tab value="tcp" label="TCP" endContent={<Badge label={counts.tcp} />} />
+          <Tab value="udp" label="UDP" endContent={<Badge label={counts.udp} />} />
+        </TabList>
         <SearchField
           value={searchTerm}
           onChange={handleSearchChange}

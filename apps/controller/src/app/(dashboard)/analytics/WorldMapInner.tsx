@@ -474,7 +474,11 @@ export interface CountryStats {
   countryCode: string;
   total: number;
   blocked: number;
+  uniqueIps: number;
 }
+
+/** Which count the choropleth is coloured by. The popup always shows all three. */
+export type MapMetric = "total" | "blocked" | "uniqueIps";
 
 interface HoverInfo {
   longitude: number;
@@ -482,14 +486,20 @@ interface HoverInfo {
   alpha2: string | null;
   total: number;
   blocked: number;
+  uniqueIps: number;
 }
 
 export default function WorldMapInner({
   data,
   selectedCountry,
+  metric = "total",
+  onSelectCountry,
 }: {
   data: CountryStats[];
   selectedCountry?: string | null;
+  metric?: MapMetric;
+  /** Called with a country's code when it is clicked, or null for the ocean or an unnamed shape. */
+  onSelectCountry?: (alpha2: string | null) => void;
 }) {
   const t = useTranslations("analytics");
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
@@ -509,9 +519,10 @@ export default function WorldMapInner({
   const hoverLayer = useMemo(() => hoverLayerFor(palette), [palette]);
   const outlineLayer = useMemo(() => outlineLayerFor(palette), [palette]);
 
-  const countMap = useMemo(() => new Map(data.map((d) => [d.countryCode, d.total])), [data]);
-  const blockedMap = useMemo(() => new Map(data.map((d) => [d.countryCode, d.blocked])), [data]);
-  const max = useMemo(() => data.reduce((m, d) => Math.max(m, d.total), 0), [data]);
+  const statsMap = useMemo(() => new Map(data.map((d) => [d.countryCode, d])), [data]);
+  // The ramp is normalised against the metric being shown, so switching to Blocked recolours the
+  // map around the country that blocks most rather than leaving everything near the empty stop.
+  const max = useMemo(() => data.reduce((m, d) => Math.max(m, d[metric] ?? 0), 0), [data, metric]);
 
   useEffect(() => {
     let cancelled = false;
@@ -540,8 +551,10 @@ export default function WorldMapInner({
       ...baseGeojson,
       features: baseGeojson.features.map((f) => {
         const alpha2 = N2A[String(Number(f.id ?? 0))] ?? null;
-        const total = alpha2 ? (countMap.get(alpha2) ?? 0) : 0;
-        const blocked = alpha2 ? (blockedMap.get(alpha2) ?? 0) : 0;
+        const stats = alpha2 ? statsMap.get(alpha2) : undefined;
+        const total = stats?.total ?? 0;
+        const blocked = stats?.blocked ?? 0;
+        const uniqueIps = stats?.uniqueIps ?? 0;
         const isSelected = alpha2 !== null && alpha2 === selectedCountry;
         return {
           ...f,
@@ -550,13 +563,14 @@ export default function WorldMapInner({
             alpha2,
             total,
             blocked,
-            norm: total / safeMax,
+            uniqueIps,
+            norm: (stats?.[metric] ?? 0) / safeMax,
             isSelected,
           },
         };
       }),
     };
-  }, [baseGeojson, countMap, blockedMap, max, selectedCountry]);
+  }, [baseGeojson, statsMap, max, metric, selectedCountry]);
 
   const onHover = useCallback((event: MapLayerMouseEvent) => {
     const f = event.features?.[0];
@@ -571,8 +585,20 @@ export default function WorldMapInner({
       alpha2,
       total: (f.properties?.total as number) ?? 0,
       blocked: (f.properties?.blocked as number) ?? 0,
+      uniqueIps: (f.properties?.uniqueIps as number) ?? 0,
     });
   }, []);
+
+  // Clicking a country selects it - the same thing the table's country button does - and clicking
+  // the ocean clears the selection, which is what a click on "nothing" usually means on a map.
+  const onClick = useCallback(
+    (event: MapLayerMouseEvent) => {
+      if (!onSelectCountry) return;
+      const alpha2 = (event.features?.[0]?.properties?.alpha2 as string | null) ?? null;
+      onSelectCountry(alpha2);
+    },
+    [onSelectCountry],
+  );
 
   // Hover filter: only tracks mouse position, changes on every mousemove
   const hoverFilter = useMemo<ExpressionSpecification>(() => {
@@ -610,6 +636,7 @@ export default function WorldMapInner({
       alpha2: selectedCountry,
       total: (feat.properties?.total as number) ?? 0,
       blocked: (feat.properties?.blocked as number) ?? 0,
+      uniqueIps: (feat.properties?.uniqueIps as number) ?? 0,
     };
   }, [selectedCountry, geojson]);
 
@@ -657,11 +684,12 @@ export default function WorldMapInner({
           interactiveLayerIds={["countries-fill"]}
           onMouseMove={onHover}
           onMouseLeave={() => setHoverInfo(null)}
+          onClick={onClick}
           style={{ position: "absolute", inset: 0 }}
           attributionControl={false}
           dragRotate={false}
           pitchWithRotate={false}
-          cursor={hoverInfo ? "crosshair" : "grab"}
+          cursor={hoverInfo ? (onSelectCountry ? "pointer" : "crosshair") : "grab"}
         >
           <Source id="countries" type="geojson" data={geojson}>
             <Layer {...fillLayer} source="countries" />
@@ -742,6 +770,23 @@ export default function WorldMapInner({
                           }}
                         >
                           {info.blocked.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {info.uniqueIps > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 20,
+                          marginTop: 3,
+                        }}
+                      >
+                        <span style={{ color: "var(--color-text-secondary)" }}>
+                          {t("uniqueIps")}
+                        </span>
+                        <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                          {info.uniqueIps.toLocaleString()}
                         </span>
                       </div>
                     )}

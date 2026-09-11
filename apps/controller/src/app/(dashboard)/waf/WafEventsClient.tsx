@@ -12,7 +12,7 @@ import {
 import { useActionState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ShieldOff, Trash2, Copy } from "lucide-react";
+import { ShieldOff, Trash2, Copy, X } from "lucide-react";
 
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -38,7 +38,6 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 
-import { AppDialog } from "@/components/ui/AppDialog";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
@@ -581,19 +580,27 @@ function EventDetailPanel({
   }
 
   return (
-    // Was a hand-built fixed-position drawer with its own backdrop and Escape handler; Dialog
-    // brings focus trapping and dismissal with it.
-    <AppDialog
-      open
-      onClose={onClose}
-      title={t("wafEvent")}
-      maxWidth="lg"
-      actions={<Button variant="secondary" label={t("close")} onClick={onClose} />}
-    >
+    // Beside the list rather than over it. Triage means reading several events in a row, and a
+    // modal makes you dismiss one to see the next - so this is plain layout, with no backdrop and
+    // no focus trap to fight the table it sits next to.
+    <Card padding={4}>
       <VStack gap={4}>
-        <HStack gap={2} vAlign="center">
-          <BlockedChip blocked={event.blocked} />
-          <SeverityChip severity={event.severity} />
+        <HStack gap={2} vAlign="center" justify="between">
+          <HStack gap={2} vAlign="center">
+            <Text type="label" weight="bold">
+              {t("wafEvent")}
+            </Text>
+            <BlockedChip blocked={event.blocked} />
+            <SeverityChip severity={event.severity} />
+          </HStack>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            label={t("close")}
+            tooltip={t("close")}
+            icon={<X />}
+            onClick={onClose}
+          />
         </HStack>
 
         <Card variant="muted" padding={4}>
@@ -673,7 +680,7 @@ function EventDetailPanel({
           <AuditPanel rawData={event.rawData} />
         </VStack>
       </VStack>
-    </AppDialog>
+    </Card>
   );
 }
 
@@ -1227,37 +1234,45 @@ export default function WafEventsClient({
               width={480}
             />
           </VStack>
-          <DataTable
-            columns={columns}
-            data={events}
-            keyField="id"
-            emptyMessage={t("eventsEmptyDescription")}
-            pagination={pagination}
-            onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
-            rowStatus={(row) =>
-              row.id === selected?.id ? { color: "accent", label: "Selected" } : null
-            }
-            mobileCard={mobileCard}
-          />
+          <HStack gap={4} vAlign="start" wrap="wrap">
+            <div style={{ flexGrow: 1, flexBasis: 520, minWidth: 0 }}>
+              <DataTable
+                columns={columns}
+                data={events}
+                keyField="id"
+                emptyMessage={t("eventsEmptyDescription")}
+                pagination={pagination}
+                onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
+                rowStatus={(row) =>
+                  row.id === selected?.id ? { color: "accent", label: "Selected" } : null
+                }
+                mobileCard={mobileCard}
+              />
+            </div>
 
-          {selected && (
-            <EventDetailPanel
-              event={selected}
-              onClose={() => setSelected(null)}
-              globalExcluded={localGlobalExcluded}
-              hostWafMap={localHostWafMap}
-              onSuppressGlobal={(ruleId) =>
-                setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])
-              }
-              onSuppressHost={(ruleId, host) => {
-                const bare = host.replace(/:\d+$/, "");
-                setLocalHostWafMap((prev) => ({
-                  ...prev,
-                  [bare]: [...new Set([...(prev[bare] ?? []), ruleId])],
-                }));
-              }}
-            />
-          )}
+            {/* flexBasis rather than a fixed width: below roughly 900px the panel wraps under the
+                table instead of squeezing it, which is the same behaviour the dialog had. */}
+            {selected && (
+              <div style={{ flexGrow: 1, flexBasis: 380, maxWidth: 460, minWidth: 0 }}>
+                <EventDetailPanel
+                  event={selected}
+                  onClose={() => setSelected(null)}
+                  globalExcluded={localGlobalExcluded}
+                  hostWafMap={localHostWafMap}
+                  onSuppressGlobal={(ruleId) =>
+                    setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])
+                  }
+                  onSuppressHost={(ruleId, host) => {
+                    const bare = host.replace(/:\d+$/, "");
+                    setLocalHostWafMap((prev) => ({
+                      ...prev,
+                      [bare]: [...new Set([...(prev[bare] ?? []), ruleId])],
+                    }));
+                  }}
+                />
+              </div>
+            )}
+          </HStack>
         </VStack>
       )}
 

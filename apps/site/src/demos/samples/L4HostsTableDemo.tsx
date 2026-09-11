@@ -1,7 +1,12 @@
 import { Badge } from "@astryxdesign/core/Badge";
+import { VStack } from "@astryxdesign/core/Stack";
+import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
+import { useTranslations } from "next-intl";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
+import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
 import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
+import { useRouter, useSearchParams } from "../shims/next-navigation";
 import { DemoSurface } from "../DemoSurface";
 
 type Row = {
@@ -49,7 +54,31 @@ const HOSTS: Row[] = [
   },
 ];
 
-export default function L4HostsTableDemo() {
+const protocolOf = (row: Row) => (row.listen.endsWith("/udp") ? "udp" : "tcp");
+
+/**
+ * The L4 list: tiles, the TCP/UDP tabs and the real table. In the app the tabs filter the query;
+ * here this component filters the rows above off the same `protocol` parameter.
+ */
+function L4HostsTableDemoContent() {
+  const t = useTranslations("l4ProxyHosts");
+  const router = useRouter();
+  const params = useSearchParams();
+  const protocol =
+    params.get("protocol") === "tcp" || params.get("protocol") === "udp"
+      ? (params.get("protocol") as "tcp" | "udp")
+      : "all";
+  const tcp = HOSTS.filter((h) => protocolOf(h) === "tcp").length;
+  const udp = HOSTS.length - tcp;
+  const rows = protocol === "all" ? HOSTS : HOSTS.filter((h) => protocolOf(h) === protocol);
+
+  function setProtocol(value: string) {
+    const next = new URLSearchParams(params.toString());
+    if (value === "all") next.delete("protocol");
+    else next.set("protocol", value);
+    router.push(`${location.pathname}?${next.toString()}`);
+  }
+
   const columns: Column<Row>[] = [
     {
       id: "name",
@@ -89,8 +118,38 @@ export default function L4HostsTableDemo() {
   ];
 
   return (
+    <VStack gap={4}>
+      <StatTiles
+        tiles={[
+          {
+            id: "hosts",
+            label: t("l4ProxyHosts"),
+            value: HOSTS.length,
+            note: t("enabledNote", { count: HOSTS.length }),
+          },
+          { id: "tcp", label: t("tcpStreams"), value: tcp, note: t("tcpNote") },
+          { id: "udp", label: t("udpStreams"), value: udp, note: t("udpNote") },
+          { id: "agents", label: t("listeners"), value: 2, note: t("listenersNote") },
+        ]}
+      />
+      <TabList value={protocol} onChange={setProtocol}>
+        <Tab value="all" label={t("filterAll")} endContent={<Badge label={HOSTS.length} />} />
+        <Tab value="tcp" label="TCP" endContent={<Badge label={tcp} />} />
+        <Tab value="udp" label="UDP" endContent={<Badge label={udp} />} />
+      </TabList>
+      <DataTable columns={columns} data={rows} keyField="id" emptyMessage="No L4 hosts yet" />
+    </VStack>
+  );
+}
+
+/**
+ * The content renders inside DemoSurface rather than around it: the surface is what provides the
+ * message catalog, and the content reads from it with useTranslations.
+ */
+export default function L4HostsTableDemo() {
+  return (
     <DemoSurface>
-      <DataTable columns={columns} data={HOSTS} keyField="id" emptyMessage="No L4 hosts yet" />
+      <L4HostsTableDemoContent />
     </DemoSurface>
   );
 }

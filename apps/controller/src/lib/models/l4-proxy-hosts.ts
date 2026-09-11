@@ -523,8 +523,11 @@ export async function listL4ProxyHosts(): Promise<L4ProxyHost[]> {
  * what an admin gets. An *empty* array is not the same thing and must not be dropped: it means the
  * viewer may see nothing, and turning that into an unfiltered query would list every host.
  */
-function l4ListFilter(search?: string, visibleIds?: number[] | null) {
+function l4ListFilter(search?: string, visibleIds?: number[] | null, protocol?: L4Protocol) {
   const clauses = [];
+  if (protocol) {
+    clauses.push(eq(l4ProxyHosts.protocol, protocol));
+  }
   if (search) {
     clauses.push(
       or(
@@ -544,11 +547,12 @@ function l4ListFilter(search?: string, visibleIds?: number[] | null) {
 export async function countL4ProxyHosts(
   search?: string,
   visibleIds?: number[] | null,
+  protocol?: L4Protocol,
 ): Promise<number> {
   const [row] = await db
     .select({ value: count() })
     .from(l4ProxyHosts)
-    .where(l4ListFilter(search, visibleIds));
+    .where(l4ListFilter(search, visibleIds, protocol));
   return row?.value ?? 0;
 }
 
@@ -582,8 +586,9 @@ export async function listL4ProxyHostsPaginated(
   sortBy?: string,
   sortDir?: "asc" | "desc",
   visibleIds?: number[] | null,
+  protocol?: L4Protocol,
 ): Promise<L4ProxyHost[]> {
-  const where = l4ListFilter(search, visibleIds);
+  const where = l4ListFilter(search, visibleIds, protocol);
   const col = (sortBy && L4_SORT_COLUMNS[sortBy]) || l4ProxyHosts.createdAt;
   const dir = sortDir === "asc" ? asc : desc;
   const hosts = await db
@@ -824,4 +829,28 @@ export async function deleteL4ProxyHost(id: number, actorUserId: number) {
     summary: `Deleted L4 proxy host ${existing.name}`,
   });
   await applyCaddyConfig();
+}
+
+export type L4ProxyHostCounts = { total: number; tcp: number; udp: number; enabled: number };
+
+/** Protocol and enabled totals across everything visible, for the tiles and the tab counts. */
+export async function countL4ProxyHostsByProtocol(
+  search?: string,
+  visibleIds?: number[] | null,
+): Promise<L4ProxyHostCounts> {
+  const [row] = await db
+    .select({
+      total: count(),
+      tcp: sql<number>`sum(case when ${l4ProxyHosts.protocol} = 'tcp' then 1 else 0 end)`.mapWith(
+        Number,
+      ),
+      enabled: sql<number>`sum(case when ${l4ProxyHosts.enabled} then 1 else 0 end)`.mapWith(
+        Number,
+      ),
+    })
+    .from(l4ProxyHosts)
+    .where(l4ListFilter(search, visibleIds));
+  const total = row?.total ?? 0;
+  const tcp = row?.tcp ?? 0;
+  return { total, tcp, udp: total - tcp, enabled: row?.enabled ?? 0 };
 }

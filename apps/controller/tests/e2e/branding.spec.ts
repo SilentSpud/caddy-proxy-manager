@@ -45,7 +45,7 @@ test.describe('Branding - custom favicon', () => {
   });
 
   test('every page declares the icon, signed in or not', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/settings/general');
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', FAVICON_URL);
   });
 

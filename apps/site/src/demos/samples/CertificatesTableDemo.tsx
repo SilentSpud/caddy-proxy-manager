@@ -1,6 +1,9 @@
 import { Badge } from "@astryxdesign/core/Badge";
+import { VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { useTranslations } from "next-intl";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
+import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
 import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
 import { DemoSurface } from "../DemoSurface";
 
@@ -13,21 +16,25 @@ type Row = {
   status: "active" | "warning" | "error";
 };
 
-/** One healthy, one close to expiry, one that has failed - what the page is watched for. */
+/**
+ * One healthy, one close to expiry, one that has failed - what the page is watched for. Only the
+ * imported ones carry a date: ACME certificates are renewed by Caddy on the agent, and their expiry
+ * never reaches the controller.
+ */
 const CERTS: Row[] = [
   {
     id: 1,
     domain: "app.example.com",
     issuer: "Let's Encrypt",
     challenge: "HTTP-01",
-    expires: "in 68 days",
+    expires: "Renewed by Caddy",
     status: "active",
   },
   {
     id: 2,
-    domain: "*.internal.example.com",
-    issuer: "Let's Encrypt",
-    challenge: "DNS-01 · Cloudflare",
+    domain: "legacy.example.com",
+    issuer: "DigiCert",
+    challenge: "Imported PEM",
     expires: "in 9 days",
     status: "warning",
   },
@@ -41,7 +48,14 @@ const CERTS: Row[] = [
   },
 ];
 
-export default function CertificatesTableDemo() {
+function CertificatesTableDemoContent() {
+  const t = useTranslations("certificates");
+  // ACME certificates are renewed by Caddy on the agent, so only the imported ones have an expiry
+  // the controller can count - which is why the tiles split them the way the page does.
+  const acme = CERTS.filter((c) => c.issuer === "Let's Encrypt").length;
+  const imported = CERTS.length - acme;
+  const expired = CERTS.filter((c) => c.status === "error").length;
+
   const columns: Column<Row>[] = [
     {
       id: "domain",
@@ -78,7 +92,7 @@ export default function CertificatesTableDemo() {
         <StatusChip
           status={r.status}
           label={
-            r.status === "warning" ? "Renewing soon" : r.status === "error" ? "Expired" : "Valid"
+            r.status === "warning" ? "Expiring soon" : r.status === "error" ? "Expired" : "Valid"
           }
         />
       ),
@@ -86,8 +100,34 @@ export default function CertificatesTableDemo() {
   ];
 
   return (
-    <DemoSurface>
+    <VStack gap={4}>
+      <StatTiles
+        tiles={[
+          { id: "acme", label: t("acme"), value: acme, note: t("acmeNote", { count: acme }) },
+          {
+            id: "imported",
+            label: t("imported"),
+            value: imported,
+            note: t("importedExpiredNote"),
+            accent: { label: t("expiredAccent", { count: expired }), variant: "error" },
+          },
+          { id: "ca", label: t("caMtls"), value: 1, note: t("caNote", { count: 4 }) },
+          { id: "roles", label: t("roles"), value: 2, note: t("rolesNote") },
+        ]}
+      />
       <DataTable columns={columns} data={CERTS} keyField="id" emptyMessage="No certificates yet" />
+    </VStack>
+  );
+}
+
+/**
+ * The content renders inside DemoSurface rather than around it: the surface is what provides the
+ * message catalog, and the content reads from it with useTranslations.
+ */
+export default function CertificatesTableDemo() {
+  return (
+    <DemoSurface>
+      <CertificatesTableDemoContent />
     </DemoSurface>
   );
 }

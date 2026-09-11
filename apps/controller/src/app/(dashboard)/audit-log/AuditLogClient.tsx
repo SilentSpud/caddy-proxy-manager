@@ -9,6 +9,8 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { StatTiles } from "@/components/ui/StatTiles";
+import { ActivityStrip, type ActivityBucket } from "@/components/ui/ActivityStrip";
 import { formatDateTimeUtc } from "@/src/lib/date-format";
 import { useTranslations } from "next-intl";
 
@@ -16,6 +18,8 @@ type EventRow = {
   id: number;
   createdAt: string;
   user: string;
+  action: string;
+  entityType: string;
   summary: string;
 };
 
@@ -23,9 +27,18 @@ type Props = {
   events: EventRow[];
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
+  /** 24 hourly buckets covering the last day of the whole log, search or no search. */
+  activity: ActivityBucket[];
+  summary: { events: number; actors: number; entityTypes: number };
 };
 
-export default function AuditLogClient({ events, pagination, initialSearch }: Props) {
+export default function AuditLogClient({
+  events,
+  pagination,
+  initialSearch,
+  activity,
+  summary,
+}: Props) {
   const t = useTranslations("auditLog");
   const router = useRouter();
   const pathname = usePathname();
@@ -62,7 +75,7 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
   const columns: Column<EventRow>[] = [
     {
       id: "created_at",
-      label: "Time (UTC)",
+      label: t("timeUtc"),
       width: 180,
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
@@ -72,13 +85,28 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
     },
     {
       id: "user",
-      label: "User",
+      label: t("user"),
       width: 160,
       render: (r) => <Badge label={r.user} />,
     },
     {
+      id: "resource",
+      label: t("resource"),
+      width: 200,
+      render: (r) => (
+        <VStack gap={0}>
+          <Text type="body" size="sm">
+            {r.entityType}
+          </Text>
+          <Text type="code" size="xsm" color="secondary">
+            {r.action}
+          </Text>
+        </VStack>
+      ),
+    },
+    {
       id: "summary",
-      label: "Event",
+      label: t("event"),
       render: (r) => (
         <Text type="body" size="sm">
           {r.summary}
@@ -106,6 +134,37 @@ export default function AuditLogClient({ events, pagination, initialSearch }: Pr
   return (
     <VStack gap={6}>
       <PageHeader title={t("auditLog")} description={t("pageDescription")} />
+
+      <StatTiles
+        tiles={[
+          {
+            id: "day",
+            label: t("eventsLastDay"),
+            value: summary.events,
+            note: t("actorsNote", { count: summary.actors }),
+          },
+          {
+            id: "kinds",
+            label: t("resourceKinds"),
+            value: summary.entityTypes,
+            note: t("resourceKindsNote"),
+          },
+          {
+            id: "total",
+            label: t("eventsRecorded"),
+            value: pagination.total,
+            note: t("matchingNote"),
+          },
+        ]}
+      />
+
+      <Card padding={4}>
+        <ActivityStrip
+          buckets={activity}
+          title={t("activityTitle")}
+          describePeak={(bucket) => t("activityPeak", { label: bucket.label, count: bucket.count })}
+        />
+      </Card>
 
       <HStack gap={2} vAlign="center">
         <SearchField

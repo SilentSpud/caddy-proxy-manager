@@ -13,7 +13,7 @@
     },
     "apps/agent": {
       "name": "@cpm/agent",
-      "version": "3.0.0-rc.1",
+      "version": "3.0.0-beta.8",
       "dependencies": {
         "@clickhouse/client": "^1.23.1",
         "@cpm/shared": "workspace:*",
@@ -26,7 +26,7 @@
     },
     "apps/controller": {
       "name": "@cpm/controller",
-      "version": "3.0.0-rc.1",
+      "version": "3.0.0-beta.8",
       "dependencies": {
         "@astryxdesign/core": "^0.5.3",
         "@astryxdesign/theme-neutral": "^0.5.3",
@@ -107,7 +107,7 @@
     },
     "packages/shared": {
       "name": "@cpm/shared",
-      "version": "3.0.0-rc.1",
+      "version": "3.0.0-beta.8",
     },
   },
   "trustedDependencies": [

@@ -16,7 +16,7 @@ import WafDemo from "../../../demos/samples/WafDemo";
   <WafDemo client:visible />
 </Demo>
 
-<Demo title="The WAF event log" note="Search it, then open a row for the rule that fired.">
+<Demo title="The WAF event log" note="Search it, then pick a row - the rule that fired opens beside the list.">
   <WafEventLogDemo client:visible />
 </Demo>
 
@@ -35,8 +35,8 @@ and more. It is enabled by default when the WAF is on.
 
 ## When a rule is wrong
 
-Real applications trip generic rules. Two ways out, both from the event detail drawer or the
-Suppressed Rules tab:
+Real applications trip generic rules. Two ways out, both from the event detail panel beside the
+list or the Suppressed Rules tab:
 
 - **Suppress globally** - the rule stops firing everywhere.
 - **Suppress for one host** - it keeps protecting everything else.
