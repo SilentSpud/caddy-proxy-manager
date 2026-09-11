@@ -49,11 +49,22 @@ test.describe('Geo Blocking - form persistence', () => {
   /**
    * Mutating v1 API calls are same-origin checked, so one without an Origin header 403s. This reset
    * silently did nothing while it lacked one, leaving tests running against the persisted volume.
+   *
+   * `Connection: close`, because the two resets bracket a test that only drives the UI: the socket
+   * the first one left in the request context's pool sits idle for five or six seconds, right at
+   * Node's default 5s keep-alive timeout, and the second reset could pick it up the moment the
+   * server closed it - "socket hang up" in CI with the test itself green. Closing after each reset
+   * leaves nothing pooled to race. The one retry covers a drop anyway; the reset is idempotent.
    */
   async function resetGeoblock(page: any) {
-    const res = await page.request.put(API_GEOBLOCK, {
-      headers: { Origin: ORIGIN },
-      data: EMPTY_GEOBLOCK,
+    const put = () =>
+      page.request.put(API_GEOBLOCK, {
+        headers: { Origin: ORIGIN, Connection: 'close' },
+        data: EMPTY_GEOBLOCK,
+      });
+    const res = await put().catch((error: Error) => {
+      if (!/socket hang up|ECONNRESET/i.test(error.message)) throw error;
+      return put();
     });
     expect(res.ok(), `geoblock reset failed: ${res.status()}`).toBe(true);
   }
