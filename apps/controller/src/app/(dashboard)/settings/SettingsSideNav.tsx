@@ -82,7 +82,7 @@ export default function SettingsSideNav({
   }, []);
 
   return (
-    <SideNav footer={footer}>
+    <SideNav footer={footer} data-testid="settings-rail">
       <VStack gap={2} padding={2}>
         <SideNavItem as={Link} href="/" label={t("backToDashboard")} icon={<ArrowLeft />} />
         <Button
@@ -108,21 +108,25 @@ export default function SettingsSideNav({
 
       {SETTINGS_GROUPS.map((group) => (
         <SideNavSection key={group.id} title={group.label}>
-          {group.items.map((item) => (
-            <SideNavItem
-              key={item.id}
-              as={Link}
-              href={`/settings/${item.id}`}
-              label={item.name}
-              icon={<item.icon />}
-              isSelected={pathname === `/settings/${item.id}`}
-              endContent={
-                storageKeysForSection(item.id).some((key) => staged.has(key)) ? (
-                  <StagedDot />
-                ) : undefined
-              }
-            />
-          ))}
+          {group.items.map((item) => {
+            const isStaged = storageKeysForSection(item.id).some((key) => staged.has(key));
+            return (
+              <SideNavItem
+                key={item.id}
+                as={Link}
+                href={`/settings/${item.id}`}
+                label={item.name}
+                icon={<item.icon />}
+                isSelected={pathname === `/settings/${item.id}`}
+                // The state rides as a description, not as part of the name. A link's name is its
+                // identity - "General" - and one that turned into "General staged" whenever an edit
+                // was pending would stop matching everything that finds it by name, assistive
+                // technology included. The description is still announced after the name.
+                aria-description={isStaged ? t("homeStagedBadge") : undefined}
+                endContent={isStaged ? <StagedDot /> : undefined}
+              />
+            );
+          })}
         </SideNavSection>
       ))}
 
@@ -158,11 +162,11 @@ export default function SettingsSideNav({
  * changed, and a number here would only be a worse version of the one on the apply button.
  */
 function StagedDot() {
-  const t = useTranslations("settings");
   return (
+    // Visual only: the item carries "staged" as its accessible description, so announcing the dot
+    // too would say it twice.
     <span
-      role="img"
-      aria-label={t("homeStagedBadge")}
+      aria-hidden="true"
       style={{
         width: 6,
         height: 6,

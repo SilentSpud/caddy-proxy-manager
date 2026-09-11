@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { applyStagedChanges } from '../helpers/staged-settings';
+import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 import { goToSettingsSection, SETTINGS_SIDEBAR } from '../helpers/settings-nav';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -246,7 +246,7 @@ test.describe('Settings - General', () => {
     const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('persist-test.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expectStaged(page, 10_000);
 
     // Reload and navigate back
     await goToSection(page, 'General');
@@ -255,7 +255,7 @@ test.describe('Settings - General', () => {
     // Reset
     await page.locator('input[name="defaultDomain"]').fill('caddyproxymanager.com');
     await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expectStaged(page, 10_000);
   });
 
   test('a changed text field still reads as changed after the save', async ({ page }) => {
@@ -273,13 +273,13 @@ test.describe('Settings - General', () => {
 
     await domain.fill('reset-check.local');
     await save.click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 15_000 });
+    await expectStaged(page, 15_000);
     await expect(domain).toHaveValue('reset-check.local');
 
     // Put the stored value back, so this leaves the shared stack as it found it.
     await domain.fill(original);
     await save.click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 15_000 });
+    await expectStaged(page, 15_000);
   });
 
   test('ACME email field accepts email input', async ({ page }) => {
@@ -374,7 +374,7 @@ test.describe('Settings - ACME Server', () => {
     await goToSection(page, 'ACME Server');
     await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
     await page.getByRole('button', { name: /save acme settings/i }).click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expectStaged(page, 10_000);
 
     await goToSection(page, 'ACME Server');
     await expect(page.locator('input[name="caUrl"]')).toHaveValue(CUSTOM_DIR);
@@ -391,7 +391,7 @@ test.describe('Settings - ACME Server', () => {
     await goToSection(page, 'ACME Server');
     await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
     await page.getByRole('button', { name: /save acme settings/i }).click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expectStaged(page, 10_000);
 
     // Staged, so the API still reports the applied value - which is the point of staging.
     const staged = await page.request.get(API_SETTINGS_ACME);
@@ -411,8 +411,9 @@ test.describe('Settings - DNS Providers', () => {
   test('shows provider selector and add form', async ({ page }) => {
     await goToSection(page, 'DNS Providers');
     await expect(page.getByRole('heading', { name: 'DNS Providers' })).toBeVisible();
-    // Should have a select for provider
-    await expect(page.getByText(/select/i).first()).toBeVisible();
+    // The provider picker itself, rather than any text matching /select/ - hidden option labels
+    // and helper copy match that pattern too, and the first of them need not be visible.
+    await expect(page.locator('form#dnsp-add-form button[aria-haspopup="listbox"]')).toBeVisible();
   });
 
   test('selecting a provider reveals its credential fields', async ({ page }) => {
@@ -492,7 +493,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
     await expect(toggle).toBeChecked({ checked: !initial });
 
     await save.click();
-    await expect(page.getByText(/staged|saved/i).first()).toBeVisible({ timeout: 15_000 });
+    await expectStaged(page, 15_000);
     // The assertion the fix exists for: the save must not visually undo what was just saved.
     await expect(toggle).toBeChecked({ checked: !initial });
 
@@ -502,7 +503,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
 
     // Put the stored value back, so this leaves the shared stack as it found it.
     await save.click();
-    await expect(page.getByText(/staged|saved/i).first()).toBeVisible({ timeout: 15_000 });
+    await expectStaged(page, 15_000);
   });
 });
 
@@ -828,7 +829,7 @@ test.describe('Settings - form data round-trip via API', () => {
     await goToSection(page, 'General');
     await page.locator('input[name="defaultDomain"]').fill('api-roundtrip.local');
     await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_GENERAL);
@@ -850,7 +851,7 @@ test.describe('Settings - form data round-trip via API', () => {
     }
     await page.locator('input[name="port"]').fill('9191');
     await page.getByRole('button', { name: /save metrics/i }).click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_METRICS);
@@ -876,7 +877,7 @@ test.describe('Settings - form data round-trip via API', () => {
     await page.getByRole('combobox', { name: 'Format' }).click();
     await page.getByRole('option', { name: /console/i }).click();
     await page.getByRole('button', { name: /save logging/i }).click();
-    await expect(page.getByText(/staged|saved|success/i).first()).toBeVisible({ timeout: 10_000 });
+    await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
     const res = await page.request.get(API_SETTINGS_LOGGING);

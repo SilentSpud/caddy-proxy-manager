@@ -10,9 +10,11 @@
  */
 import { expect, type Page } from '@playwright/test';
 
-// Settings takes the app's own rail over, so there is exactly one nav landmark on these routes -
-// the panel that used to carry an aria-label of its own is gone.
-export const SETTINGS_SIDEBAR = '[role="navigation"]';
+// Settings takes the app's own rail over. Found by test id rather than by role: at mobile width the
+// app shell adds a second navigation landmark - the bar holding the menu button - so
+// '[role="navigation"]' matches that too, and a check that the rail is off-canvas would find the
+// bar instead and fail.
+export const SETTINGS_SIDEBAR = '[data-testid="settings-rail"]';
 
 /**
  * Click a settings section and wait until it is really showing.

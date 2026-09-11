@@ -5,7 +5,7 @@
  * table and Caddy only when the operator applies. So any spec that saves in the UI and then checks
  * the REST API - or Caddy itself - has to apply in between, the way a person would.
  */
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Open the review sheet and apply everything staged.
@@ -26,4 +26,21 @@ export async function applyStagedChanges(page: Page): Promise<void> {
   // The bar disappears when the change set empties, which is the signal that the apply committed
   // rather than merely that the click landed.
   await expect(bar).toBeHidden({ timeout: 30_000 });
+}
+
+/**
+ * Wait for a settings form to confirm that its save was staged.
+ *
+ * Asserts on the confirmation itself - the status banner the form renders - rather than on any text
+ * matching /staged|saved/. Settings persist between specs, so an earlier one's saved value (a
+ * response header reading "X-Cpm-Ui: saved", say) can sit in the DOM hidden and be the first match
+ * for a loose pattern, failing a save that in fact succeeded.
+ */
+export async function expectStaged(scope: Page | Locator, timeout = 10_000): Promise<void> {
+  await expect(
+    scope
+      .getByRole('status')
+      .filter({ hasText: /^Staged\. Review and apply/ })
+      .first(),
+  ).toBeVisible({ timeout });
 }
