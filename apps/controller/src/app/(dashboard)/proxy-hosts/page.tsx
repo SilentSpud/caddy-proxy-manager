@@ -1,5 +1,10 @@
 import ProxyHostsClient from "./ProxyHostsClient";
-import { listProxyHostsPaginated, countProxyHosts } from "@/src/lib/models/proxy-hosts";
+import {
+  listProxyHostsPaginated,
+  countProxyHosts,
+  countProxyHostsByState,
+} from "@/src/lib/models/proxy-hosts";
+import { getTrafficByProxyHost } from "@/src/lib/analytics-db";
 import { listCertificates } from "@/src/lib/models/certificates";
 import { listCaCertificates } from "@/src/lib/models/ca-certificates";
 import { listAccessLists } from "@/src/lib/models/access-lists";
@@ -19,7 +24,13 @@ import { getTranslations } from "next-intl/server";
 const PER_PAGE = 25;
 
 interface PageProps {
-  searchParams: Promise<{ page?: string; search?: string; sortBy?: string; sortDir?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    sortBy?: string;
+    sortDir?: string;
+    state?: string;
+  }>;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -38,7 +49,11 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     search: searchParam,
     sortBy: sortByParam,
     sortDir: sortDirParam,
+    state: stateParam,
   } = await searchParams;
+  // The list tabs are a filter on the query, not on the page that came back: filtering client-side
+  // would make "Disabled 2" show nothing whenever both disabled hosts sat on a later page.
+  const enabled = stateParam === "enabled" ? true : stateParam === "disabled" ? false : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
   const offset = (page - 1) * PER_PAGE;
@@ -55,8 +70,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     tailscaleSettings,
     generalSettings,
   ] = await Promise.all([
-    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds),
-    countProxyHosts(search, visibleIds),
+    listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled),
+    countProxyHosts(search, visibleIds, enabled),
     listCertificates(),
     listCaCertificates(),
     listAccessLists(),
@@ -82,6 +97,20 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     ).catch(() => new Map<number, number[]>()),
   ]);
   const agentAssignments = Object.fromEntries(assignments);
+
+  // The header counts the whole (visible, searched) set rather than this page, and the traffic
+  // column is best-effort: with analytics off, getTrafficByProxyHost returns nothing and the
+  // column renders empty instead of the list failing.
+  const dayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+  const [counts, traffic] = await Promise.all([
+    countProxyHostsByState(search, visibleIds),
+    getTrafficByProxyHost(
+      dayAgo,
+      Math.floor(Date.now() / 1000),
+      hosts.map((host) => ({ id: host.id, domains: host.domains })),
+    ),
+  ]);
+  const hostTraffic = Object.fromEntries(traffic);
 
   // Build forward auth access map for hosts that have CPM forward auth enabled
   const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
@@ -133,6 +162,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       }}
       pagination={{ total, page, perPage: PER_PAGE }}
       initialSearch={search ?? ""}
+      activeState={stateParam === "enabled" || stateParam === "disabled" ? stateParam : "all"}
       initialSort={{ sortBy: sortBy ?? "createdAt", sortDir }}
       mtlsRoles={mtlsRoles}
       issuedClientCerts={issuedClientCerts}
@@ -141,6 +171,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       forwardAuthAccessMap={forwardAuthAccessMap}
       agents={agents}
       agentAssignments={agentAssignments}
+      counts={counts}
+      hostTraffic={hostTraffic}
       canCreate={canCreate(access)}
     />
   );

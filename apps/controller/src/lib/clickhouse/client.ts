@@ -907,6 +907,38 @@ export async function queryDistinctHosts(): Promise<string[]> {
   return rows.map((r) => r.host);
 }
 
+export interface HostTotals {
+  host: string;
+  total: number;
+  blocked: number;
+}
+
+/**
+ * Per-host request counts for the proxy host list. Grouped in one query rather than one per row:
+ * a page of twenty-five hosts would otherwise be twenty-five round trips to ClickHouse, and the
+ * list renders whether or not any of them answer.
+ */
+export async function queryHostTotals(from: number, to: number): Promise<HostTotals[]> {
+  const rows = await queryRows<{ host: string; total: string; blocked: string }>(
+    `
+    SELECT
+      host,
+      count() AS total,
+      countIf(is_blocked) AS blocked
+    FROM traffic_events
+    WHERE ${timeFilter()} AND host != ''
+    GROUP BY host
+  `,
+    timeParams(from, to),
+  );
+
+  return rows.map((r) => ({
+    host: r.host,
+    total: Number(r.total),
+    blocked: Number(r.blocked),
+  }));
+}
+
 // ── WAF analytics queries ───────────────────────────────────────────────────
 
 export async function queryWafCount(from: number, to: number): Promise<number> {

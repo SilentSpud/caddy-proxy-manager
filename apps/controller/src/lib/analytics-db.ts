@@ -11,6 +11,7 @@ import {
   queryStatusClasses,
   queryWafCount,
   queryDistinctHosts,
+  queryHostTotals,
   isAnalyticsEnabled,
   type AnalyticsSummary as CHSummary,
   type TimelineBucket,
@@ -166,6 +167,68 @@ export async function getOverviewAnalytics(
     queryTrafficEvents(from, to, hosts, filter, limit),
   ]);
   return { summary, statusClasses, wafBlocked, timeline, events };
+}
+
+// ── Per-host traffic ─────────────────────────────────────────────────────────
+
+export interface HostTraffic {
+  total: number;
+  blocked: number;
+}
+
+/**
+ * Traffic totals keyed by proxy host id, for a list that shows one number per row.
+ *
+ * ClickHouse records the Host header, which is a domain rather than a host id, so the totals are
+ * folded back onto the row that serves that domain - a host with three domains reports the sum of
+ * all three. Wildcards are not expanded: `*.lab.example.com` never appears as a Host header, so a
+ * request to `a.lab.example.com` counts only if that exact name is also on the host.
+ *
+ * Returns an empty map when analytics is switched off or ClickHouse cannot be reached; the list
+ * then renders without the column's numbers rather than failing.
+ */
+export async function getTrafficByProxyHost(
+  from: number,
+  to: number,
+  hosts: { id: number; domains: string[] }[],
+): Promise<Map<number, HostTraffic>> {
+  const byHost = new Map<number, HostTraffic>();
+  if (hosts.length === 0) return byHost;
+
+  let totals: Awaited<ReturnType<typeof queryHostTotals>>;
+  try {
+    totals = await queryHostTotals(from, to);
+  } catch {
+    return byHost;
+  }
+  if (totals.length === 0) return byHost;
+
+  const domainToHost = new Map<string, number[]>();
+  for (const host of hosts) {
+    for (const domain of host.domains) {
+      const key = domain.trim().toLowerCase();
+      if (!key) continue;
+      const ids = domainToHost.get(key);
+      if (ids) ids.push(host.id);
+      else domainToHost.set(key, [host.id]);
+    }
+  }
+
+  for (const row of totals) {
+    // Caddy logs the authority, which carries the port on a non-default one.
+    const name = row.host.trim().toLowerCase().split(":")[0];
+    for (const id of domainToHost.get(name) ?? []) {
+      const current = byHost.get(id);
+      if (current) {
+        current.total += row.total;
+        current.blocked += row.blocked;
+      } else {
+        byHost.set(id, { total: row.total, blocked: row.blocked });
+      }
+    }
+  }
+
+  return byHost;
 }
 
 // ── Hosts ────────────────────────────────────────────────────────────────────
