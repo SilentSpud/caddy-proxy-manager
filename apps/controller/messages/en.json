@@ -33,6 +33,7 @@
     "passwordCopiedToast": "New password generated and copied",
     "passwordGeneratedToast": "New password generated",
     "passwordPlaceholder": "auto-generate or paste",
+    "railSummary": "{lists} lists, {members} members",
     "regeneratePasswordTooltip": "Regenerate password (copies the new one to the clipboard)",
     "remove": "Remove",
     "saveChanges": "Save changes",
@@ -120,6 +121,14 @@
     "unconfiguredHostsHelp": "Hosts that received traffic but are not configured as proxy hosts in Caddy.",
     "uniqueIps": "Unique IPs",
     "wafEvents": "WAF Events"
+  },
+  "apiDocs": {
+    "graphqlEndpoint": "GraphQL endpoint",
+    "openApiSpec": "OpenAPI spec",
+    "pageDescription": "The REST API this controller serves, and the schema behind it.",
+    "restApi": "REST API",
+    "restApiNote": "Bearer-token authenticated. Group grants are applied per request, so a scoped token sees a scoped list.",
+    "title": "API Docs"
   },
   "auditLog": {
     "activityTitle": "Activity, last 24 hours (UTC)",
