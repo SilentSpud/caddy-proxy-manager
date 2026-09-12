@@ -151,7 +151,7 @@ function _DetailHeader({ activeId }: { activeId: string }) {
         <Heading level={1}>{item.name}</Heading>
         <EnvTokens names={item.env} />
       </HStack>
-      <Text type="body" size="sm" color="secondary">
+      <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
         {item.desc}
       </Text>
     </VStack>

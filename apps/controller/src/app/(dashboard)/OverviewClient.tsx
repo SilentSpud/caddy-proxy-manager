@@ -596,7 +596,7 @@ export default function OverviewClient({
       <VStack gap={8}>
         <VStack gap={1}>
           <Heading level={1}>Welcome back, {userName}</Heading>
-          <Text type="body" size="sm" color="secondary">
+          <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
             {t("pageDescription")}
           </Text>
         </VStack>
@@ -611,7 +611,8 @@ export default function OverviewClient({
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={1}>
           <Heading level={1}>Welcome back, {userName}</Heading>
-          <Text type="body" size="sm" color="secondary">
+          {/* Not on a phone, like every page's description: read once, then only in the way. */}
+          <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
             {t("pageDescription")}
           </Text>
         </VStack>

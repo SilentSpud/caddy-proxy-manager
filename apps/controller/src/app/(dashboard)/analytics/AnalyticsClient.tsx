@@ -31,7 +31,11 @@ import {
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { formatDateTimeUtc } from "@/src/lib/date-format";
+import { FilterChip } from "@/src/components/mobile/FilterChip";
+import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 
 import { useChartTheme } from "./chart-theme";
 import { useTranslations } from "next-intl";
@@ -391,6 +395,10 @@ export default function AnalyticsClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [mapMetric, setMapMetric] = useState<MapMetric>("total");
+  // Phone-only chrome: the interval and map-metric choices open as sheets instead of segments.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
+  const [intervalSheetOpen, setIntervalSheetOpen] = useState(false);
+  const [metricSheetOpen, setMetricSheetOpen] = useState(false);
 
   /** How many seconds the current selection spans - used for chart axis labels */
   const rangeSeconds = useMemo(() => {
@@ -548,6 +556,21 @@ export default function AnalyticsClient() {
   const wafByCountry = new Map((wafStats?.byCountry ?? []).map((r) => [r.countryCode, r.count]));
 
   const INTERVALS: DisplayInterval[] = ["1h", "12h", "24h", "7d", "30d", "custom"];
+  const intervalLabel = (iv: DisplayInterval) => (iv === "custom" ? "Custom" : iv);
+
+  const changeInterval = (iv: DisplayInterval) => {
+    if (iv === "custom" && !customFrom) {
+      setCustomFrom(dayjs().subtract(24, "hour"));
+      setCustomTo(dayjs());
+    }
+    setIntervalVal(iv);
+  };
+
+  const metricOptions: { value: MapMetric; label: string }[] = [
+    { value: "total", label: t("metricRequests") },
+    { value: "blocked", label: t("metricBlocked") },
+    { value: "uniqueIps", label: t("uniqueIps") },
+  ];
 
   // ── Table shapes ──────────────────────────────────────────────────────────
   // Astryx's Table wants rows carrying an index signature, so each dataset is widened at this one
@@ -821,7 +844,7 @@ export default function AnalyticsClient() {
       {/* Header */}
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={0}>
-          <Text type="label" size="xsm" color="secondary">
+          <Text type="label" size="xsm" color="secondary" className="cpm-desktop-only">
             {t("trafficIntelligence")}
           </Text>
           <Heading level={1}>Analytics</Heading>
@@ -829,26 +852,37 @@ export default function AnalyticsClient() {
         <HStack gap={3} vAlign="center" wrap="wrap">
           {/* Was six buttons whose selected state read only as a filled
               variant; SegmentedControl exposes the choice as a radio group. */}
-          <SegmentedControl
-            label={t("timeInterval")}
-            size="sm"
+          <div className="cpm-desktop-only">
+            <SegmentedControl
+              label={t("timeInterval")}
+              size="sm"
+              value={interval}
+              onChange={(next) => changeInterval(next as DisplayInterval)}
+            >
+              {INTERVALS.map((iv) => (
+                <SegmentedControlItem key={iv} value={iv} label={intervalLabel(iv)} />
+              ))}
+            </SegmentedControl>
+          </div>
+          {/* Six segments do not fit a phone: the interval is a pill that opens a sheet. */}
+          <div className="cpm-chip-row cpm-mobile-flex">
+            <FilterChip
+              label={intervalLabel(interval)}
+              aria-label={t("timeInterval")}
+              onClick={() => setIntervalSheetOpen(true)}
+            />
+          </div>
+          <OptionSheet
+            title={t("timeInterval")}
+            isOpen={intervalSheetOpen}
+            onOpenChange={setIntervalSheetOpen}
             value={interval}
-            onChange={(next) => {
-              const iv = next as DisplayInterval;
-              if (iv === "custom" && !customFrom) {
-                setCustomFrom(dayjs().subtract(24, "hour"));
-                setCustomTo(dayjs());
-              }
-              setIntervalVal(iv);
-            }}
-          >
-            {INTERVALS.map((iv) => (
-              <SegmentedControlItem key={iv} value={iv} label={iv === "custom" ? "Custom" : iv} />
-            ))}
-          </SegmentedControl>
+            options={INTERVALS.map((iv) => ({ value: iv, label: intervalLabel(iv) }))}
+            onChange={changeInterval}
+          />
 
           {interval === "custom" && (
-            <HStack gap={2} vAlign="center">
+            <HStack gap={2} vAlign="center" wrap="wrap">
               <DateTimePicker value={customFrom} onChange={setCustomFrom} placeholder={t("from")} />
               <Text type="body" size="xsm" color="secondary">
                 &ndash;
@@ -905,8 +939,52 @@ export default function AnalyticsClient() {
 
       {!loading && summary && (
         <>
-          {/* Stats row */}
-          <Grid columns={{ minWidth: 150, max: 5 }} gap={3} data-testid="analytics-stats">
+          {/* Stats row, folded into one card on a phone where five tiles are a screen of their own */}
+          <div className="cpm-mobile-only">
+            <Card padding={4}>
+              <VStack gap={3}>
+                <VStack gap={0}>
+                  <Text type="label" size="xsm" color="secondary">
+                    {t("totalRequests")}
+                  </Text>
+                  <Text type="display-3" hasTabularNumbers>
+                    {summary.totalRequests.toLocaleString()}
+                  </Text>
+                </VStack>
+                <Grid columns={{ minWidth: 80, max: 3 }} gap={2}>
+                  {[
+                    {
+                      label: t("blockedRequests"),
+                      value: summary.blockedRequests.toLocaleString(),
+                      tone: summary.blockedRequests > 0 ? ("error" as const) : undefined,
+                    },
+                    { label: t("uniqueIps"), value: summary.uniqueIps.toLocaleString() },
+                    { label: t("blockRate"), value: `${summary.blockedPercent}%` },
+                  ].map((stat) => (
+                    <VStack key={stat.label} gap={0}>
+                      <Text type="label" size="3xs" color="secondary">
+                        {stat.label}
+                      </Text>
+                      <Text type="body" weight="semibold" hasTabularNumbers>
+                        <span style={stat.tone ? { color: STAT_TONE_VAR[stat.tone] } : undefined}>
+                          {stat.value}
+                        </span>
+                      </Text>
+                    </VStack>
+                  ))}
+                </Grid>
+                <Text type="body" size="sm" color="secondary">
+                  {t("wafEvents")}: {(wafStats?.total ?? 0).toLocaleString()}
+                </Text>
+              </VStack>
+            </Card>
+          </div>
+          <Grid
+            columns={{ minWidth: 150, max: 5 }}
+            gap={3}
+            data-testid="analytics-stats"
+            className="cpm-desktop-only"
+          >
             <StatCard label={t("totalRequests")} value={summary.totalRequests.toLocaleString()} />
             <StatCard label={t("uniqueIps")} value={summary.uniqueIps.toLocaleString()} />
             <StatCard
@@ -970,16 +1048,37 @@ export default function AnalyticsClient() {
                   </Text>
                   {/* One map, recoloured: the ramp is normalised against the chosen metric, so
                       Blocked lights up the countries that block most rather than the busiest. */}
-                  <SegmentedControl
-                    label={t("mapMetric")}
-                    size="sm"
+                  <div className="cpm-desktop-only">
+                    <SegmentedControl
+                      label={t("mapMetric")}
+                      size="sm"
+                      value={mapMetric}
+                      onChange={(value) => setMapMetric(value as MapMetric)}
+                    >
+                      {metricOptions.map((option) => (
+                        <SegmentedControlItem
+                          key={option.value}
+                          value={option.value}
+                          label={option.label}
+                        />
+                      ))}
+                    </SegmentedControl>
+                  </div>
+                  <div className="cpm-mobile-flex">
+                    <FilterChip
+                      label={metricOptions.find((o) => o.value === mapMetric)?.label ?? mapMetric}
+                      aria-label={t("mapMetric")}
+                      onClick={() => setMetricSheetOpen(true)}
+                    />
+                  </div>
+                  <OptionSheet
+                    title={t("mapMetric")}
+                    isOpen={metricSheetOpen}
+                    onOpenChange={setMetricSheetOpen}
                     value={mapMetric}
-                    onChange={(value) => setMapMetric(value as MapMetric)}
-                  >
-                    <SegmentedControlItem value="total" label={t("metricRequests")} />
-                    <SegmentedControlItem value="blocked" label={t("metricBlocked")} />
-                    <SegmentedControlItem value="uniqueIps" label={t("uniqueIps")} />
-                  </SegmentedControl>
+                    options={metricOptions}
+                    onChange={setMapMetric}
+                  />
                 </HStack>
                 <WorldMap
                   data={countries}
@@ -1003,7 +1102,13 @@ export default function AnalyticsClient() {
                 ) : (
                   <Table
                     data={countryRows}
-                    columns={countryColumns}
+                    // A phone keeps the country and the two counts that answer "is it hostile";
+                    // five fixed columns are wider than the card.
+                    columns={
+                      isNarrow
+                        ? countryColumns.filter((c) => c.key !== "uniqueIps" && c.key !== "waf")
+                        : countryColumns
+                    }
                     idKey="countryCode"
                     hasHover
                     plugins={{ rowStatus: countryStatus }}
@@ -1077,7 +1182,24 @@ export default function AnalyticsClient() {
                 <EmptyState title={t("blockedRequestsEmptyTitle")} isCompact />
               ) : (
                 <>
-                  <Table data={blockedRows} columns={blockedColumns} idKey="id" hasHover />
+                  <div className="cpm-desktop-only">
+                    <Table data={blockedRows} columns={blockedColumns} idKey="id" hasHover />
+                  </div>
+                  {/* Seven columns become rows on a phone: who, what they hit, and from where. */}
+                  <div className="cpm-mobile-only">
+                    <List>
+                      {blockedRows.map((row) => (
+                        <ListItem
+                          key={row.id}
+                          label={row.clientIp}
+                          description={`${row.method} ${row.uri}`}
+                          endContent={
+                            row.countryCode ? <Badge label={row.countryCode} /> : undefined
+                          }
+                        />
+                      ))}
+                    </List>
+                  </div>
                   {blocked.pages > 1 && (
                     <HStack justify="center">
                       <Pagination

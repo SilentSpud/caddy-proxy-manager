@@ -670,7 +670,7 @@ export default function WorldMapInner({
           collapsed height clips the canvas away completely - the map still runs
           and answers queryRenderedFeatures, but paints nothing and hit-tests
           nothing. */}
-      <div className="relative rounded-lg overflow-hidden border border-border flex-1 min-h-[280px] min-w-[400px] w-full">
+      <div className="relative rounded-lg overflow-hidden border border-border flex-1 min-h-[280px] md:min-w-[400px] w-full">
         <MapGL
           mapStyle={mapStyle}
           initialViewState={{

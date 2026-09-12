@@ -84,7 +84,7 @@ function SettingsHeader({ sectionId, staged }: { sectionId: string | null; stage
             <Heading level={1}>{item ? item.name : t("homeOverview")}</Heading>
             <EnvTokens names={item?.env} />
           </HStack>
-          <Text type="body" size="sm" color="secondary">
+          <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
             {item ? item.desc : t("homeSubtitle")}
           </Text>
         </VStack>

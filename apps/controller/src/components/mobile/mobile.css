@@ -13,7 +13,8 @@
      of its own, so its title, stats and toolbar stay direct children of the page's stack and keep
      the gaps they always had. */
   .cpm-fab,
-  .cpm-mobile-only {
+  .cpm-mobile-only,
+  .cpm-mobile-flex {
     display: none;
   }
 
@@ -92,6 +93,54 @@
       padding: 12px var(--cpm-page-pad) 12px;
       background: light-dark(#ffffff, #000000);
       border-bottom: 1px solid light-dark(#c4c4c4, #5c5c5c);
+    }
+
+    .cpm-mobile-flex {
+      display: flex;
+    }
+
+    /* ---- card feed (WAF, Analytics) ------------------------------------------------------ */
+
+    /* Filters as pills in one row that scrolls sideways, each opening a sheet. */
+    .cpm-chip-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .cpm-chip-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cpm-chip {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 40px;
+      padding: 0 13px;
+      border-radius: 9999px;
+      border: 1px solid light-dark(#c4c4c4, #525252);
+      background: var(--color-background-card);
+      color: var(--color-text-primary);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* A filter moved off its default, in the accent so a narrowed page never passes for the whole. */
+    .cpm-chip[data-active] {
+      background: var(--color-text-pink);
+      border-color: var(--color-text-pink);
+      color: #111111;
+    }
+
+    .cpm-chip:focus-visible {
+      outline: 2px solid var(--color-border-pink);
+      outline-offset: 2px;
     }
 
     /* A header inside a rail that already pads itself (Access Lists, which the shell draws full

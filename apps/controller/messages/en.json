@@ -1765,6 +1765,7 @@
     "applyRange": "Apply range",
     "auditData": "Audit Data",
     "auditDataEmptyTitle": "No audit data available for this event.",
+    "backToEvents": "All events",
     "blocked": "Blocked",
     "body": "Body",
     "bodySizeLimitHelp": "Largest request body the WAF will inspect.",
@@ -1778,7 +1779,9 @@
     "customDirectivesHelp": "ModSecurity SecLang syntax. Applied after OWASP CRS if enabled.",
     "customSeclangDirectives": "Custom SecLang Directives",
     "detected": "Detected",
+    "disabled": "Disabled",
     "enableWafGloballyBlocking": "Enable WAF globally (blocking)",
+    "enabled": "Enabled",
     "events": "Events",
     "eventsEmptyDescription": "No WAF events found. Enable the WAF in Settings and send some traffic to see events here.",
     "eventsSearchPlaceholder": "Search by host, IP, URI, or rule message...",
@@ -1786,6 +1789,7 @@
     "exclusionsDisabledTitle": "Global WAF is currently disabled",
     "exclusionsTabHelp": "Rule exclusions live on the Suppressed Rules tab",
     "file": "File",
+    "firewall": "Firewall",
     "fromUtc": "From (UTC)",
     "globalExclusionsHelp": "Rules listed here are suppressed globally via SecRuleRemoveById for all proxy hosts using global WAF settings.",
     "globalSettingsDescription": "Configure the global Web Application Firewall. Per-host settings can merge with or override these defaults. Powered by Coraza with optional OWASP Core Rule Set.",
@@ -1833,6 +1837,7 @@
     "toUtc": "To (UTC)",
     "transactionId": "Transaction ID",
     "uri": "URI",
+    "views": "Views",
     "wafEvent": "WAF Event",
     "wafOverLimitActionHelp": "Reject returns 413; Partial inspects what fits and forwards the rest."
   }
