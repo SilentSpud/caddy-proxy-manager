@@ -14,6 +14,8 @@
 @import "./astryx-variants.css";
 /* Backs Tailwind utilities with Astryx tokens (bg-surface, text-primary, ...). */
 @import "@astryxdesign/core/tailwind-theme.css";
+/* Phone chrome no Astryx component draws: tab bar, More drawer, floating action button. */
+@import "../components/mobile/mobile.css";
 
 /* Unlayered last so existing app utility classes keep winning during migration. */
 @import "tailwindcss/utilities.css" layer(utilities);

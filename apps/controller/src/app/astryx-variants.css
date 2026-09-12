@@ -35,3 +35,47 @@
     }
   }
 }
+
+/**
+ * Phone palette: an OLED-friendly dark theme, below the same 767px edge the rest of the app uses
+ * for narrow. Light mode is untouched - each token keeps its light half and changes only the dark.
+ *
+ * - The page goes to pure black. An unlit OLED pixel draws no power, so the gutter between cards
+ *   costs nothing to show.
+ * - Cards go to #262626. The neutral theme paints --color-background-card the same #1b1b1b as its
+ *   body, so a card is separated by its border alone; on a black page the fill does that job, at
+ *   1.39:1 against the page.
+ * - Primary ink steps down to #ebebeb. Pure white on pure black is where OLED smearing shows during
+ *   a scroll, and it is the ink that moves, not the page - lifting the page off black would give up
+ *   the reason it is black. Still 17.6:1 on the page and 12.7:1 on a card.
+ */
+@layer astryx-theme {
+  @media (max-width: 767px) {
+    @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
+      :scope {
+        --color-background-body: light-dark(#f1f1f1, #000000);
+        --color-background-card: light-dark(#ffffff, #262626);
+        --color-text-primary: light-dark(#000000, #ebebeb);
+      }
+    }
+  }
+}
+
+/**
+ * Touch-sized controls. Every Astryx control height reads --size-element-sm/md/lg, which default
+ * to 28/32/36px - none of them reaches the 44px a fingertip needs. Raising the three tokens on a
+ * coarse pointer lifts every button, input and select at once, and leaves a mouse-driven desktop
+ * exactly as it was. This is the same override the theme's own `adaptations` API documents, as a
+ * rule: the built theme cannot take adaptations without injecting its CSS at runtime.
+ */
+@layer astryx-theme {
+  @media (pointer: coarse) {
+    @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
+      :scope {
+        --size-element-sm: 36px;
+        --size-element-md: 44px;
+        --size-element-lg: 48px;
+      }
+    }
+  }
+}

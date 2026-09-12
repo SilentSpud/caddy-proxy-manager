@@ -6,51 +6,70 @@ import { openCreateHostDialog } from '../../helpers/proxy-api';
 test.use({ viewport: { width: 393, height: 852 } });
 
 test.describe('Mobile layout', () => {
-  test('app bar is visible with hamburger and title', async ({ page }) => {
+  test('tab bar is the navigation - no hamburger drawer beside it', async ({ page }) => {
     await page.goto('/');
-    // AppShell renders the mobile top bar as a role="banner" region rather
-    // than a <header> element.
-    const appBar = page.getByRole('banner');
-    await expect(appBar).toBeVisible();
-    // Hamburger button
-    await expect(page.getByRole('button', { name: /open navigation/i })).toBeVisible();
-    // Title text
-    await expect(page.getByRole('banner').getByText('Caddy Proxy Manager')).toBeVisible();
+    const tabBar = page.getByRole('navigation', { name: 'Main navigation' });
+    await expect(tabBar).toBeVisible();
+    for (const name of ['Overview', 'Hosts', 'Agents', 'Analytics']) {
+      await expect(tabBar.getByRole('link', { name, exact: true })).toBeVisible();
+    }
+    await expect(tabBar.getByRole('button', { name: 'More', exact: true })).toBeVisible();
+    // Two persistent ways to navigate cost a screen's worth of chrome for one job, so AppShell's
+    // own hamburger is switched off on a phone.
+    await expect(page.getByRole('button', { name: /open navigation/i })).toHaveCount(0);
   });
 
-  test('drawer opens and closes via hamburger', async ({ page }) => {
+  test('the current tab is marked, not just coloured', async ({ page }) => {
+    await page.goto('/l4-proxy-hosts');
+    const tabBar = page.getByRole('navigation', { name: 'Main navigation' });
+    // Hosts owns both host pages.
+    await expect(tabBar.getByRole('link', { name: 'Hosts', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  test('More opens the drawer, and Escape closes it', async ({ page }) => {
     await page.goto('/');
-    // Drawer is closed initially. It is a native <dialog>, so its dialog role
-    // is implicit - getByRole resolves it, a [role="dialog"] CSS selector
-    // would not.
-    const drawerDialog = page.getByRole('dialog');
-    // The dialog is hidden (not visible) before opening
-    await expect(
-      drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true }),
-    ).not.toBeVisible();
-    // Open drawer
-    await page.getByRole('button', { name: /open navigation/i }).click();
-    await expect(
-      drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true }),
-    ).toBeVisible();
-    // Close by pressing Escape
+    const drawer = page.getByRole('dialog', { name: 'Jump to' });
+    await expect(drawer).toHaveCount(0);
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole('link', { name: 'All pages' })).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(
-      drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true }),
-    ).not.toBeVisible();
+    await expect(drawer).toHaveCount(0);
   });
 
-  test('navigating from drawer closes it', async ({ page }) => {
+  test('picking a page in the drawer goes there and closes the drawer', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: /open navigation/i }).click();
-    const drawerDialog = page.getByRole('dialog');
-    const drawerNavLink = drawerDialog.getByRole('link', { name: 'Proxy Hosts', exact: true });
-    await expect(drawerNavLink).toBeVisible();
-    // Click a nav link inside the drawer
-    await drawerNavLink.click();
-    await expect(page).toHaveURL('/proxy-hosts');
-    // Drawer should close after navigation - drawer links no longer visible
-    await expect(drawerDialog.getByRole('link', { name: /access lists/i })).not.toBeVisible();
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    const drawer = page.getByRole('dialog', { name: 'Jump to' });
+    await drawer.getByRole('link', { name: 'Users', exact: true }).click();
+    await expect(page).toHaveURL('/users');
+    await expect(drawer).toHaveCount(0);
+  });
+
+  test('All pages in the drawer opens the full More page', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Jump to' })
+      .getByRole('link', { name: 'All pages' })
+      .click();
+    await expect(page).toHaveURL('/more');
+    await expect(page.getByRole('heading', { name: 'More', level: 1 })).toBeVisible();
+  });
+
+  test('the drawer stops offering to be customized once it has been', async ({ page }) => {
+    await page.goto('/more/customize');
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expect(page).toHaveURL('/more');
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    const drawer = page.getByRole('dialog', { name: 'Jump to' });
+    await expect(drawer.getByRole('link', { name: 'All pages' })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: /customize this drawer/i })).toHaveCount(0);
   });
 
   test('proxy hosts page shows card list, not a table', async ({ page }) => {
