@@ -3272,8 +3272,16 @@ export async function buildCaddyDocument(agentRowId?: number) {
       : {};
 
   // Build logging configuration. Roll settings are spelled out rather than left to Caddy's
-  // file-writer defaults - those silently stopped rotating (no compression, no cleanup of old
-  // rolled files) on the deployed build and filled the host disk.
+  // file-writer defaults, so rotation does not depend on upstream defaults staying put.
+  //
+  // They cannot stop a full disk on their own, though. Caddy >= 2.11 rolls logs through
+  // timberjack, whose housekeeping pass (gzip and prune old rolled files) starts by listing the
+  // directory. A /logs that caddy's UID can write but not read keeps rotating, since create and
+  // rename need only w+x, but timberjack swallows the EACCES from the listing and 100MB rolled
+  // files pile up until the disk fills. That is what actually filled a deployed host, not the
+  // defaults. The named volume inherits the image's chown'd /logs and is fine; a bind mount needs
+  //   chgrp <caddy PGID> <host-dir> && chmod 2770 <host-dir>
+  // on the host.
   const rollSettings = {
     roll: true,
     roll_size_mb: 100,
