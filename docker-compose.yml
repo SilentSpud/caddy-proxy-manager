@@ -206,6 +206,11 @@ services:
     volumes:
       - caddy-data:/data
       - caddy-config:/config
+      # A bind mount in place of this volume must be readable as well as writable by caddy's
+      # PUID/PGID. Caddy's log roller lists the directory to gzip and prune old rolled files; if the
+      # permission class caddy falls into has w+x but no r (e.g. "other" on a 0773 dir that caddy
+      # neither owns nor shares a group with), rotation keeps working but cleanup silently stops
+      # and the disk fills. On the host: chgrp <PGID> <host-dir> && chmod 2770 <host-dir>
       - caddy-logs:/logs
       - geoip-data:/usr/share/GeoIP:ro,z
       - acme-ca:/acme-ca:ro
