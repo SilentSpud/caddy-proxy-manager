@@ -34,6 +34,14 @@ export type AgentConfig = {
   mode: AgentMode;
   /** Where state, the socket and the shared secret live. Must be writable. */
   dataDir: string;
+  /**
+   * The controller's data volume, mounted read-only, or null for an agent that has none.
+   *
+   * Two things are read from it: the bootstrap token the controller leaves for the agent in its own
+   * stack, and - once, on upgrade - the database agents kept there before they had a volume of
+   * their own. Null falls back to `dataDir` for the token, which is where it was before.
+   */
+  controllerDataDir: string | null;
   /** Where the compose project files are mounted, read-only. */
   composeDir: string;
   /** The local control socket. The agent's only listener, and it faces the host. */
@@ -129,6 +137,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
     pairingCode: resolvePairingCode(overrides),
     mode,
     dataDir,
+    controllerDataDir: optional("CONTROLLER_DATA_DIR"),
     composeDir: resolve(optional("COMPOSE_DIR") ?? "/compose"),
     socketPath: optional("AGENT_SOCKET") ?? resolve(dataDir, "agent.sock"),
     caddyContainerName: optional("CADDY_CONTAINER_NAME") ?? "caddy-proxy-manager-caddy",

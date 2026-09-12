@@ -9,10 +9,10 @@ import type { WafEventRow } from "@cpm/shared";
 import type { AgentStore } from "../db";
 import { insertWafEvents } from "./clickhouse";
 import { readLines } from "./log-read";
+import { geoipCountryDb, wafAuditLogPath, wafRulesLogPath } from "./paths";
 
-const AUDIT_LOG = process.env.WAF_AUDIT_LOG || "/logs/waf-audit.log";
-const RULES_LOG = process.env.WAF_RULES_LOG || "/logs/waf-rules.log";
-const GEOIP_DB = process.env.GEOIP_DB || "/usr/share/GeoIP/GeoLite2-Country.mmdb";
+const AUDIT_LOG = wafAuditLogPath();
+const RULES_LOG = wafRulesLogPath();
 const BATCH_SIZE = 200;
 // Coraza's SecAuditLog writes straight to AUDIT_LOG with no rotation of its own (unlike
 // access.log/waf-rules.log, which roll through Caddy's file writer). Once fully ingested,
@@ -44,9 +44,10 @@ async function setState(key: string, value: string): Promise<void> {
 // ── GeoIP ─────────────────────────────────────────────────────────────────────
 
 async function initGeoIP(): Promise<void> {
-  if (!existsSync(GEOIP_DB)) return;
+  const database = geoipCountryDb();
+  if (!existsSync(database)) return;
   try {
-    geoReader = await maxmind.open<CountryResponse>(GEOIP_DB);
+    geoReader = await maxmind.open<CountryResponse>(database);
   } catch {
     // GeoIP optional
   }
@@ -331,8 +332,8 @@ export async function parseNewWafLogEntries(): Promise<void> {
     }
 
     // Persist progress BEFORE truncating. Truncation is a best-effort disk guard that fails with
-    // EACCES when web and caddy run as different UIDs, and doing it first froze these offsets - so
-    // every later pass re-read and re-inserted the same tail forever.
+    // EACCES when the file is not group-writable for the agent, and doing it first froze these
+    // offsets - so every later pass re-read and re-inserted the same tail forever.
     await setState("waf_audit_log_offset", String(newOffset));
     await setState("waf_audit_log_size", String(currentSize));
     await setState("waf_audit_log_inode", String(currentInode));
@@ -354,7 +355,8 @@ export async function parseNewWafLogEntries(): Promise<void> {
           const code = (err as NodeJS.ErrnoException).code;
           console.warn(
             `[waf-log-parser] could not truncate ${AUDIT_LOG} (${code ?? err}); ` +
-              `it will keep growing. Ingestion is unaffected.`,
+              "it will keep growing. Ingestion is unaffected. The Agents page shows the command " +
+              "that fixes it.",
           );
           warnedTruncateFailed = true;
         }

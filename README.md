@@ -41,8 +41,25 @@ docker compose up -d
 Then open `http://localhost:3000` and follow [First Run](#first-run) - every URL redirects there
 until setup is finished. There is no administrator to sign in as until you create one.
 
-Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-data`, `caddy-data`,
-`caddy-config`, `caddy-logs`, `geoip-data`, `acme-ca`, and `clickhouse-data` when analytics are on.
+Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-data`, `agent-data`,
+`caddy-data`, `caddy-config`, `caddy-logs`, `geoip-data`, `acme-ca`, and `clickhouse-data` when
+analytics are on.
+
+Requires **Docker Engine 26 or later**: Caddy mounts a subdirectory of the agent's volume, and
+volume subpaths arrived in 26.0.
+
+### Upgrading to the non-root agent
+
+The agent used to run as root and keep its database on `caddy-manager-data`. It now runs as its own
+user (`10002`) with an `agent-data` volume of its own. Pull the new `docker-compose.yml` and
+`docker compose up -d` as usual: on its first start the agent copies its database and generated
+compose files across, so it keeps its identity and pairing and does not re-ingest old logs. The
+copies left on `caddy-manager-data` (`agent.db*`, `docker-compose.caddy-build.yml`,
+`docker-compose.l4-ports.yml`) are no longer read and can be deleted.
+
+Caddy switches to the agent's copy of the GeoIP databases the next time the agent recreates it. If
+the Agents page then reports a log permission problem - an existing `waf-audit.log` is usually
+`0644`, which the agent can read but not truncate - it shows the one command that fixes it.
 
 ---
 
@@ -263,12 +280,14 @@ is still honoured as an override until a value is stored.
 | `OAUTH_*` | An OAuth provider configured by environment. Synced into the `oauth_providers` table at startup rather than into the settings registry, so there is one source of truth per provider. See [OAuth Authentication](#oauth-authentication) | None | No |
 | `CERTS_DIRECTORY` | Where generated certificates are written | `./data/certs` | No |
 | `ACME_CA_ROOT_DIR` | Directory holding a custom ACME CA root. For non-Docker deployments | `/acme-ca` | No |
-| `L4_PORTS_DIR` | Shared directory where the local agent leaves its socket and secret. For non-Docker deployments | `/app/data` | No |
+| `L4_PORTS_DIR` | Directory where the controller leaves the bootstrap token the agent in its own stack pairs with. For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
 | `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
 | `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent - with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
-| `CADDY_GID` | Caddy's GID, added to the web container's supplementary groups so it can write the shared `/logs` volume. Must match Caddy's `PGID` | `10000` | No |
+| `AGENT_PUID` / `AGENT_PGID` | Build args setting the UID/GID the agent runs as | `10002`/`10002` | No |
+| `CADDY_GID` | Caddy's GID, added to the web and agent containers' supplementary groups so they can use Caddy's logs. Must match Caddy's `PGID` | `10000` | No |
+| `CONTROLLER_GID` | The controller's GID, added to the agent's supplementary groups so it can read the bootstrap token. Must match web's `PGID` | `10001` | No |
 | `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard - see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 | `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Compose-only. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 
@@ -283,7 +302,8 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | `PAIRING_CODE` | Pair on first start instead of idling. Overridden by `--code` | Unset |
 | `AGENT_MODE` | `standalone` or `managed`. Startup fails on any other value rather than guessing | `standalone` |
 | `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
-| `DATA_DIR` | Where the agent's SQLite state and control socket live. Must be writable | `/data` |
+| `DATA_DIR` | Where the agent's SQLite state, control socket and GeoIP databases live. Must be writable | `/data` |
+| `CONTROLLER_DATA_DIR` | The controller's data volume, mounted read-only: where the bootstrap token is read from, and where an upgraded agent copies its old state from on first start | Unset (token read from `DATA_DIR`) |
 | `COMPOSE_DIR` | Where the compose project files are mounted, read-only | `/compose` |
 | `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy:2019` |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
@@ -292,7 +312,8 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`, `geoipupdate`) is abandoned. Generous because the first start pulls the image | `900` |
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
 | `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs. `COMPOSE_HOST_DIR` is only needed where the project directory cannot be worked out from the compose labels - a UNC path, or a Docker Desktop old enough to expose drives at `/host_mnt/<letter>`; the agent logs a warning naming it when that happens | Auto-detected |
-| `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` / `GEOIP_DIR` / `GEOIP_DB` | Where the agent reads Caddy's logs and the GeoLite2 databases from | Container paths |
+| `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` | Where the agent reads Caddy's logs from | `/logs/...` |
+| `GEOIP_DIR` / `GEOIP_DB` | Where the agent keeps the GeoLite2 databases it fetches, and the one its parsers read | `$DATA_DIR/geoip` / `$GEOIP_DIR/GeoLite2-Country.mmdb` |
 | `NODE_EXTRA_CA_CERTS` | A CA bundle to trust in addition to the system store, for a controller behind TLS from a private CA. See [Connecting agents over Tailscale or Headscale](#connecting-agents-over-tailscale-or-headscale) | Unset |
 
 **Production requirements:**
@@ -675,7 +696,9 @@ GEOIPUPDATE_LICENSE_KEY=your-license-key
 docker compose --profile geoipupdate up -d
 ```
 
-The databases are stored in the `geoip-data` Docker volume and shared between the web and Caddy containers.
+`geoipupdate` stores the databases in the `geoip-data` volume, which the controller serves them from.
+Every agent - the one in the same stack included - fetches its own copy onto `agent-data`, and Caddy
+mounts that copy read-only.
 
 ---
 
@@ -794,13 +817,22 @@ account the controller reads with, not an insert-only one, and it goes to every 
 ### GeoIP databases come from the controller
 
 The controller holds the MaxMind subscription and the `geoipupdate` container that refreshes the
-databases. An agent on another host fetches them through the controller rather than needing a
-licence key of its own, checking daily and downloading only when the copy it has is out of date.
-It writes them where Caddy reads them, so geo-blocking works on every host in the fleet.
+databases. Every agent fetches them through the controller rather than needing a licence key of its
+own, checking daily and downloading only when the copy it has is out of date. It writes them to its
+own volume, which Caddy mounts read-only, so geo-blocking works on every host in the fleet without
+the agent needing root to write where `geoipupdate` does.
 
 This is the only request that runs agent-to-controller, and it is signed with the same pairing
-secret - no extra credential. It does mean a remote agent has to be able to reach `BASE_URL`. An
-agent that cannot keeps using whatever database it already has.
+secret - no extra credential. It goes to the address the agent is paired with, so an agent that can
+reach its controller at all can fetch them. An agent that cannot keeps using whatever database it
+already has.
+
+### Log permissions
+
+The agent runs as its own user and reaches Caddy's logs through Caddy's group. If a log is
+unreadable, the WAF audit log cannot be truncated, or Caddy cannot list the log directory to prune
+rolled files, the agent logs a warning and the **Agents** page shows it on that agent's card with
+the command that fixes it. The agent never changes a permission itself.
 
 ### One controller, many configurations
 
@@ -851,9 +883,9 @@ installing must not answer on 80 and 443 with a default page. Pairing is what st
 
 ### Same host - nothing to enter
 
-The bundled stack pairs itself. The controller leaves a single-use token on the shared data volume
-both containers already mount, and an idle agent that finds one pairs with it - so `docker compose
-up` gives you a working install with no code typed anywhere.
+The bundled stack pairs itself. The controller leaves a single-use token on its data volume, which
+the agent mounts read-only and reads through the controller's group, and an idle agent that finds
+one pairs with it - so `docker compose up` gives you a working install with no code typed anywhere.
 
 The boundary is the volume: reaching that file already means being inside the stack. It is the same
 boundary the pre-3.1 design used, which kept a long-lived shared secret there; this token is

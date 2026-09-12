@@ -31,9 +31,17 @@ already had. Only a 401 - the controller having forgotten this agent - ends the 
 
 ## Same host
 
-The bundled compose file runs an agent beside the controller. It pairs itself using a token both
-containers can read from a shared volume, so there is nothing to enter. Reach the dashboard on port
-3000 to finish setup and Caddy starts on its own.
+The bundled compose file runs an agent beside the controller. It pairs itself using a token the
+controller leaves on its data volume, which the agent mounts read-only, so there is nothing to
+enter. Reach the dashboard on port 3000 to finish setup and Caddy starts on its own.
+
+## Its own user
+
+The agent does not run as root. It keeps its database and its copy of the GeoIP databases on a
+volume of its own, reaches Docker through a socket proxy, and reads Caddy's logs through Caddy's
+group. If a log turns out unreadable, the WAF audit log cannot be truncated, or Caddy cannot list
+its log directory to prune old files, the agent's card on the **Agents** page shows a warning with
+the command that fixes it.
 
 ## A different host
 

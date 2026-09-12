@@ -9,7 +9,7 @@
 import type { FleetConfig } from "@cpm/shared";
 import type { AgentStore } from "../db";
 import { analyticsEnabled, closeAnalytics, configureAnalytics } from "./clickhouse";
-import { syncGeoipDatabases } from "./geoip";
+import { geoipControllerUrl, syncGeoipDatabases } from "./geoip";
 import {
   initLogParser,
   parseNewLogEntries,
@@ -62,9 +62,8 @@ export async function applyFleetConfig(
 /**
  * Fetch the GeoIP databases now, and daily after that.
  *
- * Skipped entirely when the controller offered none, and when this agent talks over a socket: that
- * agent shares the volume the databases are on, so it would be downloading a file it can already
- * see.
+ * Skipped only when the controller offered none. The agent beside the controller fetches too:
+ * Caddy reads the agent's copy, not the one geoipupdate writes for the controller.
  */
 function scheduleGeoipSync(store: AgentStore, config: FleetConfig, controllerId: string): void {
   if (geoipTimer) {
@@ -77,11 +76,14 @@ function scheduleGeoipSync(store: AgentStore, config: FleetConfig, controllerId:
   const secret = store.findController(controllerId)?.secret;
   if (!secret) return;
   const agentId = store.agentId();
+  const controllerUrl = geoipControllerUrl(store.pairedControllerUrl(), geoip.url);
 
   const run = () => {
-    void syncGeoipDatabases(store, geoip, agentId, secret).catch((error: unknown) => {
-      console.warn("[geoip] sync failed:", error);
-    });
+    void syncGeoipDatabases(store, controllerUrl, geoip.editions, agentId, secret).catch(
+      (error: unknown) => {
+        console.warn("[geoip] sync failed:", error);
+      },
+    );
   };
   run();
   geoipTimer = setInterval(run, GEOIP_REFRESH_MS);
@@ -133,8 +135,7 @@ export async function stop(): Promise<void> {
 export async function resumeFleetConfig(store: AgentStore): Promise<void> {
   const stored = store.fleetConfig();
   if (!stored) return;
-  // Whichever controller is paired: in managed mode there is exactly one, and in standalone mode
-  // there is no GeoIP fetch to sign anyway.
+  // Whichever controller is paired: an agent polls exactly one.
   const controller = store.listControllers()[0];
   if (!controller) return;
   await applyFleetConfig(store, stored, controller.controllerId);

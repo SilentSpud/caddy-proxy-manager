@@ -14,6 +14,7 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Grid } from "@astryxdesign/core/Grid";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -28,6 +29,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import type { LogAccessFix } from "@/src/lib/agent/log-access";
 import { rebuildAgentCaddyAction, renameAgentAction } from "./actions";
 
 export type AgentRow = {
@@ -44,6 +46,8 @@ export type AgentRow = {
   assignedHttpHosts: number;
   assignedL4Hosts: number;
   canManage: boolean;
+  /** Log permission problems the agent reported, each with the command that fixes it. */
+  logAccessFixes: LogAccessFix[];
 };
 
 /**
@@ -77,6 +81,20 @@ export default function AgentsClient({
 }) {
   const t = useTranslations("agents");
   const router = useRouter();
+
+  function describeFix(fix: LogAccessFix): string {
+    const values = { path: fix.path, gid: fix.gid };
+    switch (fix.kind) {
+      case "groupMismatch":
+        return t("logAccessGroupMismatch", values);
+      case "unreadable":
+        return t("logAccessUnreadable", values);
+      case "notTruncatable":
+        return t("logAccessNotTruncatable", values);
+      case "cleanupBlocked":
+        return t("logAccessCleanupBlocked", values);
+    }
+  }
   const [renaming, setRenaming] = useState<AgentRow | null>(null);
   const [newName, setNewName] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -240,6 +258,21 @@ export default function AgentsClient({
               </Text>
 
               {agent.lastError && <Banner status="warning" title={agent.lastError} />}
+              {agent.logAccessFixes.length > 0 && (
+                <Banner status="warning" title={t("logAccessTitle")}>
+                  <VStack gap={3}>
+                    {agent.logAccessFixes.map((fix) => (
+                      <VStack key={`${fix.kind}:${fix.path}`} gap={1}>
+                        <Text type="body" size="sm">
+                          {describeFix(fix)}
+                        </Text>
+                        {/* CodeBlock owns the copy button. */}
+                        <CodeBlock code={fix.command} width="100%" />
+                      </VStack>
+                    ))}
+                  </VStack>
+                </Banner>
+              )}
               {agent.buildMessage && <Banner status="info" title={agent.buildMessage} />}
             </VStack>
           </Card>

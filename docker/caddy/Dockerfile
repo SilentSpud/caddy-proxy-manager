@@ -86,13 +86,19 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 # existing user/group with the same UID/GID. `shadow` supplies useradd/userdel, which busybox does
 # not; installing it for one layer and removing it keeps the ID-remapping logic - which decides
 # ownership of /data, /config and /logs - unchanged, without shipping the tooling.
+#
+# waf-audit.log is created here, group-writable, rather than left to Coraza: the agent truncates it
+# once ingested and reaches it only through caddy's group, but Coraza creates it 0644. A new named
+# volume copies this file in with its mode, and Coraza opens an existing file without changing it.
 RUN apk add --no-cache --virtual .user-setup shadow && \
     (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
     (getent passwd ${PUID} && userdel $(getent passwd ${PUID} | cut -d: -f1) || true) && \
     groupadd -g ${PGID} caddy && \
     useradd -r -u ${PUID} -g caddy -m -d /home/caddy caddy && \
     mkdir -p /data /config /logs /acme-ca && \
+    touch /logs/waf-audit.log && \
     chown -R caddy:caddy /data /config /logs /home/caddy && \
+    chmod 0660 /logs/waf-audit.log && \
     chmod 0777 /acme-ca && \
     apk del .user-setup
 

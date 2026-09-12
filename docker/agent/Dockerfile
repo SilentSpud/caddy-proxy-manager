@@ -53,9 +53,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY --from=builder /app/apps/agent/dist/cpm-agent /app/cpm-agent
 
-# Runs as root deliberately: it talks to the Docker API and writes to the shared data volume, which
-# the controller container owns under a different uid. Reach to the daemon is narrowed by the
-# docker-socket-proxy service rather than by this container's user.
+# Its own user, not root. The Docker API is reached over TCP through docker-socket-proxy, which is
+# what narrows the agent's reach to the daemon, so nothing here needs root: the agent owns /data -
+# its database, socket, compose overrides and the GeoIP databases Caddy reads - and reaches Caddy's
+# logs and the controller's bootstrap token through groups docker-compose.yml adds. /data/geoip is
+# created here so a new volume starts with it: Caddy mounts that subdirectory, and a volume subpath
+# that does not exist fails the mount.
+#
+# Removing any existing user or group with the same IDs first, as the caddy and web images do, so
+# a PUID/PGID override that collides with one of Debian's never fails the build.
+ARG PUID=10002
+ARG PGID=10002
+RUN (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
+    (getent passwd ${PUID} && userdel $(getent passwd ${PUID} | cut -d: -f1) || true) && \
+    groupadd -g ${PGID} agent && \
+    useradd -r -u ${PUID} -g agent -m -d /home/agent agent && \
+    mkdir -p /data/geoip && \
+    chown -R agent:agent /data
 
 # Image identity, so a pulled image describes itself without the compose file beside it. Static
 # facts only: the version, revision and build timestamp are supplied by docker/metadata-action in
@@ -72,6 +86,10 @@ LABEL org.opencontainers.image.title="Caddy Proxy Manager Builder Agent" \
 ENV DATA_DIR=/data
 ENV COMPOSE_DIR=/compose
 ENV AGENT_MODE=standalone
+# The docker CLI keeps its config under $HOME, and buildx its state.
+ENV HOME=/home/agent
+
+USER agent
 
 # Managed mode listens here. Standalone binds a socket on the data volume and publishes nothing.
 EXPOSE 3100

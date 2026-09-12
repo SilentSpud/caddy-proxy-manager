@@ -62,9 +62,11 @@ controller never dials the agent. Three consequences worth knowing before touchi
   and the agent diffs it against what it has applied, so a dropped stream costs only a reconnect.
   The one exception is a Caddy admin call, which the controller blocks on: it goes down the stream
   with a correlation id and comes back via `POST /api/agent/v1/command-results`.
-- **The bundled agent pairs itself.** The controller writes a single-use token to the shared data
-  volume at startup (`lib/agent/bootstrap.ts`); an idle agent that finds one pairs with it, so the
-  default stack needs no code typed anywhere. A remote agent has no such file and uses a six-letter
+- **The bundled agent pairs itself.** The controller writes a single-use token to its data volume
+  at startup (`lib/agent/bootstrap.ts`), mode 0640; the agent mounts that volume read-only at
+  `CONTROLLER_DATA_DIR` and reads the token through the controller's group. An idle agent that
+  finds one pairs with it, so the default stack needs no code typed anywhere. A remote agent has
+  no such file and uses a six-letter
   code. Both land in the same route and the same registry - only where the credential came from
   differs.
 - **Caddy is behind a Compose profile and the agent starts it.** `docker compose up` deliberately

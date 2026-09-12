@@ -12,9 +12,9 @@ import type { TrafficEventRow } from "@cpm/shared";
 import type { AgentStore } from "../db";
 import { insertTrafficEvents } from "./clickhouse";
 import { readLines as readLinesFrom } from "./log-read";
+import { accessLogPath, geoipCountryDb } from "./paths";
 
-const LOG_FILE = process.env.CADDY_ACCESS_LOG || "/logs/access.log";
-const GEOIP_DB = process.env.GEOIP_DB || "/usr/share/GeoIP/GeoLite2-Country.mmdb";
+const LOG_FILE = accessLogPath();
 const BATCH_SIZE = 500;
 
 /** Set once at startup; every state read and write goes through it. */
@@ -48,12 +48,13 @@ async function setState(key: string, value: string): Promise<void> {
 // ── GeoIP ────────────────────────────────────────────────────────────────────
 
 async function initGeoIP(): Promise<void> {
-  if (!existsSync(GEOIP_DB)) {
+  const database = geoipCountryDb();
+  if (!existsSync(database)) {
     console.log("[log-parser] GeoIP database not found, country codes will be null");
     return;
   }
   try {
-    geoReader = await maxmind.open<CountryResponse>(GEOIP_DB);
+    geoReader = await maxmind.open<CountryResponse>(database);
     console.log("[log-parser] GeoIP database loaded");
   } catch (err) {
     console.warn("[log-parser] Failed to load GeoIP database:", err);

@@ -308,6 +308,8 @@ volumes:
     name: caddy-manager-data-test
   caddy-manager-registration-data:
     name: caddy-manager-registration-data-test
+  agent-data:
+    name: agent-data-test
   web-setup-data:
     name: web-setup-data-test
   web-migrate-data:

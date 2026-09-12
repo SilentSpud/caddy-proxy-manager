@@ -212,7 +212,16 @@ services:
       # neither owns nor shares a group with), rotation keeps working but cleanup silently stops
       # and the disk fills. On the host: chgrp <PGID> <host-dir> && chmod 2770 <host-dir>
       - caddy-logs:/logs
-      - geoip-data:/usr/share/GeoIP:ro,z
+      # The agent's copy of the MaxMind databases, not the geoip-data volume geoipupdate writes: the
+      # agent fetches them from the controller onto its own volume, which it can write without
+      # running as root. Only the geoip subdirectory, and read-only - the rest of that volume holds
+      # the agent's pairing secrets. A volume subpath needs Docker Engine 26 or later.
+      - type: volume
+        source: agent-data
+        target: /usr/share/GeoIP
+        read_only: true
+        volume:
+          subpath: geoip
       - acme-ca:/acme-ca:ro
     networks:
       - caddy-network
@@ -255,9 +264,17 @@ services:
     build:
       context: .
       dockerfile: docker/agent/Dockerfile
+      args:
+        # The agent's own user. Not PUID/PGID, which already mean two different users to web and
+        # caddy.
+        PUID: ${AGENT_PUID:-10002}
+        PGID: ${AGENT_PGID:-10002}
     restart: unless-stopped
     environment:
       DATA_DIR: /data
+      # The controller's volume, read-only: the bootstrap token it leaves for this agent, and - once,
+      # on upgrade - the state agents kept there before they had a volume of their own.
+      CONTROLLER_DATA_DIR: /controller-data
       COMPOSE_DIR: /compose
       AGENT_MODE: ${AGENT_MODE:-standalone}
       # Where the agent dials to reach its controller. The compose service name works for an agent
@@ -276,15 +293,19 @@ services:
       # Generous: the first start of either pulls its image.
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
+    # The agent runs as its own user, so it reaches other containers' files through their groups.
+    group_add:
+      # Caddy's, to read its logs and truncate the WAF audit log. Must match caddy's PGID.
+      - "${CADDY_GID:-10000}"
+      # The controller's, to read the bootstrap token. Must match web's PGID.
+      - "${CONTROLLER_GID:-10001}"
     volumes:
-      - caddy-manager-data:/data
+      # Its database, socket and compose overrides, and the GeoIP databases Caddy mounts from here.
+      - agent-data:/data
+      - caddy-manager-data:/controller-data:ro
       - .:/compose:ro
       # Caddy's access and WAF logs, which this container is the one that reads.
       - caddy-logs:/logs
-      # Country lookups for the events it writes, and where it installs the databases it fetches
-      # from the controller. Writable, unlike everywhere else this volume is mounted: on a host
-      # that has no geoipupdate of its own, the agent is what puts the files here for Caddy.
-      - geoip-data:/usr/share/GeoIP:z
     # No longer waits on Caddy: the agent is what starts Caddy, so depending on it was a deadlock
     # the moment Caddy stopped being started by compose.
     depends_on:
@@ -387,6 +408,7 @@ networks:
 
 volumes:
   caddy-manager-data:
+  agent-data:
   caddy-data:
   caddy-config:
   caddy-logs:
