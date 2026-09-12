@@ -634,10 +634,21 @@ function DetailPane({
               label={`${usage.length} ${usage.length === 1 ? "host" : "hosts"}`}
             />
             <Badge icon={<Clock />} label={`updated ${fmtRelative(list.updatedAt)}`} />
+            {list.entries.length === 0 && <Badge variant="error" label={t("noMembersBadge")} />}
             {usage.length === 0 && <Badge variant="warning" label="unused" />}
           </HStack>
         </VStack>
       </HStack>
+
+      {/* Above the tabs, so it shows whichever one is open: an empty list in use is a host that
+          answers nobody, which is worth knowing before anything else on this page. */}
+      {list.entries.length === 0 && usage.length > 0 && (
+        <Banner
+          status="warning"
+          title={t("noMembersBannerTitle")}
+          description={t("noMembersBannerDescription", { count: usage.length })}
+        />
+      )}
 
       <TabList value={tab} onChange={(v) => setTab(v as DetailTab)} size="sm" hasDivider>
         <Tab
@@ -962,7 +973,12 @@ function ListsRail({
                 label={list.name}
                 description={`${list.entries.length} ${list.entries.length === 1 ? "member" : "members"} · ${hostCount} ${hostCount === 1 ? "host" : "hosts"}`}
                 endContent={
-                  hostCount === 0 ? <Badge variant="warning" label="unused" /> : undefined
+                  // No members outranks unused: it is the one that changes what a host serves.
+                  list.entries.length === 0 ? (
+                    <Badge variant="error" label={t("noMembersBadge")} />
+                  ) : hostCount === 0 ? (
+                    <Badge variant="warning" label="unused" />
+                  ) : undefined
                 }
                 onClick={() => onSelect(list.id)}
               />
