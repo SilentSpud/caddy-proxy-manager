@@ -16,6 +16,7 @@
  */
 import { type Page, expect, test } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
+import { signInWithCredentials } from '../helpers/sign-in';
 import {
   LEGACY_CONTAINER_PATH,
   LEGACY_FIXTURE,
@@ -27,10 +28,6 @@ const MIGRATE_ORIGIN = 'http://localhost:3005';
 const LEGACY_PASSWORD = 'LegacyPassword2026!';
 
 let page: Page;
-
-function field(name: string) {
-  return page.locator(`input[name="${name}"]`);
-}
 
 test.beforeAll(async ({ browser }) => {
   // Spawned rather than imported: Playwright runs this file under Node, which cannot load
@@ -101,11 +98,35 @@ test.describe('Migrating an existing installation', () => {
     await expect(page.getByRole('checkbox', { name: /^Certificates/ })).toBeDisabled();
   });
 
+  test('the confirmation says what is coming across before anything is copied', async () => {
+    // The import is one-way and the selection above is easy to get wrong, so the counts get
+    // restated where they still mean something. Cancel leaves the page untouched for the test
+    // below, which is the one that actually migrates.
+    await page.getByRole('button', { name: 'Migrate this database' }).click();
+    const sheet = page.getByRole('dialog');
+
+    await expect(sheet.getByText(LEGACY_CONTAINER_PATH)).toBeVisible();
+    // Every group is ticked by the time this runs, so the summary accounts for all of them and
+    // the warning about having no account afterwards has nothing to warn about.
+    await expect(sheet.getByText(/8 groups/)).toBeVisible();
+    await expect(
+      sheet.getByText('This instance will still need its first administrator'),
+    ).toHaveCount(0);
+
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await expect(sheet).toBeHidden();
+  });
+
   test('migrating restarts the app before handing them on', async () => {
     // The restart is the point of this test, not a detail of it. The process read its
     // configuration from an empty database at boot, and the import has just replaced that
     // database underneath it - signing in before it restarts means signing in to the old answers.
     await page.getByRole('button', { name: 'Migrate this database' }).click();
+
+    // The button opens a confirmation rather than importing: the copy is one-way, so the
+    // selection above gets one last look before it stops being reversible.
+    await expect(page.getByRole('heading', { name: 'Migrate this database?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Start the migration' }).click();
 
     // The importer copies thirty tables; the dialog is the signal it finished.
     await expect(
@@ -124,9 +145,8 @@ test.describe('Migrating an existing installation', () => {
     // The container restarted moments ago, so this is the coldest /login in the suite - the widest
     // window between the form being painted and React attaching its onSubmit.
     await waitForHydration(page);
-    await field('username').fill(LEGACY_FIXTURE.adminUsername);
-    await field('password').fill(LEGACY_PASSWORD);
-    await page.getByRole('button', { name: /sign in/i }).click();
+    // Identifier first: the password field stays hidden until Continue.
+    await signInWithCredentials(page, LEGACY_FIXTURE.adminUsername, LEGACY_PASSWORD);
 
     // Into the settings step: migrating brings the data across, but the deployment is not
     // configured until that step is saved.

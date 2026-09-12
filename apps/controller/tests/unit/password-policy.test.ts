@@ -96,6 +96,21 @@ describe('passwordPolicyMessage', () => {
   });
 });
 
+describe('passwordPolicy.rule messages', () => {
+  // The forced password update renders its checklist as `passwordPolicy.rule.${violation}`, a key
+  // composed at runtime that the typed catalog cannot check. Every violation the policy can report
+  // needs a rule line, or the checklist shows the raw key.
+  it('has a checklist line for every violation', () => {
+    const everyViolation = passwordPolicyViolations('');
+    expect(everyViolation).toHaveLength(4);
+    for (const violation of everyViolation) {
+      expect(t(`passwordPolicy.rule.${violation}`, { min: MIN_PASSWORD_LENGTH })).not.toContain(
+        '{',
+      );
+    }
+  });
+});
+
 describe('passwordPolicyHint', () => {
   it('describes the rule it is shown next to', () => {
     // The hint is the only thing a user reads before typing, so it should not

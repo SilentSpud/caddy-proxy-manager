@@ -67,6 +67,27 @@ function toOptions(items: { id: number; name: string }[], noneLabel: string) {
   ];
 }
 
+type ProxyHostsT = ReturnType<typeof useTranslations<"proxyHosts">>;
+
+/** Access list options, naming the empty ones: picking one closes the host rather than guarding it. */
+function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
+  return toOptions(
+    accessLists.map((list) => ({
+      id: list.id,
+      name: list.entries.length === 0 ? t("accessListNoMembers", { name: list.name }) : list.name,
+    })),
+    "None",
+  );
+}
+
+/** A warning on the picker while the chosen list has no members. */
+function accessListStatus(accessLists: AccessList[], accessListId: string, t: ProxyHostsT) {
+  const chosen = accessLists.find((list) => String(list.id) === accessListId);
+  return chosen && chosen.entries.length === 0
+    ? { type: "warning" as const, message: t("accessListEmptyWarning") }
+    : undefined;
+}
+
 export function CreateHostDialog({
   open,
   onClose,
@@ -167,9 +188,10 @@ export function CreateHostDialog({
           <Selector
             label={t("accessList")}
             htmlName="accessListId"
-            options={toOptions(accessLists, "None")}
+            options={accessListOptions(accessLists, t)}
             value={accessListId}
             onChange={(next) => setAccessListId(next as string)}
+            status={accessListStatus(accessLists, accessListId, t)}
           />
           <AgentAssignmentFields agents={agents} selected={[]} />
           <RedirectsFields initialData={initialData?.redirects} />
@@ -294,9 +316,10 @@ export function EditHostDialog({
           <Selector
             label={t("accessList")}
             htmlName="accessListId"
-            options={toOptions(accessLists, "None")}
+            options={accessListOptions(accessLists, t)}
             value={accessListId}
             onChange={(next) => setAccessListId(next as string)}
+            status={accessListStatus(accessLists, accessListId, t)}
           />
           <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
           <RedirectsFields initialData={host.redirects} />

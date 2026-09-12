@@ -1,0 +1,397 @@
+/**
+ * Mobile chrome that no Astryx component draws: the tab bar, the More drawer, and the floating
+ * action button. Plain CSS over Astryx's own tokens, so both themes and every token override
+ * reach it without a second palette.
+ *
+ * Every rule sits behind the same 767px edge the rest of the app uses for "narrow" (DataTable's
+ * card view, Astryx AppShell's default mobile breakpoint), so the phone layout switches in one
+ * place and never half-applies.
+ */
+
+@layer components {
+  /* Wide by default: the phone-only pieces are hidden, and a list page's header wrapper has no box
+     of its own, so its title, stats and toolbar stay direct children of the page's stack and keep
+     the gaps they always had. */
+  .cpm-fab,
+  .cpm-mobile-only,
+  .cpm-mobile-flex {
+    display: none;
+  }
+
+  .cpm-list-header {
+    display: contents;
+  }
+
+  @media (max-width: 767px) {
+    /* The bar's own height, so content and sheets can clear it. Safe-area inset on top of it keeps
+       the labels off the home indicator on phones that have one. */
+    :root {
+      --cpm-tabbar-height: 60px;
+      /* AppShell's content padding (spacing step 6), which a full-bleed header has to cancel. */
+      --cpm-page-pad: 24px;
+    }
+
+    /* No !important needed: Astryx's StyleX rules live in the astryx-base layer, which layers.css
+       orders before components, so a rule here wins regardless of their specificity. */
+    .cpm-desktop-only {
+      display: none;
+    }
+
+    .cpm-mobile-only {
+      display: block;
+    }
+
+    /* ---- floating action button ---------------------------------------------------------- */
+
+    .cpm-fab {
+      position: fixed;
+      right: 16px;
+      bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px) + 16px);
+      /* Under the drawer's scrim (50), so the drawer covers it rather than the other way round. */
+      z-index: 45;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      border: 0;
+      border-radius: 9999px;
+      background: var(--color-text-pink);
+      /* #111 on the pink fill, the ink the accent uses for text on itself. */
+      color: #111111;
+      box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+      text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .cpm-fab:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .cpm-fab:focus-visible {
+      outline: 2px solid var(--color-border-pink);
+      outline-offset: 3px;
+    }
+
+    /* ---- list page header ---------------------------------------------------------------- */
+
+    /* Title, search and filters as one fixed control surface the rows scroll under. It bleeds to
+       the screen edges, so the line under it runs the full width like the tab bar's does. Pure
+       black against a pure black page: the light line is the whole boundary, and on OLED the header
+       costs nothing to show. */
+    .cpm-list-header {
+      display: block;
+      position: sticky;
+      /* Negative, to match the margin: a sticky element's offset is measured from inside the scroll
+         container's padding, so `top: 0` would stick it 24px down from the top of the screen. */
+      top: calc(-1 * var(--cpm-page-pad));
+      z-index: 20;
+      margin: calc(-1 * var(--cpm-page-pad)) calc(-1 * var(--cpm-page-pad)) 0;
+      padding: 12px var(--cpm-page-pad) 12px;
+      background: light-dark(#ffffff, #000000);
+      border-bottom: 1px solid light-dark(#c4c4c4, #5c5c5c);
+    }
+
+    .cpm-mobile-flex {
+      display: flex;
+    }
+
+    /* A single-form auth page starts at the top on a phone rather than centring: the keyboard takes
+       the bottom half, and a centred form is pushed under it. */
+    .cpm-auth-page {
+      align-items: flex-start;
+    }
+
+    /* ---- card feed (WAF, Analytics) ------------------------------------------------------ */
+
+    /* Filters as pills in one row that scrolls sideways, each opening a sheet. */
+    .cpm-chip-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .cpm-chip-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cpm-chip {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 40px;
+      padding: 0 13px;
+      border-radius: 9999px;
+      border: 1px solid light-dark(#c4c4c4, #525252);
+      background: var(--color-background-card);
+      color: var(--color-text-primary);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* A filter moved off its default, in the accent so a narrowed page never passes for the whole. */
+    .cpm-chip[data-active] {
+      background: var(--color-text-pink);
+      border-color: var(--color-text-pink);
+      color: #111111;
+    }
+
+    .cpm-chip:focus-visible {
+      outline: 2px solid var(--color-border-pink);
+      outline-offset: 2px;
+    }
+
+    /* A header inside a rail that already pads itself (Access Lists, which the shell draws full
+       bleed): it cancels the rail's 12px instead of the shell's 24, and sticks at the very top
+       because no shell padding sits above it. It also stands in for the rail's stack gaps. */
+    .cpm-list-header-inset {
+      --cpm-page-pad: 12px;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Search first and full width, filters under it: search is what a phone list is for. */
+    .cpm-list-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .cpm-list-search {
+      order: -1;
+    }
+
+    /* Astryx sets a field's width through an inline custom property read by a layered class, not an
+       inline width, so a plain rule in this later layer is enough to widen it. */
+    .cpm-list-search > * {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* Filters scroll sideways rather than wrapping into a second and third row. */
+    .cpm-list-filters {
+      overflow-x: auto;
+      margin-inline: calc(-1 * var(--cpm-page-pad));
+      padding-inline: var(--cpm-page-pad);
+      scrollbar-width: none;
+    }
+
+    .cpm-list-filters::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* AppShell paints its content area with the card token. On a desktop card and body are the same
+       colour; on a phone cards are lifted off the black page, so the page area has to ask for the
+       body colour itself or every screen turns card grey. */
+    .astryx-app-shell .astryx-layout-content {
+      background-color: var(--color-background-body);
+    }
+
+    .cpm-mobile-content {
+      padding-bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* ---- tab bar ------------------------------------------------------------------------- */
+
+    .cpm-tabbar {
+      position: fixed;
+      inset-inline: 0;
+      bottom: 0;
+      z-index: 60;
+      display: flex;
+      align-items: stretch;
+      padding: 0 6px env(safe-area-inset-bottom, 0px);
+      background: var(--color-background-surface);
+      border-top: 1px solid var(--color-neutral);
+    }
+
+    .cpm-tab {
+      position: relative;
+      flex: 1;
+      min-height: var(--cpm-tabbar-height);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .cpm-tab[data-active] {
+      color: var(--color-text-pink);
+    }
+
+    .cpm-tab:focus-visible {
+      outline: 2px solid var(--color-border-pink);
+      outline-offset: -4px;
+      border-radius: 10px;
+    }
+
+    /* A bar above the active tab, so selection is never colour alone. */
+    .cpm-tab-bar-mark {
+      position: absolute;
+      top: 0;
+      width: 20px;
+      height: 2px;
+      border-radius: 2px;
+      background: transparent;
+    }
+
+    .cpm-tab[data-active] .cpm-tab-bar-mark {
+      background: var(--color-text-pink);
+    }
+
+    .cpm-tab-label {
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 500;
+    }
+
+    .cpm-tab[data-active] .cpm-tab-label {
+      font-weight: 600;
+    }
+
+    /* ---- More drawer --------------------------------------------------------------------- */
+
+    /* Stops at the tab bar: the bar stays live under the drawer, so a second tap on More lands. */
+    .cpm-sheet-scrim {
+      position: fixed;
+      inset: 0 0 calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px)) 0;
+      z-index: 50;
+      background: rgb(0 0 0 / 0.45);
+    }
+
+    .cpm-sheet {
+      position: fixed;
+      inset-inline: 0;
+      bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px));
+      z-index: 55;
+      max-height: calc(100dvh - var(--cpm-tabbar-height) - 48px);
+      overflow-y: auto;
+      padding: 8px 12px 16px;
+      background: var(--color-background-surface);
+      border-top: 1px solid var(--color-neutral);
+      border-radius: 16px 16px 0 0;
+      outline: none;
+    }
+
+    .cpm-sheet-handle {
+      width: 36px;
+      height: 4px;
+      margin: 2px auto 12px;
+      border-radius: 2px;
+      background: var(--color-neutral);
+    }
+
+    .cpm-sheet-title {
+      margin: 0 0 10px;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+    }
+
+    /* Three columns of three: eight pins and All pages fill it exactly. */
+    .cpm-drawer-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .cpm-tile {
+      min-height: 88px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 12px 8px;
+      border-radius: 12px;
+      border: 1px solid var(--color-neutral);
+      background: var(--color-background-surface);
+      color: var(--color-text-primary);
+      text-align: center;
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* The page you are on, in the tonal treatment: the accent at a lower weight. */
+    .cpm-tile[data-current] {
+      background: var(--color-background-pink);
+      border-color: var(--color-border-pink);
+      color: var(--color-text-pink);
+    }
+
+    .cpm-tile:focus-visible,
+    .cpm-sheet-row:focus-visible {
+      outline: 2px solid var(--color-border-pink);
+      outline-offset: 2px;
+    }
+
+    .cpm-tile-all {
+      border-style: dashed;
+      color: var(--color-text-secondary);
+    }
+
+    .cpm-tile-label {
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .cpm-tile-caption {
+      font-size: 10px;
+      line-height: 1.2;
+      color: var(--color-text-secondary);
+    }
+
+    .cpm-sheet-row {
+      margin-top: 8px;
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--color-neutral);
+      color: var(--color-text-secondary);
+      text-decoration: none;
+    }
+
+    .cpm-sheet-row-text {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cpm-sheet-row-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-text-primary);
+    }
+
+    .cpm-sheet-row-caption {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+    }
+  }
+}

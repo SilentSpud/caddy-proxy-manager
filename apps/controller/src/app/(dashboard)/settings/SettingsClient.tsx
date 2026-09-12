@@ -151,7 +151,7 @@ function _DetailHeader({ activeId }: { activeId: string }) {
         <Heading level={1}>{item.name}</Heading>
         <EnvTokens names={item.env} />
       </HStack>
-      <Text type="body" size="sm" color="secondary">
+      <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
         {item.desc}
       </Text>
     </VStack>
@@ -178,6 +178,8 @@ type Props = {
   globalGeoBlock?: GeoBlockSettings | null;
   globalErrorPages?: ErrorPagesSettings | null;
   oauthProviders: OAuthProviderView[];
+  /** The provider offered first on the sign-in screen, or null for alphabetical order. */
+  primaryProviderId: string | null;
   localUsersDisabled: boolean;
   avatars: { gravatarEnabled: boolean; fromEnv: boolean };
   passwordPolicy: { requireChangeOnLegacyHash: boolean; fromEnv: boolean };
@@ -223,6 +225,7 @@ export default function SettingsClient({
   globalGeoBlock,
   globalErrorPages,
   oauthProviders,
+  primaryProviderId,
   localUsersDisabled,
   avatars,
   passwordPolicy,
@@ -377,6 +380,7 @@ export default function SettingsClient({
         {active === "oauth" && (
           <OAuthSection
             oauthProviders={oauthProviders}
+            primaryProviderId={primaryProviderId}
             localUsersDisabled={localUsersDisabled}
             baseUrl={baseUrl}
           />
@@ -1560,10 +1564,13 @@ function AuthentikSection({
 
 function OAuthSection({
   oauthProviders,
+  primaryProviderId,
   localUsersDisabled,
   baseUrl,
 }: {
   oauthProviders: OAuthProviderView[];
+  /** The provider offered first on the sign-in screen, or null for alphabetical order. */
+  primaryProviderId: string | null;
   localUsersDisabled: boolean;
   baseUrl: string;
 }) {
@@ -1571,6 +1578,7 @@ function OAuthSection({
     <FormCard>
       <OAuthProvidersSection
         initialProviders={oauthProviders}
+        initialPrimaryProviderId={primaryProviderId}
         baseUrl={baseUrl}
         localUsersDisabled={localUsersDisabled}
       />

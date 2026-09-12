@@ -29,6 +29,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-attrs";
 import { FormCard, InfoAlert, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
+import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { saveSetupSettings } from "./actions";
 import { useTranslations } from "next-intl";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
@@ -84,11 +85,13 @@ export default function SetupSettingsClient({
   groups,
   general,
   oauth,
+  hasMigrateStep,
 }: {
   fields: SettingField[];
   groups: Array<{ id: string; title: string }>;
   general: GeneralFields;
   oauth: OAuthCard;
+  hasMigrateStep: boolean;
 }) {
   const t = useTranslations("setup");
   const [state, submit] = useActionState(saveSetupSettings, { error: null });
@@ -123,8 +126,9 @@ export default function SetupSettingsClient({
   return (
     <Center>
       <VStack gap={5} padding={5}>
+        <SetupSteps stage="settings" hasMigrateStep={hasMigrateStep} />
         <VStack gap={2}>
-          <Heading level={1}>Finish setting up</Heading>
+          <Heading level={1}>{t("settingsStep.heading")}</Heading>
           <Text color="secondary">{t("databaseSettingsDescription")}</Text>
         </VStack>
 

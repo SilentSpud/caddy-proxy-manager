@@ -75,7 +75,11 @@ test.describe('Analytics host filter (#171)', () => {
         }
       });
       await page.goto('/analytics');
-      await expect(page.getByText('Total Requests', { exact: true })).toBeVisible({
+      // Scoped to the desktop tiles: phones get the same label in a summary card, which stays in the
+      // DOM (hidden) at this width.
+      await expect(
+        page.getByTestId('analytics-stats').getByText('Total Requests', { exact: true }),
+      ).toBeVisible({
         timeout: 15_000,
       });
 

@@ -20,6 +20,7 @@ import {
 import type { CaCertificateView } from "../page";
 import { CaCertDrawer } from "./CaCertDrawer";
 import { useTranslations } from "next-intl";
+import { Fab } from "@/src/components/mobile/Fab";
 
 type Props = {
   caCertificates: CaCertificateView[];
@@ -269,7 +270,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
 
   return (
     <VStack gap={4}>
-      <HStack justify="end">
+      <HStack justify="end" className="cpm-desktop-only">
         <Button
           variant="secondary"
           size="sm"
@@ -278,6 +279,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
           onClick={() => setDrawerCert(null)}
         />
       </HStack>
+      <Fab label={t("addCaCertificate")} onClick={() => setDrawerCert(null)} />
 
       {filtered.length === 0 ? (
         <Card>

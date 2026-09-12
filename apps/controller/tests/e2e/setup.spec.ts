@@ -14,6 +14,7 @@
  */
 import { type Page, expect, test } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
+import { signInWithCredentials } from '../helpers/sign-in';
 
 const SETUP_ORIGIN = 'http://localhost:3004';
 const USERNAME = 'setupadmin';
@@ -109,9 +110,8 @@ test.describe('First-run setup', () => {
   test('signing in with the new account carries on into the settings step', async () => {
     await page.goto('/login');
     await waitForHydration(page);
-    await field('username').fill(USERNAME);
-    await field('password').fill(PASSWORD);
-    await page.getByRole('button', { name: /sign in/i }).click();
+    // Identifier first: the password field stays hidden until Continue.
+    await signInWithCredentials(page, USERNAME, PASSWORD);
 
     await expect(page).toHaveURL(/\/setup\/settings$/, { timeout: 30_000 });
   });
@@ -214,9 +214,7 @@ test.describe('First-run setup', () => {
     try {
       await fresh.goto('/login');
       await waitForHydration(fresh);
-      await fresh.locator('input[name="username"]').fill(USERNAME);
-      await fresh.locator('input[name="password"]').fill(PASSWORD);
-      await fresh.getByRole('button', { name: /sign in/i }).click();
+      await signInWithCredentials(fresh, USERNAME, PASSWORD);
 
       await expect(fresh).toHaveURL(new RegExp(`^${SETUP_ORIGIN}/?$`), { timeout: 30_000 });
     } finally {

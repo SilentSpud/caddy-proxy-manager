@@ -20,7 +20,7 @@ import {
   getTailscaleSettings,
   defaultTailscaleSettings,
 } from "@/src/lib/settings";
-import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
+import { getPrimaryProviderId, listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { getAllAgentBuildSettings, listAgents } from "@/src/lib/models/agents";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { getFavicon } from "@/src/lib/branding";
@@ -74,6 +74,7 @@ export default async function SettingsSectionPage({
     trustedProxies,
     defaultResponse,
     oauthProviders,
+    primaryProviderId,
     avatarSettings,
     passwordPolicySettings,
     caddyBuild,
@@ -98,6 +99,7 @@ export default async function SettingsSectionPage({
       getTrustedProxiesSettings(),
       getDefaultResponseSettings(),
       listOAuthProviders(),
+      getPrimaryProviderId(),
       getAvatarSettings(),
       getPasswordPolicySettings(),
       getCaddyBuildSettings(),
@@ -141,6 +143,7 @@ export default async function SettingsSectionPage({
       globalGeoBlock={globalGeoBlock}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
+      primaryProviderId={primaryProviderId}
       localUsersDisabled={config.auth.disableLocalUsers}
       avatars={{
         // The stored toggle only applies when AVATAR_GRAVATAR leaves the choice open.

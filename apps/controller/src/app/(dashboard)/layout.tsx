@@ -10,6 +10,7 @@ import { requiresLegacyPasswordChange } from "@/src/lib/services/legacy-password
 import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
 import { stagedKeys } from "@/src/lib/settings/staged-view";
+import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireUser();
@@ -39,6 +40,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   // empty unless someone is mid-edit.
   const staged =
     session.user.role === "admin" ? [...(await stagedKeys(Number(session.user.id)))] : [];
+  // One indexed read per request, for the phone's More drawer. Null means the user never chose,
+  // which is also what keeps the drawer offering to be customized.
+  const morePins = await getMoreDrawerPins(Number(session.user.id));
   return (
     <ModuleGateProvider value={moduleGate}>
       <DashboardLayoutClient
@@ -47,6 +51,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         appName={config.appName}
         updateAvailable={updates.updateAvailable}
         stagedKeys={staged}
+        morePins={morePins}
       >
         {children}
       </DashboardLayoutClient>

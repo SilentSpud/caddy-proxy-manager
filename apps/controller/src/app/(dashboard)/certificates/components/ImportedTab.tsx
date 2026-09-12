@@ -18,6 +18,7 @@ import type { CertExpiryStatus, ImportedCertView, ManagedCertView } from "../pag
 import { RelativeTime } from "./RelativeTime";
 import { ImportCertDrawer } from "./ImportCertDrawer";
 import { useTranslations } from "next-intl";
+import { Fab } from "@/src/components/mobile/Fab";
 
 type Props = {
   importedCerts: ImportedCertView[];
@@ -196,7 +197,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
 
   return (
     <VStack gap={4}>
-      <HStack justify="end">
+      <HStack justify="end" className="cpm-desktop-only">
         <Button
           variant="secondary"
           size="sm"
@@ -205,6 +206,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
           onClick={() => setDrawerCert(null)}
         />
       </HStack>
+      <Fab label={t("importCertificate")} onClick={() => setDrawerCert(null)} />
 
       <DataTable
         columns={columns}

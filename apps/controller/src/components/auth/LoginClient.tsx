@@ -1,9 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { LogIn } from "lucide-react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -13,6 +12,8 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/Stack";
+import { SignInIdentity } from "@/src/components/auth/SignInIdentity";
+import { type SignInProvider, SignInProviders } from "@/src/components/auth/SignInProviders";
 import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_USERNAME,
@@ -21,41 +22,44 @@ import { authClient } from "@/src/lib/auth-client";
 import { formatAppVersion } from "@/src/lib/app-version";
 
 interface LoginClientProps {
-  enabledProviders: Array<{ id: string; name: string }>;
+  enabledProviders: SignInProvider[];
   /** False in OIDC-only mode: there are no local accounts to sign in with. */
   localLoginEnabled?: boolean;
   /** Display name from APP_NAME, so a rebranded instance is named consistently. */
   appName?: string;
+  /** A refused single sign-on attempt, already put into words by the page. */
+  initialError?: string | null;
 }
 
 export default function LoginClient({
   enabledProviders = [],
   localLoginEnabled = true,
   appName = "Caddy Proxy Manager",
+  initialError = null,
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
   const router = useRouter();
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(initialError);
   const [loginPending, setLoginPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  // Identifier first: the username is asked for on its own, and the password only once there is
+  // a name to attach it to. Step one never checks whether that name exists - see below.
+  const [onPasswordStep, setOnPasswordStep] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
-  const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoginError(null);
-    setLoginPending(true);
-
-    // Read from state, not FormData: Astryx withholds an input's `name` while
-    // it is disabled, and these fields disable themselves once a sign-in is
-    // pending, so a FormData read here would be racing that re-render.
-    const trimmedUsername = username.trim();
-
-    if (!trimmedUsername || !password) {
-      setLoginError(t("credentialsRequired"));
-      setLoginPending(false);
-      return;
+  // After the commit that unhides the field, not from the handler that asked for it: `focus()` on
+  // an element still inside a `hidden` subtree is a no-op, and a handler - or a rAF scheduled from
+  // one - can run before React has removed the attribute.
+  useEffect(() => {
+    if (onPasswordStep) {
+      passwordRef.current?.focus();
     }
+  }, [onPasswordStep]);
+
+  const signIn = async (trimmedUsername: string) => {
+    setLoginPending(true);
 
     // `signIn.username` is added at runtime by the usernameClient plugin. The plugin's
     // $InferServerPlugin types fail to merge into the client signature in some environments,
@@ -75,6 +79,9 @@ export default function LoginClient({
       }
       setLoginError(message ?? t("invalidCredentials"));
       setLoginPending(false);
+      // Keep the name on screen: the operator has to be able to tell a typo in it from a wrong
+      // password, and sending them back to step one hides the evidence.
+      setOnPasswordStep(true);
       return;
     }
 
@@ -82,11 +89,50 @@ export default function LoginClient({
     router.refresh();
   };
 
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoginError(null);
+
+    // Read from state, not FormData: Astryx withholds an input's `name` while it is disabled, and
+    // these fields disable themselves once a sign-in is pending, so a FormData read here would be
+    // racing that re-render.
+    const trimmedUsername = username.trim();
+
+    if (!trimmedUsername) {
+      setLoginError(t("usernameRequired"));
+      return;
+    }
+
+    // Step one advances for any username, real or not. Resolving it - to say the account is
+    // unknown, or to send it to the provider it belongs to - would answer "does this name exist?"
+    // for anyone who asks, which the single-screen form never did.
+    if (!onPasswordStep) {
+      // A password manager fills both fields at once even though only one is on screen, so a
+      // filled password means there is nothing to ask for: submit rather than showing a step whose
+      // only field is already complete.
+      if (!password) {
+        setOnPasswordStep(true);
+        return;
+      }
+    } else if (!password) {
+      setLoginError(t("passwordRequired"));
+      return;
+    }
+
+    await signIn(trimmedUsername);
+  };
+
   const handleOAuthSignIn = async (providerId: string) => {
     setLoginError(null);
     setOauthPending(providerId);
     try {
-      await authClient.signIn.social({ provider: providerId, callbackURL: "/" });
+      // Without errorCallbackURL a refused sign-in lands on Better Auth's bare error page; back
+      // here, the page can say what happened and what to do instead.
+      await authClient.signIn.social({
+        provider: providerId,
+        callbackURL: "/",
+        errorCallbackURL: "/login",
+      });
     } catch {
       setLoginError(t("oauthFailed"));
       setOauthPending(null);
@@ -94,6 +140,22 @@ export default function LoginClient({
   };
 
   const disabled = loginPending || !!oauthPending;
+  const hasProviders = enabledProviders.length > 0;
+
+  const subtitle = !localLoginEnabled
+    ? t("subtitleSsoOnly")
+    : onPasswordStep
+      ? t("subtitlePassword")
+      : t("subtitleIdentify");
+
+  const providerList = (
+    <SignInProviders
+      providers={enabledProviders}
+      pendingId={oauthPending}
+      isDisabled={disabled}
+      onSelect={handleOAuthSignIn}
+    />
+  );
 
   return (
     <Center minHeight="100vh" padding={4}>
@@ -102,44 +164,13 @@ export default function LoginClient({
           <VStack gap={1} hAlign="center">
             <Heading level={1}>{appName}</Heading>
             <Text type="body" size="sm" color="secondary">
-              {!localLoginEnabled
-                ? t("subtitleSsoOnly")
-                : enabledProviders.length > 0
-                  ? t("subtitleWithProviders")
-                  : t("subtitleCredentials")}
+              {subtitle}
             </Text>
           </VStack>
 
           {loginError && <Banner status="error" title={t("errorTitle")} description={loginError} />}
 
-          {enabledProviders.length > 0 && (
-            <>
-              <VStack gap={2}>
-                {enabledProviders.map((provider) => {
-                  const isPending = oauthPending === provider.id;
-                  return (
-                    <Button
-                      key={provider.id}
-                      variant="secondary"
-                      width="100%"
-                      icon={<LogIn />}
-                      label={
-                        isPending
-                          ? t("signingInWith", { provider: provider.name })
-                          : t("continueWith", { provider: provider.name })
-                      }
-                      isLoading={isPending}
-                      isDisabled={disabled}
-                      onClick={() => handleOAuthSignIn(provider.id)}
-                    />
-                  );
-                })}
-              </VStack>
-              {localLoginEnabled && <Divider label={t("credentialsDivider")} />}
-            </>
-          )}
-
-          {!localLoginEnabled && enabledProviders.length === 0 && (
+          {!localLoginEnabled && !hasProviders && (
             <Banner
               status="error"
               title={t("noMethodTitle")}
@@ -147,40 +178,82 @@ export default function LoginClient({
             />
           )}
 
+          {/* SSO only: there is no username to enter first, so the providers are the whole form. */}
+          {!localLoginEnabled && hasProviders && providerList}
+
           {localLoginEnabled && (
-            <form onSubmit={handleSignIn}>
-              <VStack gap={3}>
-                <TextInput
-                  {...AUTOFILL_USERNAME}
-                  label={t("username")}
-                  htmlName="username"
-                  value={username}
-                  onChange={setUsername}
-                  isRequired
-                  hasAutoFocus={enabledProviders.length === 0}
-                  isDisabled={disabled}
-                  width="100%"
-                />
-                <TextInput
-                  {...AUTOFILL_CURRENT_PASSWORD}
-                  label={t("password")}
-                  type="password"
-                  htmlName="password"
-                  value={password}
-                  onChange={setPassword}
-                  isRequired
-                  isDisabled={disabled}
-                  width="100%"
-                />
-                <Button
-                  type="submit"
-                  label={loginPending ? t("submitPending") : t("submit")}
-                  isLoading={loginPending}
-                  isDisabled={disabled}
-                  width="100%"
-                />
-              </VStack>
-            </form>
+            <>
+              {/*
+                One form across both steps, with the password field mounted throughout and hidden
+                until it is asked for. Splitting it into two forms is what costs identifier-first
+                its password managers: they fill a username and a password together, and a password
+                field that is not in the document yet cannot be filled.
+              */}
+              <form onSubmit={handleSubmit}>
+                <VStack gap={3}>
+                  {onPasswordStep ? (
+                    <SignInIdentity
+                      username={username.trim()}
+                      isDisabled={disabled}
+                      onChange={() => {
+                        setOnPasswordStep(false);
+                        setPassword("");
+                        setLoginError(null);
+                      }}
+                    />
+                  ) : (
+                    <TextInput
+                      {...AUTOFILL_USERNAME}
+                      label={t("username")}
+                      htmlName="username"
+                      value={username}
+                      onChange={setUsername}
+                      isRequired
+                      hasAutoFocus
+                      isDisabled={disabled}
+                      width="100%"
+                    />
+                  )}
+                  <div hidden={!onPasswordStep}>
+                    <TextInput
+                      {...AUTOFILL_CURRENT_PASSWORD}
+                      ref={passwordRef}
+                      label={t("password")}
+                      type="password"
+                      htmlName="password"
+                      value={password}
+                      onChange={setPassword}
+                      isRequired
+                      isDisabled={disabled}
+                      width="100%"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    label={
+                      loginPending
+                        ? t("submitPending")
+                        : onPasswordStep
+                          ? t("submit")
+                          : t("continueStep")
+                    }
+                    isLoading={loginPending}
+                    isDisabled={disabled}
+                    width="100%"
+                  />
+                </VStack>
+              </form>
+
+              {hasProviders && (
+                <>
+                  {/* The credentials form now comes first, so the divider introduces the
+                      providers rather than the form it used to sit above. */}
+                  <Divider label={t("ssoDivider")} />
+                  {providerList}
+                </>
+              )}
+            </>
           )}
 
           <VStack hAlign="center">

@@ -121,7 +121,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
     id: "agents",
     label: "Agents",
     description: "Remote agents this controller had paired with, and their shared secrets.",
-    tables: ["agents", "linking_tokens"],
+    tables: ["agents"],
     requires: [],
   },
   {

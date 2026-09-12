@@ -1396,6 +1396,27 @@ export async function createOAuthProviderAction(data: {
   return toOAuthProviderView(provider);
 }
 
+/**
+ * Choose which provider the sign-in screen offers first, or null to go back to alphabetical.
+ *
+ * A separate action from updating the provider: the value does not live on the provider row, and
+ * one that did would need every write to police "exactly one primary".
+ */
+export async function setPrimaryOAuthProviderAction(id: string | null): Promise<void> {
+  const session = await requireAdmin();
+  const { setPrimaryProviderId } = await import("@/src/lib/models/oauth-providers");
+  await setPrimaryProviderId(id);
+  const { createAuditEvent } = await import("@/src/lib/models/audit");
+  await createAuditEvent({
+    userId: Number(session.user.id),
+    action: "oauth_provider_updated",
+    entityType: "oauth_provider",
+    entityId: null,
+    summary: id ? `Made OAuth provider "${id}" primary` : "Cleared the primary OAuth provider",
+    data: JSON.stringify({ primaryProviderId: id }),
+  });
+}
+
 export async function updateOAuthProviderAction(
   id: string,
   data: Partial<{

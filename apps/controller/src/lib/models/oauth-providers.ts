@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import db, { nowIso } from "../db";
-import { oauthProviders } from "../db/schema";
+import { oauthProviders, settings } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { encryptSecret, decryptSecret } from "../secret";
 import type { AppRole } from "../oidc-groups";
@@ -223,13 +223,56 @@ export async function deleteOAuthProvider(id: string): Promise<void> {
   await db.delete(oauthProviders).where(eq(oauthProviders.id, id));
 }
 
+/**
+ * Which provider the sign-in screen offers first.
+ *
+ * A settings key rather than a column on the provider: there can only ever be one, and a single
+ * value makes "two primaries" unrepresentable instead of something the writes have to police.
+ * The id may name a provider that has since been deleted or disabled, so every read resolves it
+ * against the live list rather than trusting it.
+ */
+const PRIMARY_PROVIDER_KEY = "auth:primary_provider";
+
+/** The configured primary provider's id, or null when the operator has not chosen one. */
+export async function getPrimaryProviderId(): Promise<string | null> {
+  const [row] = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, PRIMARY_PROVIDER_KEY))
+    .limit(1);
+  return row?.value ?? null;
+}
+
+/** Choose the primary provider, or pass null to go back to listing them alphabetically. */
+export async function setPrimaryProviderId(id: string | null): Promise<void> {
+  const now = nowIso();
+  if (id === null) {
+    await db.delete(settings).where(eq(settings.key, PRIMARY_PROVIDER_KEY));
+    return;
+  }
+  await db
+    .insert(settings)
+    .values({ key: PRIMARY_PROVIDER_KEY, value: id, updatedAt: now })
+    .onConflictDoUpdate({ target: settings.key, set: { value: id, updatedAt: now } });
+}
+
 export async function getProviderDisplayList(): Promise<
-  Array<{ id: string; name: string; autoLink: boolean }>
+  Array<{ id: string; name: string; autoLink: boolean; isPrimary: boolean }>
 > {
   const rows = await db.query.oauthProviders.findMany({
     where: (table, { eq }) => eq(table.enabled, true),
     orderBy: (table, { asc }) => asc(table.name),
     columns: { id: true, name: true, autoLink: true },
   });
-  return rows.map((r) => ({ id: r.id, name: r.name, autoLink: r.autoLink }));
+  const primaryId = await getPrimaryProviderId();
+  const list = rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    autoLink: r.autoLink,
+    // Resolved against this list, so a stale id from a deleted or disabled provider simply
+    // means no primary rather than a marker nothing matches.
+    isPrimary: r.id === primaryId,
+  }));
+  // The primary is offered first; everything else keeps the alphabetical order.
+  return [...list.filter((p) => p.isPrimary), ...list.filter((p) => !p.isPrimary)];
 }

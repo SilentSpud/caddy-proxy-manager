@@ -5,6 +5,7 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 import * as seed from '../helpers/seed';
 import { waitForHydration } from '../helpers/hydration';
+import { signInWithCredentials } from '../helpers/sign-in';
 
 const BASE = 'http://localhost:3000';
 const API_BASE = `${BASE}/api/v1`;
@@ -39,9 +40,7 @@ async function loginAs(
   // The form submits natively until React attaches its onSubmit, so a fill or click landing first
   // is dropped or turned into a GET to /login with the credentials in the query string.
   await waitForHydration(page);
-  await page.getByLabel('Username').fill(username);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await signInWithCredentials(page, username, password);
 
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 60_000 });
   await page.close();
@@ -107,9 +106,7 @@ test.describe('Disabled user enforcement', () => {
     // Not just flake insurance: this test passes if the URL stays on /login, and a pre-hydration
     // native submit does exactly that - it would go green without ever attempting a login.
     await waitForHydration(page);
-    await page.getByLabel('Username').fill(TEST_USERNAME);
-    await page.getByLabel('Password').fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await signInWithCredentials(page, TEST_USERNAME, TEST_PASSWORD);
 
     // Should stay on login page or show an error
     await expect(async () => {

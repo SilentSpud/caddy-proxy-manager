@@ -23,6 +23,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Fab } from "@/src/components/mobile/Fab";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { useRouter } from "next/navigation";
@@ -116,6 +117,8 @@ export default function AgentsClient({
   return (
     <VStack gap={6}>
       <PageHeader title={t("title")} description={t("pageDescription")} />
+      {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way there. */}
+      {isAdmin && <Fab label={t("pairAgent")} href="/settings/agent" />}
 
       {message?.text && <Banner status={message.ok ? "success" : "error"} title={message.text} />}
 

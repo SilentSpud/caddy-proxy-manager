@@ -11,6 +11,7 @@ import {
   clearSettingRow,
 } from '../../helpers/seed';
 import { waitForHydration } from '../../helpers/hydration';
+import { signInWithCredentials } from '../../helpers/sign-in';
 
 const USERNAME = 'legacyhashuser';
 const EMAIL = `${USERNAME}@localhost`;
@@ -27,9 +28,7 @@ async function signIn(page: import('@playwright/test').Page, password: string) {
   // lands first is either dropped or turned into a GET to /login?username=...&password=... - the
   // shape CI caught this helper failing in, on the second sign-in below.
   await waitForHydration(page);
-  await page.getByRole('textbox', { name: /username/i }).fill(USERNAME);
-  await page.getByRole('textbox', { name: /password/i }).fill(password);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await signInWithCredentials(page, USERNAME, password);
   await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }
 

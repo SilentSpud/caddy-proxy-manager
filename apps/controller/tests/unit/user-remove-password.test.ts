@@ -1,0 +1,135 @@
+/**
+ * POST /api/user/remove-password leaves a signed-in user with only their linked providers. It is
+ * the inverse of unlink-oauth and guarded from the other side: never without a linked provider,
+ * never without the current password, and nothing changes when either check fails.
+ */
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { vi } from '@/tests/helpers/vi';
+import type { TestDb } from '../helpers/db';
+
+const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, userId: 0 }));
+
+const { createTestDb } = await import('../helpers/db');
+const schemaModule = await import('../../src/lib/db/schema');
+
+// Hoisted out of the factory below: createTestDb is async, and a Bun mock factory must be
+// synchronous - an async one never resolves and the file hangs.
+ctx.db = await createTestDb();
+
+vi.mock('../../src/lib/db', () => ({
+  default: ctx.db,
+  schema: schemaModule,
+  nowIso: () => new Date().toISOString(),
+  toIso: (value: string | Date | null | undefined): string | null =>
+    !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
+}));
+
+vi.mock('@/src/lib/models/audit', () => ({ createAuditEvent: vi.fn() }));
+
+import type { NextRequest } from 'next/server';
+import { POST } from '@/src/app/api/user/remove-password/route';
+import { auth } from '@/src/lib/auth';
+import { createUser, getUserById } from '../../src/lib/models/user';
+import { hashPassword } from '../../src/lib/password';
+import { accounts } from '../../src/lib/db/schema';
+import { eq } from 'drizzle-orm';
+
+const PASSWORD = 'CorrectHorse2026!';
+
+// setup.bun.ts pins the session to a fixed admin; each test names the user it seeded instead.
+vi.mocked(auth).mockImplementation(
+  async () => ({ user: { id: String(ctx.userId), email: 'u@example.com', role: 'user' } }) as any,
+);
+
+let seq = 0;
+
+async function seedUser(options: { linkProvider: boolean }) {
+  seq += 1;
+  const email = `remove-${seq}@example.com`;
+  const user = await createUser({
+    email,
+    provider: 'credential',
+    subject: email,
+    passwordHash: await hashPassword(PASSWORD),
+  });
+  if (options.linkProvider) {
+    const now = new Date().toISOString();
+    await ctx.db.insert(accounts).values({
+      userId: user.id,
+      accountId: `sub-${seq}`,
+      providerId: 'authentik',
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  ctx.userId = user.id;
+  return user;
+}
+
+/**
+ * A same-origin POST. Shaped by hand like the unlink-oauth test's: a real Request drops the Host
+ * header, which checkSameOrigin compares Origin against, so every call would be refused as 403.
+ */
+function post(body: unknown) {
+  return POST({
+    method: 'POST',
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === 'origin' ? 'http://localhost:3000' : 'localhost:3000',
+    },
+    json: async () => body,
+  } as unknown as NextRequest);
+}
+
+async function providersOf(userId: number) {
+  const rows = await ctx.db.select().from(accounts).where(eq(accounts.userId, userId));
+  return rows.map((row) => row.providerId).sort();
+}
+
+beforeEach(() => {
+  ctx.userId = 0;
+});
+
+describe('POST /api/user/remove-password', () => {
+  it('drops the password and credential account when a provider is linked', async () => {
+    const user = await seedUser({ linkProvider: true });
+
+    const response = await post({ currentPassword: PASSWORD });
+
+    expect(response.status).toBe(200);
+    expect(await providersOf(user.id)).toEqual(['authentik']);
+    const after = await getUserById(user.id);
+    expect(after?.passwordHash).toBeNull();
+    // The cached projection follows the accounts table rather than still claiming "credentials".
+    expect(after?.provider).toBe('authentik');
+  });
+
+  it('refuses when no provider is linked, so the account is never left with no way in', async () => {
+    const user = await seedUser({ linkProvider: false });
+
+    const response = await post({ currentPassword: PASSWORD });
+
+    expect(response.status).toBe(400);
+    expect(await providersOf(user.id)).toEqual(['credential']);
+    expect((await getUserById(user.id))?.passwordHash).not.toBeNull();
+  });
+
+  it('refuses a wrong current password and changes nothing', async () => {
+    const user = await seedUser({ linkProvider: true });
+
+    const response = await post({ currentPassword: 'NotThePassword1!' });
+
+    expect(response.status).toBe(401);
+    expect(await providersOf(user.id)).toEqual(['authentik', 'credential']);
+    expect((await getUserById(user.id))?.passwordHash).not.toBeNull();
+  });
+
+  it('requires the current password', async () => {
+    const user = await seedUser({ linkProvider: true });
+
+    const response = await post({});
+
+    expect(response.status).toBe(400);
+    expect((await getUserById(user.id))?.passwordHash).not.toBeNull();
+  });
+});

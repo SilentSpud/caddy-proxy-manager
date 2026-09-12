@@ -12,7 +12,7 @@ import {
 import { useActionState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ShieldOff, Trash2, Copy, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
 
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -37,8 +37,12 @@ import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/Modul
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 
 import { DataTable, type Column } from "@/components/ui/DataTable";
+import { FilterChip } from "@/src/components/mobile/FilterChip";
+import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 import { SearchField } from "@/components/ui/SearchField";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
@@ -251,6 +255,54 @@ function StatsBar({ stats }: { stats: WafEventStats }) {
         </Card>
       ))}
     </Grid>
+  );
+}
+
+/* ── Phone summary card ───────────────────────────────────────────────────── */
+/** The stat tiles folded into one card for a phone: the blocked count leads, the rest sit under it. */
+function WafStatusCard({ stats, isEnabled }: { stats: WafEventStats; isEnabled: boolean }) {
+  const t = useTranslations("waf");
+  const rest = [
+    { label: "Total Events", value: stats.total },
+    { label: "Critical", value: stats.critical },
+    { label: "Unique Hosts", value: stats.uniqueHosts },
+    { label: "Rule IDs Triggered", value: stats.ruleIdsTriggered },
+  ];
+
+  return (
+    <Card padding={4}>
+      <VStack gap={3}>
+        <HStack justify="between" vAlign="center" gap={2}>
+          <Text type="body" weight="semibold">
+            {t("firewall")}
+          </Text>
+          <Badge
+            variant={isEnabled ? "success" : "neutral"}
+            label={isEnabled ? t("enabled") : t("disabled")}
+          />
+        </HStack>
+        <VStack gap={0}>
+          <Text type="display-3" color="accent" hasTabularNumbers>
+            {stats.blocked}
+          </Text>
+          <Text type="body" size="xsm" weight="medium" color="secondary">
+            {t("blocked")}
+          </Text>
+        </VStack>
+        <Grid columns={{ minWidth: 120, max: 2 }} gap={3}>
+          {rest.map(({ label, value }) => (
+            <VStack key={label} gap={0}>
+              <Text type="body" weight="semibold" hasTabularNumbers>
+                {value}
+              </Text>
+              <Text type="body" size="xsm" color="secondary">
+                {label}
+              </Text>
+            </VStack>
+          ))}
+        </Grid>
+      </VStack>
+    </Card>
   );
 }
 
@@ -835,13 +887,15 @@ function GlobalSuppressedRules({
       </VStack>
 
       {excluded.length > 0 && (
-        <SearchField
-          value={search}
-          onChange={setSearch}
-          placeholder={t("suppressedRulesSearchPlaceholder")}
-          label={t("searchSuppressedRules")}
-          width={400}
-        />
+        <div style={{ maxWidth: 400 }}>
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder={t("suppressedRulesSearchPlaceholder")}
+            label={t("searchSuppressedRules")}
+            width="100%"
+          />
+        </div>
       )}
 
       {excluded.length === 0 ? (
@@ -946,6 +1000,18 @@ export default function WafEventsClient({
   const [customFrom, setCustomFrom] = useState(formatDateTimeLocalUtc(initialFrom));
   const [customTo, setCustomTo] = useState(formatDateTimeLocalUtc(initialTo));
   const [selected, setSelected] = useState<WafEvent | null>(null);
+  // Phone-only chrome: the range sheet, and search tucked behind its icon until it is wanted.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
+  const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+
+  // The field is mounted all along (only hidden), so autofocus would never fire: focus it when the
+  // icon reveals it instead.
+  useEffect(() => {
+    if (searchOpen) searchWrapRef.current?.querySelector("input")?.focus();
+  }, [searchOpen]);
   const [localGlobalExcluded, setLocalGlobalExcluded] = useState(globalExcluded);
   const [localGlobalMessages, setLocalGlobalMessages] = useState(globalExcludedMessages);
   const [localHostWafMap, setLocalHostWafMap] = useState(hostWafMap);
@@ -1164,23 +1230,84 @@ export default function WafEventsClient({
     },
   ];
 
+  const changeTab = (next: string) => {
+    setTab(next);
+    if (next !== "events") setSelected(null);
+  };
+
+  const views = [
+    { value: "events", label: t("events") },
+    { value: "suppressed", label: t("suppressedRules") },
+    { value: "settings", label: t("settings") },
+  ];
+
+  const detailPanel = selected && (
+    <EventDetailPanel
+      event={selected}
+      onClose={() => setSelected(null)}
+      globalExcluded={localGlobalExcluded}
+      hostWafMap={localHostWafMap}
+      onSuppressGlobal={(ruleId) =>
+        setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])
+      }
+      onSuppressHost={(ruleId, host) => {
+        const bare = host.replace(/:\d+$/, "");
+        setLocalHostWafMap((prev) => ({
+          ...prev,
+          [bare]: [...new Set([...(prev[bare] ?? []), ruleId])],
+        }));
+      }}
+    />
+  );
+
+  // On a phone the event replaces the list, which may have been scrolled well down: bring its top
+  // into view rather than opening it somewhere above the fold.
+  const selectedId = selected?.id;
+  useEffect(() => {
+    if (isNarrow && selectedId != null) detailRef.current?.scrollIntoView({ block: "start" });
+  }, [isNarrow, selectedId]);
+
   return (
     <VStack gap={4}>
-      <VStack gap={1}>
-        <Heading level={1}>WAF</Heading>
-        <Text type="body" color="secondary">
-          {t("pageDescription")}
-        </Text>
-      </VStack>
+      <HStack justify="between" vAlign="center" gap={2}>
+        <VStack gap={1}>
+          <Heading level={1}>WAF</Heading>
+          <Text type="body" color="secondary" className="cpm-desktop-only">
+            {t("pageDescription")}
+          </Text>
+        </VStack>
+        {/* A phone has no room for the tabs: the views move behind the overflow button, and search
+            waits behind its icon until it is wanted. */}
+        <HStack gap={1} vAlign="center" className="cpm-mobile-flex">
+          {tab === "events" && (
+            <IconButton
+              variant="ghost"
+              label={t("searchWafEvents")}
+              icon={<Search />}
+              onClick={() => setSearchOpen((open) => !open)}
+            />
+          )}
+          <DropdownMenu
+            hasChevron={false}
+            presentation="adaptive"
+            alignment="end"
+            button={{
+              variant: "ghost",
+              icon: <MoreHorizontal />,
+              label: t("views"),
+              isIconOnly: true,
+            }}
+            items={views.map((view) => ({
+              id: view.value,
+              label: view.label,
+              endContent: view.value === tab ? <Check size={16} aria-hidden="true" /> : undefined,
+              onClick: () => changeTab(view.value),
+            }))}
+          />
+        </HStack>
+      </HStack>
 
-      <TabList
-        value={tab}
-        onChange={(v) => {
-          setTab(v);
-          if (v !== "events") setSelected(null);
-        }}
-        hasDivider
-      >
+      <TabList value={tab} onChange={changeTab} hasDivider className="cpm-desktop-only">
         <Tab value="events" label={t("events")} />
         <Tab value="suppressed" label={t("suppressedRules")} />
         <Tab value="settings" label={t("settings")} />
@@ -1188,20 +1315,43 @@ export default function WafEventsClient({
 
       {tab === "events" && (
         <VStack gap={4}>
-          <StatsBar stats={stats} />
+          <div className="cpm-desktop-only">
+            <StatsBar stats={stats} />
+          </div>
+          <div className="cpm-mobile-only">
+            <WafStatusCard stats={stats} isEnabled={globalWafEnabled} />
+          </div>
           <VStack gap={3}>
             {/* Was five buttons whose "selected" state read only as a filled
                 variant; SegmentedControl exposes the choice as a radio group. */}
-            <SegmentedControl
-              label={t("timeRange")}
-              size="sm"
+            <div className="cpm-desktop-only">
+              <SegmentedControl
+                label={t("timeRange")}
+                size="sm"
+                value={range}
+                onChange={handleRangeChange}
+              >
+                {RANGE_OPTIONS.map((o) => (
+                  <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+                ))}
+              </SegmentedControl>
+            </div>
+            <div className="cpm-chip-row cpm-mobile-flex">
+              <FilterChip
+                label={RANGE_OPTIONS.find((o) => o.value === range)?.label ?? range}
+                aria-label={t("timeRange")}
+                isActive={range !== "all"}
+                onClick={() => setRangeSheetOpen(true)}
+              />
+            </div>
+            <OptionSheet
+              title={t("timeRange")}
+              isOpen={rangeSheetOpen}
+              onOpenChange={setRangeSheetOpen}
               value={range}
+              options={RANGE_OPTIONS}
               onChange={handleRangeChange}
-            >
-              {RANGE_OPTIONS.map((o) => (
-                <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
-              ))}
-            </SegmentedControl>
+            />
             {range === "custom" && (
               <HStack gap={2} vAlign="end" wrap="wrap">
                 <DateTimeInput
@@ -1223,56 +1373,65 @@ export default function WafEventsClient({
                 />
               </HStack>
             )}
-            <SearchField
-              value={searchTerm}
-              onChange={(v) => {
-                setSearchTerm(v);
-                updateSearch(v);
-              }}
-              placeholder={t("eventsSearchPlaceholder")}
-              label={t("searchWafEvents")}
-              width={480}
-            />
-          </VStack>
-          <HStack gap={4} vAlign="start" wrap="wrap">
-            <div style={{ flexGrow: 1, flexBasis: 520, minWidth: 0 }}>
-              <DataTable
-                columns={columns}
-                data={events}
-                keyField="id"
-                emptyMessage={t("eventsEmptyDescription")}
-                pagination={pagination}
-                onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
-                rowStatus={(row) =>
-                  row.id === selected?.id ? { color: "accent", label: "Selected" } : null
-                }
-                mobileCard={mobileCard}
+            {/* Always there on a desktop; on a phone only once the search icon asks for it, or
+                while a search is applied so the filter never hides. */}
+            <div
+              ref={searchWrapRef}
+              className={searchOpen || searchTerm ? undefined : "cpm-desktop-only"}
+              style={{ maxWidth: 480 }}
+            >
+              <SearchField
+                value={searchTerm}
+                onChange={(v) => {
+                  setSearchTerm(v);
+                  updateSearch(v);
+                }}
+                placeholder={t("eventsSearchPlaceholder")}
+                label={t("searchWafEvents")}
+                width="100%"
               />
             </div>
-
-            {/* flexBasis rather than a fixed width: below roughly 900px the panel wraps under the
-                table instead of squeezing it, which is the same behaviour the dialog had. */}
-            {selected && (
-              <div style={{ flexGrow: 1, flexBasis: 380, maxWidth: 460, minWidth: 0 }}>
-                <EventDetailPanel
-                  event={selected}
-                  onClose={() => setSelected(null)}
-                  globalExcluded={localGlobalExcluded}
-                  hostWafMap={localHostWafMap}
-                  onSuppressGlobal={(ruleId) =>
-                    setLocalGlobalExcluded((prev) => [...new Set([...prev, ruleId])])
-                  }
-                  onSuppressHost={(ruleId, host) => {
-                    const bare = host.replace(/:\d+$/, "");
-                    setLocalHostWafMap((prev) => ({
-                      ...prev,
-                      [bare]: [...new Set([...(prev[bare] ?? []), ruleId])],
-                    }));
-                  }}
+          </VStack>
+          {isNarrow && selected ? (
+            // A phone has no room for the list and the event side by side: the event replaces it.
+            <VStack gap={3} ref={detailRef}>
+              <div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<ArrowLeft />}
+                  label={t("backToEvents")}
+                  onClick={() => setSelected(null)}
                 />
               </div>
-            )}
-          </HStack>
+              {detailPanel}
+            </VStack>
+          ) : (
+            <HStack gap={4} vAlign="start" wrap="wrap">
+              <div style={{ flexGrow: 1, flexBasis: 520, minWidth: 0 }}>
+                <DataTable
+                  columns={columns}
+                  data={events}
+                  keyField="id"
+                  emptyMessage={t("eventsEmptyDescription")}
+                  pagination={pagination}
+                  onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
+                  rowStatus={(row) =>
+                    row.id === selected?.id ? { color: "accent", label: "Selected" } : null
+                  }
+                  mobileCard={mobileCard}
+                />
+              </div>
+
+              {/* flexBasis rather than a fixed width: below roughly 900px the panel wraps under the
+                  table instead of squeezing it, which is the same behaviour the dialog had. */}
+              {selected && (
+                <div style={{ flexGrow: 1, flexBasis: 380, maxWidth: 460, minWidth: 0 }}>
+                  {detailPanel}
+                </div>
+              )}
+            </HStack>
+          )}
         </VStack>
       )}
 

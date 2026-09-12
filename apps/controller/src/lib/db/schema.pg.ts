@@ -388,13 +388,6 @@ export const auditEvents = pgTable("audit_events", {
   createdAt: text("createdAt").notNull(),
 });
 
-export const linkingTokens = pgTable("linking_tokens", {
-  id: text("id").primaryKey(),
-  token: text("token").notNull(),
-  createdAt: text("createdAt").notNull(),
-  expiresAt: text("expiresAt").notNull(),
-});
-
 // traffic_events and waf_events live in ClickHouse - see src/lib/clickhouse/client.ts. The
 // parsers that fill them, and their read offsets, live in the agent: the Caddy log is a file on
 // the agent's host, which a controller elsewhere cannot read at all.

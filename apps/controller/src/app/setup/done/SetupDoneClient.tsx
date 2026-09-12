@@ -15,6 +15,7 @@ import { Text } from "@astryxdesign/core/Text";
 import type { EnvCleanup } from "@/src/lib/migration/env-file";
 import { FormCard } from "@/src/components/ui/FormLayout";
 import { useTranslations } from "next-intl";
+import { SetupSteps } from "@/src/components/ui/SetupSteps";
 
 export default function SetupDoneClient({
   source,
@@ -27,8 +28,11 @@ export default function SetupDoneClient({
   return (
     <Center>
       <VStack gap={5} padding={5}>
+        {/* Reached after setup completes, so every step is behind the operator. The migrate step
+            is always present here: this page only exists because a migration happened. */}
+        <SetupSteps stage="complete" hasMigrateStep />
         <VStack gap={2}>
-          <Heading level={1}>Migration complete</Heading>
+          <Heading level={1}>{t("done.heading")}</Heading>
           <Text color="secondary">{t("migrationCompleteDescription")}</Text>
         </VStack>
 

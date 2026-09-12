@@ -9,7 +9,7 @@ import { baseUrl, SETTING_DEFINITIONS, SETTING_GROUPS } from "@/src/lib/settings
 import { gateDefaults } from "@/src/lib/settings/optional-features";
 import { resolveAllSettings } from "@/src/lib/settings/resolve";
 import { settingDescription, settingGroupTitle, settingLabel } from "@/src/lib/settings/messages";
-import { getSetupState, SETUP_PATHS } from "@/src/lib/setup";
+import { getSetupState, hasLegacyDatabase, SETUP_PATHS } from "@/src/lib/setup";
 import SetupSettingsClient, { type SettingField } from "./SetupSettingsClient";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -75,6 +75,7 @@ export default async function SetupSettingsPage() {
         acmeEmail: general?.acmeEmail ?? "",
       }}
       oauth={oauthCard(providers.map((provider) => provider.name))}
+      hasMigrateStep={hasLegacyDatabase()}
     />
   );
 }

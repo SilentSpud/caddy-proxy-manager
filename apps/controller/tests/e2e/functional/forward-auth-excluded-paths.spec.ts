@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
+import { signInWithCredentials } from '../../helpers/sign-in';
 
 const DOMAIN = 'func-fwd-auth-excl.test';
 const ECHO_BODY = 'echo-ok';
@@ -94,9 +95,7 @@ test.describe
           await route.fulfill({ response });
         });
 
-        await freshPage.getByLabel('Username').fill('testadmin');
-        await freshPage.getByLabel('Password').fill('TestPassword2026!');
-        await freshPage.getByRole('button', { name: 'Sign in', exact: true }).click();
+        await signInWithCredentials(freshPage, 'testadmin', 'TestPassword2026!');
 
         const deadline = Date.now() + 15_000;
         while (!capturedRedirect && Date.now() < deadline) {

@@ -36,7 +36,7 @@ import type { TailscaleHostDefaults } from "@/components/proxy-hosts/TailscaleFi
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { toggleProxyHostAction } from "./actions";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
@@ -468,7 +468,7 @@ export default function ProxyHostsClient({
 
   return (
     <VStack gap={6}>
-      <PageHeader
+      <ListPageHeader
         title={t("proxyHosts")}
         description={t("pageDescription")}
         action={
@@ -482,66 +482,68 @@ export default function ProxyHostsClient({
               }
             : undefined
         }
-      />
-
-      <StatTiles
-        tiles={[
-          {
-            id: "hosts",
-            label: t("proxyHosts"),
-            value: counts.total,
-            note: t("enabledDisabledNote", {
-              enabled: counts.enabled,
-              disabled: counts.disabled,
-            }),
-          },
-          {
-            id: "requests",
-            label: t("requests24h"),
-            value: trafficKnown ? numberFormat.format(trafficTotals.total) : t("noData"),
-            note: trafficKnown
-              ? t("blockedShareNote", { percent: blockedShare })
-              : t("analyticsOffNote"),
-          },
-          {
-            id: "certificates",
-            label: t("certificates"),
-            value: certificates.length,
-            note: t("certificatesNote", { count: hostsWithTls }),
-          },
-          {
-            id: "agents",
-            label: t("assignedAgents"),
-            value: agents?.length ?? 0,
-            note: t("agentsConnectedNote", { count: connectedAgents }),
-            accent:
-              (agents?.length ?? 0) > connectedAgents
-                ? { label: t("someAgentsOffline"), variant: "warning" as const }
-                : undefined,
-          },
-        ]}
-      />
-
-      <HStack gap={4} vAlign="center" wrap="wrap" justify="between">
-        <TabList value={activeState} onChange={handleStateChange}>
-          <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
-          <Tab
-            value="enabled"
-            label={t("filterEnabled")}
-            endContent={<Badge label={counts.enabled} />}
+        stats={
+          <StatTiles
+            tiles={[
+              {
+                id: "hosts",
+                label: t("proxyHosts"),
+                value: counts.total,
+                note: t("enabledDisabledNote", {
+                  enabled: counts.enabled,
+                  disabled: counts.disabled,
+                }),
+              },
+              {
+                id: "requests",
+                label: t("requests24h"),
+                value: trafficKnown ? numberFormat.format(trafficTotals.total) : t("noData"),
+                note: trafficKnown
+                  ? t("blockedShareNote", { percent: blockedShare })
+                  : t("analyticsOffNote"),
+              },
+              {
+                id: "certificates",
+                label: t("certificates"),
+                value: certificates.length,
+                note: t("certificatesNote", { count: hostsWithTls }),
+              },
+              {
+                id: "agents",
+                label: t("assignedAgents"),
+                value: agents?.length ?? 0,
+                note: t("agentsConnectedNote", { count: connectedAgents }),
+                accent:
+                  (agents?.length ?? 0) > connectedAgents
+                    ? { label: t("someAgentsOffline"), variant: "warning" as const }
+                    : undefined,
+              },
+            ]}
           />
-          <Tab
-            value="disabled"
-            label={t("filterDisabled")}
-            endContent={<Badge label={counts.disabled} />}
+        }
+        filters={
+          <TabList value={activeState} onChange={handleStateChange}>
+            <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
+            <Tab
+              value="enabled"
+              label={t("filterEnabled")}
+              endContent={<Badge label={counts.enabled} />}
+            />
+            <Tab
+              value="disabled"
+              label={t("filterDisabled")}
+              endContent={<Badge label={counts.disabled} />}
+            />
+          </TabList>
+        }
+        search={
+          <SearchField
+            value={searchTerm}
+            onChange={handleSearchChange}
+            placeholder={t("searchHosts")}
           />
-        </TabList>
-        <SearchField
-          value={searchTerm}
-          onChange={handleSearchChange}
-          placeholder={t("searchHosts")}
-        />
-      </HStack>
+        }
+      />
 
       <DataTable
         columns={columns}

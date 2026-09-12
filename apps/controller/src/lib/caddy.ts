@@ -1524,6 +1524,13 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             },
           },
         });
+      } else {
+        // Fail closed: a list with no members admits nobody. Skipping the handler, as this once
+        // did, served the host to everyone. Caddy does load an empty http_basic, but that answers
+        // with a login prompt no credentials can pass, so the host refuses outright instead. It sits
+        // in the shared chain, so location rules, forward-auth path modes and mTLS subroutes all
+        // inherit it.
+        handlers.push({ handler: "static_response", status_code: 403, body: "Access denied" });
       }
     }
 
