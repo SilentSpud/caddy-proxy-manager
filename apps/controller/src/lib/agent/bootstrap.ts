@@ -46,6 +46,19 @@ function secureEquals(a: string, b: string): boolean {
 }
 
 /**
+ * Write a fresh token, readable by the agent.
+ *
+ * 0640: the agent reads it through the controller's group, which compose adds it to, and nothing
+ * else in the stack has any business reading it. Chmodded after the write as well, because a mode
+ * given to writeFileSync only applies to a file it creates - overwriting one left at 0600 by a
+ * release whose agent ran as root would keep that mode, unreadable to the agent that no longer is.
+ */
+function writeToken(path: string): void {
+  writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o640 });
+  chmodSync(path, 0o640);
+}
+
+/**
  * Write a token if there is not already one, and return whether the volume can carry one at all.
  *
  * Called at startup. Absent rather than expiring: a controller that has been up for a week must
@@ -55,15 +68,12 @@ function secureEquals(a: string, b: string): boolean {
 export function ensureBootstrapToken(): boolean {
   const path = bootstrapPath();
   try {
-    // 0640: the agent reads it through the controller's group, which compose adds it to, and
-    // nothing else in the stack has any business reading it. Set on an existing file as well,
-    // because a mode given to writeFileSync only applies to a file it creates - a token left by a
-    // release whose agent ran as root is 0600, and would stay unreadable to the one that does not.
+    // An existing token is kept but still given the agent-readable mode - see writeToken.
     if (existsSync(path) && readFileSync(path, "utf-8").trim().length > 0) {
       chmodSync(path, 0o640);
       return true;
     }
-    writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o640 });
+    writeToken(path);
     return true;
   } catch (error) {
     // No shared volume - a controller running without the bundled agent, or a read-only mount.
@@ -87,7 +97,7 @@ export function redeemBootstrapToken(submitted: string): boolean {
     const current = readFileSync(path, "utf-8").trim();
     if (current.length === 0 || !secureEquals(current, submitted.trim())) return false;
 
-    writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o640 });
+    writeToken(path);
     return true;
   } catch (error) {
     console.warn("[cpm] could not redeem the agent bootstrap token:", error);

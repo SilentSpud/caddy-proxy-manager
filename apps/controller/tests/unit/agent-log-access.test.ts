@@ -18,7 +18,7 @@ describe('logAccessFixes', () => {
     expect(logAccessFixes(report([]))).toEqual([]);
   });
 
-  it("makes an audit log in the agent's group group-writable", () => {
+  it("adds group write to an audit log in the agent's group", () => {
     const fixes = logAccessFixes(
       report([
         {
