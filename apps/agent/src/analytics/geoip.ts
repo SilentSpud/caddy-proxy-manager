@@ -8,6 +8,9 @@
  * Pulled rather than pushed because these are tens of megabytes. It is the only request that runs
  * agent-to-controller, and it is signed with the same pairing secret in the other direction, so it
  * needs no second credential.
+ *
+ * Every agent fetches, the one beside the controller included: the files land on the agent's own
+ * volume, which Caddy mounts read-only, rather than on the root-owned volume geoipupdate writes.
  */
 
 import { createHmac } from "node:crypto";
@@ -17,15 +20,11 @@ import {
   AGENT_ID_HEADER,
   AGENT_SIGNATURE_HEADER,
   AGENT_TIMESTAMP_HEADER,
-  type FleetConfig,
+  CONTROLLER_GEOIP_ROUTE,
   signatureBase,
 } from "@cpm/shared";
 import type { AgentStore } from "../db";
-
-/** Where Caddy reads them, and where the parsers look. Read per call: it is a mount point. */
-function geoipDir(): string {
-  return process.env.GEOIP_DIR || "/usr/share/GeoIP";
-}
+import { geoipDir } from "./paths";
 
 /** Generous: these are tens of megabytes over whatever link the controller is on. */
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
@@ -59,12 +58,12 @@ function conditionalEtag(store: AgentStore, edition: string): string | null {
  */
 async function syncEdition(
   store: AgentStore,
-  baseUrl: string,
+  controllerUrl: string,
   agentId: string,
   secret: string,
   edition: string,
 ): Promise<"updated" | "current" | "failed"> {
-  const path = `/api/agent/geoip/${edition}`;
+  const path = `${CONTROLLER_GEOIP_ROUTE}/${edition}`;
   const timestamp = Date.now();
   const emptyBody = new Bun.CryptoHasher("sha256").update("").digest("hex");
   const signature = createHmac("sha256", secret)
@@ -81,7 +80,7 @@ async function syncEdition(
 
   let response: Response;
   try {
-    response = await fetch(`${baseUrl.replace(/\/+$/, "")}${path}`, {
+    response = await fetch(`${controllerUrl.replace(/\/+$/, "")}${path}`, {
       headers,
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
     });
@@ -124,16 +123,32 @@ async function syncEdition(
  */
 export async function syncGeoipDatabases(
   store: AgentStore,
-  geoip: NonNullable<FleetConfig["geoip"]>,
+  controllerUrl: string,
+  editions: string[],
   agentId: string,
   secret: string,
 ): Promise<void> {
-  for (const edition of geoip.editions) {
+  for (const edition of editions) {
     // Sequentially: each is tens of megabytes, and three at once over one link is slower than
     // three in a row while making the failure harder to read.
-    const outcome = await syncEdition(store, geoip.url, agentId, secret, edition);
+    const outcome = await syncEdition(store, controllerUrl, agentId, secret, edition);
     if (outcome === "failed") {
-      console.warn(`[geoip] could not fetch ${edition} from ${geoip.url}`);
+      console.warn(`[geoip] could not fetch ${edition} from ${controllerUrl}`);
     }
   }
+}
+
+/**
+ * The controller origin to fetch from: the one this agent is paired with, else the origin inside
+ * the pushed URL.
+ *
+ * The paired address first, because the pushed one is the controller's public `BASE_URL`, and for
+ * the agent in the controller's own stack that means going out through the Caddy it may not have
+ * started yet. The pushed URL already ends in the route, which the fetch appends again - so it is
+ * stripped, where it used to be doubled and every fetch through it 404'd.
+ */
+export function geoipControllerUrl(paired: string | null, pushed: string): string {
+  if (paired) return paired;
+  const url = pushed.replace(/\/+$/, "");
+  return url.endsWith(CONTROLLER_GEOIP_ROUTE) ? url.slice(0, -CONTROLLER_GEOIP_ROUTE.length) : url;
 }

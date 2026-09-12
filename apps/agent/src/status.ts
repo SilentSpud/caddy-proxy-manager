@@ -9,6 +9,7 @@
 import type { AgentStatus, ManagedServiceName, ManagedServicesStatus } from "@cpm/shared";
 import { accessLogPresent } from "./analytics/log-parser";
 import { analyticsEnabled } from "./analytics/clickhouse";
+import { checkLogAccess } from "./analytics/log-access";
 import type { AgentConfig } from "./config";
 import type { AgentStore } from "./db";
 import type { DockerHost } from "./docker";
@@ -49,5 +50,7 @@ export async function buildStatus({ config, store, docker }: StatusDeps): Promis
       enabled: analyticsEnabled(),
       accessLogPresent: accessLogPresent(),
     },
+    // The files only matter while the agent is parsing them; the directory is Caddy's either way.
+    logAccess: checkLogAccess(config.caddyContainerName, analyticsEnabled()),
   };
 }

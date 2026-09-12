@@ -19,6 +19,7 @@ import { AgentStore } from "./db";
 import { DockerHost } from "./docker";
 import { AgentLifecycle } from "./lifecycle";
 import { createLocalHandler } from "./local-server";
+import { adoptLegacyState } from "./migrate";
 import { Operations } from "./operations";
 import { AGENT_VERSION } from "./status";
 
@@ -158,6 +159,19 @@ function describeError(error: unknown): string {
 
 // ─── Running the agent ───────────────────────────────────────────────────────
 
+// Before the store opens: opening it first would create the empty database that makes this skip.
+try {
+  if (adoptLegacyState(config.dataDir, config.controllerDataDir)) {
+    console.log(`[agent] copied this agent's state from ${config.controllerDataDir}`);
+  }
+} catch (error) {
+  console.warn(
+    `[agent] could not copy this agent's state from ${config.controllerDataDir}; starting with a ` +
+      "fresh database, which the controller will see as a new agent:",
+    error,
+  );
+}
+
 const store = new AgentStore(join(config.dataDir, "agent.db"));
 const docker = new DockerHost(config);
 const operations = new Operations(config, store, docker);
@@ -172,10 +186,9 @@ if (existsSync(config.socketPath)) unlinkSync(config.socketPath);
 
 const server = Bun.serve({ unix: config.socketPath, fetch: createLocalHandler(lifecycle) });
 
-// World-writable, and it has to be: `cpm-agent --pair` may be run by any user with a shell in this
-// container, and the agent itself runs as root for Docker. The boundary is the volume - only
-// something that mounts it can reach this socket at all - not the file mode.
-chmodSync(config.socketPath, 0o666);
+// Owner and group only. `cpm-agent --pair` and the healthcheck run through `docker exec`, which
+// uses the container's own user - the one that created the socket - so nobody else needs it.
+chmodSync(config.socketPath, 0o660);
 console.log(`[agent] ${AGENT_VERSION} listening on ${config.socketPath}`);
 
 await lifecycle.start();

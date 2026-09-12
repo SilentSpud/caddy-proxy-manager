@@ -16,7 +16,7 @@
  */
 
 import { randomBytes, timingSafeEqual, createHmac } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AGENT_BOOTSTRAP_FILE, AGENT_BOOTSTRAP_TOKEN_PATTERN } from "@cpm/shared";
 
@@ -55,10 +55,15 @@ function secureEquals(a: string, b: string): boolean {
 export function ensureBootstrapToken(): boolean {
   const path = bootstrapPath();
   try {
-    if (existsSync(path) && readFileSync(path, "utf-8").trim().length > 0) return true;
-    // 0600: the controller writes as its own unprivileged uid and the agent reads as root, which
-    // is not stopped by the mode. Nothing else in the stack has any business reading it.
-    writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o600 });
+    // 0640: the agent reads it through the controller's group, which compose adds it to, and
+    // nothing else in the stack has any business reading it. Set on an existing file as well,
+    // because a mode given to writeFileSync only applies to a file it creates - a token left by a
+    // release whose agent ran as root is 0600, and would stay unreadable to the one that does not.
+    if (existsSync(path) && readFileSync(path, "utf-8").trim().length > 0) {
+      chmodSync(path, 0o640);
+      return true;
+    }
+    writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o640 });
     return true;
   } catch (error) {
     // No shared volume - a controller running without the bundled agent, or a read-only mount.
@@ -82,7 +87,7 @@ export function redeemBootstrapToken(submitted: string): boolean {
     const current = readFileSync(path, "utf-8").trim();
     if (current.length === 0 || !secureEquals(current, submitted.trim())) return false;
 
-    writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o600 });
+    writeFileSync(path, mintToken(), { encoding: "utf-8", mode: 0o640 });
     return true;
   } catch (error) {
     console.warn("[cpm] could not redeem the agent bootstrap token:", error);

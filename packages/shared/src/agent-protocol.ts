@@ -144,6 +144,41 @@ export type AgentStatus = {
      */
     accessLogPresent: boolean;
   };
+  /**
+   * Caddy log files this host cannot use as it should, and what the controller needs to say how to
+   * fix them. Undefined from an agent older than the field, or one that cannot read its own
+   * identity (anything but Linux).
+   */
+  logAccess?: LogAccessReport;
+};
+
+/**
+ * - `unreadable`: the agent cannot read a log it parses, so those events are silently skipped.
+ * - `notTruncatable`: the agent can read the WAF audit log but not write it, so it cannot truncate
+ *   it once ingested and the file grows until the disk fills.
+ * - `cleanupBlocked`: Caddy can write the log directory but not list it, which keeps rotation
+ *   working while gzip and pruning of rolled files silently stop.
+ */
+export type LogAccessProblemKind = "unreadable" | "notTruncatable" | "cleanupBlocked";
+
+export type LogAccessProblem = {
+  kind: LogAccessProblemKind;
+  /** Path inside the agent's container, which is the same path inside Caddy's. */
+  path: string;
+  uid: number;
+  gid: number;
+  /** Permission bits, as `stat` reports them. */
+  mode: number;
+};
+
+export type LogAccessReport = {
+  /** Where a fix runs: `docker exec` into this container. */
+  caddyContainer: string;
+  /** The agent's own groups, so a file in some other group reads as a CADDY_GID mismatch. */
+  agentGroups: number[];
+  /** Caddy's group, as read off the files it owns, or null when there are none yet. */
+  caddyGid: number | null;
+  problems: LogAccessProblem[];
 };
 
 export type AgentMode = "standalone" | "managed";
@@ -231,8 +266,9 @@ export type FleetConfig = {
    * of megabytes - the only route in the protocol that runs agent-to-controller, and the reason
    * `AGENT_ID_HEADER` exists.
    *
-   * `url` must be an address the agent can reach, which for a remote agent means the controller's
-   * public one.
+   * `url` is the controller's public address. An agent prefers the address it is paired with,
+   * joined to `CONTROLLER_GEOIP_ROUTE`: an agent beside the controller would otherwise fetch through
+   * the Caddy it has not started yet. `url` remains for agents that predate that.
    */
   geoip: {
     url: string;
@@ -331,8 +367,13 @@ export const AGENT_OPERATIONS = {
     "mutation AgentCommandResults($results: [JSON!]!) { agentCommandResults(results: $results) }",
 } as const;
 
-// The MaxMind databases are not listed here: that route already ran agent-to-controller, keeps its
-// pre-v1 path, and the agent is handed its full URL in `FleetConfig.geoip` rather than deriving it.
+/**
+ * Where an agent fetches the MaxMind databases, as `<route>/<edition>` under its controller.
+ *
+ * Outside `CONTROLLER_AGENT_ROUTES` because it predates the v1 prefix and keeps its path. The
+ * controller also sends the full URL in `FleetConfig.geoip`, for agents that predate this.
+ */
+export const CONTROLLER_GEOIP_ROUTE = "/api/agent/geoip";
 
 /** Header naming the agent making a signed call, so the controller can pick the right secret. */
 export const CONTROLLER_AGENT_HEADER = AGENT_ID_HEADER;

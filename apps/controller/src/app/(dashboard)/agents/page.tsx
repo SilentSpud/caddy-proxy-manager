@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import AgentsClient, { type AgentRow } from "./AgentsClient";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
+import { logAccessFixes } from "@/src/lib/agent/log-access";
 import { connectedAgents } from "@/src/lib/agent/registry";
 import { listAgents } from "@/src/lib/models/agents";
 import { listHostAssignments } from "@/src/lib/models/host-agents";
@@ -57,6 +58,7 @@ export default async function AgentsPage() {
         assignedHttpHosts: countAssigned(httpAssignments, agent.id),
         assignedL4Hosts: countAssigned(l4Assignments, agent.id),
         canManage: canManage(access, "agent", agent.id),
+        logAccessFixes: logAccessFixes(status?.logAccess),
       };
     });
 

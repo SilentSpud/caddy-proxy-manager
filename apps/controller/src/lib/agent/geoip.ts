@@ -8,7 +8,12 @@
 
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { GEOIP_EDITIONS, type FleetConfig, type GeoipEdition } from "@cpm/shared";
+import {
+  CONTROLLER_GEOIP_ROUTE,
+  GEOIP_EDITIONS,
+  type FleetConfig,
+  type GeoipEdition,
+} from "@cpm/shared";
 import { config } from "../config";
 
 /**
@@ -129,7 +134,7 @@ export async function geoipFleetConfig(): Promise<FleetConfig["geoip"]> {
   if (editions.length === 0) return null;
 
   return {
-    url: `${config.baseUrl.replace(/\/+$/, "")}/api/agent/geoip`,
+    url: `${config.baseUrl.replace(/\/+$/, "")}${CONTROLLER_GEOIP_ROUTE}`,
     editions: [...editions],
   };
 }

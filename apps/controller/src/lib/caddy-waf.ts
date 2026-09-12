@@ -209,9 +209,12 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     "SecAuditEngine RelevantOnly",
     "SecAuditLog /logs/waf-audit.log",
     "SecAuditLogFormat JSON",
-    // The audit log is caddy-owned mode 0644, so web can read but not truncate it, and the 0022
-    // umask defeats SecAuditLogFileMode - waf-log-parser treats truncation as best-effort. Part H
-    // carries the matched rules; bodies (I, J, E) and headers (D) are omitted to avoid huge writes.
+    // The caddy image ships the audit log pre-created as caddy-owned 0660, which a new volume copies
+    // in, and Coraza opens an existing file without touching its mode - so the agent can truncate
+    // it through caddy's group. No SecAuditLogFileMode: the container's 0022 umask would strip the
+    // group-write bit from it anyway. A file Coraza creates itself is 0644, and the agent reports
+    // that on the Agents page. Part H carries the matched rules; bodies (I, J, E) and headers (D)
+    // are omitted to avoid huge writes.
     "SecAuditLogParts ABFHZ",
     "SecResponseBodyAccess Off",
   );

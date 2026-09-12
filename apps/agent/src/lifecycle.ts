@@ -153,16 +153,18 @@ export class AgentLifecycle {
   }
 
   /**
-   * A token the controller left on the shared data volume, for the agent in its own stack.
+   * A token the controller left on its data volume, for the agent in its own stack.
    *
-   * Only ever read here, and only when there is no stored pairing: reaching this file means sharing
-   * the controller's volume, which is the same host and the same trust boundary. An agent on
-   * another host has no such file and pairs with a code an operator carries instead.
+   * Only ever read here, and only when there is no stored pairing: reaching this file means
+   * mounting the controller's volume, which is the same host and the same trust boundary. The
+   * bundled agent mounts it read-only and reads the token through the controller's group. An agent
+   * on another host has no such file and pairs with a code an operator carries instead.
    *
    * Not treated as a failure when absent - that is the normal state for every remote agent.
    */
   private readBootstrapToken(): string | null {
-    const path = join(this.deps.config.dataDir, AGENT_BOOTSTRAP_FILE);
+    const { controllerDataDir, dataDir } = this.deps.config;
+    const path = join(controllerDataDir ?? dataDir, AGENT_BOOTSTRAP_FILE);
     try {
       if (!existsSync(path)) return null;
       const token = readFileSync(path, "utf-8").trim();
