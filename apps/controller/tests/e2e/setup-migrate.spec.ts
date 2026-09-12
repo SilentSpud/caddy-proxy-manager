@@ -16,6 +16,7 @@
  */
 import { type Page, expect, test } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
+import { signInWithCredentials } from '../helpers/sign-in';
 import {
   LEGACY_CONTAINER_PATH,
   LEGACY_FIXTURE,
@@ -27,10 +28,6 @@ const MIGRATE_ORIGIN = 'http://localhost:3005';
 const LEGACY_PASSWORD = 'LegacyPassword2026!';
 
 let page: Page;
-
-function field(name: string) {
-  return page.locator(`input[name="${name}"]`);
-}
 
 test.beforeAll(async ({ browser }) => {
   // Spawned rather than imported: Playwright runs this file under Node, which cannot load
@@ -148,9 +145,8 @@ test.describe('Migrating an existing installation', () => {
     // The container restarted moments ago, so this is the coldest /login in the suite - the widest
     // window between the form being painted and React attaching its onSubmit.
     await waitForHydration(page);
-    await field('username').fill(LEGACY_FIXTURE.adminUsername);
-    await field('password').fill(LEGACY_PASSWORD);
-    await page.getByRole('button', { name: /sign in/i }).click();
+    // Identifier first: the password field stays hidden until Continue.
+    await signInWithCredentials(page, LEGACY_FIXTURE.adminUsername, LEGACY_PASSWORD);
 
     // Into the settings step: migrating brings the data across, but the deployment is not
     // configured until that step is saved.

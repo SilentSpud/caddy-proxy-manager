@@ -785,22 +785,24 @@ test.describe('Settings - mobile layout', () => {
   test.use({ viewport: { width: 393, height: 852 } });
 
   /**
-   * Settings no longer ships a compact section picker of its own. The rail it used to sit beside
-   * is now the application's own, so at mobile width the sections are reached exactly the way
-   * every other page's navigation is - through the app shell's mobile nav.
+   * Settings ships no compact section picker of its own, and a phone has no rail: the tab bar
+   * replaced the app shell's hamburger drawer. The sections are reached from the Settings overview,
+   * whose tiles link to each one.
    */
-  test('the settings rail is behind the app shell nav, not inline', async ({ page }) => {
+  test('the settings rail is not stacked inline; the overview links to each section', async ({
+    page,
+  }) => {
     await page.goto('/settings/general');
     await expect(page.getByRole('heading', { level: 1, name: 'General' })).toBeVisible();
 
-    // At this width the shell renders the rail twice - a top bar holding the menu button, and a
-    // drawer holding the sections - so the rail's container is visible by design. What must not be
-    // is a section link stacked above the content; it has to be one menu tap away instead.
-    const section = page.getByRole('link', { name: 'DNS Providers', exact: true });
-    await expect(section).not.toBeVisible();
+    // What must not happen is a section link stacked above the content.
+    await expect(page.getByRole('link', { name: 'DNS Providers', exact: true })).not.toBeVisible();
 
-    await page.getByRole('button', { name: 'Open navigation' }).click();
-    await expect(section).toBeVisible();
+    await page.goto('/settings');
+    const tile = page.getByTestId(/^settings-tile-/).filter({ hasText: 'DNS Providers' });
+    await expect(tile).toBeVisible();
+    await tile.click();
+    await expect(page.getByRole('heading', { level: 1, name: 'DNS Providers' })).toBeVisible();
   });
 
   test('a section route renders its own section at mobile width', async ({ page }) => {
