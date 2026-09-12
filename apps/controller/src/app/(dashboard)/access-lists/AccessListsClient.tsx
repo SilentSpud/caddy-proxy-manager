@@ -635,7 +635,7 @@ function DetailPane({
             />
             <Badge icon={<Clock />} label={`updated ${fmtRelative(list.updatedAt)}`} />
             {list.entries.length === 0 && <Badge variant="error" label={t("noMembersBadge")} />}
-            {usage.length === 0 && <Badge variant="warning" label="unused" />}
+            {usage.length === 0 && <Badge variant="warning" label={t("unusedBadge")} />}
           </HStack>
         </VStack>
       </HStack>
@@ -901,9 +901,9 @@ function ListsRail({
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
           <VStack gap={0}>
-            <Heading level={1}>Access Lists</Heading>
+            <Heading level={1}>{t("title")}</Heading>
             <Text type="body" size="xsm" color="secondary" className="cpm-desktop-only">
-              {lists.length} {lists.length === 1 ? "list" : "lists"} · HTTP basic auth
+              {t("railSubtitle", { count: lists.length })}
             </Text>
           </VStack>
           {/* The phone gets this as a floating button instead. */}
@@ -944,7 +944,7 @@ function ListsRail({
 
       {filtered.length === 0 ? (
         <EmptyState
-          title={`No lists match "${query}"`}
+          title={t("noListsMatch", { query })}
           isCompact
           actions={
             <Button
@@ -971,13 +971,16 @@ function ListsRail({
                   />
                 }
                 label={list.name}
-                description={`${list.entries.length} ${list.entries.length === 1 ? "member" : "members"} · ${hostCount} ${hostCount === 1 ? "host" : "hosts"}`}
+                description={t("listRowDescription", {
+                  members: list.entries.length,
+                  hosts: hostCount,
+                })}
                 endContent={
                   // No members outranks unused: it is the one that changes what a host serves.
                   list.entries.length === 0 ? (
                     <Badge variant="error" label={t("noMembersBadge")} />
                   ) : hostCount === 0 ? (
-                    <Badge variant="warning" label="unused" />
+                    <Badge variant="warning" label={t("unusedBadge")} />
                   ) : undefined
                 }
                 onClick={() => onSelect(list.id)}

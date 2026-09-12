@@ -556,7 +556,7 @@ export default function AnalyticsClient() {
   const wafByCountry = new Map((wafStats?.byCountry ?? []).map((r) => [r.countryCode, r.count]));
 
   const INTERVALS: DisplayInterval[] = ["1h", "12h", "24h", "7d", "30d", "custom"];
-  const intervalLabel = (iv: DisplayInterval) => (iv === "custom" ? "Custom" : iv);
+  const intervalLabel = (iv: DisplayInterval) => (iv === "custom" ? t("intervalCustom") : iv);
 
   const changeInterval = (iv: DisplayInterval) => {
     if (iv === "custom" && !customFrom) {
