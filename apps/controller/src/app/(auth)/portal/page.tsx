@@ -4,9 +4,12 @@ import { isForwardAuthDomain, createRedirectIntent } from "@/src/lib/models/forw
 import { config } from "@/src/lib/config";
 import PortalLoginForm from "./PortalLoginForm";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+import { oauthCallbackErrorMessage } from "@/src/lib/oauth-callback-error";
 
 interface PortalPageProps {
-  searchParams: Promise<{ rd?: string; rid?: string }>;
+  /** `error` is set by Better Auth when a single sign-on attempt comes back refused. */
+  searchParams: Promise<{ rd?: string; rid?: string; error?: string }>;
 }
 
 export const metadata: Metadata = {
@@ -45,10 +48,12 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
 
   const session = await auth();
   const enabledProviders = await getProviderDisplayList();
+  const oauthError = oauthCallbackErrorMessage(params.error, await getTranslations("auth.login"));
 
   return (
     <PortalLoginForm
       rid={rid}
+      initialError={oauthError}
       hasRedirect={!!redirectUri || !!existingRid}
       targetDomain={targetDomain}
       enabledProviders={enabledProviders}

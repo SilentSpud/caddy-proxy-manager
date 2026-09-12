@@ -164,6 +164,8 @@ export default function ProfileClient({
   };
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
+  const [removePasswordDialogOpen, setRemovePasswordDialogOpen] = useState(false);
+  const [removePasswordCurrent, setRemovePasswordCurrent] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -275,6 +277,36 @@ export default function ProfileClient({
       setTimeout(() => window.location.reload(), 1500);
     } catch {
       setError(t("unlinkError"));
+      setLoading(false);
+    }
+  };
+
+  const handleRemovePassword = async () => {
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/user/remove-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: removePasswordCurrent }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || t("removePasswordFailed"));
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(t("passwordRemoved"));
+      setRemovePasswordDialogOpen(false);
+      setRemovePasswordCurrent("");
+      setLoading(false);
+      setTimeout(() => window.location.reload(), 1500);
+    } catch {
+      setError(t("removePasswordFailed"));
       setLoading(false);
     }
   };
@@ -613,12 +645,20 @@ export default function ProfileClient({
                     description={t("oauthOnlyDescription")}
                   />
                 ) : hasPassword ? (
-                  <HStack>
+                  <HStack gap={2} wrap="wrap">
                     <Button
                       variant="secondary"
                       icon={<Unlink />}
                       label={t("unlinkOauthAccount")}
                       onClick={() => setUnlinkDialogOpen(true)}
+                    />
+                    {/* The other way to end up with one sign-in method: keep the provider, drop
+                        the password. */}
+                    <Button
+                      variant="secondary"
+                      icon={<Lock />}
+                      label={t("removePassword")}
+                      onClick={() => setRemovePasswordDialogOpen(true)}
                     />
                   </HStack>
                 ) : (
@@ -810,6 +850,33 @@ export default function ProfileClient({
           Are you sure you want to unlink your {linkedNames.join(", ")} account? You will only be
           able to sign in with your username and password after this.
         </Text>
+      </AppDialog>
+
+      <AppDialog
+        open={removePasswordDialogOpen}
+        onClose={() => {
+          setRemovePasswordDialogOpen(false);
+          setRemovePasswordCurrent("");
+        }}
+        title={t("removePassword")}
+        maxWidth="sm"
+        submitLabel={t("removePassword")}
+        onSubmit={handleRemovePassword}
+        isSubmitting={loading}
+      >
+        <VStack gap={3}>
+          <Text type="body" size="sm" color="secondary">
+            {t("removePasswordDescription", { providers: linkedNames.join(", ") })}
+          </Text>
+          <TextInput
+            {...AUTOFILL_CURRENT_PASSWORD}
+            label={t("currentPassword")}
+            type="password"
+            value={removePasswordCurrent}
+            onChange={setRemovePasswordCurrent}
+            isRequired
+          />
+        </VStack>
       </AppDialog>
     </VStack>
   );

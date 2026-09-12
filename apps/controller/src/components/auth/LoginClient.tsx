@@ -27,16 +27,19 @@ interface LoginClientProps {
   localLoginEnabled?: boolean;
   /** Display name from APP_NAME, so a rebranded instance is named consistently. */
   appName?: string;
+  /** A refused single sign-on attempt, already put into words by the page. */
+  initialError?: string | null;
 }
 
 export default function LoginClient({
   enabledProviders = [],
   localLoginEnabled = true,
   appName = "Caddy Proxy Manager",
+  initialError = null,
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
   const router = useRouter();
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(initialError);
   const [loginPending, setLoginPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -123,7 +126,13 @@ export default function LoginClient({
     setLoginError(null);
     setOauthPending(providerId);
     try {
-      await authClient.signIn.social({ provider: providerId, callbackURL: "/" });
+      // Without errorCallbackURL a refused sign-in lands on Better Auth's bare error page; back
+      // here, the page can say what happened and what to do instead.
+      await authClient.signIn.social({
+        provider: providerId,
+        callbackURL: "/",
+        errorCallbackURL: "/login",
+      });
     } catch {
       setLoginError(t("oauthFailed"));
       setOauthPending(null);

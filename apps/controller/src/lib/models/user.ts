@@ -172,6 +172,21 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
 }
 
 /**
+ * Drop a user's password: the hash on the user row and the Better Auth credential account that
+ * mirrors it, leaving their linked providers as the only way in. Callers must have checked that at
+ * least one provider is linked - this does not, so it can never be the reason a check was skipped.
+ */
+export async function removeUserPassword(userId: number): Promise<void> {
+  const now = nowIso();
+  await db
+    .delete(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
+  await db.update(users).set({ passwordHash: null, updatedAt: now }).where(eq(users.id, userId));
+  // users.provider still says "credentials"; re-derive it from the accounts now left.
+  await syncUserOAuthIdentity(userId);
+}
+
+/**
  * The OAuth identities linked to a user, read from the authoritative
  * `accounts` table (Better Auth writes federated identities there).
  *

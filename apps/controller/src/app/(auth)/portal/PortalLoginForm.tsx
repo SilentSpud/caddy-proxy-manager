@@ -26,6 +26,8 @@ interface PortalLoginFormProps {
   /** False in OIDC-only mode: there are no local accounts to sign in with. */
   localLoginEnabled?: boolean;
   existingSession?: { userId: string; name: string | null; email: string | null } | null;
+  /** A refused single sign-on attempt, already put into words by the page. */
+  initialError?: string | null;
 }
 
 /** The portal is always one centred card; only its contents vary. */
@@ -65,10 +67,11 @@ export default function PortalLoginForm({
   enabledProviders = [],
   localLoginEnabled = true,
   existingSession,
+  initialError = null,
 }: PortalLoginFormProps) {
   const t = useTranslations("auth");
   const tl = useTranslations("auth.login");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [pending, setPending] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -172,7 +175,12 @@ export default function PortalLoginForm({
     // Redirect back to this portal page after OAuth, with the rid param preserved.
     // The rid is an opaque server-side ID - the actual redirect URI is never in the URL.
     const callbackUrl = `/portal?rid=${encodeURIComponent(rid)}`;
-    authClient.signIn.social({ provider: providerId, callbackURL: callbackUrl });
+    // A refused sign-in comes back to the same portal page, rid intact, so it can say why.
+    authClient.signIn.social({
+      provider: providerId,
+      callbackURL: callbackUrl,
+      errorCallbackURL: callbackUrl,
+    });
   };
 
   const disabled = pending || !!oauthPending;
