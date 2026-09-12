@@ -10,6 +10,8 @@
 @import "@astryxdesign/core/reset.css";
 @import "@astryxdesign/core/astryx.css";
 @import "@astryxdesign/theme-neutral/theme.css";
+/* The variants this app adds to that theme - same layer, so ordering is by declaration. */
+@import "./astryx-variants.css";
 /* Backs Tailwind utilities with Astryx tokens (bg-surface, text-primary, ...). */
 @import "@astryxdesign/core/tailwind-theme.css";
 

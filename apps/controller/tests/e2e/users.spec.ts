@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
 import { getUserRecord } from '../helpers/seed';
+import { signInWithCredentials } from '../helpers/sign-in';
 
 const BASE = 'http://localhost:3000';
 
@@ -14,9 +15,7 @@ async function loginWithCredentials(
   const page = await context.newPage();
 
   await page.goto(`${BASE}/login`);
-  await page.getByLabel('Username').fill(username);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await signInWithCredentials(page, username, password);
   await expect(page).not.toHaveURL(/\/login/, { timeout: 10000 });
 
   return { context, page };

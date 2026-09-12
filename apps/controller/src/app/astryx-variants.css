@@ -1,0 +1,37 @@
+/**
+ * Component variants this app adds to the neutral theme.
+ *
+ * Written by hand rather than through `defineTheme({extends: neutralTheme, ...})`: extending a
+ * built theme produces an unbuilt one, and <Theme> injects an unbuilt theme's CSS from a client
+ * effect - no SSR rule, so the sign-in screen would paint unstyled first. The layer and @scope
+ * below are the same ones `astryx theme build` emits, so these rules land in the cascade exactly
+ * where the theme's own component overrides do.
+ *
+ * Each variant here also needs its name added to the matching *VariantMap in src/types/astryx.d.ts.
+ */
+
+@layer astryx-theme {
+  @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
+    /**
+     * Button `tonal` - the accent at a lower weight, mirroring how the theme already renders
+     * `destructive`: the muted ground with its own text colour on top, and hover/pressed overlays
+     * in that same hue so the interaction tint does not read as neutral grey. Borderless, because
+     * every Astryx button variant is.
+     */
+    .astryx-button[data-variant="tonal"] {
+      background-color: var(--color-background-pink);
+      color: var(--color-text-pink);
+      /* 5% and 10% match the alpha the theme uses for destructive's overlays (0D/1A). Mixed from
+         the variant's own text colour, so it steps toward more contrast in both modes: darker on
+         the light ground, lighter on the dark one. */
+      --color-overlay-hover: color-mix(in srgb, var(--color-text-pink) 5%, transparent);
+      --color-overlay-pressed: color-mix(in srgb, var(--color-text-pink) 10%, transparent);
+    }
+
+    /* The ring matches the surface it rings, the same reason destructive re-colours its own.
+       Width, style and offset still come from the shared focus outline. */
+    .astryx-button[data-variant="tonal"]:focus-visible {
+      outline-color: var(--color-border-pink);
+    }
+  }
+}

@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
+import { signInWithCredentials, submitUsername } from '../helpers/sign-in';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -19,8 +20,13 @@ test.describe('Portal login page', () => {
     await expect(page.getByText('Authentication Required')).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
 
-    // Credential form fields
+    // Identifier first: step one is the username on its own.
     await expect(page.getByLabel('Username')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Password')).toBeHidden();
+
+    await waitForHydration(page);
+    await submitUsername(page, 'someone');
     await expect(page.getByLabel('Password')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   });
@@ -31,9 +37,7 @@ test.describe('Portal login page', () => {
     // so it submits natively until React attaches.
     await waitForHydration(page);
 
-    await page.getByLabel('Username').fill('wronguser');
-    await page.getByLabel('Password').fill('wrongpass');
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await signInWithCredentials(page, 'wronguser', 'wrongpass');
 
     // Should show an error message (use .first() to avoid matching Next.js route announcer)
     await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 10_000 });
@@ -41,13 +45,14 @@ test.describe('Portal login page', () => {
 
   test('username and password fields are required', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
+    await waitForHydration(page);
 
-    // Fields have required attribute - clicking sign in with empty fields should not submit
-    const username = page.getByLabel('Username');
-    const password = page.getByLabel('Password');
+    await expect(page.getByLabel('Username')).toHaveAttribute('aria-required', 'true');
 
-    await expect(username).toHaveAttribute('aria-required', 'true');
-    await expect(password).toHaveAttribute('aria-required', 'true');
+    // The password field is mounted from the first paint but hidden, and a hidden subtree is out
+    // of the accessibility tree - so the assertion has to follow it onto the second step.
+    await submitUsername(page, 'someone');
+    await expect(page.getByLabel('Password')).toHaveAttribute('aria-required', 'true');
   });
 
   test('rejects javascript: URI - no rid is created', async ({ page }) => {
@@ -72,17 +77,16 @@ test.describe('Portal login page', () => {
   test('shows OAuth sign-in button when OIDC is enabled', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
     // Dex is configured in the test stack - the OAuth button should appear
-    await expect(page.getByRole('button', { name: /Sign in with Dex/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Continue with Dex/i })).toBeVisible();
   });
 
   test('shows both OAuth button and credential form', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
     // Both auth methods should be available
-    await expect(page.getByRole('button', { name: /Sign in with Dex/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Continue with Dex/i })).toBeVisible();
     await expect(page.getByLabel('Username')).toBeVisible();
-    await expect(page.getByLabel('Password')).toBeVisible();
-    // "or" separator between OAuth and credentials
-    await expect(page.getByText('or', { exact: true })).toBeVisible();
+    // The credential form now comes first, so the separator introduces the providers below it.
+    await expect(page.getByText('Or continue with single sign-on')).toBeVisible();
   });
 
   test('preserves ?rid= parameter for OAuth return flow', async ({ page }) => {

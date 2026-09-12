@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -26,12 +26,15 @@ import {
 } from "@/src/lib/oauth-provider-view";
 import {
   createOAuthProviderAction,
+  setPrimaryOAuthProviderAction,
   updateOAuthProviderAction,
   deleteOAuthProviderAction,
 } from "./actions";
 
 interface OAuthProvidersSectionProps {
   initialProviders: OAuthProviderView[];
+  /** The provider offered first on the sign-in screen, or null for alphabetical order. */
+  initialPrimaryProviderId?: string | null;
   baseUrl: string;
   /** True when AUTH_DISABLE_LOCAL_USERS=true - SSO is the only way in. */
   localUsersDisabled?: boolean;
@@ -97,6 +100,7 @@ const ROLE_OPTIONS = [
 
 export default function OAuthProvidersSection({
   initialProviders,
+  initialPrimaryProviderId = null,
   baseUrl,
   localUsersDisabled = false,
 }: OAuthProvidersSectionProps) {
@@ -109,6 +113,9 @@ export default function OAuthProvidersSection({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<OAuthProviderView | null>(null);
+  // Which provider the sign-in screen offers first. Held here so the badge moves with the
+  // click rather than waiting for a reload.
+  const [primaryId, setPrimaryId] = useState<string | null>(initialPrimaryProviderId);
 
   const callbackUrl = useCallback(
     (providerId: string) => oauthCallbackUrl(baseUrl, providerId),
@@ -241,6 +248,19 @@ export default function OAuthProvidersSection({
     }
   }
 
+  async function handleSetPrimary(provider: OAuthProviderView) {
+    // Clicking the current primary clears it, which is how the operator gets back to the
+    // alphabetical list without a separate control for "none".
+    const next = primaryId === provider.id ? null : provider.id;
+    setPrimaryId(next);
+    try {
+      await setPrimaryOAuthProviderAction(next);
+    } catch (err) {
+      console.error("Failed to set the primary provider:", err);
+      setPrimaryId(primaryId);
+    }
+  }
+
   async function handleToggleEnabled(provider: OAuthProviderView) {
     try {
       const updated = await updateOAuthProviderAction(provider.id, {
@@ -310,12 +330,24 @@ export default function OAuthProvidersSection({
                   {provider.roleMappingEnabled && <Badge label={t("groupRoles")} />}
                   {provider.syncGroups && <Badge label={t("groupSync")} />}
                   {!provider.enabled && <Badge variant="warning" label={t("disabled")} />}
+                  {primaryId === provider.id && provider.enabled && (
+                    <Badge variant="pink" label={t("primaryProvider")} />
+                  )}
                 </HStack>
                 <HStack gap={2} vAlign="center">
                   <Switch
                     label={t("enabled")}
                     value={provider.enabled}
                     onChange={() => handleToggleEnabled(provider)}
+                  />
+                  <IconButton
+                    variant="secondary"
+                    size="sm"
+                    label={primaryId === provider.id ? t("clearPrimary") : t("makePrimary")}
+                    icon={<Star />}
+                    isDisabled={!provider.enabled}
+                    tooltip={primaryId === provider.id ? t("clearPrimary") : t("makePrimary")}
+                    onClick={() => handleSetPrimary(provider)}
                   />
                   <IconButton
                     variant="secondary"

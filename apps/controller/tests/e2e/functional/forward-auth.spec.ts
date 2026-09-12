@@ -5,6 +5,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
+import { signInWithCredentials } from '../../helpers/sign-in';
 
 const DOMAIN = 'func-fwd-auth.test';
 const ECHO_BODY = 'echo-ok';
@@ -72,8 +73,9 @@ test.describe
         expect(response?.status()).toBeLessThan(500);
         // Wait for the page to fully render
         await p.waitForLoadState('networkidle');
+        // Step one of identifier-first sign-in: the password is only asked for after Continue.
         await expect(p.getByLabel('Username')).toBeVisible({ timeout: 10_000 });
-        await expect(p.getByLabel('Password')).toBeVisible();
+        await expect(p.getByRole('button', { name: /^continue$/i })).toBeVisible();
       } finally {
         await ctx.close();
       }
@@ -142,9 +144,7 @@ test.describe
           await route.fulfill({ response });
         });
 
-        await freshPage.getByLabel('Username').fill('testadmin');
-        await freshPage.getByLabel('Password').fill('TestPassword2026!');
-        await freshPage.getByRole('button', { name: 'Sign in', exact: true }).click();
+        await signInWithCredentials(freshPage, 'testadmin', 'TestPassword2026!');
 
         // Wait for the intercepted response
         const deadline = Date.now() + 15_000;

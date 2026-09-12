@@ -5,6 +5,7 @@
  */
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { httpGet, waitForStatus } from '../../helpers/http';
+import { signInWithCredentials } from '../../helpers/sign-in';
 
 const DOMAIN = 'func-fwd-oauth.test';
 const ECHO_BODY = 'echo-ok';
@@ -87,7 +88,7 @@ async function doOAuthLogin(page: Page, user: { email: string; password: string 
     const p = await ctx.newPage();
     try {
       await p.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
-      const oauthButton = p.getByRole('button', { name: /continue with dex|sign in with dex/i });
+      const oauthButton = p.getByRole('button', { name: /continue with dex/i });
       await expect(oauthButton).toBeVisible({ timeout: 10_000 });
       await oauthButton.click();
       // Better Auth does fetch then window.location.href - wait for Dex or error redirect
@@ -152,7 +153,7 @@ async function oauthPortalLogin(
   });
 
   await page.goto(`${BASE_URL}/portal?rd=http://${domain}/`);
-  const oauthButton = page.getByRole('button', { name: /sign in with dex/i });
+  const oauthButton = page.getByRole('button', { name: /continue with dex/i });
   await expect(oauthButton).toBeVisible({ timeout: 10_000 });
   await oauthButton.click();
   await dexLogin(page, user.email, user.password);
@@ -397,9 +398,7 @@ test.describe
           await route.fulfill({ response });
         });
 
-        await p.getByLabel('Username').fill('testadmin');
-        await p.getByLabel('Password').fill('TestPassword2026!');
-        await p.getByRole('button', { name: 'Sign in', exact: true }).click();
+        await signInWithCredentials(p, 'testadmin', 'TestPassword2026!');
 
         // Wait for the intercepted response
         const deadline = Date.now() + 15_000;

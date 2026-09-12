@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
+import { signInWithCredentials, submitUsername } from '../helpers/sign-in';
 
 // Auth tests run WITHOUT pre-authenticated state
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -15,11 +16,30 @@ test.describe('Authentication', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('/login page renders the login form', async ({ page }) => {
+  test('/login asks for the username first, then the password', async ({ page }) => {
     await page.goto('/login');
+    await waitForHydration(page);
+
     await expect(page.getByRole('textbox', { name: /username/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^continue$/i })).toBeVisible();
+    // Mounted from the first paint so a password manager can fill both at once, but not shown
+    // until there is a name to attach it to.
+    await expect(page.getByRole('textbox', { name: /password/i })).toBeHidden();
+
+    await submitUsername(page, 'testadmin');
     await expect(page.getByRole('textbox', { name: /password/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^sign in$/i })).toBeVisible();
+  });
+
+  test('/login step one advances for a username that does not exist', async ({ page }) => {
+    // Refusing here would answer "does this account exist?" for anyone who asks. The screen has
+    // to look the same either way.
+    await page.goto('/login');
+    await waitForHydration(page);
+
+    await submitUsername(page, `nobody-${Date.now()}`);
+    await expect(page.getByRole('textbox', { name: /password/i })).toBeVisible();
+    await expect(page.getByRole('alert').first()).toBeHidden();
   });
 
   test('/login with wrong password shows an error message', async ({ page }) => {
@@ -27,9 +47,7 @@ test.describe('Authentication', () => {
     // This test asserts the page STAYS on /login, and a pre-hydration native submit does that on
     // its own - without the gate it would go green whether or not the password was ever checked.
     await waitForHydration(page);
-    await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
-    await page.getByRole('textbox', { name: /password/i }).fill('WrongPassword!');
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await signInWithCredentials(page, 'testadmin', 'WrongPassword!');
     // Should show an error and stay on login
     await expect(page).toHaveURL(/\/login/);
     await expect(page.locator('text=/invalid|error|incorrect/i')).toBeVisible({ timeout: 5000 });
@@ -38,9 +56,7 @@ test.describe('Authentication', () => {
   test('/login with correct credentials lands on dashboard', async ({ page }) => {
     await page.goto('/login');
     await waitForHydration(page);
-    await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
-    await page.getByRole('textbox', { name: /password/i }).fill('TestPassword2026!');
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await signInWithCredentials(page, 'testadmin', 'TestPassword2026!');
     // Should redirect away from login
     await expect(page).not.toHaveURL(/\/login/, { timeout: 10000 });
   });
@@ -50,9 +66,7 @@ test.describe('Authentication', () => {
     // Docker resolves to 0.0.0.0 instead of the configured BASE_URL.
     await page.goto('/login');
     await waitForHydration(page);
-    await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
-    await page.getByRole('textbox', { name: /password/i }).fill('TestPassword2026!');
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await signInWithCredentials(page, 'testadmin', 'TestPassword2026!');
     await expect(page).not.toHaveURL(/\/login/, { timeout: 10000 });
 
     // Click logout

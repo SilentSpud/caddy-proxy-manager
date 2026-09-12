@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
+import { signInWithCredentials } from '../helpers/sign-in';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -27,9 +28,7 @@ test.describe('Link Account page', () => {
     // First log in
     await page.goto('http://localhost:3000/login');
     await waitForHydration(page);
-    await page.getByRole('textbox', { name: /username/i }).fill('testadmin');
-    await page.getByRole('textbox', { name: /password/i }).fill('TestPassword2026!');
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await signInWithCredentials(page, 'testadmin', 'TestPassword2026!');
     await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
 
     // Now visit link-account - should redirect to /
