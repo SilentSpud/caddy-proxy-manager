@@ -9,11 +9,138 @@
  */
 
 @layer components {
+  /* Wide by default: the phone-only pieces are hidden, and a list page's header wrapper has no box
+     of its own, so its title, stats and toolbar stay direct children of the page's stack and keep
+     the gaps they always had. */
+  .cpm-fab,
+  .cpm-mobile-only {
+    display: none;
+  }
+
+  .cpm-list-header {
+    display: contents;
+  }
+
   @media (max-width: 767px) {
     /* The bar's own height, so content and sheets can clear it. Safe-area inset on top of it keeps
        the labels off the home indicator on phones that have one. */
     :root {
       --cpm-tabbar-height: 60px;
+      /* AppShell's content padding (spacing step 6), which a full-bleed header has to cancel. */
+      --cpm-page-pad: 24px;
+    }
+
+    /* No !important needed: Astryx's StyleX rules live in the astryx-base layer, which layers.css
+       orders before components, so a rule here wins regardless of their specificity. */
+    .cpm-desktop-only {
+      display: none;
+    }
+
+    .cpm-mobile-only {
+      display: block;
+    }
+
+    /* ---- floating action button ---------------------------------------------------------- */
+
+    .cpm-fab {
+      position: fixed;
+      right: 16px;
+      bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px) + 16px);
+      /* Under the drawer's scrim (50), so the drawer covers it rather than the other way round. */
+      z-index: 45;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      border: 0;
+      border-radius: 9999px;
+      background: var(--color-text-pink);
+      /* #111 on the pink fill, the ink the accent uses for text on itself. */
+      color: #111111;
+      box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+      text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .cpm-fab:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .cpm-fab:focus-visible {
+      outline: 2px solid var(--color-border-pink);
+      outline-offset: 3px;
+    }
+
+    /* ---- list page header ---------------------------------------------------------------- */
+
+    /* Title, search and filters as one fixed control surface the rows scroll under. It bleeds to
+       the screen edges, so the line under it runs the full width like the tab bar's does. Pure
+       black against a pure black page: the light line is the whole boundary, and on OLED the header
+       costs nothing to show. */
+    .cpm-list-header {
+      display: block;
+      position: sticky;
+      /* Negative, to match the margin: a sticky element's offset is measured from inside the scroll
+         container's padding, so `top: 0` would stick it 24px down from the top of the screen. */
+      top: calc(-1 * var(--cpm-page-pad));
+      z-index: 20;
+      margin: calc(-1 * var(--cpm-page-pad)) calc(-1 * var(--cpm-page-pad)) 0;
+      padding: 12px var(--cpm-page-pad) 12px;
+      background: light-dark(#ffffff, #000000);
+      border-bottom: 1px solid light-dark(#c4c4c4, #5c5c5c);
+    }
+
+    /* A header inside a rail that already pads itself (Access Lists, which the shell draws full
+       bleed): it cancels the rail's 12px instead of the shell's 24, and sticks at the very top
+       because no shell padding sits above it. It also stands in for the rail's stack gaps. */
+    .cpm-list-header-inset {
+      --cpm-page-pad: 12px;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Search first and full width, filters under it: search is what a phone list is for. */
+    .cpm-list-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .cpm-list-search {
+      order: -1;
+    }
+
+    /* Astryx sets a field's width through an inline custom property read by a layered class, not an
+       inline width, so a plain rule in this later layer is enough to widen it. */
+    .cpm-list-search > * {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* Filters scroll sideways rather than wrapping into a second and third row. */
+    .cpm-list-filters {
+      overflow-x: auto;
+      margin-inline: calc(-1 * var(--cpm-page-pad));
+      padding-inline: var(--cpm-page-pad);
+      scrollbar-width: none;
+    }
+
+    .cpm-list-filters::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* AppShell paints its content area with the card token. On a desktop card and body are the same
+       colour; on a phone cards are lifted off the black page, so the page area has to ask for the
+       body colour itself or every screen turns card grey. */
+    .astryx-app-shell .astryx-layout-content {
+      background-color: var(--color-background-body);
     }
 
     .cpm-mobile-content {

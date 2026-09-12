@@ -16,7 +16,8 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ListPageHeader } from "@/components/ui/ListPageHeader";
+import { Fab } from "@/src/components/mobile/Fab";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
@@ -127,58 +128,63 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
 
   return (
     <VStack gap={6}>
-      <PageHeader title={t("users")} description={t("pageDescription")} />
-
-      {error && <Banner status="error" title={t("errorTitle")} description={error} />}
-
-      <StatTiles
-        tiles={[
-          {
-            id: "total",
-            label: t("users"),
-            value: users.length,
-            note: t("activeDisabledNote", { active: activeCount, disabled: disabledCount }),
-          },
-          {
-            id: "admins",
-            label: t("roleAdmins"),
-            value: roleCounts.admin,
-            note: t("operatorsNote", { count: roleCounts.operator }),
-          },
-          {
-            id: "idp",
-            label: t("fromIdp"),
-            value: idpCount,
-            note: t("reconciledOnSignIn"),
-          },
-          {
-            id: "sessions",
-            label: t("withSession"),
-            value: withSessionCount,
-            note: t("withSessionNote"),
-          },
-        ]}
+      <ListPageHeader
+        title={t("users")}
+        description={t("pageDescription")}
+        stats={
+          <StatTiles
+            tiles={[
+              {
+                id: "total",
+                label: t("users"),
+                value: users.length,
+                note: t("activeDisabledNote", { active: activeCount, disabled: disabledCount }),
+              },
+              {
+                id: "admins",
+                label: t("roleAdmins"),
+                value: roleCounts.admin,
+                note: t("operatorsNote", { count: roleCounts.operator }),
+              },
+              {
+                id: "idp",
+                label: t("fromIdp"),
+                value: idpCount,
+                note: t("reconciledOnSignIn"),
+              },
+              {
+                id: "sessions",
+                label: t("withSession"),
+                value: withSessionCount,
+                note: t("withSessionNote"),
+              },
+            ]}
+          />
+        }
+        filters={
+          <TabList value={roleFilter} onChange={setRoleFilter}>
+            <Tab value="all" label={t("filterAll")} endContent={<Badge label={users.length} />} />
+            {ROLE_OPTIONS.map((role) => (
+              <Tab
+                key={role.value}
+                value={role.value}
+                label={role.label}
+                endContent={<Badge label={roleCounts[role.value as UserEntry["role"]]} />}
+              />
+            ))}
+          </TabList>
+        }
+        search={
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder={t("searchPlaceholder")}
+            label={t("searchLabel")}
+          />
+        }
       />
 
-      <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
-        <TabList value={roleFilter} onChange={setRoleFilter}>
-          <Tab value="all" label={t("filterAll")} endContent={<Badge label={users.length} />} />
-          {ROLE_OPTIONS.map((role) => (
-            <Tab
-              key={role.value}
-              value={role.value}
-              label={role.label}
-              endContent={<Badge label={roleCounts[role.value as UserEntry["role"]]} />}
-            />
-          ))}
-        </TabList>
-        <SearchField
-          value={search}
-          onChange={setSearch}
-          placeholder={t("searchPlaceholder")}
-          label={t("searchLabel")}
-        />
-      </HStack>
+      {error && <Banner status="error" title={t("errorTitle")} description={error} />}
 
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
         <HStack gap={3} vAlign="center">
@@ -186,13 +192,17 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
             {filtered.length} user{filtered.length !== 1 ? "s" : ""}
           </Text>
           {localUsersEnabled && (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Plus />}
-              label={t("createUser")}
-              onClick={() => setShowCreate(!showCreate)}
-            />
+            <>
+              <Button
+                className="cpm-desktop-only"
+                variant="secondary"
+                size="sm"
+                icon={<Plus />}
+                label={t("createUser")}
+                onClick={() => setShowCreate(!showCreate)}
+              />
+              <Fab label={t("createUser")} onClick={() => setShowCreate(true)} />
+            </>
           )}
         </HStack>
       </HStack>

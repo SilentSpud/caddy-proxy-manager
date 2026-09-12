@@ -12,7 +12,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
 import { toggleL4ProxyHostAction } from "./actions";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -295,7 +295,7 @@ export default function L4ProxyHostsClient({
 
       {!l4DisabledReason && <L4PortsApplyBanner refreshSignal={bannerRefresh} />}
 
-      <PageHeader
+      <ListPageHeader
         title={t("l4ProxyHosts")}
         description={t("pageDescription")}
         action={
@@ -307,39 +307,41 @@ export default function L4ProxyHostsClient({
               }
             : undefined
         }
+        stats={
+          <StatTiles
+            tiles={[
+              {
+                id: "hosts",
+                label: t("l4ProxyHosts"),
+                value: counts.total,
+                note: t("enabledNote", { count: counts.enabled }),
+              },
+              { id: "tcp", label: t("tcpStreams"), value: counts.tcp, note: t("tcpNote") },
+              { id: "udp", label: t("udpStreams"), value: counts.udp, note: t("udpNote") },
+              {
+                id: "agents",
+                label: t("listeners"),
+                value: agents?.length ?? 0,
+                note: t("listenersNote"),
+              },
+            ]}
+          />
+        }
+        filters={
+          <TabList value={activeProtocol} onChange={handleProtocolChange}>
+            <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
+            <Tab value="tcp" label="TCP" endContent={<Badge label={counts.tcp} />} />
+            <Tab value="udp" label="UDP" endContent={<Badge label={counts.udp} />} />
+          </TabList>
+        }
+        search={
+          <SearchField
+            value={searchTerm}
+            onChange={handleSearchChange}
+            placeholder={t("searchL4Hosts")}
+          />
+        }
       />
-
-      <StatTiles
-        tiles={[
-          {
-            id: "hosts",
-            label: t("l4ProxyHosts"),
-            value: counts.total,
-            note: t("enabledNote", { count: counts.enabled }),
-          },
-          { id: "tcp", label: t("tcpStreams"), value: counts.tcp, note: t("tcpNote") },
-          { id: "udp", label: t("udpStreams"), value: counts.udp, note: t("udpNote") },
-          {
-            id: "agents",
-            label: t("listeners"),
-            value: agents?.length ?? 0,
-            note: t("listenersNote"),
-          },
-        ]}
-      />
-
-      <HStack gap={4} vAlign="center" wrap="wrap" justify="between">
-        <TabList value={activeProtocol} onChange={handleProtocolChange}>
-          <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
-          <Tab value="tcp" label="TCP" endContent={<Badge label={counts.tcp} />} />
-          <Tab value="udp" label="UDP" endContent={<Badge label={counts.udp} />} />
-        </TabList>
-        <SearchField
-          value={searchTerm}
-          onChange={handleSearchChange}
-          placeholder={t("searchL4Hosts")}
-        />
-      </HStack>
 
       <DataTable
         columns={columns}

@@ -8,7 +8,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchField } from "@/components/ui/SearchField";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { ActivityStrip, type ActivityBucket } from "@/components/ui/ActivityStrip";
 import { formatDateTimeUtc } from "@/src/lib/date-format";
@@ -133,49 +133,55 @@ export default function AuditLogClient({
 
   return (
     <VStack gap={6}>
-      <PageHeader title={t("auditLog")} description={t("pageDescription")} />
-
-      <StatTiles
-        tiles={[
-          {
-            id: "day",
-            label: t("eventsLastDay"),
-            value: summary.events,
-            note: t("actorsNote", { count: summary.actors }),
-          },
-          {
-            id: "kinds",
-            label: t("resourceKinds"),
-            value: summary.entityTypes,
-            note: t("resourceKindsNote"),
-          },
-          {
-            id: "total",
-            label: t("eventsRecorded"),
-            value: pagination.total,
-            note: t("matchingNote"),
-          },
-        ]}
+      <ListPageHeader
+        title={t("auditLog")}
+        description={t("pageDescription")}
+        stats={
+          <StatTiles
+            tiles={[
+              {
+                id: "day",
+                label: t("eventsLastDay"),
+                value: summary.events,
+                note: t("actorsNote", { count: summary.actors }),
+              },
+              {
+                id: "kinds",
+                label: t("resourceKinds"),
+                value: summary.entityTypes,
+                note: t("resourceKindsNote"),
+              },
+              {
+                id: "total",
+                label: t("eventsRecorded"),
+                value: pagination.total,
+                note: t("matchingNote"),
+              },
+            ]}
+          />
+        }
+        summary={
+          <Card padding={4}>
+            <ActivityStrip
+              buckets={activity}
+              title={t("activityTitle")}
+              describePeak={(bucket) =>
+                t("activityPeak", { label: bucket.label, count: bucket.count })
+              }
+            />
+          </Card>
+        }
+        search={
+          <SearchField
+            value={searchTerm}
+            onChange={(next) => {
+              setSearchTerm(next);
+              updateSearch(next);
+            }}
+            placeholder={t("searchAuditLog")}
+          />
+        }
       />
-
-      <Card padding={4}>
-        <ActivityStrip
-          buckets={activity}
-          title={t("activityTitle")}
-          describePeak={(bucket) => t("activityPeak", { label: bucket.label, count: bucket.count })}
-        />
-      </Card>
-
-      <HStack gap={2} vAlign="center">
-        <SearchField
-          value={searchTerm}
-          onChange={(next) => {
-            setSearchTerm(next);
-            updateSearch(next);
-          }}
-          placeholder={t("searchAuditLog")}
-        />
-      </HStack>
 
       <DataTable
         columns={columns}

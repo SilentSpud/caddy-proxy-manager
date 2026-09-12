@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { VStack } from "@astryxdesign/core/Stack";
+import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatTiles } from "@/components/ui/StatTiles";
 import type {
@@ -93,62 +93,63 @@ export default function CertificatesClient({
 
   return (
     <VStack gap={6}>
-      <PageHeader title={t("sslTlsCertificates")} description={t("automaticHttpsDescription")} />
-
-      <StatTiles
-        tiles={[
-          {
-            id: "acme",
-            label: t("acme"),
-            value: acmePagination.total,
-            note: t("acmeNote", { count: healthyAcmeTotal }),
-          },
-          {
-            id: "imported",
-            label: t("imported"),
-            value: importedCerts.length,
-            note:
-              nextExpiry === null
-                ? t("importedNoneNote")
-                : nextExpiry < 0
-                  ? t("importedExpiredNote")
-                  : t("importedNote", { count: nextExpiry }),
-            accent:
-              expired > 0
-                ? { label: t("expiredAccent", { count: expired }), variant: "error" as const }
-                : expiringSoon > 0
-                  ? {
-                      label: t("expiringAccent", { count: expiringSoon }),
-                      variant: "warning" as const,
-                    }
-                  : undefined,
-          },
-          {
-            id: "ca",
-            label: t("caMtls"),
-            value: caCertificates.length,
-            note: t("caNote", { count: issuedClientCerts.length }),
-          },
-          {
-            id: "roles",
-            label: t("roles"),
-            value: mtlsRoles.length,
-            note: t("rolesNote"),
-          },
-        ]}
-      />
-
-      {/* Status summary filter chips */}
-      <StatusSummaryBar
-        expired={expired}
-        expiringSoon={expiringSoon}
-        healthy={healthy}
-        filter={statusFilter}
-        onFilter={setStatusFilter}
-      />
-
-      <VStack gap={4}>
-        <HStack gap={4} vAlign="center" wrap="wrap" justify="between">
+      <ListPageHeader
+        title={t("sslTlsCertificates")}
+        description={t("automaticHttpsDescription")}
+        stats={
+          <StatTiles
+            tiles={[
+              {
+                id: "acme",
+                label: t("acme"),
+                value: acmePagination.total,
+                note: t("acmeNote", { count: healthyAcmeTotal }),
+              },
+              {
+                id: "imported",
+                label: t("imported"),
+                value: importedCerts.length,
+                note:
+                  nextExpiry === null
+                    ? t("importedNoneNote")
+                    : nextExpiry < 0
+                      ? t("importedExpiredNote")
+                      : t("importedNote", { count: nextExpiry }),
+                accent:
+                  expired > 0
+                    ? { label: t("expiredAccent", { count: expired }), variant: "error" as const }
+                    : expiringSoon > 0
+                      ? {
+                          label: t("expiringAccent", { count: expiringSoon }),
+                          variant: "warning" as const,
+                        }
+                      : undefined,
+              },
+              {
+                id: "ca",
+                label: t("caMtls"),
+                value: caCertificates.length,
+                note: t("caNote", { count: issuedClientCerts.length }),
+              },
+              {
+                id: "roles",
+                label: t("roles"),
+                value: mtlsRoles.length,
+                note: t("rolesNote"),
+              },
+            ]}
+          />
+        }
+        summary={
+          <StatusSummaryBar
+            expired={expired}
+            expiringSoon={expiringSoon}
+            healthy={healthy}
+            filter={statusFilter}
+            onFilter={setStatusFilter}
+          />
+        }
+        filters={
           <TabList value={activeTab} onChange={handleTabChange}>
             <Tab
               value="acme"
@@ -167,7 +168,8 @@ export default function CertificatesClient({
             />
             <Tab value="roles" label={t("roles")} endContent={<Badge label={mtlsRoles.length} />} />
           </TabList>
-
+        }
+        search={
           <SearchField
             value={search}
             onChange={setSearch}
@@ -180,8 +182,10 @@ export default function CertificatesClient({
             }
             label={t("searchCertificates")}
           />
-        </HStack>
+        }
+      />
 
+      <VStack gap={4}>
         {/* Only the active tab's panel is mounted, as before. */}
         {activeTab === "acme" && (
           <AcmeTab

@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   KeyRound,
   Plus,
   Users,
@@ -44,7 +45,9 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { AppDialog } from "@/components/ui/AppDialog";
+import { Fab } from "@/src/components/mobile/Fab";
 import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
@@ -882,38 +885,51 @@ function ListsRail({
 
   return (
     <VStack gap={3} padding={3}>
-      <HStack justify="between" vAlign="center" gap={2}>
-        <VStack gap={0}>
-          <Heading level={1}>Access Lists</Heading>
-          <Text type="body" size="xsm" color="secondary">
-            {lists.length} {lists.length === 1 ? "list" : "lists"} · HTTP basic auth
-          </Text>
-        </VStack>
-        <Button size="sm" icon={<Plus />} label={t("new")} onClick={onNew} />
-      </HStack>
+      {/* On a phone the title, search and sort stick over the lists like every other list page's
+          header; on a desktop the wrapper has no box and the rail's own gaps apply. */}
+      <div className="cpm-list-header cpm-list-header-inset">
+        <HStack justify="between" vAlign="center" gap={2}>
+          <VStack gap={0}>
+            <Heading level={1}>Access Lists</Heading>
+            <Text type="body" size="xsm" color="secondary" className="cpm-desktop-only">
+              {lists.length} {lists.length === 1 ? "list" : "lists"} · HTTP basic auth
+            </Text>
+          </VStack>
+          {/* The phone gets this as a floating button instead. */}
+          <Button
+            size="sm"
+            icon={<Plus />}
+            label={t("new")}
+            onClick={onNew}
+            className="cpm-desktop-only"
+          />
+        </HStack>
 
-      <HStack gap={2} vAlign="center">
-        <SearchField
-          value={query}
-          onChange={setQuery}
-          placeholder={t("searchPlaceholder")}
-          label={t("searchAccessLists")}
-          width="100%"
-        />
-        <Kbd keys="mod+K" />
-      </HStack>
+        <HStack gap={2} vAlign="center">
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder={t("searchPlaceholder")}
+            label={t("searchAccessLists")}
+            width="100%"
+          />
+          <span className="cpm-desktop-only">
+            <Kbd keys="mod+K" />
+          </span>
+        </HStack>
 
-      <SegmentedControl
-        label={t("sortAccessLists")}
-        size="sm"
-        layout="fill"
-        value={sort}
-        onChange={(v) => setSort(v as SortKey)}
-      >
-        {SORT_OPTIONS.map((o) => (
-          <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
-        ))}
-      </SegmentedControl>
+        <SegmentedControl
+          label={t("sortAccessLists")}
+          size="sm"
+          layout="fill"
+          value={sort}
+          onChange={(v) => setSort(v as SortKey)}
+        >
+          {SORT_OPTIONS.map((o) => (
+            <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+          ))}
+        </SegmentedControl>
+      </div>
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -978,6 +994,10 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("recent");
   const [newOpen, setNewOpen] = useState(false);
+  // A phone has room for the rail or the detail, not both: it shows the rail until a list is
+  // picked. The desktop ignores this and always shows both.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
+  const [detailOpen, setDetailOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Sync from server props when they change (e.g. after revalidation)
@@ -999,6 +1019,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
   const handleDeleted = useCallback(() => {
     setLists((ls) => ls.filter((l) => l.id !== selectedId));
     setSelectedId(lists.find((l) => l.id !== selectedId)?.id ?? null);
+    setDetailOpen(false);
     router.refresh();
   }, [selectedId, lists, router]);
 
@@ -1006,6 +1027,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
     (list: AccessList) => {
       setLists((ls) => [list, ...ls]);
       setSelectedId(list.id);
+      setDetailOpen(true);
       router.refresh();
     },
     [router],
@@ -1031,25 +1053,68 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const rail = (onSelect: (id: number) => void) => (
+    <div ref={searchRef}>
+      <ListsRail
+        lists={lists}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        onNew={() => setNewOpen(true)}
+        query={query}
+        setQuery={setQuery}
+        sort={sort}
+        setSort={setSort}
+        usage={usage}
+      />
+    </div>
+  );
+
+  const newDialog = (
+    <NewListDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={handleCreated} />
+  );
+
+  if (isNarrow) {
+    return (
+      <>
+        {detailOpen && selected ? (
+          <VStack gap={3} padding={4}>
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<ArrowLeft />}
+                label={t("backToLists")}
+                onClick={() => setDetailOpen(false)}
+              />
+            </div>
+            <DetailPane
+              list={selected}
+              usage={usage[selected.id] ?? []}
+              onListUpdated={handleListUpdated}
+              onDeleted={handleDeleted}
+            />
+          </VStack>
+        ) : (
+          <>
+            {rail((id) => {
+              setSelectedId(id);
+              setDetailOpen(true);
+            })}
+            <Fab label={t("new")} onClick={() => setNewOpen(true)} />
+          </>
+        )}
+        {newDialog}
+      </>
+    );
+  }
+
   return (
     <>
       <Layout
         height="fill"
         start={
           <LayoutPanel width={320} hasDivider role="navigation" label={t("accessLists")}>
-            <div ref={searchRef}>
-              <ListsRail
-                lists={lists}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onNew={() => setNewOpen(true)}
-                query={query}
-                setQuery={setQuery}
-                sort={sort}
-                setSort={setSort}
-                usage={usage}
-              />
-            </div>
+            {rail(setSelectedId)}
           </LayoutPanel>
         }
         content={
@@ -1064,7 +1129,7 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
         }
       />
 
-      <NewListDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={handleCreated} />
+      {newDialog}
     </>
   );
 }

@@ -18,6 +18,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Fab } from "@/src/components/mobile/Fab";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -155,7 +156,7 @@ export default function GroupsClient({
         ]}
       />
 
-      <HStack justify="end">
+      <HStack justify="end" className="cpm-desktop-only">
         <Button
           variant="secondary"
           size="sm"
@@ -164,6 +165,7 @@ export default function GroupsClient({
           onClick={() => setShowCreate(!showCreate)}
         />
       </HStack>
+      <Fab label={t("newGroup")} onClick={() => setShowCreate(true)} />
 
       {showCreate && (
         <Card>
