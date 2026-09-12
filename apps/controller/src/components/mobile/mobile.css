@@ -99,6 +99,12 @@
       display: flex;
     }
 
+    /* A single-form auth page starts at the top on a phone rather than centring: the keyboard takes
+       the bottom half, and a centred form is pushed under it. */
+    .cpm-auth-page {
+      align-items: flex-start;
+    }
+
     /* ---- card feed (WAF, Analytics) ------------------------------------------------------ */
 
     /* Filters as pills in one row that scrolls sideways, each opening a sheet. */

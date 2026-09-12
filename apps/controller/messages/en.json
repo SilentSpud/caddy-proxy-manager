@@ -184,14 +184,19 @@
     "authorizing": "Authorizing...",
     "couldNotSignIn": "Could not sign in",
     "linkAccount": {
+      "confirmDescription": "Enter your current password",
+      "confirmTitle": "Confirm it is you",
       "errorTitle": "Could not link account",
-      "existingAccount": "An account with <email_>{email}</email_> already exists",
       "failed": "Failed to link account",
       "heading": "Link Your Account",
       "invalidRequest": "Invalid linking request",
+      "linksTo": "links to",
       "metaTitle": "Link Account",
+      "newIdentity": "New",
       "password": "Password",
-      "prompt": "Would you like to link your <provider_>{provider}</provider_> account to your existing account? Enter your password to confirm.",
+      "passwordPlaceholder": "Your current password",
+      "removePassword": "Remove password",
+      "removePasswordDescription": "{provider} becomes the only way to sign in to this account",
       "submit": "Link Account",
       "submitPending": "Linking Account…",
       "tokenExpired": "Linking token expired or invalid",
@@ -235,6 +240,8 @@
       "mismatch": "New passwords do not match",
       "mustDiffer": "New password must be different from your current password",
       "newPassword": "New Password",
+      "policyProgress": "{met} of {total}",
+      "policyTitle": "Password policy",
       "submit": "Update Password",
       "subtitle": "Your password is stored with an older algorithm. Choose a new one to continue."
     },
@@ -703,6 +710,12 @@
   "passwordPolicy": {
     "error": "{subject} {failures}",
     "hint": "At least {min} characters, including upper and lower case, a number, and a special character",
+    "rule": {
+      "case": "Upper and lower case letters",
+      "length": "At least {min} characters long",
+      "number": "At least one number",
+      "special": "At least one special character"
+    },
     "subject": {
       "exportPassword": "Export password",
       "newPassword": "New password",

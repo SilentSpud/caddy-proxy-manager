@@ -2,7 +2,7 @@ import { verifyPassword } from "../password";
 import { randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { config } from "../config";
-import { findUserByEmail, getUserById } from "../models/user";
+import { findUserByEmail, getUserById, syncUserOAuthIdentity } from "../models/user";
 import db from "../db";
 import { users, linkingTokens, accounts } from "../db/schema";
 import { and, eq, lt } from "drizzle-orm";
@@ -165,12 +165,19 @@ export async function retrieveLinkingToken(id: string): Promise<string | null> {
   return token;
 }
 
-/** Verify the password and link an OAuth account to an existing user. */
+/**
+ * Verify the password and link an OAuth account to an existing user.
+ *
+ * With `removePassword`, the password is dropped once the link is in place, so the provider becomes
+ * the only way in. The order is the safeguard: the link is written first, and a failed password
+ * check returns before anything changes, so no path leaves an account with neither.
+ */
 export async function verifyAndLinkOAuth(
   userId: number,
   password: string,
   provider: string,
   providerAccountId: string,
+  options: { removePassword?: boolean } = {},
 ): Promise<boolean> {
   const user = await getUserById(userId);
   if (!user?.passwordHash) {
@@ -192,7 +199,27 @@ export async function verifyAndLinkOAuth(
     updatedAt: nowIso(),
   });
 
+  if (options.removePassword) {
+    await removeUserPassword(userId);
+  }
+
   return true;
+}
+
+/**
+ * Drop a user's password: the hash on the user row and the Better Auth credential account that
+ * mirrors it. Only for a user who has just been given another way in - see verifyAndLinkOAuth.
+ */
+async function removeUserPassword(userId: number): Promise<void> {
+  await db
+    .delete(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
+  await db
+    .update(users)
+    .set({ passwordHash: null, updatedAt: nowIso() })
+    .where(eq(users.id, userId));
+  // users.provider still says "credentials"; re-derive it from the accounts now left.
+  await syncUserOAuthIdentity(userId);
 }
 
 /** Auto-link an OAuth account, for users without passwords. */

@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { linkingId, password } = body;
+    // Strictly true: anything else, a truthy string included, keeps the password.
+    const removePassword = body.removePassword === true;
 
     if (!linkingId || !password) {
       return NextResponse.json({ error: t("missingRequiredFields") }, { status: 400 });
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
       password,
       tokenPayload.provider,
       tokenPayload.providerAccountId,
+      { removePassword },
     );
 
     if (!success) {
@@ -83,6 +86,17 @@ export async function POST(request: NextRequest) {
         email: tokenPayload.email,
       }),
     });
+
+    if (removePassword) {
+      await createAuditEvent({
+        userId: tokenPayload.userId,
+        action: "password_removed",
+        entityType: "user",
+        entityId: tokenPayload.userId,
+        summary: `Password removed while linking ${tokenPayload.provider}; it is now the only sign-in`,
+        data: JSON.stringify({ provider: tokenPayload.provider }),
+      });
+    }
 
     return NextResponse.json({
       success: true,
