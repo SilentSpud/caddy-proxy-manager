@@ -1,5 +1,6 @@
 /** E2E: Users page - listing, search, edit, disable/enable, delete, create. Runs as admin. */
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 import { getUserRecord } from '../helpers/seed';
 
 const BASE = 'http://localhost:3000';
@@ -24,6 +25,8 @@ async function loginWithCredentials(
 test.describe('Users page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/users');
+    // The search box is controlled: filled before hydration, React resets it to empty.
+    await waitForHydration(page);
   });
 
   test('page loads with Users heading', async ({ page }) => {

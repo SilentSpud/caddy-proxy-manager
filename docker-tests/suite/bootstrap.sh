@@ -79,7 +79,7 @@ acme_body=$(jq -nc --arg url "$PEBBLE_DIRECTORY" --rawfile root "$PEBBLE_ENDPOIN
 api PUT "/api/v1/settings/acme" "$acme_body"
 [ "$API_STATUS" = "200" ] || die "could not save ACME settings (HTTP $API_STATUS): $API_BODY"
 
-general_body=$(jq -nc --arg d "$TEST_DOMAIN" '{primaryDomain:$d, acmeEmail:"docker-tests@cpm.test"}')
+general_body=$(jq -nc --arg d "$TEST_DOMAIN" '{defaultDomain:$d, acmeEmail:"docker-tests@cpm.test"}')
 api PUT "/api/v1/settings/general" "$general_body"
 [ "$API_STATUS" = "200" ] || die "could not save general settings (HTTP $API_STATUS): $API_BODY"
 

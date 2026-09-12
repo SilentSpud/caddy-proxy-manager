@@ -50,9 +50,9 @@
     "test:e2e:no-clickhouse": "bun run --filter @cpm/controller test:e2e:no-clickhouse"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.12",
+    "@biomejs/biome": "^2.5.13",
     "@socketsecurity/bun-security-scanner": "^1.1.2",
-    "@types/bun": "^1.4.1",
+    "@types/bun": "^1.4.2",
     "typescript": "^7.0.2"
   },
   "overrides": {

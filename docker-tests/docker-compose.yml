@@ -96,13 +96,14 @@ services:
 
   # ── System under test ───────────────────────────────────────────────────
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: cpm
       POSTGRES_PASSWORD: docker-tests
       POSTGRES_DB: cpm
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # The parent directory, as the 18+ images expect - see the root docker-compose.yml.
+      - postgres-data:/var/lib/postgresql
     networks:
       - cpm-test
     healthcheck:
@@ -144,8 +145,12 @@ services:
       NODE_ENV: production
       SESSION_SECRET: test-session-secret-not-for-production-use-0123456789
       CADDY_API_URL: http://caddy:2019
-      BASE_URL: http://web:3000
-      NEXTAUTH_URL: http://web:3000
+      # The dotted alias below, not the bare service name: curl 8.22 (Alpine 3.24's) stores a
+      # cookie set by a single-label host like `web` but never sends it back, so the runner's
+      # signed-in session would vanish between sign-in and its first API call. The origin the
+      # suite sends has to match this one, so CPM_API on the runner moves with it.
+      BASE_URL: http://web.cpm.internal:3000
+      NEXTAUTH_URL: http://web.cpm.internal:3000
       DATABASE_URL: postgres://cpm:docker-tests@postgres:5432/cpm
       APP_NAME: CPM Docker Test
       AVATAR_GRAVATAR: "false"
@@ -169,6 +174,8 @@ services:
     networks:
       cpm-test:
         ipv4_address: 172.28.0.11
+        aliases:
+          - web.cpm.internal
     healthcheck:
       # The image's own probe. It cannot be a shell one-liner: the runtime stage is Debian with the
       # compiled binary and nothing else - no Bun CLI, no curl, no wget.
@@ -272,7 +279,7 @@ services:
     container_name: cpm-test-runner
     command: ["sleep", "infinity"]
     environment:
-      CPM_API: http://web:3000
+      CPM_API: http://web.cpm.internal:3000
       CPM_ADMIN_USER: cpmadmin
       CPM_ADMIN_PASSWORD: ${CPM_TEST_ADMIN_PASSWORD:-Dock3r-T3st!Passw0rd}
       TEST_DOMAIN: cpm.test

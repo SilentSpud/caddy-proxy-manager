@@ -39,8 +39,8 @@ require (
 	github.com/caddy-dns/spaceship v1.0.0
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
 	github.com/caddyserver/caddy/v2 v2.11.4
-	github.com/corazawaf/coraza-caddy/v2 v2.6.0
-	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20260728192246-a1ff7050deb7
+	github.com/corazawaf/coraza-caddy/v2 v2.6.1
+	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20260910060514-71474a863f65
 	github.com/mholt/caddy-l4 v0.1.2
 	github.com/tailscale/caddy-tailscale v0.0.0-20260826180304-de41b249af4f
 )
@@ -258,7 +258,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org/mem v0.0.0-20240501181205-ae6ca9944745 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.56.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260323153451-8400f4a93807 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.40.0 // indirect

@@ -23,7 +23,7 @@ t_contains "the ACME directory points at the in-network CA" "pebble" "$(jqr '.ca
 t_contains "the ACME CA root is stored" "BEGIN CERTIFICATE" "$(jqr '.caRootPem')"
 
 api GET /api/v1/settings/general
-t_eq "the primary domain round-trips" "$TEST_DOMAIN" "$(jqr '.primaryDomain')"
+t_eq "the default domain round-trips" "$TEST_DOMAIN" "$(jqr '.defaultDomain')"
 
 api PUT /api/v1/settings/trusted-proxies \
   '{"ranges":["172.28.0.0/24"],"client_ip_headers":["X-Forwarded-For"]}'

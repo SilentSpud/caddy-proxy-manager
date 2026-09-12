@@ -296,14 +296,19 @@ services:
   # needs it, and publishing 5432 is how a database ends up on the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
       POSTGRES_USER: ${POSTGRES_USER:-cpm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}
+    # The parent directory, as the 18+ images expect: the cluster lives in a versioned
+    # subdirectory (18/docker), so a later major can sit beside it for `pg_upgrade --link`.
+    # A volume still holding a 17 cluster at its root makes this refuse to start rather than
+    # initialise an empty database next to it - the upgrade is a dump and restore, see
+    # "Upgrading from PostgreSQL 17" in the README.
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     networks:
       - caddy-network
     healthcheck:
