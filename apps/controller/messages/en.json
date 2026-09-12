@@ -1572,6 +1572,7 @@
     "defaults": "Defaults",
     "displayName": "Display name",
     "done": {
+      "heading": "Migration complete",
       "metaTitle": "Migration complete"
     },
     "emptyDatabaseRequiredDescription": "This copies rows with their original identifiers, so it expects nothing to have been created here yet. Running it against a database that is already in use is not supported.",
@@ -1610,7 +1611,25 @@
     "legacySecretRequiredTitle": "This database was encrypted with a different key",
     "manualEndpointsHelp": "The three endpoints are only needed for a provider that does not publish OIDC discovery; leave them blank otherwise.",
     "migrate": {
-      "metaTitle": "Migrate an existing installation"
+      "confirmCancel": "Cancel",
+      "confirmCopying": "Copying",
+      "confirmDescription": "Rows are copied with their original identifiers, so this only works into a database nothing has been created in yet.",
+      "confirmFootnote": "The old file is not modified either way. The application restarts once the copy finishes.",
+      "confirmGroups": "{groups, plural, one {# group} other {# groups}}, {rows, plural, one {# row} other {# rows}}",
+      "confirmLeaving": "Leaving behind",
+      "confirmNoAccountsDescription": "Users and their sign-in is unticked, so no account comes across.",
+      "confirmNoAccountsTitle": "This instance will still need its first administrator",
+      "confirmNothing": "Nothing",
+      "confirmSecrets": "Stored secrets",
+      "confirmSecretsReencrypted": "Re-encrypted with this instance's key",
+      "confirmSecretsUnchanged": "Readable with this instance's key",
+      "confirmSource": "Source",
+      "confirmStart": "Start the migration",
+      "confirmTitle": "Migrate this database?",
+      "heading": "Migrate an existing installation",
+      "metaTitle": "Migrate an existing installation",
+      "submit": "Migrate this database",
+      "submitPending": "Migrating…"
     },
     "migrationCompleteDescription": "Everything you chose to bring across is now in PostgreSQL, and the application is running from it.",
     "migrationCopiedDescription": "The old database has been copied. One more step before you sign in.",
@@ -1634,11 +1653,19 @@
     "secretReencryptionDescription": "Everything is re-encrypted with the SESSION_SECRET this deployment already uses, so the old one is needed for this import and never again. Migrating without it would leave those secrets unreadable, and each would have to be entered again by hand.",
     "secretReencryptionTitle": "You do not have to keep the old secret",
     "settingsStep": {
+      "heading": "Finish setting up",
       "metaTitle": "Finish setting up"
     },
     "skipMigrationDescription": "Skip the migration and configure this instance from scratch. The old file is left alone, and this offer will not appear again.",
     "skipMigrationLabel": "Skip and set up fresh",
     "skippedFilesTitle": "Files that were skipped",
+    "steps": {
+      "label": "Setup progress",
+      "migrate": "Migrate",
+      "account": "Account",
+      "verify": "Sign in",
+      "settings": "Settings"
+    },
     "tokenUrl": "Token URL",
     "userGroup": "User group",
     "userinfoUrl": "Userinfo URL",

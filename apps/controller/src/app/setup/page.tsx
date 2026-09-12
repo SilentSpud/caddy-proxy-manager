@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
-import { getMigrationSource, getSetupState, SETUP_PATHS } from "@/src/lib/setup";
+import { getMigrationSource, getSetupState, hasLegacyDatabase, SETUP_PATHS } from "@/src/lib/setup";
 import SetupAccountClient from "./SetupAccountClient";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,5 +25,12 @@ export default async function SetupPage() {
 
   // A migration that left the old accounts behind lands here, and it looks exactly like a fresh
   // install unless the page says otherwise - which reads as the migration having done nothing.
-  return <SetupAccountClient migratedFrom={await getMigrationSource()} />;
+  return (
+    <SetupAccountClient
+      migratedFrom={await getMigrationSource()}
+      // The migrate step is only part of this flow on a host that had a previous version's
+      // database, so the stepper has to be told rather than assume four steps.
+      hasMigrateStep={hasLegacyDatabase()}
+    />
+  );
 }

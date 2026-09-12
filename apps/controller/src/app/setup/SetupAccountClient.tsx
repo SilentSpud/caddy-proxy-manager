@@ -25,6 +25,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { passwordPolicyHint } from "@/src/lib/password-policy-message";
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
+import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { AUTOFILL_NEW_PASSWORD, AUTOFILL_USERNAME } from "@/src/components/ui/native-input-attrs";
 import { configureFirstOAuthProvider, createFirstAdmin } from "./actions";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
@@ -34,7 +35,13 @@ const AGENT_DOCS = "https://github.com/SilentSpud/caddy-proxy-manager/wiki/Agent
 type Role = "controller" | "agent";
 type Method = "local" | "oauth";
 
-export default function SetupAccountClient({ migratedFrom }: { migratedFrom?: string | null }) {
+export default function SetupAccountClient({
+  migratedFrom,
+  hasMigrateStep,
+}: {
+  migratedFrom?: string | null;
+  hasMigrateStep: boolean;
+}) {
   const t = useTranslations();
   const ta = useTranslations("setup.account");
   const [role, setRole] = useState<Role>("controller");
@@ -56,6 +63,7 @@ export default function SetupAccountClient({ migratedFrom }: { migratedFrom?: st
   return (
     <Center>
       <VStack gap={5} padding={5}>
+        <SetupSteps stage="account" hasMigrateStep={hasMigrateStep} />
         <VStack gap={2}>
           <Heading level={1}>{ta("heading")}</Heading>
           <Text color="secondary">{ta("subtitle")}</Text>

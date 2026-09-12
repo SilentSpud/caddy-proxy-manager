@@ -12,9 +12,11 @@
  * answer is whether to keep the old accounts: an installation being handed to someone else wants
  * the proxy hosts and none of the users, and before this it was all or nothing.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
+import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
 import { Center } from "@astryxdesign/core/Center";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Heading } from "@astryxdesign/core/Heading";
@@ -22,7 +24,8 @@ import { SelectableCard } from "@astryxdesign/core/SelectableCard";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
+import { FormCard, StatusAlert } from "@/src/components/ui/FormLayout";
+import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { AUTOFILL_OFF } from "@/src/components/ui/native-input-attrs";
 import {
   ALL_MIGRATION_GROUP_IDS,
@@ -55,6 +58,20 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** A label and the value it settles, for the confirmation summary. */
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <HStack gap={3} justify="between" align="center">
+      <Text size="sm" color="secondary">
+        {label}
+      </Text>
+      <Text size="sm" weight="medium">
+        {value}
+      </Text>
+    </HStack>
+  );
+}
+
 export default function SetupMigrateClient({
   candidates,
   rejected,
@@ -77,6 +94,9 @@ export default function SetupMigrateClient({
   const [keyDemanded, setKeyDemanded] = useState(false);
   // Set once the import has succeeded, which swaps the page for the restart dialog.
   const [imported, setImported] = useState<{ next: string; migratedSignIn: boolean } | null>(null);
+  // The confirmation sheet, and the form it submits from outside itself.
+  const [confirming, setConfirming] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const candidate = candidates.find((entry) => entry.path === selected);
 
@@ -107,6 +127,9 @@ export default function SetupMigrateClient({
     event.preventDefault();
     setError(null);
     setRunning(true);
+    // Out of the way before anything can fail: the error banner sits on the page behind the
+    // sheet, so leaving it open would hide the only explanation of what went wrong.
+    setConfirming(false);
 
     try {
       const response = await fetch("/api/setup/migrate", {
@@ -151,6 +174,23 @@ export default function SetupMigrateClient({
   // The probe answers for the file; `keyDemanded` is the server having asked anyway. Once the field
   // is on screen it stays, so a wrong key does not make the box the operator is fixing disappear.
   const needsLegacyKey = (candidate?.needsLegacyKey ?? false) || keyDemanded;
+  const blocked = effective.size === 0 || running || (needsLegacyKey && !legacyKey.trim());
+
+  /**
+   * What the confirmation counts. Split on `effective` rather than `picked`, so a group that was
+   * locked on by a dependency is counted as coming across - which is what will happen.
+   */
+  const { copying, leaving } = useMemo(() => {
+    const tally = (included: boolean) =>
+      MIGRATION_GROUPS.filter((group) => effective.has(group.id) === included).reduce(
+        (sum, group) => ({
+          groups: sum.groups + 1,
+          rows: sum.rows + (candidate?.groupCounts?.[group.id] ?? 0),
+        }),
+        { groups: 0, rows: 0 },
+      );
+    return { copying: tally(true), leaving: tally(false) };
+  }, [effective, candidate]);
 
   if (imported) {
     return <RestartDialog next={imported.next} migratedSignIn={imported.migratedSignIn} />;
@@ -159,14 +199,15 @@ export default function SetupMigrateClient({
   return (
     <Center>
       <VStack gap={5} padding={5}>
+        <SetupSteps stage="migrate" hasMigrateStep />
         <VStack gap={2}>
-          <Heading level={1}>Migrate an existing installation</Heading>
+          <Heading level={1}>{t("migrate.heading")}</Heading>
           <Text color="secondary">{t("migrationDescription")}</Text>
         </VStack>
 
         {error && <StatusAlert message={error} success={false} />}
 
-        <form onSubmit={runMigration}>
+        <form ref={formRef} onSubmit={runMigration}>
           <VStack gap={4}>
             <FormCard title={t("databasesFound")}>
               <VStack gap={3}>
@@ -301,12 +342,95 @@ export default function SetupMigrateClient({
               description={t("emptyDatabaseRequiredDescription")}
             />
 
-            <SaveButton
-              label={running ? "Migrating…" : "Migrate this database"}
-              isDisabled={effective.size === 0 || running || (needsLegacyKey && !legacyKey.trim())}
+            {/* Opens the confirmation rather than submitting: the import is one-way, and the
+                selection above is easy to get wrong in a way nothing later can undo. */}
+            <Button
+              variant="primary"
+              label={running ? t("migrate.submitPending") : t("migrate.submit")}
+              isDisabled={blocked}
+              onClick={() => setConfirming(true)}
             />
           </VStack>
         </form>
+
+        <BottomSheet
+          label={t("migrate.confirmTitle")}
+          isOpen={confirming}
+          onOpenChange={setConfirming}
+          // A swipe or a scrim tap is the same answer as Cancel here, so nothing is blocked.
+          purpose="info"
+        >
+          {/* Only while open: the sheet stays mounted for its own motion, and its copy repeats
+              the page's - a closed sheet contributing a second copy of the chosen path is a
+              duplicate for find-in-page, for a screen reader, and for any locator. */}
+          {confirming && (
+            <VStack gap={4} padding={4}>
+              <VStack gap={2}>
+                <Heading level={2}>{t("migrate.confirmTitle")}</Heading>
+                <Text color="secondary">{t("migrate.confirmDescription")}</Text>
+              </VStack>
+
+              <Card>
+                <VStack gap={3} padding={3}>
+                  <SummaryRow label={t("migrate.confirmSource")} value={selected} />
+                  <SummaryRow
+                    label={t("migrate.confirmCopying")}
+                    value={t("migrate.confirmGroups", {
+                      groups: copying.groups,
+                      rows: copying.rows,
+                    })}
+                  />
+                  <SummaryRow
+                    label={t("migrate.confirmLeaving")}
+                    value={
+                      leaving.groups === 0
+                        ? t("migrate.confirmNothing")
+                        : t("migrate.confirmGroups", { groups: leaving.groups, rows: leaving.rows })
+                    }
+                  />
+                  <SummaryRow
+                    label={t("migrate.confirmSecrets")}
+                    value={
+                      needsLegacyKey
+                        ? t("migrate.confirmSecretsReencrypted")
+                        : t("migrate.confirmSecretsUnchanged")
+                    }
+                  />
+                </VStack>
+              </Card>
+
+              {!migratingUsers && (
+                <Banner
+                  status="warning"
+                  title={t("migrate.confirmNoAccountsTitle")}
+                  description={t("migrate.confirmNoAccountsDescription")}
+                />
+              )}
+
+              <Text size="sm" color="secondary">
+                {t("migrate.confirmFootnote")}
+              </Text>
+
+              <VStack gap={2}>
+                <Button
+                  variant="primary"
+                  // Named for the outcome rather than repeating the trigger: two buttons with the
+                  // same accessible name is ambiguous to a screen reader.
+                  label={t("migrate.confirmStart")}
+                  isDisabled={blocked}
+                  // requestSubmit rather than a submit button: the sheet renders in its own dialog,
+                  // so a button inside it is not associated with the form above.
+                  onClick={() => formRef.current?.requestSubmit()}
+                />
+                <Button
+                  variant="secondary"
+                  label={t("migrate.confirmCancel")}
+                  onClick={() => setConfirming(false)}
+                />
+              </VStack>
+            </VStack>
+          )}
+        </BottomSheet>
 
         <FormCard title={t("orStartFresh")}>
           <VStack gap={3}>
