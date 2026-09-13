@@ -154,3 +154,52 @@ describe('raw Caddy config is admin-only', () => {
     );
   });
 });
+
+describe('upstreams that reach the Caddy admin API are admin-only', () => {
+  async function expectUpstreamAdminOnly(promise: Promise<unknown>) {
+    await expect(promise).rejects.toMatchObject({ code: 'upstreamTargetAdminOnly' });
+  }
+
+  it.each([
+    'caddy:2019',
+    'http://localhost:2019',
+    '[::1]:2019',
+    'tcp/caddy:2019',
+    'caddy:2000-2100',
+    'unix//run/caddy/admin.sock',
+    'caddy:{http.request.uri.query.p}',
+  ])('refuses an operator adding %s', async (target) => {
+    const host = await createProxyHost(
+      { name: 'plain', domains: ['plain.example.com'], upstreams: ['10.0.0.5:8080'] },
+      ADMIN,
+    );
+    await expectUpstreamAdminOnly(updateProxyHost(host.id, { upstreams: [target] }, OPERATOR));
+    expect((await getProxyHost(host.id))?.upstreams).toEqual(['10.0.0.5:8080']);
+  });
+
+  it('refuses an operator creating a host or an outpost upstream on the admin port', async () => {
+    await expectUpstreamAdminOnly(
+      createProxyHost(
+        { name: 'op', domains: ['op.example.com'], upstreams: ['caddy:2019'] },
+        OPERATOR,
+      ),
+    );
+    const host = await createProxyHost(
+      { name: 'plain', domains: ['plain.example.com'], upstreams: ['10.0.0.5:8080'] },
+      ADMIN,
+    );
+    await expectUpstreamAdminOnly(
+      updateProxyHost(host.id, { authentik: { outpostUpstream: 'caddy:2019' } }, OPERATOR),
+    );
+  });
+
+  it('lets an operator keep a target an admin set, and an admin set one', async () => {
+    const host = await createProxyHost(
+      { name: 'admin-set', domains: ['admin.example.com'], upstreams: ['caddy:2019'] },
+      ADMIN,
+    );
+    await updateProxyHost(host.id, { name: 'renamed', upstreams: ['caddy:2019'] }, OPERATOR);
+    await updateProxyHost(host.id, { upstreams: ['10.0.0.5:2020', 'app:8080'] }, OPERATOR);
+    expect((await getProxyHost(host.id))?.upstreams).toEqual(['10.0.0.5:2020', 'app:8080']);
+  });
+});

@@ -6,7 +6,7 @@ import { proxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
-import { stripCaddyPlaceholders } from "../caddy-utils";
+import { parseUpstreamTarget, stripCaddyPlaceholders } from "../caddy-utils";
 import { ApiValidationError } from "../api-errors";
 import {
   bodyLimitRangeMessage,
@@ -43,9 +43,8 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
   }
 }
 
-// Security: only the protocol scheme is validated (http/https). Host/IP targets are not
-// restricted - admins intentionally need to proxy to internal services, and the Caddy admin
-// API (port 2019) is protected by origins checking, not network isolation.
+// Only the scheme is checked here: proxying to internal services is the point. Targets that reach
+// the Caddy admin API are refused to non-admins separately, in assertDialTargetsAllowed.
 function validateUpstreamProtocol(upstream: string): void {
   const trimmed = upstream.trim();
   if (!trimmed) return;
@@ -2746,12 +2745,58 @@ async function assertRawConfigChangeAllowed(
       normalizeMetaValue(input[field]) !== normalizeMetaValue(existing?.[field]),
   );
   if (!changed) return;
+  if (!(await isAdminActor(actorUserId))) {
+    throw domainError("rawCaddyConfigAdminOnly");
+  }
+}
+
+async function isAdminActor(actorUserId: number): Promise<boolean> {
   const actor = await db.query.users.findFirst({
     where: (table, { eq }) => eq(table.id, actorUserId),
     columns: { role: true },
   });
-  if (actor?.role !== "admin") {
-    throw domainError("rawCaddyConfigAdminOnly");
+  return actor?.role === "admin";
+}
+
+const CADDY_ADMIN_PORT = 2019;
+
+/**
+ * Whether Caddy dialing this target could land on its own admin API. A placeholder is refused
+ * because it can resolve to the admin port at request time, and a unix socket because the admin
+ * listener can be one.
+ */
+export function isCaddyAdminDialTarget(target: string): boolean {
+  const trimmed = target.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes("{")) return true;
+  if (/^unix/i.test(trimmed)) return true;
+  const port = parseUpstreamTarget(trimmed.replace(/^[a-z0-9]+\/(?!\/)/i, "")).port;
+  if (!port) return false;
+  const range = port.match(/^(\d+)-(\d+)$/);
+  if (range) return Number(range[1]) <= CADDY_ADMIN_PORT && CADDY_ADMIN_PORT <= Number(range[2]);
+  return Number(port) === CADDY_ADMIN_PORT;
+}
+
+/**
+ * The raw-config guard's twin for ordinary upstreams: an operator keeps upstream editing, but not a
+ * target that reaches the admin API, which would expose the whole Caddy config through their host.
+ * Only newly added targets count, so an operator can still save a host an admin pointed there.
+ */
+async function assertDialTargetsAllowed(
+  existing: Pick<ProxyHost, "upstreams" | "authentik"> | null,
+  input: Partial<ProxyHostInput>,
+  actorUserId: number,
+): Promise<void> {
+  const previous = new Set(
+    [...(existing?.upstreams ?? []), existing?.authentik?.outpostUpstream ?? ""].map((t) =>
+      t.trim(),
+    ),
+  );
+  const proposed = [...(input.upstreams ?? []), input.authentik?.outpostUpstream ?? ""];
+  const added = proposed.filter((t) => !previous.has(t.trim()) && isCaddyAdminDialTarget(t));
+  if (added.length === 0) return;
+  if (!(await isAdminActor(actorUserId))) {
+    throw domainError("upstreamTargetAdminOnly");
   }
 }
 
@@ -2763,6 +2808,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   }
   input.upstreams.forEach(validateUpstreamProtocol);
   await assertRawConfigChangeAllowed(null, input, actorUserId);
+  await assertDialTargetsAllowed(null, input, actorUserId);
   await assertWildcardIssuable(domains, input.certificateId ?? null);
   await assertCaddyfileAdapts(input.customCaddyfile);
 
@@ -2830,6 +2876,7 @@ export async function updateProxyHost(
     throw domainError("proxyHostNotFound");
   }
   await assertRawConfigChangeAllowed(existing, input, actorUserId);
+  await assertDialTargetsAllowed(existing, input, actorUserId);
 
   const domainList = input.domains ? normalizeProxyHostDomains(input.domains) : existing.domains;
   const domains = JSON.stringify(domainList);

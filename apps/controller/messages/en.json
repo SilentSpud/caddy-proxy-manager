@@ -428,6 +428,7 @@
     "proxyHostDomainsRequired": "At least one domain must be specified",
     "proxyHostNotFound": "Proxy host not found",
     "rawCaddyConfigAdminOnly": "Only an administrator can change a host's custom Caddyfile, pre-handlers or reverse proxy JSON",
+    "upstreamTargetAdminOnly": "Only an administrator can point an upstream at Caddy's admin port, a unix socket or a placeholder",
     "rebuildCaddyFailed": "Failed to trigger a Caddy rebuild",
     "renameAgentFailed": "Failed to rename the agent",
     "setupAlreadyCompleted": "Setup has already been completed.",
