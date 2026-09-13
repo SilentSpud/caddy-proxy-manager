@@ -3,9 +3,11 @@
  * was either compiled in by xcaddy or does not exist. This is the one place recording that, so
  * `docker/caddy/Dockerfile` (what gets compiled), `src/lib/caddy.ts` (which handlers may be
  * emitted - an absent module makes Caddy reject the *entire* config) and the Settings UI agree.
- * DNS provider modules derive from DNS_PROVIDERS.
+ * DNS provider modules derive from DNS_PROVIDERS. What the shipped image carries is
+ * SHIPPED_CADDY_MODULES in @cpm/shared, which the agent reads too; a unit test keeps them equal.
  */
 
+import { MODULE_PATH_PATTERN, MODULE_VERSION_PATTERN } from "@cpm/shared";
 import { DNS_PROVIDERS } from "./dns-providers";
 
 /**
@@ -130,12 +132,8 @@ export type CaddyCustomModule = {
   enabled: boolean;
 };
 
-/**
- * Go module paths arrive pasted from READMEs, with schemes and stray whitespace, and land verbatim
- * in a shell command in the Dockerfile - so an allowlist, not escaping.
- */
-const MODULE_PATH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._~/-]*[a-zA-Z0-9]$/;
-const VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._+-]*$/;
+// Go module paths arrive pasted from READMEs, with schemes and stray whitespace. The patterns are
+// shared because the agent re-checks every spec before it reaches the Dockerfile.
 
 export function normalizeModulePath(raw: string): string {
   const path = raw.trim().replace(/^https?:\/\//, "");
@@ -159,7 +157,7 @@ export function validateCustomModule(entry: CaddyCustomModule): string | null {
   }
   if (entry.version) {
     const version = entry.version.trim();
-    if (!VERSION_PATTERN.test(version)) {
+    if (!MODULE_VERSION_PATTERN.test(version)) {
       return `Invalid version "${version}" for ${path}. Expected a tag, branch, or commit such as v1.2.3`;
     }
   }

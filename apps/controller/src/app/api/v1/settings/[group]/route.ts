@@ -1,161 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiAdmin, apiErrorResponse, logUnexpectedApiError } from "@/src/lib/api-auth";
-import {
-  getGeneralSettings,
-  saveGeneralSettings,
-  getAcmeSettings,
-  saveAcmeSettings,
-  getCloudflareSettings,
-  saveCloudflareSettings,
-  getAuthentikSettings,
-  saveAuthentikSettings,
-  getMetricsSettings,
-  saveMetricsSettings,
-  getLoggingSettings,
-  saveLoggingSettings,
-  getDnsSettings,
-  saveDnsSettings,
-  getDnsProviderSettings,
-  saveDnsProviderSettings,
-  getUpstreamDnsResolutionSettings,
-  saveUpstreamDnsResolutionSettings,
-  getGeoBlockSettings,
-  saveGeoBlockSettings,
-  getWafSettings,
-  saveWafSettings,
-  getErrorPagesSettings,
-  saveErrorPagesSettings,
-  getDefaultResponseSettings,
-  saveDefaultResponseSettings,
-  getTrustedProxiesSettings,
-  saveTrustedProxiesSettings,
-  getTailscaleSettings,
-  saveTailscaleSettings,
-  defaultTailscaleSettings,
-  getSetting,
-  setSetting,
-  clearSetting,
-} from "@/src/lib/settings";
-import { applyCaddyConfig } from "@/src/lib/caddy";
+import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { DefaultResponseValidationError } from "@/src/lib/caddy-default-response";
-import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
 import {
-  redactDnsProviderSettingsForApi,
-  redactLegacyCloudflareSettingsForApi,
-} from "@/src/lib/dns-providers";
-import type {
-  CloudflareSettings,
-  DnsProviderSettings,
-  TailscaleSettings,
-} from "@/src/lib/settings";
-import {
-  assertSettingsPayloadSize,
-  SettingsValidationError,
-  validateSettingsGroup,
-} from "@/src/lib/settings-validation";
-import { withSettingsUpdateLock } from "@/src/lib/settings-update-lock";
-
-type SettingsHandler = {
-  get: () => Promise<unknown>;
-  save: (data: never) => Promise<void>;
-  storageKey: string;
-  applyCaddy?: boolean;
-};
-
-const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
-  general: {
-    get: getGeneralSettings,
-    save: saveGeneralSettings as (data: never) => Promise<void>,
-    storageKey: "general",
-    applyCaddy: true,
-  },
-  acme: {
-    get: getAcmeSettings,
-    save: saveAcmeSettings as (data: never) => Promise<void>,
-    storageKey: "acme",
-    applyCaddy: true,
-  },
-  cloudflare: {
-    get: getCloudflareSettings,
-    save: saveCloudflareSettings as (data: never) => Promise<void>,
-    storageKey: "cloudflare",
-    applyCaddy: true,
-  },
-  authentik: {
-    get: getAuthentikSettings,
-    save: saveAuthentikSettings as (data: never) => Promise<void>,
-    storageKey: "authentik",
-    applyCaddy: true,
-  },
-  metrics: {
-    get: getMetricsSettings,
-    save: saveMetricsSettings as (data: never) => Promise<void>,
-    storageKey: "metrics",
-    applyCaddy: true,
-  },
-  logging: {
-    get: getLoggingSettings,
-    save: saveLoggingSettings as (data: never) => Promise<void>,
-    storageKey: "logging",
-    applyCaddy: true,
-  },
-  dns: {
-    get: getDnsSettings,
-    save: saveDnsSettings as (data: never) => Promise<void>,
-    storageKey: "dns",
-    applyCaddy: true,
-  },
-  "dns-provider": {
-    get: getDnsProviderSettings,
-    save: saveDnsProviderSettings as (data: never) => Promise<void>,
-    storageKey: "dns_provider",
-    applyCaddy: true,
-  },
-  "upstream-dns": {
-    get: getUpstreamDnsResolutionSettings,
-    save: saveUpstreamDnsResolutionSettings as (data: never) => Promise<void>,
-    storageKey: "upstream_dns_resolution",
-    applyCaddy: true,
-  },
-  geoblock: {
-    get: getGeoBlockSettings,
-    save: saveGeoBlockSettings as (data: never) => Promise<void>,
-    storageKey: "geoblock",
-    applyCaddy: true,
-  },
-  waf: {
-    get: getWafSettings,
-    save: saveWafSettings as (data: never) => Promise<void>,
-    storageKey: "waf",
-    applyCaddy: true,
-  },
-  "error-pages": {
-    get: getErrorPagesSettings,
-    save: saveErrorPagesSettings as (data: never) => Promise<void>,
-    storageKey: "error_pages",
-    applyCaddy: true,
-  },
-  "default-response": {
-    get: async () => (await getDefaultResponseSettings()) ?? { mode: "caddy" },
-    save: saveDefaultResponseSettings as (data: never) => Promise<void>,
-    storageKey: "default_response",
-    applyCaddy: true,
-  },
-  "trusted-proxies": {
-    get: getTrustedProxiesSettings,
-    save: saveTrustedProxiesSettings as (data: never) => Promise<void>,
-    storageKey: "trusted_proxies",
-    applyCaddy: true,
-  },
-  tailscale: {
-    // Defaulted rather than null, so a GET before anything is saved still describes the shape a
-    // PUT has to send - the node name in particular, which hosts inherit.
-    get: async () => (await getTailscaleSettings()) ?? defaultTailscaleSettings(),
-    save: saveTailscaleSettings as (data: never) => Promise<void>,
-    storageKey: "tailscale",
-    applyCaddy: true,
-  },
-};
+  isSettingsGroup,
+  readSettingsGroup,
+  saveSettingsGroup,
+  SettingsApplyError,
+} from "@/src/lib/settings-api";
+import { assertSettingsPayloadSize, SettingsValidationError } from "@/src/lib/settings-validation";
 
 export async function GET(
   request: NextRequest,
@@ -165,29 +17,15 @@ export async function GET(
     await requireApiAdmin(request);
     const { group } = await params;
 
-    const handler = SETTINGS_HANDLERS[group];
-    if (!handler) {
+    const settings = await readSettingsGroup(group);
+    if (!settings) {
       return NextResponse.json({ error: "Unknown settings group" }, { status: 404 });
     }
 
-    const settings = await handler.get();
-    if (group === "cloudflare" && settings) {
-      return NextResponse.json(
-        redactLegacyCloudflareSettingsForApi(settings as CloudflareSettings),
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
-    if (group === "tailscale" && settings) {
-      return NextResponse.json(redactTailscaleSettingsForApi(settings as TailscaleSettings), {
-        headers: { "Cache-Control": "no-store" },
-      });
-    }
-    if (group === "dns-provider" && settings) {
-      return NextResponse.json(redactDnsProviderSettingsForApi(settings as DnsProviderSettings), {
-        headers: { "Cache-Control": "no-store" },
-      });
-    }
-    return NextResponse.json(settings ?? {});
+    return NextResponse.json(
+      settings.value,
+      settings.sensitive ? { headers: { "Cache-Control": "no-store" } } : undefined,
+    );
   } catch (error) {
     return apiErrorResponse(error);
   }
@@ -220,14 +58,12 @@ export async function PUT(
       throw error;
     }
 
-    const handler = SETTINGS_HANDLERS[group];
-    if (!handler) {
+    if (!isSettingsGroup(group)) {
       return NextResponse.json({ error: "Unknown settings group" }, { status: 404 });
     }
 
-    let validated: unknown;
     try {
-      validated = validateSettingsGroup(group, input);
+      await saveSettingsGroup(group, input);
     } catch (error) {
       if (
         error instanceof SettingsValidationError ||
@@ -235,52 +71,13 @@ export async function PUT(
       ) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
+      if (error instanceof SettingsApplyError) {
+        return NextResponse.json({ error: error.message }, { status: error.status });
+      }
       throw error;
     }
 
-    return await withSettingsUpdateLock(async () => {
-      // Preserve the exact local stored value (including encrypted credentials),
-      // rather than the effective or redacted GET representation, for rollback.
-      const previousValue = await getSetting<unknown>(handler.storageKey);
-      await handler.save(validated as never);
-
-      if (handler.applyCaddy) {
-        try {
-          await applyCaddyConfig();
-        } catch (applyError) {
-          logUnexpectedApiError("Caddy settings apply failed", applyError);
-          try {
-            if (previousValue === null || previousValue === undefined) {
-              await clearSetting(handler.storageKey);
-            } else {
-              await setSetting(handler.storageKey, previousValue);
-            }
-          } catch (rollbackError) {
-            logUnexpectedApiError("Settings rollback failed", rollbackError);
-            return NextResponse.json(
-              { error: "Failed to apply Caddy configuration and roll back settings" },
-              { status: 500 },
-            );
-          }
-
-          // Caddy's load is atomic, but a failure may also happen after load while
-          // synchronizing instances. Best-effort reapply confirms the active
-          // configuration matches the restored database state.
-          try {
-            await applyCaddyConfig();
-          } catch (restoreApplyError) {
-            logUnexpectedApiError("Previous Caddy settings reapply failed", restoreApplyError);
-          }
-
-          return NextResponse.json(
-            { error: "Failed to apply Caddy configuration; settings were rolled back" },
-            { status: 502 },
-          );
-        }
-      }
-
-      return NextResponse.json({ ok: true });
-    });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return apiErrorResponse(error);
   }

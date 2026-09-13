@@ -6,6 +6,13 @@ import PortalLoginForm from "./PortalLoginForm";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { oauthCallbackErrorMessage } from "@/src/lib/oauth-callback-error";
+import { headers } from "next/headers";
+import { getClientIp } from "@/src/lib/client-ip";
+import { takeFromWindow } from "@/src/lib/rate-limit";
+
+/** A person opens a handful of protected tabs in ten minutes; a GET loop opens thousands. */
+const INTENTS_PER_CLIENT = 30;
+const INTENT_WINDOW_MS = 10 * 60_000;
 
 interface PortalPageProps {
   /** `error` is set by Better Auth when a single sign-on attempt comes back refused. */
@@ -37,9 +44,14 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         (await isForwardAuthDomain(parsed.hostname))
       ) {
         targetDomain = parsed.hostname;
-        // Store the redirect URI server-side. The client only gets an opaque ID,
-        // so a tampered ?rd= parameter cannot influence the final redirect target.
-        rid = await createRedirectIntent(redirectUri);
+        // Every GET writes a row, so each client gets a budget; past it the portal shows its
+        // generic message rather than another intent.
+        const ip = (await getClientIp(await headers())) ?? "unknown";
+        if (takeFromWindow(`portal-intent:${ip}`, INTENTS_PER_CLIENT, INTENT_WINDOW_MS)) {
+          // Store the redirect URI server-side. The client only gets an opaque ID,
+          // so a tampered ?rd= parameter cannot influence the final redirect target.
+          rid = await createRedirectIntent(redirectUri);
+        }
       }
     } catch {
       // invalid URL - portal will show a generic message

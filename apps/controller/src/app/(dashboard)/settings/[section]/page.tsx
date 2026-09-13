@@ -23,6 +23,7 @@ import {
 import { getPrimaryProviderId, listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { getAllAgentBuildSettings, listAgents } from "@/src/lib/models/agents";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
+import { autoPairingDisabled } from "@/src/lib/agent/bootstrap";
 import { getFavicon } from "@/src/lib/branding";
 import { getUpdateStatus } from "@/src/lib/updates";
 import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
@@ -94,6 +95,7 @@ export default async function SettingsSectionPage({
     agentBuildSelections,
     staged,
     agentOptions,
+    autoPairingOff,
   ] = await Promise.all([
     withStagedReads(overlay, () =>
       Promise.all([
@@ -127,6 +129,7 @@ export default async function SettingsSectionPage({
     getAllAgentBuildSettings(),
     stagedView(userId),
     listAgentOptions().catch(() => []),
+    autoPairingDisabled().catch(() => false),
   ]);
   const connectedAgentIds = new Set(agentOptions.filter((a) => a.connected).map((a) => a.id));
 
@@ -187,7 +190,11 @@ export default async function SettingsSectionPage({
       // settings still save and still gate the features; only the container management is missing.
       canManageServices={agentStatuses.some((result) => result.ok)}
       baseUrl={config.baseUrl}
-      agents={{ paired: pairedAgents, statuses: agentStatuses }}
+      agents={{
+        paired: pairedAgents,
+        statuses: agentStatuses,
+        autoPairingDisabled: autoPairingOff,
+      }}
     />
   );
 }

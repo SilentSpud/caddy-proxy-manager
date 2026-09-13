@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import type { AgentMode } from "@cpm/shared";
 import {
   ControllerAddressError,
+  checkControllerTransport,
   normalizeControllerUrl,
   normalizePairingCode,
 } from "./controller-url";
@@ -27,9 +28,8 @@ export type AgentConfig = {
   /** One-time code to pair with at startup, when the operator supplied one up front. */
   pairingCode: string | null;
   /**
-   * `standalone` listens on a Unix socket in the shared data volume: the controller is on the same
-   * host and reaches it through the filesystem. `managed` listens on TCP and requires an operator
-   * to pair it first.
+   * A label reported to the controller, and nothing more. Both modes dial out to the controller and
+   * bind only the local control socket; nothing listens on TCP.
    */
   mode: AgentMode;
   /** Where state, the socket and the shared secret live. Must be writable. */
@@ -49,6 +49,8 @@ export type AgentConfig = {
   caddyContainerName: string;
   /** Where this host's Caddy admin API listens. The controller reaches it only through here. */
   caddyApiUrl: string;
+  /** Pinned as `admin.listen` in every config forwarded to Caddy, or null to forward as sent. */
+  caddyAdminListen: string | null;
   /** Override for the auto-detected compose project name. */
   composeProject: string | null;
   /** Passed to compose as --project-directory, for a host path the agent cannot see. */
@@ -69,6 +71,8 @@ export type AgentConfig = {
   serviceTimeoutSeconds: number;
   /** Seconds to wait for Caddy to report healthy after a recreate. */
   healthTimeoutSeconds: number;
+  /** Dial plain http to a public controller address anyway. See `checkControllerTransport`. */
+  allowInsecureHttp: boolean;
 };
 
 function optional(name: string): string | null {
@@ -89,12 +93,7 @@ function positiveInteger(name: string, fallback: number): number {
 function resolveMode(): AgentMode {
   const raw = optional("AGENT_MODE") ?? "standalone";
   if (raw === "standalone" || raw === "managed") return raw;
-  throw new Error(
-    `AGENT_MODE must be "standalone" or "managed"; got "${raw}". Startup fails rather than ` +
-      `guessing: standalone listens on a socket only the local controller can reach, while ` +
-      `managed listens on the network, and defaulting the wrong way either hides the agent or ` +
-      `exposes it.`,
-  );
+  throw new Error(`AGENT_MODE must be "standalone" or "managed"; got "${raw}".`);
 }
 
 /**
@@ -109,12 +108,35 @@ export type ConfigOverrides = {
   pairingCode?: string | null;
 };
 
-function resolveControllerUrl(overrides: ConfigOverrides): string | null {
+/** Values that switch a flag on. Anything else, unset included, leaves it off. */
+function flag(name: string): boolean {
+  return ["1", "true", "yes", "on"].includes((optional(name) ?? "").toLowerCase());
+}
+
+/** Refuse an address the agent must not dial, and warn when it may but plain http is involved. */
+function checkedUrl(url: string, allowInsecureHttp: boolean): string {
+  const warning = checkControllerTransport(url, allowInsecureHttp);
+  if (warning) console.warn(`[agent] ${warning}`);
+  return url;
+}
+
+function resolveControllerUrl(
+  overrides: ConfigOverrides,
+  allowInsecureHttp: boolean,
+): string | null {
   if (overrides.controllerHost) {
-    return normalizeControllerUrl(overrides.controllerHost, overrides.controllerPort ?? null);
+    return checkedUrl(
+      normalizeControllerUrl(overrides.controllerHost, overrides.controllerPort ?? null),
+      allowInsecureHttp,
+    );
   }
   const fromEnv = optional("CONTROLLER_URL");
-  if (fromEnv) return normalizeControllerUrl(fromEnv, overrides.controllerPort ?? null);
+  if (fromEnv) {
+    return checkedUrl(
+      normalizeControllerUrl(fromEnv, overrides.controllerPort ?? null),
+      allowInsecureHttp,
+    );
+  }
   // A port with nothing to attach it to is a half-configured agent, and silently idling on it
   // would look identical to never having been configured at all.
   if (overrides.controllerPort != null) {
@@ -131,9 +153,11 @@ function resolvePairingCode(overrides: ConfigOverrides): string | null {
 export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
   const mode = resolveMode();
   const dataDir = resolve(optional("DATA_DIR") ?? "/data");
+  const allowInsecureHttp = flag("CONTROLLER_ALLOW_INSECURE_HTTP");
 
   return {
-    controllerUrl: resolveControllerUrl(overrides),
+    controllerUrl: resolveControllerUrl(overrides, allowInsecureHttp),
+    allowInsecureHttp,
     pairingCode: resolvePairingCode(overrides),
     mode,
     dataDir,
@@ -142,6 +166,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
     socketPath: optional("AGENT_SOCKET") ?? resolve(dataDir, "agent.sock"),
     caddyContainerName: optional("CADDY_CONTAINER_NAME") ?? "caddy-proxy-manager-caddy",
     caddyApiUrl: optional("CADDY_API_URL") ?? "http://caddy:2019",
+    caddyAdminListen: optional("CADDY_ADMIN_LISTEN"),
     composeProject: optional("COMPOSE_PROJECT_NAME"),
     composeHostDir: optional("COMPOSE_HOST_DIR"),
     composeExtraFile: optional("COMPOSE_EXTRA_FILE"),

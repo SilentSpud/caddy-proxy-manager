@@ -52,8 +52,16 @@ const freshConfig = await import(`../../src/lib/config${fresh()}`);
 vi.mock('../../src/lib/config', () => ({ ...freshConfig }));
 
 import { getAuth } from '../../src/lib/auth-server';
+import { DISABLED_AUTH_PATHS } from '../../src/lib/auth-disabled-paths';
 import { ensureAdminUser } from '../../src/lib/init-db';
 import { users } from '../../src/lib/db/schema';
+
+describe('the Better Auth instance', () => {
+  it('is built with the endpoints the app replaces turned off', async () => {
+    const auth = (await getAuth()) as any;
+    expect(auth.options.disabledPaths).toEqual(DISABLED_AUTH_PATHS);
+  });
+});
 
 describe('AUTH_DISABLE_LOCAL_USERS=true', () => {
   it('turns off better-auth email/password sign-in', async () => {

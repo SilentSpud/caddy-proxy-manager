@@ -27,7 +27,7 @@ vi.mock('../../src/lib/db', () => {
 });
 
 import { eq } from 'drizzle-orm';
-import { accounts, groupMembers, groups, users } from '../../src/lib/db/schema';
+import { accounts, groupIdpMappings, groupMembers, groups, users } from '../../src/lib/db/schema';
 import {
   applyOidcSync,
   clearPendingOidcSyncs,
@@ -175,7 +175,7 @@ describe('group membership', () => {
     expect(await groupNamesFor(userId)).toEqual(['Devs', 'Manual']);
   });
 
-  it('joins an existing operator-created group rather than duplicating it', async () => {
+  it('does not join an operator-created group on a bare name match', async () => {
     const userId = await createUser('dev@example.com', 'user');
     await ctx.db
       .insert(groups)
@@ -183,9 +183,32 @@ describe('group membership', () => {
 
     await applyOidcSync(userId, entry({ syncGroups: true, localGroups: ['devs'] }));
 
+    // Neither joined nor twinned: the UI group's grants were never tied to the IdP.
     const all = await ctx.db.select().from(groups);
     expect(all).toHaveLength(1);
     expect(all[0].source).toBe('ui');
+    expect(await groupNamesFor(userId)).toEqual([]);
+  });
+
+  it('joins an operator-created group that an explicit mapping names', async () => {
+    const userId = await createUser('dev@example.com', 'user');
+    const [manual] = await ctx.db
+      .insert(groups)
+      .values({ name: 'Devs', source: 'ui', createdAt: now, updatedAt: now })
+      .returning();
+    await ctx.db.insert(groupIdpMappings).values({
+      groupId: manual.id,
+      providerId: null,
+      externalName: 'engineering',
+      externalKey: 'engineering',
+      createdAt: now,
+    });
+
+    await applyOidcSync(
+      userId,
+      entry({ syncGroups: true, claimedGroups: ['engineering'], localGroups: [] }),
+    );
+
     expect(await groupNamesFor(userId)).toEqual(['Devs']);
   });
 

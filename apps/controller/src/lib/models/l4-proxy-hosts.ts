@@ -1,10 +1,13 @@
 import db, { nowIso, toIso } from "../db";
-import { splitHostPort } from "../caddy-utils";
+import { RESERVED_L4_PORTS, splitHostPort } from "../caddy-utils";
 import { applyCaddyConfig } from "../caddy";
+import { getMetricsSettings } from "../settings";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
+import { ApiValidationError } from "../api-errors";
+import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { setHostAgents } from "./host-agents";
 
 export type L4Protocol = "tcp" | "udp";
@@ -469,10 +472,14 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
     // splitHostPort rather than a trailing-colon match: `2001:db8::1` ends in `:1`, and reading
     // that as a port is how an IPv6 address silently becomes a listener on port 1. An IPv6 literal
     // has to be bracketed here, as it does everywhere else in this stack.
-    if (splitHostPort(input.listenAddress) === null) {
-      throw new Error(
+    const parsed = splitHostPort(input.listenAddress);
+    if (parsed === null) {
+      throw new ApiValidationError(
         "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535",
       );
+    }
+    if (RESERVED_L4_PORTS.has(parsed.port)) {
+      throw domainError("l4ListenPortReserved", { port: parsed.port });
     }
   }
 
@@ -481,7 +488,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
   }
 
   if (input.matcherType !== undefined && !VALID_MATCHER_TYPES.includes(input.matcherType)) {
-    throw new Error(`Matcher type must be one of: ${VALID_MATCHER_TYPES.join(", ")}`);
+    throw new ApiValidationError(`Matcher type must be one of: ${VALID_MATCHER_TYPES.join(", ")}`);
   }
 
   if (input.matcherType === "tls_sni" || input.matcherType === "http_host") {
@@ -505,7 +512,9 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
       // A bare IPv6 literal contains colons and would have passed a `includes(":")` check while
       // naming no port at all.
       if (splitHostPort(upstream) === null || splitHostPort(upstream)?.host === "") {
-        throw new Error(`Upstream '${upstream}' must be in 'host:port' or '[IPv6]:port' format`);
+        throw new ApiValidationError(
+          `Upstream '${upstream}' must be in 'host:port' or '[IPv6]:port' format`,
+        );
       }
     }
   }
@@ -601,8 +610,20 @@ export async function listL4ProxyHostsPaginated(
   return hosts.map(parseL4ProxyHost);
 }
 
+/** The metrics listener's port is configurable, so it is checked here rather than in the constant. */
+export async function assertNotMetricsPort(listenAddress: string | undefined): Promise<void> {
+  if (listenAddress === undefined) return;
+  const parsed = splitHostPort(listenAddress);
+  const metrics = await getMetricsSettings();
+  if (parsed && metrics?.enabled && (metrics.port ?? 9090) === parsed.port) {
+    throw domainError("l4ListenPortReserved", { port: parsed.port });
+  }
+}
+
 export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: number) {
   validateL4Input(input, true);
+  await assertNotMetricsPort(input.listenAddress);
+  await assertNoNewAdminDialTargets([], input.upstreams, actorUserId);
 
   const now = nowIso();
   const [record] = await db
@@ -695,6 +716,10 @@ export async function updateL4ProxyHost(
   }
 
   validateL4Input(input, false);
+  await assertNotMetricsPort(input.listenAddress);
+  // A layer-4 dial is a raw TCP pipe, so an upstream on the admin port publishes the whole admin
+  // API on this host's listen port - the same hole the HTTP host model closes.
+  await assertNoNewAdminDialTargets(existing.upstreams, input.upstreams ?? [], actorUserId);
 
   const now = nowIso();
   await db

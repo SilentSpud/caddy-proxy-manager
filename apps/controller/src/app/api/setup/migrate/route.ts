@@ -8,7 +8,12 @@ import {
 } from "@/src/lib/migration/legacy-secrets";
 import { parseMigrationSelection } from "@/src/lib/migration/selection";
 import { carryOverBlobSettings } from "@/src/lib/migration/settings-carryover";
-import { hasAnySignIn, isSetupCompleted, recordMigrationSource } from "@/src/lib/setup";
+import {
+  hasAnySignIn,
+  isSetupCompleted,
+  issueRestartToken,
+  recordMigrationSource,
+} from "@/src/lib/setup";
 
 /**
  * POST /api/setup/migrate - copy the chosen groups out of a legacy database.
@@ -25,7 +30,8 @@ import { hasAnySignIn, isSetupCompleted, recordMigrationSource } from "@/src/lib
  */
 
 export type MigrateResponse =
-  | { ok: true; next: string; migratedSignIn: boolean }
+  // `restartToken` lets this browser, and only this one, ask /api/setup/restart for the restart.
+  | { ok: true; next: string; migratedSignIn: boolean; restartToken: string }
   // `code` is what lets the browser tell "ask for the old SESSION_SECRET" apart from an error it
   // can only report. Everything else carries the message alone.
   | { ok: false; error: string; code?: "legacy-key-required" | "legacy-key-invalid" };
@@ -159,5 +165,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   // OAuth provider is a way in even without the old accounts, and a users group that turned out to
   // be empty is not one. A deployment that now has neither still needs its first administrator.
   const migratedSignIn = await hasAnySignIn();
-  return json({ ok: true, next: migratedSignIn ? "/login" : "/setup", migratedSignIn }, 200);
+  const restartToken = await issueRestartToken();
+  return json(
+    { ok: true, next: migratedSignIn ? "/login" : "/setup", migratedSignIn, restartToken },
+    200,
+  );
 }

@@ -16,8 +16,12 @@ import { config } from "@/src/lib/config";
 import { hashPassword } from "@/src/lib/password";
 import { getTranslations } from "next-intl/server";
 import { actionError, actionSuccess, type ActionState } from "@/src/lib/actions";
-
-const VALID_ROLES = new Set<User["role"]>(["admin", "user", "viewer"]);
+import {
+  assertAcceptablePassword,
+  assertNotSelf,
+  assertUserRole,
+  assertUserStatus,
+} from "@/src/lib/user-admin";
 
 async function createUserActionUntranslated(formData: FormData) {
   const session = await requireAdmin();
@@ -29,15 +33,13 @@ async function createUserActionUntranslated(formData: FormData) {
 
   const email = String(formData.get("email") ?? "").trim();
   const name = formData.get("name") ? String(formData.get("name")).trim() : null;
-  const requestedRole = String(formData.get("role") ?? "user");
-  const role = VALID_ROLES.has(requestedRole as User["role"])
-    ? (requestedRole as User["role"])
-    : "user";
+  const role = assertUserRole(String(formData.get("role") ?? "user"));
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
     throw domainError("emailAndPasswordRequired");
   }
+  assertAcceptablePassword(password);
 
   const passwordHash = await hashPassword(password);
 
@@ -61,13 +63,13 @@ async function createUserActionUntranslated(formData: FormData) {
   revalidatePath("/users");
 }
 
-async function updateUserRoleActionUntranslated(userId: number, role: User["role"]) {
+async function updateUserRoleActionUntranslated(userId: number, requestedRole: User["role"]) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
-  if (actorId === userId) {
-    throw domainError("cannotChangeOwnRole");
-  }
+  assertNotSelf(actorId, userId, "cannotChangeOwnRole");
+  // A server action is a public endpoint: the type annotation is not a check on what arrives.
+  const role = assertUserRole(requestedRole);
 
   await updateUserRole(userId, role);
 
@@ -82,13 +84,12 @@ async function updateUserRoleActionUntranslated(userId: number, role: User["role
   revalidatePath("/users");
 }
 
-async function updateUserStatusActionUntranslated(userId: number, status: string) {
+async function updateUserStatusActionUntranslated(userId: number, requestedStatus: string) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
-  if (actorId === userId) {
-    throw domainError("cannotChangeOwnStatus");
-  }
+  assertNotSelf(actorId, userId, "cannotChangeOwnStatus");
+  const status = assertUserStatus(requestedStatus);
 
   await updateUserStatus(userId, status);
 
@@ -127,9 +128,7 @@ async function deleteUserActionUntranslated(userId: number) {
   const session = await requireAdmin();
   const actorId = Number(session.user.id);
 
-  if (actorId === userId) {
-    throw domainError("cannotDeleteOwnAccount");
-  }
+  assertNotSelf(actorId, userId, "cannotDeleteOwnAccount");
 
   await deleteUser(userId);
 

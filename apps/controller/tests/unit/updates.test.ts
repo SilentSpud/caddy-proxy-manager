@@ -46,6 +46,7 @@ const {
   nextPageUrl,
   parseRepository,
   parseSemver,
+  tokenRealmUrl,
 } = await import('@/src/lib/updates');
 
 beforeEach(() => {
@@ -205,6 +206,46 @@ describe('following registry pagination', () => {
   it('stops when there is no next page', () => {
     expect(nextPageUrl(null, 'ghcr.io')).toBeNull();
     expect(nextPageUrl('</v2/x/tags/list>; rel="prev"', 'ghcr.io')).toBeNull();
+  });
+});
+
+describe('following the registry auth challenge', () => {
+  it('follows a realm on the registry itself, which is what ghcr.io sends', () => {
+    expect(tokenRealmUrl('https://ghcr.io/token', 'ghcr.io').toString()).toBe(
+      'https://ghcr.io/token',
+    );
+  });
+
+  it('follows the token service Docker Hub is known to use', () => {
+    expect(tokenRealmUrl('https://auth.docker.io/token', 'registry-1.docker.io').hostname).toBe(
+      'auth.docker.io',
+    );
+  });
+
+  it('refuses a realm on another host rather than fetching it', () => {
+    expect(() => tokenRealmUrl('https://169.254.169.254/latest/meta-data', 'ghcr.io')).toThrow(
+      /will not follow/,
+    );
+  });
+
+  it('does not lend one registry the token service of another', () => {
+    expect(() => tokenRealmUrl('https://auth.docker.io/token', 'ghcr.io')).toThrow(
+      /will not follow/,
+    );
+  });
+
+  it('refuses a realm that downgrades to http on the same host', () => {
+    expect(() => tokenRealmUrl('http://ghcr.io/token', 'ghcr.io')).toThrow(/will not follow/);
+  });
+
+  it('refuses a known token service on another port', () => {
+    expect(() => tokenRealmUrl('https://auth.docker.io:8443/token', 'docker.io')).toThrow(
+      /will not follow/,
+    );
+  });
+
+  it('refuses a realm that is not an absolute URL', () => {
+    expect(() => tokenRealmUrl('/token', 'ghcr.io')).toThrow(/not a URL/);
   });
 });
 

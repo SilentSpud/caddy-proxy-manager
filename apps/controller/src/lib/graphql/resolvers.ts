@@ -58,8 +58,9 @@ import {
   updateProxyHost,
 } from "../models/proxy-hosts";
 import { deleteUser, getUserById, listUsers, updateUserRole } from "../models/user";
-import { getSetting, setSetting } from "../settings";
-import { validateSettingsGroup } from "../settings-validation";
+import { ApiAuthError, NotFoundError } from "../api-auth";
+import { isSettingsGroup, readSettingsGroup, saveSettingsGroup } from "../settings-api";
+import { assertNotSelf, assertUserRole } from "../user-admin";
 import { type GraphQLContext, requireAdmin } from "./context";
 import { DateTimeScalar, JSONScalar } from "./scalars";
 
@@ -97,6 +98,9 @@ const L4_SCALAR_FIELDS = new Set([
   "createdAt",
   "updatedAt",
 ]);
+
+/** The page size `/api/v1/audit-log` allows, so neither API can be asked for the whole table. */
+const MAX_AUDIT_LOG_LIMIT = 200;
 
 /** Whatever the type does not name as a field, so nothing on the model is unreachable. */
 function remainder(row: Record<string, unknown>, promoted: Set<string>): Record<string, unknown> {
@@ -238,15 +242,21 @@ export const resolvers = {
       context: GraphQLContext,
     ) => {
       await requireAdmin(context);
+      const limit = Math.min(Math.max(args.limit ?? 100, 1), MAX_AUDIT_LOG_LIMIT);
+      const offset = Math.max(args.offset ?? 0, 0);
       const [items, total] = await Promise.all([
-        listAuditEvents(args.limit ?? 100, args.offset ?? 0, args.search),
+        listAuditEvents(limit, offset, args.search),
         countAuditEvents(args.search),
       ]);
       return { items, total };
     },
     settings: async (_: unknown, args: { group: string }, context: GraphQLContext) => {
       await requireAdmin(context);
-      return await getSetting(args.group);
+      // The REST route's groups and redaction, not a raw storage key: that read any row, secrets
+      // included.
+      const settings = await readSettingsGroup(args.group);
+      if (!settings) throw new NotFoundError("Unknown settings group");
+      return settings.value;
     },
     caddyModules: async (_: unknown, __: unknown, context: GraphQLContext) => {
       await requireAdmin(context);
@@ -347,17 +357,24 @@ export const resolvers = {
 
     updateUser: async (
       _: unknown,
-      args: { id: number; input: { role?: string } },
+      args: { id: number; input: { role?: unknown } },
       context: GraphQLContext,
     ) => {
-      await requireAdmin(context);
-      if (args.input.role) await updateUserRole(args.id, args.input.role as never);
+      const { userId } = await requireAdmin(context);
+      if (!(await getUserById(args.id))) throw new NotFoundError("User not found");
+      if (args.input.role !== undefined && args.input.role !== null) {
+        const role = assertUserRole(args.input.role);
+        assertNotSelf(userId, args.id, "cannotChangeOwnRole");
+        await updateUserRole(args.id, role);
+      }
       const row = await getUserById(args.id);
-      if (!row) throw new Error("User not found");
+      if (!row) throw new NotFoundError("User not found");
       return projectUser(row);
     },
     deleteUser: async (_: unknown, args: { id: number }, context: GraphQLContext) => {
-      await requireAdmin(context);
+      const { userId } = await requireAdmin(context);
+      assertNotSelf(userId, args.id, "cannotDeleteOwnAccount");
+      if (!(await getUserById(args.id))) throw new NotFoundError("User not found");
       await deleteUser(args.id);
       return true;
     },
@@ -368,6 +385,11 @@ export const resolvers = {
       context: GraphQLContext,
     ) => {
       const viewer = await context.viewer();
+      // As over REST: a stolen, possibly short-lived Bearer token must not mint a successor that
+      // outlives its own revocation or expiry.
+      if (viewer.authMethod !== "session") {
+        throw new ApiAuthError("API tokens can only be created from an authenticated session", 403);
+      }
       const created = await createApiToken(
         args.input.name,
         viewer.userId,
@@ -389,10 +411,12 @@ export const resolvers = {
       context: GraphQLContext,
     ) => {
       await requireAdmin(context);
-      // The same validator the REST route uses, so a value refused there is refused here.
-      const validated = validateSettingsGroup(args.group, args.input);
-      await setSetting(args.group, validated);
-      return validated;
+      if (!isSettingsGroup(args.group)) throw new NotFoundError("Unknown settings group");
+      // The REST route's implementation: the group's own saver (and its encryption), the Caddy
+      // apply and the rollback when Caddy refuses.
+      await saveSettingsGroup(args.group, args.input);
+      // What is now stored, redacted - never the credentials the caller just sent.
+      return (await readSettingsGroup(args.group))?.value ?? {};
     },
 
     applyCaddyConfig: async (_: unknown, __: unknown, context: GraphQLContext) => {

@@ -66,17 +66,29 @@ controller never dials the agent. Three consequences worth knowing before touchi
   and the agent diffs it against what it has applied, so a dropped stream costs only a reconnect.
   The one exception is a Caddy admin call, which the controller blocks on: it goes down the stream
   with a correlation id and comes back via `POST /api/agent/v1/command-results`.
-- **The bundled agent pairs itself.** The controller writes a single-use token to its data volume
-  at startup (`lib/agent/bootstrap.ts`), mode 0640; the agent mounts that volume read-only at
+- **The bundled agent pairs itself.** While no bundled agent is paired, the controller writes a
+  single-use token to its data volume at startup (`lib/agent/bootstrap.ts`), mode 0640, which
+  expires in 30 minutes and is deleted on redemption; the agent mounts that volume read-only at
   `CONTROLLER_DATA_DIR` and reads the token through the controller's group. An idle agent that
-  finds one pairs with it, so the default stack needs no code typed anywhere. A remote agent has
-  no such file and uses a six-letter
-  code. Both land in the same route and the same registry - only where the credential came from
-  differs.
+  finds one pairs with it, so the default stack needs no code typed anywhere. Unpairing the bundled
+  agent turns this off until an operator turns it back on. A remote agent has no such file and uses
+  a six-letter code. Both land in the same route and the same registry - only where the credential
+  came from differs. An agentId that is already paired is re-paired only with a credential minted
+  for that agent (the Re-pair action), never the shared code.
+- **An agent is less trusted than the controller.** Whatever one agent answers may only shape that
+  agent's own config: Caddyfile snippets are adapted by the agent the document is loaded onto
+  (`CaddyAdminRequest.agentId`), and the health monitor re-applies per agent. The unpinned "primary"
+  is for answers that stay on the controller.
 - **Caddy is behind a Compose profile and the agent starts it.** `docker compose up` deliberately
   does not. An unpaired agent leaves Caddy stopped, so a host nobody has finished installing does
   not answer on 80 and 443. Never add a `depends_on: caddy` - the agent is what starts it, so
   waiting on it deadlocks.
+- **Caddy's admin API binds on the internal `caddy-admin` network only.** The controller's `admin`
+  block binds every interface, and caddy-network is where users attach upstreams, so the agent
+  rewrites `admin.listen` to `CADDY_ADMIN_LISTEN` in every config it forwards
+  (`pinAdminListen`). A config that is not a JSON object is refused rather than sent unpinned. The
+  controller's direct transport, used with no agent attached, pins the same way from its own
+  `CADDY_ADMIN_LISTEN`.
 
 ## Comments
 
@@ -128,6 +140,10 @@ Two consequences to keep in mind when touching either:
   Interpolation happens per file before Compose decides what to act on, so a `:?` fails every
   invocation naming the project - including ones for unrelated services - on a deployment that
   keeps the value in the database instead of `.env`.
+- **The agent never reads `.env`.** It passes `--env-file /dev/null` and its own placeholders for the
+  two `:?` variables, so a variable the `caddy`, `clickhouse` or `geoipupdate` definitions
+  interpolate must also be forwarded under `agent.environment`, or the agent's compose sees its
+  default.
 
 ## User-facing text
 

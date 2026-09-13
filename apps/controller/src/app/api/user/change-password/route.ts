@@ -1,6 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { auth, checkSameOrigin } from "@/src/lib/auth";
+import {
+  auth,
+  checkSameOrigin,
+  FRESH_SESSION_MAX_AGE_MS,
+  getCurrentSessionInfo,
+  isFreshSession,
+} from "@/src/lib/auth";
 import { getUserById, updateUserPassword } from "@/src/lib/models/user";
+import { revokeSessionsAfterPasswordChange } from "@/src/lib/models/sessions";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
 import { config } from "@/src/lib/config";
@@ -62,6 +69,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const currentSession = await getCurrentSessionInfo(request);
+
     // If user has a password, verify current password
     if (user.passwordHash) {
       if (!currentPassword) {
@@ -73,6 +82,19 @@ export async function POST(request: NextRequest) {
         await registerFailedAttempt(rateLimitKey);
         return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
       }
+    } else if (!isFreshSession(currentSession)) {
+      // A first password is a new way in, and a password lets the IdP be unlinked afterwards - so a
+      // borrowed session must not be enough, as remove-password already insists. With no current
+      // password to ask for, a recent provider sign-in is the proof.
+      return NextResponse.json(
+        {
+          error: t("profile.reauthRequiredToSetPassword", {
+            minutes: FRESH_SESSION_MAX_AGE_MS / 60_000,
+          }),
+          code: "reauth-required",
+        },
+        { status: 403 },
+      );
     }
 
     // Password verified successfully - reset rate limit counter
@@ -83,6 +105,9 @@ export async function POST(request: NextRequest) {
 
     // Update password
     await updateUserPassword(userId, newPasswordHash);
+
+    // A changed password has to end whoever else was signed in with the old one.
+    await revokeSessionsAfterPasswordChange(userId, currentSession?.id ?? null);
 
     // Audit log
     await createAuditEvent({

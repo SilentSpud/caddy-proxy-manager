@@ -2,9 +2,35 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { auth } from "@/src/lib/auth";
+import { config as appConfig } from "@/src/lib/config";
 import { buildCsp } from "@/src/lib/csp";
 
 /** Next.js Proxy: defense-in-depth auth at the edge, before page components. Node runtime. */
+
+const PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), interest-cohort=()";
+
+/** The headers every response this proxy lets through carries, whatever branch it took. */
+function applySecurityHeaders(response: NextResponse, csp: string): NextResponse {
+  response.headers.set("Content-Security-Policy", csp);
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", PERMISSIONS_POLICY);
+  // Only over HTTPS: a browser pinned to a scheme this origin does not serve cannot be unpinned.
+  if (appConfig.baseUrl.toLowerCase().startsWith("https:")) {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000");
+  }
+  return response;
+}
+
+/** A page response with a per-request nonce CSP. vinext reads the nonce from the request's copy. */
+function nonceCspResponse(req: NextRequest): NextResponse {
+  const nonce = crypto.randomBytes(16).toString("base64");
+  const csp = buildCsp(nonce);
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("Content-Security-Policy", csp);
+  return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), csp);
+}
 
 export default async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
@@ -22,9 +48,15 @@ export default async function proxy(req: NextRequest) {
     pathname === "/api/setup/migrate" ||
     pathname === "/api/setup/restart";
 
-  /** The sparse header set a page nobody has signed in for still needs. */
-  const publicPageResponse = () => {
-    const response = NextResponse.next();
+  /** What a request nobody has signed in for gets: /login, /portal and setup pages, public APIs. */
+  const publicResponse = () => {
+    // Pages get the same nonce CSP as the dashboard; the sign-in forms are what an injected script
+    // would most want to read.
+    if (!pathname.startsWith("/api/")) return nonceCspResponse(req);
+
+    // Not HTML, so no script policy to enforce - only framing, which still applies to a response
+    // a browser renders (better-auth's error page, a JSON viewer).
+    const response = applySecurityHeaders(NextResponse.next(), "frame-ancestors 'none'");
     // Says so in the protocol, not only in the README. A client that never reads our docs still
     // sees this on every call, which is the only way a deprecation reaches an integration written
     // years ago by somebody who has moved on.
@@ -32,11 +64,6 @@ export default async function proxy(req: NextRequest) {
       response.headers.set("Deprecation", "true");
       response.headers.set("Link", '</api/graphql>; rel="successor-version"');
     }
-    // Anti-clickjacking for public pages (/login, /portal): the authenticated branch below sets the
-    // full header set, but public responses carried none, leaving those forms framable.
-    response.headers.set("X-Frame-Options", "DENY");
-    response.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
-    response.headers.set("X-Content-Type-Options", "nosniff");
     return response;
   };
 
@@ -67,7 +94,7 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith("/api/agent/") ||
     pathname.startsWith("/api/forward-auth/")
   ) {
-    return publicPageResponse();
+    return publicResponse();
   }
 
   // Check authentication for protected routes
@@ -103,32 +130,10 @@ export default async function proxy(req: NextRequest) {
   // Reached only once the setup gate above is satisfied, which is what lets an unconfigured
   // deployment redirect away from here instead of showing a form nothing can answer.
   if (pathname.startsWith("/login")) {
-    return publicPageResponse();
+    return publicResponse();
   }
 
-  // Generate per-request nonce for CSP
-  const nonce = crypto.randomBytes(16).toString("base64");
-  const csp = buildCsp(nonce);
-
-  // Set CSP as a request header so Next.js can read the nonce
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("Content-Security-Policy", csp);
-
-  const response = NextResponse.next({
-    request: { headers: requestHeaders },
-  });
-
-  // Also set CSP as a response header for browser enforcement
-  response.headers.set("Content-Security-Policy", csp);
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-  );
-
-  return response;
+  return nonceCspResponse(req);
 }
 
 export const config = {

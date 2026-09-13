@@ -7,8 +7,11 @@ import { describe, it, expect } from 'bun:test';
 import {
   pemToBase64Der,
   buildClientAuthentication,
+  buildMtlsRbacSubroutes,
   buildValidClientCertCelExpression,
   groupMtlsDomainsByCaSet,
+  isCertificateUnexpired,
+  resolveLegacyCaFingerprints,
 } from '../../src/lib/caddy-mtls';
 
 // ---------------------------------------------------------------------------
@@ -215,22 +218,86 @@ describe('buildClientAuthentication', () => {
     expect(result!.trusted_ca_certs).toEqual(['CA_A']);
   });
 
-  it('supports request mode for HTTP-layer scoped mTLS enforcement', () => {
+  // SECURITY-AUDIT H6: scoped hosts used "request" mode, which verifies nothing, so any self-signed
+  // cert passed the HTTP gate and an expired one was never rejected.
+  it('verifies the chain in verify_if_given mode and leaves leaf pinning to the HTTP gate', () => {
     const mTlsDomainMap = new Map([['app.example.com', [1]]]);
     const caCertMap = makeCaCertMap([1, 'CA_A']);
+    const issuedClientCertMap = new Map([[1, [makeCaPem('LEAF_1')]]]);
 
     const result = buildClientAuthentication(
       ['app.example.com'],
       mTlsDomainMap,
       caCertMap,
+      issuedClientCertMap,
+      new Set([1]),
+      undefined,
+      'verify_if_given',
+    );
+
+    // No trusted_leaf_certs: Caddy's leaf verifier would fail every cert-less handshake.
+    expect(result).toEqual({ mode: 'verify_if_given', trusted_ca_certs: ['CA_A'] });
+  });
+
+  it('still fails closed in verify_if_given mode when no CA is left to trust', () => {
+    const result = buildClientAuthentication(
+      ['app.example.com'],
+      new Map([['app.example.com', []]]),
+      new Map(),
       new Map(),
       new Set(),
       undefined,
-      'request',
+      'verify_if_given',
     );
+    expect(result).toBeNull();
+  });
+});
 
-    expect(result).not.toBeNull();
-    expect(result).toEqual({ mode: 'request' });
+describe('resolveLegacyCaFingerprints', () => {
+  const fps = new Map([
+    [1, new Set(['aa'])],
+    [2, new Set(['bb'])],
+  ]);
+
+  it('returns null (any verified cert) when no CA in the set has CPM-issued certs', () => {
+    expect(resolveLegacyCaFingerprints([3], fps, new Set([1, 2]))).toBeNull();
+  });
+
+  it('pins to the active certs once any CA in the set is managed', () => {
+    expect(resolveLegacyCaFingerprints([1, 3], fps, new Set([1]))).toEqual(new Set(['aa']));
+  });
+
+  it('returns an empty set, not null, when a managed CA has no active certs', () => {
+    expect(resolveLegacyCaFingerprints([4], fps, new Set([4]))).toEqual(new Set());
+  });
+});
+
+describe('isCertificateUnexpired', () => {
+  const now = Date.parse('2026-01-01T00:00:00.000Z');
+
+  it('accepts a future expiry and rejects a past one', () => {
+    expect(isCertificateUnexpired('2026-06-01T00:00:00.000Z', now)).toBe(true);
+    expect(isCertificateUnexpired('2025-06-01T00:00:00.000Z', now)).toBe(false);
+  });
+
+  it('treats an unparseable date as expired', () => {
+    expect(isCertificateUnexpired('not a date', now)).toBe(false);
+  });
+});
+
+describe('buildMtlsRbacSubroutes default gate', () => {
+  it('denies by default when given an empty fingerprint set instead of admitting any cert', () => {
+    const subroutes = buildMtlsRbacSubroutes(
+      [{ pathPattern: '/x', allowedRoleIds: [], allowedCertIds: [], denyAll: true }],
+      new Map(),
+      new Map(),
+      [],
+      { handler: 'reverse_proxy' },
+      true,
+      new Set(),
+    )!;
+    const defaultRoute = subroutes.at(-2) as { match: { expression: string }[] };
+    expect(defaultRoute.match[0].expression).toBe('{http.request.tls.client.fingerprint} in []');
   });
 });
 

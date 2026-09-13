@@ -7,6 +7,7 @@ import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } from "../settings";
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
+import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets";
 import { ApiValidationError } from "../api-errors";
 import {
   bodyLimitRangeMessage,
@@ -15,7 +16,7 @@ import {
 } from "../caddy-waf";
 import { normalizeNodeName, validateNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
-import { setHostAgents } from "./host-agents";
+import { agentIdsForHost, setHostAgents } from "./host-agents";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -43,9 +44,8 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
   }
 }
 
-// Security: only the protocol scheme is validated (http/https). Host/IP targets are not
-// restricted - admins intentionally need to proxy to internal services, and the Caddy admin
-// API (port 2019) is protected by origins checking, not network isolation.
+// Only the scheme is checked here: proxying to internal services is the point. Targets that reach
+// the Caddy admin API are refused to non-admins separately, in assertDialTargetsAllowed.
 function validateUpstreamProtocol(upstream: string): void {
   const trimmed = upstream.trim();
   if (!trimmed) return;
@@ -54,7 +54,7 @@ function validateUpstreamProtocol(upstream: string): void {
   if (schemeMatch) {
     const scheme = schemeMatch[1].toLowerCase();
     if (scheme !== "http" && scheme !== "https") {
-      throw new Error(
+      throw new ApiValidationError(
         `Invalid upstream protocol "${scheme}://". Only http:// and https:// are allowed`,
       );
     }
@@ -2715,12 +2715,56 @@ export async function listProxyHostsPaginated(
  * so the REST API is held to the same rule: the builder would skip an unadaptable snippet with a
  * warning, quietly dropping whatever it was written for.
  */
-async function assertCaddyfileAdapts(snippet: string | null | undefined): Promise<void> {
+async function assertCaddyfileAdapts(
+  snippet: string | null | undefined,
+  agentRowIds: readonly number[],
+): Promise<void> {
   if (!snippet?.trim()) return;
-  const error = await validateCaddyfileSnippet(snippet);
+  const error = await validateCaddyfileSnippet(snippet, agentRowIds);
   if (error) {
-    throw new Error(`Custom Caddyfile: ${error}`);
+    throw new ApiValidationError(`Custom Caddyfile: ${error}`);
   }
+}
+
+const RAW_CONFIG_FIELDS = [
+  "customReverseProxyJson",
+  "customPreHandlersJson",
+  "customCaddyfile",
+] as const;
+
+/**
+ * The raw-config fields are spliced into the Caddy document unchecked - a reverse_proxy to the admin
+ * API or a file_server rooted at / is one JSON object away - so only an admin may change them.
+ * Enforced here rather than per route so the dashboard, REST and GraphQL all meet it. Resubmitting
+ * the stored value is not a change: an operator can still save a host an admin gave a snippet.
+ */
+async function assertRawConfigChangeAllowed(
+  existing: Pick<ProxyHost, (typeof RAW_CONFIG_FIELDS)[number]> | null,
+  input: Partial<ProxyHostInput>,
+  actorUserId: number,
+): Promise<void> {
+  const changed = RAW_CONFIG_FIELDS.some(
+    (field) =>
+      input[field] !== undefined &&
+      normalizeMetaValue(input[field]) !== normalizeMetaValue(existing?.[field]),
+  );
+  if (!changed) return;
+  if (!(await isAdminActor(actorUserId))) {
+    throw domainError("rawCaddyConfigAdminOnly");
+  }
+}
+
+/** The raw-config guard's twin for ordinary upstreams and the Authentik outpost upstream. */
+async function assertDialTargetsAllowed(
+  existing: Pick<ProxyHost, "upstreams" | "authentik"> | null,
+  input: Partial<ProxyHostInput>,
+  actorUserId: number,
+): Promise<void> {
+  await assertNoNewAdminDialTargets(
+    [...(existing?.upstreams ?? []), existing?.authentik?.outpostUpstream ?? ""],
+    [...(input.upstreams ?? []), input.authentik?.outpostUpstream ?? ""],
+    actorUserId,
+  );
 }
 
 export async function createProxyHost(input: ProxyHostInput, actorUserId: number) {
@@ -2730,8 +2774,10 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     throw domainError("upstreamsRequired");
   }
   input.upstreams.forEach(validateUpstreamProtocol);
+  await assertRawConfigChangeAllowed(null, input, actorUserId);
+  await assertDialTargetsAllowed(null, input, actorUserId);
   await assertWildcardIssuable(domains, input.certificateId ?? null);
-  await assertCaddyfileAdapts(input.customCaddyfile);
+  await assertCaddyfileAdapts(input.customCaddyfile, input.agentIds ?? []);
 
   const now = nowIso();
   const meta = buildMeta({}, input);
@@ -2796,6 +2842,8 @@ export async function updateProxyHost(
   if (!existing) {
     throw domainError("proxyHostNotFound");
   }
+  await assertRawConfigChangeAllowed(existing, input, actorUserId);
+  await assertDialTargetsAllowed(existing, input, actorUserId);
 
   const domainList = input.domains ? normalizeProxyHostDomains(input.domains) : existing.domains;
   const domains = JSON.stringify(domainList);
@@ -2806,7 +2854,10 @@ export async function updateProxyHost(
     input.certificateId !== undefined ? input.certificateId : existing.certificateId;
   await assertWildcardIssuable(domainList, effectiveCertificateId);
   if (input.customCaddyfile !== undefined) {
-    await assertCaddyfileAdapts(input.customCaddyfile);
+    await assertCaddyfileAdapts(
+      input.customCaddyfile,
+      input.agentIds ?? (await agentIdsForHost("http", id)),
+    );
   }
   const upstreams = input.upstreams
     ? JSON.stringify(Array.from(new Set(input.upstreams)))

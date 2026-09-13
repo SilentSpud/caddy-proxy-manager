@@ -89,6 +89,8 @@ type Props = {
   /** False for an operator: a grant names a host that already exists, so creating one is an
    * admin's job. The dialogs and the duplicate action go with the button. */
   canCreate?: boolean;
+  /** The custom Caddyfile and raw JSON editors. Admin-only, enforced by the proxy host model. */
+  canEditRawConfig?: boolean;
 };
 
 /** The feature badges as data. `variant` marks the two meaning "traffic is being restricted". */
@@ -229,6 +231,7 @@ export default function ProxyHostsClient({
   trafficAvailable,
   activeState,
   canCreate = true,
+  canEditRawConfig = false,
 }: Props) {
   const t = useTranslations("proxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
@@ -597,6 +600,7 @@ export default function ProxyHostsClient({
           forwardAuthAccess={forwardAuthAccessMap?.[editHost.id] ?? null}
           agents={agents ?? []}
           assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
+          canEditRawConfig={canEditRawConfig}
         />
       )}
 

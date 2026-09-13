@@ -174,6 +174,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
       hostTraffic={hostTraffic}
       trafficAvailable={traffic.available}
       canCreate={canCreate(access)}
+      canEditRawConfig={access.isAdmin}
     />
   );
 }

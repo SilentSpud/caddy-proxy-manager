@@ -18,7 +18,11 @@ import {
 import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 import { bindSessionToIdpSession, recordSessionBindingFromIdToken } from "./services/oidc-logout";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { hashPassword, verifyPassword } from "./password";
+import { MIN_PASSWORD_LENGTH } from "./password-policy";
+import { SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./auth-signup-policy";
+import { DISABLED_AUTH_PATHS } from "./auth-disabled-paths";
 
 // biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
 let cachedAuth: any = null;
@@ -222,6 +226,11 @@ async function createAuth(): Promise<any> {
       database: {
         generateId: "serial",
       },
+      // The /api/auth route sets this from lib/client-ip.ts, replacing any client-sent copy. Left on
+      // X-Forwarded-For, a spoofed or multi-hop value put every sign-in into one shared bucket.
+      ipAddress: {
+        ipAddressHeaders: ["x-cpm-client-ip"],
+      },
     } as Record<string, unknown>,
     rateLimit: {
       enabled: process.env.AUTH_RATE_LIMIT_ENABLED !== "false",
@@ -263,6 +272,7 @@ async function createAuth(): Promise<any> {
       // OIDC-only mode turns credential sign-in off entirely - there are no local accounts.
       enabled: !config.auth.disableLocalUsers,
       disableSignUp: !config.auth.allowSelfRegistration,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
       password: {
         async hash(password: string) {
           return hashPassword(password);
@@ -271,6 +281,15 @@ async function createAuth(): Promise<any> {
           return verifyPassword(password, hash);
         },
       },
+    },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        // Checked first so every other auth request skips loading the translator.
+        if (ctx.path !== SIGN_UP_EMAIL_PATH) return;
+        const { getTranslations } = await import("next-intl/server");
+        const message = signUpPasswordError(ctx.path, ctx.body, await getTranslations());
+        if (message) throw new APIError("BAD_REQUEST", { message });
+      }),
     },
     databaseHooks: {
       user: {
@@ -389,6 +408,7 @@ async function createAuth(): Promise<any> {
         },
       },
     },
+    disabledPaths: DISABLED_AUTH_PATHS,
     plugins: [
       // Cast via unknown: better-auth's `username` plugin types `email: string` where
       // BetterAuthPlugin expects `email?: any`, and the mismatch is environment-dependent.

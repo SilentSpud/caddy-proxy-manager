@@ -20,7 +20,11 @@ services:
       # Required, and unique per instance. Generate with: openssl rand -base64 32
       SESSION_SECRET: ${SESSION_SECRET:?ERROR - SESSION_SECRET is required}
 
-      CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
+      # Only used with no agent. Caddy's name on the internal caddy-admin network; see caddy below.
+      CADDY_API_URL: ${CADDY_API_URL:-http://caddy-admin:2019}
+      # Pinned as admin.listen into a config loaded with no agent in between, as the agent pins every
+      # config it forwards. Must match caddy's CADDY_ADMIN_LISTEN.
+      CADDY_ADMIN_LISTEN: caddy-admin:2019
 
       # Where generated certificates are written. Defaults to <workdir>/data/certs.
       CERTS_DIRECTORY: ${CERTS_DIRECTORY:-}
@@ -168,7 +172,11 @@ services:
         condition: service_healthy
         required: false
     networks:
+      # So Caddy can reach the dashboard and forward auth, and for egress.
       - caddy-network
+      - caddy-admin
+      - database
+      - analytics
     healthcheck:
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 30s
@@ -197,12 +205,14 @@ services:
       - "80:80/udp"
       - "443:443"
       - "443:443/udp"
-      # Admin API. Internal-only by default; publish it at your own risk.
-      # - "2019:2019"
+      # No 2019: the admin API binds only on the internal caddy-admin network, which cannot publish.
       # Metrics for Prometheus/Grafana, once enabled in Settings.
       # - "9090:9090"
     environment:
       DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-caddyproxymanager.com}
+      # What the Caddyfile binds the admin API to until the first config arrives: a name only the
+      # caddy-admin network resolves. The agent's CADDY_ADMIN_LISTEN and the healthcheck match it.
+      CADDY_ADMIN_LISTEN: caddy-admin:2019
     volumes:
       - caddy-data:/data
       - caddy-config:/config
@@ -224,35 +234,55 @@ services:
           subpath: geoip
       - acme-ca:/acme-ca:ro
     networks:
-      - caddy-network
+      # Where users attach the containers Caddy proxies to.
+      caddy-network: {}
+      # The admin API's only bind. The alias exists on this network alone, so the name resolves to
+      # this address and an upstream on caddy-network cannot reach the API.
+      caddy-admin:
+        aliases:
+          - caddy-admin
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:2019/config/"]
+      # The bound name: the admin API does not listen on loopback.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://caddy-admin:2019/config/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
 
-  # Restricts the Docker API surface reachable by the agent.
+  # Narrows the Docker API the agent can call; not a security boundary. It matches URL prefixes and
+  # never sees a body, so the container create that recreates Caddy could as well ask for a
+  # privileged container with / bind-mounted: whatever drives the agent is root on this host. The
+  # real controls are the agent validating what it is told and staying minimal. See SECURITY.md.
   docker-socket-proxy:
     container_name: caddy-proxy-manager-docker-proxy
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     restart: unless-stopped
     environment:
+      # Each grant is used by the agent's compose calls. Containers: create, start, stop and inspect
+      # caddy, clickhouse and geoipupdate. Networks: compose inspects them on every up. Volumes and
+      # images: a managed service's first start creates its volume and pulls its image.
       CONTAINERS: 1
       POST: 1
       NETWORKS: 1
       VOLUMES: 1
       IMAGES: 1
       SECRETS: 0
-      # Allows recompiling Caddy when the module selection changes. Set 0 to disable the
-      # "Rebuild Caddy" button; everything else keeps working.
-      BUILD: 1
-      # Deny everything else by default
+      # Recompiling Caddy: BuildKit's gRPC API and the session that streams the build context, both
+      # piped to the socket unfiltered once matched (see the mounted config). Set both 0 to disable
+      # the "Rebuild Caddy" button; everything else keeps working.
+      GRPC: 1
+      SESSION: 1
+      # On in the image's defaults; nothing the agent runs reads the event stream.
+      EVENTS: 0
+      # Deny everything else by default. BUILD is the legacy builder, which cannot build Caddy's image.
+      BUILD: 0
       EXEC: 0
       SWARM: 0
       AUTH: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Upstream's config plus a TCP route for GRPC and SESSION, which its HTTP mode cannot pass.
+      - ./docker/socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
     networks:
       - socket-proxy
 
@@ -281,9 +311,15 @@ services:
       # in this stack; an agent on another host needs the controller's reachable address instead,
       # and pairs with `cpm-agent --pair --host <that address> --code <code>`.
       CONTROLLER_URL: ${CONTROLLER_URL:-http://web:3000}
+      # Plain http to a controller address that is not private (loopback, a compose name, RFC 1918,
+      # a tailnet) is refused, because pairing sends the shared secret over it. true accepts that.
+      CONTROLLER_ALLOW_INSECURE_HTTP: ${CONTROLLER_ALLOW_INSECURE_HTTP:-false}
       # Every Caddy admin call the controller makes is proxied through the agent, because the
       # agent is the only thing that knows where its Caddy is. This is that address.
-      CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}
+      CADDY_API_URL: ${CADDY_API_URL:-http://caddy-admin:2019}
+      # Pinned as admin.listen into every config the agent forwards, since the controller's own admin
+      # block binds every interface, caddy-network included. Must match caddy's CADDY_ADMIN_LISTEN.
+      CADDY_ADMIN_LISTEN: caddy-admin:2019
       # Analytics: the agent parses this host's Caddy logs and writes the events itself, using
       # credentials the controller pushes. Nothing to configure here - the controller decides
       # whether analytics are on at all.
@@ -293,6 +329,18 @@ services:
       # Generous: the first start of either pulls its image.
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
+      # What the services the agent runs interpolate. It never reads .env, which holds
+      # SESSION_SECRET and POSTGRES_PASSWORD, so these are forwarded from it here instead. A variable
+      # an override file interpolates into caddy, clickhouse or geoipupdate belongs here too.
+      PUID: ${PUID:-}
+      PGID: ${PGID:-}
+      DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      GEOIPUPDATE_ACCOUNT_ID: ${GEOIPUPDATE_ACCOUNT_ID:-}
+      GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY:-}
+      HOSTNAME: ${HOSTNAME:-}
     # The agent runs as its own user, so it reaches other containers' files through their groups.
     group_add:
       # Caddy's, to read its logs and truncate the WAF audit log. Must match caddy's PGID.
@@ -303,6 +351,9 @@ services:
       # Its database, socket and compose overrides, and the GeoIP databases Caddy mounts from here.
       - agent-data:/data
       - caddy-manager-data:/controller-data:ro
+      # The directory, because a single-file mount of an override that does not exist would create a
+      # directory on the host. .env stays unread (--env-file /dev/null; keep it 0600), but anything
+      # else here that other users can read - an override file, .git - the agent can read.
       - .:/compose:ro
       # Caddy's access and WAF logs, which this container is the one that reads.
       - caddy-logs:/logs
@@ -312,9 +363,12 @@ services:
       docker-socket-proxy:
         condition: service_started
     networks:
-      # socket-proxy for the Docker API, caddy-network to reach the Caddy admin API it proxies for.
-      # The agent already controls that container through Docker, so this grants it nothing new.
       - socket-proxy
+      # Caddy's admin API, which it proxies for, and the controller.
+      - caddy-admin
+      # ClickHouse, which it writes this host's analytics into.
+      - analytics
+      # Egress, for a controller on another host.
       - caddy-network
 
   # The controller's database. No profile: unlike clickhouse and geoipupdate this is not optional,
@@ -322,7 +376,7 @@ services:
   # needs it, and publishing 5432 is how a database ends up on the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
@@ -336,7 +390,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql
     networks:
-      - caddy-network
+      - database
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cpm} -d ${POSTGRES_DB:-cpm}"]
       interval: 10s
@@ -349,7 +403,7 @@ services:
   # in COMPOSE_PROFILES is only needed on a deployment with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
-    image: clickhouse/clickhouse-server:latest-alpine
+    image: clickhouse/clickhouse-server:26.8.2.7-alpine@sha256:8f1dd1ec7213410276c8e9aee11b25b458fe9d53eee13ad8cfdf7c79e36aad17
     profiles: [clickhouse]
     restart: always
     environment:
@@ -362,14 +416,18 @@ services:
       # An empty value still cannot start ClickHouse; the controller refuses to enable analytics
       # without one, which is where that check now lives.
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      # No CREATE USER, GRANT or ROLE: the controller needs only table DDL, and every paired agent is
+      # handed this same account.
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 0
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./docker/clickhouse/low-disk-write.yml:/etc/clickhouse-server/config.d/low-disk-write.yml:ro
     networks:
-      - caddy-network
+      - analytics
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --user ${CLICKHOUSE_USER:-cpm} --password ${CLICKHOUSE_PASSWORD:-} --query 'SELECT 1'"]
+      # Expanded by the container's shell, so the password stays out of the healthcheck command
+      # `docker inspect` prints.
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -382,7 +440,7 @@ services:
   # Optional, and started the same way: Settings → GeoIP, or the profile without an agent.
   geoipupdate:
     container_name: geoipupdate-${HOSTNAME}
-    image: ghcr.io/maxmind/geoipupdate
+    image: ghcr.io/maxmind/geoipupdate:v8.0.0@sha256:51e70dd6f16cd3e4d845ac02d09940b10772a75b9d741427d235a78570923c1d
     profiles: [geoipupdate]
     restart: always
     environment:
@@ -392,8 +450,9 @@ services:
       - GEOIPUPDATE_FREQUENCY=72
     volumes:
       - geoip-data:/usr/share/GeoIP:z
+    # It talks to MaxMind and nothing in the stack, so only the default network, for egress.
     networks:
-      - caddy-network
+      - default
 
 networks:
   caddy-network:
@@ -401,6 +460,19 @@ networks:
     # Dual-stack. Without this Docker gives the network IPv4 only, and a proxy host with an IPv6
     # upstream has no route to it however the containers themselves are configured.
     enable_ipv6: true
+  # Caddy's admin API, web and the agent. Internal, like the two after it: nothing on them needs
+  # egress, and a container on caddy-network cannot reach them.
+  caddy-admin:
+    driver: bridge
+    internal: true
+  # PostgreSQL and web.
+  database:
+    driver: bridge
+    internal: true
+  # ClickHouse, web that reads it, and the agent that writes it.
+  analytics:
+    driver: bridge
+    internal: true
   # The agent's route to the Docker API; internal, with no external connectivity.
   socket-proxy:
     driver: bridge

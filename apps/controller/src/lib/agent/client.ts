@@ -180,15 +180,20 @@ function describe(error: unknown): string {
 }
 
 /**
- * A read against the primary agent's Caddy.
+ * A request against one agent's Caddy: `agentId`'s, or the primary's when none is named.
  *
- * Reads go to one agent because every Caddy in the fleet carries the identical document, so a
- * second answer would only be the same answer again.
+ * The primary is only for answers that stay on the controller - a validation message, a preview.
+ * Agents are less trusted than the controller, so anything feeding a config loaded onto an agent
+ * names that agent: the primary is whichever attached first, and its answer is its own to give.
  */
 export async function caddyAdminViaAgent(
   request: CaddyAdminProxyRequest,
+  agentId?: string,
 ): Promise<CaddyAdminProxyResponse> {
-  const agent = primary();
+  const agent =
+    agentId === undefined
+      ? primary()
+      : (connectedAgents().find((candidate) => candidate.agentId === agentId) ?? null);
   if (!agent) throw noAgentError();
   try {
     return await dispatchCaddyAdmin(agent.agentId, request);

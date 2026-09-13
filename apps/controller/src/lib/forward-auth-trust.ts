@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "./config";
+import { derivePurposeKey } from "./derived-key";
 
 /**
  * Internal proof header injected by generated Caddy routes before they proxy a
@@ -9,7 +10,9 @@ import { config } from "./config";
  */
 export const FORWARD_AUTH_PROXY_PROOF_HEADER = "X-CPM-Forward-Auth-Proof";
 
-const PROOF_CONTEXT = "cpm-forward-auth-proxy-proof:v1";
+// v1 was an HMAC under the raw session secret, which the public /api/health probe also signed with.
+const PROOF_CONTEXT = "cpm-forward-auth-proxy-proof:v2";
+const LEGACY_PROOF_CONTEXT = "cpm-forward-auth-proxy-proof:v1";
 
 /**
  * Derive a purpose-specific key instead of placing SESSION_SECRET itself in the
@@ -17,16 +20,38 @@ const PROOF_CONTEXT = "cpm-forward-auth-proxy-proof:v1";
  * are already trusted with the forward-auth control plane.
  */
 export function getForwardAuthProxyProof(): string {
-  return createHmac("sha256", config.sessionSecret).update(PROOF_CONTEXT).digest("hex");
+  return createHmac("sha256", derivePurposeKey("forward-auth-proxy-proof:v2"))
+    .update(PROOF_CONTEXT)
+    .digest("hex");
 }
+
+function hexEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a, "hex");
+  const right = Buffer.from(b, "hex");
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+let warnedLegacyProof = false;
 
 function hasValidProxyProof(headers: Headers): boolean {
   const supplied = headers.get(FORWARD_AUTH_PROXY_PROOF_HEADER);
   if (!supplied || !/^[a-f0-9]{64}$/.test(supplied)) return false;
+  if (hexEqual(supplied, getForwardAuthProxyProof())) return true;
 
-  const expected = Buffer.from(getForwardAuthProxyProof(), "hex");
-  const actual = Buffer.from(supplied, "hex");
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
+  // Never accepted, since it may have been harvested through the old probe - but a Caddy still
+  // serving a pre-upgrade config would otherwise fail every forward-auth request without a trace.
+  if (!warnedLegacyProof) {
+    const legacy = createHmac("sha256", config.sessionSecret)
+      .update(LEGACY_PROOF_CONTEXT)
+      .digest("hex");
+    if (hexEqual(supplied, legacy)) {
+      warnedLegacyProof = true;
+      console.warn(
+        "[forward-auth] Caddy sent a proxy proof from an older release; forward auth fails until the Caddy configuration is re-applied.",
+      );
+    }
+  }
+  return false;
 }
 
 /**

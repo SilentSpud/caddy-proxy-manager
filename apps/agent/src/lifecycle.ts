@@ -25,15 +25,23 @@ import {
   type AgentLocalState,
   type AgentServerEvent,
   MAX_CADDY_CONFIG_BYTES,
+  SHIPPED_CADDY_MODULES,
 } from "@cpm/shared";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { applyFleetConfig } from "./analytics/runner";
-import { CaddyAdminUnreachable, forwardToCaddy, isAllowedAdminPath } from "./caddy-admin";
+import {
+  CaddyAdminUnreachable,
+  forwardToCaddy,
+  isAllowedAdminPath,
+  loadsConfig,
+  pinAdminListen,
+} from "./caddy-admin";
 import type { AgentConfig } from "./config";
 import { ControllerClient, ControllerRejected } from "./controller-client";
 import {
   ControllerAddressError,
+  checkControllerTransport,
   normalizeControllerUrl,
   normalizePairingCode,
 } from "./controller-url";
@@ -91,6 +99,17 @@ export class AgentLifecycle {
     const [storedController] = this.deps.store.listControllers();
 
     if (storedUrl && storedController) {
+      // Checked on resume too: a pairing stored before plain http to a public address was refused
+      // must not keep carrying credentials over it. The pairing is kept, so opting in and
+      // restarting resumes it.
+      try {
+        const warning = checkControllerTransport(storedUrl, this.deps.config.allowInsecureHttp);
+        if (warning) console.warn(`[agent] ${warning}`);
+      } catch (error) {
+        if (!(error instanceof ControllerAddressError)) throw error;
+        await this.goIdle(error.message);
+        return;
+      }
       this.adopt(storedUrl, storedController.controllerId, storedController.secret);
       console.log(`[agent] resuming pairing with ${storedUrl}`);
       void this.run();
@@ -202,6 +221,8 @@ export class AgentLifecycle {
     try {
       url = normalizeControllerUrl(host, port);
       normalizedCode = normalizePairingCode(code);
+      const warning = checkControllerTransport(url, this.deps.config.allowInsecureHttp);
+      if (warning) console.warn(`[agent] ${warning}`);
     } catch (error) {
       if (error instanceof ControllerAddressError) return { ok: false, error: error.message };
       throw error;
@@ -387,10 +408,10 @@ export class AgentLifecycle {
         operations.applyL4Ports(state.l4Ports);
       }
 
-      const appliedModules = store.appliedCaddyModules();
-      // Null means "never rebuilt", which the controller reads as the shipped image's catalog -
-      // not an empty list. Rebuilding on that would recompile Caddy on every fresh install.
-      if (appliedModules !== null && !sameList(state.caddyModules, appliedModules)) {
+      // Null means "never rebuilt", so the running binary is the shipped image. Skipping the diff
+      // there instead made the first rebuild on a fresh install impossible.
+      const appliedModules = store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
+      if (!sameList(state.caddyModules, appliedModules)) {
         operations.applyCaddyBuild(state.caddyModules);
       }
 
@@ -453,8 +474,23 @@ export class AgentLifecycle {
       return { id: command.id, ok: false, code: "BAD_REQUEST", error: "The config is too large." };
     }
 
+    let request = command.request;
+    const listen = this.deps.config.caddyAdminListen;
+    if (listen && request.body && loadsConfig(request)) {
+      const body = pinAdminListen(request.body, listen);
+      if (body === null) {
+        return {
+          id: command.id,
+          ok: false,
+          code: "BAD_REQUEST",
+          error: "A config for Caddy must be a JSON object.",
+        };
+      }
+      request = { ...request, body };
+    }
+
     try {
-      const response = await forwardToCaddy(this.deps.config.caddyApiUrl, command.request);
+      const response = await forwardToCaddy(this.deps.config.caddyApiUrl, request);
       return { id: command.id, ok: true, response };
     } catch (error) {
       const code = error instanceof CaddyAdminUnreachable ? "BUSY" : "INTERNAL";

@@ -1,4 +1,14 @@
-import { getMigrationSource, isSetupCompleted } from "@/src/lib/setup";
+import type { NextRequest } from "next/server";
+import { getTranslations } from "next-intl/server";
+import { auth, checkSameOrigin } from "@/src/lib/auth";
+import { scheduleProcessRestart } from "@/src/lib/process-restart";
+import {
+  claimRestartSlot,
+  consumeRestartToken,
+  getMigrationSource,
+  hasAnySignIn,
+  isSetupCompleted,
+} from "@/src/lib/setup";
 
 /**
  * POST /api/setup/restart - stop the process so the supervisor starts it again.
@@ -17,17 +27,13 @@ import { getMigrationSource, isSetupCompleted } from "@/src/lib/setup";
  * rather than leaving the operator on a page that never loads.
  */
 
-/**
- * Long enough for the response to reach the browser, short enough that the operator is not left
- * watching a modal that has not started doing anything.
- */
-const EXIT_DELAY_MS = 750;
+/** Sent by the migration screen; the value is the single-use token the migrate response issued. */
+const RESTART_TOKEN_HEADER = "x-cpm-restart-token";
 
-export async function POST(): Promise<Response> {
-  // The window is "a migration has run and setup is not finished", which is exactly the moment the
-  // restart is for. It is deliberately not narrower: an instance in this state is unauthenticated
-  // by design - anyone who can reach it can complete its setup and own it outright - so being able
-  // to restart it as well is not a door this opens.
+export async function POST(request: NextRequest): Promise<Response> {
+  const originCheck = checkSameOrigin(request);
+  if (originCheck) return originCheck;
+
   if (await isSetupCompleted()) {
     return Response.json(
       { ok: false, error: "Setup has already been completed." },
@@ -41,12 +47,37 @@ export async function POST(): Promise<Response> {
     );
   }
 
-  // Scheduled rather than immediate: an exit inside the handler closes the socket before the reply
-  // is written, and a browser cannot tell that apart from the app having crashed.
-  setTimeout(() => {
-    console.log("Restarting after a migration, so the app runs from the database it imported");
-    process.exit(0);
-  }, EXIT_DELAY_MS);
+  // Before anything can sign in, the instance is unauthenticated by design - whoever reaches it can
+  // finish setup and own it. An import that brought accounts or an enabled provider ends that, and
+  // with it an open door to stopping the process: only the browser that ran the import, holding
+  // its token, or an administrator may ask.
+  if (await hasAnySignIn()) {
+    const permitted =
+      (await consumeRestartToken(request.headers.get(RESTART_TOKEN_HEADER))) ||
+      (await auth(request))?.user.role === "admin";
+    if (!permitted) {
+      return Response.json(
+        { ok: false, error: (await getTranslations("setup"))("restartNotPermitted") },
+        { status: 401 },
+      );
+    }
+  }
+
+  // Even a permitted caller gets one restart a minute, so nothing can hold the process in a loop.
+  const slot = await claimRestartSlot();
+  if (!slot.ok) {
+    return Response.json(
+      { ok: false, error: (await getTranslations("setup"))("restartTooSoon") },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(slot.retryAfterMs / 1000)) },
+      },
+    );
+  }
+
+  scheduleProcessRestart(
+    "Restarting after a migration, so the app runs from the database it imported",
+  );
 
   return Response.json({ ok: true }, { status: 202, headers: { "Cache-Control": "no-store" } });
 }

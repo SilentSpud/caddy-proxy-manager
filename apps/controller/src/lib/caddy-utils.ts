@@ -164,6 +164,26 @@ export function splitHostPort(value: string): HostPort | null {
   return { host: raw.host, port };
 }
 
+/**
+ * Ports an L4 host may not listen on. The agent publishes an L4 listen port on the Caddy container,
+ * so 2019 would put the admin API on the host; 80/443 belong to the HTTP server, 9090 is the
+ * default metrics listener and 3000 is the controller's own published port.
+ */
+export const RESERVED_L4_PORTS: ReadonlySet<number> = new Set([80, 443, 2019, 3000, 9090]);
+
+/**
+ * Whether a stored L4 listen address is on a reserved port, or on the enabled metrics port. The
+ * port publisher and the document builder both skip such a row, so neither acts on it alone.
+ */
+export function isReservedL4ListenAddress(
+  listenAddress: string,
+  metricsPort: number | null,
+): boolean {
+  const parsed = splitHostPort(listenAddress);
+  if (!parsed) return false;
+  return RESERVED_L4_PORTS.has(parsed.port) || parsed.port === metricsPort;
+}
+
 /** Join a host and port, bracketing an IPv6 literal. The inverse of splitHostPort. */
 export function formatHostPort(host: string, port: number): string {
   return host.length === 0 ? `:${port}` : formatDialAddress(host, String(port));

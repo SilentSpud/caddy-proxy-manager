@@ -170,6 +170,40 @@ export function nextPageUrl(header: string | null, host: string): string | null 
   return next.toString();
 }
 
+/** Token services a registry is known to send its auth challenge to, besides itself. */
+const TOKEN_SERVICE_HOSTS: Record<string, readonly string[]> = {
+  "docker.io": ["auth.docker.io"],
+  "index.docker.io": ["auth.docker.io"],
+  "registry-1.docker.io": ["auth.docker.io"],
+  "registry.gitlab.com": ["gitlab.com"],
+};
+
+/**
+ * The token endpoint a `WWW-Authenticate` realm names, refused unless it is one to follow.
+ *
+ * The same hazard as `nextPageUrl`: the realm is a URL the registry picks and this server fetches.
+ * So it has to be https, on the registry's own origin or a token service that registry is known to
+ * use - otherwise a registry could point the check at anything this host can reach.
+ */
+export function tokenRealmUrl(realm: string, host: string): URL {
+  let url: URL;
+  try {
+    url = new URL(realm);
+  } catch {
+    throw new Error("The registry sent an auth realm that is not a URL");
+  }
+
+  const registry = new URL(`https://${host}/`);
+  const knownService =
+    url.port === "" && (TOKEN_SERVICE_HOSTS[registry.hostname] ?? []).includes(url.hostname);
+  if (url.protocol !== "https:" || (url.host !== registry.host && !knownService)) {
+    throw new Error(
+      `The registry sent its auth challenge to ${url.origin}, not ${registry.origin} - this check will not follow that`,
+    );
+  }
+  return url;
+}
+
 /** The realm/service/scope out of a `WWW-Authenticate: Bearer ...` challenge. */
 function parseChallenge(header: string): Record<string, string> | null {
   if (!/^bearer /i.test(header)) return null;
@@ -203,13 +237,15 @@ async function listTags(host: string, repository: string, signal: AbortSignal): 
       if (!challenge)
         throw new Error("The registry asked for credentials this check cannot supply");
 
-      const tokenUrl = new URL(challenge.realm);
+      const tokenUrl = tokenRealmUrl(challenge.realm, host);
       if (challenge.service) tokenUrl.searchParams.set("service", challenge.service);
       tokenUrl.searchParams.set("scope", challenge.scope ?? `repository:${repository}:pull`);
 
       const tokenResponse = await fetch(tokenUrl, {
         headers: { accept: "application/json" },
         signal,
+        // A redirect would carry the request past the check above.
+        redirect: "error",
       });
       if (!tokenResponse.ok)
         throw new Error(`The registry refused an anonymous token (HTTP ${tokenResponse.status})`);

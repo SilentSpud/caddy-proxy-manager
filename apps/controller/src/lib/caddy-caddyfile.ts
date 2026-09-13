@@ -4,6 +4,7 @@
  * hand-rolled parser would drift and accept directives for plugins that are not compiled in.
  */
 
+import { connectedAgents } from "./agent/registry";
 import { caddyAdminRequest } from "./caddy-admin";
 
 export type AdaptedCaddyfile = {
@@ -45,8 +46,17 @@ type AdaptResponse = {
   error?: string;
 };
 
-/** Adapt a snippet into HTTP routes. Throws CaddyfileAdaptError with Caddy's own message. */
-export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCaddyfile> {
+/**
+ * Adapt a snippet into HTTP routes. Throws CaddyfileAdaptError with Caddy's own message.
+ *
+ * `agentId` names the agent whose Caddy adapts it, and routes adapted for a document must come from
+ * the agent that document is loaded onto. The answer is nested into the config unmodified, so an
+ * agent adapting for another would be writing that agent's routes.
+ */
+export async function adaptCaddyfileSnippet(
+  snippet: string,
+  agentId?: string,
+): Promise<AdaptedCaddyfile> {
   const trimmed = snippet.trim();
   if (!trimmed) return { routes: [], warnings: [], ignoredApps: [] };
 
@@ -58,6 +68,7 @@ export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCad
     // Adaptation is pure parsing - no answer in ten seconds means something is wrong with the
     // admin endpoint, not with the snippet.
     timeoutMs: 10_000,
+    agentId,
   });
 
   let parsed: AdaptResponse;
@@ -107,20 +118,39 @@ export function buildCaddyfileSubrouteHandler(
   return { handler: "subroute", routes };
 }
 
-/** Validate a snippet by adapting it; error message or null. Used on save. */
-export async function validateCaddyfileSnippet(snippet: string): Promise<string | null> {
+/**
+ * Validate a snippet by adapting it; error message or null. Used on save.
+ *
+ * `agentRowIds` are the agents the host is pinned to, empty for every agent - the same rule
+ * `servedByAgent` applies when building each agent's document.
+ */
+export async function validateCaddyfileSnippet(
+  snippet: string,
+  agentRowIds: readonly number[] = [],
+): Promise<string | null> {
   if (!snippet.trim()) return null;
-  try {
-    const { ignoredApps } = await adaptCaddyfileSnippet(snippet);
-    if (ignoredApps.length > 0) {
-      return `These directives configure Caddy at a level this field cannot reach (${ignoredApps.join(", ")}). Per-host Caddyfile directives may only produce HTTP routes.`;
-    }
-    return null;
-  } catch (error) {
-    if (error instanceof CaddyfileAdaptError) return error.message;
-    // A transport failure is not the operator's fault and must not read as a syntax error - let
-    // the save through and let the config build warn.
-    console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
-    return null;
-  }
+  // Every agent that loads the host adapts the snippet for its own config, so each of those is
+  // asked: one agent's verdict alone must not pass a snippet another would reject. An agent that
+  // never loads the host has no say - its Caddy may lack a module the host's agent has.
+  const agents = connectedAgents().filter(
+    (agent) => agentRowIds.length === 0 || agentRowIds.includes(agent.agentRowId),
+  );
+  const targets = agents.length > 0 ? agents.map((agent) => agent.agentId) : [undefined];
+  const verdicts = await Promise.all(
+    targets.map(async (agentId): Promise<string | null> => {
+      try {
+        const { ignoredApps } = await adaptCaddyfileSnippet(snippet, agentId);
+        if (ignoredApps.length > 0) {
+          return `These directives configure Caddy at a level this field cannot reach (${ignoredApps.join(", ")}). Per-host Caddyfile directives may only produce HTTP routes.`;
+        }
+      } catch (error) {
+        if (error instanceof CaddyfileAdaptError) return error.message;
+        // A transport failure is not the operator's fault and must not read as a syntax error - let
+        // the save through and let the config build warn.
+        console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
+      }
+      return null;
+    }),
+  );
+  return verdicts.find((verdict) => verdict !== null) ?? null;
 }

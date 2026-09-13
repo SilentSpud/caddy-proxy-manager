@@ -1,22 +1,12 @@
-import { hkdfSync, createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { config } from "./config";
+import { derivePurposeKey } from "./derived-key";
 
 const PREFIX = "enc:v1:";
 const IV_LENGTH = 12;
 
-/** The last HKDF result, keyed on its input: every decrypt in a settings load wants the same key. */
-let derived: { secret: string; key: Buffer } | null = null;
-
 function deriveKey(sessionSecret: string = config.sessionSecret): Buffer {
-  if (derived?.secret !== sessionSecret) {
-    derived = {
-      secret: sessionSecret,
-      key: Buffer.from(
-        hkdfSync("sha256", sessionSecret, Buffer.alloc(0), "caddy-proxy-manager:secret:v1", 32),
-      ),
-    };
-  }
-  return derived.key;
+  return derivePurposeKey("secret:v1", sessionSecret);
 }
 
 function deriveKeyLegacy(sessionSecret: string = config.sessionSecret): Buffer {

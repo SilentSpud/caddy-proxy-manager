@@ -68,7 +68,7 @@ async function seedCaAndCerts() {
       fingerprintSha256: 'AA:BB:CC:DD',
       certificatePem: '-----BEGIN CERTIFICATE-----\nALICE\n-----END CERTIFICATE-----',
       validFrom: now,
-      validTo: now,
+      validTo: new Date(Date.now() + 86_400_000).toISOString(),
       createdAt: now,
       updatedAt: now,
     })
@@ -83,7 +83,7 @@ async function seedCaAndCerts() {
       fingerprintSha256: 'EE:FF:00:11',
       certificatePem: '-----BEGIN CERTIFICATE-----\nBOB\n-----END CERTIFICATE-----',
       validFrom: now,
-      validTo: now,
+      validTo: new Date(Date.now() + 86_400_000).toISOString(),
       createdAt: now,
       updatedAt: now,
     })
@@ -98,7 +98,7 @@ async function seedCaAndCerts() {
       fingerprintSha256: '99:88:77:66',
       certificatePem: '-----BEGIN CERTIFICATE-----\nREVOKED\n-----END CERTIFICATE-----',
       validFrom: now,
-      validTo: now,
+      validTo: new Date(Date.now() + 86_400_000).toISOString(),
       revokedAt: now,
       createdAt: now,
       updatedAt: now,
@@ -350,6 +350,48 @@ describe('buildCertFingerprintMap', () => {
     const { revokedCert } = await seedCaAndCerts();
     const map = await buildCertFingerprintMap();
     expect(map.has(revokedCert.id)).toBe(false);
+  });
+});
+
+// SECURITY-AUDIT H6: the maps filtered on revokedAt alone, so an expired cert stayed trusted on
+// path-scoped hosts until someone revoked it.
+describe('expired certs', () => {
+  async function seedExpiredCert(caId: number) {
+    const now = nowIso();
+    const [cert] = await db
+      .insert(issuedClientCertificates)
+      .values({
+        caCertificateId: caId,
+        commonName: 'expired-user',
+        serialNumber: '004',
+        fingerprintSha256: '12:34:56:78',
+        certificatePem: '-----BEGIN CERTIFICATE-----\nEXPIRED\n-----END CERTIFICATE-----',
+        validFrom: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        validTo: new Date(Date.now() - 86_400_000).toISOString(),
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    return cert;
+  }
+
+  it('leaves them out of the cert fingerprint map', async () => {
+    const { ca, cert1 } = await seedCaAndCerts();
+    const expired = await seedExpiredCert(ca.id);
+    const map = await buildCertFingerprintMap();
+    expect(map.has(cert1.id)).toBe(true);
+    expect(map.has(expired.id)).toBe(false);
+  });
+
+  it('leaves them out of the role maps', async () => {
+    const { ca, cert1 } = await seedCaAndCerts();
+    const expired = await seedExpiredCert(ca.id);
+    const role = await createMtlsRole({ name: 'mixed' }, userId);
+    await assignRoleToCertificate(role.id, cert1.id, 1);
+    await assignRoleToCertificate(role.id, expired.id, 1);
+
+    expect(await buildRoleFingerprintMap()).toEqual(new Map([[role.id, new Set(['aabbccdd'])]]));
+    expect(await buildRoleCertIdMap()).toEqual(new Map([[role.id, new Set([cert1.id])]]));
   });
 });
 

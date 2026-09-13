@@ -93,7 +93,11 @@ export default function SetupMigrateClient({
   // secret was rotated more than once, where the sample read but something later did not.
   const [keyDemanded, setKeyDemanded] = useState(false);
   // Set once the import has succeeded, which swaps the page for the restart dialog.
-  const [imported, setImported] = useState<{ next: string; migratedSignIn: boolean } | null>(null);
+  const [imported, setImported] = useState<{
+    next: string;
+    migratedSignIn: boolean;
+    restartToken: string;
+  } | null>(null);
   // The confirmation sheet, and the form it submits from outside itself.
   const [confirming, setConfirming] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -138,7 +142,7 @@ export default function SetupMigrateClient({
         body: JSON.stringify({ path: selected, groups: [...effective], legacyKey }),
       });
       const body = (await response.json()) as
-        | { ok: true; next: string; migratedSignIn: boolean }
+        | { ok: true; next: string; migratedSignIn: boolean; restartToken: string }
         | { ok: false; error: string; code?: "legacy-key-required" | "legacy-key-invalid" };
 
       if (!body.ok) {
@@ -148,7 +152,11 @@ export default function SetupMigrateClient({
         if (body.code) setKeyDemanded(true);
         return;
       }
-      setImported({ next: body.next, migratedSignIn: body.migratedSignIn });
+      setImported({
+        next: body.next,
+        migratedSignIn: body.migratedSignIn,
+        restartToken: body.restartToken,
+      });
     } catch {
       // The import copies thirty tables and can outlast a proxy's idle timeout. Saying so beats a
       // bare "failed", because trying again on a half-populated database is the one thing not to
@@ -193,7 +201,13 @@ export default function SetupMigrateClient({
   }, [effective, candidate]);
 
   if (imported) {
-    return <RestartDialog next={imported.next} migratedSignIn={imported.migratedSignIn} />;
+    return (
+      <RestartDialog
+        next={imported.next}
+        migratedSignIn={imported.migratedSignIn}
+        restartToken={imported.restartToken}
+      />
+    );
   }
 
   return (

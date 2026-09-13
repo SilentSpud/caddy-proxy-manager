@@ -37,6 +37,9 @@ export function isAllowedAdminPath(path: string): boolean {
   return ALLOWED_PATHS.some((pattern) => pattern.test(withoutQuery));
 }
 
+/** Shared with the controller, which pins a config it loads without an agent the same way. */
+export { loadsConfig, pinAdminListen } from "@cpm/shared";
+
 export class CaddyAdminUnreachable extends Error {}
 
 /**

@@ -1,9 +1,9 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
 
 # The agent compiles to a single Bun binary, but its runtime still needs the Docker CLI and the
 # compose plugin: recreating the Caddy container is the whole job, and there is no Go client here
 # that would let it talk to the daemon directly.
-FROM --platform=$BUILDPLATFORM oven/bun:1-slim AS builder
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS builder
 WORKDIR /app
 
 # Every workspace manifest, not just the agent's: `bun install` resolves the whole workspace graph
@@ -34,11 +34,13 @@ RUN case "$TARGETARCH" in \
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than docker:cli, whose Alpine base is musl: the compiled binary carries its own
 # glibc-linked Bun runtime and will not start there.
-FROM debian:trixie-slim AS runner
+FROM debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132 AS runner
 
 # docker-ce-cli and the compose plugin from Docker's own repository. `docker compose` is invoked
 # for every operation this container exists to perform, so its absence is a startup failure rather
-# than something to discover on the first port change.
+# than something to discover on the first port change. buildx because without it compose falls back
+# to the legacy builder, which cannot build docker/caddy/Dockerfile. Pinned to a major, not an exact build: that
+# repository drops old builds, which would break every rebuild. Bump the majors by hand.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl gnupg \
     && install -m 0755 -d /etc/apt/keyrings \
@@ -48,15 +50,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
        https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list \
     && apt-get update && apt-get install -y --no-install-recommends \
-      docker-ce-cli docker-compose-plugin \
+      'docker-ce-cli=5:29.*' 'docker-compose-plugin=5.*' 'docker-buildx-plugin=0.*' \
     && apt-get purge -y gnupg && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=builder /app/apps/agent/dist/cpm-agent /app/cpm-agent
 
-# Its own user, not root. The Docker API is reached over TCP through docker-socket-proxy, which is
-# what narrows the agent's reach to the daemon, so nothing here needs root: the agent owns /data -
+# Its own user, not root - though that is no boundary: through docker-socket-proxy the agent can
+# create a privileged container, so it is host-root-equivalent and this image stays minimal. Nothing
+# here needs root: the agent owns /data -
 # its database, socket, compose overrides and the GeoIP databases Caddy reads - and reaches Caddy's
 # logs and the controller's bootstrap token through groups docker-compose.yml adds. /data/geoip is
 # created here so a new volume starts with it: Caddy mounts that subdirectory, and a volume subpath
@@ -92,9 +95,6 @@ ENV AGENT_MODE=standalone
 ENV HOME=/home/agent
 
 USER agent
-
-# Managed mode listens here. Standalone binds a socket on the data volume and publishes nothing.
-EXPOSE 3100
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
   CMD /app/cpm-agent --healthcheck

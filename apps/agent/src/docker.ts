@@ -7,9 +7,15 @@
  * create time, and compiled-in plugins.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ManagedServiceName, ManagedServicesRequest } from "@cpm/shared";
+import {
+  isValidL4PortMapping,
+  isValidModuleSpec,
+  MANAGED_SERVICE_ENV_KEYS,
+  type ManagedServiceName,
+  type ManagedServicesRequest,
+} from "@cpm/shared";
 import type { AgentConfig } from "./config";
 
 /** Files the agent generates for compose. Written by the agent now, not the controller. */
@@ -101,6 +107,16 @@ export function hostPathForDaemon(label: string): string {
   const path = rest.replace(/\\/g, "/").replace(/\/+$/, "");
   return `/run/desktop/mnt/host/${drive.toLowerCase()}/${path}`;
 }
+
+/**
+ * Stand-ins for the two variables docker-compose.yml guards with `:?`, which only web and postgres
+ * read. Compose interpolates the whole file, so without them every invocation aborts; too short for
+ * web to accept as a SESSION_SECRET, so one can never become a running controller's key.
+ */
+export const COMPOSE_PLACEHOLDERS: Readonly<Record<string, string>> = {
+  SESSION_SECRET: "unused-by-the-agent",
+  POSTGRES_PASSWORD: "unused-by-the-agent",
+};
 
 export class DockerHost {
   /** Cached because it comes from a container label that cannot change without a recreate. */
@@ -226,38 +242,57 @@ export class DockerHost {
    * Both overrides are always included: a rebuild must not drop the published L4 ports, and a port
    * change must not rebuild Caddy without the module selection. Omitting either is how one
    * operation silently undoes the other.
+   *
+   * `readsBuildContext` drops `--project-directory`: the daemon resolves bind mounts, but the CLI in
+   * this container reads `context: .`, and the host path does not exist here - so a build against it
+   * fails with "unable to prepare context". Compose then anchors to the first -f file, in COMPOSE_DIR.
    */
-  private async composeArgs(): Promise<string[]> {
+  private async composeArgs(readsBuildContext = false): Promise<string[]> {
     const { composeDir, composeSkipOverride, composeExtraFile, dataDir } = this.config;
     // Two independent inspects, each bounded at 15s; in series an unresponsive daemon doubled it.
-    const [project, hostDir] = await Promise.all([this.composeProject(), this.composeHostDir()]);
+    const [project, hostDir] = await Promise.all([
+      this.composeProject(),
+      readsBuildContext ? "" : this.composeHostDir(),
+    ]);
     const args = ["-p", project];
 
     // The daemon resolves relative bind-mount paths against the project directory, and the agent's
     // /compose mount is not where the host thinks the project is. See composeHostDir.
     if (hostDir) args.push("--project-directory", hostDir);
-    // Supplied explicitly so required variables are available even when --project-directory points
-    // at a host path this container cannot read.
-    if (existsSync(join(composeDir, ".env"))) args.push("--env-file", join(composeDir, ".env"));
+    // Never the project's .env: it holds SESSION_SECRET and POSTGRES_PASSWORD, which this container
+    // must not read. An explicit empty file stops compose finding one on its own. What the services
+    // the agent runs interpolate reaches it through its own environment (docker-compose.yml).
+    args.push("--env-file", "/dev/null");
 
     args.push("-f", join(composeDir, "docker-compose.yml"));
     const override = join(composeDir, "docker-compose.override.yml");
     if (!composeSkipOverride && existsSync(override)) args.push("-f", override);
     if (composeExtraFile && existsSync(composeExtraFile)) args.push("-f", composeExtraFile);
 
-    const buildOverride = join(dataDir, BUILD_OVERRIDE_FILE);
-    if (existsSync(buildOverride)) args.push("-f", buildOverride);
-    const portsOverride = join(dataDir, L4_OVERRIDE_FILE);
-    if (existsSync(portsOverride)) args.push("-f", portsOverride);
+    if (overrideIsUsable(dataDir, BUILD_OVERRIDE_FILE)) {
+      args.push("-f", join(dataDir, BUILD_OVERRIDE_FILE));
+    }
+    if (overrideIsUsable(dataDir, L4_OVERRIDE_FILE)) {
+      args.push("-f", join(dataDir, L4_OVERRIDE_FILE));
+    }
 
     return args;
   }
 
   async compose(
     argv: string[],
-    options: { timeoutSeconds?: number; env?: Record<string, string> } = {},
+    options: {
+      timeoutSeconds?: number;
+      env?: Record<string, string>;
+      readsBuildContext?: boolean;
+    } = {},
   ) {
-    return run(["docker", "compose", ...(await this.composeArgs()), ...argv], options);
+    const { readsBuildContext, ...runOptions } = options;
+    return run(["docker", "compose", ...(await this.composeArgs(readsBuildContext)), ...argv], {
+      ...runOptions,
+      // Over process.env, so a real secret this container was handed anyway never reaches compose.
+      env: { ...COMPOSE_PLACEHOLDERS, ...runOptions.env },
+    });
   }
 
   /** Recreate only the Caddy container, leaving everything else running. */
@@ -304,9 +339,11 @@ export class DockerHost {
     return result.ok && result.output.trim() === "true";
   }
 
+  /** No host project directory: the build context is read here, not by the daemon. See composeArgs. */
   async buildCaddy(): Promise<CommandResult> {
     return this.compose(["build", "caddy"], {
       timeoutSeconds: this.config.buildTimeoutSeconds,
+      readsBuildContext: true,
     });
   }
 
@@ -415,6 +452,14 @@ export class DockerHost {
 
 // ─── Generated compose files ─────────────────────────────────────────────────
 
+/**
+ * A YAML double-quoted scalar. JSON's string syntax is a subset of it, so no value - validated or
+ * not - can close the quote and add keys to the service.
+ */
+function yamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
 export function renderL4PortsOverride(ports: string[]): string {
   if (ports.length === 0) {
     return `# Generated by the Caddy Proxy Manager agent - L4 port mappings
@@ -422,7 +467,7 @@ export function renderL4PortsOverride(ports: string[]): string {
 services: {}
 `;
   }
-  const lines = ports.map((port) => `      - "${port}"`).join("\n");
+  const lines = ports.map((port) => `      - ${yamlString(port)}`).join("\n");
   return `# Generated by the Caddy Proxy Manager agent - L4 port mappings
 # Do not edit: rewritten whenever the controller applies a port change.
 services:
@@ -439,7 +484,7 @@ services:
   caddy:
     build:
       args:
-        CADDY_MODULES: "${modules.join(" ")}"
+        CADDY_MODULES: ${yamlString(modules.join(" "))}
 `;
 }
 
@@ -447,9 +492,97 @@ export function writeOverride(dataDir: string, file: string, contents: string): 
   writeFileSync(join(dataDir, file), contents, "utf-8");
 }
 
-/** Drop the unset entries, so an absent credential leaves compose to fall back to the `.env`. */
-export function composeEnv(env: ManagedServicesRequest["env"]): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(env).filter(([, value]) => typeof value === "string" && value.length > 0),
-  ) as Record<string, string>;
+/** The first entry that is not a valid port mapping, or null when all are. */
+export function invalidL4Port(ports: unknown): string | null {
+  if (!Array.isArray(ports)) return String(ports);
+  for (const port of ports) {
+    if (typeof port !== "string" || !isValidL4PortMapping(port)) return String(port);
+  }
+  return null;
+}
+
+/** The first entry that is not a valid xcaddy `--with` spec, or null when all are. */
+export function invalidCaddyModule(modules: unknown): string | null {
+  if (!Array.isArray(modules)) return String(modules);
+  for (const spec of modules) {
+    if (typeof spec !== "string" || !isValidModuleSpec(spec)) return String(spec);
+  }
+  return null;
+}
+
+/**
+ * Recover the entries an override file was rendered from, or null if it is not exactly what the
+ * renderer would write for valid entries. A file from an older agent, or one written before
+ * validation existed, is otherwise included in every compose invocation for good.
+ */
+function parseOverride(file: string, contents: string): string[] | null {
+  const lines = contents.split("\n");
+  let entries: string[];
+  try {
+    if (file === L4_OVERRIDE_FILE) {
+      entries = lines
+        .filter((line) => line.startsWith("      - "))
+        .map((line) => JSON.parse(line.slice("      - ".length)) as string);
+      if (invalidL4Port(entries) !== null) return null;
+      return renderL4PortsOverride(entries) === contents ? entries : null;
+    }
+    const prefix = "        CADDY_MODULES: ";
+    const line = lines.find((l) => l.startsWith(prefix));
+    if (line === undefined) return null;
+    const joined = JSON.parse(line.slice(prefix.length)) as unknown;
+    if (typeof joined !== "string") return null;
+    entries = joined.split(" ").filter((spec) => spec.length > 0);
+    if (invalidCaddyModule(entries) !== null) return null;
+    return renderCaddyBuildOverride(entries) === contents ? entries : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a generated override may be handed to compose. One that fails to round-trip is removed:
+ * the next desired-state frame, or the startup port restore, writes a fresh one.
+ */
+export function overrideIsUsable(dataDir: string, file: string): boolean {
+  const path = join(dataDir, file);
+  if (!existsSync(path)) return false;
+  let contents: string;
+  try {
+    contents = readFileSync(path, "utf-8");
+  } catch {
+    return false;
+  }
+  if (parseOverride(file, contents) !== null) return true;
+  console.warn(`[docker] ${file} is not one this agent would have written; removing it`);
+  try {
+    rmSync(path, { force: true });
+  } catch (error) {
+    console.warn(`[docker] could not remove ${file}:`, error);
+  }
+  return false;
+}
+
+/**
+ * The child environment for a managed-service invocation.
+ *
+ * Only MANAGED_SERVICE_ENV_KEYS pass: every entry lands in the environment of a `docker` that
+ * holds the socket, where DOCKER_HOST, PATH or LD_PRELOAD would hand over the host. Unset entries
+ * are dropped so compose falls back to the agent's own environment; it never reads `.env`.
+ */
+export function composeEnv(env: ManagedServicesRequest["env"] | undefined): Record<string, string> {
+  const allowed = MANAGED_SERVICE_ENV_KEYS as readonly string[];
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env ?? {})) {
+    if (!allowed.includes(key)) {
+      console.warn(`[docker] ignoring ${JSON.stringify(key)}: not a managed service variable`);
+      continue;
+    }
+    if (typeof value !== "string" || value.length === 0) continue;
+    // Thrown rather than dropped, so the operation reports it. Names the key, never the value.
+    if (/[\n\r\0]/.test(value)) {
+      throw new Error(`${key} contains a line break or NUL, which compose cannot be given safely`);
+    }
+    result[key] = value;
+  }
+  return result;
 }

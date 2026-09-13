@@ -3,7 +3,7 @@ import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { mtlsRoles, mtlsCertificateRoles, issuedClientCertificates } from "../db/schema";
 import { asc, eq, inArray, count, and, isNull } from "drizzle-orm";
-import { normalizeFingerprint } from "../caddy-mtls";
+import { isCertificateUnexpired, normalizeFingerprint } from "../caddy-mtls";
 import { domainError } from "../domain-error";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -268,6 +268,7 @@ export async function buildRoleMaps(): Promise<{
       roleId: mtlsCertificateRoles.mtlsRoleId,
       certId: mtlsCertificateRoles.issuedClientCertificateId,
       fingerprint: issuedClientCertificates.fingerprintSha256,
+      validTo: issuedClientCertificates.validTo,
     })
     .from(mtlsCertificateRoles)
     .innerJoin(
@@ -278,7 +279,9 @@ export async function buildRoleMaps(): Promise<{
 
   const roleCertIdMap = new Map<number, Set<number>>();
   const roleFingerprintMap = new Map<number, Set<string>>();
+  const now = Date.now();
   for (const row of rows) {
+    if (!isCertificateUnexpired(row.validTo, now)) continue;
     let certIds = roleCertIdMap.get(row.roleId);
     if (!certIds) {
       certIds = new Set();
@@ -307,12 +310,15 @@ export async function buildCertFingerprintMap(): Promise<Map<number, string>> {
     .select({
       id: issuedClientCertificates.id,
       fingerprint: issuedClientCertificates.fingerprintSha256,
+      validTo: issuedClientCertificates.validTo,
     })
     .from(issuedClientCertificates)
     .where(isNull(issuedClientCertificates.revokedAt));
 
   const map = new Map<number, string>();
+  const now = Date.now();
   for (const row of rows) {
+    if (!isCertificateUnexpired(row.validTo, now)) continue;
     map.set(row.id, normalizeFingerprint(row.fingerprint));
   }
   return map;

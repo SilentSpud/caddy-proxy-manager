@@ -11,6 +11,7 @@ import {
 import { and, eq, gt, inArray, lt } from "drizzle-orm";
 import { hostMatchesPattern } from "../host-pattern-priority";
 import { domainError } from "../domain-error";
+import { takeFromWindow } from "../rate-limit";
 
 const DEFAULT_SESSION_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 const EXCHANGE_CODE_TTL = 60; // 60 seconds
@@ -52,12 +53,27 @@ function audienceMatchesUrl(audience: ForwardAuthAudience, parsed: URL): boolean
 // ── Redirect Intents ────────────────────────────────────────────────
 // Store redirect URIs server-side so the client only holds an opaque ID.
 
+/** Created by an unauthenticated GET, so bounded across all clients; counted in memory, not by query. */
+export const REDIRECT_INTENT_WINDOW_KEY = "forward-auth:redirect-intents";
+export const MAX_REDIRECT_INTENTS_PER_WINDOW = 5_000;
+export const REDIRECT_INTENT_SWEEP_INTERVAL_MS = 60_000;
+let lastIntentSweepAt = 0;
+
 export async function createRedirectIntent(redirectUri: string): Promise<string> {
   // Resolve and persist the concrete target now.  In particular, a wildcard
   // match is reduced to the exact origin the browser will visit and the one
   // proxy-host record that authorized it.
   const audience = await resolveForwardAuthAudience(redirectUri);
   if (!audience) throw domainError("invalidForwardAuthRedirectTarget");
+  if (
+    !takeFromWindow(
+      REDIRECT_INTENT_WINDOW_KEY,
+      MAX_REDIRECT_INTENTS_PER_WINDOW,
+      REDIRECT_INTENT_TTL * 1000,
+    )
+  ) {
+    throw domainError("tooManyRedirectIntents");
+  }
 
   const rid = randomBytes(16).toString("hex");
   const ridHash = hashToken(rid);
@@ -74,10 +90,29 @@ export async function createRedirectIntent(redirectUri: string): Promise<string>
     createdAt: now,
   });
 
-  // Opportunistic cleanup of expired intents
-  await db.delete(forwardAuthRedirectIntents).where(lt(forwardAuthRedirectIntents.expiresAt, now));
+  // Opportunistic cleanup of expired intents, at most once per interval so a GET loop cannot drive it.
+  if (Date.now() - lastIntentSweepAt >= REDIRECT_INTENT_SWEEP_INTERVAL_MS) {
+    lastIntentSweepAt = Date.now();
+    await db
+      .delete(forwardAuthRedirectIntents)
+      .where(lt(forwardAuthRedirectIntents.expiresAt, now));
+  }
 
   return rid;
+}
+
+/** Whether `rid` names a live intent, without consuming it: a mistyped password must not burn it. */
+export async function hasLiveRedirectIntent(rid: string): Promise<boolean> {
+  const row = await db.query.forwardAuthRedirectIntents.findFirst({
+    columns: { id: true },
+    where: (table, operators) =>
+      operators.and(
+        operators.eq(table.ridHash, hashToken(rid)),
+        operators.eq(table.consumed, false),
+        operators.gt(table.expiresAt, nowIso()),
+      ),
+  });
+  return row !== undefined;
 }
 
 export async function consumeRedirectIntent(rid: string): Promise<{

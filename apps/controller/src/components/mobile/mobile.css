@@ -58,8 +58,9 @@
       border: 0;
       border-radius: 9999px;
       background: var(--color-text-pink);
-      /* #111 on the pink fill, the ink the accent uses for text on itself. */
-      color: #111111;
+      /* The ink the accent uses for text on itself: #111 on the dark-mode pink, white on the
+         light-mode plum. A fixed #111 was 1.6:1 against the plum. */
+      color: var(--color-on-accent);
       box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
       text-decoration: none;
       cursor: pointer;
@@ -141,7 +142,7 @@
     .cpm-chip[data-active] {
       background: var(--color-text-pink);
       border-color: var(--color-text-pink);
-      color: #111111;
+      color: var(--color-on-accent);
     }
 
     .cpm-chip:focus-visible {

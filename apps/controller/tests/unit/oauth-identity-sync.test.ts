@@ -17,6 +17,7 @@
  */
 import { describe, it, expect, beforeAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '../helpers/next-intl';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, unlinkUserId: 0 }));
@@ -38,6 +39,8 @@ vi.mock('../../src/lib/db', () => ({
   toIso: (value: string | Date | null | undefined): string | null =>
     !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
 }));
+
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 // Stub better-auth so `betterAuth(options)` hands back the raw options object;
 // the databaseHooks on (await getAuth()).options are then the real functions CPM wired.
@@ -295,12 +298,14 @@ describe('#261 - unlink API re-derives identity from the accounts table', () => 
   it('resets users.provider/subject after the OAuth rows are deleted', async () => {
     const { POST } = await import('../../src/app/api/user/unlink-oauth/route');
 
+    const { hashPassword } = await import('../../src/lib/password');
+
     const user = await createUser({
       email: 'unlink@example.com',
       name: 'Unlink Me',
       provider: 'credentials',
       subject: null as unknown as string,
-      passwordHash: 'x'.repeat(60),
+      passwordHash: await hashPassword('CorrectHorse2026!'),
     });
     ctx.unlinkUserId = user.id;
     await createAccountLikeBetterAuth(user.id, 'prov-a', 'sub-a-unlink');
@@ -312,6 +317,7 @@ describe('#261 - unlink API re-derives identity from the accounts table', () => 
         get: (name: string) =>
           name.toLowerCase() === 'origin' ? 'http://localhost:3000' : 'localhost:3000',
       },
+      json: async () => ({ currentPassword: 'CorrectHorse2026!' }),
     } as unknown as Request;
 
     const response = await POST(request as any);

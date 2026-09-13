@@ -17,6 +17,7 @@ import {
   canonicalHeaderName,
   upstreamHeaderPlaceholder,
   stripCaddyPlaceholders,
+  isReservedL4ListenAddress,
 } from "./caddy-utils";
 import {
   groupHostPatternsByPriority,
@@ -92,8 +93,10 @@ import {
   buildMtlsRbacSubroutes,
   buildFingerprintCelExpression,
   buildValidClientCertCelExpression,
+  isCertificateUnexpired,
   normalizeFingerprint,
   resolveAllowedFingerprints,
+  resolveLegacyCaFingerprints,
   type MtlsAccessRuleLike,
 } from "./caddy-mtls";
 import { buildRoleMaps } from "./models/mtls-roles";
@@ -919,10 +922,19 @@ type CaddyBuildContext = {
   moduleAvailability: CaddyModuleAvailability;
   /** Null outside buildCaddyDocument - callers exercising route shapes have no settings to read. */
   tailscale?: TailscaleRuntime | null;
+  /**
+   * The agent this document is loaded onto, whose own Caddy adapts its Caddyfile snippets. Unset
+   * only for a document no agent loads: a preview, or a controller with no agent attached.
+   */
+  adaptVia?: string;
   mtlsRbac?: {
     roleFingerprintMap: Map<number, Set<string>>;
     certFingerprintMap: Map<number, string>;
     accessRulesByHost: Map<number, MtlsAccessRuleLike[]>;
+    /** CA id → fingerprints of its active certs, for legacy whole-CA hosts. */
+    caFingerprintMap?: Map<number, Set<string>>;
+    /** CAs that have ever had a CPM-issued cert, and so pin to leaves rather than trust the CA. */
+    managedCaIds?: Set<number>;
   };
 };
 
@@ -1327,7 +1339,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       .map(async (row) => {
         const snippet = metaOf(row).custom_caddyfile as string;
         try {
-          adaptedCaddyfiles.set(row.id, await adaptCaddyfileSnippet(snippet));
+          // On the agent this document is for: adapted routes go into the config unmodified.
+          adaptedCaddyfiles.set(row.id, await adaptCaddyfileSnippet(snippet, context.adaptVia));
         } catch (error) {
           // Left absent in the map; the loop below reports it per host.
           console.warn(
@@ -1685,9 +1698,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       );
     }
 
-    // Security: this field lets admins inject arbitrary Caddy reverse_proxy config, which is
-    // intentional - admins have full control of the proxy configuration. mergeDeep blocks
-    // __proto__/constructor/prototype, so prototype pollution is not reachable.
+    // Security: arbitrary reverse_proxy config, by design. Only an admin can set it - enforced by
+    // assertRawConfigChangeAllowed in models/proxy-hosts.ts, which every write path goes through.
+    // mergeDeep blocks __proto__/constructor/prototype, so prototype pollution is not reachable.
     const customReverseProxy = parseOptionalJson(meta.custom_reverse_proxy_json);
     if (customReverseProxy) {
       if (isPlainObject(customReverseProxy)) {
@@ -1712,8 +1725,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       }
     }
 
-    // Security: this field lets admins inject arbitrary Caddy HTTP handlers before the
-    // reverse_proxy. Intentional - admins can add any handler (file_server, rewrite, etc.).
+    // Security: arbitrary HTTP handlers before the reverse_proxy (file_server, rewrite, ...), by
+    // design. Admin-only, like the Caddyfile below - see assertRawConfigChangeAllowed.
     const customHandlers = parseCustomHandlers(meta.custom_pre_handlers_json);
     if (customHandlers.length > 0) {
       handlers.push(...customHandlers);
@@ -2029,10 +2042,21 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             context.mtlsRbac?.certFingerprintMap ?? new Map(),
           )
         : new Set<string>();
-      const hostTrustedFingerprintExpression =
+      // Path-scoped hosts cannot pin leaves at the TLS layer (see buildClientAuthentication), so a
+      // legacy whole-CA host pins here instead. Null means any cert the TLS layer verified.
+      const hostGateFingerprints: Set<string> | null =
         hostTrustedFingerprints.size > 0
-          ? buildFingerprintCelExpression(hostTrustedFingerprints)
-          : validClientCertExpression;
+          ? hostTrustedFingerprints
+          : mtls?.ca_certificate_ids?.length
+            ? resolveLegacyCaFingerprints(
+                mtls.ca_certificate_ids,
+                context.mtlsRbac?.caFingerprintMap ?? new Map(),
+                context.mtlsRbac?.managedCaIds ?? new Set(),
+              )
+            : null;
+      const hostTrustedFingerprintExpression = hostGateFingerprints
+        ? buildFingerprintCelExpression(hostGateFingerprints)
+        : validClientCertExpression;
 
       const buildProtectedPathRoute = (domainGroup: string[], path: string) => {
         if (hasMtlsRbac) {
@@ -2043,7 +2067,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             handlers,
             reverseProxyHandler,
             true,
-            hostTrustedFingerprints,
+            hostGateFingerprints ?? undefined,
           );
           if (rbacSubroutes) {
             return [
@@ -2091,7 +2115,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             handlers,
             reverseProxyHandler,
             true,
-            hostTrustedFingerprints,
+            hostGateFingerprints ?? undefined,
           );
           if (rbacSubroutes) {
             return [
@@ -2235,10 +2259,7 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
   const readyCertificates = new Set<number>();
   const importedCertPems: { certificate: string; key: string }[] = [];
 
-  const buildAuth = (
-    domains: string[],
-    mode: "require_and_verify" | "verify_if_given" | "request",
-  ) =>
+  const buildAuth = (domains: string[], mode: "require_and_verify" | "verify_if_given") =>
     buildClientAuthentication(
       domains,
       mTlsDomainMap,
@@ -2254,9 +2275,11 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
     const scopedDomains = mTlsDomains.filter((domain) => mTlsOptionalAuthDomains.has(domain));
     const requiredDomains = mTlsDomains.filter((domain) => !mTlsOptionalAuthDomains.has(domain));
 
+    // Scoped hosts must let cert-less requests reach the HTTP path gate, but "request" mode verifies
+    // nothing - any self-signed or expired cert got through. verify_if_given checks what is shown.
     for (const [domains, mode] of [
       [requiredDomains, "require_and_verify"],
-      [scopedDomains, "request"],
+      [scopedDomains, "verify_if_given"],
     ] as const) {
       if (domains.length === 0) continue;
 
@@ -2600,10 +2623,17 @@ async function buildL4Servers(
   // unmarshal, so emitting one would fail the whole config - HTTP hosts included.
   if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
 
-  const [allL4Hosts, assignments] = await Promise.all([
+  const [enabledL4Hosts, assignments, metrics] = await Promise.all([
     db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true)),
     agentRowId === undefined ? null : listHostAssignments("l4"),
+    getMetricsSettings(),
   ]);
+  // A row on a reserved port predates validateL4Input's check. getRequiredL4Ports does not publish
+  // it, so a listener here would either bind a port nobody can reach or collide with 80/443/2019.
+  const metricsPort = metrics?.enabled ? (metrics.port ?? 9090) : null;
+  const allL4Hosts = enabledL4Hosts.filter(
+    (host) => !isReservedL4ListenAddress(host.listenAddress, metricsPort),
+  );
   const l4Hosts =
     assignments === null
       ? allL4Hosts
@@ -2831,8 +2861,11 @@ async function buildL4Servers(
  * test and the single-agent path do - nothing is filtered and the module gate falls back to the
  * fleet-wide intersection, which is exactly the document this function produced before hosts could
  * be assigned at all.
+ *
+ * `options.adaptVia` is the agent whose Caddy adapts the hosts' Caddyfile snippets, and must be the
+ * agent this document is loaded onto.
  */
-export async function buildCaddyDocument(agentRowId?: number) {
+export async function buildCaddyDocument(agentRowId?: number, options: { adaptVia?: string } = {}) {
   const [
     proxyHostRecords,
     certRows,
@@ -2893,6 +2926,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
         caCertificateId: issuedClientCertificates.caCertificateId,
         certificatePem: issuedClientCertificates.certificatePem,
         fingerprintSha256: issuedClientCertificates.fingerprintSha256,
+        validTo: issuedClientCertificates.validTo,
       })
       .from(issuedClientCertificates)
       .where(isNull(issuedClientCertificates.revokedAt)),
@@ -2963,9 +2997,21 @@ export async function buildCaddyDocument(agentRowId?: number) {
 
   const certificateMap = new Map(certRowsMapped.map((cert) => [cert.id, cert]));
   const caCertMap = new Map(caCertRows.map((ca) => [ca.id, ca]));
-  const issuedClientCertMap = issuedClientCertRows.reduce<Map<number, string[]>>((map, record) => {
+  // Expired certs leave every trust set here too. Path-scoped hosts do not rely on it - Go checks
+  // expiry on each handshake - but it keeps the leaf pins and HTTP gates from naming dead certs.
+  const now = Date.now();
+  const activeIssuedCerts = issuedClientCertRows.filter((r) =>
+    isCertificateUnexpired(r.validTo, now),
+  );
+  const issuedClientCertMap = activeIssuedCerts.reduce<Map<number, string[]>>((map, record) => {
     const current = map.get(record.caCertificateId) ?? [];
     current.push(record.certificatePem);
+    map.set(record.caCertificateId, current);
+    return map;
+  }, new Map());
+  const caFingerprintMap = activeIssuedCerts.reduce<Map<number, Set<string>>>((map, record) => {
+    const current = map.get(record.caCertificateId) ?? new Set<string>();
+    current.add(normalizeFingerprint(record.fingerprintSha256));
     map.set(record.caCertificateId, current);
     return map;
   }, new Map());
@@ -2979,10 +3025,10 @@ export async function buildCaddyDocument(agentRowId?: number) {
   }, new Map());
 
   // Build a lookup: issued cert ID → { id, caCertificateId, certificatePem } (active only)
-  const issuedCertById = new Map(issuedClientCertRows.map((r) => [r.id, r]));
+  const issuedCertById = new Map(activeIssuedCerts.map((r) => [r.id, r]));
   // Same active rows, so the fingerprint map for RBAC comes from them rather than a second read.
   const certFingerprintMap = new Map(
-    issuedClientCertRows.map((r) => [r.id, normalizeFingerprint(r.fingerprintSha256)]),
+    activeIssuedCerts.map((r) => [r.id, normalizeFingerprint(r.fingerprintSha256)]),
   );
 
   // Domain → CA cert IDs map for mTLS-enabled hosts. New model (trusted_client_cert_ids +
@@ -3170,10 +3216,13 @@ export async function buildCaddyDocument(agentRowId?: number) {
     globalWaf,
     moduleAvailability,
     tailscale: tailscaleRuntime,
+    adaptVia: options.adaptVia,
     mtlsRbac: {
       roleFingerprintMap,
       certFingerprintMap,
       accessRulesByHost,
+      caFingerprintMap,
+      managedCaIds: cAsWithAnyIssuedCerts,
     },
   };
 
@@ -3266,15 +3315,9 @@ export async function buildCaddyDocument(agentRowId?: number) {
       listen: [`:${metricsPort}`],
       routes: [
         {
-          handle: [
-            {
-              handler: "reverse_proxy",
-              upstreams: [{ dial: "localhost:2019" }],
-              rewrite: {
-                uri: "/metrics",
-              },
-            },
-          ],
+          // Served in-process rather than proxied to the admin API, which binds only the internal
+          // caddy-admin network once the agent pins it, never loopback.
+          handle: [{ handler: "metrics" }],
         },
       ],
     };
@@ -3407,25 +3450,16 @@ export async function applyCaddyConfig() {
   // routes to that one agent, and broadcasting to it would be the same call with extra steps.
   // Keeping the common case on one seam is also what lets a test install one in-memory Caddy.
   if (targets.length <= 1) {
-    const payload = JSON.stringify(await buildCaddyDocument(targets[0]?.agentRowId));
-    let response: { status: number; text: string };
-    try {
-      response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
-    } catch (requestError) {
-      logCaddyApplyFailure("Caddy admin request failed", requestError);
-      if (isConnectionError(requestError)) {
-        throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
-      }
-      throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
-    }
-    assertCaddyAccepted(response, "");
+    await loadOne(targets[0] ?? null, "");
     return;
   }
 
+  // Each agent adapts the snippets in its own document. Adapted routes are nested unmodified, and
+  // an agent is trusted to describe its own Caddy, never to write another agent's config.
   const results = await broadcastCaddyAdmin(async (agent) => ({
     path: "/load",
     method: "POST",
-    body: JSON.stringify(await buildCaddyDocument(agent.agentRowId)),
+    body: JSON.stringify(await buildCaddyDocument(agent.agentRowId, { adaptVia: agent.agentId })),
   }));
   const unreachable = results.filter((result) => !result.ok);
   if (unreachable.length > 0) {
@@ -3442,6 +3476,48 @@ export async function applyCaddyConfig() {
     if (!result.ok) continue;
     assertCaddyAccepted(result.value, result.agent);
   }
+}
+
+/**
+ * Build one agent's document, with its snippets adapted by that agent, and load it through the
+ * transport seam pinned to the same agent. Null is the Caddy reached with no agent attached.
+ */
+async function loadOne(
+  agent: { agentId: string; agentRowId: number } | null,
+  who: string,
+): Promise<void> {
+  const payload = JSON.stringify(
+    await buildCaddyDocument(agent?.agentRowId, { adaptVia: agent?.agentId }),
+  );
+  let response: { status: number; text: string };
+  try {
+    response = await caddyAdminRequest({
+      path: "/load",
+      method: "POST",
+      body: payload,
+      agentId: agent?.agentId,
+    });
+  } catch (requestError) {
+    logCaddyApplyFailure("Caddy admin request failed", requestError);
+    if (isConnectionError(requestError)) {
+      throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
+    }
+    throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
+  }
+  assertCaddyAccepted(response, who);
+}
+
+/**
+ * Rebuild and reload one agent's Caddy and no other: what the health monitor does for a Caddy that
+ * restarted, so an agent reporting one cannot make the rest of the fleet reload.
+ */
+export async function applyCaddyConfigToAgent(agent: {
+  agentId: string;
+  agentRowId: number;
+  name: string;
+}): Promise<void> {
+  if (currentStagingScope()?.suppressApply) return;
+  await loadOne(agent, agent.name);
 }
 
 /**

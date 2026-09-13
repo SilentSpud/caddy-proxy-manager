@@ -18,22 +18,20 @@ services:
       - max_connections=300
     volumes:
       - ./apps/controller/tests/postgres-init.sql:/docker-entrypoint-initdb.d/10-e2e.sql:ro
-    networks:
-      - caddy-network
 
   # Fixture seeding for the e2e suite. The web image is a compiled binary with no Bun CLI or shell
   # runtime - deliberately, so the tests run the image that ships - so seeding happens in this
   # throwaway container, which mounts the same data volume and opens the same SQLite file.
   # `profiles` keeps it out of `docker compose up`; see tests/helpers/seed.ts.
   db-seed:
-    image: oven/bun:1-slim
+    image: oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61
     profiles: ["tools"]
     working_dir: /app
     entrypoint: ["bun"]
     # No data volume any more: seeding talks to the postgres service over the network, not to a
     # file on the shared volume.
     networks:
-      - caddy-network
+      - database
 
   web:
     environment:
@@ -92,8 +90,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # caddy-network as well, because an internal network alone cannot publish 3001.
     networks:
       - caddy-network
+      - database
     healthcheck:
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
@@ -103,9 +103,12 @@ services:
   clickhouse:
     environment:
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
-    # Expose the HTTP interface so retention/TTL e2e tests can query directly.
+    # Expose the HTTP interface so retention/TTL e2e tests can query directly. caddy-network too,
+    # because analytics is internal and an internal network cannot publish a port.
     ports:
       - "8123:8123"
+    networks:
+      - caddy-network
   # Still behind the `caddy` profile it inherits from docker-compose.yml, so `up` does not start
   # it - the agent does, once it has paired and the controller has a configuration to serve. That
   # is production behaviour and the suite follows it: starting Caddy here instead had the agent
@@ -132,14 +135,9 @@ services:
     environment:
       COMPOSE_SKIP_OVERRIDE: "1"
       COMPOSE_EXTRA_FILE: /compose/apps/controller/tests/docker-compose.test.yml
-      # The agent shells out to `docker compose` against the repo mounted at /compose. It adds
-      # --env-file only when /compose/.env exists, and the e2e stack deliberately runs without one,
-      # so the variables docker-compose.yml refuses to interpolate without have to arrive as real
-      # environment variables instead. Values are irrelevant -- the services it recreates take
-      # theirs from this file -- but absence aborts the whole compose invocation.
-      SESSION_SECRET: "test-l4-agent-interpolation-32chars"
+      # No SESSION_SECRET or POSTGRES_PASSWORD: the agent reads no env file and supplies placeholders
+      # for both itself.
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
-      POSTGRES_PASSWORD: "e2e-postgres-password"
   # ── First-run setup, on instances that have never been set up ────────────────
   # Two more, rather than resetting the main one: setup is single-use by design, so an instance
   # that has completed it cannot show those screens again. They are deliberately pointed at a dead
@@ -173,6 +171,7 @@ services:
         condition: service_healthy
     networks:
       - caddy-network
+      - database
     healthcheck:
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s
@@ -214,6 +213,7 @@ services:
         condition: service_healthy
     networks:
       - caddy-network
+      - database
     healthcheck:
       test: ["CMD", "/app/cpm-server", "--healthcheck"]
       interval: 5s

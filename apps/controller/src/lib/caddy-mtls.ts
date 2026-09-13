@@ -29,6 +29,10 @@ export function pemToBase64Der(pem: string): string {
  * so callers must pre-group domains sharing a CA config (`groupMtlsDomainsByCaSet`). Per CA:
  * unmanaged → trust anything it signed; managed with active certs → CA plus active leaves in
  * `trusted_leaf_certs`; all revoked → excluded. Null when no CA certs are left to trust.
+ *
+ * `verify_if_given` (path-scoped hosts) carries no leaf pins: Caddy's leaf verifier fails a
+ * handshake with no certificate, which would lock cert-less clients out of the open paths. Go still
+ * verifies chain and expiry of any presented cert, and the HTTP gate pins the fingerprints.
  */
 export function buildClientAuthentication(
   domains: string[],
@@ -37,12 +41,8 @@ export function buildClientAuthentication(
   issuedClientCertMap: Map<number, string[]>,
   cAsWithAnyIssuedCerts: Set<number>,
   mTlsDomainLeafOverride?: Map<string, string[]>,
-  mode: "require_and_verify" | "verify_if_given" | "request" = "require_and_verify",
+  mode: "require_and_verify" | "verify_if_given" = "require_and_verify",
 ): Record<string, unknown> | null {
-  if (mode === "request") {
-    return { mode: "request" };
-  }
-
   const caCertIds = new Set<number>();
   for (const domain of domains) {
     const ids = mTlsDomainMap.get(domain.toLowerCase());
@@ -108,12 +108,39 @@ export function buildClientAuthentication(
     mode,
     trusted_ca_certs: trustedCaCerts,
   };
-  if (trustedLeafCerts.length > 0) result.trusted_leaf_certs = trustedLeafCerts;
+  if (trustedLeafCerts.length > 0 && mode === "require_and_verify") {
+    result.trusted_leaf_certs = trustedLeafCerts;
+  }
   return result;
 }
 
 export function buildValidClientCertCelExpression(): string {
   return "{http.request.tls.client.fingerprint} != ''";
+}
+
+/** An unparseable expiry counts as expired, so bad data narrows trust rather than widening it. */
+export function isCertificateUnexpired(validTo: string, now = Date.now()): boolean {
+  const expiry = Date.parse(validTo);
+  return Number.isFinite(expiry) && expiry > now;
+}
+
+/**
+ * What a legacy whole-CA host admits on its gated paths: null for any cert the TLS layer verified,
+ * otherwise the active fingerprints. Mirrors buildClientAuthentication's `trusted_leaf_certs`, which
+ * pins the whole set once any CA in it has CPM-issued certs - and which path-scoped hosts cannot
+ * carry at the TLS layer.
+ */
+export function resolveLegacyCaFingerprints(
+  caIds: number[],
+  caFingerprintMap: Map<number, Set<string>>,
+  managedCaIds: Set<number>,
+): Set<string> | null {
+  if (!caIds.some((id) => managedCaIds.has(id))) return null;
+  const allowed = new Set<string>();
+  for (const id of caIds) {
+    for (const fp of caFingerprintMap.get(id) ?? []) allowed.add(fp);
+  }
+  return allowed;
 }
 
 /**
@@ -247,10 +274,11 @@ export function buildMtlsRbacSubroutes(
   }
 
   if (requireValidClientCertByDefault) {
-    const defaultExpression =
-      defaultAllowedFingerprints && defaultAllowedFingerprints.size > 0
-        ? buildFingerprintCelExpression(defaultAllowedFingerprints)
-        : buildValidClientCertCelExpression();
+    // An empty set denies: a host pinned to certs that are all revoked or expired must not fall
+    // back to "any verified cert". Undefined is what means unpinned.
+    const defaultExpression = defaultAllowedFingerprints
+      ? buildFingerprintCelExpression(defaultAllowedFingerprints)
+      : buildValidClientCertCelExpression();
 
     subroutes.push({
       match: [{ expression: defaultExpression }],

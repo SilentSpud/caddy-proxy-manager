@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { updateUserProfile } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
+import { MAX_AVATAR_DATA_URL_LENGTH } from "@/src/lib/avatar-limits";
 
 export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
@@ -32,9 +33,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check base64 size (rough estimate: base64 is ~33% larger than binary)
-      // 2MB binary = ~2.7MB base64, so limit to 3MB base64 string
-      if (avatarUrl.length > 3 * 1024 * 1024) {
+      if (avatarUrl.length > MAX_AVATAR_DATA_URL_LENGTH) {
         return NextResponse.json({ error: "Avatar image is too large" }, { status: 400 });
       }
     }

@@ -255,10 +255,13 @@ export function EditHostDialog({
   agents = [],
   assignedAgentIds = [],
   tailscaleDefaults,
+  canEditRawConfig = false,
 }: {
   open: boolean;
   host: ProxyHost;
   onClose: () => void;
+  /** Admins only. Omitted rather than disabled, so the save leaves an admin's snippet untouched. */
+  canEditRawConfig?: boolean;
   certificates: CertificatePickerOption[];
   accessLists: AccessList[];
   // Required, matching CreateHostDialog - see AuthentikFields (#232).
@@ -338,7 +341,7 @@ export function EditHostDialog({
           <PathBlocksFields initialData={host.pathBlocks} />
           <PathRewritesFields initialData={host.pathRewrites} />
           <ErrorPagesFields initialData={host.errorPages} />
-          <AdvancedConfigFields host={host} />
+          {canEditRawConfig && <AdvancedConfigFields host={host} />}
           <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
           <CpmForwardAuthFields
             cpmForwardAuth={host.cpmForwardAuth}

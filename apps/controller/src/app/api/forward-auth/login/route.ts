@@ -3,15 +3,24 @@ import { getTranslations } from "next-intl/server";
 import { verifyPassword } from "@/src/lib/password";
 import db from "@/src/lib/db";
 import { config } from "@/src/lib/config";
-import { lastHeaderValue } from "@/src/lib/request-headers";
+import { getClientIp } from "@/src/lib/client-ip";
 import {
   createForwardAuthSession,
   createExchangeCode,
   checkHostAccess,
   consumeRedirectIntent,
+  hasLiveRedirectIntent,
 } from "@/src/lib/models/forward-auth";
 import { logAuditEvent } from "@/src/lib/audit";
-import { isRateLimited, registerFailedAttempt, resetAttempts } from "@/src/lib/rate-limit";
+import {
+  accountKey,
+  accountRetryAfterMs,
+  isRateLimited,
+  registerAccountFailure,
+  registerFailedAttempt,
+  resetAccountFailures,
+  resetAttempts,
+} from "@/src/lib/rate-limit";
 
 /** Forward auth login - validates credentials and starts the exchange flow, given a rid. */
 export async function POST(request: NextRequest) {
@@ -42,14 +51,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("missingRedirectIntent") }, { status: 400 });
     }
 
-    // Rate limiting - prefer x-real-ip (set by reverse proxy) over x-forwarded-for
-    const ip =
-      lastHeaderValue(request.headers.get("x-real-ip")) ||
-      lastHeaderValue(request.headers.get("x-forwarded-for")) ||
-      "unknown";
+    const ip = (await getClientIp(request.headers)) ?? "unknown";
+    const account = accountKey(username);
     const rateLimitResult = await isRateLimited(ip);
-    if (rateLimitResult.blocked) {
+    if (rateLimitResult.blocked || accountRetryAfterMs(account) > 0) {
       return NextResponse.json({ error: t("tooManyLoginAttempts") }, { status: 429 });
+    }
+
+    // Before the password, so a request without a live intent learns nothing about the credentials.
+    if (!(await hasLiveRedirectIntent(rid))) {
+      return NextResponse.json({ error: t("invalidRedirectIntent") }, { status: 400 });
     }
 
     // Authenticate using the same logic as the credentials provider
@@ -60,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     if (user?.status !== "active" || !user.passwordHash) {
       await registerFailedAttempt(ip);
+      registerAccountFailure(account);
       await logAuditEvent({
         userId: null,
         action: "forward_auth_login_failed",
@@ -72,6 +84,7 @@ export async function POST(request: NextRequest) {
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
       await registerFailedAttempt(ip);
+      registerAccountFailure(account);
       await logAuditEvent({
         userId: user.id,
         action: "forward_auth_login_failed",
@@ -82,8 +95,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: t("invalidCredentials") }, { status: 401 });
     }
 
-    // Successful credential check - reset rate limiter for this IP
     resetAttempts(ip);
+    resetAccountFailures(account);
 
     // Consume the redirect intent - returns the server-stored redirect URI.
     // This is a one-time operation: the intent is deleted after consumption.

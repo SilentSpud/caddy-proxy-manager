@@ -61,6 +61,35 @@ Caddy switches to the agent's copy of the GeoIP databases the next time the agen
 the Agents page then reports a log permission problem - an existing `waf-audit.log` is usually
 `0644`, which the agent can read but not truncate - it shows the one command that fixes it.
 
+### Upgrading to the isolated Caddy admin API
+
+Caddy's admin API no longer listens on `caddy-network`, where your upstream containers could reach
+it, but on an internal `caddy-admin` network only web and the agent share. PostgreSQL and ClickHouse
+move to internal networks of their own, and the agent no longer reads `.env`. After pulling the new
+`docker-compose.yml`, on the controller host and on every agent host that runs it:
+
+```bash
+docker compose up -d
+docker rm -f caddy-proxy-manager-caddy
+docker compose restart agent
+```
+
+The old Caddy container is not on the new network, so the agent cannot reach its admin API until
+it is replaced. Removing it keeps its volumes, and the restarted agent starts a new one with its own
+port and module overrides. Then check:
+
+- **`CADDY_API_URL` in `.env`.** Delete it, or set `http://caddy-admin:2019`: `caddy` can resolve to
+  Caddy's `caddy-network` address, where the admin API no longer answers.
+- **A `docker-compose.override.yml` that interpolates variables** into `caddy`, `clickhouse` or
+  `geoipupdate`. The agent's Compose sees only the agent's environment now, so forward each one
+  under `agent.environment` in the override, as `MY_VAR: ${MY_VAR:-}`.
+- **`.env` stays `0600`.** If you loosened it so the agent could read it, tighten it again.
+- **Analytics or GeoIP already on.** Their containers keep the old network until recreated; switch
+  each off and on again under Settings so the agent recreates it with the stored credentials.
+- **An `acme-ca` volume from an earlier release** keeps its old `0777` mode. Tighten it with
+  `docker run --rm -v <project>_acme-ca:/acme-ca alpine sh -c 'chown 10001:10001 /acme-ca && chmod 0755 /acme-ca'`,
+  using web's `PUID`/`PGID` if you changed them.
+
 ---
 
 ## First Run
@@ -228,7 +257,8 @@ is still honoured as an override until a value is stored.
 | ------- | -------- | ------- |
 | Application name - sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
-| Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy:2019` |
+| Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy-admin:2019` |
+| Pinned as `admin.listen` in a config the controller loads with no agent in between, as the agent pins every config it forwards. Must match the `caddy` service's value | `CADDY_ADMIN_LISTEN` | `caddy-admin:2019` in `docker-compose.yml`, else unset (sent as built) |
 | Gravatar fallback for user icons. Off keeps every avatar lookup off the network | `AVATAR_GRAVATAR` | `true` |
 | Internal forward-auth address Caddy dials. Derived from the container network when empty | `FORWARD_AUTH_INTERNAL_URL` | Derived |
 | Seconds before an xcaddy rebuild is abandoned | `CADDY_BUILD_TIMEOUT` | `1800` |
@@ -298,14 +328,16 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
-| `CONTROLLER_URL` | Where the agent dials to reach its controller. A tailnet IP or MagicDNS name works here like any other address. Overridden by `--host`/`--port` | Unset (idle until paired) |
+| `CONTROLLER_URL` | Where the agent dials to reach its controller. A tailnet IP or MagicDNS name works here like any other address. A bare host means `https://`, except loopback and single-label names such as `web`. Overridden by `--host`/`--port` | Unset (idle until paired) |
+| `CONTROLLER_ALLOW_INSECURE_HTTP` | Dial a plain `http://` controller address that is not private anyway. Without it the agent refuses one, because pairing sends the shared secret over that link. `http://` to loopback, a compose service name, an RFC 1918 range or a tailnet is allowed and only logs a warning | `false` |
 | `PAIRING_CODE` | Pair on first start instead of idling. Overridden by `--code` | Unset |
-| `AGENT_MODE` | `standalone` or `managed`. Startup fails on any other value rather than guessing | `standalone` |
+| `AGENT_MODE` | `standalone` or `managed`, shown on the controller's agent status. A label only: either way the agent dials out and binds just its local control socket. Startup fails on any other value | `standalone` |
 | `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
 | `DATA_DIR` | Where the agent's SQLite state, control socket and GeoIP databases live. Must be writable | `/data` |
 | `CONTROLLER_DATA_DIR` | The controller's data volume, mounted read-only: where the bootstrap token is read from, and where an upgraded agent copies its old state from on first start | Unset (token read from `DATA_DIR`) |
-| `COMPOSE_DIR` | Where the compose project files are mounted, read-only | `/compose` |
-| `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy:2019` |
+| `COMPOSE_DIR` | Where the compose project files are mounted, read-only. The agent never reads `.env` from it: what Compose interpolates into the services it runs comes from the agent's own environment | `/compose` |
+| `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy-admin:2019` in `docker-compose.yml`, else `http://caddy:2019` |
+| `CADDY_ADMIN_LISTEN` | Pinned as `admin.listen` in every config the agent forwards to Caddy, replacing the controller's bind-every-interface default. `docker-compose.yml` sets `caddy-admin:2019` here and on the `caddy` service, whose Caddyfile binds the same address until the first config arrives - a name only the internal `caddy-admin` network resolves | Unset (forwarded as sent) |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
 | `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
@@ -545,6 +577,9 @@ TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:5432/cpm_test bun run test
   and the login lockout (5 failed sign-ins per 5 minutes, then blocked for 15). Both are Settings
   fields
 - Audit trail for all configuration changes
+- Caddy's admin API, PostgreSQL and ClickHouse sit on internal networks the containers you proxy to
+  cannot reach. The agent is root-equivalent on its host; [SECURITY.md](SECURITY.md) says why and
+  what bounds it
 - Supports OAuth2/OIDC for SSO, including group-based roles and an OIDC-only mode with no local accounts
 
 **Production Setup:**
@@ -898,16 +933,24 @@ serve. Reach the dashboard on `:3000` to complete it, and Caddy starts on its ow
 
 An agent on another host cannot mount that volume, so it pairs with a code you carry.
 
-Generate one under **Settings → Agents**. It is six letters, valid for five minutes, works once,
-and is refused after ten wrong guesses. Then, on the agent's host:
+Generate one under **Settings → Agents**. It is six letters, valid for five minutes and works once.
+Wrong guesses are limited to five a minute per client address and 200 per code. Then, on the
+agent's host:
 
 ```bash
-docker exec caddy-proxy-manager-agent cpm-agent --pair --host 10.0.0.5 --code ABCDEF
+docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm.example.com --code ABCDEF
 ```
 
-`--host` is the controller's address as the agent can reach it; add `--port` if it is not 3000. The
-two exchange a secret, which is stored encrypted on the controller and in the agent's own database,
-and the code is never used again. The agent then pulls its configuration and starts Caddy.
+`--host` is the controller's address as the agent can reach it. A bare host means `https://` on
+443, except loopback and single-label names such as `web`. Plain `http://` towards a private address
+(RFC 1918, a tailnet) works with a warning - `--host http://10.0.0.5:3000` - and towards a public
+one is refused unless `CONTROLLER_ALLOW_INSECURE_HTTP=true`, because pairing sends the shared secret
+over this link. The two exchange a secret, which is stored encrypted on the controller and in the
+agent's own database, and the code is never used again. The agent then pulls its configuration and
+starts Caddy.
+
+The code pairs only an agent the controller has never seen. To re-pair one that is already listed -
+its database was rebuilt, say - use **Re-pair** on its row, which mints a code for that agent alone.
 
 `--pair` talks to the agent already running on that host rather than doing the work itself - the
 running process is the one holding the database the secret lands in and the stream it will open.
@@ -933,8 +976,10 @@ Three ways to address it, all of which work:
 | `https://cpm-controller.tailnet-1234.ts.net` | Behind `tailscale serve --bg --https=443 http://127.0.0.1:3000` on the controller's host |
 
 An `https://` address with no port means **443**, because the controller serves plain HTTP and an
-https address means something in front of it is terminating TLS. A bare host or an `http://`
-address with no port still means 3000. `--port` overrides either.
+https address means something in front of it is terminating TLS. An `http://` address with no port
+still means 3000. A bare host means `https://`, unless it is a single-label name like
+`cpm-controller`, which keeps meaning `http://` on 3000. `--port` overrides either. Plain http to a
+tailnet IP or name is allowed, since the tailnet encrypts it, and logs a warning.
 
 **Getting the agent onto the tailnet.** If the agent's host is already on it, there is nothing to
 do. Otherwise put the container on the tailnet however you normally would - a `tailscale/tailscale`
@@ -1072,8 +1117,9 @@ selection and click Rebuild again. If the agent is restarted mid-build (a host
 reboot, say), it clears the stale "building" state on startup and the button
 becomes available again.
 
-Rebuilding needs `BUILD: 1` on the `docker-socket-proxy` service (the default in
-`docker-compose.yml`). Set it to `0` to opt out: everything else keeps working,
+Rebuilding needs `GRPC: 1` and `SESSION: 1` on the `docker-socket-proxy` service (the
+default in `docker-compose.yml`), which BuildKit builds through. Set both to `0` to opt
+out: everything else keeps working,
 and you can run `docker compose build caddy` yourself. Note that a hand-run build
 does not tell the agent anything, so the app keeps assuming the shipped module set
 until a rebuild goes through the agent.

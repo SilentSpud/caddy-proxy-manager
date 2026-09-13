@@ -90,3 +90,29 @@ updates:
       - "docker"
     commit-message:
       prefix: "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/docker/agent"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "docker"
+
+  # The third-party images docker-compose.yml runs, pinned by tag and digest. Our own web, caddy and
+  # agent images stay on :latest there, and release.yml pins those per release.
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "docker"

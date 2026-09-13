@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
+import { MAX_AVATAR_FILE_KB } from "@/src/lib/avatar-limits";
 import { authClient } from "@/src/lib/auth-client";
 import { Key, Link, LogIn, Lock, LogOut, Monitor, Plus, Trash2, Unlink, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -166,6 +167,7 @@ export default function ProfileClient({
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [removePasswordDialogOpen, setRemovePasswordDialogOpen] = useState(false);
   const [removePasswordCurrent, setRemovePasswordCurrent] = useState("");
+  const [unlinkCurrentPassword, setUnlinkCurrentPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -259,6 +261,7 @@ export default function ProfileClient({
       const response = await fetch("/api/user/unlink-oauth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: unlinkCurrentPassword }),
       });
 
       const data = await response.json();
@@ -271,6 +274,7 @@ export default function ProfileClient({
 
       setSuccess(t("oauthUnlinked"));
       setUnlinkDialogOpen(false);
+      setUnlinkCurrentPassword("");
       setLoading(false);
 
       // Reload page to reflect changes
@@ -346,9 +350,8 @@ export default function ProfileClient({
       return;
     }
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setError(t("avatarTooLarge"));
+    if (file.size > MAX_AVATAR_FILE_KB * 1024) {
+      setError(t("avatarTooLarge", { max: MAX_AVATAR_FILE_KB }));
       return;
     }
 
@@ -492,7 +495,7 @@ export default function ProfileClient({
                     value={null}
                     onChange={handleAvatarUpload}
                     isDisabled={loading}
-                    description={t("avatarUploadHelp")}
+                    description={t("avatarUploadHelp", { max: MAX_AVATAR_FILE_KB })}
                   />
                   {avatarUrl && (
                     <IconButton
@@ -839,17 +842,29 @@ export default function ProfileClient({
 
       <AppDialog
         open={unlinkDialogOpen}
-        onClose={() => setUnlinkDialogOpen(false)}
+        onClose={() => {
+          setUnlinkDialogOpen(false);
+          setUnlinkCurrentPassword("");
+        }}
         title={t("unlinkOauthAccount")}
         maxWidth="sm"
         submitLabel={t("unlinkOauth")}
         onSubmit={handleUnlinkOAuth}
         isSubmitting={loading}
       >
-        <Text type="body" size="sm" color="secondary">
-          Are you sure you want to unlink your {linkedNames.join(", ")} account? You will only be
-          able to sign in with your username and password after this.
-        </Text>
+        <VStack gap={3}>
+          <Text type="body" size="sm" color="secondary">
+            {t("unlinkOauthConfirm", { providers: linkedNames.join(", ") })}
+          </Text>
+          <TextInput
+            {...AUTOFILL_CURRENT_PASSWORD}
+            label={t("currentPassword")}
+            type="password"
+            value={unlinkCurrentPassword}
+            onChange={setUnlinkCurrentPassword}
+            isRequired
+          />
+        </VStack>
       </AppDialog>
 
       <AppDialog

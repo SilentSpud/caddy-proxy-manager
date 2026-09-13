@@ -15,6 +15,8 @@ import {
   BUILD_OVERRIDE_FILE,
   composeEnv,
   type DockerHost,
+  invalidCaddyModule,
+  invalidL4Port,
   L4_OVERRIDE_FILE,
   renderCaddyBuildOverride,
   renderL4PortsOverride,
@@ -125,6 +127,20 @@ export class Operations {
    * make its own HTTP client time out mid-operation.
    */
   applyL4Ports(ports: string[]): void {
+    // Checked before the lock and before any file is written: a frame carrying one bad entry is
+    // refused whole, since publishing the rest would report a port set nobody asked for.
+    const invalid = invalidL4Port(ports);
+    if (invalid !== null) {
+      const error = `Invalid port mapping ${JSON.stringify(invalid)}`;
+      console.warn(`[agent] refusing port change: ${error}`);
+      this.store.setL4PortsStatus({
+        state: "failed",
+        message: `The port change was refused: ${error}. Expected HOST:CONTAINER[/tcp|/udp].`,
+        triggeredAt: new Date().toISOString(),
+        error,
+      });
+      return;
+    }
     this.begin("l4-ports");
     const triggeredAt = new Date().toISOString();
     this.store.setL4PortsStatus({
@@ -179,6 +195,18 @@ export class Operations {
   // ─── Caddy build ───────────────────────────────────────────────────────────
 
   applyCaddyBuild(modules: string[]): void {
+    const invalid = invalidCaddyModule(modules);
+    if (invalid !== null) {
+      const error = `Invalid module spec ${JSON.stringify(invalid)}`;
+      console.warn(`[agent] refusing rebuild: ${error}`);
+      this.store.setCaddyBuildStatus({
+        state: "failed",
+        message: `The rebuild was refused and the running container left untouched: ${error}.`,
+        triggeredAt: new Date().toISOString(),
+        error,
+      });
+      return;
+    }
     this.begin("caddy-build");
     const triggeredAt = new Date().toISOString();
     this.store.setCaddyBuildStatus({

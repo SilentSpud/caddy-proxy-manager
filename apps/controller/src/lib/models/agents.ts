@@ -69,11 +69,18 @@ export async function listAgents(): Promise<PairedAgent[]> {
   return rows.map(toView);
 }
 
-export async function saveAgent(input: {
+/**
+ * Store a newly paired agent, or return null when that agentId is already paired.
+ *
+ * Never an upsert: a pairing that could overwrite an existing row would let any code displace an
+ * agent that is serving traffic, and re-enable one an operator disabled. Replacing a secret is
+ * `replaceAgentSecret`, which the pair route reaches only with a credential minted for that agent.
+ */
+export async function insertPairedAgent(input: {
   name: string;
   agentId: string;
   secret: string;
-}): Promise<PairedAgent> {
+}): Promise<PairedAgent | null> {
   const now = nowIso();
   const [row] = await db
     .insert(agents)
@@ -85,21 +92,36 @@ export async function saveAgent(input: {
       createdAt: now,
       updatedAt: now,
     })
-    // The same host pairing again replaces its secret. That is the recovery path for an agent whose
-    // database was rebuilt, and refusing it would leave the operator editing this table by hand.
-    .onConflictDoUpdate({
-      target: agents.agentId,
-      set: {
-        name: input.name,
-        secret: encryptSecret(input.secret),
-        enabled: true,
-        lastError: null,
-        updatedAt: now,
-      },
-    })
+    .onConflictDoNothing({ target: agents.agentId })
     .returning();
+  return row ? toView(row) : null;
+}
 
-  return toView(row);
+/**
+ * Give an existing agent a new secret - the recovery path for a host whose database was rebuilt.
+ *
+ * Leaves `enabled` and the operator's name for it alone: re-pairing restores a credential, it does
+ * not undo decisions made about the agent.
+ */
+export async function replaceAgentSecret(input: {
+  agentId: string;
+  secret: string;
+}): Promise<void> {
+  await db
+    .update(agents)
+    .set({ secret: encryptSecret(input.secret), lastError: null, updatedAt: nowIso() })
+    .where(eq(agents.agentId, input.agentId));
+}
+
+/** Who an agentId belongs to, disabled or not, without its secret. */
+export async function findAgentRowByAgentId(agentId: string): Promise<PairedAgent | null> {
+  const [row] = await db.select().from(agents).where(eq(agents.agentId, agentId)).limit(1);
+  return row ? toView(row) : null;
+}
+
+export async function findAgentById(id: number): Promise<PairedAgent | null> {
+  const [row] = await db.select().from(agents).where(eq(agents.id, id)).limit(1);
+  return row ? toView(row) : null;
 }
 
 /** The stored row for an agent asserting this id, secret included, or null if it is unknown. */
@@ -124,8 +146,13 @@ export async function renameAgent(id: number, name: string): Promise<void> {
     .where(eq(agents.id, id));
 }
 
-export async function deleteAgent(id: number): Promise<void> {
-  await db.delete(agents).where(eq(agents.id, id));
+/** Delete a row, returning the agentId it held so the caller can drop that agent's stream. */
+export async function deleteAgent(id: number): Promise<string | null> {
+  const [row] = await db
+    .delete(agents)
+    .where(eq(agents.id, id))
+    .returning({ agentId: agents.agentId });
+  return row?.agentId ?? null;
 }
 
 /**

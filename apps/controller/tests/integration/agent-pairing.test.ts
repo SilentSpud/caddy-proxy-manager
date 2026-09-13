@@ -3,11 +3,11 @@
  *
  * A row in `agents` lets whoever holds its secret run Caddy admin calls on another host, so the
  * properties worth pinning are about what the exchange refuses and what it never lets out: the
- * secret must not be stored in the clear, the code must work exactly once, and guessing must be
- * bounded.
+ * secret must not be stored in the clear, a credential must work exactly once, guessing must be
+ * bounded, and no credential anyone could hold may displace an agent that is already paired.
  *
  * The route is exercised directly. There is no agent to stand up any more - the agent's side of
- * pairing is one unsigned POST - which is most of why this file is a third of its old length.
+ * pairing is one unsigned POST.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -32,30 +32,52 @@ vi.mock('../../src/lib/db', () => ({
   },
 }));
 
+import { eq } from 'drizzle-orm';
 import * as schema from '../../src/lib/db/schema';
-const { ensurePairingCode, redeemPairingCode, resetPairingCodes } = await import(
-  '../../src/lib/agent/pairing-codes'
+const {
+  clientThrottled,
+  ensurePairingCode,
+  mintRepairCode,
+  recordFailedGuess,
+  redeemPairingCode,
+  redeemRepairCode,
+  resetPairingCodes,
+} = await import('../../src/lib/agent/pairing-codes');
+const { deleteAgent, listAgents, findAgentByAgentId, renameAgent } = await import(
+  '../../src/lib/models/agents'
 );
-const { listAgents, findAgentByAgentId } = await import('../../src/lib/models/agents');
+const bootstrap = await import('../../src/lib/agent/bootstrap');
 const { POST } = await import('../../src/app/api/agent/v1/pair/route');
 
 const AGENT_ID = 'a'.repeat(32);
+const OTHER_ID = 'b'.repeat(32);
 
-function pairRequest(body: unknown): Request {
+function pairRequest(body: unknown, headers: Record<string, string> = {}): Request {
   return new Request('http://controller.test/api/agent/v1/pair', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 }
 
+async function pair(code: string, agentId = AGENT_ID, headers: Record<string, string> = {}) {
+  return POST(pairRequest({ code, agentId, agentVersion: '3.0.0' }, headers));
+}
+
+async function secretOf(response: Response): Promise<string> {
+  return ((await response.json()) as { secret: string }).secret;
+}
+
 beforeEach(async () => {
   resetPairingCodes();
+  bootstrap.resetBootstrapState();
   await ctx.db.delete(schema.agents);
+  await ctx.db.delete(schema.settings);
 });
 
 afterEach(() => {
   resetPairingCodes();
+  bootstrap.resetBootstrapState();
 });
 
 describe('pairing codes', () => {
@@ -85,15 +107,41 @@ describe('pairing codes', () => {
     expect(redeemPairingCode(code).ok).toBe(false);
   });
 
-  it('burns the code after ten wrong guesses, bounding a five-minute guessing window', () => {
+  it('survives 199 wrong guesses, so one noisy client cannot burn it', () => {
     const { code } = ensurePairingCode();
-    for (let i = 0; i < 10; i += 1) expect(redeemPairingCode('ZZZZZZ').ok).toBe(false);
+    for (let i = 0; i < 199; i += 1) expect(redeemPairingCode('ZZZZZZ').ok).toBe(false);
+    expect(redeemPairingCode(code).ok).toBe(true);
+  });
+
+  it('burns the code after 200 wrong guesses in total, bounding a guessing botnet', () => {
+    const { code } = ensurePairingCode();
+    for (let i = 0; i < 200; i += 1) expect(redeemPairingCode('ZZZZZZ').ok).toBe(false);
     expect(redeemPairingCode(code).ok).toBe(false);
   });
 
   it('accepts a code typed in lower case with stray spaces', () => {
     const { code } = ensurePairingCode();
     expect(redeemPairingCode(`  ${code.toLowerCase()} `).ok).toBe(true);
+  });
+
+  it('keeps a re-pair code to the agent it was minted for', () => {
+    const { code } = mintRepairCode(AGENT_ID);
+    expect(redeemRepairCode(OTHER_ID, code).ok).toBe(false);
+    // Neither is the live code, nor does it stand in for one.
+    expect(redeemPairingCode(code).ok).toBe(false);
+    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(true);
+    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(false);
+  });
+
+  it('throttles a client after five wrong guesses in a minute, and forgets it after', () => {
+    const now = Date.now();
+    for (let i = 0; i < 5; i += 1) {
+      expect(clientThrottled('203.0.113.9', now)).toBe(false);
+      recordFailedGuess('203.0.113.9', now);
+    }
+    expect(clientThrottled('203.0.113.9', now)).toBe(true);
+    expect(clientThrottled('198.51.100.7', now)).toBe(false);
+    expect(clientThrottled('203.0.113.9', now + 61_000)).toBe(false);
   });
 });
 
@@ -117,8 +165,7 @@ describe('POST /api/agent/v1/pair', () => {
 
   it('never stores the secret in the clear', async () => {
     const { code } = ensurePairingCode();
-    const response = await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
-    const { secret } = (await response.json()) as { secret: string };
+    const secret = await secretOf(await pair(code));
 
     const [row] = await ctx.db.select().from(schema.agents);
     expect(row.secret).not.toBe(secret);
@@ -128,19 +175,15 @@ describe('POST /api/agent/v1/pair', () => {
 
   it('refuses a wrong code with 401 and stores nothing', async () => {
     ensurePairingCode();
-    const response = await POST(
-      pairRequest({ code: 'ZZZZZZ', agentId: AGENT_ID, agentVersion: '3.0.0' }),
-    );
+    const response = await pair('ZZZZZZ');
     expect(response.status).toBe(401);
     expect(await listAgents()).toHaveLength(0);
   });
 
   it('refuses a code that was already redeemed', async () => {
     const { code } = ensurePairingCode();
-    await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
-    const second = await POST(
-      pairRequest({ code, agentId: 'b'.repeat(32), agentVersion: '3.0.0' }),
-    );
+    await pair(code);
+    const second = await pair(code, OTHER_ID);
     expect(second.status).toBe(401);
     expect(await listAgents()).toHaveLength(1);
   });
@@ -153,28 +196,9 @@ describe('POST /api/agent/v1/pair', () => {
     expect(redeemPairingCode(code).ok).toBe(true);
   });
 
-  it('re-pairing the same host replaces its secret rather than adding a row', async () => {
-    const first = ensurePairingCode();
-    const a = await POST(
-      pairRequest({ code: first.code, agentId: AGENT_ID, agentVersion: '3.0.0' }),
-    );
-    const secretA = ((await a.json()) as { secret: string }).secret;
-
-    resetPairingCodes();
-    const second = ensurePairingCode();
-    const b = await POST(
-      pairRequest({ code: second.code, agentId: AGENT_ID, agentVersion: '3.0.0' }),
-    );
-    const secretB = ((await b.json()) as { secret: string }).secret;
-
-    expect(secretB).not.toBe(secretA);
-    expect(await listAgents()).toHaveLength(1);
-    expect((await findAgentByAgentId(AGENT_ID))?.secret).toBe(secretB);
-  });
-
   it('names an agent that did not name itself', async () => {
     const { code } = ensurePairingCode();
-    await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
+    await pair(code);
     expect((await listAgents())[0].name).toBe(`Agent ${AGENT_ID.slice(0, 8)}`);
   });
 
@@ -184,6 +208,80 @@ describe('POST /api/agent/v1/pair', () => {
       new Request('http://controller.test/api/agent/v1/pair', { method: 'POST', body: 'nonsense' }),
     );
     expect(response.status).toBe(400);
+  });
+});
+
+describe('an agent that is already paired', () => {
+  it('cannot be displaced with the shared code, which stays usable for a new agent', async () => {
+    const original = await secretOf(await pair(ensurePairingCode().code));
+
+    resetPairingCodes();
+    const { code } = ensurePairingCode();
+    const hijack = await pair(code);
+    expect(hijack.status).toBe(401);
+    expect((await findAgentByAgentId(AGENT_ID))?.secret).toBe(original);
+
+    // Refused before the code was spent: an attacker naming a known id must not burn it.
+    expect((await pair(code, OTHER_ID)).status).toBe(200);
+  });
+
+  it('is never re-enabled by pairing, even with a code minted for it', async () => {
+    await pair(ensurePairingCode().code);
+    await ctx.db.update(schema.agents).set({ enabled: false });
+    const { code } = mintRepairCode(AGENT_ID);
+
+    const response = await pair(code);
+    expect(response.status).toBe(403);
+    const [row] = await ctx.db
+      .select()
+      .from(schema.agents)
+      .where(eq(schema.agents.agentId, AGENT_ID));
+    expect(row.enabled).toBe(false);
+    // Nothing was spent on a refusal.
+    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(true);
+  });
+
+  it('recovers with a re-pair code minted for it, keeping its row and its name', async () => {
+    const first = await secretOf(await pair(ensurePairingCode().code));
+    const [row] = await listAgents();
+    await renameAgent(row.id, 'edge-renamed');
+
+    const { code } = mintRepairCode(AGENT_ID);
+    const response = await pair(code);
+    expect(response.status).toBe(200);
+    const second = await secretOf(response);
+
+    expect(second).not.toBe(first);
+    const agents = await listAgents();
+    expect(agents).toHaveLength(1);
+    expect(agents[0].name).toBe('edge-renamed');
+    expect((await findAgentByAgentId(AGENT_ID))?.secret).toBe(second);
+    expect((await pair(code)).status).toBe(401);
+  });
+
+  it('cannot be re-paired with a code minted for a different agent', async () => {
+    await pair(ensurePairingCode().code);
+    resetPairingCodes();
+    await pair(ensurePairingCode().code, OTHER_ID);
+    const { code } = mintRepairCode(OTHER_ID);
+
+    expect((await pair(code, AGENT_ID)).status).toBe(401);
+  });
+});
+
+describe('guessing from one address', () => {
+  // The address comes from X-Forwarded-For here: the test server stamps no peer address, and
+  // X-Real-IP is never trusted.
+  const from = { 'x-forwarded-for': '203.0.113.9' };
+
+  it('stops a client after five wrong codes, even when its sixth is right', async () => {
+    const { code } = ensurePairingCode();
+    for (let i = 0; i < 5; i += 1) expect((await pair('ZZZZZZ', AGENT_ID, from)).status).toBe(401);
+
+    expect((await pair(code, AGENT_ID, from)).status).toBe(429);
+    // Another client still pairs with the same code: the throttled one could not burn it.
+    const elsewhere = await pair(code, AGENT_ID, { 'x-forwarded-for': '198.51.100.7' });
+    expect(elsewhere.status).toBe(200);
   });
 });
 
@@ -204,72 +302,151 @@ describe('bootstrap token', () => {
     process.env.L4_PORTS_DIR = undefined;
   });
 
-  it('writes a token once and leaves it alone on the next start', async () => {
+  async function readToken(): Promise<string> {
     const { readFileSync } = await import('node:fs');
-    const { ensureBootstrapToken, bootstrapPath } = await import('../../src/lib/agent/bootstrap');
+    return readFileSync(bootstrap.bootstrapPath(), 'utf-8').trim();
+  }
 
-    expect(ensureBootstrapToken()).toBe(true);
-    const first = readFileSync(bootstrapPath(), 'utf-8');
+  async function tokenOnDisk(): Promise<boolean> {
+    const { existsSync } = await import('node:fs');
+    return existsSync(bootstrap.bootstrapPath());
+  }
+
+  it('writes a token when nothing is paired, and keeps it on a second call', async () => {
+    expect(await bootstrap.ensureBootstrapToken()).toBe(true);
+    const first = await readToken();
     expect(first).toMatch(/^[0-9a-f]{64}$/);
 
-    // A restart must not invalidate a token an agent has already read but not yet redeemed.
-    ensureBootstrapToken();
-    expect(readFileSync(bootstrapPath(), 'utf-8')).toBe(first);
+    await bootstrap.ensureBootstrapToken();
+    expect(await readToken()).toBe(first);
   });
 
-  it('pairs an agent that presents it, and rotates it so it cannot be replayed', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { ensureBootstrapToken, bootstrapPath } = await import('../../src/lib/agent/bootstrap');
-    ensureBootstrapToken();
-    const token = readFileSync(bootstrapPath(), 'utf-8').trim();
+  it('pairs an agent that presents it and deletes it, so it cannot be replayed', async () => {
+    await bootstrap.ensureBootstrapToken();
+    const token = await readToken();
 
-    const response = await POST(
-      pairRequest({ code: token, agentId: AGENT_ID, agentVersion: '3.0.0' }),
-    );
-    expect(response.status).toBe(200);
+    expect((await pair(token)).status).toBe(200);
     expect(await listAgents()).toHaveLength(1);
+    expect(await bootstrap.isBundledAgent(AGENT_ID)).toBe(true);
 
-    // Rotated, not deleted: the next agent to come up needs one of its own.
-    const rotated = readFileSync(bootstrapPath(), 'utf-8').trim();
-    expect(rotated).toMatch(/^[0-9a-f]{64}$/);
-    expect(rotated).not.toBe(token);
-
-    // And the one just used is dead.
-    const replay = await POST(
-      pairRequest({ code: token, agentId: 'c'.repeat(32), agentVersion: '3.0.0' }),
-    );
-    expect(replay.status).toBe(401);
+    // Deleted, not rotated: nothing is left on the volume for anyone else to read.
+    expect(await tokenOnDisk()).toBe(false);
+    expect((await pair(token, 'c'.repeat(32))).status).toBe(401);
     expect(await listAgents()).toHaveLength(1);
   });
 
   it('refuses a token that is the right shape but not the stored one', async () => {
-    const { ensureBootstrapToken } = await import('../../src/lib/agent/bootstrap');
-    ensureBootstrapToken();
-
-    const response = await POST(
-      pairRequest({ code: 'd'.repeat(64), agentId: AGENT_ID, agentVersion: '3.0.0' }),
-    );
-    expect(response.status).toBe(401);
+    await bootstrap.ensureBootstrapToken();
+    expect((await pair('d'.repeat(64))).status).toBe(401);
     expect(await listAgents()).toHaveLength(0);
   });
 
+  it('accepts no token this process did not write, whatever is on the volume', async () => {
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(bootstrap.bootstrapPath(), 'e'.repeat(64));
+    expect((await pair('e'.repeat(64))).status).toBe(401);
+  });
+
   it('does not let a bootstrap token stand in for a typed code when none was written', async () => {
-    // No ensureBootstrapToken() here: a controller with no shared volume must refuse this outright
-    // rather than falling through to the six-letter path and comparing against a live code.
+    // A controller with no shared volume must refuse this outright rather than falling through to
+    // the six-letter path and comparing against a live code.
     ensurePairingCode();
-    const response = await POST(
-      pairRequest({ code: 'e'.repeat(64), agentId: AGENT_ID, agentVersion: '3.0.0' }),
-    );
-    expect(response.status).toBe(401);
+    expect((await pair('e'.repeat(64))).status).toBe(401);
     expect(await listAgents()).toHaveLength(0);
   });
 
   it('leaves the typed-code path working alongside it', async () => {
-    const { ensureBootstrapToken } = await import('../../src/lib/agent/bootstrap');
-    ensureBootstrapToken();
+    await bootstrap.ensureBootstrapToken();
+    expect((await pair(ensurePairingCode().code)).status).toBe(200);
+  });
 
-    const { code } = ensurePairingCode();
-    const response = await POST(pairRequest({ code, agentId: AGENT_ID, agentVersion: '3.0.0' }));
+  it('lets exactly one of two simultaneous redemptions through', async () => {
+    await bootstrap.ensureBootstrapToken();
+    const token = await readToken();
+
+    const statuses = (await Promise.all([pair(token, AGENT_ID), pair(token, OTHER_ID)]))
+      .map((response) => response.status)
+      .sort();
+    expect(statuses).toEqual([200, 401]);
+    expect(await listAgents()).toHaveLength(1);
+  });
+
+  it('refuses a token whose file was already claimed by another process', async () => {
+    const { rmSync } = await import('node:fs');
+    await bootstrap.ensureBootstrapToken();
+    const token = await readToken();
+    rmSync(bootstrap.bootstrapPath());
+
+    expect((await pair(token)).status).toBe(401);
+  });
+
+  it('expires', async () => {
+    await bootstrap.ensureBootstrapToken();
+    const token = await readToken();
+    const later = Date.now() + bootstrap.BOOTSTRAP_TOKEN_TTL_MS + 1;
+
+    expect(bootstrap.redeemBootstrapToken(token, AGENT_ID, false, later)).toBe(false);
+    expect(await tokenOnDisk()).toBe(false);
+    expect((await pair(token)).status).toBe(401);
+  });
+
+  it('writes no token while the bundled agent is paired', async () => {
+    await bootstrap.ensureBootstrapToken();
+    await pair(await readToken());
+
+    bootstrap.resetBootstrapState();
+    expect(await bootstrap.ensureBootstrapToken()).toBe(false);
+    expect(await tokenOnDisk()).toBe(false);
+  });
+
+  it('cannot displace an agent that is already paired', async () => {
+    const original = await secretOf(await pair(ensurePairingCode().code));
+    await bootstrap.enableAutoPairing();
+
+    expect((await pair(await readToken())).status).toBe(401);
+    expect((await findAgentByAgentId(AGENT_ID))?.secret).toBe(original);
+  });
+
+  it('re-pairs the bundled agent with a token bound to it, and nobody else with that token', async () => {
+    await bootstrap.ensureBootstrapToken();
+    const first = await secretOf(await pair(await readToken()));
+
+    expect(bootstrap.issueBootstrapToken(AGENT_ID)).toBe(true);
+    const bound = await readToken();
+    expect((await pair(bound, OTHER_ID)).status).toBe(401);
+
+    const response = await pair(bound);
     expect(response.status).toBe(200);
+    expect(await secretOf(response)).not.toBe(first);
+    expect(await listAgents()).toHaveLength(1);
+  });
+
+  it('stays unpaired after the bundled agent is unpaired, until auto-pairing is turned back on', async () => {
+    await bootstrap.ensureBootstrapToken();
+    await pair(await readToken());
+    const [row] = await listAgents();
+
+    const agentId = await deleteAgent(row.id);
+    expect(agentId).toBe(AGENT_ID);
+    await bootstrap.forgetBootstrapAgent(AGENT_ID);
+
+    // A restart is exactly when the old behaviour wrote a fresh token and the agent paired back.
+    bootstrap.resetBootstrapState();
+    expect(await bootstrap.ensureBootstrapToken()).toBe(false);
+    expect(await tokenOnDisk()).toBe(false);
+    expect(await bootstrap.autoPairingDisabled()).toBe(true);
+
+    expect(await bootstrap.enableAutoPairing()).toBe(true);
+    expect(await bootstrap.autoPairingDisabled()).toBe(false);
+    expect((await pair(await readToken())).status).toBe(200);
+  });
+
+  it('leaves auto-pairing alone when a remote agent is unpaired', async () => {
+    await bootstrap.ensureBootstrapToken();
+    await pair(await readToken());
+    await pair(ensurePairingCode().code, OTHER_ID);
+
+    await bootstrap.forgetBootstrapAgent(OTHER_ID);
+    expect(await bootstrap.autoPairingDisabled()).toBe(false);
   });
 });

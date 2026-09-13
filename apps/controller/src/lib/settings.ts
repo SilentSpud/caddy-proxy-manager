@@ -190,12 +190,19 @@ export async function clearSetting(key: string): Promise<void> {
   await db.delete(settings).where(eq(settings.key, key));
 }
 
+/**
+ * The legacy Cloudflare settings. The token comes back as stored, like Tailscale's auth key: its
+ * readers only test for presence, and the dns_provider migration hands it to a reader that decrypts
+ * on use. A row written before tokens were encrypted still reads as plaintext until its next save.
+ */
 export async function getCloudflareSettings(): Promise<CloudflareSettings | null> {
   return await getSetting<CloudflareSettings>("cloudflare");
 }
 
 export async function saveCloudflareSettings(settings: CloudflareSettings): Promise<void> {
-  await setSetting("cloudflare", settings);
+  // encryptSecret passes an already-encrypted token through, which is what a form re-saving the
+  // stored value sends.
+  await setSetting("cloudflare", { ...settings, apiToken: encryptSecret(settings.apiToken ?? "") });
 }
 
 export async function getGeneralSettings(): Promise<GeneralSettings | null> {

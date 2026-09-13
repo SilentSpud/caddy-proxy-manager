@@ -312,7 +312,9 @@ test.describe('Users API v1 - create user (POST)', () => {
     expect(created.accountProviderId).toBe('credential');
   });
 
-  test('API POST with invalid role is downgraded to user', async ({ page }) => {
+  // Refused rather than downgraded: a silent downgrade hides a typo in an automation script, and the
+  // dashboard, REST and GraphQL now share one role allowlist.
+  test('API POST with invalid role is refused', async ({ page }) => {
     const origin = new URL(page.url()).origin;
     const email = `api-invalid-role-${Date.now()}@test.local`;
 
@@ -326,12 +328,8 @@ test.describe('Users API v1 - create user (POST)', () => {
       },
     });
 
-    expect(response.status()).toBe(201);
-    const body = await response.json();
-    expect(body.role).toBe('user');
-
-    const created = getUserRecord(email);
-    expect(created.role).toBe('user');
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toMatch(/role/i);
   });
 
   test('API POST returns 400 when email is missing', async ({ page }) => {
