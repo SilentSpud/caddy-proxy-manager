@@ -48,7 +48,7 @@ export const AGENT_CLOCK_SKEW_MS = 60_000;
  * `bodyHash` is the hex SHA-256 of the raw body - of the empty string when there is none - which
  * keeps the signature over the body without making the signer buffer it twice.
  *
- * Without `nonce` this is the base agents before 3.0.0-rc.3 sign, which the controller still
+ * Without `nonce` this is the base agents before 3.0.0-rc.4 sign, which the controller still
  * verifies. The two shapes differ in line count, so neither can produce the other's string.
  */
 export function signatureBase(

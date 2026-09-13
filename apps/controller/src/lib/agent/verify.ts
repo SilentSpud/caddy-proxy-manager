@@ -141,7 +141,7 @@ async function verify(request: Request, body: string, now: number): Promise<Veri
 
   if (!secureEquals(expected, signature)) return DENY;
 
-  // Agents before 3.0.0-rc.3 sign without a nonce. A replay is byte-identical, so its signature
+  // Agents before 3.0.0-rc.4 sign without a nonce. A replay is byte-identical, so its signature
   // rejects it as well as a nonce would. Remove this fallback in the first release after 3.0.0.
   const replayKey = `${agent.agentId}\n${nonce ?? `sig:${signature}`}`;
   if (!claimNonce(replayKey, timestamp, now)) return DENY;

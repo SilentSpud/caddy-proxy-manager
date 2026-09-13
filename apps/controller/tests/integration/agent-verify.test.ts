@@ -50,7 +50,7 @@ function bodyHash(body: string): string {
   return new Bun.CryptoHasher('sha256').update(body).digest('hex');
 }
 
-/** Headers as an agent signs them. `nonce: null` signs the way agents before rc.3 did. */
+/** Headers as an agent signs them. `nonce: null` signs the way agents before rc.4 did. */
 function signedHeaders(
   options: { nonce?: string | null; timestamp?: number } = {},
 ): Record<string, string> {
@@ -109,7 +109,7 @@ describe('replay protection', () => {
   });
 
   it('refuses a replay of a request from an agent that signs without a nonce', async () => {
-    // Agents before rc.3. Their replay is byte-identical, so the signature is the nonce.
+    // Agents before rc.4. Their replay is byte-identical, so the signature is the nonce.
     const headers = signedHeaders({ nonce: null });
     expect((await verifyAgentRequest(arriving(headers), BODY)).ok).toBe(true);
     expect((await verifyAgentRequest(arriving(headers), BODY)).ok).toBe(false);
