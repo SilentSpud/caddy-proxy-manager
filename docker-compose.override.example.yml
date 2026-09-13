@@ -1,0 +1,24 @@
+# Host-specific overrides — copy to docker-compose.override.yml (gitignored).
+#
+# Both fixes below are REQUIRED on SELinux-enforcing hosts (Fedora CoreOS,
+# RHEL). Without them the l4-port-manager sidecar cannot recreate caddy:
+#
+#  1. SELinux blocks container access to /var/run/docker.sock even for root,
+#     so docker-socket-proxy 503s every request (HAProxy SC-- backend
+#     connect failure). Watchtower-style deployments need label=disable too.
+#
+#  2. compose inside the sidecar resolves caddy's relative bind mounts
+#     (./caddy-config, ./caddy-data, ./caddy-logs, ./geoip-data) against its
+#     read-only /compose mount and recreation fails with "read-only file
+#     system". COMPOSE_HOST_DIR makes the script pass --project-directory
+#     pointing at the host project dir so the daemon resolves them there.
+#
+# Set L4_COMPOSE_HOST_DIR in .env to the absolute host path of this project.
+services:
+  docker-socket-proxy:
+    security_opt:
+      - label=disable
+
+  l4-port-manager:
+    environment:
+      COMPOSE_HOST_DIR: ${L4_COMPOSE_HOST_DIR:-}
