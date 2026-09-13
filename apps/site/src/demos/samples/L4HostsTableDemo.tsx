@@ -119,19 +119,22 @@ function L4HostsTableDemoContent() {
 
   return (
     <VStack gap={4}>
-      <StatTiles
-        tiles={[
-          {
-            id: "hosts",
-            label: t("l4ProxyHosts"),
-            value: HOSTS.length,
-            note: t("enabledNote", { count: HOSTS.length }),
-          },
-          { id: "tcp", label: t("tcpStreams"), value: tcp, note: t("tcpNote") },
-          { id: "udp", label: t("udpStreams"), value: udp, note: t("udpNote") },
-          { id: "agents", label: t("listeners"), value: 2, note: t("listenersNote") },
-        ]}
-      />
+      {/* Desktop only, as ListPageHeader has them: a phone list is for finding a row. */}
+      <div className="cpm-desktop-only">
+        <StatTiles
+          tiles={[
+            {
+              id: "hosts",
+              label: t("l4ProxyHosts"),
+              value: HOSTS.length,
+              note: t("enabledNote", { count: HOSTS.length }),
+            },
+            { id: "tcp", label: t("tcpStreams"), value: tcp, note: t("tcpNote") },
+            { id: "udp", label: t("udpStreams"), value: udp, note: t("udpNote") },
+            { id: "agents", label: t("listeners"), value: 2, note: t("listenersNote") },
+          ]}
+        />
+      </div>
       <TabList value={protocol} onChange={setProtocol}>
         <Tab value="all" label={t("filterAll")} endContent={<Badge label={HOSTS.length} />} />
         <Tab value="tcp" label="TCP" endContent={<Badge label={tcp} />} />

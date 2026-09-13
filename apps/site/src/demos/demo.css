@@ -9,7 +9,7 @@
  * `not-content`, which its content styles exclude by selector, and every rule here is scoped to
  * `.cpm-demo` or to `[data-astryx-theme]`, which nothing outside a demo carries.
  */
-@layer reset, astryx-base, astryx-theme;
+@layer reset, astryx-base, astryx-theme, cpm-demo-phone;
 
 /*
  * Astryx's compiled component CSS: atomic classes only, all inside @layer astryx-base, so it
@@ -19,6 +19,102 @@
  */
 @import "@astryxdesign/core/astryx.css";
 @import "@astryxdesign/theme-neutral/theme.css";
+/*
+ * The variants the controller adds to that theme - the `tonal` button, the phone's OLED palette and
+ * touch-sized controls. The same @scope, so like the theme it reaches nothing outside a demo.
+ */
+@import "@cpm/controller/src/app/astryx-variants.css";
+
+/*
+ * The half of the controller's mobile.css a demo needs.
+ *
+ * The components mark what belongs to which width with `cpm-desktop-only`, `cpm-mobile-only` and
+ * `cpm-mobile-flex`, and leave the rest to that stylesheet. Without these rules a demo shows both
+ * copies at once - the audit log's activity strip twice, the phone's summary card under the
+ * desktop's tiles.
+ *
+ * mobile.css itself is not imported. Half of it is chrome positioned against the screen - the tab
+ * bar, the More drawer, the floating action button, a list header that sticks to the top - and on
+ * this site the screen belongs to the docs, not to a demo. So a demo follows the phone layout for
+ * everything inside the page and none of what is pinned to the viewport: the floating button stays
+ * hidden and the list header stays a plain block. Same 767px edge, so it switches where the app
+ * does, and where DataTable's card view already does.
+ */
+@layer cpm-demo-phone {
+  .cpm-demo :is(.cpm-fab, .cpm-mobile-only, .cpm-mobile-flex) {
+    display: none;
+  }
+
+  .cpm-demo .cpm-list-header {
+    display: contents;
+  }
+
+  @media (max-width: 767px) {
+    .cpm-demo .cpm-desktop-only {
+      display: none;
+    }
+
+    .cpm-demo .cpm-mobile-only {
+      display: block;
+    }
+
+    .cpm-demo .cpm-mobile-flex {
+      display: flex;
+    }
+
+    /* Search first and full width, as the app's list header lays it out. */
+    .cpm-demo .cpm-list-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    .cpm-demo .cpm-list-search {
+      order: -1;
+    }
+
+    .cpm-demo .cpm-list-search > * {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* The filter pills that stand in for segmented controls, opening a sheet each. */
+    .cpm-demo .cpm-chip-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .cpm-demo .cpm-chip {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 40px;
+      padding: 0 13px;
+      border-radius: 9999px;
+      border: 1px solid light-dark(#c4c4c4, #525252);
+      background: var(--color-background-card);
+      color: var(--color-text-primary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .cpm-demo .cpm-chip[data-active] {
+      background: var(--color-text-pink);
+      border-color: var(--color-text-pink);
+      color: #111111;
+    }
+
+    .cpm-demo .cpm-chip:focus-visible {
+      outline: 2px solid var(--color-border-pink);
+      outline-offset: 2px;
+    }
+  }
+}
 
 /*
  * Astryx's reset, scoped.

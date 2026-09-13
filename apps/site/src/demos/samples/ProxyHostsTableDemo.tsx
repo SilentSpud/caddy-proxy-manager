@@ -201,40 +201,43 @@ function ProxyHostsTableDemoContent() {
 
   return (
     <VStack gap={4}>
-      <StatTiles
-        tiles={[
-          {
-            id: "hosts",
-            label: t("proxyHosts"),
-            value: counts.total,
-            note: t("enabledDisabledNote", {
-              enabled: counts.enabled,
-              disabled: counts.disabled,
-            }),
-          },
-          {
-            id: "requests",
-            label: t("requests24h"),
-            value: numberFormat.format(traffic.total),
-            note: t("blockedShareNote", {
-              percent: ((traffic.blocked / traffic.total) * 100).toFixed(1),
-            }),
-          },
-          {
-            id: "certificates",
-            label: t("certificates"),
-            value: HOSTS.filter((h) => h.certificate).length,
-            note: t("certificatesNote", { count: HOSTS.filter((h) => h.certificate).length }),
-          },
-          {
-            id: "agents",
-            label: t("assignedAgents"),
-            value: AGENTS.total,
-            note: t("agentsConnectedNote", { count: AGENTS.connected }),
-            accent: { label: t("someAgentsOffline"), variant: "warning" },
-          },
-        ]}
-      />
+      {/* Desktop only, as ListPageHeader has them: a phone list is for finding a row. */}
+      <div className="cpm-desktop-only">
+        <StatTiles
+          tiles={[
+            {
+              id: "hosts",
+              label: t("proxyHosts"),
+              value: counts.total,
+              note: t("enabledDisabledNote", {
+                enabled: counts.enabled,
+                disabled: counts.disabled,
+              }),
+            },
+            {
+              id: "requests",
+              label: t("requests24h"),
+              value: numberFormat.format(traffic.total),
+              note: t("blockedShareNote", {
+                percent: ((traffic.blocked / traffic.total) * 100).toFixed(1),
+              }),
+            },
+            {
+              id: "certificates",
+              label: t("certificates"),
+              value: HOSTS.filter((h) => h.certificate).length,
+              note: t("certificatesNote", { count: HOSTS.filter((h) => h.certificate).length }),
+            },
+            {
+              id: "agents",
+              label: t("assignedAgents"),
+              value: AGENTS.total,
+              note: t("agentsConnectedNote", { count: AGENTS.connected }),
+              accent: { label: t("someAgentsOffline"), variant: "warning" },
+            },
+          ]}
+        />
+      </div>
       <TabList value={state} onChange={setState}>
         <Tab value="all" label={t("filterAll")} endContent={<Badge label={counts.total} />} />
         <Tab

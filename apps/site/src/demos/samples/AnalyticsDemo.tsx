@@ -11,10 +11,15 @@ import {
   CountryBreakdownView,
   type CountryBreakdownData,
 } from "@cpm/controller/src/app/(dashboard)/analytics/CountryBreakdown";
+import { FilterChip } from "@cpm/controller/src/components/mobile/FilterChip";
+import { OptionSheet } from "@cpm/controller/src/components/mobile/OptionSheet";
 import { useTranslations } from "next-intl";
 import { DemoSurface } from "../DemoSurface";
 
 type Range = "24h" | "7d" | "30d";
+
+/** Three of the page's intervals, labelled as it labels them. */
+const RANGES: Range[] = ["24h", "7d", "30d"];
 
 /**
  * A week of traffic against a small deployment, shaped the way real traffic is: a working-hours
@@ -158,7 +163,15 @@ function AnalyticsDemoContent() {
   const [range, setRange] = useState<Range>("7d");
   const [metric, setMetric] = useState<Metric>("requests");
   const [selected, setSelected] = useState<string | null>(null);
+  // Phone-only, as on the page: both choices open as sheets instead of segments.
+  const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
+  const [metricSheetOpen, setMetricSheetOpen] = useState(false);
   const theme = useChartTheme();
+  const metricOptions: { value: Metric; label: string }[] = [
+    { value: "requests", label: t("metricRequests") },
+    { value: "blocked", label: t("metricBlocked") },
+    { value: "uniqueIps", label: t("uniqueIps") },
+  ];
   const data = SERIES[range];
 
   const options = useMemo(
@@ -184,15 +197,34 @@ function AnalyticsDemoContent() {
 
   return (
     <VStack gap={4}>
-      <SegmentedControl
-        label="Time range"
+      <div className="cpm-desktop-only">
+        <SegmentedControl
+          label={t("timeInterval")}
+          size="sm"
+          value={range}
+          onChange={(next) => setRange(next as Range)}
+        >
+          {RANGES.map((option) => (
+            <SegmentedControlItem key={option} value={option} label={option} />
+          ))}
+        </SegmentedControl>
+      </div>
+      {/* The segments do not fit a phone: the interval is a pill that opens a sheet. */}
+      <div className="cpm-chip-row cpm-mobile-flex">
+        <FilterChip
+          label={range}
+          aria-label={t("timeInterval")}
+          onClick={() => setRangeSheetOpen(true)}
+        />
+      </div>
+      <OptionSheet
+        title={t("timeInterval")}
+        isOpen={rangeSheetOpen}
+        onOpenChange={setRangeSheetOpen}
         value={range}
-        onChange={(next) => setRange(next as Range)}
-      >
-        <SegmentedControlItem value="24h" label="24 hours" />
-        <SegmentedControlItem value="7d" label="7 days" />
-        <SegmentedControlItem value="30d" label="30 days" />
-      </SegmentedControl>
+        options={RANGES.map((option) => ({ value: option, label: option }))}
+        onChange={setRange}
+      />
 
       <Panel title="Requests">
         <ReactApexChart
@@ -217,16 +249,37 @@ function AnalyticsDemoContent() {
 
         <Panel title="Top countries">
           <VStack gap={3}>
-            <SegmentedControl
-              label={t("mapMetric")}
-              size="sm"
+            <div className="cpm-desktop-only">
+              <SegmentedControl
+                label={t("mapMetric")}
+                size="sm"
+                value={metric}
+                onChange={(next) => setMetric(next as Metric)}
+              >
+                {metricOptions.map((option) => (
+                  <SegmentedControlItem
+                    key={option.value}
+                    value={option.value}
+                    label={option.label}
+                  />
+                ))}
+              </SegmentedControl>
+            </div>
+            <div className="cpm-mobile-flex">
+              <FilterChip
+                label={metricOptions.find((option) => option.value === metric)?.label ?? metric}
+                aria-label={t("mapMetric")}
+                onClick={() => setMetricSheetOpen(true)}
+              />
+            </div>
+            <OptionSheet
+              title={t("mapMetric")}
+              isOpen={metricSheetOpen}
+              onOpenChange={setMetricSheetOpen}
               value={metric}
-              onChange={(next) => setMetric(next as Metric)}
-            >
-              <SegmentedControlItem value="requests" label={t("metricRequests")} />
-              <SegmentedControlItem value="blocked" label={t("metricBlocked")} />
-              <SegmentedControlItem value="uniqueIps" label={t("uniqueIps")} />
-            </SegmentedControl>
+              options={metricOptions}
+              onChange={setMetric}
+            />
             {ranked.map((country) => (
               // The whole row opens the country's breakdown, as a click on the map does.
               <button

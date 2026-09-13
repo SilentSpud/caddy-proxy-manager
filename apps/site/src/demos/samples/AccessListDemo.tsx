@@ -1,21 +1,35 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Globe, KeyRound, Trash2, Users } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
 import { Card } from "@astryxdesign/core/Card";
-import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { useTranslations } from "next-intl";
 import { Text } from "@astryxdesign/core/Text";
-import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import { DemoSurface } from "../DemoSurface";
 
 type Member = { id: number; username: string; addedAt: string };
-type UsedBy = { id: number; domain: string };
-type List = { id: number; name: string; description: string; members: Member[]; usedBy: UsedBy[] };
+type UsedBy = { id: number; domain: string; enabled: boolean };
+type AccessList = {
+  id: number;
+  name: string;
+  description: string;
+  members: Member[];
+  usedBy: UsedBy[];
+};
 
-const LISTS: List[] = [
+/**
+ * One of each state the rail tells apart: two lists doing their job, one nobody uses, and one with
+ * no members that a host still points at - which is the one that matters, because that host now
+ * refuses every request.
+ */
+const LISTS: AccessList[] = [
   {
     id: 1,
     name: "Staging",
@@ -26,8 +40,8 @@ const LISTS: List[] = [
       { id: 3, username: "priya", addedAt: "22/01/2026" },
     ],
     usedBy: [
-      { id: 1, domain: "staging.example.com" },
-      { id: 2, domain: "preview.example.com" },
+      { id: 1, domain: "staging.example.com", enabled: true },
+      { id: 2, domain: "preview.example.com", enabled: true },
     ],
   },
   {
@@ -38,7 +52,7 @@ const LISTS: List[] = [
       { id: 4, username: "avery", addedAt: "04/01/2026" },
       { id: 5, username: "oncall", addedAt: "17/02/2026" },
     ],
-    usedBy: [{ id: 3, domain: "grafana.example.com" }],
+    usedBy: [{ id: 3, domain: "grafana.example.com", enabled: true }],
   },
   {
     id: 3,
@@ -46,6 +60,13 @@ const LISTS: List[] = [
     description: "A contractor, for as long as the contract lasts",
     members: [{ id: 6, username: "vendor-acme", addedAt: "02/03/2026" }],
     usedBy: [],
+  },
+  {
+    id: 4,
+    name: "Board preview",
+    description: "Waiting on the accounts to be created",
+    members: [],
+    usedBy: [{ id: 4, domain: "board.example.com", enabled: true }],
   },
 ];
 
@@ -79,8 +100,9 @@ const MEMBER_COLUMNS: Column<Member>[] = [
 ];
 
 /**
- * The two-pane shape of the access lists page: pick a list on the left, and its members and the
- * hosts it protects fill the right. Passwords are bcrypt-hashed on save, so nothing here shows one.
+ * The two-pane shape of the access lists page: pick a list in the rail, and its members and the
+ * hosts it protects fill the pane under it. Passwords are bcrypt-hashed on save, so nothing here
+ * shows one.
  */
 function AccessListDemoContent() {
   const t = useTranslations("accessLists");
@@ -88,74 +110,117 @@ function AccessListDemoContent() {
   const [tab, setTab] = useState("members");
   const selected = LISTS.find((list) => list.id === selectedId) ?? LISTS[0];
   if (!selected) return null;
+  const isEmpty = selected.members.length === 0;
 
   return (
     <VStack gap={4}>
-      <VStack gap={2}>
-        {LISTS.map((list) => (
-          <ClickableCard
-            key={list.id}
-            label={list.name}
-            // The selected list is the one filling the pane below, so it takes a tint and the
-            // others sit on the plain surface.
-            variant={list.id === selectedId ? "blue" : "default"}
-            onClick={() => setSelectedId(list.id)}
-          >
-            <HStack justify="between" vAlign="center" gap={3}>
-              <VStack gap={0}>
-                <Text type="body" size="sm" weight="semibold">
-                  {list.name}
-                </Text>
-                <Text type="body" size="xsm" color="secondary">
-                  {list.description}
-                </Text>
-              </VStack>
-              <HStack gap={2} vAlign="center">
-                <Badge label={`${list.members.length} members`} />
-                <Badge
-                  variant={list.usedBy.length > 0 ? "info" : "neutral"}
-                  label={`${list.usedBy.length} hosts`}
+      <Card padding={2}>
+        <List>
+          {LISTS.map((list) => (
+            <ListItem
+              key={list.id}
+              isSelected={list.id === selectedId}
+              startContent={
+                <Icon
+                  icon={KeyRound}
+                  size="sm"
+                  color={list.id === selectedId ? "accent" : "secondary"}
                 />
-              </HStack>
-            </HStack>
-          </ClickableCard>
-        ))}
-        {/* The totals the page's rail ends with, for the whole set rather than the list in view. */}
-        <Text type="supporting" color="secondary">
-          {t("railSummary", {
-            lists: LISTS.length,
-            members: LISTS.reduce((sum, list) => sum + list.members.length, 0),
-          })}
+              }
+              label={list.name}
+              description={t("listRowDescription", {
+                members: list.members.length,
+                hosts: list.usedBy.length,
+              })}
+              endContent={
+                // No members outranks unused, as on the page: it is the one that changes what a
+                // host serves.
+                list.members.length === 0 ? (
+                  <Badge variant="error" label={t("noMembersBadge")} />
+                ) : list.usedBy.length === 0 ? (
+                  <Badge variant="warning" label={t("unusedBadge")} />
+                ) : undefined
+              }
+              onClick={() => setSelectedId(list.id)}
+            />
+          ))}
+        </List>
+      </Card>
+      {/* The totals the page's rail ends with, for the whole set rather than the list in view. */}
+      <Text type="supporting" color="secondary">
+        {t("railSummary", {
+          lists: LISTS.length,
+          members: LISTS.reduce((sum, list) => sum + list.members.length, 0),
+        })}
+      </Text>
+
+      <VStack gap={1}>
+        <Text type="body" weight="semibold">
+          {selected.name}
+        </Text>
+        <Text type="body" size="sm" color="secondary">
+          {selected.description}
         </Text>
       </VStack>
 
-      <TabList value={tab} onChange={setTab}>
-        <Tab value="members" label="Members" />
-        <Tab value="usedBy" label="Used by" />
+      {/* Above the tabs, where the page puts it: whichever tab is open, a host that answers nobody
+          is the first thing to know. */}
+      {isEmpty && selected.usedBy.length > 0 && (
+        <Banner
+          status="warning"
+          title={t("noMembersBannerTitle")}
+          description={t("noMembersBannerDescription", { count: selected.usedBy.length })}
+        />
+      )}
+
+      <TabList value={tab} onChange={setTab} size="sm" hasDivider>
+        <Tab
+          value="members"
+          label={t("members")}
+          icon={<Users />}
+          endContent={<Badge label={selected.members.length} />}
+        />
+        <Tab
+          value="usedBy"
+          label={t("usedBy")}
+          icon={<Globe />}
+          endContent={<Badge label={selected.usedBy.length} />}
+        />
       </TabList>
 
       {tab === "members" ? (
-        <DataTable
-          columns={MEMBER_COLUMNS}
-          data={selected.members}
-          keyField="id"
-          emptyMessage="No members yet"
+        isEmpty ? (
+          <EmptyState
+            icon={<Users />}
+            title={t("membersEmptyTitle")}
+            description={t("membersEmptyDescription")}
+          />
+        ) : (
+          <DataTable columns={MEMBER_COLUMNS} data={selected.members} keyField="id" />
+        )
+      ) : selected.usedBy.length === 0 ? (
+        <EmptyState
+          icon={<Globe />}
+          title={t("unusedListTitle")}
+          description={t("unusedListDescription")}
         />
       ) : (
-        <Card>
-          {selected.usedBy.length === 0 ? (
-            <Text type="body" size="sm" color="secondary">
-              No proxy hosts use this list. It can be deleted safely.
-            </Text>
-          ) : (
-            <VStack gap={2}>
-              {selected.usedBy.map((host) => (
-                <Text key={host.id} type="code" size="sm">
-                  {host.domain}
-                </Text>
-              ))}
-            </VStack>
-          )}
+        <Card padding={2}>
+          <List hasDividers>
+            {selected.usedBy.map((host) => (
+              <ListItem
+                key={host.id}
+                startContent={<Icon icon={Globe} size="sm" color="secondary" />}
+                label={host.domain}
+                endContent={
+                  <Badge
+                    variant={host.enabled ? "success" : "neutral"}
+                    label={host.enabled ? "active" : "disabled"}
+                  />
+                }
+              />
+            ))}
+          </List>
         </Card>
       )}
     </VStack>
