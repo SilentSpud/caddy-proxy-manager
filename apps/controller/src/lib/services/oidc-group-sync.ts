@@ -140,9 +140,19 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
   const groupsById = new Map(existingGroups.map((group) => [group.id, group]));
   const memberGroupIds = new Set(memberships.map((m) => m.groupId));
 
+  // A mirrored name joins only an IdP-owned group. A UI group that merely shares the name carries
+  // grants the operator never tied to the IdP, so that claim is skipped - not given a twin, since
+  // names are unique. An explicit mapping is the operator's own choice and may name any group.
+  const explicitNames = new Set(explicit.map((name) => name.toLowerCase()));
   const added: string[] = [];
   for (const [key, name] of desired) {
     let group = groupsByName.get(key);
+    if (group && group.source !== "oidc" && !explicitNames.has(key)) {
+      console.warn(
+        `[oidc-group-sync] Not adding user ${userId} to "${group.name}": it was created in the UI, and no mapping names it.`,
+      );
+      continue;
+    }
     if (!group) {
       const now = nowIso();
       const [created] = await db
