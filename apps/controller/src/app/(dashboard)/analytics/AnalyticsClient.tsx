@@ -484,74 +484,98 @@ export default function AnalyticsClient() {
 
   const chartTheme = useChartTheme();
 
-  const timelineLabels = timeline.map((b) => formatTs(b.ts, rangeSeconds));
-  const timelineOptions: ApexOptions = {
-    ...chartTheme.base,
-    chart: { ...chartTheme.base.chart, type: "area", stacked: false, id: "timeline" },
-    colors: [chartTheme.series.blue, chartTheme.series.red],
-    fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 } },
-    stroke: { curve: "smooth", width: 2 },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: timelineLabels,
-      labels: { rotate: 0, style: { colors: chartTheme.labelColor, fontSize: "11px" } },
-      axisBorder: { show: false },
-      axisTicks: { show: false },
-    },
-    yaxis: { labels: { style: { colors: chartTheme.labelColor } } },
-    legend: { labels: { colors: chartTheme.labelColor } },
-    tooltip: { theme: chartTheme.mode, shared: true, intersect: false },
-  };
-  const timelineSeries = [
-    { name: "Allowed", data: timeline.map((b) => b.total - b.blocked) },
-    { name: "Blocked", data: timeline.map((b) => b.blocked) },
-  ];
-
-  const donutOptions: ApexOptions = {
-    ...chartTheme.base,
-    chart: { ...chartTheme.base.chart, type: "donut", id: "protocols" },
-    colors: [
-      chartTheme.series.blue,
-      chartTheme.series.purple,
-      chartTheme.series.cyan,
-      chartTheme.series.orange,
+  // Every chart config is memoized on its data: react-apexcharts deep-compares options and series
+  // on each render, so a fresh object per render had it walking the whole timeline whenever any
+  // state on the page changed - a sheet opening, a country being picked.
+  const timelineOptions = useMemo<ApexOptions>(
+    () => ({
+      ...chartTheme.base,
+      chart: { ...chartTheme.base.chart, type: "area", stacked: false, id: "timeline" },
+      colors: [chartTheme.series.blue, chartTheme.series.red],
+      fill: {
+        type: "gradient",
+        gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 },
+      },
+      stroke: { curve: "smooth", width: 2 },
+      dataLabels: { enabled: false },
+      xaxis: {
+        categories: timeline.map((b) => formatTs(b.ts, rangeSeconds)),
+        labels: { rotate: 0, style: { colors: chartTheme.labelColor, fontSize: "11px" } },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+      },
+      yaxis: { labels: { style: { colors: chartTheme.labelColor } } },
+      legend: { labels: { colors: chartTheme.labelColor } },
+      tooltip: { theme: chartTheme.mode, shared: true, intersect: false },
+    }),
+    [chartTheme, timeline, rangeSeconds],
+  );
+  const timelineSeries = useMemo(
+    () => [
+      { name: "Allowed", data: timeline.map((b) => b.total - b.blocked) },
+      { name: "Blocked", data: timeline.map((b) => b.blocked) },
     ],
-    labels: protocols.map((p) => p.proto),
-    legend: { position: "bottom", labels: { colors: chartTheme.labelColor } },
-    dataLabels: { style: { colors: [chartTheme.onSeries] } },
-    plotOptions: { pie: { donut: { size: "65%" } } },
-  };
-  const donutSeries = protocols.map((p) => p.count);
+    [timeline],
+  );
 
-  const uaNames = userAgents.map((u) => parseUA(u.userAgent));
-  const barOptions: ApexOptions = {
-    ...chartTheme.base,
-    chart: { ...chartTheme.base.chart, type: "bar", id: "ua" },
-    colors: [chartTheme.series.purple],
-    plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: uaNames,
-      labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
-    },
-    yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
-  };
-  const barSeries = [{ name: "Requests", data: userAgents.map((u) => u.count) }];
+  const donutOptions = useMemo<ApexOptions>(
+    () => ({
+      ...chartTheme.base,
+      chart: { ...chartTheme.base.chart, type: "donut", id: "protocols" },
+      colors: [
+        chartTheme.series.blue,
+        chartTheme.series.purple,
+        chartTheme.series.cyan,
+        chartTheme.series.orange,
+      ],
+      labels: protocols.map((p) => p.proto),
+      legend: { position: "bottom", labels: { colors: chartTheme.labelColor } },
+      dataLabels: { style: { colors: [chartTheme.onSeries] } },
+      plotOptions: { pie: { donut: { size: "65%" } } },
+    }),
+    [chartTheme, protocols],
+  );
+  const donutSeries = useMemo(() => protocols.map((p) => p.count), [protocols]);
 
-  const wafRuleLabels = (wafStats?.topRules ?? []).map((r) => `#${r.ruleId}`);
-  const wafBarOptions: ApexOptions = {
-    ...chartTheme.base,
-    chart: { ...chartTheme.base.chart, type: "bar", id: "waf-rules" },
-    colors: [chartTheme.series.orange],
-    plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: wafRuleLabels,
-      labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
-    },
-    yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
-  };
-  const wafBarSeries = [{ name: "Hits", data: (wafStats?.topRules ?? []).map((r) => r.count) }];
+  const barOptions = useMemo<ApexOptions>(
+    () => ({
+      ...chartTheme.base,
+      chart: { ...chartTheme.base.chart, type: "bar", id: "ua" },
+      colors: [chartTheme.series.purple],
+      plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
+      dataLabels: { enabled: false },
+      xaxis: {
+        categories: userAgents.map((u) => parseUA(u.userAgent)),
+        labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
+      },
+      yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
+    }),
+    [chartTheme, userAgents],
+  );
+  const barSeries = useMemo(
+    () => [{ name: "Requests", data: userAgents.map((u) => u.count) }],
+    [userAgents],
+  );
+
+  const wafBarOptions = useMemo<ApexOptions>(
+    () => ({
+      ...chartTheme.base,
+      chart: { ...chartTheme.base.chart, type: "bar", id: "waf-rules" },
+      colors: [chartTheme.series.orange],
+      plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
+      dataLabels: { enabled: false },
+      xaxis: {
+        categories: (wafStats?.topRules ?? []).map((r) => `#${r.ruleId}`),
+        labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
+      },
+      yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
+    }),
+    [chartTheme, wafStats],
+  );
+  const wafBarSeries = useMemo(
+    () => [{ name: "Hits", data: (wafStats?.topRules ?? []).map((r) => r.count) }],
+    [wafStats],
+  );
 
   const wafByCountry = new Map((wafStats?.byCountry ?? []).map((r) => [r.countryCode, r.count]));
 

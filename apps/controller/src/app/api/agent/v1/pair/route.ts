@@ -57,12 +57,14 @@ export async function POST(request: Request) {
   const secret = randomBytes(32).toString("hex");
   await saveAgent({ name, agentId, secret });
 
-  const controllerName =
-    (await getSetting<string>("branding_title").catch(() => null)) || "Caddy Proxy Manager";
+  const [brandingTitle, controllerId] = await Promise.all([
+    getSetting<string>("branding_title").catch(() => null),
+    getControllerId(),
+  ]);
 
   return Response.json({
     secret,
-    controllerId: await getControllerId(),
-    controllerName,
+    controllerId,
+    controllerName: brandingTitle || "Caddy Proxy Manager",
   } satisfies AgentPairResponse);
 }

@@ -60,70 +60,75 @@ export default async function SettingsSectionPage({
   // moment the page reloaded.
   const overlay = await stagedOverlay(userId);
 
+  // The agent and staging reads sit outside the staged scope on purpose - they are not settings -
+  // but run alongside it: the scope is AsyncLocalStorage, so a sibling promise cannot see the
+  // overlay. getAllAgentStatuses reports per agent and never throws.
   const [
-    general,
-    acme,
-    dnsProvider,
-    authentik,
-    metrics,
-    logging,
-    dns,
-    upstreamDnsResolution,
-    globalGeoBlock,
-    globalErrorPages,
-    trustedProxies,
-    defaultResponse,
-    oauthProviders,
-    primaryProviderId,
-    avatarSettings,
-    passwordPolicySettings,
-    caddyBuild,
-    tailscale,
-    dashboard,
-    analytics,
-    geoip,
-    favicon,
-    updates,
-  ] = await withStagedReads(overlay, () =>
-    Promise.all([
-      getGeneralSettings(),
-      getAcmeSettings(),
-      getDnsProviderSettings(),
-      getAuthentikSettings(),
-      getMetricsSettings(),
-      getLoggingSettings(),
-      getDnsSettings(),
-      getUpstreamDnsResolutionSettings(),
-      getGeoBlockSettings(),
-      getErrorPagesSettings(),
-      getTrustedProxiesSettings(),
-      getDefaultResponseSettings(),
-      listOAuthProviders(),
-      getPrimaryProviderId(),
-      getAvatarSettings(),
-      getPasswordPolicySettings(),
-      getCaddyBuildSettings(),
-      getTailscaleSettings(),
-      getDashboardSettings(),
-      analyticsView(),
-      geoipView(),
-      getFavicon(),
-      getUpdateStatus(),
-    ]),
-  );
-
-  // Separate from the settings reads above: these go out over the network to each agent, so a slow
-  // or absent one must not hold up the rest of the page. getAllAgentStatuses reports per agent and
-  // never throws, for exactly that reason.
-  const [pairedAgents, agentStatuses, agentBuildSelections] = await Promise.all([
+    [
+      general,
+      acme,
+      dnsProvider,
+      authentik,
+      metrics,
+      logging,
+      dns,
+      upstreamDnsResolution,
+      globalGeoBlock,
+      globalErrorPages,
+      trustedProxies,
+      defaultResponse,
+      oauthProviders,
+      primaryProviderId,
+      avatarSettings,
+      passwordPolicySettings,
+      caddyBuild,
+      tailscale,
+      dashboard,
+      analytics,
+      geoip,
+      favicon,
+      updates,
+    ],
+    pairedAgents,
+    agentStatuses,
+    agentBuildSelections,
+    staged,
+    agentOptions,
+  ] = await Promise.all([
+    withStagedReads(overlay, () =>
+      Promise.all([
+        getGeneralSettings(),
+        getAcmeSettings(),
+        getDnsProviderSettings(),
+        getAuthentikSettings(),
+        getMetricsSettings(),
+        getLoggingSettings(),
+        getDnsSettings(),
+        getUpstreamDnsResolutionSettings(),
+        getGeoBlockSettings(),
+        getErrorPagesSettings(),
+        getTrustedProxiesSettings(),
+        getDefaultResponseSettings(),
+        listOAuthProviders(),
+        getPrimaryProviderId(),
+        getAvatarSettings(),
+        getPasswordPolicySettings(),
+        getCaddyBuildSettings(),
+        getTailscaleSettings(),
+        getDashboardSettings(),
+        analyticsView(),
+        geoipView(),
+        getFavicon(),
+        getUpdateStatus(),
+      ]),
+    ),
     listAgents(),
     getAllAgentStatuses(),
     getAllAgentBuildSettings(),
+    stagedView(userId),
+    listAgentOptions().catch(() => []),
   ]);
-  const staged = await stagedView(userId);
-  const connectedAgentIds = new Set(
-    (await listAgentOptions().catch(() => [])).filter((a) => a.connected).map((a) => a.id),
-  );
+  const connectedAgentIds = new Set(agentOptions.filter((a) => a.connected).map((a) => a.id));
 
   return (
     <SettingsClient

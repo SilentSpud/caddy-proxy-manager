@@ -129,13 +129,15 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
 
   const desired = new Map([...explicit, ...mirrored].map((name) => [name.toLowerCase(), name]));
 
-  const existingGroups = await db.select().from(groups);
+  const [existingGroups, memberships] = await Promise.all([
+    db.select().from(groups),
+    db
+      .select({ groupId: groupMembers.groupId, memberId: groupMembers.id })
+      .from(groupMembers)
+      .where(eq(groupMembers.userId, userId)),
+  ]);
   const groupsByName = new Map(existingGroups.map((group) => [group.name.toLowerCase(), group]));
-
-  const memberships = await db
-    .select({ groupId: groupMembers.groupId, memberId: groupMembers.id })
-    .from(groupMembers)
-    .where(eq(groupMembers.userId, userId));
+  const groupsById = new Map(existingGroups.map((group) => [group.id, group]));
   const memberGroupIds = new Set(memberships.map((m) => m.groupId));
 
   const added: string[] = [];
@@ -167,7 +169,7 @@ async function applyGroups(userId: number, entry: PendingOidcSync): Promise<void
   // membership they gave it.
   const removed: string[] = [];
   for (const membership of memberships) {
-    const group = existingGroups.find((g) => g.id === membership.groupId);
+    const group = groupsById.get(membership.groupId);
     if (group?.source !== "oidc") continue;
     if (desired.has(group.name.toLowerCase())) continue;
     await db.delete(groupMembers).where(eq(groupMembers.id, membership.memberId));

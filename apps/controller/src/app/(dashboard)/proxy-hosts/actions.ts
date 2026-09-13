@@ -50,7 +50,6 @@ import {
 
 async function validateAndSanitizeCertificateId(
   certificateId: number | null,
-  cloudflareConfigured: boolean,
 ): Promise<{ certificateId: number | null; warning?: string }> {
   // null is valid (Caddy Auto)
   if (certificateId === null) {
@@ -61,6 +60,9 @@ async function validateAndSanitizeCertificateId(
   const certificate = await getCertificate(certificateId);
 
   if (!certificate) {
+    // Only the warning's wording depends on Cloudflare, so the read is deferred to this branch.
+    const cloudflareConfigured = !!(await getCloudflareSettings())?.apiToken;
+
     // Build helpful warning message
     let warning: string;
 
@@ -723,16 +725,9 @@ export async function createProxyHostAction(
     const session = await requireAdmin();
     const userId = Number(session.user.id);
 
-    // Parse certificateId safely
-    const parsedCertificateId = parseCertificateId(formData.get("certificateId"));
-
-    // Validate certificate exists and get sanitized value
-    const cloudflareSettings = await getCloudflareSettings();
-    const cloudflareConfigured = !!cloudflareSettings?.apiToken;
-
+    // Parse certificateId safely, then validate it exists and get the sanitized value
     const { certificateId, warning } = await validateAndSanitizeCertificateId(
-      parsedCertificateId,
-      cloudflareConfigured,
+      parseCertificateId(formData.get("certificateId")),
     );
 
     // Log warning if certificate was auto-fallback
@@ -828,15 +823,9 @@ export async function updateProxyHostAction(
     let warning: string | undefined;
 
     if (formData.has("certificateId")) {
-      const parsedCertificateId = parseCertificateId(formData.get("certificateId"));
-
       // Validate certificate exists and get sanitized value
-      const cloudflareSettings = await getCloudflareSettings();
-      const cloudflareConfigured = !!cloudflareSettings?.apiToken;
-
       const validation = await validateAndSanitizeCertificateId(
-        parsedCertificateId,
-        cloudflareConfigured,
+        parseCertificateId(formData.get("certificateId")),
       );
       certificateId = validation.certificateId;
       warning = validation.warning;

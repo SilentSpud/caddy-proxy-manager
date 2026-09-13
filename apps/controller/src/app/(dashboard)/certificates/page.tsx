@@ -97,35 +97,33 @@ export default async function CertificatesPage({ searchParams }: PageProps) {
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PER_PAGE;
-  const [caCerts, issuedClientCerts] = await Promise.all([
-    listCaCertificates(),
-    listIssuedClientCertificates(),
-  ]);
-  const mtlsRoles = await listMtlsRoles().catch(() => []);
-
-  const [allAcmeRows, certRows, usageRows] = await Promise.all([
-    db
-      .select({
-        id: proxyHosts.id,
-        name: proxyHosts.name,
-        domains: proxyHosts.domains,
-        sslForced: proxyHosts.sslForced,
-        enabled: proxyHosts.enabled,
-      })
-      .from(proxyHosts)
-      .where(isNull(proxyHosts.certificateId))
-      .orderBy(proxyHosts.name),
-    db.select().from(certificates),
-    db
-      .select({
-        certId: proxyHosts.certificateId,
-        hostId: proxyHosts.id,
-        hostName: proxyHosts.name,
-        hostDomains: proxyHosts.domains,
-      })
-      .from(proxyHosts)
-      .where(isNotNull(proxyHosts.certificateId)),
-  ]);
+  const [caCerts, issuedClientCerts, mtlsRoles, allAcmeRows, certRows, usageRows] =
+    await Promise.all([
+      listCaCertificates(),
+      listIssuedClientCertificates(),
+      listMtlsRoles().catch(() => []),
+      db
+        .select({
+          id: proxyHosts.id,
+          name: proxyHosts.name,
+          domains: proxyHosts.domains,
+          sslForced: proxyHosts.sslForced,
+          enabled: proxyHosts.enabled,
+        })
+        .from(proxyHosts)
+        .where(isNull(proxyHosts.certificateId))
+        .orderBy(proxyHosts.name),
+      db.select().from(certificates),
+      db
+        .select({
+          certId: proxyHosts.certificateId,
+          hostId: proxyHosts.id,
+          hostName: proxyHosts.name,
+          hostDomains: proxyHosts.domains,
+        })
+        .from(proxyHosts)
+        .where(isNotNull(proxyHosts.certificateId)),
+    ]);
 
   const allAcmeHosts: AcmeHost[] = allAcmeRows.map((r) => ({
     id: r.id,

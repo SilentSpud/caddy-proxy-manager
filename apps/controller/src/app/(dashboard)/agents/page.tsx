@@ -25,11 +25,12 @@ function countAssigned(assignments: Map<number, number[]>, agentRowId: number): 
 export default async function AgentsPage() {
   const access = await requireAccess();
 
-  const [paired, statuses, httpAssignments, l4Assignments] = await Promise.all([
+  const [paired, statuses, httpAssignments, l4Assignments, agentOptions] = await Promise.all([
     listAgents(),
     getAllAgentStatuses(),
     listHostAssignments("http"),
     listHostAssignments("l4"),
+    listAgentOptions().catch(() => []),
   ]);
 
   // Names, because that is all getAllAgentStatuses reports against. Routing is by row id
@@ -64,7 +65,7 @@ export default async function AgentsPage() {
 
   // Only used to decide the empty state's wording: "none are paired" and "none are yours" are
   // different problems with different fixes, and an operator cannot tell them apart otherwise.
-  const anyPaired = (await listAgentOptions().catch(() => [])).length > 0;
+  const anyPaired = agentOptions.length > 0;
 
   return <AgentsClient agents={rows} anyPaired={anyPaired} isAdmin={access.isAdmin} />;
 }

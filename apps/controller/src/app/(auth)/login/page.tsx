@@ -18,14 +18,17 @@ interface LoginPageProps {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const session = await auth();
+  const [session, enabledProviders, t, params] = await Promise.all([
+    auth(),
+    getProviderDisplayList(),
+    getTranslations("auth.login"),
+    searchParams,
+  ]);
   if (session) {
     redirect("/");
   }
 
-  const enabledProviders = await getProviderDisplayList();
-  const t = await getTranslations("auth.login");
-  const oauthError = oauthCallbackErrorMessage((await searchParams).error, t);
+  const oauthError = oauthCallbackErrorMessage(params.error, t);
 
   return (
     <LoginClient

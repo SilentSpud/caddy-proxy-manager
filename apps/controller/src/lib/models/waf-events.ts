@@ -2,7 +2,6 @@ import {
   queryWafCount,
   queryWafCountWithSearch,
   queryWafEventStatsWithSearch,
-  queryTopWafRules,
   queryTopWafRulesWithHosts,
   queryWafCountries,
   queryWafRuleMessages,
@@ -68,10 +67,6 @@ export async function getWafEventStats(
 
 export async function countWafEventsInRange(from: number, to: number): Promise<number> {
   return withWafAnalyticsFallback("countWafEventsInRange", 0, () => queryWafCount(from, to));
-}
-
-export async function getTopWafRules(from: number, to: number, limit = 10): Promise<TopWafRule[]> {
-  return withWafAnalyticsFallback("getTopWafRules", [], () => queryTopWafRules(from, to, limit));
 }
 
 export async function getTopWafRulesWithHosts(

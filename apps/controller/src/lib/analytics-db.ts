@@ -53,6 +53,9 @@ export const INTERVAL_SECONDS: Record<Interval, number> = {
 /** A whole number of seconds since the epoch, as the analytics routes take `from` and `to`. */
 const EPOCH_SECONDS = /^\d{1,12}$/;
 
+/** A bare IPv4 host, with or without a port; never worth listing as an analytics host. */
+const IPV4_HOST = /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/;
+
 /**
  * The time window an analytics request asks for.
  *
@@ -299,12 +302,13 @@ export async function getAnalyticsHosts(): Promise<AnalyticsHost[]> {
   const hostSet = new Set<string>();
   const configured = new Set<string>();
 
-  // Hosts from ClickHouse traffic events
-  const chHosts = await queryDistinctHosts();
+  // Hosts seen in ClickHouse traffic events, and every domain configured on a proxy host.
+  const [chHosts, proxyRows] = await Promise.all([
+    queryDistinctHosts(),
+    db.select({ domains: proxyHosts.domains }).from(proxyHosts),
+  ]);
   for (const h of chHosts) if (h) hostSet.add(h);
 
-  // All domains configured on proxy hosts
-  const proxyRows = await db.select({ domains: proxyHosts.domains }).from(proxyHosts);
   for (const r of proxyRows) {
     try {
       const domains = JSON.parse(r.domains) as string[];
@@ -320,9 +324,8 @@ export async function getAnalyticsHosts(): Promise<AnalyticsHost[]> {
     }
   }
 
-  const isIp = (h: string) => /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(h);
   return Array.from(hostSet)
-    .filter((h) => !isIp(h))
+    .filter((h) => !IPV4_HOST.test(h))
     .sort()
     .map((host) => ({ host, configured: configured.has(host.toLowerCase()) }));
 }

@@ -66,7 +66,6 @@ function StatusDot({ status }: { status: SectionHealth["status"] }) {
 
 export default function SettingsHome({ sections, attention, staged }: Props) {
   const t = useTranslations("settings");
-  const _tNav = useTranslations("nav");
 
   const groupLabel: Record<SectionHealth["group"], string> = {
     traffic: t("homeGroupTraffic"),

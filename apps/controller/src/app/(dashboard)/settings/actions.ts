@@ -1072,10 +1072,6 @@ function parseRedirectUrl(raw: FormDataEntryValue | null): string {
   }
 }
 
-function parseGeoBlockCheckbox(value: FormDataEntryValue | null): boolean {
-  return value === "on" || value === "true" || value === "1";
-}
-
 function parseGeoBlockStringList(key: string, formData: FormData): string[] {
   const val = formData.get(key);
   if (!val || typeof val !== "string") return [];
@@ -1111,7 +1107,7 @@ async function updateGeoBlockSettingsActionUnlocked(
   try {
     await requireAdmin();
 
-    const enabled = parseGeoBlockCheckbox(formData.get("geoblockEnabled"));
+    const enabled = parseCheckbox(formData.get("geoblockEnabled"));
 
     const statusRaw = formData.get("geoblockResponseStatus");
     const statusNum =
@@ -1143,7 +1139,7 @@ async function updateGeoBlockSettingsActionUnlocked(
       allow_cidrs: parseGeoBlockStringList("geoblockAllowCidrs", formData),
       allow_ips: parseGeoBlockStringList("geoblockAllowIps", formData),
       trusted_proxies: parseGeoBlockStringList("geoblockTrustedProxies", formData),
-      fail_closed: parseGeoBlockCheckbox(formData.get("geoblockFailClosed")),
+      fail_closed: parseCheckbox(formData.get("geoblockFailClosed")),
       response_status: responseStatus,
       response_body: responseBody,
       response_headers: parseGeoBlockResponseHeaders(formData),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -53,6 +53,23 @@ type ForwardAuthGroup = {
 type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
 
 const NONE_VALUE = "__none__";
+
+/**
+ * Close the dialog a second after the action succeeds, once. Keyed on the status alone: `onClose`
+ * is a new function on every parent render, and depending on it re-armed a fresh, never-cleared
+ * timer each time the page revalidated while the status stayed "success".
+ */
+function useCloseOnSuccess(state: { status: string }, onClose: () => void) {
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  useEffect(() => {
+    if (state.status !== "success") return;
+    const timer = setTimeout(() => onCloseRef.current(), 1000);
+    return () => clearTimeout(timer);
+  }, [state.status]);
+}
 
 /** The action result banner, shared by all three dialogs. */
 function ActionStatus({ status, message }: { status: string; message?: string }) {
@@ -134,11 +151,7 @@ export function CreateHostDialog({
   );
   const [accessListId, setAccessListId] = useState(String(initialData?.accessListId ?? NONE_VALUE));
 
-  useEffect(() => {
-    if (state.status === "success") {
-      setTimeout(onClose, 1000);
-    }
-  }, [state.status, onClose]);
+  useCloseOnSuccess(state, onClose);
 
   return (
     <AppDialog
@@ -271,11 +284,7 @@ export function EditHostDialog({
   const [certificateId, setCertificateId] = useState(String(host.certificateId ?? NONE_VALUE));
   const [accessListId, setAccessListId] = useState(String(host.accessListId ?? NONE_VALUE));
 
-  useEffect(() => {
-    if (state.status === "success") {
-      setTimeout(onClose, 1000);
-    }
-  }, [state.status, onClose]);
+  useCloseOnSuccess(state, onClose);
 
   return (
     <AppDialog
@@ -376,11 +385,7 @@ export function DeleteHostDialog({
     INITIAL_ACTION_STATE,
   );
 
-  useEffect(() => {
-    if (state.status === "success") {
-      setTimeout(onClose, 1000);
-    }
-  }, [state.status, onClose]);
+  useCloseOnSuccess(state, onClose);
 
   return (
     <AppDialog

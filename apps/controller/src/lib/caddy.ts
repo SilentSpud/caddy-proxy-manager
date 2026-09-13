@@ -92,14 +92,11 @@ import {
   buildMtlsRbacSubroutes,
   buildFingerprintCelExpression,
   buildValidClientCertCelExpression,
+  normalizeFingerprint,
   resolveAllowedFingerprints,
   type MtlsAccessRuleLike,
 } from "./caddy-mtls";
-import {
-  buildRoleFingerprintMap,
-  buildCertFingerprintMap,
-  buildRoleCertIdMap,
-} from "./models/mtls-roles";
+import { buildRoleMaps } from "./models/mtls-roles";
 import { getAccessRulesForHosts } from "./models/mtls-access-rules";
 import { buildWafHandlerEntry, resolveEffectiveWaf } from "./caddy-waf";
 import { adaptCaddyfileSnippet, buildCaddyfileSubrouteHandler } from "./caddy-caddyfile";
@@ -507,48 +504,40 @@ async function resolveHostnameAddresses(
   family: UpstreamDnsAddressFamily,
   timeoutMs: number | null,
 ): Promise<string[]> {
-  const errors: string[] = [];
+  // Each lookup reports its own failure so the two can run together and still join errors in
+  // AAAA-then-A order.
+  const lookup = async (
+    query: () => Promise<string[]>,
+    label: string,
+  ): Promise<{ addresses: string[]; error: string | null }> => {
+    try {
+      return { addresses: await withTimeout(query(), timeoutMs, label), error: null };
+    } catch (error) {
+      return { addresses: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  const resolve6 = () => lookup(() => resolver.resolve6(hostname), `AAAA lookup for ${hostname}`);
+  const resolve4 = () => lookup(() => resolver.resolve4(hostname), `A lookup for ${hostname}`);
+
+  const results =
+    family === "ipv6"
+      ? [await resolve6()]
+      : family === "ipv4"
+        ? [await resolve4()]
+        : await Promise.all([resolve6(), resolve4()]);
+
   const resolved: string[] = [];
   const seen = new Set<string>();
-
-  const resolve6 = async () => {
-    try {
-      return await withTimeout(
-        resolver.resolve6(hostname),
-        timeoutMs,
-        `AAAA lookup for ${hostname}`,
-      );
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-      return [];
-    }
-  };
-
-  const resolve4 = async () => {
-    try {
-      return await withTimeout(resolver.resolve4(hostname), timeoutMs, `A lookup for ${hostname}`);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-      return [];
-    }
-  };
-
-  const pushUnique = (addresses: string[]) => {
-    for (const address of addresses) {
+  const errors: string[] = [];
+  for (const result of results) {
+    if (result.error !== null) errors.push(result.error);
+    for (const address of result.addresses) {
       if (!seen.has(address)) {
         seen.add(address);
         resolved.push(address);
       }
     }
-  };
-
-  if (family === "ipv6") {
-    pushUnique(await resolve6());
-  } else if (family === "ipv4") {
-    pushUnique(await resolve4());
-  } else {
-    pushUnique(await resolve6());
-    pushUnique(await resolve4());
   }
 
   if (resolved.length === 0 && errors.length > 0) {
@@ -610,44 +599,42 @@ async function resolveUpstreamDials(
   }
   const timeoutMs = getLookupTimeoutMs(dnsConfig, globalDnsSettings);
 
-  const dials: string[] = [];
-  for (const target of parsedTargets) {
-    if (!target.host || !target.port || isIP(target.host) !== 0) {
-      dials.push(target.dial);
-      continue;
-    }
-
-    if (target.scheme === "https" && !canResolveHttps) {
-      dials.push(target.dial);
-      continue;
-    }
-
-    try {
-      const addresses = await resolveHostnameAddresses(
-        resolver,
-        target.host,
-        dnsResolution.family,
-        timeoutMs,
-      );
-      if (addresses.length === 0) {
-        dials.push(target.dial);
-        continue;
+  // Targets are looked up together and flattened in list order, so the dial order is what the
+  // operator wrote and the wait is the slowest lookup rather than the sum.
+  const dialsPerTarget = await Promise.all(
+    parsedTargets.map(async (target): Promise<string[]> => {
+      if (!target.host || !target.port || isIP(target.host) !== 0) {
+        return [target.dial];
       }
-      for (const address of addresses) {
-        dials.push(formatDialAddress(address, target.port));
+
+      if (target.scheme === "https" && !canResolveHttps) {
+        return [target.dial];
       }
-    } catch (error) {
-      console.warn(
-        `[caddy] Failed to resolve upstream "${target.original}" for host "${row.name}", falling back to hostname dial.`,
-        error,
-      );
-      dials.push(target.dial);
-    }
-  }
+
+      try {
+        const addresses = await resolveHostnameAddresses(
+          resolver,
+          target.host,
+          dnsResolution.family,
+          timeoutMs,
+        );
+        if (addresses.length === 0) {
+          return [target.dial];
+        }
+        return addresses.map((address) => formatDialAddress(address, target.port as string));
+      } catch (error) {
+        console.warn(
+          `[caddy] Failed to resolve upstream "${target.original}" for host "${row.name}", falling back to hostname dial.`,
+          error,
+        );
+        return [target.dial];
+      }
+    }),
+  );
 
   const dedupedDials: Array<{ dial: string }> = [];
   const seen = new Set<string>();
-  for (const dial of dials) {
+  for (const dial of dialsPerTarget.flat()) {
     if (!seen.has(dial)) {
       seen.add(dial);
       dedupedDials.push({ dial });
@@ -1319,17 +1306,26 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
   const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
 
+  // Parsed once per row: the adapt pre-pass and the per-host loop both read it.
+  const metaByRow = new Map<ProxyHostRow, ProxyHostMeta>();
+  const metaOf = (row: ProxyHostRow): ProxyHostMeta => {
+    let meta = metaByRow.get(row);
+    if (!meta) {
+      meta = parseJson<ProxyHostMeta>(row.meta, {});
+      metaByRow.set(row, meta);
+    }
+    return meta;
+  };
+
   // Adapt every host's snippet up front, concurrently: each adapt is an admin-API round trip on
   // every config apply, so the cost becomes the slowest rather than the sum. Not cached - a cache
   // outliving a rebuild would hand back routes for a module that is gone.
   const adaptedCaddyfiles = new Map<number, Awaited<ReturnType<typeof adaptCaddyfileSnippet>>>();
   await Promise.all(
     rows
-      .filter(
-        (row) => row.enabled && parseJson<ProxyHostMeta>(row.meta, {}).custom_caddyfile?.trim(),
-      )
+      .filter((row) => row.enabled && metaOf(row).custom_caddyfile?.trim())
       .map(async (row) => {
-        const snippet = parseJson<ProxyHostMeta>(row.meta, {}).custom_caddyfile as string;
+        const snippet = metaOf(row).custom_caddyfile as string;
         try {
           adaptedCaddyfiles.set(row.id, await adaptCaddyfileSnippet(snippet));
         } catch (error) {
@@ -1368,7 +1364,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     }
 
     const handlers: Record<string, unknown>[] = [];
-    const meta = parseJson<ProxyHostMeta>(row.meta, {});
+    const meta = metaOf(row);
     const tailscale = parseTailscaleConfig(meta.tailscale, context.tailscale ?? null);
 
     // The host was configured to exist only on the tailnet, and it cannot be: Tailscale is off in
@@ -2604,14 +2600,14 @@ async function buildL4Servers(
   // unmarshal, so emitting one would fail the whole config - HTTP hosts included.
   if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
 
-  const allL4Hosts = await db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true));
+  const [allL4Hosts, assignments] = await Promise.all([
+    db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true)),
+    agentRowId === undefined ? null : listHostAssignments("l4"),
+  ]);
   const l4Hosts =
-    agentRowId === undefined
+    assignments === null
       ? allL4Hosts
-      : await (async () => {
-          const assignments = await listHostAssignments("l4");
-          return allL4Hosts.filter((host) => servedByAgent(assignments, host.id, agentRowId));
-        })();
+      : allL4Hosts.filter((host) => servedByAgent(assignments, host.id, agentRowId ?? null));
 
   if (l4Hosts.length === 0) return null;
 
@@ -2739,34 +2735,34 @@ async function buildL4Servers(
         }
         const timeoutMs = getLookupTimeoutMs(dnsConfig, context.globalDnsSettings);
 
-        const pinned: string[] = [];
-        for (const upstream of upstreams) {
-          const colonIdx = upstream.lastIndexOf(":");
-          if (colonIdx <= 0) {
-            pinned.push(upstream);
-            continue;
-          }
-          const hostPart = upstream.substring(0, colonIdx);
-          const portPart = upstream.substring(colonIdx + 1);
-          if (isIP(hostPart) !== 0) {
-            pinned.push(upstream);
-            continue;
-          }
-          try {
-            const addresses = await resolveHostnameAddresses(
-              resolver,
-              hostPart,
-              effectiveDnsResolution.family,
-              timeoutMs,
-            );
-            for (const addr of addresses) {
-              pinned.push(addr.includes(":") ? `[${addr}]:${portPart}` : `${addr}:${portPart}`);
+        // Looked up together and flattened in list order, as the HTTP path does.
+        const pinned = await Promise.all(
+          upstreams.map(async (upstream): Promise<string[]> => {
+            const colonIdx = upstream.lastIndexOf(":");
+            if (colonIdx <= 0) {
+              return [upstream];
             }
-          } catch {
-            pinned.push(upstream);
-          }
-        }
-        resolvedDials = pinned;
+            const hostPart = upstream.substring(0, colonIdx);
+            const portPart = upstream.substring(colonIdx + 1);
+            if (isIP(hostPart) !== 0) {
+              return [upstream];
+            }
+            try {
+              const addresses = await resolveHostnameAddresses(
+                resolver,
+                hostPart,
+                effectiveDnsResolution.family,
+                timeoutMs,
+              );
+              return addresses.map((addr) =>
+                addr.includes(":") ? `[${addr}]:${portPart}` : `${addr}:${portPart}`,
+              );
+            } catch {
+              return [upstream];
+            }
+          }),
+        );
+        resolvedDials = pinned.flat();
       }
 
       // For UDP hosts, upstream dials must also use the udp/ prefix
@@ -2844,6 +2840,9 @@ export async function buildCaddyDocument(agentRowId?: number) {
     caCertRows,
     issuedClientCertRows,
     allIssuedCaCertIds,
+    httpAssignments,
+    dashboardSettings,
+    { roleCertIdMap, roleFingerprintMap },
   ] = await Promise.all([
     db
       .select({
@@ -2893,6 +2892,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
         id: issuedClientCertificates.id,
         caCertificateId: issuedClientCertificates.caCertificateId,
         certificatePem: issuedClientCertificates.certificatePem,
+        fingerprintSha256: issuedClientCertificates.fingerprintSha256,
       })
       .from(issuedClientCertificates)
       .where(isNull(issuedClientCertificates.revokedAt)),
@@ -2901,18 +2901,18 @@ export async function buildCaddyDocument(agentRowId?: number) {
     db
       .selectDistinct({ caCertificateId: issuedClientCertificates.caCertificateId })
       .from(issuedClientCertificates),
+    agentRowId === undefined ? null : listHostAssignments("http"),
+    getDashboardSettings(),
+    buildRoleMaps(),
   ]);
 
   // Pinned elsewhere, so this agent must not serve it. Filtered here rather than in the query so
   // the fleet-wide path stays a plain select, and so "no assignments means everywhere" is decided
   // by one function instead of by which side a join was written on.
   const servedRecords =
-    agentRowId === undefined
+    httpAssignments === null
       ? proxyHostRecords
-      : await (async () => {
-          const assignments = await listHostAssignments("http");
-          return proxyHostRecords.filter((h) => servedByAgent(assignments, h.id, agentRowId));
-        })();
+      : proxyHostRecords.filter((h) => servedByAgent(httpAssignments, h.id, agentRowId ?? null));
 
   const storedHostRows: ProxyHostRow[] = servedRecords.map((h) => ({
     id: h.id,
@@ -2937,7 +2937,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
   // the point - a host someone creates for the dashboard's domain must not shadow the route the
   // dashboard is reached through. Absent entirely when the setting is off, the domain is blank, or
   // the dial address could not be worked out.
-  const dashboardRow = buildDashboardHostRow(await getDashboardSettings(), getCpmDialAddress());
+  const dashboardRow = buildDashboardHostRow(dashboardSettings, getCpmDialAddress());
   const proxyHostRows: ProxyHostRow[] = dashboardRow
     ? [dashboardRow, ...storedHostRows]
     : storedHostRows;
@@ -2980,9 +2980,10 @@ export async function buildCaddyDocument(agentRowId?: number) {
 
   // Build a lookup: issued cert ID → { id, caCertificateId, certificatePem } (active only)
   const issuedCertById = new Map(issuedClientCertRows.map((r) => [r.id, r]));
-
-  // Resolve role IDs → cert IDs for trusted_role_ids in mTLS config
-  const roleCertIdMap = await buildRoleCertIdMap();
+  // Same active rows, so the fingerprint map for RBAC comes from them rather than a second read.
+  const certFingerprintMap = new Map(
+    issuedClientCertRows.map((r) => [r.id, normalizeFingerprint(r.fingerprintSha256)]),
+  );
 
   // Domain → CA cert IDs map for mTLS-enabled hosts. New model (trusted_client_cert_ids +
   // trusted_role_ids): derive CAs from the selected certs and pin to those certs. Old model
@@ -3064,17 +3065,13 @@ export async function buildCaddyDocument(agentRowId?: number) {
 
   // Build mTLS RBAC data for HTTP-layer enforcement
   const enabledProxyHostIds = proxyHostRows.filter((r) => r.enabled).map((r) => r.id);
-  const [roleFingerprintMap, certFingerprintMap, accessRulesByHost] = await Promise.all([
-    buildRoleFingerprintMap(),
-    buildCertFingerprintMap(),
-    getAccessRulesForHosts(enabledProxyHostIds),
-  ]);
 
   const { usage: certificateUsage, autoManagedDomains } = collectCertificateUsage(
     proxyHostRows,
     certificateMap,
   );
   const [
+    accessRulesByHost,
     generalSettings,
     acmeSettings,
     dnsSettings,
@@ -3086,7 +3083,11 @@ export async function buildCaddyDocument(agentRowId?: number) {
     moduleAvailability,
     defaultResponseSettings,
     storedTailscaleSettings,
+    globalErrorPages,
+    metricsSettings,
+    loggingSettings,
   ] = await Promise.all([
+    getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsSettings(),
@@ -3098,6 +3099,9 @@ export async function buildCaddyDocument(agentRowId?: number) {
     getCaddyModuleAvailability(agentRowId),
     getDefaultResponseSettings(),
     getTailscaleSettings(),
+    getErrorPagesSettings(),
+    getMetricsSettings(),
+    getLoggingSettings(),
   ]);
 
   // Resolved before anything reads it, because both the routes and the servers depend on the same
@@ -3173,12 +3177,23 @@ export async function buildCaddyDocument(agentRowId?: number) {
     },
   };
 
-  const {
-    routes: httpRoutes,
-    tailnetRoutes,
-    tailscaleNodes,
-    errorRoutes: hostErrorRoutes,
-  } = await buildProxyRoutes(caddyBuildContext);
+  // The two route sets share nothing but the settings above, so their DNS lookups and adapt
+  // round trips overlap instead of queueing.
+  const [
+    { routes: httpRoutes, tailnetRoutes, tailscaleNodes, errorRoutes: hostErrorRoutes },
+    l4Servers,
+  ] = await Promise.all([
+    buildProxyRoutes(caddyBuildContext),
+    buildL4Servers(
+      {
+        globalDnsSettings: dnsSettings,
+        globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
+        globalGeoBlock: effectiveGlobalGeoBlock,
+        moduleAvailability,
+      },
+      agentRowId,
+    ),
+  ]);
 
   // An administrator-configured matcher-less route replaces Caddy's native
   // unmatched-request behavior and must remain last so it cannot shadow any
@@ -3188,7 +3203,6 @@ export async function buildCaddyDocument(agentRowId?: number) {
 
   // Server-level error routes (Caddy handle_errors): per-host rules first so they
   // take precedence, then global rules act as a fallback for any unmatched host/status.
-  const globalErrorPages = await getErrorPagesSettings();
   const globalErrorRoutes = (globalErrorPages?.rules ?? []).map((rule) =>
     buildErrorPageRoute(rule),
   );
@@ -3197,12 +3211,10 @@ export async function buildCaddyDocument(agentRowId?: number) {
   const hasTls = tlsConnectionPolicies.length > 0;
 
   // Check if metrics should be enabled
-  const metricsSettings = await getMetricsSettings();
   const metricsEnabled = metricsSettings?.enabled ?? false;
   const metricsPort = metricsSettings?.port ?? 9090;
 
   // Check if access logging should be enabled
-  const loggingSettings = await getLoggingSettings();
   const loggingEnabled = loggingSettings?.enabled ?? false;
   const loggingFormat = loggingSettings?.format ?? "json";
 
@@ -3316,16 +3328,6 @@ export async function buildCaddyDocument(agentRowId?: number) {
   }
   const loggingApp = { logging: { logs: loggingLogs } };
 
-  // Build L4 (TCP/UDP) proxy servers
-  const l4Servers = await buildL4Servers(
-    {
-      globalDnsSettings: dnsSettings,
-      globalUpstreamDnsResolutionSettings: upstreamDnsResolutionSettings,
-      globalGeoBlock: effectiveGlobalGeoBlock,
-      moduleAvailability,
-    },
-    agentRowId,
-  );
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};
 
   return {

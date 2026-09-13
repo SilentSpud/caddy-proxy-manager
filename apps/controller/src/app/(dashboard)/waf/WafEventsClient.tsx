@@ -353,8 +353,9 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
   const [innerTab, setInnerTab] = useState("overview");
 
   // Parsed once per event instead of on every render. The matched rules get their row ids here, so
-  // switching the inner tab re-keys nothing.
-  const { data, msgs } = useMemo(() => {
+  // switching the inner tab re-keys nothing, and the pretty-printed copy - request and response
+  // bodies included - is not rebuilt on every tab switch either.
+  const { data, msgs, raw } = useMemo(() => {
     let parsed: AuditData | null = null;
     if (rawData) {
       try {
@@ -366,6 +367,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
     return {
       data: parsed,
       msgs: withRowIds((parsed?.messages ?? []).map(normalizeAuditMessage)),
+      raw: parsed ? JSON.stringify(parsed, null, 2) : "",
     };
   }, [rawData]);
 
@@ -570,12 +572,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
           </Text>
         }
       >
-        <CodeBlock
-          code={JSON.stringify(data, null, 2)}
-          language="json"
-          width="100%"
-          isCollapsible
-        />
+        <CodeBlock code={raw} language="json" width="100%" isCollapsible />
       </Collapsible>
     </VStack>
   );

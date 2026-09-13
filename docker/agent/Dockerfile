@@ -16,7 +16,9 @@ COPY packages/shared/package.json ./packages/shared/
 RUN bun install --frozen-lockfile --ignore-scripts
 
 COPY packages/shared ./packages/shared
-COPY apps/agent ./apps/agent
+# Only what the compile reads, so a test-only change keeps this layer and the binary cached.
+COPY apps/agent/tsconfig.json ./apps/agent/
+COPY apps/agent/src ./apps/agent/src
 
 # This stage runs on the host arch, so the binary is cross-compiled for the target. Bun names
 # targets by libc and arch, and the glibc variants match the docker:cli runtime's musl - they do

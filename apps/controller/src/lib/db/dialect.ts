@@ -172,15 +172,3 @@ export function driverOptions(
   const { kind: _kind, ...options } = target;
   return options;
 }
-
-/**
- * How to describe the connection without printing the password.
- *
- * A URL is not summarised: it may carry credentials anywhere in it, and there is no safe partial
- * of an arbitrary one.
- */
-export function describeTarget(target: DatabaseTarget): string {
-  return target.kind === "url"
-    ? "the server named by DATABASE_URL"
-    : `${target.username}@${target.hostname}:${target.port}/${target.database}`;
-}

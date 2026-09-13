@@ -11,7 +11,7 @@
  * and a write goes through ./resolve.ts's own save path, which clears the cache - so the only way
  * to see a stale value is to write to the table directly.
  */
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { settings } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../secret";
@@ -23,8 +23,11 @@ import {
   type SettingValue,
 } from "./registry";
 
-/** Stored values by key. Absent means "not loaded yet"; a key absent from a loaded map is unset. */
-let cache: Map<string, SettingValue> | null = null;
+/**
+ * Stored values by key. Null means "not loaded yet"; a key absent from the loaded map is unset.
+ * The promise is cached rather than the map, so concurrent cold reads share one query.
+ */
+let cache: Promise<Map<string, SettingValue>> | null = null;
 
 /** Drops the cache so the next read reloads. Exported for the tests and the migration flow. */
 export function invalidateSettingsCache(): void {
@@ -52,9 +55,19 @@ function decode(definition: SettingDefinition, raw: string): SettingValue | unde
   }
 }
 
-async function load(): Promise<Map<string, SettingValue>> {
-  if (cache) return cache;
+function load(): Promise<Map<string, SettingValue>> {
+  if (!cache) {
+    const pending = loadStored();
+    cache = pending;
+    // A failed read must not stick: the next read retries rather than re-throwing a stale error.
+    pending.catch(() => {
+      if (cache === pending) cache = null;
+    });
+  }
+  return cache;
+}
 
+async function loadStored(): Promise<Map<string, SettingValue>> {
   const keys = SETTING_DEFINITIONS.map((definition) => definition.key);
   const rows = await db
     .select({ key: settings.key, value: settings.value })
@@ -69,7 +82,6 @@ async function load(): Promise<Map<string, SettingValue>> {
     if (value !== undefined) loaded.set(row.key, value);
   }
 
-  cache = loaded;
   return loaded;
 }
 
@@ -151,14 +163,15 @@ export async function saveSettings(values: Record<string, unknown>): Promise<voi
     writes.push({ key, value: JSON.stringify(encoded) });
   }
 
-  const now = nowIso();
-  for (const write of writes) {
+  if (writes.length > 0) {
+    const now = nowIso();
+    // One statement for the batch; keys are unique here, which a multi-row upsert requires.
     await db
       .insert(settings)
-      .values({ key: write.key, value: write.value, updatedAt: now })
+      .values(writes.map((write) => ({ key: write.key, value: write.value, updatedAt: now })))
       .onConflictDoUpdate({
         target: settings.key,
-        set: { value: write.value, updatedAt: now },
+        set: { value: sql`excluded.value`, updatedAt: now },
       });
   }
 

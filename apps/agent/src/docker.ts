@@ -229,11 +229,12 @@ export class DockerHost {
    */
   private async composeArgs(): Promise<string[]> {
     const { composeDir, composeSkipOverride, composeExtraFile, dataDir } = this.config;
-    const args = ["-p", await this.composeProject()];
+    // Two independent inspects, each bounded at 15s; in series an unresponsive daemon doubled it.
+    const [project, hostDir] = await Promise.all([this.composeProject(), this.composeHostDir()]);
+    const args = ["-p", project];
 
     // The daemon resolves relative bind-mount paths against the project directory, and the agent's
     // /compose mount is not where the host thinks the project is. See composeHostDir.
-    const hostDir = await this.composeHostDir();
     if (hostDir) args.push("--project-directory", hostDir);
     // Supplied explicitly so required variables are available even when --project-directory points
     // at a host path this container cannot read.

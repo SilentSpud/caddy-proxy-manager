@@ -2,12 +2,10 @@
 
 import { useState, useActionState, useEffect, useTransition, type ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
-import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
 import { AppDialog } from "@/src/components/ui/AppDialog";
-import { Heading } from "@astryxdesign/core/Heading";
 import { Link } from "@astryxdesign/core/Link";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -94,69 +92,7 @@ import {
   unpairAgentAction,
 } from "./actions";
 
-import { SETTINGS_GROUPS, findSettingsItem } from "./sections";
-
-const ALL_ITEMS = SETTINGS_GROUPS.flatMap((g) =>
-  g.items.map((i) => ({ ...i, groupId: g.id, groupLabel: g.label })),
-);
-
-function findItem(id: string) {
-  return ALL_ITEMS.find((i) => i.id === id);
-}
-
-// ─── Layout primitives ───────────────────────────────────────────────────────
-
-// ─── Detail header ───────────────────────────────────────────────────────────
-
-/**
- * The environment variables a section is configured by, as tokens beside its name.
- *
- * Named rather than explained: an operator holding a `.env` line recognises `CLICKHOUSE_URL`
- * faster than any sentence about it, and the same string is what the search matches on.
- */
-function EnvTokens({ names }: { names?: readonly string[] }) {
-  const t = useTranslations("settings");
-  if (!names || names.length === 0) return null;
-  return (
-    // A bare div with an aria-label is not exposed; the role is what gives the tokens a name
-    // instead of reading them out as loose words after the heading.
-    <HStack
-      gap={1}
-      vAlign="center"
-      wrap="wrap"
-      role="group"
-      aria-label={t("environmentVariablesLabel")}
-    >
-      {names.map((name) => (
-        <Code key={name} size="inherit" color="secondary">
-          {name}
-        </Code>
-      ))}
-    </HStack>
-  );
-}
-
-function _DetailHeader({ activeId }: { activeId: string }) {
-  const item = findItem(activeId);
-  if (!item) return null;
-  return (
-    <VStack gap={1}>
-      <div data-testid="settings-breadcrumb">
-        <Breadcrumbs>
-          <BreadcrumbItem>Settings</BreadcrumbItem>
-          <BreadcrumbItem isCurrent>{item.groupLabel}</BreadcrumbItem>
-        </Breadcrumbs>
-      </div>
-      <HStack gap={2} vAlign="center" wrap="wrap">
-        <Heading level={1}>{item.name}</Heading>
-        <EnvTokens names={item.env} />
-      </HStack>
-      <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
-        {item.desc}
-      </Text>
-    </VStack>
-  );
-}
+import { findSettingsItem } from "./sections";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -242,7 +178,6 @@ export default function SettingsClient({
   baseUrl,
   agents,
 }: Props) {
-  const _t = useTranslations("settings");
   // Falls back rather than 404s: a stale bookmark to a renamed section should land somewhere
   // useful, and every id here is also a real route. Route-derived rather than state - the rail
   // navigates now, so there is nothing for the page to remember.

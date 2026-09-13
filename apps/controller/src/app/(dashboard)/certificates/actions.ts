@@ -7,17 +7,7 @@ import {
   deleteCertificate,
   updateCertificate,
 } from "@/src/lib/models/certificates";
-
-function parseDomains(value: FormDataEntryValue | null): string[] {
-  if (!value || typeof value !== "string") {
-    return [];
-  }
-  return value
-    .replace(/\n/g, ",")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+import { parseCsv } from "@/src/lib/form-parse";
 
 export async function createCertificateAction(formData: FormData) {
   const session = await requireAdmin();
@@ -27,7 +17,7 @@ export async function createCertificateAction(formData: FormData) {
     {
       name: String(formData.get("name") ?? "Certificate"),
       type,
-      domainNames: parseDomains(formData.get("domain_names")),
+      domainNames: parseCsv(formData.get("domain_names")),
       autoRenew: type === "managed" ? formData.get("auto_renew") === "on" : false,
       certificatePem: type === "imported" ? String(formData.get("certificate_pem") ?? "") : null,
       privateKeyPem: type === "imported" ? String(formData.get("private_key_pem") ?? "") : null,
@@ -49,7 +39,7 @@ export async function updateCertificateAction(id: number, formData: FormData) {
       name: formData.get("name") ? String(formData.get("name")) : undefined,
       type,
       domainNames: formData.get("domain_names")
-        ? parseDomains(formData.get("domain_names"))
+        ? parseCsv(formData.get("domain_names"))
         : undefined,
       autoRenew: formData.has("auto_renew_present")
         ? formData.get("auto_renew") === "on"

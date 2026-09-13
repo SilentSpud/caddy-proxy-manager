@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import db from "../db";
 import { sessions } from "../db/schema";
 
@@ -59,8 +59,10 @@ export async function revokeOtherUserSessions(
     .from(sessions)
     .where(eq(sessions.userId, userId));
   const toRevoke = rows.map((r) => r.id).filter((id) => id !== exceptSessionId);
-  for (const id of toRevoke) {
-    await db.delete(sessions).where(and(eq(sessions.id, id), eq(sessions.userId, userId)));
+  if (toRevoke.length > 0) {
+    await db
+      .delete(sessions)
+      .where(and(eq(sessions.userId, userId), inArray(sessions.id, toRevoke)));
   }
   return toRevoke.length;
 }

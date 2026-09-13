@@ -131,6 +131,9 @@ export function collectBlockedSignatures(
 ): Map<string, number> {
   const blocked = into ?? new Map<string, number>();
   for (const line of lines) {
+    // Every line is parsed again by parseLine, so skip the JSON work for the vast majority that
+    // cannot be a block. Caddy's encoder never escapes the letters of a message value.
+    if (!line.includes("request blocked")) continue;
     let entry: CaddyLogEntry;
     try {
       entry = JSON.parse(line.trim());
@@ -250,11 +253,15 @@ export async function parseNewLogEntries(): Promise<void> {
       await insertBatch(rows);
       // Unconsumed signatures are unmatched blocks; carry the recent ones forward and drop stale
       // ones so the map can't grow forever.
-      const latestTs = rows.length
-        ? Math.max(...rows.map((r) => r.ts))
-        : Math.floor(Date.now() / 1000);
+      // A loop rather than Math.max(...spread): a backlog of a few hundred thousand rows would
+      // overflow the argument list.
+      let latestTs = rows.length ? -Infinity : Math.floor(Date.now() / 1000);
+      let blockedRows = 0;
+      for (const r of rows) {
+        if (r.ts > latestTs) latestTs = r.ts;
+        if (r.is_blocked) blockedRows++;
+      }
       pendingBlocked = pruneBlockedSignatures(blocked, latestTs);
-      const blockedRows = rows.reduce((n, r) => n + (r.is_blocked ? 1 : 0), 0);
       console.log(`[log-parser] inserted ${rows.length} traffic events (${blockedRows} blocked)`);
     }
 

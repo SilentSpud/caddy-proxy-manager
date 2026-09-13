@@ -3047,14 +3047,18 @@ const spec = {
   },
 };
 
+// Serialized once: the document never changes, and stringifying it was the whole cost of a GET.
+const SPEC_JSON = JSON.stringify(spec);
+
 export async function GET(request: NextRequest) {
   try {
     await requireApiAdmin(request);
   } catch (error) {
     return apiErrorResponse(error);
   }
-  return NextResponse.json(spec, {
+  return new NextResponse(SPEC_JSON, {
     headers: {
+      "Content-Type": "application/json",
       "Cache-Control": "private, max-age=3600",
     },
   });

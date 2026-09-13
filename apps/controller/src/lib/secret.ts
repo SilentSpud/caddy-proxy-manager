@@ -4,10 +4,19 @@ import { config } from "./config";
 const PREFIX = "enc:v1:";
 const IV_LENGTH = 12;
 
+/** The last HKDF result, keyed on its input: every decrypt in a settings load wants the same key. */
+let derived: { secret: string; key: Buffer } | null = null;
+
 function deriveKey(sessionSecret: string = config.sessionSecret): Buffer {
-  return Buffer.from(
-    hkdfSync("sha256", sessionSecret, Buffer.alloc(0), "caddy-proxy-manager:secret:v1", 32),
-  );
+  if (derived?.secret !== sessionSecret) {
+    derived = {
+      secret: sessionSecret,
+      key: Buffer.from(
+        hkdfSync("sha256", sessionSecret, Buffer.alloc(0), "caddy-proxy-manager:secret:v1", 32),
+      ),
+    };
+  }
+  return derived.key;
 }
 
 function deriveKeyLegacy(sessionSecret: string = config.sessionSecret): Buffer {

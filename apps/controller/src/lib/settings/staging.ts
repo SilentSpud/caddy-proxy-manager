@@ -7,8 +7,8 @@
  */
 
 import db, { nowIso } from "../db";
-import { settingsStaged } from "../db/schema";
-import { and, eq } from "drizzle-orm";
+import { settings, settingsStaged } from "../db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import { getSetting } from "../settings";
 import { withStagedReads } from "./staging-context";
 
@@ -51,11 +51,12 @@ export async function countStagedSettings(userId: number): Promise<number> {
  * up in the review sheet as a change from a value to itself.
  */
 export async function stageWrites(userId: number, writes: Map<string, string>): Promise<void> {
+  if (writes.size === 0) return;
   const now = nowIso();
+  const stored = await storedValues([...writes.keys()]);
 
   for (const [key, value] of writes) {
-    const stored = await storedValue(key);
-    if (stored === value) {
+    if (stored.get(key) === value) {
       await discardStagedKey(userId, key);
       continue;
     }
@@ -81,17 +82,18 @@ export async function discardAllStaged(userId: number): Promise<void> {
 }
 
 /**
- * The stored serialization of a key, or null when unset.
+ * The stored serialization of each key; an unset key is absent.
  *
- * Deliberately reads the raw row rather than going through `getSetting`, which parses - comparing
+ * Deliberately reads the raw rows rather than going through `getSetting`, which parses - comparing
  * serialized forms is what tells us whether a write is a no-op, and re-serializing a parsed value
  * could differ from what is stored by key order alone.
  */
-async function storedValue(key: string): Promise<string | null> {
-  const row = await db.query.settings.findFirst({
-    where: (table, { eq: matches }) => matches(table.key, key),
-  });
-  return row?.value ?? null;
+async function storedValues(keys: string[]): Promise<Map<string, string>> {
+  const rows = await db
+    .select({ key: settings.key, value: settings.value })
+    .from(settings)
+    .where(inArray(settings.key, keys));
+  return new Map(rows.map((row) => [row.key, row.value]));
 }
 
 /** Read a setting as it would be after applying this operator's staged set. */

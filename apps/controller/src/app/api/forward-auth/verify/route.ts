@@ -30,18 +30,22 @@ export async function GET(request: NextRequest) {
     return new NextResponse(null, { status: 401 });
   }
 
-  const user = await getUserById(session.userId);
+  // Caddy subrequests this on every proxied request, so the three reads that only need the user
+  // id share one round trip; the checks below still answer in the same order.
+  const [user, hasAccess, userGroups] = await Promise.all([
+    getUserById(session.userId),
+    checkHostAccess(session.userId, audience.proxyHostId),
+    getGroupsForUser(session.userId),
+  ]);
   if (user?.status !== "active") {
     return new NextResponse(null, { status: 401 });
   }
 
-  const hasAccess = await checkHostAccess(session.userId, audience.proxyHostId);
   if (!hasAccess) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
   // Get user's groups for the header
-  const userGroups = await getGroupsForUser(session.userId);
   const groupNames = userGroups.map((g) => g.name).join(",");
 
   // Return 200 with user info headers that Caddy will copy to upstream

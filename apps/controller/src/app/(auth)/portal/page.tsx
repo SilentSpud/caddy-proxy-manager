@@ -46,9 +46,12 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     }
   }
 
-  const session = await auth();
-  const enabledProviders = await getProviderDisplayList();
-  const oauthError = oauthCallbackErrorMessage(params.error, await getTranslations("auth.login"));
+  const [session, enabledProviders, t] = await Promise.all([
+    auth(),
+    getProviderDisplayList(),
+    getTranslations("auth.login"),
+  ]);
+  const oauthError = oauthCallbackErrorMessage(params.error, t);
 
   return (
     <PortalLoginForm
