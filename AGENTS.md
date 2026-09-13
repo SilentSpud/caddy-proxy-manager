@@ -86,7 +86,9 @@ controller never dials the agent. Three consequences worth knowing before touchi
 - **Caddy's admin API binds on the internal `caddy-admin` network only.** The controller's `admin`
   block binds every interface, and caddy-network is where users attach upstreams, so the agent
   rewrites `admin.listen` to `CADDY_ADMIN_LISTEN` in every config it forwards
-  (`pinAdminListen`). A config that is not a JSON object is refused rather than sent unpinned.
+  (`pinAdminListen`). A config that is not a JSON object is refused rather than sent unpinned. The
+  controller's direct transport, used with no agent attached, pins the same way from its own
+  `CADDY_ADMIN_LISTEN`.
 
 ## Comments
 

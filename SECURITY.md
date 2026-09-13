@@ -189,12 +189,13 @@ application, whatever signed it.
 **An agent answers only for its own Caddy.** Each agent adapts Caddyfile snippets for the config
 it is sent, and the health monitor re-applies config only to the agent that reported a problem. A
 compromised agent can misconfigure its own Caddy, but never another agent's. A snippet is checked
-against every connected agent before it is saved.
+against every connected agent that serves the host before it is saved.
 
 **Caddy's admin API is not on the upstream network.** The bundled compose file binds it to Caddy's
-address on the internal `caddy-admin` network, which only web and the agent share, and the agent
-pins that address into every config it forwards, since the controller's own `admin` block binds
-every interface. A deployment without that network - an older compose file, or no agent - keeps
+address on the internal `caddy-admin` network, which only web and the agent share. The agent pins
+that address into every config it forwards, since the controller's own `admin` block binds every
+interface, and the controller pins it the same way when it loads a config with no agent attached.
+A deployment without that network or without `CADDY_ADMIN_LISTEN` - an older compose file - keeps
 the open bind, where only leaving port 2019 unpublished bounds who can reach it.
 
 **The GeoLite2 route hides itself.** Every refusal on it answers `404` - unsigned, unknown agent id,

@@ -155,6 +155,22 @@ async function checkTarget(target: Target, now: number, reapplyDelayMs: number):
   }, reapplyDelayMs);
 }
 
+/**
+ * The startup apply just loaded the direct Caddy, so its first sighting need not load it again.
+ * Only the direct target: an agent that attaches later still gets its own first-sighting re-apply,
+ * and a state for a target that is not live is dropped on the next pass.
+ */
+export function noteStartupApply(now = Date.now()): void {
+  states.set(DIRECT, {
+    isHealthy: true,
+    lastConfigId: "startup",
+    lastCheckTime: now,
+    consecutiveFailures: 0,
+    lastReapplyAt: 0,
+    reapplyPending: false,
+  });
+}
+
 /** One pass over every Caddy. Exported so tests can drive it with no delay before the re-apply. */
 export async function checkCaddyHealth(reapplyDelayMs = REAPPLY_DELAY): Promise<void> {
   const now = Date.now();

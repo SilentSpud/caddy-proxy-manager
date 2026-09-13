@@ -22,6 +22,9 @@ services:
 
       # Only used with no agent. Caddy's name on the internal caddy-admin network; see caddy below.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy-admin:2019}
+      # Pinned as admin.listen into a config loaded with no agent in between, as the agent pins every
+      # config it forwards. Must match caddy's CADDY_ADMIN_LISTEN.
+      CADDY_ADMIN_LISTEN: caddy-admin:2019
 
       # Where generated certificates are written. Defaults to <workdir>/data/certs.
       CERTS_DIRECTORY: ${CERTS_DIRECTORY:-}

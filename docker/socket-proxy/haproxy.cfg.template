@@ -40,10 +40,13 @@ defaults
     errorfile 503 /usr/local/etc/haproxy/errors/503.http
     errorfile 504 /usr/local/etc/haproxy/errors/504.http
 
-# Routed on the request line and headers, then piped unfiltered: on success the daemon hijacks the
-# connection into gRPC, so nothing later on it is the Docker API. The header checks keep the
-# daemon's pre-hijack refusals unreachable, since a refused request would leave the pipe open for
-# requests this proxy never saw.
+# Routed on the first request's line and headers, then piped unfiltered from the first byte: on
+# success the daemon hijacks the connection into gRPC, so nothing later on it is the Docker API.
+# The checks narrow which requests take this route; they do not make it safe. The daemon can still
+# refuse a matching request before hijacking (an API version it does not serve, a repeated Upgrade
+# header, a session id already in use), and the connection then stays a raw pipe to the socket that
+# carries any later request past the allowlist below. That is no more than CONTAINERS and POST
+# already give whoever reaches this proxy, which is why the compose file calls it not a boundary.
 frontend dockerfrontend
     mode tcp
     option tcplog

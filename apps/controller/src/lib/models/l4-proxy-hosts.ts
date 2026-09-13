@@ -7,6 +7,7 @@ import { l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
 import { ApiValidationError } from "../api-errors";
+import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { setHostAgents } from "./host-agents";
 
 export type L4Protocol = "tcp" | "udp";
@@ -622,6 +623,7 @@ export async function assertNotMetricsPort(listenAddress: string | undefined): P
 export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: number) {
   validateL4Input(input, true);
   await assertNotMetricsPort(input.listenAddress);
+  await assertNoNewAdminDialTargets([], input.upstreams, actorUserId);
 
   const now = nowIso();
   const [record] = await db
@@ -715,6 +717,9 @@ export async function updateL4ProxyHost(
 
   validateL4Input(input, false);
   await assertNotMetricsPort(input.listenAddress);
+  // A layer-4 dial is a raw TCP pipe, so an upstream on the admin port publishes the whole admin
+  // API on this host's listen port - the same hole the HTTP host model closes.
+  await assertNoNewAdminDialTargets(existing.upstreams, input.upstreams ?? [], actorUserId);
 
   const now = nowIso();
   await db

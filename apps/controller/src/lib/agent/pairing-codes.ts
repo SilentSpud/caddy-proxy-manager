@@ -16,6 +16,7 @@
 
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH, PAIRING_CODE_TTL_MS } from "@cpm/shared";
+import { resetWindows, takeFromWindow, windowSpent } from "../rate-limit";
 
 export type PairingCode = { code: string; expiresAt: number };
 
@@ -31,15 +32,14 @@ const MAX_FAILURES_PER_CODE = 200;
 /** Wrong guesses one client address may make per window before it is refused outright. */
 const MAX_FAILURES_PER_CLIENT = 5;
 const CLIENT_WINDOW_MS = 60_000;
-/** Bounds the table a caller rotating spoofed forwarding headers could otherwise grow. */
-const MAX_TRACKED_CLIENTS = 10_000;
+/** The rate-limit window key prefix; its table is bounded against a caller rotating addresses. */
+const CLIENT_WINDOW_PREFIX = "pair-client:";
 
 type LiveCode = PairingCode & { failures: number };
 
 let current: LiveCode | null = null;
 /** Re-pair codes, keyed by the agentId each one may re-pair. */
 const repairCodes = new Map<string, LiveCode>();
-const clients = new Map<string, { failures: number; windowStart: number }>();
 
 function secureEquals(a: string, b: string): boolean {
   const left = createHmac("sha256", "compare").update(Buffer.from(a, "utf8")).digest();
@@ -144,35 +144,22 @@ export function redeemRepairCode(
 
 /** Whether this client has used up its wrong guesses for the current window. */
 export function clientThrottled(client: string, now = Date.now()): boolean {
-  const entry = clients.get(client);
-  if (!entry) return false;
-  if (entry.windowStart + CLIENT_WINDOW_MS <= now) {
-    clients.delete(client);
-    return false;
-  }
-  return entry.failures >= MAX_FAILURES_PER_CLIENT;
+  return windowSpent(`${CLIENT_WINDOW_PREFIX}${client}`, MAX_FAILURES_PER_CLIENT, now);
 }
 
+/** Counted only on a wrong guess, and checked before the next one reaches a code's own budget. */
 export function recordFailedGuess(client: string, now = Date.now()): void {
-  let entry = clients.get(client);
-  if (!entry || entry.windowStart + CLIENT_WINDOW_MS <= now) {
-    if (clients.size >= MAX_TRACKED_CLIENTS) {
-      for (const [key, value] of clients) {
-        if (value.windowStart + CLIENT_WINDOW_MS <= now) clients.delete(key);
-      }
-      // Still full: drop the oldest window, which Map iteration order hands over first.
-      const oldest = clients.keys().next();
-      if (clients.size >= MAX_TRACKED_CLIENTS && !oldest.done) clients.delete(oldest.value);
-    }
-    entry = { failures: 0, windowStart: now };
-    clients.set(client, entry);
-  }
-  entry.failures += 1;
+  takeFromWindow(
+    `${CLIENT_WINDOW_PREFIX}${client}`,
+    MAX_FAILURES_PER_CLIENT,
+    CLIENT_WINDOW_MS,
+    now,
+  );
 }
 
 /** Test seam: forget every code and every throttle so one suite cannot see another's. */
 export function resetPairingCodes(): void {
   current = null;
   repairCodes.clear();
-  clients.clear();
+  resetWindows(CLIENT_WINDOW_PREFIX);
 }

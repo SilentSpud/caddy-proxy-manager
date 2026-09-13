@@ -80,6 +80,8 @@ export async function register() {
       console.log("Applying Caddy configuration from database...");
       await applyCaddyConfig();
       console.log("Caddy configuration applied successfully");
+      // So the monitor's first pass does not build and load the same document again.
+      (await import("./lib/caddy-monitor")).noteStartupApply();
     } catch (error) {
       console.error("Failed to apply Caddy configuration on startup:", error);
       // Don't throw - Caddy may not be ready yet, or the config may be applied later; this keeps

@@ -12,6 +12,7 @@
  */
 import http from "node:http";
 import https from "node:https";
+import { loadsConfig, pinAdminListen } from "@cpm/shared";
 
 export type CaddyAdminRequest = {
   /** Path relative to the configured admin API root, e.g. "/load" or "/config/". */
@@ -53,13 +54,31 @@ async function caddyAdminUrl(path: string): Promise<string> {
 }
 
 /**
+ * The body a direct request sends: a config it loads gets `CADDY_ADMIN_LISTEN` pinned as its admin
+ * bind, as the agent does for every config it forwards.
+ *
+ * `buildCaddyDocument` binds every interface, because it cannot know each agent's address. With no
+ * agent in between, that document would rebind the admin API onto caddy-network, where every
+ * upstream could reach it - in a stack with no agent, and whenever the bundled one is reconnecting.
+ */
+export function directRequestBody(
+  request: Pick<CaddyAdminRequest, "method" | "path" | "body">,
+  listen = process.env.CADDY_ADMIN_LISTEN?.trim() || null,
+): string | undefined {
+  if (!listen || !request.body || !loadsConfig(request)) return request.body;
+  const pinned = pinAdminListen(request.body, listen);
+  if (pinned === null) throw new Error("A config for Caddy must be a JSON object.");
+  return pinned;
+}
+
+/**
  * Real transport: a plain node:http request. Not `fetch` - that sends Sec-Fetch-* headers, which
  * trigger Caddy's CORS origin enforcement.
  */
 export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   path,
   method,
-  body,
+  body: requestBody,
   timeoutMs,
   contentType,
 }) => {
@@ -74,6 +93,7 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   }
 
   const parsed = new URL(await caddyAdminUrl(path));
+  const body = directRequestBody({ method, path, body: requestBody });
 
   return new Promise((resolve, reject) => {
     const lib = parsed.protocol === "https:" ? https : http;
