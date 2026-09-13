@@ -16,6 +16,10 @@
 #   COMPOSE_DIR           - Path to compose files (default: /compose)
 #   CADDY_CONTAINER_NAME  - Caddy container name for project auto-detection (default: caddy-proxy-manager-caddy)
 #   COMPOSE_PROJECT_NAME  - Override compose project name (auto-detected from caddy container labels if unset)
+#   COMPOSE_HOST_DIR      - Only for non-standard bind-mount deployments: host
+#                           path passed as --project-directory so relative
+#                           bind-mount paths resolve on the host. The official
+#                           named-volume setup must leave this unset.
 #   POLL_INTERVAL         - Seconds between trigger file checks (default: 2)
 #   COMPOSE_SKIP_OVERRIDE - If non-empty, skip docker-compose.override.yml (useful in test environments)
 #   COMPOSE_EXTRA_FILE    - If set, include this additional compose file (e.g. a test-specific override)
@@ -86,6 +90,9 @@ do_apply() {
   # COMPOSE_HOST_DIR (when set) is passed as --project-directory so the Docker
   # daemon resolves relative bind-mount paths (e.g. ./geoip-data) against the
   # actual host project directory rather than the sidecar's /compose mount.
+  # NOTE: only relevant for non-standard bind-mount deployments. The official
+  # named-volume setup has no relative paths to resolve and must leave this
+  # unset.
   COMPOSE_ARGS="-p $COMPOSE_PROJECT"
   if [ -n "$COMPOSE_HOST_DIR" ]; then
     COMPOSE_ARGS="$COMPOSE_ARGS --project-directory $COMPOSE_HOST_DIR"
