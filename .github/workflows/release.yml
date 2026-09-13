@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Notes and the deploy-file diff are both computed against the previous release tag.
           fetch-depth: 0
@@ -209,10 +209,9 @@ jobs:
           # someone deploying v3.0.0's files got whatever `latest` had become, and a redeploy months
           # later silently upgraded the containers under compose files that had not changed.
           #
-          # Scoped to the three images this project publishes. `tecnativa/docker-socket-proxy:latest`
-          # and `clickhouse/clickhouse-server:latest-alpine` are other people's images on their own
-          # release cadence, and pinning them to our version would name tags that do not exist --
-          # which is what the assertions below are really guarding.
+          # Scoped to the three images this project publishes. The rest are other people's images,
+          # already pinned by tag and digest on their own cadence, and rewriting them to our version
+          # would name tags that do not exist -- which is what the assertions below are really guarding.
           sed -i -E \
             "s#(image: ghcr\.io/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*/(web|caddy|agent)):latest#\\1:${VERSION}#" \
             "$staging/docker-compose.yml"
@@ -225,15 +224,14 @@ jobs:
             fi
           done
 
-          # A sed that reached too far is the other half of the same worry: the third-party images
-          # must still say what they said.
-          for untouched in 'tecnativa/docker-socket-proxy:latest' 'clickhouse/clickhouse-server:latest-alpine'; do
-            if ! grep -qF "$untouched" "$staging/docker-compose.yml"; then
-              echo "::error::staged docker-compose.yml no longer references ${untouched}"
-              grep -n 'image:' "$staging/docker-compose.yml"
-              exit 1
-            fi
-          done
+          # A sed that reached too far is the other half of the same worry: every other image line
+          # must still say exactly what the checkout says. Compared, not listed, so a Dependabot
+          # bump to one of those pins cannot break the release.
+          if ! diff <(grep -E '^[[:space:]]*image:' docker-compose.yml | grep -vE '/(web|caddy|agent):') \
+                    <(grep -E '^[[:space:]]*image:' "$staging/docker-compose.yml" | grep -vE '/(web|caddy|agent):'); then
+            echo "::error::staged docker-compose.yml changed a third-party image reference"
+            exit 1
+          fi
 
           # A sed that matched nothing is the failure worth catching here: it would ship a compose
           # file pointing at a directory the archive does not contain, and nothing downstream

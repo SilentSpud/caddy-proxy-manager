@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
 
       # Hands the PR to GitHub's own auto-merge, which holds it until the checks main
       # requires -- test and e2e -- report success, then squashes. The job finishes in

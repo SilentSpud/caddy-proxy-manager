@@ -40,12 +40,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: latest
+          # The oven/bun tag in docker/web and docker/agent, so CI tests what the images build with.
+          bun-version: 1.4.2
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -70,7 +71,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.browsers }}
@@ -90,7 +91,7 @@ jobs:
       # The default docker driver cannot export build cache, so type=gha in
       # tests/docker-compose.ci.yml needs a real buildx builder to exist first.
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       # tests/global-setup.ts drives `docker compose up -d --build` over
       # docker-compose.yml + tests/docker-compose.test.yml, seeds fixtures, logs
@@ -110,7 +111,7 @@ jobs:
         # what make a red run diagnosable without reproducing it locally, and a
         # green run's copies are noise.
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-results
           path: test-results/
