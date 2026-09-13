@@ -60,9 +60,11 @@ vi.mock('../../src/lib/agent/desired-state', () => ({
   }),
 }));
 
-import { POST } from '../../src/app/api/graphql/route';
+import { OPTIONS, POST } from '../../src/app/api/graphql/route';
 import { AGENT_OPERATIONS } from '@cpm/shared';
 import { detach } from '../../src/lib/agent/registry';
+import { createApiToken } from '../../src/lib/models/api-tokens';
+import { users } from '../../src/lib/db/schema';
 
 function post(body: unknown, headers: Record<string, string> = {}) {
   return POST(
@@ -123,5 +125,66 @@ describe('the endpoint over HTTP', () => {
 
     const payload = (await response.json()) as { data?: { __typename: string } };
     expect(payload.data?.__typename).toBe('Query');
+  });
+});
+
+describe('what the endpoint gives away', () => {
+  type Payload = { data?: Record<string, unknown> | null; errors?: { message: string }[] };
+
+  it('refuses introspection to a caller who does not authenticate', async () => {
+    const response = await post({ query: '{ __schema { queryType { name } } }' });
+
+    const payload = (await response.json()) as Payload;
+    expect(payload.errors?.[0]?.message).toBe('Unauthorized');
+    expect(payload.data ?? null).toBeNull();
+  });
+
+  it('answers introspection for a caller with a valid API token', async () => {
+    const now = new Date().toISOString();
+    const [user] = await ctx.db
+      .insert(users)
+      .values({
+        email: 'introspection@example.com',
+        name: 'Introspection',
+        role: 'viewer',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    const { rawToken } = await createApiToken('introspection', user.id);
+
+    const response = await post(
+      { query: '{ __schema { queryType { name } } }' },
+      { authorization: `Bearer ${rawToken}` },
+    );
+
+    const payload = (await response.json()) as {
+      data?: { __schema: { queryType: { name: string } } };
+    };
+    expect(payload.data?.__schema.queryType.name).toBe('Query');
+  });
+
+  it('does not suggest real field names in a validation error', async () => {
+    // "Did you mean" would name the fields introspection is withholding.
+    const response = await post({ query: '{ proxyHots { id } }' });
+
+    const payload = (await response.json()) as Payload;
+    expect(payload.errors?.[0]?.message).toContain('Cannot query field');
+    expect(JSON.stringify(payload)).not.toContain('Did you mean');
+  });
+
+  it('grants no cross-origin access, credentialed or otherwise', async () => {
+    const preflight = await OPTIONS(
+      new Request('http://localhost:3000/api/graphql', {
+        method: 'OPTIONS',
+        headers: { origin: 'https://evil.example', 'access-control-request-method': 'POST' },
+      }) as never,
+    );
+    expect(preflight.headers.get('access-control-allow-origin')).toBeNull();
+
+    const response = await post({ query: '{ __typename }' }, { origin: 'https://evil.example' });
+    expect(response.headers.get('access-control-allow-origin')).toBeNull();
+    expect(response.headers.get('access-control-allow-credentials')).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import db, { nowIso, toIso } from "../db";
 import { apiTokens } from "../db/schema";
 import { and, count, eq } from "drizzle-orm";
 import { NotFoundError } from "../api-auth";
+import { ApiValidationError } from "../api-errors";
 import { domainError } from "../domain-error";
 
 export type ApiToken = {
@@ -41,7 +42,7 @@ export async function createApiToken(
 ): Promise<{ token: ApiToken; rawToken: string }> {
   const trimmedName = name.trim();
   if (trimmedName.length > MAX_TOKEN_NAME_LENGTH) {
-    throw new Error(`Token name must be ${MAX_TOKEN_NAME_LENGTH} characters or fewer`);
+    throw new ApiValidationError(`Token name must be ${MAX_TOKEN_NAME_LENGTH} characters or fewer`);
   }
 
   // Enforce per-user token limit
@@ -50,7 +51,7 @@ export async function createApiToken(
     .from(apiTokens)
     .where(eq(apiTokens.createdBy, createdBy));
   if (existingCount[0] && existingCount[0].value >= MAX_TOKENS_PER_USER) {
-    throw new Error(`Maximum of ${MAX_TOKENS_PER_USER} API tokens per user`);
+    throw new ApiValidationError(`Maximum of ${MAX_TOKENS_PER_USER} API tokens per user`);
   }
 
   // Validate expires_at is a valid ISO 8601 date in the future

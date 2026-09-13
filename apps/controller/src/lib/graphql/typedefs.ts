@@ -219,8 +219,12 @@ export const typeDefs = /* GraphQL */ `
     agents: [Agent!]!
     oauthProviders: [OAuthProvider!]!
     dnsProviders: [DnsProvider!]!
+    """At most 200 events per page, as over REST."""
     auditLog(limit: Int, offset: Int, search: String): AuditEventPage!
-    """One settings group, e.g. "general" or "dashboard". Shape belongs to the group."""
+    """
+    One settings group as /api/v1/settings/{group} serves it, e.g. "general" or "dns-provider".
+    Shape belongs to the group; credentials are redacted.
+    """
     settings(group: String!): JSON
     """The Caddy modules compiled into the running binary."""
     caddyModules: JSON

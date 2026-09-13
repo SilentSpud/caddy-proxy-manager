@@ -5,13 +5,14 @@
  * `src/lib/graphql/agent.ts` for why the agent lives in the same schema rather than a second one.
  *
  * GraphiQL is served in development only. In production it would be an unauthenticated HTML page
- * advertising the shape of every mutation on the box; the schema is still introspectable by an
- * authenticated client, which is what a real GraphQL client needs.
+ * advertising the shape of every mutation on the box. For the same reason introspection answers
+ * only a caller who authenticates, which is what a real GraphQL client needs.
  */
 
 import { createYoga } from "graphql-yoga";
 import type { NextRequest } from "next/server";
 import { createContext } from "@/src/lib/graphql/context";
+import { authenticatedIntrospectionPlugin, maskGraphQLError } from "@/src/lib/graphql/errors";
 import { schema } from "@/src/lib/graphql/schema";
 
 type ServerContext = { request: NextRequest; rawBody: () => Promise<string> };
@@ -23,11 +24,15 @@ const yoga = createYoga<ServerContext>({
   // what `fetchAPI` pins.
   fetchAPI: { Response },
   graphiql: process.env.NODE_ENV === "development",
+  // Same-origin only. Yoga's default reflects any Origin with credentials allowed, leaving a
+  // per-field check as the only thing between another site and the reader's session.
+  cors: false,
+  plugins: [authenticatedIntrospectionPlugin()],
   context: ({ request, rawBody }) => createContext(request as NextRequest, rawBody),
-  // Errors are already shaped by the model layer and `api-errors`. Yoga masking them would turn a
-  // "domain already in use" into "Unexpected error", which is worse than useless to a client.
+  // Deliberate refusals go out as written, so "domain already in use" survives; anything else is
+  // logged and replaced, as REST's apiErrorResponse does.
   maskedErrors: {
-    maskError: (error) => error as Error,
+    maskError: maskGraphQLError,
   },
 });
 

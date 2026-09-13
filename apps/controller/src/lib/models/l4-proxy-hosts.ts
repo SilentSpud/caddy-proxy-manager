@@ -5,6 +5,7 @@ import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
+import { ApiValidationError } from "../api-errors";
 import { setHostAgents } from "./host-agents";
 
 export type L4Protocol = "tcp" | "udp";
@@ -471,7 +472,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
     // has to be bracketed here, as it does everywhere else in this stack.
     const parsed = splitHostPort(input.listenAddress);
     if (parsed === null) {
-      throw new Error(
+      throw new ApiValidationError(
         "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535",
       );
     }
@@ -485,7 +486,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
   }
 
   if (input.matcherType !== undefined && !VALID_MATCHER_TYPES.includes(input.matcherType)) {
-    throw new Error(`Matcher type must be one of: ${VALID_MATCHER_TYPES.join(", ")}`);
+    throw new ApiValidationError(`Matcher type must be one of: ${VALID_MATCHER_TYPES.join(", ")}`);
   }
 
   if (input.matcherType === "tls_sni" || input.matcherType === "http_host") {
@@ -509,7 +510,9 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
       // A bare IPv6 literal contains colons and would have passed a `includes(":")` check while
       // naming no port at all.
       if (splitHostPort(upstream) === null || splitHostPort(upstream)?.host === "") {
-        throw new Error(`Upstream '${upstream}' must be in 'host:port' or '[IPv6]:port' format`);
+        throw new ApiValidationError(
+          `Upstream '${upstream}' must be in 'host:port' or '[IPv6]:port' format`,
+        );
       }
     }
   }
