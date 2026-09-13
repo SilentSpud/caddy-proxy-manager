@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { rmSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { COMPOSE_ARGS, COMPOSE_CWD } from './helpers/compose';
+import { COMPOSE_ARGS, COMPOSE_CWD, TEARDOWN_PROFILES } from './helpers/compose';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
@@ -15,7 +15,7 @@ export default async function globalTeardown() {
       env: {
         ...process.env,
         CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026',
-        COMPOSE_PROFILES: 'clickhouse',
+        COMPOSE_PROFILES: TEARDOWN_PROFILES,
       },
     });
   } catch (err) {

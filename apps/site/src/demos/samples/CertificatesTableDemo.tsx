@@ -101,20 +101,23 @@ function CertificatesTableDemoContent() {
 
   return (
     <VStack gap={4}>
-      <StatTiles
-        tiles={[
-          { id: "acme", label: t("acme"), value: acme, note: t("acmeNote", { count: acme }) },
-          {
-            id: "imported",
-            label: t("imported"),
-            value: imported,
-            note: t("importedExpiredNote"),
-            accent: { label: t("expiredAccent", { count: expired }), variant: "error" },
-          },
-          { id: "ca", label: t("caMtls"), value: 1, note: t("caNote", { count: 4 }) },
-          { id: "roles", label: t("roles"), value: 2, note: t("rolesNote") },
-        ]}
-      />
+      {/* Desktop only, as ListPageHeader has them: a phone list is for finding a row. */}
+      <div className="cpm-desktop-only">
+        <StatTiles
+          tiles={[
+            { id: "acme", label: t("acme"), value: acme, note: t("acmeNote", { count: acme }) },
+            {
+              id: "imported",
+              label: t("imported"),
+              value: imported,
+              note: t("importedExpiredNote"),
+              accent: { label: t("expiredAccent", { count: expired }), variant: "error" },
+            },
+            { id: "ca", label: t("caMtls"), value: 1, note: t("caNote", { count: 4 }) },
+            { id: "roles", label: t("roles"), value: 2, note: t("rolesNote") },
+          ]}
+        />
+      </div>
       <DataTable columns={columns} data={CERTS} keyField="id" emptyMessage="No certificates yet" />
     </VStack>
   );

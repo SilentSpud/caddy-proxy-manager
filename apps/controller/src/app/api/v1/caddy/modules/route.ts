@@ -6,6 +6,16 @@ import { applyCaddyConfig } from "@/src/lib/caddy";
 import { CADDY_MODULES } from "@/src/lib/caddy-modules";
 import { getCaddyBuildSettings, saveCaddyBuildSettings } from "@/src/lib/settings";
 
+// The catalog is fixed at build time, so it is shaped once rather than per GET.
+const AVAILABLE = CADDY_MODULES.map((m) => ({
+  id: m.id,
+  name: m.name,
+  modulePath: m.modulePath,
+  description: m.description,
+  category: m.category,
+  features: m.features,
+}));
+
 /**
  * GET /api/v1/caddy/modules - the catalog, the current selection, and how it differs from the
  * running image. The catalog ships along because module ids are what PUT expects.
@@ -15,14 +25,7 @@ export async function GET(request: NextRequest) {
     await requireApiAdmin(request);
     const [settings, diff] = await Promise.all([getCaddyBuildSettings(), getCaddyBuildDiff()]);
     return NextResponse.json({
-      available: CADDY_MODULES.map((m) => ({
-        id: m.id,
-        name: m.name,
-        modulePath: m.modulePath,
-        description: m.description,
-        category: m.category,
-        features: m.features,
-      })),
+      available: AVAILABLE,
       selection: {
         modules: settings?.modules ?? {},
         customModules: settings?.customModules ?? [],

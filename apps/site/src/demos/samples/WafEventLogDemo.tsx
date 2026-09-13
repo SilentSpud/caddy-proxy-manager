@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Search } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -6,6 +7,9 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Text } from "@astryxdesign/core/Text";
 import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { useTranslations } from "next-intl";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import { SearchField } from "@cpm/controller/src/components/ui/SearchField";
 import { formatDateTimeUtc } from "@cpm/controller/src/lib/date-format";
@@ -138,16 +142,91 @@ const EVENTS: Event[] = [
   },
 ];
 
-function Stat({ label, value }: { label: string; value: string }) {
+type Stats = {
+  total: number;
+  blocked: number;
+  critical: number;
+  uniqueHosts: number;
+  ruleIdsTriggered: number;
+};
+
+/** What the page's stats query returns, counted off the rows above. */
+const STATS: Stats = {
+  total: EVENTS.length,
+  blocked: EVENTS.filter((e) => e.blocked).length,
+  critical: EVENTS.filter((e) => e.severity === "CRITICAL").length,
+  uniqueHosts: new Set(EVENTS.map((e) => e.host)).size,
+  ruleIdsTriggered: new Set(EVENTS.map((e) => e.ruleId)).size,
+};
+
+/** The page's five tiles. */
+function StatsBar({ stats }: { stats: Stats }) {
+  const t = useTranslations("waf");
+  const items = [
+    { label: t("statTotalEvents"), value: stats.total, color: "primary" as const },
+    { label: t("blocked"), value: stats.blocked, color: "accent" as const },
+    { label: t("statCritical"), value: stats.critical, color: "accent" as const },
+    { label: t("statUniqueHosts"), value: stats.uniqueHosts, color: "accent" as const },
+    { label: t("statRuleIdsTriggered"), value: stats.ruleIdsTriggered, color: "accent" as const },
+  ];
+
   return (
-    <Card>
-      <VStack gap={1}>
-        <Text type="label" size="3xs" weight="bold" color="secondary">
-          {label}
-        </Text>
-        <Text type="body" size="lg" weight="semibold">
-          {value}
-        </Text>
+    <Grid columns={{ minWidth: 120, max: 5 }} gap={3}>
+      {items.map(({ label, value, color }) => (
+        <Card key={label} padding={3}>
+          <VStack gap={0}>
+            <Text type="display-3" color={color} hasTabularNumbers>
+              {value}
+            </Text>
+            <Text type="body" size="xsm" weight="medium" color="secondary">
+              {label}
+            </Text>
+          </VStack>
+        </Card>
+      ))}
+    </Grid>
+  );
+}
+
+/** The same tiles folded into one card on a phone: the blocked count leads, the rest sit under it. */
+function WafStatusCard({ stats }: { stats: Stats }) {
+  const t = useTranslations("waf");
+  const rest = [
+    { label: t("statTotalEvents"), value: stats.total },
+    { label: t("statCritical"), value: stats.critical },
+    { label: t("statUniqueHosts"), value: stats.uniqueHosts },
+    { label: t("statRuleIdsTriggered"), value: stats.ruleIdsTriggered },
+  ];
+
+  return (
+    <Card padding={4}>
+      <VStack gap={3}>
+        <HStack justify="between" vAlign="center" gap={2}>
+          <Text type="body" weight="semibold">
+            {t("firewall")}
+          </Text>
+          <Badge variant="success" label={t("enabled")} />
+        </HStack>
+        <VStack gap={0}>
+          <Text type="display-3" color="accent" hasTabularNumbers>
+            {stats.blocked}
+          </Text>
+          <Text type="body" size="xsm" weight="medium" color="secondary">
+            {t("blocked")}
+          </Text>
+        </VStack>
+        <Grid columns={{ minWidth: 120, max: 2 }} gap={3}>
+          {rest.map(({ label, value }) => (
+            <VStack key={label} gap={0}>
+              <Text type="body" weight="semibold" hasTabularNumbers>
+                {value}
+              </Text>
+              <Text type="body" size="xsm" color="secondary">
+                {label}
+              </Text>
+            </VStack>
+          ))}
+        </Grid>
       </VStack>
     </Card>
   );
@@ -204,9 +283,21 @@ function Detail({ event, onClose }: { event: Event; onClose: () => void }) {
   );
 }
 
-export default function WafEventLogDemo() {
+function WafEventLogDemoContent() {
+  const t = useTranslations("waf");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Phone-only, as on the page: search waits behind its icon, and an event replaces the list.
+  const isNarrow = useMediaQuery("(max-width: 767px)");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+
+  // The field is mounted all along, only hidden, so autofocus would never fire: focus it when the
+  // icon reveals it instead.
+  useEffect(() => {
+    if (searchOpen) searchWrapRef.current?.querySelector("input")?.focus();
+  }, [searchOpen]);
 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -297,28 +388,64 @@ export default function WafEventLogDemo() {
     },
   ];
 
-  return (
-    <DemoSurface>
-      <VStack gap={4}>
-        <Grid columns={{ minWidth: 130, max: 4 }} gap={3}>
-          <Stat label="Events" value={String(EVENTS.length)} />
-          <Stat label="Blocked" value={String(EVENTS.filter((e) => e.blocked).length)} />
-          <Stat
-            label="Critical"
-            value={String(EVENTS.filter((e) => e.severity === "CRITICAL").length)}
-          />
-          <Stat label="Hosts" value={String(new Set(EVENTS.map((e) => e.host)).size)} />
-        </Grid>
+  // On a phone the event replaces the list, which may have been scrolled well down: bring its top
+  // into view rather than opening it somewhere above the fold.
+  useEffect(() => {
+    if (isNarrow && selected) detailRef.current?.scrollIntoView({ block: "start" });
+  }, [isNarrow, selected]);
 
+  return (
+    <VStack gap={4}>
+      {/* The search icon the page's header carries on a phone, where the field hides until it
+            is wanted. */}
+      <HStack justify="end" className="cpm-mobile-flex">
+        <IconButton
+          variant="ghost"
+          label={t("searchWafEvents")}
+          icon={<Search />}
+          onClick={() => setSearchOpen((open) => !open)}
+        />
+      </HStack>
+
+      <div className="cpm-desktop-only">
+        <StatsBar stats={STATS} />
+      </div>
+      <div className="cpm-mobile-only">
+        <WafStatusCard stats={STATS} />
+      </div>
+
+      {/* Always there on a desktop; on a phone once the icon asks for it, or while a search is
+            applied so the filter never hides. */}
+      <div
+        ref={searchWrapRef}
+        className={searchOpen || search ? undefined : "cpm-desktop-only"}
+        style={{ maxWidth: 480 }}
+      >
         <SearchField
           value={search}
           onChange={setSearch}
           width="100%"
-          placeholder="Search events by host, IP, path or rule..."
+          placeholder={t("eventsSearchPlaceholder")}
+          label={t("searchWafEvents")}
         />
+      </div>
 
-        {/* The same wrapping split the page uses: side by side when there is room, the panel
-            under the table when there is not. */}
+      {isNarrow && selected ? (
+        <VStack gap={3} ref={detailRef}>
+          <div>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<ArrowLeft />}
+              label={t("backToEvents")}
+              onClick={() => setSelectedId(null)}
+            />
+          </div>
+          <Detail event={selected} onClose={() => setSelectedId(null)} />
+        </VStack>
+      ) : (
+        /* The same wrapping split the page uses: side by side when there is room, the panel
+            under the table when there is not. */
         <HStack gap={4} vAlign="start" wrap="wrap">
           <div style={{ flexGrow: 1, flexBasis: 520, minWidth: 0 }}>
             <DataTable
@@ -338,7 +465,19 @@ export default function WafEventLogDemo() {
             </div>
           )}
         </HStack>
-      </VStack>
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The content renders inside DemoSurface rather than around it: the surface is what provides the
+ * message catalog, and the content reads from it with useTranslations.
+ */
+export default function WafEventLogDemo() {
+  return (
+    <DemoSurface>
+      <WafEventLogDemoContent />
     </DemoSurface>
   );
 }

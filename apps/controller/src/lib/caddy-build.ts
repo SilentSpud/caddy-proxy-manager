@@ -253,24 +253,7 @@ export function featureModuleNames(feature: CaddyFeatureId): string {
     .join(", ");
 }
 
-// ─── Dockerfile / compose generation ─────────────────────────────────────────
-
-/**
- * The Dockerfile the image is built from, rendered with the selected modules. Shown read-only in
- * Settings; the real file stays generic, so this substitutes only CADDY_MODULES.
- */
-export function generateCaddyDockerfilePreview(specs: string[]): string {
-  const withLines = specs.map((spec) => `#     --with ${spec}`).join("\n");
-  return `# Generated preview - the real build uses docker/caddy/Dockerfile with
-# CADDY_MODULES set to the value below.
-#
-# xcaddy build controller \\
-${withLines || "#     (no plugins - plain Caddy)"}
-#     --output /usr/bin/caddy
-
-ARG CADDY_MODULES="${specs.join(" ")}"
-`;
-}
+// ─── Build ───────────────────────────────────────────────────────────────────
 
 /**
  * Send the selection to the agent to build with. Validated here as well as in the UI, since the

@@ -3,6 +3,9 @@ title: Users, roles & groups
 description: Four roles, group-based delegation, and OAuth/OIDC single sign-on.
 ---
 
+import Demo from "../../../components/Demo.astro";
+import SignInDemo from "../../../demos/samples/SignInDemo";
+
 ## The four roles
 
 | Capability | Viewer | User | Operator | Admin |
@@ -36,10 +39,33 @@ Groups are lists of users doing two jobs:
 2. Deciding what an operator may manage, through **Groups → Access**: tick the proxy hosts, L4
    hosts and agents the group should reach, then choose the capability.
 
+## Signing in
+
+The sign-in screen asks for the username on its own, then the password. The dashboard's `/login`
+and the [forward-auth portal](../forward-auth/) work the same way.
+
+- **It is still one form.** The password field is in the page from the start, only hidden, so a
+  password manager can fill both at once - and when it has, **Continue** signs straight in.
+- **Any username continues.** The first step never checks whether the account exists, or which
+  provider it belongs to, so the screen cannot be used to find out which usernames are real.
+- **The username stays on screen** for the second step, with a way to change it, so a typo in it
+  can be told apart from a wrong password.
+- **The primary provider stands out.** Its button is filled with a lighter tint of the accent;
+  the other providers are plain. The solid accent stays with **Sign in**.
+
+<Demo title="Signing in" note="Any username continues. No password is accepted - there is no controller behind this page.">
+  <SignInDemo client:visible />
+</Demo>
+
 ## OAuth / SSO
 
 Any OAuth2/OIDC provider - Authentik, Keycloak, Auth0, and others. Accounts can be linked from the
 Profile page, so an existing local account gains SSO rather than becoming a duplicate.
+
+A provider sign-in that is refused comes back to the sign-in screen with the reason. The common one
+is an email that already belongs to an account the provider is not linked to: sign in with the
+password, then link the provider from Profile. Once one is linked, Profile can also remove the
+password, after confirming the current one, so the account signs in through the provider only.
 
 Two options worth knowing:
 

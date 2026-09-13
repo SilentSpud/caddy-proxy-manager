@@ -310,8 +310,6 @@ export type WafEventRow = {
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
-export type AgentErrorBody = { error: string; code: AgentErrorCode };
-
 export type AgentErrorCode =
   | "UNAUTHENTICATED"
   | "PAIRING_DISABLED"
@@ -374,9 +372,6 @@ export const AGENT_OPERATIONS = {
  * controller also sends the full URL in `FleetConfig.geoip`, for agents that predate this.
  */
 export const CONTROLLER_GEOIP_ROUTE = "/api/agent/geoip";
-
-/** Header naming the agent making a signed call, so the controller can pick the right secret. */
-export const CONTROLLER_AGENT_HEADER = AGENT_ID_HEADER;
 
 /**
  * How often the controller writes a comment frame to an idle stream.
@@ -493,10 +488,6 @@ export type AgentCommandResult = { id: string } & (
   | { ok: true; response: CaddyAdminProxyResponse }
   | { ok: false; error: string; code: AgentErrorCode }
 );
-
-export type AgentCommandResultsRequest = { results: AgentCommandResult[] };
-
-export type AgentStatusRequest = { status: AgentStatus };
 
 // ─── Local control ───────────────────────────────────────────────────────────
 

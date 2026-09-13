@@ -370,43 +370,6 @@ export async function checkHostAccess(userId: number, proxyHostId: number): Prom
   return !!groupAccess;
 }
 
-export async function checkHostAccessByDomain(
-  userId: number,
-  host: string,
-): Promise<{ hasAccess: boolean; proxyHostId: number | null }> {
-  // Find proxy host(s) that contain this domain
-  const allHosts = await db.query.proxyHosts.findMany({
-    where: (table, operators) => operators.eq(table.enabled, true),
-  });
-
-  // Exact-match hosts take precedence over wildcard-covered ones, mirroring how Caddy itself
-  // prioritizes routes (see host-pattern-priority.ts).
-  let wildcardMatch: (typeof allHosts)[number] | null = null;
-  for (const ph of allHosts) {
-    let parsed: string[];
-    try {
-      parsed = JSON.parse(ph.domains);
-    } catch {
-      continue;
-    }
-    if (parsed.some((d) => d.toLowerCase() === host.toLowerCase())) {
-      const hasAccess = await checkHostAccess(userId, ph.id);
-      return { hasAccess, proxyHostId: ph.id };
-    }
-    if (!wildcardMatch && parsed.some((d) => hostMatchesPattern(host, d))) {
-      wildcardMatch = ph;
-    }
-  }
-
-  if (wildcardMatch) {
-    const hasAccess = await checkHostAccess(userId, wildcardMatch.id);
-    return { hasAccess, proxyHostId: wildcardMatch.id };
-  }
-
-  // Host not found in any proxy host - deny by default
-  return { hasAccess: false, proxyHostId: null };
-}
-
 export async function getForwardAuthAccessForHost(
   proxyHostId: number,
 ): Promise<ForwardAuthAccessEntry[]> {
@@ -485,6 +448,7 @@ async function findForwardAuthProxyHost(host: string) {
   // mirroring the routing precedence Caddy itself applies.
   let exactMatchFound = false;
   let wildcardMatch: (typeof allHosts)[number] | null = null;
+  const hostLower = host.toLowerCase();
 
   for (const ph of allHosts) {
     let parsed: string[];
@@ -493,7 +457,7 @@ async function findForwardAuthProxyHost(host: string) {
     } catch {
       continue;
     }
-    if (parsed.some((d) => d.toLowerCase() === host.toLowerCase())) {
+    if (parsed.some((d) => d.toLowerCase() === hostLower)) {
       exactMatchFound = true;
       if (hasForwardAuthEnabled(ph)) return ph;
       continue;
@@ -533,21 +497,4 @@ export async function resolveForwardAuthAudience(
 
 export async function isForwardAuthDomain(host: string): Promise<boolean> {
   return !!(await findForwardAuthProxyHost(host));
-}
-
-// ── Cleanup ──────────────────────────────────────────────────────────
-
-export async function cleanupExpiredSessions(): Promise<number> {
-  const now = nowIso();
-
-  // Delete expired exchanges first (FK constraint)
-  await db.delete(forwardAuthExchanges).where(lt(forwardAuthExchanges.expiresAt, now));
-
-  // Delete expired sessions
-  const result = await db
-    .delete(forwardAuthSessions)
-    .where(lt(forwardAuthSessions.expiresAt, now))
-    .returning();
-
-  return result.length;
 }

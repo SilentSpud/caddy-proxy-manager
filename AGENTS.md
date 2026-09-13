@@ -39,11 +39,15 @@ them. Three things make that work, and all three live in `apps/site/astro.config
   resolve from the site. `apps/site/tsconfig.json` mirrors them again for tsc.
 - **`next-intl` and `next/navigation` resolve to shims.** Only `useTranslations` is used from the
   first, which `use-intl` provides framework-agnostically; the second is reached by `DataTable`
-  alone, and the shim makes the query string reactive so a demo can sort and page for real.
+  alone, and the shim makes the query string reactive so a demo can sort and page for real. The
+  controller's `src/lib/auth-client` is shimmed too, so the sign-in demo never posts to
+  `/api/auth/*` on the docs site; every attempt fails the way a wrong password does.
 - **Astryx's global reset is not loaded.** It would strip Starlight's prose, so `src/demos/demo.css`
   carries the rules its components need, scoped to `.cpm-demo`. For the same reason `DemoSurface`
   renders Astryx's theme wrapper itself instead of using `<Theme>`, which would write its
-  attributes onto `<html>` and restyle the whole documentation site.
+  attributes onto `<html>` and restyle the whole documentation site. The controller's
+  `astryx-variants.css` is imported whole; its `mobile.css` is not, because half of it pins chrome
+  to the viewport - `demo.css` repeats only the `cpm-desktop-only`/`cpm-mobile-only` rules.
 
 A component that imports a server action or the database cannot be demoed - the import would pull
 the db into the browser bundle. That rules out the page clients under `(dashboard)` that import

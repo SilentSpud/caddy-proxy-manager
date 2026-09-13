@@ -44,10 +44,16 @@ export function storageKeysForSection(id: string): readonly string[] {
   return SECTION_STORAGE_KEYS[id]?.keys ?? [];
 }
 
+/** Inverted once at load. First section to name a key keeps it, as the per-call scan this replaced did. */
+const SECTION_BY_STORAGE_KEY = new Map<string, { id: string; label: string }>();
+for (const [id, entry] of Object.entries(SECTION_STORAGE_KEYS)) {
+  for (const key of entry.keys) {
+    if (!SECTION_BY_STORAGE_KEY.has(key))
+      SECTION_BY_STORAGE_KEY.set(key, { id, label: entry.label });
+  }
+}
+
 /** The section a storage key belongs to, with its change-list label, or null if nothing claims it. */
 export function sectionForStorageKey(key: string): { id: string; label: string } | null {
-  for (const [id, entry] of Object.entries(SECTION_STORAGE_KEYS)) {
-    if (entry.keys.includes(key)) return { id, label: entry.label };
-  }
-  return null;
+  return SECTION_BY_STORAGE_KEY.get(key) ?? null;
 }

@@ -60,27 +60,35 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   const sortBy = sortByParam || undefined;
   const sortDir = sortDirParam === "asc" || sortDirParam === "desc" ? sortDirParam : "desc";
 
+  // One round trip for everything that does not depend on which hosts came back. The header
+  // counts the whole (visible, searched) set rather than this page.
   const [
     hosts,
     total,
+    counts,
     certificates,
     caCertificates,
     accessLists,
     authentikDefaults,
     tailscaleSettings,
     generalSettings,
+    agents,
+    // These are safe to fail if the RBAC migration hasn't been applied yet
+    mtlsRoles,
+    issuedClientCerts,
+    allUsers,
+    allGroups,
   ] = await Promise.all([
     listProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, enabled),
     countProxyHosts(search, visibleIds, enabled),
+    countProxyHostsByState(search, visibleIds),
     listCertificates(),
     listCaCertificates(),
     listAccessLists(),
     getAuthentikSettings(),
     getTailscaleSettings(),
     getGeneralSettings(),
-  ]);
-  // These are safe to fail if the RBAC migration hasn't been applied yet
-  const [mtlsRoles, issuedClientCerts, allUsers, allGroups] = await Promise.all([
+    listAgentOptions().catch(() => []),
     listMtlsRoles().catch(() => []),
     listIssuedClientCertificates().catch(() => []),
     listUsers().catch(() => []),
@@ -89,34 +97,25 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
 
   // Only the hosts on this page: the map is for the edit dialog, and loading the fleet's whole
   // assignment table to fill in twenty-five rows would grow with the deployment for no gain.
-  const [agents, assignments] = await Promise.all([
-    listAgentOptions().catch(() => []),
+  // The traffic column is best-effort: with analytics off or unreachable, `available` is false and
+  // the column is dropped instead of the list failing.
+  const dayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+  const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
+  const [assignments, traffic, faAccessEntries] = await Promise.all([
     agentIdsForHosts(
       "http",
       hosts.map((host) => host.id),
     ).catch(() => new Map<number, number[]>()),
-  ]);
-  const agentAssignments = Object.fromEntries(assignments);
-
-  // The header counts the whole (visible, searched) set rather than this page, and the traffic
-  // column is best-effort: with analytics off or unreachable, `available` is false and the column
-  // is dropped instead of the list failing.
-  const dayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
-  const [counts, traffic] = await Promise.all([
-    countProxyHostsByState(search, visibleIds),
     getTrafficByProxyHost(
       dayAgo,
       Math.floor(Date.now() / 1000),
       hosts.map((host) => ({ id: host.id, domains: host.domains })),
     ),
+    // Build forward auth access map for hosts that have CPM forward auth enabled
+    Promise.all(faHosts.map((h) => getForwardAuthAccessForHost(h.id).catch(() => []))),
   ]);
+  const agentAssignments = Object.fromEntries(assignments);
   const hostTraffic = Object.fromEntries(traffic.byHost);
-
-  // Build forward auth access map for hosts that have CPM forward auth enabled
-  const faHosts = hosts.filter((h) => h.cpmForwardAuth?.enabled);
-  const faAccessEntries = await Promise.all(
-    faHosts.map((h) => getForwardAuthAccessForHost(h.id).catch(() => [])),
-  );
   const forwardAuthAccessMap: Record<number, { userIds: number[]; groupIds: number[] }> = {};
   faHosts.forEach((h, i) => {
     const entries = faAccessEntries[i];

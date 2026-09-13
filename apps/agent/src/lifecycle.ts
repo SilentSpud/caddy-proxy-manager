@@ -101,7 +101,11 @@ export class AgentLifecycle {
     const code = pairingCode ?? this.readBootstrapToken();
     if (controllerUrl && code) {
       const outcome = await this.pairWith(controllerUrl, code);
-      if (!outcome.ok) console.warn(`[agent] ${outcome.error}`);
+      if (!outcome.ok) {
+        console.warn(`[agent] ${outcome.error}`);
+        // A token found at boot can fail to redeem because the controller is still starting.
+        this.rearmBootstrapWatch();
+      }
       return;
     }
 
@@ -110,13 +114,24 @@ export class AgentLifecycle {
         ? "No pairing code. Run `cpm-agent --pair --host <controller> --code <code>`."
         : "No controller configured. Run `cpm-agent --pair --host <controller> --code <code>`.",
     );
+    this.rearmBootstrapWatch();
+  }
 
-    // The bundled stack starts the agent and the controller together, and the controller writes
-    // the bootstrap token as it boots. Reading it once meant losing that race left the agent idle
-    // *forever* - Caddy never started, and the only clue was "No pairing code" on a stack the
-    // operator never had to pair by hand. So keep looking while there is a controller to pair
-    // with. A remote agent has no such file and this finds nothing, which costs one `existsSync`
-    // a few seconds and is the state it is already sitting in.
+  /**
+   * Keep looking for a bootstrap token whenever the agent lands in idle with a controller to pair
+   * with.
+   *
+   * The bundled stack starts the agent and the controller together, and the controller writes the
+   * bootstrap token as it boots. Reading it once meant losing that race left the agent idle
+   * *forever* - Caddy never started, and the only clue was "No pairing code" on a stack the
+   * operator never had to pair by hand. The same applies to an agent whose stored pairing the
+   * controller no longer recognises: a rebuilt controller writes a fresh token, and an agent that
+   * stopped watching would sit idle beside it. A remote agent has no such file and this finds
+   * nothing, which costs one `existsSync` every few seconds and is the state it is already in. An
+   * explicit `--code` opts out: that operator is pairing by hand.
+   */
+  private rearmBootstrapWatch(): void {
+    const { controllerUrl, pairingCode } = this.deps.config;
     if (controllerUrl && !pairingCode) this.watchForBootstrapToken(controllerUrl);
   }
 
@@ -321,6 +336,7 @@ export class AgentLifecycle {
           await this.goIdle(
             "The controller no longer recognises this agent. Pair it again with a fresh code.",
           );
+          this.rearmBootstrapWatch();
           return;
         }
         console.warn(`[agent] stream lost, retrying in ${Math.round(backoff / 1000)}s:`, error);

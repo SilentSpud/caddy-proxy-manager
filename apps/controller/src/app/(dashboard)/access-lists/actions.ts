@@ -8,6 +8,7 @@ import {
   addAccessListEntry,
   createAccessList,
   deleteAccessList,
+  getAccessList,
   removeAccessListEntry,
   updateAccessList,
 } from "@/src/lib/models/access-lists";
@@ -88,18 +89,17 @@ async function regeneratePasswordActionUntranslated(
   const userId = Number(session.user.id);
   // Remove old entry and add new one with same username
   // We need to get the username first
-  const {
-    removeAccessListEntry: remove,
-    addAccessListEntry: add,
-    getAccessList,
-  } = await import("@/src/lib/models/access-lists");
   const listBefore = await getAccessList(accessListId);
   if (!listBefore) throw domainError("accessListNotFound");
   const entry = listBefore.entries.find((e) => e.id === entryId);
   if (!entry) throw domainError("accessListEntryNotFound");
 
-  await remove(accessListId, entryId, userId);
-  const list = await add(accessListId, { username: entry.username, password: newPassword }, userId);
+  await removeAccessListEntry(accessListId, entryId, userId);
+  const list = await addAccessListEntry(
+    accessListId,
+    { username: entry.username, password: newPassword },
+    userId,
+  );
   revalidatePath("/access-lists");
   return list;
 }

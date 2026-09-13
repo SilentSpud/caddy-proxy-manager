@@ -483,13 +483,15 @@ export async function querySummary(
   const hf = hostFilter(hosts);
   const tp = timeParams(from, to);
 
-  const traffic = await queryRow<{
-    total: string;
-    unique_ips: string;
-    blocked: string;
-    bytes: string;
-  }>(
-    `
+  // Independent tables, so one round trip rather than two in sequence.
+  const [traffic, wafRow] = await Promise.all([
+    queryRow<{
+      total: string;
+      unique_ips: string;
+      blocked: string;
+      bytes: string;
+    }>(
+      `
     SELECT
       count() AS total,
       uniq(client_ip) AS unique_ips,
@@ -498,17 +500,17 @@ export async function querySummary(
     FROM traffic_events
     WHERE ${timeFilter()}${hf.sql}
   `,
-    { ...tp, ...hf.params },
-  );
-
-  const wafRow = await queryRow<{ waf_blocked: string }>(
-    `
+      { ...tp, ...hf.params },
+    ),
+    queryRow<{ waf_blocked: string }>(
+      `
     SELECT count() AS waf_blocked
     FROM waf_events
     WHERE ${timeFilter()} AND blocked = true${hf.sql}
   `,
-    { ...tp, ...hf.params },
-  );
+      { ...tp, ...hf.params },
+    ),
+  ]);
 
   const total = Number(traffic?.total ?? 0);
   const geoBlocked = Number(traffic?.blocked ?? 0);
@@ -1193,11 +1195,19 @@ export async function queryTopWafRulesWithHosts(
     { ...tp, ...ruleParams },
   );
 
+  // Grouped once; the rows arrive ordered by count, and insertion order keeps it per rule.
+  const hostsByRule = new Map<number, { host: string; count: number }[]>();
+  for (const r of hostRows) {
+    const ruleId = Number(r.rule_id);
+    const entry = { host: r.host, count: Number(r.count) };
+    const list = hostsByRule.get(ruleId);
+    if (list) list.push(entry);
+    else hostsByRule.set(ruleId, [entry]);
+  }
+
   return topRules.map((rule) => ({
     ...rule,
-    hosts: hostRows
-      .filter((r) => Number(r.rule_id) === rule.ruleId)
-      .map((r) => ({ host: r.host, count: Number(r.count) })),
+    hosts: hostsByRule.get(rule.ruleId) ?? [],
   }));
 }
 

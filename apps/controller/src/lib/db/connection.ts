@@ -36,9 +36,6 @@ export const target = resolveDatabaseTarget(process.env);
 const DEFAULT_POOL_MAX = 10;
 const poolMax = Number(process.env.DATABASE_POOL_MAX) || DEFAULT_POOL_MAX;
 
-/** The tables handed to the driver. ./schema.ts re-exports these rather than importing separately. */
-export const activeSchema = pgSchema;
-
 /**
  * The raw driver handle. Only the migration path should need it.
  *

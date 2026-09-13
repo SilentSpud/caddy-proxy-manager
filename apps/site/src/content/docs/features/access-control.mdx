@@ -12,7 +12,7 @@ import MtlsDemo from "../../../demos/samples/MtlsDemo";
 Two ways to put something in front of a host that does not involve a login page. For the login-page
 version, see [forward auth](../forward-auth/).
 
-<Demo title="Access lists" note="Pick a list to see its members and the hosts it protects.">
+<Demo title="Access lists" note="Pick a list to see its members and the hosts it protects - Board preview has none.">
   <AccessListDemo client:visible />
 </Demo>
 
@@ -20,6 +20,11 @@ version, see [forward auth](../forward-auth/).
 
 Multi-account HTTP basic auth, assignable per proxy host. Passwords are bcrypt-hashed. One list can
 protect several hosts, and adding an account to the list grants it everywhere the list is used.
+
+**An empty list fails closed.** A host whose list has no members refuses every request rather than
+serving it unauthenticated. The access lists page flags a list with no members, and warns when a
+host is still using one; the host editor marks empty lists in its picker and warns when one is
+chosen.
 
 Simple, and appropriate for exactly the cases basic auth is appropriate for: an internal tool, a
 staging site, something you want off the open internet without standing up an identity provider.

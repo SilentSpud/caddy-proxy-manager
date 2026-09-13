@@ -154,6 +154,10 @@ const FEATURES: ReadonlyArray<{
   },
 ];
 
+// Built once: constructing a formatter resolves locale data, and this component re-renders on
+// every keystroke in the search field.
+const NUMBER_FORMAT = new Intl.NumberFormat();
+
 /** "example.com +2" - the primary entry plus a count of the rest. */
 function summarize(values: string[]) {
   return values.length > 1 ? `${values[0]} +${values.length - 1}` : values[0];
@@ -279,7 +283,6 @@ export default function ProxyHostsClient({
 
   const certificateNames = new Map(certificates.map((c) => [c.id, c.name]));
   const agentNames = new Map((agents ?? []).map((a) => [a.id, a.name]));
-  const numberFormat = new Intl.NumberFormat();
   // Whether there is traffic data at all comes from the server, not from the map: with analytics on,
   // an empty map is a quiet day, and hiding the column then would read as "analytics is off".
   const trafficKnown = trafficAvailable;
@@ -380,11 +383,11 @@ export default function ProxyHostsClient({
               return (
                 <VStack gap={0} hAlign="end">
                   <Text type="code" size="sm">
-                    {numberFormat.format(row.total)}
+                    {NUMBER_FORMAT.format(row.total)}
                   </Text>
                   {row.blocked > 0 && (
                     <Text type="supporting" color="secondary">
-                      {t("blockedCount", { count: numberFormat.format(row.blocked) })}
+                      {t("blockedCount", { count: NUMBER_FORMAT.format(row.blocked) })}
                     </Text>
                   )}
                 </VStack>
@@ -497,7 +500,7 @@ export default function ProxyHostsClient({
               {
                 id: "requests",
                 label: t("requests24h"),
-                value: trafficKnown ? numberFormat.format(trafficTotals.total) : t("noData"),
+                value: trafficKnown ? NUMBER_FORMAT.format(trafficTotals.total) : t("noData"),
                 note: trafficKnown
                   ? t("blockedShareNote", { percent: blockedShare })
                   : t("analyticsOffNote"),

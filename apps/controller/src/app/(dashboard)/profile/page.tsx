@@ -20,24 +20,31 @@ export default async function ProfilePage() {
   const session = await requireUser();
   const userId = Number(session.user.id);
 
-  const user = await getUserById(userId);
-  if (!user) {
-    redirect("/login");
-  }
-
-  // OAuth connection state comes from the authoritative accounts table - the
-  // informational users.provider/subject columns are only a projection (#261).
-  const linkedProviders = await listUserOAuthProviders(userId);
-
-  const [enabledProviders, apiTokens, userSessions, currentSessionId] = await Promise.all([
+  // Everything keys off the session's user id alone, so nothing has to wait for the user row.
+  const [
+    user,
+    linkedProviders,
+    enabledProviders,
+    apiTokens,
+    userSessions,
+    currentSessionId,
+    gravatarEnabled,
+  ] = await Promise.all([
+    getUserById(userId),
+    // OAuth connection state comes from the authoritative accounts table - the
+    // informational users.provider/subject columns are only a projection (#261).
+    listUserOAuthProviders(userId),
     getProviderDisplayList(),
     listApiTokens(userId),
     listUserSessions(userId),
     getCurrentSessionId(),
+    isGravatarEnabled(),
   ]);
+  if (!user) {
+    redirect("/login");
+  }
 
   const sessions = userSessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
-  const gravatarEnabled = await isGravatarEnabled();
 
   return (
     <ProfileClient

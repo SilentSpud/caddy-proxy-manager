@@ -48,24 +48,6 @@ export async function getUserCount(): Promise<number> {
   return result[0]?.value ?? 0;
 }
 
-export async function findUserByProviderSubject(
-  provider: string,
-  subject: string,
-): Promise<User | null> {
-  const account = await db
-    .select()
-    .from(accounts)
-    .where(and(eq(accounts.providerId, provider), eq(accounts.accountId, subject)))
-    .limit(1);
-
-  if (account.length === 0) return null;
-
-  const user = await db.query.users.findFirst({
-    where: (table, { eq }) => eq(table.id, account[0].userId),
-  });
-  return user ? parseDbUser(user) : null;
-}
-
 export async function findUserByEmail(email: string): Promise<User | null> {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await db.query.users.findFirst({
@@ -237,12 +219,14 @@ export async function syncUserOAuthIdentity(userId: number): Promise<void> {
     return;
   }
 
-  const [credentialAccount] = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
-    .limit(1);
-  const user = await getUserById(userId);
+  const [[credentialAccount], user] = await Promise.all([
+    db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+      .limit(1),
+    getUserById(userId),
+  ]);
   const hasCredential = !!credentialAccount || !!user?.passwordHash;
 
   await db
@@ -260,17 +244,6 @@ export async function listUsers(): Promise<User[]> {
     orderBy: (table, { asc }) => asc(table.createdAt),
   });
   return rows.map(parseDbUser);
-}
-
-export async function promoteToAdmin(userId: number): Promise<void> {
-  const now = nowIso();
-  await db
-    .update(users)
-    .set({
-      role: "admin",
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
 }
 
 export async function updateUserRole(userId: number, role: User["role"]): Promise<User | null> {

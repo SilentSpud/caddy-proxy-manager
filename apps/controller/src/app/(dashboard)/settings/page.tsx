@@ -49,6 +49,8 @@ export default async function SettingsPage() {
     certificates,
     keys,
     staged,
+    paired,
+    connected,
   ] = await Promise.all([
     getDnsProviderSettings(),
     getAcmeSettings(),
@@ -63,14 +65,13 @@ export default async function SettingsPage() {
     listCertificates(),
     stagedKeys(userId),
     stagedView(userId),
+    // Agent reachability is a property of this process and is never allowed to fail the page: an
+    // unreachable agent is a tile that says so, not a 500.
+    listAgents().catch(() => []),
+    listAgentOptions()
+      .then((options) => options.filter((option) => option.connected).length)
+      .catch(() => 0),
   ]);
-
-  // Agent reachability is a property of this process, so it is read separately and never allowed
-  // to fail the page: an unreachable agent is a tile that says so, not a 500.
-  const paired = await listAgents().catch(() => []);
-  const connected = await listAgentOptions()
-    .then((options) => options.filter((option) => option.connected).length)
-    .catch(() => 0);
 
   const sections = sectionHealth({
     dnsProvider,

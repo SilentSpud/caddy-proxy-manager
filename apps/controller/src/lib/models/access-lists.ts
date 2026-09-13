@@ -9,7 +9,7 @@ import db, { nowIso, toIso } from "../db";
 import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { accessListEntries, accessLists, proxyHosts } from "../db/schema";
-import { asc, eq, inArray, count } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { domainError } from "../domain-error";
 
 export type AccessListEntry = {
@@ -76,39 +76,6 @@ export async function listAccessLists(): Promise<AccessList[]> {
     .where(inArray(accessListEntries.accessListId, listIds));
 
   const entriesByList = new Map<number, AccessListEntryRow[]>();
-  for (const entry of entries) {
-    const bucket = entriesByList.get(entry.accessListId) ?? [];
-    bucket.push(entry);
-    entriesByList.set(entry.accessListId, bucket);
-  }
-
-  return lists.map((list) => toAccessList(list, entriesByList.get(list.id) ?? []));
-}
-
-export async function countAccessLists(): Promise<number> {
-  const [row] = await db.select({ value: count() }).from(accessLists);
-  return row?.value ?? 0;
-}
-
-export async function listAccessListsPaginated(
-  limit: number,
-  offset: number,
-): Promise<AccessList[]> {
-  const lists = await db.query.accessLists.findMany({
-    orderBy: (table) => asc(table.name),
-    limit,
-    offset,
-  });
-
-  if (lists.length === 0) return [];
-
-  const listIds = lists.map((list) => list.id);
-  const entries = await db
-    .select()
-    .from(accessListEntries)
-    .where(inArray(accessListEntries.accessListId, listIds));
-
-  const entriesByList = new Map<number, (typeof accessListEntries.$inferSelect)[]>();
   for (const entry of entries) {
     const bucket = entriesByList.get(entry.accessListId) ?? [];
     bucket.push(entry);

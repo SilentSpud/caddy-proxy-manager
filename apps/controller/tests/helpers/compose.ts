@@ -40,3 +40,13 @@ const BASE_ARGS = [
 const EXTRA_FILE = process.env.E2E_COMPOSE_EXTRA_FILE;
 
 export const COMPOSE_ARGS = EXTRA_FILE ? [...BASE_ARGS, '-f', EXTRA_FILE] : BASE_ARGS;
+
+/**
+ * `COMPOSE_PROFILES` for teardown: every profile the stack defines, whether or not the run enabled
+ * it. `down` only touches services in active profiles, and Caddy is started by the agent behind
+ * the `caddy` profile that no setup activates - so a `down -v` that does not name it leaves the
+ * Caddy container running and the volumes it holds ("agent-data-test", "caddy-*-test") in use. The
+ * next run's agent then resumes the previous run's pairing against a fresh controller database,
+ * gets refused, and stops Caddy for the rest of the run. A profile with no containers is a no-op.
+ */
+export const TEARDOWN_PROFILES = 'caddy,clickhouse,geoipupdate,tools';

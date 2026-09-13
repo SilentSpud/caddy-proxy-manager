@@ -78,8 +78,17 @@ interface RuleInfo {
   severity: string | null;
 }
 
+// One regex per field name, built on first use: this runs several times per audit message and
+// per rules-log line, and the field set is four fixed strings.
+const bracketFieldPatterns = new Map<string, RegExp>();
+
 export function extractBracketField(msg: string, field: string): string | null {
-  const m = msg.match(new RegExp(`\\[${field} "([^"]*)"\\]`));
+  let pattern = bracketFieldPatterns.get(field);
+  if (!pattern) {
+    pattern = new RegExp(`\\[${field} "([^"]*)"\\]`);
+    bracketFieldPatterns.set(field, pattern);
+  }
+  const m = msg.match(pattern);
   return m ? m[1] : null;
 }
 

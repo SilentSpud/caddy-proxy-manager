@@ -3,6 +3,7 @@
  * used-by, keyboard shortcuts, empty states. Runs as admin.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 const API = 'http://localhost:3000/api/v1/access-lists';
 
@@ -252,8 +253,11 @@ test.describe('Access Lists - rail interaction', () => {
     await expect(page.getByRole('heading', { name: listB.name })).toBeVisible({ timeout: 5_000 });
   });
 
+  // The search input exists in the server-rendered markup, so a fill that lands before hydration
+  // is silently discarded when React takes over the controlled input. See helpers/hydration.ts.
   test('search filters lists in the rail', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     const search = page.getByPlaceholder(/search lists or members/i);
     const rail = page.locator('ul');
     await search.fill('Alpha');
@@ -264,6 +268,7 @@ test.describe('Access Lists - rail interaction', () => {
 
   test('search by member username filters correctly', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     const search = page.getByPlaceholder(/search lists or members/i);
     const rail = page.locator('ul');
     await search.fill('carol');
@@ -274,11 +279,8 @@ test.describe('Access Lists - rail interaction', () => {
 
   test('no-match search shows "No lists match" message', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     const search = page.getByPlaceholder(/search lists or members/i);
-    // Wait for the rail to be populated before typing. The search input exists in the
-    // server-rendered markup, so filling it can land before hydration wires up onChange - the value
-    // sticks but no filtering happens, and an absence-driven assertion can never retry into being.
-    await expect(page.locator('ul').getByText(listA.name)).toBeVisible();
     await search.fill('zzz-nonexistent-zzz');
 
     await expect(page.getByText(/no lists match/i)).toBeVisible();
@@ -286,10 +288,9 @@ test.describe('Access Lists - rail interaction', () => {
 
   test('clear search link resets the filter', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     const search = page.getByPlaceholder(/search lists or members/i);
     const rail = page.locator('ul');
-    // See above: the rail must be hydrated before the search box is driven.
-    await expect(rail.getByText(listA.name)).toBeVisible();
     await search.fill('zzz-nonexistent-zzz');
     await expect(page.getByText(/no lists match/i)).toBeVisible();
 

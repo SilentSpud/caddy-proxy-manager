@@ -8,7 +8,7 @@
 
 import db, { nowIso } from "../db";
 import { settings, settingsRevisions } from "../db/schema";
-import { desc } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { applyCaddyConfig, buildCaddyDocument } from "../caddy";
 import { withSettingsUpdateLock } from "../settings-update-lock";
 import { discardAllStaged, listStagedSettings, stagedOverlay } from "./staging";
@@ -66,15 +66,14 @@ export async function applyStagedSettings(
     }
 
     const now = nowIso();
-    for (const entry of staged) {
-      await db
-        .insert(settings)
-        .values({ key: entry.key, value: entry.value, updatedAt: now })
-        .onConflictDoUpdate({
-          target: settings.key,
-          set: { value: entry.value, updatedAt: now },
-        });
-    }
+    // One statement for the set; keys are unique per operator, which a multi-row upsert requires.
+    await db
+      .insert(settings)
+      .values(staged.map((entry) => ({ key: entry.key, value: entry.value, updatedAt: now })))
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value: sql`excluded.value`, updatedAt: now },
+      });
     await discardAllStaged(userId);
 
     const keys = staged.map((entry) => entry.key);

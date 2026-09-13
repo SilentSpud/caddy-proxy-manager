@@ -255,11 +255,18 @@ export async function getCertificateRoles(certId: number): Promise<MtlsRole[]> {
   return rows.map((r) => toMtlsRole(r, 0));
 }
 
-/** roleId → Set<normalizedFingerprint> for active certs. Used during config generation. */
-export async function buildRoleFingerprintMap(): Promise<Map<number, Set<string>>> {
+/**
+ * Both per-role views of the active role assignments from one query: roleId → Set<certId> and
+ * roleId → Set<normalizedFingerprint>. Config generation needs both on every apply.
+ */
+export async function buildRoleMaps(): Promise<{
+  roleCertIdMap: Map<number, Set<number>>;
+  roleFingerprintMap: Map<number, Set<string>>;
+}> {
   const rows = await db
     .select({
       roleId: mtlsCertificateRoles.mtlsRoleId,
+      certId: mtlsCertificateRoles.issuedClientCertificateId,
       fingerprint: issuedClientCertificates.fingerprintSha256,
     })
     .from(mtlsCertificateRoles)
@@ -269,16 +276,29 @@ export async function buildRoleFingerprintMap(): Promise<Map<number, Set<string>
     )
     .where(isNull(issuedClientCertificates.revokedAt));
 
-  const map = new Map<number, Set<string>>();
+  const roleCertIdMap = new Map<number, Set<number>>();
+  const roleFingerprintMap = new Map<number, Set<string>>();
   for (const row of rows) {
-    let set = map.get(row.roleId);
-    if (!set) {
-      set = new Set();
-      map.set(row.roleId, set);
+    let certIds = roleCertIdMap.get(row.roleId);
+    if (!certIds) {
+      certIds = new Set();
+      roleCertIdMap.set(row.roleId, certIds);
     }
-    set.add(normalizeFingerprint(row.fingerprint));
+    certIds.add(row.certId);
+
+    let fingerprints = roleFingerprintMap.get(row.roleId);
+    if (!fingerprints) {
+      fingerprints = new Set();
+      roleFingerprintMap.set(row.roleId, fingerprints);
+    }
+    fingerprints.add(normalizeFingerprint(row.fingerprint));
   }
-  return map;
+  return { roleCertIdMap, roleFingerprintMap };
+}
+
+/** roleId → Set<normalizedFingerprint> for active certs. Used during config generation. */
+export async function buildRoleFingerprintMap(): Promise<Map<number, Set<string>>> {
+  return (await buildRoleMaps()).roleFingerprintMap;
 }
 
 /** certId → normalizedFingerprint for active certs, for direct cert overrides. */
@@ -300,28 +320,7 @@ export async function buildCertFingerprintMap(): Promise<Map<number, string>> {
 
 /** roleId → Set<certId> for active certs, resolving trusted_role_ids → cert IDs. */
 export async function buildRoleCertIdMap(): Promise<Map<number, Set<number>>> {
-  const rows = await db
-    .select({
-      roleId: mtlsCertificateRoles.mtlsRoleId,
-      certId: mtlsCertificateRoles.issuedClientCertificateId,
-    })
-    .from(mtlsCertificateRoles)
-    .innerJoin(
-      issuedClientCertificates,
-      eq(mtlsCertificateRoles.issuedClientCertificateId, issuedClientCertificates.id),
-    )
-    .where(isNull(issuedClientCertificates.revokedAt));
-
-  const map = new Map<number, Set<number>>();
-  for (const row of rows) {
-    let set = map.get(row.roleId);
-    if (!set) {
-      set = new Set();
-      map.set(row.roleId, set);
-    }
-    set.add(row.certId);
-  }
-  return map;
+  return (await buildRoleMaps()).roleCertIdMap;
 }
 
 // Re-exported for convenience; normalizeFingerprint's canonical home is caddy-mtls.ts.

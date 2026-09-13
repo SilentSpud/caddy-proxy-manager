@@ -33,7 +33,6 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
   const t = useTranslations("l4ProxyHosts");
   const [data, setData] = useState<PortsResponse | null>(null);
   const [applying, setApplying] = useState(false);
-  const [polling, setPolling] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -57,21 +56,14 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
     fetchStatus();
   }, [refreshSignal, fetchStatus]);
 
+  // Keyed on the boolean, not on `data`: every poll result would otherwise restart the interval,
+  // and the old `polling` state it toggled re-ran this effect before the timer could ever fire.
+  const shouldPoll = data?.status.state === "pending" || data?.status.state === "applying";
   useEffect(() => {
-    if (!data) return;
-    const shouldPoll = data.status.state === "pending" || data.status.state === "applying";
-    if (shouldPoll && !polling) {
-      setPolling(true);
-      const interval = setInterval(fetchStatus, 2000);
-      return () => {
-        clearInterval(interval);
-        setPolling(false);
-      };
-    }
-    if (!shouldPoll && polling) {
-      setPolling(false);
-    }
-  }, [data, polling, fetchStatus]);
+    if (!shouldPoll) return;
+    const interval = setInterval(fetchStatus, 2000);
+    return () => clearInterval(interval);
+  }, [shouldPoll, fetchStatus]);
 
   const handleApply = async () => {
     setApplying(true);

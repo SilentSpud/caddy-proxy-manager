@@ -95,9 +95,12 @@ export function hostMatchesPattern(host: string, pattern: string): boolean {
 }
 
 export function compareHostPatterns(a: string, b: string) {
-  const infoA = getHostPatternInfo(a);
-  const infoB = getHostPatternInfo(b);
+  return compareHostInfo(getHostPatternInfo(a), getHostPatternInfo(b));
+}
 
+// The sorts below parse each pattern once up front; parsing inside the comparator repeats it on
+// every comparison.
+function compareHostInfo(infoA: HostPatternInfo, infoB: HostPatternInfo) {
   if (infoA.wildcard !== infoB.wildcard) {
     return infoA.wildcard ? 1 : -1;
   }
@@ -114,26 +117,18 @@ export function compareHostPatterns(a: string, b: string) {
 }
 
 export function groupHostPatternsByPriority(patterns: string[]) {
-  const sorted = [...patterns].sort(compareHostPatterns);
+  const sorted = patterns.map(getHostPatternInfo).sort(compareHostInfo);
   const groups: string[][] = [];
+  let currentKey: string | null = null;
 
-  for (const pattern of sorted) {
-    const info = getHostPatternInfo(pattern);
+  for (const info of sorted) {
     const key = getHostPriorityKey(info);
-    const currentGroup = groups[groups.length - 1];
-
-    if (!currentGroup) {
-      groups.push([info.normalized]);
+    if (key === currentKey) {
+      groups[groups.length - 1].push(info.normalized);
       continue;
     }
-
-    const currentKey = getHostPriorityKey(getHostPatternInfo(currentGroup[0]));
-    if (currentKey === key) {
-      currentGroup.push(info.normalized);
-      continue;
-    }
-
     groups.push([info.normalized]);
+    currentKey = key;
   }
 
   return groups;
@@ -141,24 +136,29 @@ export function groupHostPatternsByPriority(patterns: string[]) {
 
 export function sortRoutesByHostPriority<T extends RouteLike>(routes: T[]) {
   return routes
-    .map((route, index) => ({ route, index }))
+    .map((route, index) => {
+      const matches = route.match ?? [];
+      const hosts = matches.flatMap((match) => match.host ?? []);
+      return {
+        route,
+        index,
+        hostCount: hosts.length,
+        hostInfo: hosts.length > 0 ? getHostPatternInfo(hosts[0]) : null,
+        pathPriority: getPathPriority(matches.flatMap((match) => match.path ?? [])),
+      };
+    })
     .sort((left, right) => {
-      const leftHosts = (left.route.match ?? []).flatMap((match) => match.host ?? []);
-      const rightHosts = (right.route.match ?? []).flatMap((match) => match.host ?? []);
-
-      if (leftHosts.length > 0 && rightHosts.length > 0) {
-        const hostComparison = compareHostPatterns(leftHosts[0], rightHosts[0]);
+      if (left.hostInfo && right.hostInfo) {
+        const hostComparison = compareHostInfo(left.hostInfo, right.hostInfo);
         if (hostComparison !== 0) {
           return hostComparison;
         }
-      } else if (leftHosts.length !== rightHosts.length) {
-        return rightHosts.length - leftHosts.length;
+      } else if (left.hostCount !== right.hostCount) {
+        return right.hostCount - left.hostCount;
       }
 
-      const leftPaths = (left.route.match ?? []).flatMap((match) => match.path ?? []);
-      const rightPaths = (right.route.match ?? []).flatMap((match) => match.path ?? []);
-      const leftPathPriority = getPathPriority(leftPaths);
-      const rightPathPriority = getPathPriority(rightPaths);
+      const leftPathPriority = left.pathPriority;
+      const rightPathPriority = right.pathPriority;
 
       if (leftPathPriority.hasPath !== rightPathPriority.hasPath) {
         return leftPathPriority.hasPath ? -1 : 1;
@@ -177,30 +177,29 @@ export function sortRoutesByHostPriority<T extends RouteLike>(routes: T[]) {
     .map(({ route }) => route);
 }
 
+/** Sort by the first pattern of each entry, entries with none last; stable for the rest. */
+function sortByFirstPattern<T>(entries: T[], patternsOf: (entry: T) => string[]) {
+  return entries
+    .map((entry) => {
+      const patterns = patternsOf(entry);
+      return {
+        entry,
+        count: patterns.length,
+        info: patterns.length > 0 ? getHostPatternInfo(patterns[0]) : null,
+      };
+    })
+    .sort((left, right) =>
+      left.info && right.info ? compareHostInfo(left.info, right.info) : right.count - left.count,
+    )
+    .map(({ entry }) => entry);
+}
+
 export function sortTlsPoliciesBySniPriority<T extends TlsPolicyLike>(policies: T[]) {
-  return [...policies].sort((left, right) => {
-    const leftSni = left.match?.sni ?? [];
-    const rightSni = right.match?.sni ?? [];
-
-    if (leftSni.length > 0 && rightSni.length > 0) {
-      return compareHostPatterns(leftSni[0], rightSni[0]);
-    }
-
-    return rightSni.length - leftSni.length;
-  });
+  return sortByFirstPattern(policies, (policy) => policy.match?.sni ?? []);
 }
 
 export function sortAutomationPoliciesBySubjectPriority<T extends AutomationPolicyLike>(
   policies: T[],
 ) {
-  return [...policies].sort((left, right) => {
-    const leftSubjects = left.subjects ?? [];
-    const rightSubjects = right.subjects ?? [];
-
-    if (leftSubjects.length > 0 && rightSubjects.length > 0) {
-      return compareHostPatterns(leftSubjects[0], rightSubjects[0]);
-    }
-
-    return rightSubjects.length - leftSubjects.length;
-  });
+  return sortByFirstPattern(policies, (policy) => policy.subjects ?? []);
 }

@@ -61,11 +61,6 @@ function toGrant(row: typeof groupGrants.$inferSelect): GroupGrant | null {
   };
 }
 
-export async function listGrantsForGroup(groupId: number): Promise<GroupGrant[]> {
-  const rows = await db.select().from(groupGrants).where(eq(groupGrants.groupId, groupId));
-  return rows.map(toGrant).filter((grant): grant is GroupGrant => grant !== null);
-}
-
 /** Every grant, keyed by group id - for the page that lists all the groups at once. */
 export async function listAllGrants(): Promise<Map<number, GroupGrant[]>> {
   const rows = await db.select().from(groupGrants);

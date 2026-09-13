@@ -50,20 +50,18 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const protocol: L4Protocol | undefined =
     protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : undefined;
 
-  const [hosts, total, counts] = await Promise.all([
+  const [hosts, total, counts, agents] = await Promise.all([
     listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, protocol),
     countL4ProxyHosts(search, visibleIds, protocol),
     countL4ProxyHostsByProtocol(search, visibleIds),
+    listAgentOptions().catch(() => []),
   ]);
 
   // Only the hosts on this page - the map is for the edit dialog.
-  const [agents, assignments] = await Promise.all([
-    listAgentOptions().catch(() => []),
-    agentIdsForHosts(
-      "l4",
-      hosts.map((host) => host.id),
-    ).catch(() => new Map<number, number[]>()),
-  ]);
+  const assignments = await agentIdsForHosts(
+    "l4",
+    hosts.map((host) => host.id),
+  ).catch(() => new Map<number, number[]>());
 
   return (
     <L4ProxyHostsClient

@@ -157,11 +157,6 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
   },
 };
 
-function _unknownKey(input: Record<string, unknown>, allowed: readonly string[]): string | null {
-  const allowedKeys = new Set(allowed);
-  return Object.keys(input).find((key) => !allowedKeys.has(key)) ?? null;
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ group: string }> },
