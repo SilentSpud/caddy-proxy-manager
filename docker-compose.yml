@@ -403,7 +403,7 @@ services:
   # in COMPOSE_PROFILES is only needed on a deployment with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
-    image: clickhouse/clickhouse-server:26.8.2.7-alpine@sha256:8f1dd1ec7213410276c8e9aee11b25b458fe9d53eee13ad8cfdf7c79e36aad17
+    image: clickhouse/clickhouse-server:26.8.3.105-alpine@sha256:91f21d5996c6ecbd29570b01912cc3dd1e46eade94160e55c4fe3d743d408e9e
     profiles: [clickhouse]
     restart: always
     environment:
