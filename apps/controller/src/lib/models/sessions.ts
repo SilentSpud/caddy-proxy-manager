@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import db from "../db";
 import { sessions } from "../db/schema";
+import { deleteUserForwardAuthSessions } from "./forward-auth";
 
 /**
  * Active management-UI session for a user, as shown in the profile. (Forward-auth `_cpm_fa`
@@ -65,4 +66,17 @@ export async function revokeOtherUserSessions(
       .where(and(eq(sessions.userId, userId), inArray(sessions.id, toRevoke)));
   }
   return toRevoke.length;
+}
+
+/**
+ * End every session a password change should cut off: the user's other dashboard sessions and all
+ * their forward-auth sessions. `keepSessionId` is the session that made the change, or null when
+ * none should survive.
+ */
+export async function revokeSessionsAfterPasswordChange(
+  userId: number,
+  keepSessionId: number | null,
+): Promise<void> {
+  await revokeOtherUserSessions(userId, keepSessionId);
+  await deleteUserForwardAuthSessions(userId);
 }

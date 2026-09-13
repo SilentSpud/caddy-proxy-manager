@@ -3,8 +3,8 @@ import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
 import { config } from "@/src/lib/config";
 import { hashPassword } from "@/src/lib/password";
-
-const VALID_ROLES = new Set(["admin", "user", "viewer"]);
+import { DomainError } from "@/src/lib/domain-error";
+import { assertAcceptablePassword, isUserRole } from "@/src/lib/user-admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;
@@ -40,10 +40,22 @@ export async function POST(request: NextRequest) {
     const email = String(body.email ?? "").trim();
     const password = String(body.password ?? "");
     const name = body.name ? String(body.name).trim() : null;
-    const role = VALID_ROLES.has(body.role) ? body.role : "user";
+    if (body.role !== undefined && body.role !== null && !isUserRole(body.role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    const role = isUserRole(body.role) ? body.role : "user";
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    }
+
+    try {
+      assertAcceptablePassword(password);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
     }
 
     const passwordHash = await hashPassword(password);

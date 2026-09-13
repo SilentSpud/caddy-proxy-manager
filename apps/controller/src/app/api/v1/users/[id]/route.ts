@@ -12,6 +12,7 @@ import {
   updateUserStatus,
   deleteUser,
 } from "@/src/lib/models/user";
+import { isUserRole, isUserStatus } from "@/src/lib/user-admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
   const { passwordHash: _, ...rest } = user;
@@ -47,8 +48,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const targetId = Number(id);
     const body = await request.json();
 
+    // Refused rather than skipped: silently ignoring an unknown value reads as success to a client.
+    const hasRole = body.role !== undefined && body.role !== null;
+    const hasStatus = body.status !== undefined && body.status !== null;
+    if (hasRole && !isUserRole(body.role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    if (hasStatus && !isUserStatus(body.status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
     // Handle role change
-    if (body.role && ["admin", "user", "viewer"].includes(body.role)) {
+    if (hasRole) {
       if (auth.userId === targetId) {
         return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 });
       }
@@ -56,7 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Handle status change
-    if (body.status && ["active", "disabled"].includes(body.status)) {
+    if (hasStatus) {
       if (auth.userId === targetId) {
         return NextResponse.json({ error: "Cannot change your own status" }, { status: 400 });
       }

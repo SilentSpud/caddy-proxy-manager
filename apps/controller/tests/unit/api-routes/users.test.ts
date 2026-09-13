@@ -8,6 +8,7 @@ vi.mock('@/src/lib/models/user', () => ({
   updateUserRole: vi.fn(),
   updateUserStatus: vi.fn(),
   deleteUser: vi.fn(),
+  createUser: vi.fn(),
 }));
 
 vi.mock('@/src/lib/api-auth', () => {
@@ -36,9 +37,16 @@ vi.mock('@/src/lib/api-auth', () => {
   };
 });
 
-import { GET as listGET } from '@/src/app/api/v1/users/route';
+import { GET as listGET, POST as createPOST } from '@/src/app/api/v1/users/route';
 import { GET as getGET, PUT } from '@/src/app/api/v1/users/[id]/route';
-import { listUsers, getUserById, updateUserProfile } from '@/src/lib/models/user';
+import {
+  listUsers,
+  getUserById,
+  updateUserProfile,
+  updateUserRole,
+  updateUserStatus,
+  createUser,
+} from '@/src/lib/models/user';
 import { requireApiAdmin, requireApiUser } from '@/src/lib/api-auth';
 
 const mockListUsers = vi.mocked(listUsers);
@@ -168,5 +176,68 @@ describe('PUT /api/v1/users/[id]', () => {
 
     expect(response.status).toBe(404);
     expect(data.error).toBe('Not found');
+  });
+});
+
+describe('PUT /api/v1/users/[id] role and status', () => {
+  const put = (body: unknown) =>
+    PUT(createMockRequest({ method: 'PUT', body }), { params: Promise.resolve({ id: '2' }) });
+
+  it('refuses a role outside the allowlist rather than silently ignoring it', async () => {
+    mockGetUserById.mockResolvedValue({ ...sampleUser, id: 2 } as any);
+
+    const response = await put({ role: 'superadmin' });
+
+    expect(response.status).toBe(400);
+    expect(vi.mocked(updateUserRole)).not.toHaveBeenCalled();
+  });
+
+  it('assigns the operator role, which the dashboard offers too', async () => {
+    mockGetUserById.mockResolvedValue({ ...sampleUser, id: 2, role: 'operator' } as any);
+
+    const response = await put({ role: 'operator' });
+
+    expect(response.status).toBe(200);
+    expect(vi.mocked(updateUserRole)).toHaveBeenCalledWith(2, 'operator');
+  });
+
+  it('refuses an unknown status', async () => {
+    mockGetUserById.mockResolvedValue({ ...sampleUser, id: 2 } as any);
+
+    const response = await put({ status: 'banned' });
+
+    expect(response.status).toBe(400);
+    expect(vi.mocked(updateUserStatus)).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/v1/users', () => {
+  it('holds a password an administrator chooses to the password policy', async () => {
+    const response = await createPOST(
+      createMockRequest({
+        method: 'POST',
+        body: { email: 'new@example.com', password: 'password' },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain('at least 12 characters');
+    expect(vi.mocked(createUser)).not.toHaveBeenCalled();
+  });
+
+  it('creates a user whose password passes', async () => {
+    vi.mocked(createUser).mockResolvedValue({ ...sampleUser, id: 3 } as any);
+
+    const response = await createPOST(
+      createMockRequest({
+        method: 'POST',
+        body: { email: 'new@example.com', password: 'CorrectHorse2026!', role: 'viewer' },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(vi.mocked(createUser)).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@example.com', role: 'viewer' }),
+    );
   });
 });

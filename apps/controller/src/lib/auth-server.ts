@@ -19,6 +19,7 @@ import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 import { bindSessionToIdpSession, recordSessionBindingFromIdToken } from "./services/oidc-logout";
 import { hashPassword, verifyPassword } from "./password";
+import { DISABLED_AUTH_PATHS } from "./auth-disabled-paths";
 
 // biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
 let cachedAuth: any = null;
@@ -394,6 +395,7 @@ async function createAuth(): Promise<any> {
         },
       },
     },
+    disabledPaths: DISABLED_AUTH_PATHS,
     plugins: [
       // Cast via unknown: better-auth's `username` plugin types `email: string` where
       // BetterAuthPlugin expects `email?: any`, and the mismatch is environment-dependent.

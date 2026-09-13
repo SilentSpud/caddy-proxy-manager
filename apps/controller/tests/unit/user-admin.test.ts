@@ -1,0 +1,54 @@
+/**
+ * The account rules the Users page, `/api/v1/users` and GraphQL share. Each used to keep its own
+ * copy, and the ones that kept none wrote whatever string arrived into the role column.
+ */
+import { describe, expect, it } from 'bun:test';
+import { DomainError } from '@/src/lib/domain-error';
+import {
+  assertAcceptablePassword,
+  assertNotSelf,
+  assertUserRole,
+  assertUserStatus,
+  isUserRole,
+  isUserStatus,
+} from '@/src/lib/user-admin';
+
+describe('roles an administrator may assign', () => {
+  it('accepts every application role, operator included', () => {
+    for (const role of ['admin', 'operator', 'user', 'viewer']) {
+      expect(isUserRole(role), role).toBe(true);
+    }
+  });
+
+  it('refuses anything else, near misses included', () => {
+    for (const role of ['superadmin', 'Admin', ' admin', '', null, undefined, 1]) {
+      expect(isUserRole(role), String(role)).toBe(false);
+    }
+    expect(() => assertUserRole('root')).toThrow(DomainError);
+  });
+});
+
+describe('account statuses', () => {
+  it('accepts active and disabled only', () => {
+    expect(isUserStatus('active')).toBe(true);
+    expect(isUserStatus('disabled')).toBe(true);
+    expect(isUserStatus('banned')).toBe(false);
+    expect(() => assertUserStatus('pending')).toThrow(DomainError);
+  });
+});
+
+describe('acting on your own account', () => {
+  it('is refused with the code the caller names', () => {
+    expect(() => assertNotSelf(3, 3, 'cannotDeleteOwnAccount')).toThrow(
+      'Cannot delete your own account',
+    );
+    expect(() => assertNotSelf(3, 4, 'cannotDeleteOwnAccount')).not.toThrow();
+  });
+});
+
+describe('a password chosen for someone else', () => {
+  it('is held to the password policy', () => {
+    expect(() => assertAcceptablePassword('password')).toThrow(/at least 12 characters/);
+    expect(() => assertAcceptablePassword('CorrectHorse2026!')).not.toThrow();
+  });
+});

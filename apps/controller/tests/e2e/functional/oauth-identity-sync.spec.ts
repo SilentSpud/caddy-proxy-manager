@@ -26,6 +26,8 @@ const BASE_URL = 'http://localhost:3000';
 const API = `${BASE_URL}/api/v1`;
 const ORIGIN = BASE_URL;
 const ADMIN_EMAIL = 'testadmin@localhost';
+// docker-compose.test.yml's ADMIN_PASSWORD; unlinking asks for it again.
+const ADMIN_PASSWORD = 'TestPassword2026!';
 
 interface ApiUser {
   id: number;
@@ -91,7 +93,10 @@ async function deleteProvider(
 /** Restore the admin user to a password-only identity after a test. */
 async function unlinkAdmin(request: import('@playwright/test').APIRequestContext) {
   await request
-    .post(`${BASE_URL}/api/user/unlink-oauth`, { headers: { Origin: ORIGIN } })
+    .post(`${BASE_URL}/api/user/unlink-oauth`, {
+      headers: { Origin: ORIGIN },
+      data: { currentPassword: ADMIN_PASSWORD },
+    })
     .catch(() => {});
 }
 
@@ -213,6 +218,7 @@ test.describe('OAuth link/unlink synchronizes the CPM user state (#261)', () => 
     const unlinkButton = page.getByRole('button', { name: /unlink oauth account/i });
     await expect(unlinkButton).toBeVisible({ timeout: 15_000 });
     await unlinkButton.click();
+    await page.getByLabel(/current password/i).fill(ADMIN_PASSWORD);
     await page.getByRole('button', { name: /^unlink oauth$/i }).click();
 
     // The page reloads and must show the account as no longer linked.

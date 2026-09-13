@@ -89,6 +89,33 @@ export async function getCurrentSessionId(req?: NextRequest): Promise<number | n
   }
 }
 
+/** The caller's better-auth session id and when it began, or null without cookie auth. */
+export async function getCurrentSessionInfo(
+  req?: NextRequest,
+): Promise<{ id: number; createdAt: Date } | null> {
+  const hdrs = req ? req.headers : (await import("next/headers")).headers();
+  const resolvedHeaders = hdrs instanceof Promise ? await hdrs : hdrs;
+  try {
+    const result = await (await getAuth()).api.getSession({ headers: resolvedHeaders });
+    const session = result?.session;
+    if (session?.id == null || !session.createdAt) return null;
+    const createdAt = new Date(session.createdAt);
+    return Number.isNaN(createdAt.getTime()) ? null : { id: Number(session.id), createdAt };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How recent a sign-in must be to stand in for re-authentication, where there is no current
+ * password to ask for. Short on purpose: a borrowed or stolen session is usually an old one.
+ */
+export const FRESH_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
+
+export function isFreshSession(session: { createdAt: Date } | null, now = Date.now()): boolean {
+  return !!session && now - session.createdAt.getTime() <= FRESH_SESSION_MAX_AGE_MS;
+}
+
 /** Require authentication. Redirects to /login if not authenticated. */
 export async function requireUser(): Promise<Session> {
   const session = await auth();
