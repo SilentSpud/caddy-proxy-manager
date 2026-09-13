@@ -113,7 +113,9 @@ with, and add their own. Two consequences are worth stating plainly:
   set `BUILD: 0` to opt out; the rest of the application is unaffected and
   images can be built by hand instead.
 
-Only admins can reach either surface, and custom Caddy configuration is likewise admin-only.
+Only admins can reach either surface. Custom Caddy configuration is likewise admin-only, and so is
+pointing an upstream at Caddy's admin port, a unix socket or a placeholder: an operator granted a
+host can edit its upstreams, but not reach the admin API through it.
 
 ### First-run Setup
 
@@ -125,6 +127,20 @@ skips the flow entirely.
 
 Once setup completes the flag is stored, and the setup screens redirect away for good.
 
+### Sign-in and Forward Auth
+
+- **Guessing is limited by address and by account.** Dashboard and forward-auth sign-in count
+  failures per client address and per username, with a backoff that doubles up to 15 minutes. The
+  client address is the connection's own peer unless that peer is loopback, Caddy or a configured
+  trusted proxy; `X-Real-IP` is never trusted.
+- **Each derived key has one purpose.** The reachability probe on `/api/health` and the proof Caddy
+  attaches to forward-auth requests are keyed separately from `SESSION_SECRET`, so no probe answer
+  can stand in for the proof.
+- **Changing credentials takes a fresh sign-in.** Setting a first password on a provider-only
+  account needs a session under ten minutes old, unlinking a provider needs the password, and a
+  password change ends the user's other sessions and forward-auth sessions. Better Auth's own
+  password, profile, account and token routes are switched off in favour of the app's.
+
 ### Controller and Agent
 
 The agent dials the controller; the controller never dials the agent. Pairing, the event stream
@@ -135,7 +151,7 @@ command the controller waits on: it goes down the stream with a correlation id, 
 the answer back.
 
 Those requests are signed rather than bearer-authenticated. Each carries an HMAC-SHA256, keyed by
-the pairing secret, over the method, path, timestamp and a hash of the body:
+the pairing secret, over the method, path, timestamp, a nonce and a hash of the body:
 
 - **The secret never travels with a request**, so it cannot be lifted from a proxy log or a
   `curl -v` pasted into an issue.
@@ -144,18 +160,32 @@ the pairing secret, over the method, path, timestamp and a hash of the body:
 - A ±60 second window bounds replay, and a nonce seen inside that window is refused.
 
 **Pairing.** The agent in the controller's own stack pairs with a single-use bootstrap token the
-controller leaves on its data volume, which expires if unused. An agent on another host prints a
-six-letter code valid for five minutes, burned on first use and refused after ten wrong guesses,
-and dials its controller over HTTPS unless told otherwise. A pairing never silently replaces an
-existing one. The two sides exchange a secret, which is encrypted with `encryptSecret` before it
-reaches a row and is never returned to the browser, logged, or included in any view type.
-Unpairing forgets the controller's side only - restart the agent as well if you are removing one
-you no longer trust.
+controller leaves on its data volume. The token is written only while that agent is unpaired,
+expires after 30 minutes, and is not written again after an admin unpairs the agent until
+auto-pairing is switched back on. An agent on another host pairs with a six-letter code valid for
+five minutes and burned on first use. Wrong guesses are limited per client address, and each code
+is discarded after 200 of them. The two sides exchange a secret, which is encrypted with
+`encryptSecret` before it reaches a row and is never returned to the browser, logged, or included
+in any view type.
+
+- **A pairing never replaces an existing one.** An agent id the controller already knows can only
+  be paired again with a code an admin mints from that agent's row, and a disabled agent cannot
+  pair at all.
+- **Remote agents default to HTTPS.** A bare host name means `https://`, except loopback and
+  single-label names such as `web`. Plain `http://` to a private address is allowed with a
+  warning, and to a public address it is refused unless `CONTROLLER_ALLOW_INSECURE_HTTP` is set.
+- **Unpairing closes the agent's stream** and forgets the controller's side. Restart the agent as
+  well if you are removing one you no longer trust.
 
 **The agent's Caddy admin proxy is an allowlist**, not a sanitiser: `/load`, `/config/`, `/adapt`
 and `/reverse_proxy/upstreams` are the four paths the controller needs. Caddy's admin API can stop
 the server outright, so a request for anything else is treated as not having come from this
 application, whatever signed it.
+
+**An agent answers only for its own Caddy.** Each agent adapts Caddyfile snippets for the config
+it is sent, and the health monitor re-applies config only to the agent that reported a problem. A
+compromised agent can misconfigure its own Caddy, but never another agent's. A snippet is checked
+against every connected agent before it is saved.
 
 **Caddy's admin API is not on the upstream network.** The bundled compose file binds it to Caddy's
 address on the internal `caddy-admin` network, which only web and the agent share, and the agent

@@ -553,7 +553,7 @@ export function overrideIsUsable(dataDir: string, file: string): boolean {
  *
  * Only MANAGED_SERVICE_ENV_KEYS pass: every entry lands in the environment of a `docker` that
  * holds the socket, where DOCKER_HOST, PATH or LD_PRELOAD would hand over the host. Unset entries
- * are dropped so compose falls back to the `.env`.
+ * are dropped so compose falls back to the agent's own environment; it never reads `.env`.
  */
 export function composeEnv(env: ManagedServicesRequest["env"] | undefined): Record<string, string> {
   const allowed = MANAGED_SERVICE_ENV_KEYS as readonly string[];
