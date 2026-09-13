@@ -53,7 +53,7 @@ function validateUpstreamProtocol(upstream: string): void {
   if (schemeMatch) {
     const scheme = schemeMatch[1].toLowerCase();
     if (scheme !== "http" && scheme !== "https") {
-      throw new Error(
+      throw new ApiValidationError(
         `Invalid upstream protocol "${scheme}://". Only http:// and https:// are allowed`,
       );
     }
@@ -2718,7 +2718,7 @@ async function assertCaddyfileAdapts(snippet: string | null | undefined): Promis
   if (!snippet?.trim()) return;
   const error = await validateCaddyfileSnippet(snippet);
   if (error) {
-    throw new Error(`Custom Caddyfile: ${error}`);
+    throw new ApiValidationError(`Custom Caddyfile: ${error}`);
   }
 }
 

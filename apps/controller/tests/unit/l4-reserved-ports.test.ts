@@ -39,6 +39,7 @@ import {
   type L4ProxyHostInput,
 } from '../../src/lib/models/l4-proxy-hosts';
 import { getRequiredL4Ports } from '../../src/lib/l4-ports';
+import { saveMetricsSettings } from '../../src/lib/settings';
 import { RESERVED_L4_PORTS } from '../../src/lib/caddy-utils';
 import { DomainError } from '../../src/lib/domain-error';
 import * as schema from '../../src/lib/db/schema';
@@ -107,5 +108,31 @@ describe('reserved L4 listen ports', () => {
       .where(eq(schema.l4ProxyHosts.id, legacy.id));
 
     expect(await getRequiredL4Ports()).toEqual(['5432:5432']);
+  });
+});
+
+describe('the configured metrics port', () => {
+  it('is refused while metrics listen on it, and free once they are off', async () => {
+    try {
+      await saveMetricsSettings({ enabled: true, port: 9180 });
+      await expect(createL4ProxyHost(input(':9180'), 1)).rejects.toMatchObject({
+        code: 'l4ListenPortReserved',
+        params: { port: 9180 },
+      });
+      await saveMetricsSettings({ enabled: false, port: 9180 });
+      await expect(createL4ProxyHost(input(':9180'), 1)).resolves.toBeDefined();
+    } finally {
+      await saveMetricsSettings({ enabled: false });
+    }
+  });
+
+  it('is not published for a row stored while metrics were off', async () => {
+    try {
+      await createL4ProxyHost(input(':9180'), 1);
+      await saveMetricsSettings({ enabled: true, port: 9180 });
+      expect(await getRequiredL4Ports()).toEqual([]);
+    } finally {
+      await saveMetricsSettings({ enabled: false });
+    }
   });
 });

@@ -12,6 +12,7 @@ import type { L4PortsStatus } from "@cpm/shared";
 import { eq } from "drizzle-orm";
 import db from "./db";
 import { RESERVED_L4_PORTS, splitHostPort } from "./caddy-utils";
+import { getMetricsSettings } from "./settings";
 import { l4ProxyHosts } from "./db/schema";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { isAgentAvailable, requestL4Ports, tryGetAgentStatus } from "./agent/client";
@@ -50,6 +51,8 @@ export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]>
           return allHosts.filter((host) => servedByAgent(assignments, host.id, agentRowId));
         })();
 
+  const metrics = await getMetricsSettings();
+  const metricsPort = metrics?.enabled ? (metrics.port ?? 9090) : null;
   const portSet = new Set<string>();
   for (const host of hosts) {
     // splitHostPort, not a trailing-colon match: an unbracketed IPv6 literal ends in something
@@ -57,7 +60,7 @@ export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]>
     const parsed = splitHostPort(host.listenAddress);
     if (!parsed) continue;
     // validateL4Input refuses these; a row that predates the check must still not publish one.
-    if (RESERVED_L4_PORTS.has(parsed.port)) {
+    if (RESERVED_L4_PORTS.has(parsed.port) || parsed.port === metricsPort) {
       console.warn(
         `Not publishing reserved port ${parsed.port} for L4 proxy host ${host.id}; change its listen address.`,
       );

@@ -39,6 +39,7 @@ vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { agentCaddyAdminTransport, setCaddyAdminTransport } from '../../src/lib/caddy-admin';
 import { checkCaddyHealth, getMonitorState, resetCaddyMonitor } from '../../src/lib/caddy-monitor';
+import { validateCaddyfileSnippet } from '../../src/lib/caddy-caddyfile';
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { clearAgentEnv, startFakeAgent, type FakeAgent } from '../helpers/fake-agent';
 import * as schema from '../../src/lib/db/schema';
@@ -165,5 +166,15 @@ describe('a rogue agent', () => {
     });
     await checkCaddyHealth(0);
     await waitFor(() => loadsOn(agent).length > 0);
+  });
+});
+
+describe('validating a Caddyfile snippet', () => {
+  it('asks every agent, so one cannot pass a snippet another rejects', async () => {
+    await startFakeAgent({ caddyAdmin: { status: 200, text: BENIGN } });
+    await startFakeAgent({
+      caddyAdmin: { status: 400, text: '{"error":"unrecognized directive: nope"}' },
+    });
+    expect(await validateCaddyfileSnippet('nope')).toBe('unrecognized directive: nope');
   });
 });

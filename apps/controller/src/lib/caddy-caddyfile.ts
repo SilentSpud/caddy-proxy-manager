@@ -4,6 +4,7 @@
  * hand-rolled parser would drift and accept directives for plugins that are not compiled in.
  */
 
+import { connectedAgents } from "./agent/registry";
 import { caddyAdminRequest } from "./caddy-admin";
 
 export type AdaptedCaddyfile = {
@@ -120,17 +121,22 @@ export function buildCaddyfileSubrouteHandler(
 /** Validate a snippet by adapting it; error message or null. Used on save. */
 export async function validateCaddyfileSnippet(snippet: string): Promise<string | null> {
   if (!snippet.trim()) return null;
-  try {
-    const { ignoredApps } = await adaptCaddyfileSnippet(snippet);
-    if (ignoredApps.length > 0) {
-      return `These directives configure Caddy at a level this field cannot reach (${ignoredApps.join(", ")}). Per-host Caddyfile directives may only produce HTTP routes.`;
+  // Every agent adapts the snippet for its own config, so every agent is asked: one agent's verdict
+  // alone must not pass a snippet another would reject.
+  const agents = connectedAgents();
+  const targets = agents.length > 0 ? agents.map((agent) => agent.agentId) : [undefined];
+  for (const agentId of targets) {
+    try {
+      const { ignoredApps } = await adaptCaddyfileSnippet(snippet, agentId);
+      if (ignoredApps.length > 0) {
+        return `These directives configure Caddy at a level this field cannot reach (${ignoredApps.join(", ")}). Per-host Caddyfile directives may only produce HTTP routes.`;
+      }
+    } catch (error) {
+      if (error instanceof CaddyfileAdaptError) return error.message;
+      // A transport failure is not the operator's fault and must not read as a syntax error - let
+      // the save through and let the config build warn.
+      console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
     }
-    return null;
-  } catch (error) {
-    if (error instanceof CaddyfileAdaptError) return error.message;
-    // A transport failure is not the operator's fault and must not read as a syntax error - let
-    // the save through and let the config build warn.
-    console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
-    return null;
   }
+  return null;
 }

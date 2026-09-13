@@ -10,6 +10,7 @@
 import { eq, ne, and, isNull, desc } from "drizzle-orm";
 import * as schema from "./db/schema";
 import { db, isEphemeral, runSchemaMigrations } from "./db/connection";
+import { encryptSecret, isEncryptedSecret } from "./secret";
 
 export { db, client, runInTransaction } from "./db/connection";
 export type { Db } from "./db/connection";
@@ -277,8 +278,10 @@ async function runCloudflareToProviderMigration() {
     };
     if (cf.apiToken) {
       const now = new Date().toISOString();
+      // The legacy row may predate encryption; the provider row must not carry the token in clear.
+      const apiToken = isEncryptedSecret(cf.apiToken) ? cf.apiToken : encryptSecret(cf.apiToken);
       const newSetting = {
-        providers: { cloudflare: { api_token: cf.apiToken } },
+        providers: { cloudflare: { api_token: apiToken } },
         default: "cloudflare",
       };
       await db

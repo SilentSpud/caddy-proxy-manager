@@ -1,6 +1,7 @@
 import db, { nowIso, toIso } from "../db";
 import { RESERVED_L4_PORTS, splitHostPort } from "../caddy-utils";
 import { applyCaddyConfig } from "../caddy";
+import { getMetricsSettings } from "../settings";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
@@ -608,8 +609,19 @@ export async function listL4ProxyHostsPaginated(
   return hosts.map(parseL4ProxyHost);
 }
 
+/** The metrics listener's port is configurable, so it is checked here rather than in the constant. */
+export async function assertNotMetricsPort(listenAddress: string | undefined): Promise<void> {
+  if (listenAddress === undefined) return;
+  const parsed = splitHostPort(listenAddress);
+  const metrics = await getMetricsSettings();
+  if (parsed && metrics?.enabled && (metrics.port ?? 9090) === parsed.port) {
+    throw domainError("l4ListenPortReserved", { port: parsed.port });
+  }
+}
+
 export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: number) {
   validateL4Input(input, true);
+  await assertNotMetricsPort(input.listenAddress);
 
   const now = nowIso();
   const [record] = await db
@@ -702,6 +714,7 @@ export async function updateL4ProxyHost(
   }
 
   validateL4Input(input, false);
+  await assertNotMetricsPort(input.listenAddress);
 
   const now = nowIso();
   await db
