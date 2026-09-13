@@ -13,6 +13,43 @@
 @layer astryx-theme {
   @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
     /**
+     * The accent, in the theme's pink family.
+     *
+     * The neutral theme's accent is near-black in light mode and near-white in dark: a primary
+     * button is a black pill, a switched-on switch is white. The phone chrome already paints its
+     * selection and its one primary action in pink - the active tab, the current drawer tile, a
+     * narrowed filter chip, the floating action button - so the desktop was the one width without
+     * it. Pointing the accent token at the same hue carries it to every Astryx control that reads
+     * the token: primary Button, Switch, Slider, the Tab underline, the current page in Pagination,
+     * a checked box or radio, the NavIcon in the rail header, Spinner, and the keyboard focus ring,
+     * whose colour defaults to the accent.
+     *
+     * --color-on-accent is left as the theme has it: white on the light-mode plum (#70003f), #111
+     * on the dark-mode pink (#ffa9ca), both comfortably over 4.5:1. --color-text-accent is also
+     * untouched - it is what Link and Text color="accent" read, and a pink accent does not mean
+     * pink prose.
+     */
+    :scope {
+      --color-accent: var(--color-text-pink);
+    }
+
+    /**
+     * The selected rail row, in the tonal treatment the phone's More drawer gives the page you are
+     * on: the accent's muted ground with the accent's own text on it. The theme's selected row is
+     * the same neutral tint it uses for hover, so beside pink controls the current page read as a
+     * row the pointer happened to be over. The icon inherits the row's colour, so it follows.
+     *
+     * A later layer wins over the component's own rule in every state, hover included - which is
+     * the theme's behaviour too: its selected row paints the same tint at rest and under the
+     * pointer. Under forced colors the UA remaps both properties to Highlight/HighlightText exactly
+     * as it does for the theme's rule, so nothing is lost there.
+     */
+    .astryx-side-nav-item[data-selected="selected"] {
+      background-color: var(--color-background-pink);
+      color: var(--color-text-pink);
+    }
+
+    /**
      * Button `tonal` - the accent at a lower weight, mirroring how the theme already renders
      * `destructive`: the muted ground with its own text colour on top, and hover/pressed overlays
      * in that same hue so the interaction tint does not read as neutral grey. Borderless, because
