@@ -146,7 +146,10 @@ describe("compose invocation", () => {
     // A rebuild must not drop the published L4 ports, and a port change must not rebuild Caddy
     // without the module selection. Omitting either is how one operation silently undoes the other.
     writeFileSync(join(dir, "docker-compose.l4-ports.yml"), renderL4PortsOverride(["25:25"]));
-    writeFileSync(join(dir, "docker-compose.caddy-build.yml"), renderCaddyBuildOverride(["x"]));
+    writeFileSync(
+      join(dir, "docker-compose.caddy-build.yml"),
+      renderCaddyBuildOverride(["github.com/a/b"]),
+    );
     results.push({ exitCode: 0, stdout: "proj" });
 
     await new DockerHost(config).buildCaddy();
@@ -530,7 +533,7 @@ describe("optional services", () => {
   });
 
   it("refuses to run alongside a rebuild", async () => {
-    operations.applyCaddyBuild(["mod"]);
+    operations.applyCaddyBuild(["github.com/a/b"]);
     expect(() =>
       operations.applyManagedServices({
         services: { clickhouse: true, geoipupdate: false },

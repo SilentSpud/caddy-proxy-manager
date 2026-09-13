@@ -27,9 +27,8 @@ export type AgentConfig = {
   /** One-time code to pair with at startup, when the operator supplied one up front. */
   pairingCode: string | null;
   /**
-   * `standalone` listens on a Unix socket in the shared data volume: the controller is on the same
-   * host and reaches it through the filesystem. `managed` listens on TCP and requires an operator
-   * to pair it first.
+   * A label reported to the controller, and nothing more. Both modes dial out to the controller and
+   * bind only the local control socket; nothing listens on TCP.
    */
   mode: AgentMode;
   /** Where state, the socket and the shared secret live. Must be writable. */
@@ -89,12 +88,7 @@ function positiveInteger(name: string, fallback: number): number {
 function resolveMode(): AgentMode {
   const raw = optional("AGENT_MODE") ?? "standalone";
   if (raw === "standalone" || raw === "managed") return raw;
-  throw new Error(
-    `AGENT_MODE must be "standalone" or "managed"; got "${raw}". Startup fails rather than ` +
-      `guessing: standalone listens on a socket only the local controller can reach, while ` +
-      `managed listens on the network, and defaulting the wrong way either hides the agent or ` +
-      `exposes it.`,
-  );
+  throw new Error(`AGENT_MODE must be "standalone" or "managed"; got "${raw}".`);
 }
 
 /**

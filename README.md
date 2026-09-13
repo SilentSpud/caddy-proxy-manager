@@ -300,7 +300,7 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | -------- | ----------- | ------- |
 | `CONTROLLER_URL` | Where the agent dials to reach its controller. A tailnet IP or MagicDNS name works here like any other address. Overridden by `--host`/`--port` | Unset (idle until paired) |
 | `PAIRING_CODE` | Pair on first start instead of idling. Overridden by `--code` | Unset |
-| `AGENT_MODE` | `standalone` or `managed`. Startup fails on any other value rather than guessing | `standalone` |
+| `AGENT_MODE` | `standalone` or `managed`, shown on the controller's agent status. A label only: either way the agent dials out and binds just its local control socket. Startup fails on any other value | `standalone` |
 | `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
 | `DATA_DIR` | Where the agent's SQLite state, control socket and GeoIP databases live. Must be writable | `/data` |
 | `CONTROLLER_DATA_DIR` | The controller's data volume, mounted read-only: where the bootstrap token is read from, and where an upgraded agent copies its old state from on first start | Unset (token read from `DATA_DIR`) |

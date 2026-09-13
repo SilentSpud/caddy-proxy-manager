@@ -93,9 +93,6 @@ ENV HOME=/home/agent
 
 USER agent
 
-# Managed mode listens here. Standalone binds a socket on the data volume and publishes nothing.
-EXPOSE 3100
-
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
   CMD /app/cpm-agent --healthcheck
 
