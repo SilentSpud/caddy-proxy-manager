@@ -1,13 +1,15 @@
 {
-	# Bound to 0.0.0.0 within the Docker network so the web container can reach it. Port 2019 must
-	# NOT be published to the host in docker-compose.yml - that is the boundary this relies on.
+	# docker-compose.yml sets CADDY_ADMIN_LISTEN to a name only the internal caddy-admin network
+	# resolves, so the admin API is not on caddy-network, where every upstream could reach it. The
+	# agent pins the same address into each config it loads. Unset, this keeps the old open bind,
+	# where only leaving port 2019 unpublished bounds reach.
 	#
-	# `origins` rejects requests whose Origin header is not listed, which is what stops a page in the
-	# operator's browser from reconfiguring the proxy. It does NOT restrict Host here: binding to an
-	# open interface makes Caddy log "admin endpoint on open interface; host checking disabled" and
-	# skip Host validation, so any name that resolves to this container reaches the API.
-	admin 0.0.0.0:2019 {
-		origins caddy:2019 localhost:2019 localhost
+	# `origins` rejects a request whose Origin header is not listed, which stops a page in the
+	# operator's browser reconfiguring the proxy. On an open bind Caddy also skips Host checking
+	# ("admin endpoint on open interface; host checking disabled"); on a named one it enforces this
+	# list against Host.
+	admin {$CADDY_ADMIN_LISTEN:0.0.0.0:2019} {
+		origins caddy-admin:2019 caddy:2019 localhost:2019 localhost
 	}
 }
 

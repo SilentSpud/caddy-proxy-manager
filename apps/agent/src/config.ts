@@ -49,6 +49,8 @@ export type AgentConfig = {
   caddyContainerName: string;
   /** Where this host's Caddy admin API listens. The controller reaches it only through here. */
   caddyApiUrl: string;
+  /** Pinned as `admin.listen` in every config forwarded to Caddy, or null to forward as sent. */
+  caddyAdminListen: string | null;
   /** Override for the auto-detected compose project name. */
   composeProject: string | null;
   /** Passed to compose as --project-directory, for a host path the agent cannot see. */
@@ -164,6 +166,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
     socketPath: optional("AGENT_SOCKET") ?? resolve(dataDir, "agent.sock"),
     caddyContainerName: optional("CADDY_CONTAINER_NAME") ?? "caddy-proxy-manager-caddy",
     caddyApiUrl: optional("CADDY_API_URL") ?? "http://caddy:2019",
+    caddyAdminListen: optional("CADDY_ADMIN_LISTEN"),
     composeProject: optional("COMPOSE_PROJECT_NAME"),
     composeHostDir: optional("COMPOSE_HOST_DIR"),
     composeExtraFile: optional("COMPOSE_EXTRA_FILE"),

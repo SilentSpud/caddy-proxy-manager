@@ -83,6 +83,10 @@ controller never dials the agent. Three consequences worth knowing before touchi
   does not. An unpaired agent leaves Caddy stopped, so a host nobody has finished installing does
   not answer on 80 and 443. Never add a `depends_on: caddy` - the agent is what starts it, so
   waiting on it deadlocks.
+- **Caddy's admin API binds on the internal `caddy-admin` network only.** The controller's `admin`
+  block binds every interface, and caddy-network is where users attach upstreams, so the agent
+  rewrites `admin.listen` to `CADDY_ADMIN_LISTEN` in every config it forwards
+  (`pinAdminListen`). A config that is not a JSON object is refused rather than sent unpinned.
 
 ## Comments
 
@@ -134,6 +138,10 @@ Two consequences to keep in mind when touching either:
   Interpolation happens per file before Compose decides what to act on, so a `:?` fails every
   invocation naming the project - including ones for unrelated services - on a deployment that
   keeps the value in the database instead of `.env`.
+- **The agent never reads `.env`.** It passes `--env-file /dev/null` and its own placeholders for the
+  two `:?` variables, so a variable the `caddy`, `clickhouse` or `geoipupdate` definitions
+  interpolate must also be forwarded under `agent.environment`, or the agent's compose sees its
+  default.
 
 ## User-facing text
 

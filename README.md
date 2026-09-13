@@ -61,6 +61,35 @@ Caddy switches to the agent's copy of the GeoIP databases the next time the agen
 the Agents page then reports a log permission problem - an existing `waf-audit.log` is usually
 `0644`, which the agent can read but not truncate - it shows the one command that fixes it.
 
+### Upgrading to the isolated Caddy admin API
+
+Caddy's admin API no longer listens on `caddy-network`, where your upstream containers could reach
+it, but on an internal `caddy-admin` network only web and the agent share. PostgreSQL and ClickHouse
+move to internal networks of their own, and the agent no longer reads `.env`. After pulling the new
+`docker-compose.yml`, on the controller host and on every agent host that runs it:
+
+```bash
+docker compose up -d
+docker rm -f caddy-proxy-manager-caddy
+docker compose restart agent
+```
+
+The old Caddy container is not on the new network, so the agent cannot reach its admin API until
+it is replaced. Removing it keeps its volumes, and the restarted agent starts a new one with its own
+port and module overrides. Then check:
+
+- **`CADDY_API_URL` in `.env`.** Delete it, or set `http://caddy-admin:2019`: `caddy` can resolve to
+  Caddy's `caddy-network` address, where the admin API no longer answers.
+- **A `docker-compose.override.yml` that interpolates variables** into `caddy`, `clickhouse` or
+  `geoipupdate`. The agent's Compose sees only the agent's environment now, so forward each one
+  under `agent.environment` in the override, as `MY_VAR: ${MY_VAR:-}`.
+- **`.env` stays `0600`.** If you loosened it so the agent could read it, tighten it again.
+- **Analytics or GeoIP already on.** Their containers keep the old network until recreated; switch
+  each off and on again under Settings so the agent recreates it with the stored credentials.
+- **An `acme-ca` volume from an earlier release** keeps its old `0777` mode. Tighten it with
+  `docker run --rm -v <project>_acme-ca:/acme-ca alpine sh -c 'chown 10001:10001 /acme-ca && chmod 0755 /acme-ca'`,
+  using web's `PUID`/`PGID` if you changed them.
+
 ---
 
 ## First Run
@@ -228,7 +257,7 @@ is still honoured as an override until a value is stored.
 | ------- | -------- | ------- |
 | Application name - sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
-| Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy:2019` |
+| Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy-admin:2019` |
 | Gravatar fallback for user icons. Off keeps every avatar lookup off the network | `AVATAR_GRAVATAR` | `true` |
 | Internal forward-auth address Caddy dials. Derived from the container network when empty | `FORWARD_AUTH_INTERNAL_URL` | Derived |
 | Seconds before an xcaddy rebuild is abandoned | `CADDY_BUILD_TIMEOUT` | `1800` |
@@ -305,8 +334,9 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
 | `DATA_DIR` | Where the agent's SQLite state, control socket and GeoIP databases live. Must be writable | `/data` |
 | `CONTROLLER_DATA_DIR` | The controller's data volume, mounted read-only: where the bootstrap token is read from, and where an upgraded agent copies its old state from on first start | Unset (token read from `DATA_DIR`) |
-| `COMPOSE_DIR` | Where the compose project files are mounted, read-only | `/compose` |
-| `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy:2019` |
+| `COMPOSE_DIR` | Where the compose project files are mounted, read-only. The agent never reads `.env` from it: what Compose interpolates into the services it runs comes from the agent's own environment | `/compose` |
+| `CADDY_API_URL` | Where this host's Caddy admin API listens. The controller reaches it only through here | `http://caddy-admin:2019` in `docker-compose.yml`, else `http://caddy:2019` |
+| `CADDY_ADMIN_LISTEN` | Pinned as `admin.listen` in every config the agent forwards to Caddy, replacing the controller's bind-every-interface default. `docker-compose.yml` sets `caddy-admin:2019` here and on the `caddy` service, whose Caddyfile binds the same address until the first config arrives - a name only the internal `caddy-admin` network resolves | Unset (forwarded as sent) |
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
 | `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
@@ -546,6 +576,9 @@ TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:5432/cpm_test bun run test
   and the login lockout (5 failed sign-ins per 5 minutes, then blocked for 15). Both are Settings
   fields
 - Audit trail for all configuration changes
+- Caddy's admin API, PostgreSQL and ClickHouse sit on internal networks the containers you proxy to
+  cannot reach. The agent is root-equivalent on its host; [SECURITY.md](SECURITY.md) says why and
+  what bounds it
 - Supports OAuth2/OIDC for SSO, including group-based roles and an OIDC-only mode with no local accounts
 
 **Production Setup:**

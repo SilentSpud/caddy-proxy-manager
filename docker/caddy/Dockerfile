@@ -6,7 +6,7 @@
 # and the version stops floating. Pinned to an exact tag for that second reason; it selects the Go
 # toolchain and xcaddy only - what gets compiled is pinned in docker/caddy/go.mod. The two are
 # allowed to drift: this tag is the xcaddy pin, go.mod is the Caddy and plugin pin.
-FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder@sha256:403d237d0bb16d2e62b1f93ca9ebb4953ecbb78aee5986765713a39f9263a5b4 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -69,7 +69,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # stages on one distro means it stays that way even if a plugin pulls in cgo. Not caddy:<version>
 # itself - this stage overwrites /usr/bin/caddy, so the official binary would sit in a lower layer
 # as ~50MB of dead weight. wget is busybox's, which the compose healthcheck uses unchanged.
-FROM alpine:3.24
+FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 # Accept build args for user/group IDs to support rootless operation
 # Using 10000 as default to avoid conflicts with system users
@@ -90,16 +90,18 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 # waf-audit.log is created here, group-writable, rather than left to Coraza: the agent truncates it
 # once ingested and reaches it only through caddy's group, but Coraza creates it 0644. A new named
 # volume copies this file in with its mode, and Coraza opens an existing file without changing it.
+#
+# No /acme-ca: web's image owns that directory, and a new volume takes its owner from the first image
+# that has one. A copy here would hand the volume to root if Caddy happened to mount it first.
 RUN apk add --no-cache --virtual .user-setup shadow && \
     (getent group ${PGID} && groupdel $(getent group ${PGID} | cut -d: -f1) || true) && \
     (getent passwd ${PUID} && userdel $(getent passwd ${PUID} | cut -d: -f1) || true) && \
     groupadd -g ${PGID} caddy && \
     useradd -r -u ${PUID} -g caddy -m -d /home/caddy caddy && \
-    mkdir -p /data /config /logs /acme-ca && \
+    mkdir -p /data /config /logs && \
     touch /logs/waf-audit.log && \
     chown -R caddy:caddy /data /config /logs /home/caddy && \
     chmod 0660 /logs/waf-audit.log && \
-    chmod 0777 /acme-ca && \
     apk del .user-setup
 
 # Record what this image was built with, so an image is inspectable on its own:

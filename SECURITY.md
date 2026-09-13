@@ -30,22 +30,70 @@ We will respond within 48 hours and provide regular updates on the fix progress.
 Our CI/CD pipeline implements multiple security layers:
 
 1. **Nothing published from a pull request**: images are built and pushed by one workflow
-   (`docker-build-trusted.yml`), which runs only on a `v*` tag or a manual dispatch. A pull request -
-   from a fork or otherwise - runs the test and end-to-end suites and never touches the registry, so
-   there is no build-and-push path for untrusted code to reach.
-2. **The version bump is the gate**: `release.yml` tags a release only when `package.json`'s version
-   changes on `main`, and only that tag triggers an image build.
-3. **SBOM Generation**: Software Bill of Materials is generated for all builds
-4. **Provenance Attestation**: Build provenance is recorded for supply chain security
-5. **Limited Permissions**: Workflows use minimal required permissions. The test workflow declares
+   (`docker-build-trusted.yml`). A pull request - from a fork or otherwise - runs the test and
+   end-to-end suites and never touches the registry, so there is no build-and-push path for
+   untrusted code to reach.
+2. **Only a release tag on `main` publishes**: `release.yml` tags a release when `package.json`'s
+   version changes on `main`, then dispatches the image build at that tag. The build's first job
+   refuses any ref that is not a `vX.Y.Z` tag whose commit is reachable from `main`, so a manual
+   dispatch on a branch publishes nothing. Anyone who can push tags can still start a build, but
+   only of a commit that already landed on `main`.
+3. **`latest` follows prereleases, for now**: `docker-compose.yml` runs `:latest`, and 3.0.0 has
+   only release candidates, so the newest prerelease moves `latest`. Once a stable `v3` tag exists,
+   only stable releases move it. Re-dispatching an older tag republishes its own version tags but
+   never moves `latest`, `3` or `3.0` back. To avoid tracking `latest` at all, deploy from the
+   release archive, which pins the three images to that release.
+4. **Pinned inputs**: every GitHub Action is pinned to a full commit SHA, every base and third-party
+   image to a tag and digest, and CI's Bun to the version the images build with. The agent image
+   pins `docker-ce-cli` and `docker-compose-plugin` to a major version only, because Docker's apt
+   repository drops old builds.
+5. **Automated pull requests**: Dependabot proposes the bumps above. `caddy-compatibility-pins.yml`
+   opens its pull request with `GITHUB_TOKEN`, which starts no workflow, so the test and end-to-end
+   checks do not run on it until a maintainer closes and reopens it or pushes to its branch.
+6. **SBOM Generation**: Software Bill of Materials is generated for all builds
+7. **Provenance Attestation**: Build provenance is recorded for supply chain security
+8. **Limited Permissions**: Workflows use minimal required permissions. The test workflow declares
    `permissions: {}`, so its `GITHUB_TOKEN` carries no scopes, and it references no repository secrets
 
 ### Container Security
 
 - Multi-architecture builds (linux/amd64 and linux/arm64)
-- Regular base image updates
-- Minimal attack surface
-- Non-root user execution where possible
+- Base images pinned by digest, with weekly Dependabot updates for all three Dockerfiles and the
+  images `docker-compose.yml` runs
+- Web, Caddy and the agent run as their own non-root users
+- **Networks follow who needs whom.** `caddy-network` holds Caddy, web, the agent (for egress) and
+  the upstreams you attach. Caddy's admin API, PostgreSQL and ClickHouse each sit on an internal
+  network (`caddy-admin`, `database`, `analytics`) shared only with the containers that use them,
+  so a container attached to be proxied reaches none of them. `geoipupdate` has only the default
+  network, for egress to MaxMind.
+- `/acme-ca`, which decides the CA Caddy trusts for ACME, is owned by web's user with mode `0755`,
+  and Caddy mounts it read-only. A volume created by an earlier release keeps its old `0777` mode
+  until tightened by hand; the README's upgrade notes show how.
+
+### The Agent Is Root on Its Host
+
+The agent recreates Caddy and starts ClickHouse and `geoipupdate` through the Docker API, which it
+reaches only through `docker-socket-proxy`. That proxy allows containers, images, volumes, networks
+and builds, with `POST`, and denies exec, swarm, secrets, auth, events and everything else.
+
+**Treat the proxy as narrowing the API, not as a boundary.** It matches URL prefixes and never sees
+a request body, so the same `POST /containers/create` that recreates Caddy could ask for a
+privileged container, the host's PID namespace or `/` bind-mounted, and `PUT
+/containers/{id}/archive` could write files into any container. Whatever controls the agent, or can
+reach the proxy, is root on that host.
+
+The controls that matter are therefore:
+
+- **The agent validates what it is told.** Desired state from the controller is checked on the
+  agent before it reaches Docker: published ports, Caddy module paths, the environment variables a
+  managed service may receive, and GeoIP edition names. Caddy admin calls pass a path allowlist.
+- **The agent stays minimal.** Its image holds the compiled agent, the Docker CLI and the Compose
+  plugin, and it is the only container on the proxy's internal network.
+- **The agent does not read `.env`.** It mounts the compose directory read-only to run Compose, but
+  passes `--env-file /dev/null` and placeholders for `SESSION_SECRET` and `POSTGRES_PASSWORD`, and
+  gets the variables its services need from its own environment. Keep `.env` at mode `0600`.
+  Anything else in that directory that other users can read - an override file, `.git` - the agent
+  can read.
 
 ### Caddy Module Builds
 
@@ -60,14 +108,12 @@ with, and add their own. Two consequences are worth stating plainly:
   a path cannot inject shell into the Dockerfile - but a *valid* path to a
   malicious repository is still malicious.
 
-- **Rebuilding widens the Docker API surface.** The `docker-socket-proxy`
-  service ships with `BUILD: 1` so the agent can run `docker compose build
-  caddy`. The socket proxy still denies `EXEC`, `SWARM`, `AUTH`, and `SECRETS`,
-  and only the agent is attached to that isolated network - but image builds
-  are a meaningful capability. Set `BUILD: 0` to opt out; the rest of the
-  application is unaffected and images can be built by hand instead.
+- **Rebuilding needs `BUILD: 1`** on `docker-socket-proxy`, the default. Image
+  builds add little to an API that is already root-equivalent (see above), but
+  set `BUILD: 0` to opt out; the rest of the application is unaffected and
+  images can be built by hand instead.
 
-Only admins can reach either surface.
+Only admins can reach either surface, and custom Caddy configuration is likewise admin-only.
 
 ### First-run Setup
 
@@ -81,37 +127,52 @@ Once setup completes the flag is stored, and the setup screens redirect away for
 
 ### Controller and Agent
 
-The controller reaches its agents over a REST API, and the seam is signed rather than
-bearer-authenticated. Every request carries an HMAC-SHA256 over the method, path, timestamp and a
-hash of the body:
+The agent dials the controller; the controller never dials the agent. Pairing, the event stream
+(`/api/agent/v1/events`, one SSE stream per agent), status reports, command results
+(`POST /api/agent/v1/command-results`) and the GeoLite2 download are all agent-to-controller
+requests. Configuration goes down the stream as desired state. A Caddy admin call is the one
+command the controller waits on: it goes down the stream with a correlation id, and the agent posts
+the answer back.
+
+Those requests are signed rather than bearer-authenticated. Each carries an HMAC-SHA256, keyed by
+the pairing secret, over the method, path, timestamp and a hash of the body:
 
 - **The secret never travels with a request**, so it cannot be lifted from a proxy log or a
   `curl -v` pasted into an issue.
 - **The path is bound into the signature**, so a captured read cannot be replayed as a write.
 - **The body is bound too**, so a valid request cannot be edited in flight.
-- A ±60 second window bounds replay.
+- A ±60 second window bounds replay, and a nonce seen inside that window is refused.
 
-**Pairing.** An agent on another host prints a six-letter code valid for five minutes, burned on
-first use and refused after ten wrong guesses. The two exchange a secret, which is encrypted with
-`encryptSecret` before it reaches a row and is never returned to the browser, logged, or included
-in any view type. Unpairing forgets the controller's side only - restart the agent as well if you
-are removing one you no longer trust.
+**Pairing.** The agent in the controller's own stack pairs with a single-use bootstrap token the
+controller leaves on its data volume, which expires if unused. An agent on another host prints a
+six-letter code valid for five minutes, burned on first use and refused after ten wrong guesses,
+and dials its controller over HTTPS unless told otherwise. A pairing never silently replaces an
+existing one. The two sides exchange a secret, which is encrypted with `encryptSecret` before it
+reaches a row and is never returned to the browser, logged, or included in any view type.
+Unpairing forgets the controller's side only - restart the agent as well if you are removing one
+you no longer trust.
 
 **The agent's Caddy admin proxy is an allowlist**, not a sanitiser: `/load`, `/config/`, `/adapt`
 and `/reverse_proxy/upstreams` are the four paths the controller needs. Caddy's admin API can stop
 the server outright, so a request for anything else is treated as not having come from this
 application, whatever signed it.
 
-**Agent-to-controller** runs on exactly one route, the GeoLite2 download, signed with the same
-pairing secret. Every refusal on it answers `404` - unsigned, unknown agent id, stale timestamp,
-disabled agent, unknown database edition are all identical from outside, so nothing can learn the
-route exists or which agent ids are real without already holding a secret.
+**Caddy's admin API is not on the upstream network.** The bundled compose file binds it to Caddy's
+address on the internal `caddy-admin` network, which only web and the agent share, and the agent
+pins that address into every config it forwards, since the controller's own `admin` block binds
+every interface. A deployment without that network - an older compose file, or no agent - keeps
+the open bind, where only leaving port 2019 unpublished bounds who can reach it.
+
+**The GeoLite2 route hides itself.** Every refusal on it answers `404` - unsigned, unknown agent id,
+stale timestamp, disabled agent, unknown database edition are all identical from outside, so
+nothing can learn the route exists or which agent ids are real without already holding a secret.
 
 **ClickHouse credentials travel to every agent.** Each host parses its own Caddy logs and inserts
-the events itself, using credentials the controller pushes. Two things follow: enabling analytics
-puts that password on every agent host, and it is currently the same account the controller reads
-with, not an insert-only one. On a fleet spread across hosts you do not equally trust, weigh that
-before turning analytics on.
+the events itself, using credentials the controller pushes. It is the same account the controller
+creates tables and reads with, not an insert-only one, so every agent host holding it can read, alter
+or drop every host's analytics. The account has no access management
+(`CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 0`), so it cannot create users or grant itself more. On a
+fleet spread across hosts you do not equally trust, weigh that before turning analytics on.
 
 **`SESSION_SECRET` is the root of all of it.** It derives the key that encrypts DNS provider
 credentials, imported private keys, agent secrets and the secret settings. Rotating it makes every
@@ -119,7 +180,8 @@ one of them unreadable.
 
 ### Dependency Management
 
-- Automated dependency updates via Dependabot
+- Automated dependency updates via Dependabot: Bun packages, the Go modules compiled into Caddy,
+  GitHub Actions, the three Dockerfiles and `docker-compose.yml`
 - Security alerts enabled
 - Regular security audits
 
@@ -150,6 +212,13 @@ rather than what the run itself can do:
 2. Check for suspicious file modifications - workflow files and `docker/` especially, since those
    decide what a later release builds and pushes
 3. Verify no secrets or credentials are exposed
+
+## Upgrading
+
+Releases after 3.0.0-rc.3 move Caddy's admin API, PostgreSQL and ClickHouse onto internal networks
+and stop the agent reading `.env`. An existing Caddy container has to be replaced once, and a
+`CADDY_API_URL` or an override file that interpolates variables may need changing. The README's
+"Upgrading to the isolated Caddy admin API" lists the steps.
 
 ## Security Updates
 

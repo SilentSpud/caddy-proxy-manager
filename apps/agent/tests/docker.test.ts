@@ -231,21 +231,38 @@ describe("compose invocation", () => {
     expect(argv[argv.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
   });
 
-  it("reads --env-file from the mounted compose dir, not the host path", async () => {
-    // --project-directory can name a host path this container cannot see; the env file has to come
-    // from somewhere it can actually read.
-    writeFileSync(join(dir, ".env"), "X=1\n");
-    process.env.COMPOSE_HOST_DIR = "/srv/cpm";
-    results.push({ exitCode: 0, stdout: "proj" });
-    await new DockerHost(loadConfig()).recreateCaddy();
-    const argv = lastCompose();
-    expect(argv[argv.indexOf("--env-file") + 1]).toBe(join(dir, ".env"));
-  });
-
-  it("omits --env-file entirely when there is no .env to read", async () => {
+  it("never hands compose the project's .env, even when one is mounted", async () => {
+    // It holds SESSION_SECRET and POSTGRES_PASSWORD. An explicit empty env file is also what stops
+    // compose picking the project's .env up on its own.
+    writeFileSync(join(dir, ".env"), "SESSION_SECRET=real\n");
     results.push({ exitCode: 0, stdout: "proj" });
     await new DockerHost(config).recreateCaddy();
-    expect(lastCompose()).not.toContain("--env-file");
+    const argv = lastCompose();
+    expect(argv[argv.indexOf("--env-file") + 1]).toBe("/dev/null");
+    expect(argv).not.toContain(join(dir, ".env"));
+  });
+
+  it("interpolates the web-only secrets with placeholders, over the agent's own environment", async () => {
+    process.env.SESSION_SECRET = "a-real-secret-that-leaked-into-the-agent";
+    const envs: Array<Record<string, string> | undefined> = [];
+    const stub = Bun.spawn;
+    (Bun as { spawn: unknown }).spawn = ((
+      argv: string[],
+      options: { env?: Record<string, string> },
+    ) => {
+      if (argv[1] === "compose") envs.push(options.env);
+      return (stub as unknown as (a: string[], o: unknown) => unknown)(argv, options);
+    }) as unknown as typeof Bun.spawn;
+    try {
+      results.push({ exitCode: 0, stdout: "proj" });
+      await new DockerHost(config).startService("clickhouse", { CLICKHOUSE_PASSWORD: "pw" });
+    } finally {
+      delete process.env.SESSION_SECRET;
+    }
+    const env = envs.at(-1);
+    expect(env?.SESSION_SECRET).toBe("unused-by-the-agent");
+    expect(env?.POSTGRES_PASSWORD).toBe("unused-by-the-agent");
+    expect(env?.CLICKHOUSE_PASSWORD).toBe("pw");
   });
 
   it("bounds the build with a timeout so a hung compile cannot wedge the agent", async () => {

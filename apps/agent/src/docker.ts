@@ -108,6 +108,16 @@ export function hostPathForDaemon(label: string): string {
   return `/run/desktop/mnt/host/${drive.toLowerCase()}/${path}`;
 }
 
+/**
+ * Stand-ins for the two variables docker-compose.yml guards with `:?`, which only web and postgres
+ * read. Compose interpolates the whole file, so without them every invocation aborts; too short for
+ * web to accept as a SESSION_SECRET, so one can never become a running controller's key.
+ */
+export const COMPOSE_PLACEHOLDERS: Readonly<Record<string, string>> = {
+  SESSION_SECRET: "unused-by-the-agent",
+  POSTGRES_PASSWORD: "unused-by-the-agent",
+};
+
 export class DockerHost {
   /** Cached because it comes from a container label that cannot change without a recreate. */
   private detectedProject: string | null = null;
@@ -242,9 +252,10 @@ export class DockerHost {
     // The daemon resolves relative bind-mount paths against the project directory, and the agent's
     // /compose mount is not where the host thinks the project is. See composeHostDir.
     if (hostDir) args.push("--project-directory", hostDir);
-    // Supplied explicitly so required variables are available even when --project-directory points
-    // at a host path this container cannot read.
-    if (existsSync(join(composeDir, ".env"))) args.push("--env-file", join(composeDir, ".env"));
+    // Never the project's .env: it holds SESSION_SECRET and POSTGRES_PASSWORD, which this container
+    // must not read. An explicit empty file stops compose finding one on its own. What the services
+    // the agent runs interpolate reaches it through its own environment (docker-compose.yml).
+    args.push("--env-file", "/dev/null");
 
     args.push("-f", join(composeDir, "docker-compose.yml"));
     const override = join(composeDir, "docker-compose.override.yml");
@@ -265,7 +276,11 @@ export class DockerHost {
     argv: string[],
     options: { timeoutSeconds?: number; env?: Record<string, string> } = {},
   ) {
-    return run(["docker", "compose", ...(await this.composeArgs()), ...argv], options);
+    return run(["docker", "compose", ...(await this.composeArgs()), ...argv], {
+      ...options,
+      // Over process.env, so a real secret this container was handed anyway never reaches compose.
+      env: { ...COMPOSE_PLACEHOLDERS, ...options.env },
+    });
   }
 
   /** Recreate only the Caddy container, leaving everything else running. */

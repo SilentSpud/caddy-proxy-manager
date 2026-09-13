@@ -1,11 +1,12 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
 
 # Bun is the only supported runtime (src/lib/runtime-guard.ts); the runtime stage needs no toolchain
 # because what ships is one compiled binary. Pinned to $BUILDPLATFORM so `deps` and `builder` run
 # natively: emulated, the Rolldown-backed `vinext build` deadlocks in its first transform pass and
 # wedges the job until the runner's 6-hour cap. The runtime stage still builds per-target, and the
-# only arch-specific artifact it gets is the binary, cross-compiled a few lines down.
-FROM --platform=$BUILDPLATFORM oven/bun:1-slim AS base
+# only arch-specific artifact it gets is the binary, cross-compiled a few lines down. Digest-pinned
+# like every base here; keep the tag in step with bun-version in the workflows and db-seed.
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS base
 WORKDIR /app
 
 FROM base AS deps
@@ -57,12 +58,12 @@ RUN case "$TARGETARCH" in \
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than oven/bun: the compiled binary carries its own Bun runtime, so a package manager
-# and Bun CLI would be dead weight. Trixie matches oven/bun:1-slim's base, so the glibc matches -
-# check `docker run --rm oven/bun:1-slim cat /etc/debian_version` when either moves, since the
+# and Bun CLI would be dead weight. Trixie matches oven/bun's slim base, so the glibc matches -
+# check `docker run --rm oven/bun:1.4.2-slim cat /etc/debian_version` when either moves, since the
 # standalone node_modules copied below were installed there and may carry native binaries.
 # The only runtime stage - the e2e suite runs this same image, seeding through the `db-seed`
 # container rather than executing code here.
-FROM debian:trixie-slim AS runner
+FROM debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132 AS runner
 ARG PUID=10001
 ARG PGID=10001
 
@@ -94,11 +95,10 @@ COPY --from=builder --chown=cpm:cpm /app/apps/controller/drizzle ./drizzle
 
 RUN mkdir -p /app/data && chown -R cpm:cpm /app/data
 
-# Shared volume for the custom ACME CA root PEM (issue #192). The web container writes it here;
-# Caddy mounts the same volume read-only. Mode 0777 so it stays writable regardless of which
-# container (with differing UIDs) initializes the named volume first - the file only ever holds a
-# public CA certificate.
-RUN mkdir -p /acme-ca && chmod 0777 /acme-ca
+# Shared volume for the custom ACME CA root PEM (issue #192), which decides the CA Caddy trusts for
+# ACME, so only web may write it. A new named volume takes this directory's owner and mode on first
+# mount; Caddy's image has no /acme-ca to compete, and Caddy mounts it read-only.
+RUN mkdir -p /acme-ca && chown cpm:cpm /acme-ca && chmod 0755 /acme-ca
 
 COPY --chown=cpm:cpm docker/web/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

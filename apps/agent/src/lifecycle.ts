@@ -29,7 +29,13 @@ import {
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { applyFleetConfig } from "./analytics/runner";
-import { CaddyAdminUnreachable, forwardToCaddy, isAllowedAdminPath } from "./caddy-admin";
+import {
+  CaddyAdminUnreachable,
+  forwardToCaddy,
+  isAllowedAdminPath,
+  loadsConfig,
+  pinAdminListen,
+} from "./caddy-admin";
 import type { AgentConfig } from "./config";
 import { ControllerClient, ControllerRejected } from "./controller-client";
 import {
@@ -467,8 +473,23 @@ export class AgentLifecycle {
       return { id: command.id, ok: false, code: "BAD_REQUEST", error: "The config is too large." };
     }
 
+    let request = command.request;
+    const listen = this.deps.config.caddyAdminListen;
+    if (listen && request.body && loadsConfig(request)) {
+      const body = pinAdminListen(request.body, listen);
+      if (body === null) {
+        return {
+          id: command.id,
+          ok: false,
+          code: "BAD_REQUEST",
+          error: "A config for Caddy must be a JSON object.",
+        };
+      }
+      request = { ...request, body };
+    }
+
     try {
-      const response = await forwardToCaddy(this.deps.config.caddyApiUrl, command.request);
+      const response = await forwardToCaddy(this.deps.config.caddyApiUrl, request);
       return { id: command.id, ok: true, response };
     } catch (error) {
       const code = error instanceof CaddyAdminUnreachable ? "BUSY" : "INTERNAL";
