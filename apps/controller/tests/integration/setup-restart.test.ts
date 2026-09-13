@@ -154,6 +154,22 @@ describe('POST /api/setup/restart in any state', () => {
     expect(mockRestart).toHaveBeenCalledTimes(1);
   });
 
+  it('replaces a corrupt cooldown stamp rather than refusing forever with a NaN Retry-After', async () => {
+    await ctx.db.insert(settings).values({
+      key: 'setup:restart_requested_at',
+      value: 'not-a-date',
+      updatedAt: now,
+    });
+
+    const first = await post();
+    expect(first.status).toBe(202);
+
+    const second = await post();
+    expect(second.status).toBe(429);
+    expect(Number.isFinite(Number(second.headers.get('retry-after')))).toBe(true);
+    expect(mockRestart).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses a cross-origin request', async () => {
     const response = await post({ origin: 'https://evil.example' });
 

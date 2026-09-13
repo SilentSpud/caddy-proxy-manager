@@ -21,7 +21,7 @@ import { bindSessionToIdpSession, recordSessionBindingFromIdToken } from "./serv
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { hashPassword, verifyPassword } from "./password";
 import { MIN_PASSWORD_LENGTH } from "./password-policy";
-import { signUpPasswordError } from "./auth-signup-policy";
+import { SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./auth-signup-policy";
 import { DISABLED_AUTH_PATHS } from "./auth-disabled-paths";
 
 // biome-ignore lint/suspicious/noExplicitAny: better-auth infers its instance type from the plugin list, which is assembled at runtime from the providers table
@@ -284,7 +284,10 @@ async function createAuth(): Promise<any> {
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
-        const message = signUpPasswordError(ctx.path, ctx.body);
+        // Checked first so every other auth request skips loading the translator.
+        if (ctx.path !== SIGN_UP_EMAIL_PATH) return;
+        const { getTranslations } = await import("next-intl/server");
+        const message = signUpPasswordError(ctx.path, ctx.body, await getTranslations());
         if (message) throw new APIError("BAD_REQUEST", { message });
       }),
     },

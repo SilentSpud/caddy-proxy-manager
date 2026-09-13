@@ -11,6 +11,10 @@ import { TEST_ENV } from '@/tests/helpers/env';
 import { fresh } from '@/tests/helpers/fresh';
 import { reloadDbModule } from '@/tests/helpers/fresh-db';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '@/tests/helpers/next-intl';
+
+// The sign-up hook words a password refusal through next-intl, which needs a request scope.
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 const cleanups: Array<() => void | Promise<void>> = [];
 

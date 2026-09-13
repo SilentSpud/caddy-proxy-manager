@@ -186,7 +186,18 @@ export async function claimRestartSlot(
     .from(settings)
     .where(eq(settings.key, RESTART_REQUESTED_KEY))
     .limit(1);
-  const last = row ? Date.parse(row.value) : now;
+  const parsed = row ? Date.parse(row.value) : Number.NaN;
+  if (row && !Number.isFinite(parsed)) {
+    // A corrupt stamp never compares older than the cutoff, so it would refuse every restart - and
+    // its Retry-After would be NaN. Replace it, still atomically: only if nobody else just did.
+    const repaired = await db
+      .update(settings)
+      .set({ value: stamp, updatedAt: stamp })
+      .where(and(eq(settings.key, RESTART_REQUESTED_KEY), eq(settings.value, row.value)))
+      .returning({ key: settings.key });
+    if (repaired.length > 0) return { ok: true };
+  }
+  const last = Number.isFinite(parsed) ? parsed : now;
   return { ok: false, retryAfterMs: Math.max(0, last + RESTART_COOLDOWN_MS - now) };
 }
 
