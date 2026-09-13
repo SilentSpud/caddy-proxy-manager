@@ -13,7 +13,7 @@
  */
 
 import crypto from "node:crypto";
-import type { CaddyBuildState, CaddyBuildStatus } from "@cpm/shared";
+import { type CaddyBuildState, type CaddyBuildStatus, SHIPPED_CADDY_MODULES } from "@cpm/shared";
 import {
   CADDY_MODULES,
   type CaddyCustomModule,
@@ -76,7 +76,7 @@ export function resolveModuleSpecs(settings: CaddyBuildSettings | null): string[
 
 /** Specs the shipped image is built with - the baseline before any rebuild. */
 export function defaultModuleSpecs(): string[] {
-  return CADDY_MODULES.map((m) => m.modulePath).sort();
+  return [...SHIPPED_CADDY_MODULES].sort();
 }
 
 // ─── Applied state ───────────────────────────────────────────────────────────

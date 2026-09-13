@@ -6,6 +6,7 @@ import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SHIPPED_CADDY_MODULES } from '@cpm/shared';
 
 import {
   CADDY_MODULES,
@@ -68,8 +69,14 @@ describe('caddy module registry', () => {
   });
 
   it('matches the Dockerfile default module list exactly', () => {
-    expect(dockerfileDefaultModules().sort()).toEqual(
-      CADDY_MODULES.map((m) => m.modulePath).sort(),
+    expect(dockerfileDefaultModules().sort()).toEqual([...SHIPPED_CADDY_MODULES].sort());
+  });
+
+  it('offers exactly the modules the shipped image carries', () => {
+    // The agent diffs a never-rebuilt host against the shared list, the UI against this catalog; a
+    // drift would rebuild every fresh install on its first reconnect.
+    expect(CADDY_MODULES.map((m) => m.modulePath).sort()).toEqual(
+      [...SHIPPED_CADDY_MODULES].sort(),
     );
   });
 

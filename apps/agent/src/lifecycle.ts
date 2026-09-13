@@ -25,6 +25,7 @@ import {
   type AgentLocalState,
   type AgentServerEvent,
   MAX_CADDY_CONFIG_BYTES,
+  SHIPPED_CADDY_MODULES,
 } from "@cpm/shared";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -387,10 +388,10 @@ export class AgentLifecycle {
         operations.applyL4Ports(state.l4Ports);
       }
 
-      const appliedModules = store.appliedCaddyModules();
-      // Null means "never rebuilt", which the controller reads as the shipped image's catalog -
-      // not an empty list. Rebuilding on that would recompile Caddy on every fresh install.
-      if (appliedModules !== null && !sameList(state.caddyModules, appliedModules)) {
+      // Null means "never rebuilt", so the running binary is the shipped image. Skipping the diff
+      // there instead made the first rebuild on a fresh install impossible.
+      const appliedModules = store.appliedCaddyModules() ?? [...SHIPPED_CADDY_MODULES];
+      if (!sameList(state.caddyModules, appliedModules)) {
         operations.applyCaddyBuild(state.caddyModules);
       }
 

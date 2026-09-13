@@ -3,7 +3,8 @@
  * was either compiled in by xcaddy or does not exist. This is the one place recording that, so
  * `docker/caddy/Dockerfile` (what gets compiled), `src/lib/caddy.ts` (which handlers may be
  * emitted - an absent module makes Caddy reject the *entire* config) and the Settings UI agree.
- * DNS provider modules derive from DNS_PROVIDERS.
+ * DNS provider modules derive from DNS_PROVIDERS. What the shipped image carries is
+ * SHIPPED_CADDY_MODULES in @cpm/shared, which the agent reads too; a unit test keeps them equal.
  */
 
 import { DNS_PROVIDERS } from "./dns-providers";
