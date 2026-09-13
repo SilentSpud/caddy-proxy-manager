@@ -215,7 +215,7 @@ function AccessListDemoContent() {
                 endContent={
                   <Badge
                     variant={host.enabled ? "success" : "neutral"}
-                    label={host.enabled ? "active" : "disabled"}
+                    label={host.enabled ? t("hostActive") : t("hostDisabled")}
                   />
                 }
               />

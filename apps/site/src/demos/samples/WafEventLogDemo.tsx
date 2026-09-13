@@ -161,12 +161,13 @@ const STATS: Stats = {
 
 /** The page's five tiles. */
 function StatsBar({ stats }: { stats: Stats }) {
+  const t = useTranslations("waf");
   const items = [
-    { label: "Total Events", value: stats.total, color: "primary" as const },
-    { label: "Blocked", value: stats.blocked, color: "accent" as const },
-    { label: "Critical", value: stats.critical, color: "accent" as const },
-    { label: "Unique Hosts", value: stats.uniqueHosts, color: "accent" as const },
-    { label: "Rule IDs Triggered", value: stats.ruleIdsTriggered, color: "accent" as const },
+    { label: t("statTotalEvents"), value: stats.total, color: "primary" as const },
+    { label: t("blocked"), value: stats.blocked, color: "accent" as const },
+    { label: t("statCritical"), value: stats.critical, color: "accent" as const },
+    { label: t("statUniqueHosts"), value: stats.uniqueHosts, color: "accent" as const },
+    { label: t("statRuleIdsTriggered"), value: stats.ruleIdsTriggered, color: "accent" as const },
   ];
 
   return (
@@ -191,10 +192,10 @@ function StatsBar({ stats }: { stats: Stats }) {
 function WafStatusCard({ stats }: { stats: Stats }) {
   const t = useTranslations("waf");
   const rest = [
-    { label: "Total Events", value: stats.total },
-    { label: "Critical", value: stats.critical },
-    { label: "Unique Hosts", value: stats.uniqueHosts },
-    { label: "Rule IDs Triggered", value: stats.ruleIdsTriggered },
+    { label: t("statTotalEvents"), value: stats.total },
+    { label: t("statCritical"), value: stats.critical },
+    { label: t("statUniqueHosts"), value: stats.uniqueHosts },
+    { label: t("statRuleIdsTriggered"), value: stats.ruleIdsTriggered },
   ];
 
   return (

@@ -575,7 +575,7 @@ function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
             endContent={
               <Badge
                 variant={h.enabled ? "success" : "neutral"}
-                label={h.enabled ? "active" : "disabled"}
+                label={h.enabled ? t("hostActive") : t("hostDisabled")}
               />
             }
           />
