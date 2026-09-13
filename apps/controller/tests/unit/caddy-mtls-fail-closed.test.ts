@@ -228,3 +228,204 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
     expect(JSON.stringify(policy)).not.toContain('CERTIFICATE'); // no trusted leaf/CA certs leaked in
   });
 });
+
+// SECURITY-AUDIT H6: a legacy whole-CA host with protected/excluded paths got "request" mode with no
+// trusted CAs, and its HTTP gate was `fingerprint != ''` - so any self-signed cert got in. Expired
+// certs were never rejected on any path-scoped host either.
+describe('mTLS on path-scoped legacy CA hosts', () => {
+  const DAY = 86_400_000;
+
+  async function seedCa(
+    caId: number,
+    certs: { id: number; fp: string; pem: string; expired?: boolean; revoked?: boolean }[],
+  ) {
+    const now = new Date().toISOString();
+    await ctx.db.insert(schema.caCertificates).values({
+      id: caId,
+      name: `CA ${caId}`,
+      certificatePem: `-----BEGIN CERTIFICATE-----\nCA${caId}\n-----END CERTIFICATE-----`,
+      privateKeyPem: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (const cert of certs) {
+      await ctx.db.insert(schema.issuedClientCertificates).values({
+        id: cert.id,
+        caCertificateId: caId,
+        commonName: cert.fp,
+        serialNumber: String(cert.id),
+        fingerprintSha256: cert.fp,
+        certificatePem: `-----BEGIN CERTIFICATE-----\n${cert.pem}\n-----END CERTIFICATE-----`,
+        validFrom: new Date(Date.now() - 10 * DAY).toISOString(),
+        validTo: new Date(Date.now() + (cert.expired ? -DAY : DAY)).toISOString(),
+        revokedAt: cert.revoked ? now : null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  }
+
+  /** Every client-certificate CEL expression on a route matching this host. */
+  function expressionsForHost(doc: unknown, domain: string): string[] {
+    const out: string[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (!node || typeof node !== 'object') return;
+      const match = (node as { match?: unknown }).match;
+      if (Array.isArray(match)) {
+        const matchers = match as { host?: string[]; expression?: unknown }[];
+        if (matchers.some((m) => m.host?.includes(domain))) {
+          for (const m of matchers) {
+            if (typeof m.expression === 'string' && m.expression.includes('tls.client')) {
+              out.push(m.expression);
+            }
+          }
+        }
+      }
+      Object.values(node).forEach(walk);
+    };
+    walk(doc);
+    return out;
+  }
+
+  beforeEach(async () => {
+    await ctx.db.delete(schema.issuedClientCertificates).catch(() => {});
+    await ctx.db.delete(schema.caCertificates).catch(() => {});
+  });
+
+  it('verifies presented certs against the CA and pins the gate to active, unexpired certs', async () => {
+    await seedCa(1, [
+      { id: 11, fp: 'aa', pem: 'ACTIVE' },
+      { id: 12, fp: 'bb', pem: 'REVOKED', revoked: true },
+      { id: 13, fp: 'cc', pem: 'EXPIRED', expired: true },
+    ]);
+    const domain = 'legacy-protected.example.com';
+    await createProxyHost(
+      {
+        name: 'legacy-protected',
+        domains: [domain],
+        upstreams: ['10.0.0.5:8080'],
+        mtls: { enabled: true, ca_certificate_ids: [1], protected_paths: ['/admin/*'] },
+      },
+      1,
+    );
+
+    const doc = await buildCaddyDocument();
+    const auth = policyForDomain(doc, domain)?.client_authentication as Record<string, unknown>;
+    expect(auth).toEqual({ mode: 'verify_if_given', trusted_ca_certs: ['CA1'] });
+
+    const expressions = expressionsForHost(doc, domain);
+    expect(expressions).toContain("{http.request.tls.client.fingerprint} in ['aa']");
+    expect(expressions).not.toContain("{http.request.tls.client.fingerprint} != ''");
+  });
+
+  it("denies every cert on gated paths once all of a managed CA's certs have expired", async () => {
+    await seedCa(1, [{ id: 11, fp: 'aa', pem: 'EXPIRED', expired: true }]);
+    const domain = 'legacy-expired.example.com';
+    await createProxyHost(
+      {
+        name: 'legacy-expired',
+        domains: [domain],
+        upstreams: ['10.0.0.5:8080'],
+        mtls: { enabled: true, ca_certificate_ids: [1], excluded_paths: ['/public/*'] },
+      },
+      1,
+    );
+
+    const doc = await buildCaddyDocument();
+    const expressions = expressionsForHost(doc, domain);
+    expect(expressions).toEqual(['{http.request.tls.client.fingerprint} in []']);
+  });
+
+  it('trusts any verified cert of an unmanaged CA, with the CA required at the TLS layer', async () => {
+    await seedCa(2, []);
+    const domain = 'legacy-unmanaged.example.com';
+    await createProxyHost(
+      {
+        name: 'legacy-unmanaged',
+        domains: [domain],
+        upstreams: ['10.0.0.5:8080'],
+        mtls: { enabled: true, ca_certificate_ids: [2], protected_paths: ['/admin/*'] },
+      },
+      1,
+    );
+
+    const doc = await buildCaddyDocument();
+    const auth = policyForDomain(doc, domain)?.client_authentication as Record<string, unknown>;
+    expect(auth).toEqual({ mode: 'verify_if_given', trusted_ca_certs: ['CA2'] });
+    expect(expressionsForHost(doc, domain)).toContain(
+      "{http.request.tls.client.fingerprint} != ''",
+    );
+  });
+
+  it('keeps separate policies for path-scoped hosts trusting different CAs', async () => {
+    await seedCa(1, []);
+    await seedCa(2, []);
+    for (const [ca, domain] of [
+      [1, 'scoped-a.example.com'],
+      [2, 'scoped-b.example.com'],
+    ] as const) {
+      await createProxyHost(
+        {
+          name: domain,
+          domains: [domain],
+          upstreams: ['10.0.0.5:8080'],
+          mtls: { enabled: true, ca_certificate_ids: [ca], protected_paths: ['/admin/*'] },
+        },
+        1,
+      );
+    }
+
+    const doc = await buildCaddyDocument();
+    const a = policyForDomain(doc, 'scoped-a.example.com');
+    const b = policyForDomain(doc, 'scoped-b.example.com');
+    expect(a).not.toBe(b);
+    expect((a!.client_authentication as Record<string, unknown>).trusted_ca_certs).toEqual(['CA1']);
+    expect((b!.client_authentication as Record<string, unknown>).trusted_ca_certs).toEqual(['CA2']);
+  });
+
+  it('drops a host whose only directly-trusted cert has expired', async () => {
+    await seedCa(1, [
+      { id: 11, fp: 'aa', pem: 'EXPIRED', expired: true },
+      { id: 12, fp: 'bb', pem: 'SIBLING' },
+    ]);
+    const domain = 'expired-direct.example.com';
+    await createProxyHost(
+      {
+        name: 'expired-direct',
+        domains: [domain],
+        upstreams: ['10.0.0.5:8080'],
+        mtls: { enabled: true, trusted_client_cert_ids: [11], protected_paths: ['/admin/*'] },
+      },
+      1,
+    );
+
+    const policy = policyForDomain(await buildCaddyDocument(), domain);
+    expect(policy?.drop).toBe(true);
+  });
+
+  it('leaves expired certs out of the full-site leaf pins', async () => {
+    await seedCa(1, [
+      { id: 11, fp: 'aa', pem: 'ACTIVE' },
+      { id: 12, fp: 'cc', pem: 'EXPIRED', expired: true },
+    ]);
+    const domain = 'legacy-full.example.com';
+    await createProxyHost(
+      {
+        name: 'legacy-full',
+        domains: [domain],
+        upstreams: ['10.0.0.5:8080'],
+        mtls: { enabled: true, ca_certificate_ids: [1] },
+      },
+      1,
+    );
+
+    const auth = policyForDomain(await buildCaddyDocument(), domain)
+      ?.client_authentication as Record<string, unknown>;
+    expect(auth.mode).toBe('require_and_verify');
+    expect(auth.trusted_leaf_certs).toEqual(['ACTIVE']);
+  });
+});

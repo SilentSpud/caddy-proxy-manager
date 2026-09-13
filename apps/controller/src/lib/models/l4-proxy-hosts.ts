@@ -1,5 +1,5 @@
 import db, { nowIso, toIso } from "../db";
-import { splitHostPort } from "../caddy-utils";
+import { RESERVED_L4_PORTS, splitHostPort } from "../caddy-utils";
 import { applyCaddyConfig } from "../caddy";
 import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
@@ -469,10 +469,14 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
     // splitHostPort rather than a trailing-colon match: `2001:db8::1` ends in `:1`, and reading
     // that as a port is how an IPv6 address silently becomes a listener on port 1. An IPv6 literal
     // has to be bracketed here, as it does everywhere else in this stack.
-    if (splitHostPort(input.listenAddress) === null) {
+    const parsed = splitHostPort(input.listenAddress);
+    if (parsed === null) {
       throw new Error(
         "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535",
       );
+    }
+    if (RESERVED_L4_PORTS.has(parsed.port)) {
+      throw domainError("l4ListenPortReserved", { port: parsed.port });
     }
   }
 

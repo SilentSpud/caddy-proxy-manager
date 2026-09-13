@@ -92,8 +92,10 @@ import {
   buildMtlsRbacSubroutes,
   buildFingerprintCelExpression,
   buildValidClientCertCelExpression,
+  isCertificateUnexpired,
   normalizeFingerprint,
   resolveAllowedFingerprints,
+  resolveLegacyCaFingerprints,
   type MtlsAccessRuleLike,
 } from "./caddy-mtls";
 import { buildRoleMaps } from "./models/mtls-roles";
@@ -923,6 +925,10 @@ type CaddyBuildContext = {
     roleFingerprintMap: Map<number, Set<string>>;
     certFingerprintMap: Map<number, string>;
     accessRulesByHost: Map<number, MtlsAccessRuleLike[]>;
+    /** CA id → fingerprints of its active certs, for legacy whole-CA hosts. */
+    caFingerprintMap?: Map<number, Set<string>>;
+    /** CAs that have ever had a CPM-issued cert, and so pin to leaves rather than trust the CA. */
+    managedCaIds?: Set<number>;
   };
 };
 
@@ -1685,9 +1691,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       );
     }
 
-    // Security: this field lets admins inject arbitrary Caddy reverse_proxy config, which is
-    // intentional - admins have full control of the proxy configuration. mergeDeep blocks
-    // __proto__/constructor/prototype, so prototype pollution is not reachable.
+    // Security: arbitrary reverse_proxy config, by design. Only an admin can set it - enforced by
+    // assertRawConfigChangeAllowed in models/proxy-hosts.ts, which every write path goes through.
+    // mergeDeep blocks __proto__/constructor/prototype, so prototype pollution is not reachable.
     const customReverseProxy = parseOptionalJson(meta.custom_reverse_proxy_json);
     if (customReverseProxy) {
       if (isPlainObject(customReverseProxy)) {
@@ -1712,8 +1718,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       }
     }
 
-    // Security: this field lets admins inject arbitrary Caddy HTTP handlers before the
-    // reverse_proxy. Intentional - admins can add any handler (file_server, rewrite, etc.).
+    // Security: arbitrary HTTP handlers before the reverse_proxy (file_server, rewrite, ...), by
+    // design. Admin-only, like the Caddyfile below - see assertRawConfigChangeAllowed.
     const customHandlers = parseCustomHandlers(meta.custom_pre_handlers_json);
     if (customHandlers.length > 0) {
       handlers.push(...customHandlers);
@@ -2029,10 +2035,21 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             context.mtlsRbac?.certFingerprintMap ?? new Map(),
           )
         : new Set<string>();
-      const hostTrustedFingerprintExpression =
+      // Path-scoped hosts cannot pin leaves at the TLS layer (see buildClientAuthentication), so a
+      // legacy whole-CA host pins here instead. Null means any cert the TLS layer verified.
+      const hostGateFingerprints: Set<string> | null =
         hostTrustedFingerprints.size > 0
-          ? buildFingerprintCelExpression(hostTrustedFingerprints)
-          : validClientCertExpression;
+          ? hostTrustedFingerprints
+          : mtls?.ca_certificate_ids?.length
+            ? resolveLegacyCaFingerprints(
+                mtls.ca_certificate_ids,
+                context.mtlsRbac?.caFingerprintMap ?? new Map(),
+                context.mtlsRbac?.managedCaIds ?? new Set(),
+              )
+            : null;
+      const hostTrustedFingerprintExpression = hostGateFingerprints
+        ? buildFingerprintCelExpression(hostGateFingerprints)
+        : validClientCertExpression;
 
       const buildProtectedPathRoute = (domainGroup: string[], path: string) => {
         if (hasMtlsRbac) {
@@ -2043,7 +2060,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             handlers,
             reverseProxyHandler,
             true,
-            hostTrustedFingerprints,
+            hostGateFingerprints ?? undefined,
           );
           if (rbacSubroutes) {
             return [
@@ -2091,7 +2108,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
             handlers,
             reverseProxyHandler,
             true,
-            hostTrustedFingerprints,
+            hostGateFingerprints ?? undefined,
           );
           if (rbacSubroutes) {
             return [
@@ -2235,10 +2252,7 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
   const readyCertificates = new Set<number>();
   const importedCertPems: { certificate: string; key: string }[] = [];
 
-  const buildAuth = (
-    domains: string[],
-    mode: "require_and_verify" | "verify_if_given" | "request",
-  ) =>
+  const buildAuth = (domains: string[], mode: "require_and_verify" | "verify_if_given") =>
     buildClientAuthentication(
       domains,
       mTlsDomainMap,
@@ -2254,9 +2268,11 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
     const scopedDomains = mTlsDomains.filter((domain) => mTlsOptionalAuthDomains.has(domain));
     const requiredDomains = mTlsDomains.filter((domain) => !mTlsOptionalAuthDomains.has(domain));
 
+    // Scoped hosts must let cert-less requests reach the HTTP path gate, but "request" mode verifies
+    // nothing - any self-signed or expired cert got through. verify_if_given checks what is shown.
     for (const [domains, mode] of [
       [requiredDomains, "require_and_verify"],
-      [scopedDomains, "request"],
+      [scopedDomains, "verify_if_given"],
     ] as const) {
       if (domains.length === 0) continue;
 
@@ -2893,6 +2909,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
         caCertificateId: issuedClientCertificates.caCertificateId,
         certificatePem: issuedClientCertificates.certificatePem,
         fingerprintSha256: issuedClientCertificates.fingerprintSha256,
+        validTo: issuedClientCertificates.validTo,
       })
       .from(issuedClientCertificates)
       .where(isNull(issuedClientCertificates.revokedAt)),
@@ -2963,9 +2980,21 @@ export async function buildCaddyDocument(agentRowId?: number) {
 
   const certificateMap = new Map(certRowsMapped.map((cert) => [cert.id, cert]));
   const caCertMap = new Map(caCertRows.map((ca) => [ca.id, ca]));
-  const issuedClientCertMap = issuedClientCertRows.reduce<Map<number, string[]>>((map, record) => {
+  // Expired certs leave every trust set here too. Path-scoped hosts do not rely on it - Go checks
+  // expiry on each handshake - but it keeps the leaf pins and HTTP gates from naming dead certs.
+  const now = Date.now();
+  const activeIssuedCerts = issuedClientCertRows.filter((r) =>
+    isCertificateUnexpired(r.validTo, now),
+  );
+  const issuedClientCertMap = activeIssuedCerts.reduce<Map<number, string[]>>((map, record) => {
     const current = map.get(record.caCertificateId) ?? [];
     current.push(record.certificatePem);
+    map.set(record.caCertificateId, current);
+    return map;
+  }, new Map());
+  const caFingerprintMap = activeIssuedCerts.reduce<Map<number, Set<string>>>((map, record) => {
+    const current = map.get(record.caCertificateId) ?? new Set<string>();
+    current.add(normalizeFingerprint(record.fingerprintSha256));
     map.set(record.caCertificateId, current);
     return map;
   }, new Map());
@@ -2979,10 +3008,10 @@ export async function buildCaddyDocument(agentRowId?: number) {
   }, new Map());
 
   // Build a lookup: issued cert ID → { id, caCertificateId, certificatePem } (active only)
-  const issuedCertById = new Map(issuedClientCertRows.map((r) => [r.id, r]));
+  const issuedCertById = new Map(activeIssuedCerts.map((r) => [r.id, r]));
   // Same active rows, so the fingerprint map for RBAC comes from them rather than a second read.
   const certFingerprintMap = new Map(
-    issuedClientCertRows.map((r) => [r.id, normalizeFingerprint(r.fingerprintSha256)]),
+    activeIssuedCerts.map((r) => [r.id, normalizeFingerprint(r.fingerprintSha256)]),
   );
 
   // Domain → CA cert IDs map for mTLS-enabled hosts. New model (trusted_client_cert_ids +
@@ -3174,6 +3203,8 @@ export async function buildCaddyDocument(agentRowId?: number) {
       roleFingerprintMap,
       certFingerprintMap,
       accessRulesByHost,
+      caFingerprintMap,
+      managedCaIds: cAsWithAnyIssuedCerts,
     },
   };
 

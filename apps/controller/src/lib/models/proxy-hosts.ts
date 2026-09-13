@@ -2723,6 +2723,38 @@ async function assertCaddyfileAdapts(snippet: string | null | undefined): Promis
   }
 }
 
+const RAW_CONFIG_FIELDS = [
+  "customReverseProxyJson",
+  "customPreHandlersJson",
+  "customCaddyfile",
+] as const;
+
+/**
+ * The raw-config fields are spliced into the Caddy document unchecked - a reverse_proxy to the admin
+ * API or a file_server rooted at / is one JSON object away - so only an admin may change them.
+ * Enforced here rather than per route so the dashboard, REST and GraphQL all meet it. Resubmitting
+ * the stored value is not a change: an operator can still save a host an admin gave a snippet.
+ */
+async function assertRawConfigChangeAllowed(
+  existing: Pick<ProxyHost, (typeof RAW_CONFIG_FIELDS)[number]> | null,
+  input: Partial<ProxyHostInput>,
+  actorUserId: number,
+): Promise<void> {
+  const changed = RAW_CONFIG_FIELDS.some(
+    (field) =>
+      input[field] !== undefined &&
+      normalizeMetaValue(input[field]) !== normalizeMetaValue(existing?.[field]),
+  );
+  if (!changed) return;
+  const actor = await db.query.users.findFirst({
+    where: (table, { eq }) => eq(table.id, actorUserId),
+    columns: { role: true },
+  });
+  if (actor?.role !== "admin") {
+    throw domainError("rawCaddyConfigAdminOnly");
+  }
+}
+
 export async function createProxyHost(input: ProxyHostInput, actorUserId: number) {
   const domains = normalizeProxyHostDomains(input.domains ?? []);
 
@@ -2730,6 +2762,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
     throw domainError("upstreamsRequired");
   }
   input.upstreams.forEach(validateUpstreamProtocol);
+  await assertRawConfigChangeAllowed(null, input, actorUserId);
   await assertWildcardIssuable(domains, input.certificateId ?? null);
   await assertCaddyfileAdapts(input.customCaddyfile);
 
@@ -2796,6 +2829,7 @@ export async function updateProxyHost(
   if (!existing) {
     throw domainError("proxyHostNotFound");
   }
+  await assertRawConfigChangeAllowed(existing, input, actorUserId);
 
   const domainList = input.domains ? normalizeProxyHostDomains(input.domains) : existing.domains;
   const domains = JSON.stringify(domainList);

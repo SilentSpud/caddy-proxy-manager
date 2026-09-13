@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import type { L4PortsStatus } from "@cpm/shared";
 import { eq } from "drizzle-orm";
 import db from "./db";
-import { splitHostPort } from "./caddy-utils";
+import { RESERVED_L4_PORTS, splitHostPort } from "./caddy-utils";
 import { l4ProxyHosts } from "./db/schema";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
 import { isAgentAvailable, requestL4Ports, tryGetAgentStatus } from "./agent/client";
@@ -56,6 +56,13 @@ export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]>
     // that looks like a port, and publishing that number would open a port nobody asked for.
     const parsed = splitHostPort(host.listenAddress);
     if (!parsed) continue;
+    // validateL4Input refuses these; a row that predates the check must still not publish one.
+    if (RESERVED_L4_PORTS.has(parsed.port)) {
+      console.warn(
+        `Not publishing reserved port ${parsed.port} for L4 proxy host ${host.id}; change its listen address.`,
+      );
+      continue;
+    }
     const proto = host.protocol === "udp" ? "/udp" : "";
     // Docker publishes a port on every address family the network has; the listen address's own
     // host part is Caddy's business, inside the container.

@@ -811,7 +811,8 @@ export async function updateProxyHostAction(
   void _prevState;
   try {
     // An operator may edit a host their groups were granted; creating one stays with admins,
-    // because a grant names a host that already exists.
+    // because a grant names a host that already exists. The raw Caddy config fields stay
+    // admin-only too, which updateProxyHost enforces.
     const access = await requireAccess();
     assertCanManage(access, "proxyHost", id);
     const userId = access.userId;
