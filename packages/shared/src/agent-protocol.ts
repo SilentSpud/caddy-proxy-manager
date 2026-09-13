@@ -26,6 +26,15 @@ export const AGENT_SIGNATURE_HEADER = "x-cpm-signature";
 export const AGENT_ID_HEADER = "x-cpm-agent";
 
 /**
+ * Header carrying a fresh random value per signed request. Signed, and the controller refuses one
+ * it has already accepted, so a captured request cannot be replayed inside the clock-skew window -
+ * where a replayed subscription would displace the real agent's stream.
+ */
+export const AGENT_NONCE_HEADER = "x-cpm-nonce";
+/** 128 random bits, lowercase hex. */
+export const AGENT_NONCE_PATTERN = /^[0-9a-f]{32}$/;
+
+/**
  * How far a request's timestamp may be from the agent's clock. Wide enough to survive two
  * containers whose clocks were never synchronised, narrow enough that a captured request stops
  * being replayable in a minute rather than a day.
@@ -38,14 +47,19 @@ export const AGENT_CLOCK_SKEW_MS = 60_000;
  *
  * `bodyHash` is the hex SHA-256 of the raw body - of the empty string when there is none - which
  * keeps the signature over the body without making the signer buffer it twice.
+ *
+ * Without `nonce` this is the base agents before 3.0.0-rc.3 sign, which the controller still
+ * verifies. The two shapes differ in line count, so neither can produce the other's string.
  */
 export function signatureBase(
   method: string,
   path: string,
   timestamp: number,
   bodyHash: string,
+  nonce?: string,
 ): string {
-  return `${method.toUpperCase()}\n${path}\n${timestamp}\n${bodyHash}`;
+  if (nonce === undefined) return `${method.toUpperCase()}\n${path}\n${timestamp}\n${bodyHash}`;
+  return `${method.toUpperCase()}\n${path}\n${timestamp}\n${nonce}\n${bodyHash}`;
 }
 
 // ─── Pairing ─────────────────────────────────────────────────────────────────

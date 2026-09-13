@@ -90,8 +90,11 @@ import {
   updateTailscaleSettingsAction,
   pairingCodeAction,
   unpairAgentAction,
+  repairAgentAction,
+  enableAutoPairingAction,
 } from "./actions";
 
+import type { RepairAgentResult } from "./actions";
 import { findSettingsItem } from "./sections";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -139,6 +142,8 @@ type Props = {
     paired: PairedAgent[];
     /** What each agent reports, per agent, so one unreachable host is visible as itself. */
     statuses: AgentResult<AgentStatus>[];
+    /** Unpairing the bundled agent switched its auto-pairing off. */
+    autoPairingDisabled: boolean;
   };
 };
 
@@ -2166,11 +2171,33 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
   const t = useTranslations("settings");
   const [code, setCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [repair, setRepair] = useState<{ name: string; result: RepairAgentResult } | null>(null);
 
   const { paired, statuses } = agents;
   const usingPaired = paired.length > 0;
   const statusFor = (agentName: string) => statuses.find((entry) => entry.agent === agentName);
   const answering = statuses.filter((entry) => entry.ok).length;
+  const repairResult = repair?.result ?? null;
+
+  const repairControls = (agent: { id: number; name: string }) => (
+    <HStack gap={2}>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        label={t("repairAgent")}
+        onClick={() => {
+          repairAgentAction(agent.id)
+            .then((result) => setRepair({ name: agent.name, result }))
+            .catch(() => setRepair({ name: agent.name, result: { kind: "failed" } }));
+        }}
+      />
+      <form action={unpairAgentAction}>
+        <input type="hidden" name="agentId" value={agent.id} />
+        <Button type="submit" size="sm" variant="secondary" label={t("unpair")} />
+      </form>
+    </HStack>
+  );
 
   return (
     <>
@@ -2218,15 +2245,32 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
                     status={entry?.ok ? entry.value : null}
                     error={entry && !entry.ok ? entry.error : agent.lastError}
                     lastSeenAt={agent.lastSeenAt}
-                    onRemove={
-                      <form action={unpairAgentAction}>
-                        <input type="hidden" name="agentId" value={agent.id} />
-                        <Button type="submit" size="sm" variant="secondary" label={t("unpair")} />
-                      </form>
-                    }
+                    onRemove={repairControls(agent)}
                   />
                 );
               })}
+
+              {repair && repairResult?.kind === "failed" && (
+                <StatusAlert message={t("repairFailed")} success={false} />
+              )}
+              {repair && repairResult?.kind === "bootstrap" && (
+                <InfoAlert title={t("repairTitle", { name: repair.name })}>
+                  {t("repairBootstrapIssued")}
+                </InfoAlert>
+              )}
+              {repair && repairResult?.kind === "code" && (
+                <InfoAlert title={t("repairTitle", { name: repair.name })}>
+                  <VStack gap={2}>
+                    <Text size="xl" weight="semibold">
+                      {repairResult.code}
+                    </Text>
+                    <Text size="sm" color="secondary">
+                      {t("repairCodeHelp")}
+                    </Text>
+                    <Code>{`cpm-agent --pair --host <this-controller> --code ${repairResult.code}`}</Code>
+                  </VStack>
+                </InfoAlert>
+              )}
             </VStack>
           )}
 
@@ -2245,6 +2289,21 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
           <Text size="sm" color="secondary">
             {t("pairingCodeHelp")}
           </Text>
+          {agents.autoPairingDisabled && (
+            <InfoAlert title={t("autoPairingDisabledTitle")}>
+              <VStack gap={2}>
+                <Text size="sm">{t("autoPairingDisabledDescription")}</Text>
+                <form action={enableAutoPairingAction}>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="secondary"
+                    label={t("enableAutoPairing")}
+                  />
+                </form>
+              </VStack>
+            </InfoAlert>
+          )}
           {codeError && <StatusAlert message={codeError} success={false} />}
           {code ? (
             <VStack gap={2}>

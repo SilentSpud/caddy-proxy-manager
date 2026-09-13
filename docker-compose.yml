@@ -281,6 +281,9 @@ services:
       # in this stack; an agent on another host needs the controller's reachable address instead,
       # and pairs with `cpm-agent --pair --host <that address> --code <code>`.
       CONTROLLER_URL: ${CONTROLLER_URL:-http://web:3000}
+      # Plain http to a controller address that is not private (loopback, a compose name, RFC 1918,
+      # a tailnet) is refused, because pairing sends the shared secret over it. true accepts that.
+      CONTROLLER_ALLOW_INSECURE_HTTP: ${CONTROLLER_ALLOW_INSECURE_HTTP:-false}
       # Every Caddy admin call the controller makes is proxied through the agent, because the
       # agent is the only thing that knows where its Caddy is. This is that address.
       CADDY_API_URL: ${CADDY_API_URL:-http://caddy:2019}

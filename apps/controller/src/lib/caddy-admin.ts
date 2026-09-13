@@ -22,6 +22,12 @@ export type CaddyAdminRequest = {
   timeoutMs?: number;
   /** Content-Type for the body. Defaults to application/json; /adapt needs text/caddyfile. */
   contentType?: string;
+  /**
+   * The agent whose Caddy must answer. Required for anything whose answer ends up in a config
+   * loaded onto that agent: an unpinned request goes to whichever agent is first, and one agent's
+   * answer must never shape another's config. Never falls back to a direct connection.
+   */
+  agentId?: string;
 };
 
 export type CaddyAdminResponse = {
@@ -116,15 +122,20 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
 export const agentCaddyAdminTransport: CaddyAdminTransport = async (request) => {
   const { caddyAdminViaAgent, AgentUnavailableError } = await import("./agent/client");
   try {
-    const response = await caddyAdminViaAgent({
-      path: request.path,
-      method: request.method,
-      body: request.body,
-      contentType: request.contentType,
-    });
+    const response = await caddyAdminViaAgent(
+      {
+        path: request.path,
+        method: request.method,
+        body: request.body,
+        contentType: request.contentType,
+      },
+      request.agentId,
+    );
     return { status: response.status, text: response.text, headers: response.headers };
   } catch (error) {
-    if (error instanceof AgentUnavailableError) {
+    // Never for a pinned request: what was meant for one agent must not land on this app's own
+    // CADDY_API_URL because that agent went away mid-apply.
+    if (error instanceof AgentUnavailableError && request.agentId === undefined) {
       return httpCaddyAdminTransport(request);
     }
     throw error;

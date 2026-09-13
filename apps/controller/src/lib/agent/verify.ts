@@ -11,6 +11,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   AGENT_CLOCK_SKEW_MS,
   AGENT_ID_HEADER,
+  AGENT_NONCE_HEADER,
+  AGENT_NONCE_PATTERN,
   AGENT_SIGNATURE_HEADER,
   AGENT_TIMESTAMP_HEADER,
   signatureBase,
@@ -48,21 +50,79 @@ async function sha256Hex(body: string): Promise<string> {
   return hasher.digest("hex");
 }
 
+// ─── Replay ──────────────────────────────────────────────────────────────────
+
+/**
+ * Nonces already accepted, keyed by agent, with when each stops mattering.
+ *
+ * In memory like the registry it protects: a replayed subscription inside the skew window would
+ * attach a second stream and displace the real agent's. Past `timestamp + skew` the timestamp check
+ * refuses a replay on its own, so that is as long as an entry has to live.
+ */
+const seen = new Map<string, number>();
+
+/** Past this, refuse rather than evict: dropping a live entry early lets its replay through. */
+const MAX_SEEN = 100_000;
+let claimsSinceSweep = 0;
+
+function sweep(now: number): void {
+  for (const [key, expiresAt] of seen) {
+    if (expiresAt <= now) seen.delete(key);
+  }
+  claimsSinceSweep = 0;
+}
+
+function claimNonce(key: string, timestamp: number, now: number): boolean {
+  const expiresAt = seen.get(key);
+  if (expiresAt !== undefined && expiresAt > now) return false;
+
+  claimsSinceSweep += 1;
+  if (claimsSinceSweep >= 1024 || seen.size >= MAX_SEEN) sweep(now);
+  if (seen.size >= MAX_SEEN) return false;
+
+  seen.set(key, timestamp + AGENT_CLOCK_SKEW_MS + 1);
+  return true;
+}
+
+/** Test seam: forget every accepted nonce. */
+export function resetReplayCache(): void {
+  seen.clear();
+  claimsSinceSweep = 0;
+}
+
+// ─── Verification ────────────────────────────────────────────────────────────
+
+/**
+ * One verdict per request object. A GraphQL document naming two agent fields verifies the same
+ * request twice, and the second pass must not read as a replay of the first.
+ */
+const verdicts = new WeakMap<Request, Promise<VerifyResult>>();
+
 /**
  * Verify a signed agent request.
  *
  * `body` is the raw text the agent signed - read it once at the route and pass it here, because
  * re-reading a consumed request body would hash the empty string and fail every POST.
  */
-export async function verifyAgentRequest(
+export function verifyAgentRequest(
   request: Request,
   body: string,
   now = Date.now(),
 ): Promise<VerifyResult> {
+  const cached = verdicts.get(request);
+  if (cached) return cached;
+  const verdict = verify(request, body, now);
+  verdicts.set(request, verdict);
+  return verdict;
+}
+
+async function verify(request: Request, body: string, now: number): Promise<VerifyResult> {
   const agentId = request.headers.get(AGENT_ID_HEADER);
   const timestampRaw = request.headers.get(AGENT_TIMESTAMP_HEADER);
   const signature = request.headers.get(AGENT_SIGNATURE_HEADER);
+  const nonce = request.headers.get(AGENT_NONCE_HEADER);
   if (!agentId || !timestampRaw || !signature) return DENY;
+  if (nonce !== null && !AGENT_NONCE_PATTERN.test(nonce)) return DENY;
 
   const timestamp = Number.parseInt(timestampRaw, 10);
   if (!Number.isFinite(timestamp)) return DENY;
@@ -74,9 +134,17 @@ export async function verifyAgentRequest(
 
   const path = new URL(request.url).pathname;
   const expected = createHmac("sha256", agent.secret)
-    .update(signatureBase(request.method, path, timestamp, await sha256Hex(body)))
+    .update(
+      signatureBase(request.method, path, timestamp, await sha256Hex(body), nonce ?? undefined),
+    )
     .digest("hex");
 
   if (!secureEquals(expected, signature)) return DENY;
+
+  // Agents before 3.0.0-rc.3 sign without a nonce. A replay is byte-identical, so its signature
+  // rejects it as well as a nonce would. Remove this fallback in the first release after 3.0.0.
+  const replayKey = `${agent.agentId}\n${nonce ?? `sig:${signature}`}`;
+  if (!claimNonce(replayKey, timestamp, now)) return DENY;
+
   return { ok: true, agent };
 }

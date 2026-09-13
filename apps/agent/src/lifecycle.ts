@@ -34,6 +34,7 @@ import type { AgentConfig } from "./config";
 import { ControllerClient, ControllerRejected } from "./controller-client";
 import {
   ControllerAddressError,
+  checkControllerTransport,
   normalizeControllerUrl,
   normalizePairingCode,
 } from "./controller-url";
@@ -91,6 +92,17 @@ export class AgentLifecycle {
     const [storedController] = this.deps.store.listControllers();
 
     if (storedUrl && storedController) {
+      // Checked on resume too: a pairing stored before plain http to a public address was refused
+      // must not keep carrying credentials over it. The pairing is kept, so opting in and
+      // restarting resumes it.
+      try {
+        const warning = checkControllerTransport(storedUrl, this.deps.config.allowInsecureHttp);
+        if (warning) console.warn(`[agent] ${warning}`);
+      } catch (error) {
+        if (!(error instanceof ControllerAddressError)) throw error;
+        await this.goIdle(error.message);
+        return;
+      }
       this.adopt(storedUrl, storedController.controllerId, storedController.secret);
       console.log(`[agent] resuming pairing with ${storedUrl}`);
       void this.run();
@@ -202,6 +214,8 @@ export class AgentLifecycle {
     try {
       url = normalizeControllerUrl(host, port);
       normalizedCode = normalizePairingCode(code);
+      const warning = checkControllerTransport(url, this.deps.config.allowInsecureHttp);
+      if (warning) console.warn(`[agent] ${warning}`);
     } catch (error) {
       if (error instanceof ControllerAddressError) return { ok: false, error: error.message };
       throw error;

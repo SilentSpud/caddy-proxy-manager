@@ -11,9 +11,10 @@
  * proxy log between the agent and its controller.
  */
 
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import {
   AGENT_ID_HEADER,
+  AGENT_NONCE_HEADER,
   AGENT_SIGNATURE_HEADER,
   AGENT_TIMESTAMP_HEADER,
   type AgentCommandResult,
@@ -242,9 +243,10 @@ export class ControllerClient {
   /**
    * Sign and send. `secret` null means an unsigned call, which only pairing is.
    *
-   * The signature covers method, path, timestamp and a hash of the body - the same base string the
-   * controller verifies - so a captured request cannot be replayed against a different endpoint,
-   * and goes stale within `AGENT_CLOCK_SKEW_MS` regardless.
+   * The signature covers method, path, timestamp, a nonce and a hash of the body - the same base
+   * string the controller verifies - so a captured request cannot be replayed against a different
+   * endpoint, the controller refuses its nonce a second time, and it goes stale within
+   * `AGENT_CLOCK_SKEW_MS` regardless.
    */
   private async send(
     path: string,
@@ -263,9 +265,11 @@ export class ControllerClient {
 
     if (secret) {
       const timestamp = Date.now();
+      const nonce = randomBytes(16).toString("hex");
       headers[AGENT_TIMESTAMP_HEADER] = String(timestamp);
+      headers[AGENT_NONCE_HEADER] = nonce;
       headers[AGENT_SIGNATURE_HEADER] = createHmac("sha256", secret)
-        .update(signatureBase(method, path, timestamp, await sha256Hex(body)))
+        .update(signatureBase(method, path, timestamp, await sha256Hex(body), nonce))
         .digest("hex");
     }
 

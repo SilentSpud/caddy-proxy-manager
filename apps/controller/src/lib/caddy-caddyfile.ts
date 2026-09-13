@@ -45,8 +45,17 @@ type AdaptResponse = {
   error?: string;
 };
 
-/** Adapt a snippet into HTTP routes. Throws CaddyfileAdaptError with Caddy's own message. */
-export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCaddyfile> {
+/**
+ * Adapt a snippet into HTTP routes. Throws CaddyfileAdaptError with Caddy's own message.
+ *
+ * `agentId` names the agent whose Caddy adapts it, and routes adapted for a document must come from
+ * the agent that document is loaded onto. The answer is nested into the config unmodified, so an
+ * agent adapting for another would be writing that agent's routes.
+ */
+export async function adaptCaddyfileSnippet(
+  snippet: string,
+  agentId?: string,
+): Promise<AdaptedCaddyfile> {
   const trimmed = snippet.trim();
   if (!trimmed) return { routes: [], warnings: [], ignoredApps: [] };
 
@@ -58,6 +67,7 @@ export async function adaptCaddyfileSnippet(snippet: string): Promise<AdaptedCad
     // Adaptation is pure parsing - no answer in ten seconds means something is wrong with the
     // admin endpoint, not with the snippet.
     timeoutMs: 10_000,
+    agentId,
   });
 
   let parsed: AdaptResponse;

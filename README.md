@@ -298,7 +298,8 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
-| `CONTROLLER_URL` | Where the agent dials to reach its controller. A tailnet IP or MagicDNS name works here like any other address. Overridden by `--host`/`--port` | Unset (idle until paired) |
+| `CONTROLLER_URL` | Where the agent dials to reach its controller. A tailnet IP or MagicDNS name works here like any other address. A bare host means `https://`, except loopback and single-label names such as `web`. Overridden by `--host`/`--port` | Unset (idle until paired) |
+| `CONTROLLER_ALLOW_INSECURE_HTTP` | Dial a plain `http://` controller address that is not private anyway. Without it the agent refuses one, because pairing sends the shared secret over that link. `http://` to loopback, a compose service name, an RFC 1918 range or a tailnet is allowed and only logs a warning | `false` |
 | `PAIRING_CODE` | Pair on first start instead of idling. Overridden by `--code` | Unset |
 | `AGENT_MODE` | `standalone` or `managed`, shown on the controller's agent status. A label only: either way the agent dials out and binds just its local control socket. Startup fails on any other value | `standalone` |
 | `AGENT_SOCKET` | The local control socket `cpm-agent --pair` and `--healthcheck` dial | `$DATA_DIR/agent.sock` |
@@ -898,16 +899,24 @@ serve. Reach the dashboard on `:3000` to complete it, and Caddy starts on its ow
 
 An agent on another host cannot mount that volume, so it pairs with a code you carry.
 
-Generate one under **Settings → Agents**. It is six letters, valid for five minutes, works once,
-and is refused after ten wrong guesses. Then, on the agent's host:
+Generate one under **Settings → Agents**. It is six letters, valid for five minutes and works once.
+Wrong guesses are limited to five a minute per client address and 200 per code. Then, on the
+agent's host:
 
 ```bash
-docker exec caddy-proxy-manager-agent cpm-agent --pair --host 10.0.0.5 --code ABCDEF
+docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm.example.com --code ABCDEF
 ```
 
-`--host` is the controller's address as the agent can reach it; add `--port` if it is not 3000. The
-two exchange a secret, which is stored encrypted on the controller and in the agent's own database,
-and the code is never used again. The agent then pulls its configuration and starts Caddy.
+`--host` is the controller's address as the agent can reach it. A bare host means `https://` on
+443, except loopback and single-label names such as `web`. Plain `http://` towards a private address
+(RFC 1918, a tailnet) works with a warning - `--host http://10.0.0.5:3000` - and towards a public
+one is refused unless `CONTROLLER_ALLOW_INSECURE_HTTP=true`, because pairing sends the shared secret
+over this link. The two exchange a secret, which is stored encrypted on the controller and in the
+agent's own database, and the code is never used again. The agent then pulls its configuration and
+starts Caddy.
+
+The code pairs only an agent the controller has never seen. To re-pair one that is already listed -
+its database was rebuilt, say - use **Re-pair** on its row, which mints a code for that agent alone.
 
 `--pair` talks to the agent already running on that host rather than doing the work itself - the
 running process is the one holding the database the secret lands in and the stream it will open.
@@ -933,8 +942,10 @@ Three ways to address it, all of which work:
 | `https://cpm-controller.tailnet-1234.ts.net` | Behind `tailscale serve --bg --https=443 http://127.0.0.1:3000` on the controller's host |
 
 An `https://` address with no port means **443**, because the controller serves plain HTTP and an
-https address means something in front of it is terminating TLS. A bare host or an `http://`
-address with no port still means 3000. `--port` overrides either.
+https address means something in front of it is terminating TLS. An `http://` address with no port
+still means 3000. A bare host means `https://`, unless it is a single-label name like
+`cpm-controller`, which keeps meaning `http://` on 3000. `--port` overrides either. Plain http to a
+tailnet IP or name is allowed, since the tailnet encrypts it, and logs a warning.
 
 **Getting the agent onto the tailnet.** If the agent's host is already on it, there is nothing to
 do. Otherwise put the container on the tailnet however you normally would - a `tailscale/tailscale`

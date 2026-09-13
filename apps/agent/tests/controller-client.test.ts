@@ -10,7 +10,16 @@
  * These drive the client against a stub controller rather than a live one. What is being pinned is
  * the meaning the agent takes from a reply, which does not need a socket to exercise.
  */
+import { createHmac } from "node:crypto";
 import { describe, it, expect, afterEach } from "bun:test";
+import {
+  AGENT_NONCE_HEADER,
+  AGENT_NONCE_PATTERN,
+  AGENT_SIGNATURE_HEADER,
+  AGENT_TIMESTAMP_HEADER,
+  CONTROLLER_AGENT_ROUTES,
+  signatureBase,
+} from "@cpm/shared";
 import { ControllerClient, ControllerRejected } from "../src/controller-client";
 
 const ORIGINAL_FETCH = globalThis.fetch;
@@ -128,5 +137,35 @@ describe("command results are not capped at a status-sized body", () => {
     await client().postResults("secret", []);
 
     expect(called).toBe(false);
+  });
+});
+
+describe("signing", () => {
+  it("signs a fresh nonce into every request, so the controller can refuse a replay", async () => {
+    const sent: { headers: Headers; body: string }[] = [];
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      sent.push({ headers: new Headers(init?.headers), body: String(init?.body ?? "") });
+      return new Response(JSON.stringify({ data: { agentStatus: true } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    await client().postStatus("secret", STATUS);
+    await client().postStatus("secret", STATUS);
+
+    const [first, second] = sent;
+    const nonce = first.headers.get(AGENT_NONCE_HEADER) ?? "";
+    expect(nonce).toMatch(AGENT_NONCE_PATTERN);
+    expect(second.headers.get(AGENT_NONCE_HEADER)).not.toBe(nonce);
+
+    // The nonce is under the signature, or stripping it would turn a request back into a
+    // replayable one.
+    const timestamp = Number(first.headers.get(AGENT_TIMESTAMP_HEADER));
+    const bodyHash = new Bun.CryptoHasher("sha256").update(first.body).digest("hex");
+    const expected = createHmac("sha256", "secret")
+      .update(signatureBase("POST", CONTROLLER_AGENT_ROUTES.graphql, timestamp, bodyHash, nonce))
+      .digest("hex");
+    expect(first.headers.get(AGENT_SIGNATURE_HEADER)).toBe(expected);
   });
 });

@@ -85,8 +85,20 @@ import {
 } from "@/src/lib/settings/staging";
 import { withCapturedWrites } from "@/src/lib/settings/staging-context";
 import { applyStagedSettings } from "@/src/lib/settings/apply";
-import { ensurePairingCode, revokePairingCode } from "@/src/lib/agent/pairing-codes";
-import { deleteAgent, setAgentBuildSettings } from "@/src/lib/models/agents";
+import {
+  ensurePairingCode,
+  mintRepairCode,
+  revokePairingCode,
+  revokeRepairCode,
+} from "@/src/lib/agent/pairing-codes";
+import {
+  enableAutoPairing,
+  forgetBootstrapAgent,
+  isBundledAgent,
+  issueBootstrapToken,
+} from "@/src/lib/agent/bootstrap";
+import { detach } from "@/src/lib/agent/registry";
+import { deleteAgent, findAgentById, setAgentBuildSettings } from "@/src/lib/models/agents";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
 import type { AppRole } from "@/src/lib/oidc-groups";
 
@@ -1894,14 +1906,50 @@ export async function revokePairingCodeAction(): Promise<void> {
 /**
  * Forget a paired agent.
  *
- * Removes this controller's side and, because the agent's next signed call is then refused, drops
- * it back to idle on its own host - which stops its Caddy. Unpairing takes a host out of service,
- * so the UI says so.
+ * Removes this controller's side and drops its stream, so the agent's reconnect is refused and it
+ * goes back to idle on its own host - which stops its Caddy. Unpairing takes a host out of service,
+ * so the UI says so. For the bundled agent it also turns auto-pairing off: otherwise the agent would
+ * find a fresh bootstrap token and pair itself straight back.
  */
 export async function unpairAgentAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("agentId"));
   if (Number.isNaN(id)) return;
-  await deleteAgent(id);
+  const agentId = await deleteAgent(id);
+  if (agentId) {
+    revokeRepairCode(agentId);
+    await forgetBootstrapAgent(agentId);
+    detach(agentId);
+  }
+  revalidatePath("/settings");
+}
+
+export type RepairAgentResult =
+  | { kind: "code"; code: string; expiresAt: number }
+  | { kind: "bootstrap" }
+  | { kind: "failed" };
+
+/**
+ * Let one paired agent pair again, replacing its secret: the recovery path for a host whose
+ * database was rebuilt, or whose secret this controller can no longer decrypt.
+ *
+ * The bundled agent cannot be handed a code, so it gets a bootstrap token bound to its id. Any other
+ * agent gets a six-letter code that re-pairs it and nothing else.
+ */
+export async function repairAgentAction(agentRowId: number): Promise<RepairAgentResult> {
+  await requireAdmin();
+  const agent = await findAgentById(agentRowId);
+  if (!agent) return { kind: "failed" };
+  if (await isBundledAgent(agent.agentId)) {
+    return issueBootstrapToken(agent.agentId) ? { kind: "bootstrap" } : { kind: "failed" };
+  }
+  const { code, expiresAt } = mintRepairCode(agent.agentId);
+  return { kind: "code", code, expiresAt };
+}
+
+/** Let the bundled agent pair itself again, after unpairing it turned that off. */
+export async function enableAutoPairingAction(): Promise<void> {
+  await requireAdmin();
+  await enableAutoPairing();
   revalidatePath("/settings");
 }

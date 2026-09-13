@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   AGENT_ID_HEADER,
+  AGENT_NONCE_HEADER,
   AGENT_SIGNATURE_HEADER,
   AGENT_TIMESTAMP_HEADER,
   CONTROLLER_GEOIP_ROUTE,
@@ -125,13 +126,15 @@ async function syncEdition(
   const path = `${CONTROLLER_GEOIP_ROUTE}/${edition}`;
   const timestamp = Date.now();
   const emptyBody = new Bun.CryptoHasher("sha256").update("").digest("hex");
+  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("hex");
   const signature = createHmac("sha256", secret)
-    .update(signatureBase("GET", path, timestamp, emptyBody))
+    .update(signatureBase("GET", path, timestamp, emptyBody, nonce))
     .digest("hex");
 
   const headers: Record<string, string> = {
     [AGENT_ID_HEADER]: agentId,
     [AGENT_TIMESTAMP_HEADER]: String(timestamp),
+    [AGENT_NONCE_HEADER]: nonce,
     [AGENT_SIGNATURE_HEADER]: signature,
   };
   const known = conditionalEtag(store, edition);

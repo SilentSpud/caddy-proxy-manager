@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import type { AgentMode } from "@cpm/shared";
 import {
   ControllerAddressError,
+  checkControllerTransport,
   normalizeControllerUrl,
   normalizePairingCode,
 } from "./controller-url";
@@ -68,6 +69,8 @@ export type AgentConfig = {
   serviceTimeoutSeconds: number;
   /** Seconds to wait for Caddy to report healthy after a recreate. */
   healthTimeoutSeconds: number;
+  /** Dial plain http to a public controller address anyway. See `checkControllerTransport`. */
+  allowInsecureHttp: boolean;
 };
 
 function optional(name: string): string | null {
@@ -103,12 +106,35 @@ export type ConfigOverrides = {
   pairingCode?: string | null;
 };
 
-function resolveControllerUrl(overrides: ConfigOverrides): string | null {
+/** Values that switch a flag on. Anything else, unset included, leaves it off. */
+function flag(name: string): boolean {
+  return ["1", "true", "yes", "on"].includes((optional(name) ?? "").toLowerCase());
+}
+
+/** Refuse an address the agent must not dial, and warn when it may but plain http is involved. */
+function checkedUrl(url: string, allowInsecureHttp: boolean): string {
+  const warning = checkControllerTransport(url, allowInsecureHttp);
+  if (warning) console.warn(`[agent] ${warning}`);
+  return url;
+}
+
+function resolveControllerUrl(
+  overrides: ConfigOverrides,
+  allowInsecureHttp: boolean,
+): string | null {
   if (overrides.controllerHost) {
-    return normalizeControllerUrl(overrides.controllerHost, overrides.controllerPort ?? null);
+    return checkedUrl(
+      normalizeControllerUrl(overrides.controllerHost, overrides.controllerPort ?? null),
+      allowInsecureHttp,
+    );
   }
   const fromEnv = optional("CONTROLLER_URL");
-  if (fromEnv) return normalizeControllerUrl(fromEnv, overrides.controllerPort ?? null);
+  if (fromEnv) {
+    return checkedUrl(
+      normalizeControllerUrl(fromEnv, overrides.controllerPort ?? null),
+      allowInsecureHttp,
+    );
+  }
   // A port with nothing to attach it to is a half-configured agent, and silently idling on it
   // would look identical to never having been configured at all.
   if (overrides.controllerPort != null) {
@@ -125,9 +151,11 @@ function resolvePairingCode(overrides: ConfigOverrides): string | null {
 export function loadConfig(overrides: ConfigOverrides = {}): AgentConfig {
   const mode = resolveMode();
   const dataDir = resolve(optional("DATA_DIR") ?? "/data");
+  const allowInsecureHttp = flag("CONTROLLER_ALLOW_INSECURE_HTTP");
 
   return {
-    controllerUrl: resolveControllerUrl(overrides),
+    controllerUrl: resolveControllerUrl(overrides, allowInsecureHttp),
+    allowInsecureHttp,
     pairingCode: resolvePairingCode(overrides),
     mode,
     dataDir,

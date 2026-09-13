@@ -1,37 +1,52 @@
 /**
- * Caddy health monitoring: watches for restarts/crashes and reapplies configuration.
+ * Caddy health monitoring: watches each agent's Caddy for a restart and reapplies its configuration.
+ *
+ * Per agent, never through one "primary": an agent answers only for its own Caddy, so what it says
+ * may only ever cause work on that same agent. A lying agent can make this re-apply its own config,
+ * at most once a minute, and nothing else in the fleet.
  */
 
+import type { ConnectedAgent } from "./agent/registry";
+import { connectedAgents } from "./agent/registry";
 import { caddyAdminRequest } from "./caddy-admin";
-import { applyCaddyConfig } from "./caddy";
+import { applyCaddyConfig, applyCaddyConfigToAgent } from "./caddy";
 
 type CaddyMonitorState = {
   isHealthy: boolean;
   lastConfigId: string | null;
   lastCheckTime: number;
   consecutiveFailures: number;
+  lastReapplyAt: number;
+  reapplyPending: boolean;
 };
 
 const HEALTH_CHECK_INTERVAL = 10000; // Check every 10 seconds
 const MAX_CONSECUTIVE_FAILURES = 3; // Consider unhealthy after 3 failures
 const REAPPLY_DELAY = 5000; // Wait 5 seconds after detecting restart before reapplying
+/** Floor between re-applies to one Caddy, so one reporting an empty config forever stays cheap. */
+const MIN_REAPPLY_INTERVAL = 60_000;
 
-const monitorState: CaddyMonitorState = {
-  isHealthy: false,
-  lastConfigId: null,
-  lastCheckTime: 0,
-  consecutiveFailures: 0,
-};
+/** The Caddy reached with no agent attached: a development setup, or nothing paired yet. */
+const DIRECT = "direct";
+
+type Target = { key: string; agent: ConnectedAgent | null };
+
+const states = new Map<string, CaddyMonitorState>();
 
 let monitorInterval: NodeJS.Timeout | null = null;
 let isMonitoring = false;
 
 /**
- * The current Caddy config ID from the admin API, used to detect a restart (the ID changes).
+ * The current Caddy config ID from one admin API, used to detect a restart (the ID changes).
  */
-async function getCaddyConfigId(): Promise<string | null> {
+async function getCaddyConfigId(agentId?: string): Promise<string | null> {
   try {
-    const response = await caddyAdminRequest({ path: "/config/", method: "GET", timeoutMs: 5000 });
+    const response = await caddyAdminRequest({
+      path: "/config/",
+      method: "GET",
+      timeoutMs: 5000,
+      agentId,
+    });
 
     if (response.status < 200 || response.status >= 300) {
       return null;
@@ -54,71 +69,101 @@ async function getCaddyConfigId(): Promise<string | null> {
   }
 }
 
-/** Check whether Caddy is healthy, detecting restarts. */
-async function checkCaddyHealth(): Promise<void> {
-  const now = Date.now();
-  monitorState.lastCheckTime = now;
+function targets(): Target[] {
+  const agents = connectedAgents();
+  if (agents.length === 0) return [{ key: DIRECT, agent: null }];
+  return agents.map((agent) => ({ key: agent.agentId, agent }));
+}
 
-  const currentConfigId = await getCaddyConfigId();
+async function checkTarget(target: Target, now: number, reapplyDelayMs: number): Promise<void> {
+  let state = states.get(target.key);
+  if (!state) {
+    state = {
+      isHealthy: false,
+      lastConfigId: null,
+      lastCheckTime: 0,
+      consecutiveFailures: 0,
+      lastReapplyAt: 0,
+      reapplyPending: false,
+    };
+    states.set(target.key, state);
+  }
+  state.lastCheckTime = now;
+  const who = target.agent ? ` on ${target.agent.name}` : "";
+
+  const currentConfigId = await getCaddyConfigId(target.agent?.agentId);
 
   if (currentConfigId === null) {
     // Caddy is not responding
-    monitorState.consecutiveFailures++;
+    state.consecutiveFailures++;
 
-    if (monitorState.isHealthy && monitorState.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    if (state.isHealthy && state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
       console.warn(
-        `[CaddyMonitor] Caddy appears to be down (${monitorState.consecutiveFailures} consecutive failures)`,
+        `[CaddyMonitor] Caddy${who} appears to be down (${state.consecutiveFailures} consecutive failures)`,
       );
-      monitorState.isHealthy = false;
+      state.isHealthy = false;
     }
     return;
   }
 
   // Caddy is responding
-  const wasUnhealthy = !monitorState.isHealthy;
-  monitorState.consecutiveFailures = 0;
-  monitorState.isHealthy = true;
+  const wasUnhealthy = !state.isHealthy;
+  state.consecutiveFailures = 0;
+  state.isHealthy = true;
 
   // Detect restart: config ID changed to "empty" or Caddy was previously unhealthy
   const hasRestarted =
-    (monitorState.lastConfigId !== null && currentConfigId === "empty") ||
+    (state.lastConfigId !== null && currentConfigId === "empty") ||
     (wasUnhealthy && currentConfigId === "empty");
 
-  if (hasRestarted) {
-    console.log(
-      "[CaddyMonitor] Caddy restart detected! Waiting before reapplying configuration...",
-    );
-
-    // Wait a bit for Caddy to fully initialize
-    setTimeout(async () => {
-      try {
-        console.log("[CaddyMonitor] Reapplying Caddy configuration after restart...");
-        await applyCaddyConfig();
-        console.log("[CaddyMonitor] Configuration reapplied successfully");
-
-        // Update the config ID after successful reapplication
-        const newConfigId = await getCaddyConfigId();
-        monitorState.lastConfigId = newConfigId;
-      } catch (error) {
-        console.error("[CaddyMonitor] Failed to reapply configuration after restart:", error);
-        // Will retry on next health check
-      }
-    }, REAPPLY_DELAY);
-  } else if (monitorState.lastConfigId === null) {
-    // First sighting since this process started. The startup apply usually ran before any agent had
-    // attached, so a running Caddy can still hold a config the previous release built.
-    console.log("[CaddyMonitor] Caddy health monitoring initialized; reapplying configuration");
-    try {
-      await applyCaddyConfig();
-      monitorState.lastConfigId = (await getCaddyConfigId()) ?? currentConfigId;
-    } catch (error) {
-      console.error("[CaddyMonitor] Failed to apply configuration on first contact:", error);
-      // lastConfigId stays null, so the next health check tries again.
-    }
-  } else {
-    // Normal operation, update last known config ID
-    monitorState.lastConfigId = currentConfigId;
+  // First sighting since this process started also re-applies: the startup apply usually ran before
+  // any agent attached, so a running Caddy can still hold a config the previous release built (an
+  // old forward-auth proof, say). lastConfigId stays null until a re-apply lands, so it retries.
+  const firstSighting = state.lastConfigId === null;
+  if (!hasRestarted && !firstSighting) {
+    state.lastConfigId = currentConfigId;
+    return;
   }
+
+  if (state.reapplyPending) return;
+  // Only restarts count toward the floor; a first sighting happens once per attach.
+  if (hasRestarted) {
+    if (now - state.lastReapplyAt < MIN_REAPPLY_INTERVAL) return;
+    state.lastReapplyAt = now;
+  }
+  state.reapplyPending = true;
+  console.log(
+    hasRestarted
+      ? `[CaddyMonitor] Caddy restart detected${who}; reapplying its configuration shortly`
+      : `[CaddyMonitor] Monitoring Caddy${who}; reapplying its configuration`,
+  );
+
+  const pending = state;
+  // Wait a bit for Caddy to fully initialize
+  setTimeout(async () => {
+    try {
+      // Only this agent's own document, built with snippets this same agent adapted.
+      if (target.agent) await applyCaddyConfigToAgent(target.agent);
+      else await applyCaddyConfig();
+      pending.lastConfigId = await getCaddyConfigId(target.agent?.agentId);
+    } catch (error) {
+      // Will retry on a later health check
+      console.error(`[CaddyMonitor] Failed to reapply configuration${who}:`, error);
+    } finally {
+      pending.reapplyPending = false;
+    }
+  }, reapplyDelayMs);
+}
+
+/** One pass over every Caddy. Exported so tests can drive it with no delay before the re-apply. */
+export async function checkCaddyHealth(reapplyDelayMs = REAPPLY_DELAY): Promise<void> {
+  const now = Date.now();
+  const current = targets();
+  const live = new Set(current.map((target) => target.key));
+  for (const key of states.keys()) {
+    if (!live.has(key)) states.delete(key);
+  }
+  await Promise.all(current.map((target) => checkTarget(target, now, reapplyDelayMs)));
 }
 
 /** Start monitoring Caddy health. */
@@ -161,7 +206,12 @@ export function stopCaddyMonitoring(): void {
   }
 }
 
-/** Current monitoring state (useful for debugging). */
-export function getMonitorState(): Readonly<CaddyMonitorState> {
-  return { ...monitorState };
+/** Current monitoring state per Caddy, keyed by agentId (useful for debugging). */
+export function getMonitorState(): Record<string, Readonly<CaddyMonitorState>> {
+  return Object.fromEntries([...states].map(([key, state]) => [key, { ...state }]));
+}
+
+/** Test seam: forget every Caddy's state. */
+export function resetCaddyMonitor(): void {
+  states.clear();
 }

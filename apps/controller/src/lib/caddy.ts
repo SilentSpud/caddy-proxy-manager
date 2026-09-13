@@ -921,6 +921,11 @@ type CaddyBuildContext = {
   moduleAvailability: CaddyModuleAvailability;
   /** Null outside buildCaddyDocument - callers exercising route shapes have no settings to read. */
   tailscale?: TailscaleRuntime | null;
+  /**
+   * The agent this document is loaded onto, whose own Caddy adapts its Caddyfile snippets. Unset
+   * only for a document no agent loads: a preview, or a controller with no agent attached.
+   */
+  adaptVia?: string;
   mtlsRbac?: {
     roleFingerprintMap: Map<number, Set<string>>;
     certFingerprintMap: Map<number, string>;
@@ -1333,7 +1338,8 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
       .map(async (row) => {
         const snippet = metaOf(row).custom_caddyfile as string;
         try {
-          adaptedCaddyfiles.set(row.id, await adaptCaddyfileSnippet(snippet));
+          // On the agent this document is for: adapted routes go into the config unmodified.
+          adaptedCaddyfiles.set(row.id, await adaptCaddyfileSnippet(snippet, context.adaptVia));
         } catch (error) {
           // Left absent in the map; the loop below reports it per host.
           console.warn(
@@ -2847,8 +2853,11 @@ async function buildL4Servers(
  * test and the single-agent path do - nothing is filtered and the module gate falls back to the
  * fleet-wide intersection, which is exactly the document this function produced before hosts could
  * be assigned at all.
+ *
+ * `options.adaptVia` is the agent whose Caddy adapts the hosts' Caddyfile snippets, and must be the
+ * agent this document is loaded onto.
  */
-export async function buildCaddyDocument(agentRowId?: number) {
+export async function buildCaddyDocument(agentRowId?: number, options: { adaptVia?: string } = {}) {
   const [
     proxyHostRecords,
     certRows,
@@ -3199,6 +3208,7 @@ export async function buildCaddyDocument(agentRowId?: number) {
     globalWaf,
     moduleAvailability,
     tailscale: tailscaleRuntime,
+    adaptVia: options.adaptVia,
     mtlsRbac: {
       roleFingerprintMap,
       certFingerprintMap,
@@ -3438,25 +3448,16 @@ export async function applyCaddyConfig() {
   // routes to that one agent, and broadcasting to it would be the same call with extra steps.
   // Keeping the common case on one seam is also what lets a test install one in-memory Caddy.
   if (targets.length <= 1) {
-    const payload = JSON.stringify(await buildCaddyDocument(targets[0]?.agentRowId));
-    let response: { status: number; text: string };
-    try {
-      response = await caddyAdminRequest({ path: "/load", method: "POST", body: payload });
-    } catch (requestError) {
-      logCaddyApplyFailure("Caddy admin request failed", requestError);
-      if (isConnectionError(requestError)) {
-        throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
-      }
-      throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
-    }
-    assertCaddyAccepted(response, "");
+    await loadOne(targets[0] ?? null, "");
     return;
   }
 
+  // Each agent adapts the snippets in its own document. Adapted routes are nested unmodified, and
+  // an agent is trusted to describe its own Caddy, never to write another agent's config.
   const results = await broadcastCaddyAdmin(async (agent) => ({
     path: "/load",
     method: "POST",
-    body: JSON.stringify(await buildCaddyDocument(agent.agentRowId)),
+    body: JSON.stringify(await buildCaddyDocument(agent.agentRowId, { adaptVia: agent.agentId })),
   }));
   const unreachable = results.filter((result) => !result.ok);
   if (unreachable.length > 0) {
@@ -3473,6 +3474,48 @@ export async function applyCaddyConfig() {
     if (!result.ok) continue;
     assertCaddyAccepted(result.value, result.agent);
   }
+}
+
+/**
+ * Build one agent's document, with its snippets adapted by that agent, and load it through the
+ * transport seam pinned to the same agent. Null is the Caddy reached with no agent attached.
+ */
+async function loadOne(
+  agent: { agentId: string; agentRowId: number } | null,
+  who: string,
+): Promise<void> {
+  const payload = JSON.stringify(
+    await buildCaddyDocument(agent?.agentRowId, { adaptVia: agent?.agentId }),
+  );
+  let response: { status: number; text: string };
+  try {
+    response = await caddyAdminRequest({
+      path: "/load",
+      method: "POST",
+      body: payload,
+      agentId: agent?.agentId,
+    });
+  } catch (requestError) {
+    logCaddyApplyFailure("Caddy admin request failed", requestError);
+    if (isConnectionError(requestError)) {
+      throw new CaddyApplyError("Unable to reach Caddy API", "CADDY_UNREACHABLE");
+    }
+    throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
+  }
+  assertCaddyAccepted(response, who);
+}
+
+/**
+ * Rebuild and reload one agent's Caddy and no other: what the health monitor does for a Caddy that
+ * restarted, so an agent reporting one cannot make the rest of the fleet reload.
+ */
+export async function applyCaddyConfigToAgent(agent: {
+  agentId: string;
+  agentRowId: number;
+  name: string;
+}): Promise<void> {
+  if (currentStagingScope()?.suppressApply) return;
+  await loadOne(agent, agent.name);
 }
 
 /**

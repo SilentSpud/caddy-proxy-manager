@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import {
   AGENT_ID_HEADER,
+  AGENT_NONCE_HEADER,
   AGENT_SIGNATURE_HEADER,
   AGENT_TIMESTAMP_HEADER,
   signatureBase,
@@ -75,8 +76,12 @@ function signedRequest(
   if (overrides.signed !== false) {
     headers[AGENT_ID_HEADER] = overrides.agentId ?? AGENT_ID;
     headers[AGENT_TIMESTAMP_HEADER] = String(timestamp);
+    // A nonce per request, as the agent sends: two requests signed in the same millisecond would
+    // otherwise be byte-identical, and the second would rightly be refused as a replay.
+    const nonce = randomBytes(16).toString('hex');
+    headers[AGENT_NONCE_HEADER] = nonce;
     headers[AGENT_SIGNATURE_HEADER] = createHmac('sha256', overrides.secret ?? SECRET)
-      .update(signatureBase('GET', path, timestamp, emptyBody))
+      .update(signatureBase('GET', path, timestamp, emptyBody, nonce))
       .digest('hex');
   }
   if (overrides.etag) headers['if-none-match'] = overrides.etag;
