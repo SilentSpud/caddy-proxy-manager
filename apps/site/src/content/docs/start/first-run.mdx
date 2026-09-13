@@ -8,6 +8,7 @@ sidebar:
 import { Steps } from "@astrojs/starlight/components";
 import Demo from "../../../components/Demo.astro";
 import PasswordFieldDemo from "../../../demos/samples/PasswordFieldDemo";
+import SetupStepsDemo from "../../../demos/samples/SetupStepsDemo";
 
 A fresh install has no accounts and nothing configured. The first request lands on `/setup`, and
 the app serves nothing else until the flow finishes.
@@ -31,11 +32,20 @@ the app serves nothing else until the flow finishes.
 </Steps>
 
 The stage is derived from what exists rather than tracked as a counter, so a half-finished setup
-resumes where it left off and the back button cannot desynchronise it.
+resumes where it left off and the back button cannot desynchronise it. Every screen shows where it
+sits in the flow, and the stepper reads the same stages the redirects do, so the two cannot
+disagree.
+
+<Demo title="Setup progress" note="Step through it, or untick the database to drop the migration step.">
+  <SetupStepsDemo client:visible />
+</Demo>
 
 <Demo title="The administrator password field" note="Generate one and reveal it.">
   <PasswordFieldDemo client:visible />
 </Demo>
+
+The sign-in step is the ordinary sign-in screen: the username first, then the password. There is a
+live one under [signing in](../../features/users-and-groups/#signing-in).
 
 ## What it decides for you
 
@@ -47,6 +57,9 @@ is a check you run once the domain reaches you.
 
 - **An existing pre-3.0 installation.** A SQLite database found on the host is offered for
   migration *before* account creation, because you want its accounts rather than a new one
-  alongside them. Secrets are re-encrypted under this deployment's own key.
+  alongside them. Secrets are re-encrypted under this deployment's own key. Starting it asks for
+  confirmation first, restating what will be copied: the rows keep their original identifiers in a
+  database that has to be empty, the application restarts, and leaving the accounts behind means
+  nothing can sign in afterwards.
 - **A deployment that predates the flow.** If `ADMIN_USERNAME`/`ADMIN_PASSWORD` or `OAUTH_ENABLED`
   already configure a way in, setup is marked complete at startup and never shown.

@@ -49,6 +49,13 @@
     display: contents;
   }
 
+  /* The sign-in screen centres itself in a full viewport's height, set inline. In a documentation
+     page that is a screen of empty frame, so the demo keeps the centring and drops the height. */
+  .cpm-demo .cpm-demo-auth > * {
+    /* biome-ignore lint/complexity/noImportantStyles: Center sets the height inline, which only an important declaration outranks. */
+    min-height: 0 !important;
+  }
+
   @media (max-width: 767px) {
     .cpm-demo .cpm-desktop-only {
       display: none;

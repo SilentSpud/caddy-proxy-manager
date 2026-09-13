@@ -1,4 +1,5 @@
 // @ts-check
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
@@ -11,6 +12,12 @@ import { defineConfig } from "astro/config";
  * @param {string} path
  */
 const controller = (path) => fileURLToPath(new URL(`../controller/${path}`, import.meta.url));
+
+/**
+ * The controller's version, for the sign-in screen's footer. The controller's own vite.config.ts
+ * inlines it the same way, from the same package.json, so the demo shows what that build would.
+ */
+const { version: controllerVersion } = createRequire(import.meta.url)("../controller/package.json");
 
 /**
  * `satteri` in this app's dependencies is not imported by anything here, and is not cruft.
@@ -133,8 +140,16 @@ export default defineConfig({
        * The two shims stand in for framework packages the components import but do not need: only
        * `useTranslations` is used from next-intl, and `next/navigation` is reached by one
        * component. Both resolve to a few lines each rather than dragging Next into a static site.
+       *
+       * The third replaces the controller's auth client, which would post sign-in attempts to
+       * `/api/auth/*` on this site. It has to come before the `@/src/` alias, which would
+       * otherwise match first.
        */
       alias: [
+        {
+          find: /^@\/src\/lib\/auth-client$/,
+          replacement: fileURLToPath(new URL("./src/demos/shims/auth-client.ts", import.meta.url)),
+        },
         { find: /^@\/components\//, replacement: `${controller("src/components")}/` },
         { find: /^@\/lib\//, replacement: `${controller("src/lib")}/` },
         { find: /^@\/src\//, replacement: `${controller("src")}/` },
@@ -152,6 +167,10 @@ export default defineConfig({
       // The controller is a workspace symlink, so its React would otherwise resolve to a second
       // copy and every hook in a demo would throw.
       dedupe: ["react", "react-dom"],
+    },
+    // Read by the controller's src/lib/app-version.ts, which the sign-in screen shows.
+    define: {
+      "process.env.NEXT_PUBLIC_APP_VERSION": JSON.stringify(controllerVersion),
     },
   },
 });

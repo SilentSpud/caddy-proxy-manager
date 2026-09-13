@@ -12,6 +12,15 @@
       "next/navigation": ["./src/demos/shims/next-navigation.ts"]
     }
   },
-  "include": [".astro/types.d.ts", "**/*.ts", "**/*.tsx", "**/*.astro", "**/*.mjs"],
+  // The controller's Astryx augmentations come along with its components: SignInProviders uses the
+  // `tonal` button variant they declare.
+  "include": [
+    ".astro/types.d.ts",
+    "../controller/src/types/astryx.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.astro",
+    "**/*.mjs"
+  ],
   "exclude": ["dist"]
 }
