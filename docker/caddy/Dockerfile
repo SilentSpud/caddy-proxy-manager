@@ -20,8 +20,8 @@ COPY docker/caddy/go.mod docker/caddy/go.sum docker/caddy/build.sh ./
 
 # Plugins compiled into the binary: whitespace-separated Go module paths with an optional @version.
 # Settings → Caddy Build overrides this through a generated compose override. Keep in sync with
-# CADDY_MODULES in src/lib/caddy-modules.ts - tests/unit/caddy-modules.test.ts asserts the two
-# match. Declared in this stage only; the runtime stage reads the resolved list from a file the
+# SHIPPED_CADDY_MODULES in packages/shared/src/caddy-modules.ts - the controller's
+# tests/unit/caddy-modules.test.ts asserts the two match. Declared in this stage only; the runtime stage reads the resolved list from a file the
 # build writes, since ARG scope is per stage.
 ARG CADDY_MODULES="\
 github.com/caddy-dns/cloudflare \
