@@ -111,6 +111,57 @@ describe('L4 port manager entrypoint.sh', () => {
     expect(statusWrites.length).toBeGreaterThanOrEqual(4);
   });
 
+  // ---------------------------------------------------------------------------
+  // Regression (production incident 2026-09-13): a failed `docker compose up`
+  // aborted the script under `set -e` before the failure was logged, before a
+  // "failed" status was written, and before the apply lock was removed. The
+  // stale lock then made every startup skip the port restore — caddy came back
+  // without the L4 ports and LiveKit media traffic silently broke.
+  // ---------------------------------------------------------------------------
+
+  it('captures the compose exit status in a way that survives `set -e` (no bare assignment + dead $?)', () => {
+    // The broken pattern:
+    //   COMPOSE_OUTPUT=$(docker compose ... 2>&1)
+    //   COMPOSE_EXIT=$?          <- never runs; set -e aborts on failure first
+    // There must be no assignment of a docker compose invocation to a variable
+    // that is not inside an if/&&/|| condition.
+    const bareAssignment = lines.filter(
+      l => /\w+\s*=\s*\$\(docker compose/.test(l)
+        && !l.trim().startsWith('#')
+        // capture inside an if condition is safe — set -e does not abort there
+        && !l.trim().startsWith('if ')
+    );
+    expect(bareAssignment, 'docker compose output must be captured inside an if condition').toHaveLength(0);
+  });
+
+  it('does not capture $? after a negated if (inverted-status gotcha)', () => {
+    // `if ! cmd; then VAR=$?; fi` captures the *inverted* status (0 on failure).
+    const negatedIfWithDollarQ = lines.filter(
+      l => l.trim().startsWith('if ! ') && l.includes('$(')
+    );
+    for (const line of negatedIfWithDollarQ) {
+      const lineIdx = lines.indexOf(line);
+      const body = lines.slice(lineIdx, lineIdx + 5).join('\n');
+      expect(body).not.toMatch(/\$\?/);
+    }
+  });
+
+  it('removes the apply lock via a trap so a crashed apply cannot block future startups', () => {
+    expect(script).toMatch(/trap .*rm -f "\$APPLY_LOCK"/);
+    // and the lock must be cleared explicitly after do_apply completes too
+    expect(script).toMatch(/rm -f "\$APPLY_LOCK"/);
+  });
+
+  it('startup waits for a fresh apply lock instead of skipping permanently', () => {
+    // The old guard skipped the restore whenever the lock was <10s old, which
+    // permanently suppressed port restoration after a crashed apply.
+    // The fix: wait for the lock to clear (bounded), then apply unconditionally.
+    expect(script).toMatch(/APPLY_LOCK_MAX_AGE/);
+    expect(script).toContain('taking over and re-applying');
+    // The skip must no longer exist as a permanent path
+    expect(script).not.toContain('already in progress, skipping');
+  });
+
   it('does not include test override files in production', () => {
     // Including docker-compose.test.yml would override web env vars (triggering
     // web restart) and switch to test volume names.

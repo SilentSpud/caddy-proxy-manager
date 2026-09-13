@@ -19,6 +19,7 @@
 #   POLL_INTERVAL         - Seconds between trigger file checks (default: 2)
 #   COMPOSE_SKIP_OVERRIDE - If non-empty, skip docker-compose.override.yml (useful in test environments)
 #   COMPOSE_EXTRA_FILE    - If set, include this additional compose file (e.g. a test-specific override)
+#   APPLY_LOCK_MAX_AGE    - Seconds after which an apply lock is considered stale (default: 10)
 
 set -e
 
@@ -67,6 +68,11 @@ detect_project_name() {
 }
 
 APPLY_LOCK="$DATA_DIR/.l4-apply.lock"
+APPLY_LOCK_MAX_AGE="${APPLY_LOCK_MAX_AGE:-10}"
+
+# Never let a failed apply leave the lock behind or kill the poll loop.
+# The lock must only exist while an apply is genuinely in progress.
+trap 'rm -f "$APPLY_LOCK"' EXIT INT TERM
 
 # Apply the current port override — recreates only the caddy container.
 do_apply() {
@@ -102,9 +108,23 @@ do_apply() {
 
   write_status "applying" "Recreating caddy container with updated ports..."
 
+  # Capture the compose result without letting `set -e` abort the script on
+  # failure. The old form (`COMPOSE_OUTPUT=$(...); COMPOSE_EXIT=$?`) killed the
+  # sidecar on the first compose error — before the failure was logged, before
+  # a "failed" status was written, and before the apply lock was removed. That
+  # left a stale lock which made every subsequent startup skip the restore,
+  # so caddy came back up WITHOUT the L4 ports bound and voice/video traffic
+  # silently broke until someone re-applied by hand.
+  COMPOSE_OUTPUT=""
+  COMPOSE_EXIT=0
   # shellcheck disable=SC2086
-  COMPOSE_OUTPUT=$(docker compose $COMPOSE_ARGS up -d --no-deps --pull never --force-recreate caddy 2>&1)
-  COMPOSE_EXIT=$?
+  # NOTE: do NOT write `if ! VAR=$(cmd); then EXIT=$?; fi` — inside the negated
+  # if, $? is the *inverted* status (0 on failure), so the failure is never seen.
+  if COMPOSE_OUTPUT=$(docker compose $COMPOSE_ARGS up -d --no-deps --pull never --force-recreate caddy 2>&1); then
+    COMPOSE_EXIT=0
+  else
+    COMPOSE_EXIT=$?
+  fi
   log "$COMPOSE_OUTPUT"
   if [ $COMPOSE_EXIT -eq 0 ]; then
     log "Caddy container recreated successfully."
@@ -150,25 +170,32 @@ do_apply() {
 # (The main compose stack starts caddy without the L4 ports override file.)
 # Only apply if the override file exists (created on first "Apply Ports").
 #
-# If the apply lock was written less than 10 s ago, this container was just
-# recreated as a side effect of a compose "up" targeting caddy. In that
-# case skip the re-apply — the compose operation is already in progress.
+# If the apply lock is younger than APPLY_LOCK_MAX_AGE seconds, this container
+# was likely just recreated as a side effect of a compose "up" targeting caddy.
+# In that case WAIT for the in-progress apply to release the lock instead of
+# skipping outright — a previously-crashed apply must never permanently suppress
+# the startup restore. If the lock does not clear within the grace window
+# (crashed apply), take over and re-apply unconditionally.
 # ---------------------------------------------------------------------------
 if [ -f "$OVERRIDE_FILE" ]; then
-  SKIP_APPLY=0
   if [ -f "$APPLY_LOCK" ]; then
     LOCK_TS=$(cat "$APPLY_LOCK" 2>/dev/null || echo "0")
     NOW=$(date +%s)
-    if [ $((NOW - LOCK_TS)) -lt 10 ]; then
-      SKIP_APPLY=1
-      log "Startup: restore after compose-up restart — caddy recreation already in progress, skipping..."
+    if [ $((NOW - LOCK_TS)) -lt "$APPLY_LOCK_MAX_AGE" ]; then
+      log "Startup: recent apply lock found — waiting up to ${APPLY_LOCK_MAX_AGE}s for in-progress apply..."
+      WAITED=0
+      while [ -f "$APPLY_LOCK" ] && [ "$WAITED" -lt "$APPLY_LOCK_MAX_AGE" ]; do
+        sleep 1
+        WAITED=$((WAITED + 1))
+      done
+    fi
+    if [ -f "$APPLY_LOCK" ]; then
+      log "Startup: apply lock is stale (crashed apply?) — taking over and re-applying."
     fi
   fi
 
-  if [ "$SKIP_APPLY" -eq 0 ]; then
-    log "Startup: applying existing L4 port override..."
-    do_apply
-  fi
+  log "Startup: applying existing L4 port override..."
+  do_apply
 else
   write_status "idle" "Port manager sidecar is running and ready."
   log "Started. No L4 port override file yet."
