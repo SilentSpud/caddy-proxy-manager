@@ -435,6 +435,7 @@
     "toggleProxyHostFailed": "Failed to toggle proxy host. Please check the logs for details.",
     "tokenExpiryInPast": "expires_at must be in the future",
     "tokenExpiryInvalid": "expires_at must be a valid ISO 8601 date",
+    "tooManyRedirectIntents": "Too many sign-in attempts are in progress. Try again in a few minutes.",
     "udpTlsTerminationUnsupported": "TLS termination is only supported with TCP protocol",
     "updateL4HostFailed": "Failed to update L4 proxy host.",
     "updateProxyHostFailed": "Failed to update proxy host. Please check the logs for details.",

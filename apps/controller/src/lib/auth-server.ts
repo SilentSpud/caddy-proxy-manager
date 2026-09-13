@@ -222,6 +222,11 @@ async function createAuth(): Promise<any> {
       database: {
         generateId: "serial",
       },
+      // The /api/auth route sets this from lib/client-ip.ts, replacing any client-sent copy. Left on
+      // X-Forwarded-For, a spoofed or multi-hop value put every sign-in into one shared bucket.
+      ipAddress: {
+        ipAddressHeaders: ["x-cpm-client-ip"],
+      },
     } as Record<string, unknown>,
     rateLimit: {
       enabled: process.env.AUTH_RATE_LIMIT_ENABLED !== "false",

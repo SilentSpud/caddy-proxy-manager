@@ -27,7 +27,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { config } from "./config";
+import { derivePurposeKey } from "./derived-key";
 
 /** Path the probe asks for. Public, and already exempt from authentication in `proxy.ts`. */
 export const PROBE_PATH = "/api/health";
@@ -41,9 +41,11 @@ export const PROBE_PARAM = "probe";
  */
 export const MAX_NONCE_LENGTH = 64;
 
-/** The signature this instance answers a nonce with. */
+/** The signature this instance answers a nonce with, under a key no other HMAC here uses. */
 export function signProbe(nonce: string): string {
-  return createHmac("sha256", config.sessionSecret).update(nonce).digest("hex");
+  return createHmac("sha256", derivePurposeKey("reachability-probe:v1"))
+    .update(nonce)
+    .digest("hex");
 }
 
 export function createProbeNonce(): string {

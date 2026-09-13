@@ -7,6 +7,7 @@ import {
 import { getUserById } from "@/src/lib/models/user";
 import { getGroupsForUser } from "@/src/lib/models/groups";
 import { getTrustedForwardAuthOrigin } from "@/src/lib/forward-auth-trust";
+import { encodeGroupsHeaderValue, encodeIdentityHeaderValue } from "@/src/lib/identity-header";
 
 const COOKIE_NAME = "_cpm_fa";
 
@@ -45,16 +46,13 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // Get user's groups for the header
-  const groupNames = userGroups.map((g) => g.name).join(",");
-
   // Return 200 with user info headers that Caddy will copy to upstream
   return new NextResponse(null, {
     status: 200,
     headers: {
-      "X-CPM-User": user.name ?? user.email.split("@")[0],
-      "X-CPM-Email": user.email,
-      "X-CPM-Groups": groupNames,
+      "X-CPM-User": encodeIdentityHeaderValue(user.name ?? user.email.split("@")[0]),
+      "X-CPM-Email": encodeIdentityHeaderValue(user.email),
+      "X-CPM-Groups": encodeGroupsHeaderValue(userGroups.map((g) => g.name)),
       "X-CPM-User-Id": String(user.id),
     },
   });

@@ -105,9 +105,16 @@ async function checkCaddyHealth(): Promise<void> {
       }
     }, REAPPLY_DELAY);
   } else if (monitorState.lastConfigId === null) {
-    // First time seeing Caddy healthy
-    console.log("[CaddyMonitor] Caddy health monitoring initialized");
-    monitorState.lastConfigId = currentConfigId;
+    // First sighting since this process started. The startup apply usually ran before any agent had
+    // attached, so a running Caddy can still hold a config the previous release built.
+    console.log("[CaddyMonitor] Caddy health monitoring initialized; reapplying configuration");
+    try {
+      await applyCaddyConfig();
+      monitorState.lastConfigId = (await getCaddyConfigId()) ?? currentConfigId;
+    } catch (error) {
+      console.error("[CaddyMonitor] Failed to apply configuration on first contact:", error);
+      // lastConfigId stays null, so the next health check tries again.
+    }
   } else {
     // Normal operation, update last known config ID
     monitorState.lastConfigId = currentConfigId;

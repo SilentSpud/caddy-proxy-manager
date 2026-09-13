@@ -4,11 +4,13 @@
  * `import.meta.dirname`, which `bun build --compile` freezes to the build machine's path. This uses
  * `process.execPath` instead. The app bundle stays outside the compiled graph, read from disk.
  */
+import { Server } from "node:http";
 import { dirname, join } from "node:path";
 import { startProdServer } from "vinext/server/prod-server";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import pkg from "../package.json";
+import { installPeerAddressStamp } from "../src/lib/peer-address";
 
 /** Directory holding the build output (`dist/`) and its runtime dependencies. */
 function resolveAppRoot(): string {
@@ -68,6 +70,8 @@ if (argv.healthcheck) {
   // The resolved port, so probing a server started with --port still reaches it.
   runHealthCheck(argv.port);
 } else {
+  // Before the server exists: the client IP behind every login throttle comes from this stamp.
+  installPeerAddressStamp(Server);
   startProdServer({
     port: argv.port,
     host: argv.host,
