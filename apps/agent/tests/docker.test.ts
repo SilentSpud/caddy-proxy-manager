@@ -228,6 +228,33 @@ describe("compose invocation", () => {
     expect(argv[argv.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
   });
 
+  it("builds without --project-directory, even a detected one", async () => {
+    // The build context is read by the CLI in this container, not the daemon, so the host path
+    // fails with "unable to prepare context". Seen on Docker Desktop for Windows; Linux too, unless
+    // the host directory happens to be /compose.
+    hostDirLabel = "C:\\deploy\\cpm";
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(config).buildCaddy();
+    const argv = lastCompose();
+    expect(argv).not.toContain("--project-directory");
+    expect(argv.slice(-2)).toEqual(["build", "caddy"]);
+    // Nothing to ask the daemon for, either.
+    expect(spawned.some((a) => a.some((s) => s.includes("working_dir")))).toBe(false);
+  });
+
+  it("builds without --project-directory when COMPOSE_HOST_DIR is pinned", async () => {
+    writeFileSync(join(dir, ".env"), "X=1\n");
+    process.env.COMPOSE_HOST_DIR = "/srv/cpm";
+    results.push({ exitCode: 0, stdout: "proj" });
+    await new DockerHost(loadConfig()).buildCaddy();
+    const argv = lastCompose();
+    expect(argv).not.toContain("--project-directory");
+    // The rest of the shared arguments still apply, so the build resolves the same project.
+    expect(argv[argv.indexOf("-p") + 1]).toBe("proj");
+    expect(argv[argv.indexOf("--env-file") + 1]).toBe(join(dir, ".env"));
+    expect(argv[argv.indexOf("-f") + 1]).toBe(join(dir, "docker-compose.yml"));
+  });
+
   it("reads --env-file from the mounted compose dir, not the host path", async () => {
     // --project-directory can name a host path this container cannot see; the env file has to come
     // from somewhere it can actually read.
@@ -248,10 +275,9 @@ describe("compose invocation", () => {
   it("bounds the build with a timeout so a hung compile cannot wedge the agent", async () => {
     // Without it a wedged xcaddy holds the operation lock forever, and every later port change and
     // rebuild is refused as BUSY until someone restarts the container.
-    // Both pinned so composeArgs asks Docker nothing: the stub below never exits, and this test is
-    // about the build's timeout, not the label lookups'.
+    // Pinned so composeArgs asks Docker nothing: the stub below never exits, and this test is about
+    // the build's timeout, not the label lookup's. A build never reads the host directory.
     process.env.COMPOSE_PROJECT_NAME = "proj";
-    process.env.COMPOSE_HOST_DIR = "/srv/cpm";
     const host = new DockerHost({ ...loadConfig(), buildTimeoutSeconds: 1 });
     (Bun as { spawn: unknown }).spawn = ((argv: string[], options: { signal?: AbortSignal }) => {
       spawned.push(argv);
@@ -333,6 +359,24 @@ describe("operations", () => {
     expect(spawned.some((a) => a.includes("up"))).toBe(false);
     expect(store.caddyBuildStatus().message).toContain("left untouched");
     expect(store.appliedCaddyModules()).toBeNull();
+  });
+
+  it("builds from the mounted project but recreates against the host one", async () => {
+    // The build reads its context in this container; the recreate needs the daemon to resolve
+    // relative binds. Each gets the directory its reader can see.
+    hostDirLabel = "/srv/cpm";
+    results.push({ exitCode: 0, stdout: "proj" }); // inspect (project)
+    results.push({ exitCode: 0 }); // build
+    results.push({ exitCode: 0 }); // up
+
+    operations.applyCaddyBuild(["github.com/a/b"]);
+    await Bun.sleep(100);
+
+    const composeCalls = spawned.filter((a) => a[0] === "docker" && a[1] === "compose");
+    const build = composeCalls.find((a) => a.includes("build"));
+    const up = composeCalls.find((a) => a.includes("up"));
+    expect(build).not.toContain("--project-directory");
+    expect(up?.[up.indexOf("--project-directory") + 1]).toBe("/srv/cpm");
   });
 
   it("writes the override before the build reads it", async () => {

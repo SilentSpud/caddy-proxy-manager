@@ -226,11 +226,18 @@ export class DockerHost {
    * Both overrides are always included: a rebuild must not drop the published L4 ports, and a port
    * change must not rebuild Caddy without the module selection. Omitting either is how one
    * operation silently undoes the other.
+   *
+   * `readsBuildContext` drops `--project-directory`: the daemon resolves bind mounts, but the CLI in
+   * this container reads `context: .`, and the host path does not exist here - so a build against it
+   * fails with "unable to prepare context". Compose then anchors to the first -f file, in COMPOSE_DIR.
    */
-  private async composeArgs(): Promise<string[]> {
+  private async composeArgs(readsBuildContext = false): Promise<string[]> {
     const { composeDir, composeSkipOverride, composeExtraFile, dataDir } = this.config;
     // Two independent inspects, each bounded at 15s; in series an unresponsive daemon doubled it.
-    const [project, hostDir] = await Promise.all([this.composeProject(), this.composeHostDir()]);
+    const [project, hostDir] = await Promise.all([
+      this.composeProject(),
+      readsBuildContext ? "" : this.composeHostDir(),
+    ]);
     const args = ["-p", project];
 
     // The daemon resolves relative bind-mount paths against the project directory, and the agent's
@@ -255,9 +262,17 @@ export class DockerHost {
 
   async compose(
     argv: string[],
-    options: { timeoutSeconds?: number; env?: Record<string, string> } = {},
+    options: {
+      timeoutSeconds?: number;
+      env?: Record<string, string>;
+      readsBuildContext?: boolean;
+    } = {},
   ) {
-    return run(["docker", "compose", ...(await this.composeArgs()), ...argv], options);
+    const { readsBuildContext, ...runOptions } = options;
+    return run(
+      ["docker", "compose", ...(await this.composeArgs(readsBuildContext)), ...argv],
+      runOptions,
+    );
   }
 
   /** Recreate only the Caddy container, leaving everything else running. */
@@ -304,9 +319,11 @@ export class DockerHost {
     return result.ok && result.output.trim() === "true";
   }
 
+  /** No host project directory: the build context is read here, not by the daemon. See composeArgs. */
   async buildCaddy(): Promise<CommandResult> {
     return this.compose(["build", "caddy"], {
       timeoutSeconds: this.config.buildTimeoutSeconds,
+      readsBuildContext: true,
     });
   }
 
