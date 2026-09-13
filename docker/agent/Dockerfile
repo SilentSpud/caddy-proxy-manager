@@ -38,7 +38,8 @@ FROM debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc401
 
 # docker-ce-cli and the compose plugin from Docker's own repository. `docker compose` is invoked
 # for every operation this container exists to perform, so its absence is a startup failure rather
-# than something to discover on the first port change. Pinned to a major, not an exact build: that
+# than something to discover on the first port change. buildx because without it compose falls back
+# to the legacy builder, which cannot build docker/caddy/Dockerfile. Pinned to a major, not an exact build: that
 # repository drops old builds, which would break every rebuild. Bump the majors by hand.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl gnupg \
@@ -49,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
        https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list \
     && apt-get update && apt-get install -y --no-install-recommends \
-      'docker-ce-cli=5:29.*' 'docker-compose-plugin=5.*' \
+      'docker-ce-cli=5:29.*' 'docker-compose-plugin=5.*' 'docker-buildx-plugin=0.*' \
     && apt-get purge -y gnupg && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 

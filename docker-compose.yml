@@ -264,17 +264,22 @@ services:
       VOLUMES: 1
       IMAGES: 1
       SECRETS: 0
-      # Allows recompiling Caddy when the module selection changes. Set 0 to disable the
-      # "Rebuild Caddy" button; everything else keeps working.
-      BUILD: 1
+      # Recompiling Caddy: BuildKit's gRPC API and the session that streams the build context, both
+      # piped to the socket unfiltered once matched (see the mounted config). Set both 0 to disable
+      # the "Rebuild Caddy" button; everything else keeps working.
+      GRPC: 1
+      SESSION: 1
       # On in the image's defaults; nothing the agent runs reads the event stream.
       EVENTS: 0
-      # Deny everything else by default
+      # Deny everything else by default. BUILD is the legacy builder, which cannot build Caddy's image.
+      BUILD: 0
       EXEC: 0
       SWARM: 0
       AUTH: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Upstream's config plus a TCP route for GRPC and SESSION, which its HTTP mode cannot pass.
+      - ./docker/socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
     networks:
       - socket-proxy
 

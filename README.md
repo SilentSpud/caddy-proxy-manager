@@ -1116,8 +1116,9 @@ selection and click Rebuild again. If the agent is restarted mid-build (a host
 reboot, say), it clears the stale "building" state on startup and the button
 becomes available again.
 
-Rebuilding needs `BUILD: 1` on the `docker-socket-proxy` service (the default in
-`docker-compose.yml`). Set it to `0` to opt out: everything else keeps working,
+Rebuilding needs `GRPC: 1` and `SESSION: 1` on the `docker-socket-proxy` service (the
+default in `docker-compose.yml`), which BuildKit builds through. Set both to `0` to opt
+out: everything else keeps working,
 and you can run `docker compose build caddy` yourself. Note that a hand-run build
 does not tell the agent anything, so the app keeps assuming the shipped module set
 until a rebuild goes through the agent.
