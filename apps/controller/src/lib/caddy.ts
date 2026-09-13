@@ -17,6 +17,7 @@ import {
   canonicalHeaderName,
   upstreamHeaderPlaceholder,
   stripCaddyPlaceholders,
+  isReservedL4ListenAddress,
 } from "./caddy-utils";
 import {
   groupHostPatternsByPriority,
@@ -2622,10 +2623,17 @@ async function buildL4Servers(
   // unmarshal, so emitting one would fail the whole config - HTTP hosts included.
   if (!isFeatureUsable(context.moduleAvailability, "l4")) return null;
 
-  const [allL4Hosts, assignments] = await Promise.all([
+  const [enabledL4Hosts, assignments, metrics] = await Promise.all([
     db.select().from(l4ProxyHosts).where(eq(l4ProxyHosts.enabled, true)),
     agentRowId === undefined ? null : listHostAssignments("l4"),
+    getMetricsSettings(),
   ]);
+  // A row on a reserved port predates validateL4Input's check. getRequiredL4Ports does not publish
+  // it, so a listener here would either bind a port nobody can reach or collide with 80/443/2019.
+  const metricsPort = metrics?.enabled ? (metrics.port ?? 9090) : null;
+  const allL4Hosts = enabledL4Hosts.filter(
+    (host) => !isReservedL4ListenAddress(host.listenAddress, metricsPort),
+  );
   const l4Hosts =
     assignments === null
       ? allL4Hosts
@@ -3307,15 +3315,9 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
       listen: [`:${metricsPort}`],
       routes: [
         {
-          handle: [
-            {
-              handler: "reverse_proxy",
-              upstreams: [{ dial: "localhost:2019" }],
-              rewrite: {
-                uri: "/metrics",
-              },
-            },
-          ],
+          // Served in-process rather than proxied to the admin API, which binds only the internal
+          // caddy-admin network once the agent pins it, never loopback.
+          handle: [{ handler: "metrics" }],
         },
       ],
     };

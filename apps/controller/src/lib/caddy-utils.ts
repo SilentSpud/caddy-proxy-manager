@@ -171,6 +171,19 @@ export function splitHostPort(value: string): HostPort | null {
  */
 export const RESERVED_L4_PORTS: ReadonlySet<number> = new Set([80, 443, 2019, 3000, 9090]);
 
+/**
+ * Whether a stored L4 listen address is on a reserved port, or on the enabled metrics port. The
+ * port publisher and the document builder both skip such a row, so neither acts on it alone.
+ */
+export function isReservedL4ListenAddress(
+  listenAddress: string,
+  metricsPort: number | null,
+): boolean {
+  const parsed = splitHostPort(listenAddress);
+  if (!parsed) return false;
+  return RESERVED_L4_PORTS.has(parsed.port) || parsed.port === metricsPort;
+}
+
 /** Join a host and port, bracketing an IPv6 literal. The inverse of splitHostPort. */
 export function formatHostPort(host: string, port: number): string {
   return host.length === 0 ? `:${port}` : formatDialAddress(host, String(port));

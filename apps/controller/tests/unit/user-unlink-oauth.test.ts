@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '../helpers/next-intl';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, userId: 0 }));
@@ -25,6 +26,7 @@ vi.mock('../../src/lib/db', () => ({
 }));
 
 vi.mock('@/src/lib/models/audit', () => ({ createAuditEvent: vi.fn() }));
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 import type { NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';

@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import type { L4PortsStatus } from "@cpm/shared";
 import { eq } from "drizzle-orm";
 import db from "./db";
-import { RESERVED_L4_PORTS, splitHostPort } from "./caddy-utils";
+import { isReservedL4ListenAddress, splitHostPort } from "./caddy-utils";
 import { getMetricsSettings } from "./settings";
 import { l4ProxyHosts } from "./db/schema";
 import { listHostAssignments, servedByAgent } from "./models/host-agents";
@@ -60,7 +60,8 @@ export async function getRequiredL4Ports(agentRowId?: number): Promise<string[]>
     const parsed = splitHostPort(host.listenAddress);
     if (!parsed) continue;
     // validateL4Input refuses these; a row that predates the check must still not publish one.
-    if (RESERVED_L4_PORTS.has(parsed.port) || parsed.port === metricsPort) {
+    // buildL4Servers leaves the same rows out of the document.
+    if (isReservedL4ListenAddress(host.listenAddress, metricsPort)) {
       console.warn(
         `Not publishing reserved port ${parsed.port} for L4 proxy host ${host.id}; change its listen address.`,
       );

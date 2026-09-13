@@ -94,7 +94,7 @@ jobs:
 
           # What a deployment carries on disk. `docker compose pull` cannot deliver a change to any
           # of these, which is what makes it worth calling out.
-          deploy_paths=(docker-compose.yml .env.example docker/clickhouse)
+          deploy_paths=(docker-compose.yml .env.example docker/clickhouse docker/socket-proxy)
 
           deploy_changed=""
           if [ -n "$PREVIOUS" ]; then
@@ -137,8 +137,8 @@ jobs:
             echo "The archive holds every file at its top level and deploys as it unpacks -"
             echo "extract it into one directory and \`docker compose up -d\` needs nothing moved."
             echo "Its \`docker-compose.yml\` differs from the copy in the repository in exactly two"
-            echo "ways: it mounts the ClickHouse override from beside itself rather than from"
-            echo "\`./docker/clickhouse/\`, and it pins the three images to \`${VERSION}\` rather than"
+            echo "ways: it mounts the ClickHouse override and the socket proxy template from beside"
+            echo "itself rather than from \`./docker/\`, and it pins the three images to \`${VERSION}\` rather than"
             echo "\`latest\`. The repository copy follows \`latest\` on purpose; this one is a snapshot"
             echo "of one release and says so."
             echo
@@ -191,15 +191,17 @@ jobs:
           staging="$(mktemp -d)"
           entries=(docker-compose.yml .env.example)
           cp docker-compose.yml .env.example "$staging/"
-          for f in docker/clickhouse/*; do
-            entry="clickhouse-$(basename "$f")"
-            cp "$f" "${staging}/${entry}"
-            entries+=("$entry")
+          # docker/socket-proxy gets the same treatment: compose bind-mounts its HAProxy template, and
+          # a missing source becomes an empty directory that the proxy cannot render.
+          for dir in clickhouse socket-proxy; do
+            for f in "docker/${dir}"/*; do
+              entry="${dir}-$(basename "$f")"
+              cp "$f" "${staging}/${entry}"
+              entries+=("$entry")
+            done
+            # Host side only. The container side stays where the service actually reads the file.
+            sed -i "s#\./docker/${dir}/#./${dir}-#g" "$staging/docker-compose.yml"
           done
-
-          # Host side only. The container side stays /etc/clickhouse-server/config.d/..., which is
-          # where ClickHouse actually reads the override from.
-          sed -i 's#\./docker/clickhouse/#./clickhouse-#g' "$staging/docker-compose.yml"
 
           # Pin this release's own images to this release's version.
           #
@@ -236,14 +238,14 @@ jobs:
           # A sed that matched nothing is the failure worth catching here: it would ship a compose
           # file pointing at a directory the archive does not contain, and nothing downstream
           # would notice until a deploy failed.
-          if grep -q 'docker/clickhouse/' "$staging/docker-compose.yml"; then
-            echo "::error::staged docker-compose.yml still references docker/clickhouse/"
-            grep -n 'docker/clickhouse/' "$staging/docker-compose.yml"
+          if grep -qE '\./docker/' "$staging/docker-compose.yml"; then
+            echo "::error::staged docker-compose.yml still references ./docker/"
+            grep -nE '\./docker/' "$staging/docker-compose.yml"
             exit 1
           fi
           for entry in "${entries[@]}"; do
             case "$entry" in
-              clickhouse-*)
+              clickhouse-*|socket-proxy-*)
                 if ! grep -q "\./${entry}:" "$staging/docker-compose.yml"; then
                   echo "::error::staged docker-compose.yml does not mount ${entry}"
                   exit 1
@@ -258,7 +260,7 @@ jobs:
           # The dotfile is half the reason this is an archive, so it is worth asserting rather
           # than trusting: tar stores the name it was given, but a release that quietly shipped
           # `.env.example` under some other name would look fine until someone tried to deploy.
-          for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml; do
+          for want in docker-compose.yml .env.example clickhouse-low-disk-write.yml socket-proxy-haproxy.cfg.template; do
             if ! tar -tzf "$name" | grep -qxF "$want"; then
               echo "::error::${name} is missing ${want}"
               tar -tzf "$name"

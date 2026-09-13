@@ -118,25 +118,39 @@ export function buildCaddyfileSubrouteHandler(
   return { handler: "subroute", routes };
 }
 
-/** Validate a snippet by adapting it; error message or null. Used on save. */
-export async function validateCaddyfileSnippet(snippet: string): Promise<string | null> {
+/**
+ * Validate a snippet by adapting it; error message or null. Used on save.
+ *
+ * `agentRowIds` are the agents the host is pinned to, empty for every agent - the same rule
+ * `servedByAgent` applies when building each agent's document.
+ */
+export async function validateCaddyfileSnippet(
+  snippet: string,
+  agentRowIds: readonly number[] = [],
+): Promise<string | null> {
   if (!snippet.trim()) return null;
-  // Every agent adapts the snippet for its own config, so every agent is asked: one agent's verdict
-  // alone must not pass a snippet another would reject.
-  const agents = connectedAgents();
+  // Every agent that loads the host adapts the snippet for its own config, so each of those is
+  // asked: one agent's verdict alone must not pass a snippet another would reject. An agent that
+  // never loads the host has no say - its Caddy may lack a module the host's agent has.
+  const agents = connectedAgents().filter(
+    (agent) => agentRowIds.length === 0 || agentRowIds.includes(agent.agentRowId),
+  );
   const targets = agents.length > 0 ? agents.map((agent) => agent.agentId) : [undefined];
-  for (const agentId of targets) {
-    try {
-      const { ignoredApps } = await adaptCaddyfileSnippet(snippet, agentId);
-      if (ignoredApps.length > 0) {
-        return `These directives configure Caddy at a level this field cannot reach (${ignoredApps.join(", ")}). Per-host Caddyfile directives may only produce HTTP routes.`;
+  const verdicts = await Promise.all(
+    targets.map(async (agentId): Promise<string | null> => {
+      try {
+        const { ignoredApps } = await adaptCaddyfileSnippet(snippet, agentId);
+        if (ignoredApps.length > 0) {
+          return `These directives configure Caddy at a level this field cannot reach (${ignoredApps.join(", ")}). Per-host Caddyfile directives may only produce HTTP routes.`;
+        }
+      } catch (error) {
+        if (error instanceof CaddyfileAdaptError) return error.message;
+        // A transport failure is not the operator's fault and must not read as a syntax error - let
+        // the save through and let the config build warn.
+        console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
       }
-    } catch (error) {
-      if (error instanceof CaddyfileAdaptError) return error.message;
-      // A transport failure is not the operator's fault and must not read as a syntax error - let
-      // the save through and let the config build warn.
-      console.warn("Could not reach Caddy to validate a Caddyfile snippet", error);
-    }
-  }
-  return null;
+      return null;
+    }),
+  );
+  return verdicts.find((verdict) => verdict !== null) ?? null;
 }

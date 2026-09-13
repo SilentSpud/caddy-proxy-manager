@@ -17,6 +17,7 @@
  */
 import { describe, it, expect, beforeAll } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '../helpers/next-intl';
 import type { TestDb } from '../helpers/db';
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, unlinkUserId: 0 }));
@@ -38,6 +39,8 @@ vi.mock('../../src/lib/db', () => ({
   toIso: (value: string | Date | null | undefined): string | null =>
     !value ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString(),
 }));
+
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 // Stub better-auth so `betterAuth(options)` hands back the raw options object;
 // the databaseHooks on (await getAuth()).options are then the real functions CPM wired.

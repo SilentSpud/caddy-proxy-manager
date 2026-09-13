@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { scheduleProcessRestart } from "@/src/lib/process-restart";
 import {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       (await auth(request))?.user.role === "admin";
     if (!permitted) {
       return Response.json(
-        { ok: false, error: "Sign in as an administrator to restart the application." },
+        { ok: false, error: (await getTranslations("setup"))("restartNotPermitted") },
         { status: 401 },
       );
     }
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const slot = await claimRestartSlot();
   if (!slot.ok) {
     return Response.json(
-      { ok: false, error: "A restart was requested moments ago. Wait for it to finish." },
+      { ok: false, error: (await getTranslations("setup"))("restartTooSoon") },
       {
         status: 429,
         headers: { "Retry-After": String(Math.ceil(slot.retryAfterMs / 1000)) },

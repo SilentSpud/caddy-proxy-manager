@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { getUserById } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
@@ -24,13 +25,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const t = await getTranslations("profile");
     const userId = Number(session.user.id);
     // The change-password budget: every route verifying this password shares one counter.
     const rateLimitKey = `password-change:${userId}`;
     const rateCheck = await isRateLimited(rateLimitKey);
     if (rateCheck.blocked) {
       return NextResponse.json(
-        { error: "Too many attempts. Please try again later." },
+        { error: t("tooManyAttempts") },
         {
           status: 429,
           headers: rateCheck.retryAfterMs
@@ -67,11 +69,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const currentPassword = typeof body?.currentPassword === "string" ? body.currentPassword : "";
     if (!currentPassword) {
-      return NextResponse.json({ error: "Current password is required" }, { status: 400 });
+      return NextResponse.json({ error: t("currentPasswordRequired") }, { status: 400 });
     }
     if (!(await verifyPassword(currentPassword, user.passwordHash))) {
       await registerFailedAttempt(rateLimitKey);
-      return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
+      return NextResponse.json({ error: t("currentPasswordIncorrect") }, { status: 401 });
     }
     resetAttempts(rateLimitKey);
 

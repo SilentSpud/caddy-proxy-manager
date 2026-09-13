@@ -21,21 +21,23 @@ export class ControllerAddressError extends Error {
 }
 
 /**
- * Whether the operator actually typed a port, which `new URL` will not tell you.
+ * The port the operator actually typed, which `new URL` will not tell you. Null when none was.
  *
  * The URL API normalises a scheme's default port away - `new URL("https://h:443").port` is the
  * empty string, indistinguishable from `https://h`. Both mean 443 here, but for http the two
  * differ: `http://h:80` asked for 80 and `http://h` did not ask for anything, and the second has
- * always meant the controller's own default.
+ * always meant the controller's own default. The digits matter too: a bare `h:80` is parsed as
+ * http, loses its 80, and then becomes https, whose default is not what was typed.
  */
-function authorityHasExplicitPort(input: string): boolean {
+function typedAuthorityPort(input: string): string | null {
   const withoutScheme = input.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
   const authority = withoutScheme.split(/[/?#]/, 1)[0] ?? "";
   // A port only ever follows the closing bracket of an IPv6 literal, never a colon inside it.
   const afterHost = authority.startsWith("[")
     ? authority.slice(authority.indexOf("]") + 1)
     : authority;
-  return /:\d+$/.test(afterHost);
+  const match = /:(\d+)$/.exec(afterHost);
+  return match ? String(Number(match[1])) : null;
 }
 
 function bareHost(hostname: string): string {
@@ -128,11 +130,9 @@ export function normalizeControllerUrl(host: string, port?: number | null): stri
   // at `https://<machine>.<tailnet>.ts.net` with no port to type - and defaulting that to 3000
   // dialled a port nothing was listening on. `http://` keeps meaning 3000 without an explicit
   // port, which is what every existing deployment relies on.
-  const typedPort = authorityHasExplicitPort(trimmed);
-  const schemeDefault = url.protocol === "https:" ? "443" : "80";
+  const typedPort = typedAuthorityPort(trimmed);
   const resolved =
-    url.port ||
-    (typedPort || url.protocol === "https:" ? schemeDefault : String(DEFAULT_CONTROLLER_PORT));
+    url.port || typedPort || (url.protocol === "https:" ? "443" : String(DEFAULT_CONTROLLER_PORT));
   return `${url.protocol}//${url.hostname}:${resolved}`;
 }
 

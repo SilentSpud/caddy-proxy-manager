@@ -23,6 +23,7 @@ import {
   redeemRepairCode,
 } from "@/src/lib/agent/pairing-codes";
 import {
+  ensureBootstrapToken,
   looksLikeBootstrapToken,
   recordBundledAgent,
   redeemBootstrapToken,
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
   const bootstrap = looksLikeBootstrapToken(code);
   if (bootstrap) {
     if (!redeemBootstrapToken(code, agentId, existing !== null)) {
+      // Startup is the only other writer, so an agent that arrives after the token expired would
+      // otherwise wait for a file nothing writes. A fresh one appears only while the bundled agent
+      // still wants pairing, and the agent's watcher picks it up on its next poll.
+      await ensureBootstrapToken();
       return bad("That bootstrap token is not valid.", 401);
     }
   } else {

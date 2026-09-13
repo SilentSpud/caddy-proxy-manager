@@ -14,19 +14,37 @@ const TRUSTED_CACHE_MS = 30_000;
 let trustedCache: { at: number; ranges: string[] } | null = null;
 
 /**
+ * The bundled stack's Caddy service. Its admin URL names `caddy-admin`, an alias that resolves only
+ * on the internal admin network, while Caddy reaches this controller over caddy-network - so the
+ * address its requests arrive from is the one the service name resolves to.
+ */
+const CADDY_SERVICE_NAME = "caddy";
+
+/**
  * Peers allowed to say who the client is: loopback, the Caddy this controller administers (whatever
- * its admin URL resolves to), and Settings -> Trusted Proxies.
+ * its admin URL and the bundled service name resolve to), and Settings -> Trusted Proxies.
  */
 async function trustedProxies(): Promise<string[]> {
   if (trustedCache && Date.now() - trustedCache.at < TRUSTED_CACHE_MS) return trustedCache.ranges;
 
   const ranges = [...LOOPBACK];
+  let adminHost = "";
   try {
-    const host = new URL(config.caddyApiUrl).hostname.replace(/^\[|\]$/g, "");
-    if (isIP(host)) ranges.push(host);
-    else if (host) ranges.push(...(await lookup(host, { all: true })).map((a) => a.address));
+    adminHost = new URL(config.caddyApiUrl).hostname.replace(/^\[|\]$/g, "");
   } catch {
-    // Caddy not resolvable from here: only the configured ranges vouch for anyone.
+    // An unparseable admin URL vouches for nobody.
+  }
+  for (const host of new Set([adminHost, CADDY_SERVICE_NAME])) {
+    if (!host) continue;
+    if (isIP(host)) {
+      ranges.push(host);
+      continue;
+    }
+    try {
+      ranges.push(...(await lookup(host, { all: true })).map((a) => a.address));
+    } catch {
+      // Not resolvable from here: only the configured ranges vouch for anyone.
+    }
   }
   try {
     // Imported lazily so reading headers never drags the database into a module that does not need it.

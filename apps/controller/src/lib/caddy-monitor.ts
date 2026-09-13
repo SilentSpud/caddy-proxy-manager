@@ -126,11 +126,9 @@ async function checkTarget(target: Target, now: number, reapplyDelayMs: number):
   }
 
   if (state.reapplyPending) return;
-  // Only restarts count toward the floor; a first sighting happens once per attach.
-  if (hasRestarted) {
-    if (now - state.lastReapplyAt < MIN_REAPPLY_INTERVAL) return;
-    state.lastReapplyAt = now;
-  }
+  // Both paths count toward the floor: a first sighting whose re-apply fails stays a first sighting.
+  if (now - state.lastReapplyAt < MIN_REAPPLY_INTERVAL) return;
+  state.lastReapplyAt = now;
   state.reapplyPending = true;
   console.log(
     hasRestarted
@@ -146,6 +144,8 @@ async function checkTarget(target: Target, now: number, reapplyDelayMs: number):
       if (target.agent) await applyCaddyConfigToAgent(target.agent);
       else await applyCaddyConfig();
       pending.lastConfigId = await getCaddyConfigId(target.agent?.agentId);
+      // A first sighting that landed is not a restart, so it must not hold back the next real one.
+      if (!hasRestarted) pending.lastReapplyAt = 0;
     } catch (error) {
       // Will retry on a later health check
       console.error(`[CaddyMonitor] Failed to reapply configuration${who}:`, error);

@@ -15,7 +15,7 @@ import {
 } from "../caddy-waf";
 import { normalizeNodeName, validateNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
-import { setHostAgents } from "./host-agents";
+import { agentIdsForHost, setHostAgents } from "./host-agents";
 
 /**
  * Wildcard certificates need ACME DNS-01, so a wildcard host on auto-managed TLS silently fails to
@@ -2714,9 +2714,12 @@ export async function listProxyHostsPaginated(
  * so the REST API is held to the same rule: the builder would skip an unadaptable snippet with a
  * warning, quietly dropping whatever it was written for.
  */
-async function assertCaddyfileAdapts(snippet: string | null | undefined): Promise<void> {
+async function assertCaddyfileAdapts(
+  snippet: string | null | undefined,
+  agentRowIds: readonly number[],
+): Promise<void> {
   if (!snippet?.trim()) return;
-  const error = await validateCaddyfileSnippet(snippet);
+  const error = await validateCaddyfileSnippet(snippet, agentRowIds);
   if (error) {
     throw new ApiValidationError(`Custom Caddyfile: ${error}`);
   }
@@ -2810,7 +2813,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   await assertRawConfigChangeAllowed(null, input, actorUserId);
   await assertDialTargetsAllowed(null, input, actorUserId);
   await assertWildcardIssuable(domains, input.certificateId ?? null);
-  await assertCaddyfileAdapts(input.customCaddyfile);
+  await assertCaddyfileAdapts(input.customCaddyfile, input.agentIds ?? []);
 
   const now = nowIso();
   const meta = buildMeta({}, input);
@@ -2887,7 +2890,10 @@ export async function updateProxyHost(
     input.certificateId !== undefined ? input.certificateId : existing.certificateId;
   await assertWildcardIssuable(domainList, effectiveCertificateId);
   if (input.customCaddyfile !== undefined) {
-    await assertCaddyfileAdapts(input.customCaddyfile);
+    await assertCaddyfileAdapts(
+      input.customCaddyfile,
+      input.agentIds ?? (await agentIdsForHost("http", id)),
+    );
   }
   const upstreams = input.upstreams
     ? JSON.stringify(Array.from(new Set(input.upstreams)))

@@ -56,6 +56,11 @@ describe("an explicit http:// keeps meaning the controller's own port", () => {
   it("keeps an explicitly typed 80 on an http address", () => {
     expect(normalizeControllerUrl("http://10.0.0.5:80")).toBe("http://10.0.0.5:80");
   });
+
+  it("keeps a typed 80 on a bare host that becomes https", () => {
+    // Parsed as http first, which drops :80 as the default; https must not then substitute 443.
+    expect(normalizeControllerUrl("cpm.example.com:80")).toBe("https://cpm.example.com:80");
+  });
 });
 
 describe("an https address means whatever is terminating TLS, not the controller", () => {
