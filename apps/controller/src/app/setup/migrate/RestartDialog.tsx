@@ -66,11 +66,14 @@ function sleep(ms: number): Promise<void> {
 export default function RestartDialog({
   next,
   migratedSignIn,
+  restartToken,
 }: {
   /** Where to send the operator once the app is back. */
   next: string;
   /** Whether the migration brought something that can sign in, which changes what comes next. */
   migratedSignIn: boolean;
+  /** Single-use proof that this browser ran the import, which the restart asks for. */
+  restartToken: string;
 }) {
   const t = useTranslations("setup");
   const [phase, setPhase] = useState<Phase>("stopping");
@@ -93,7 +96,10 @@ export default function RestartDialog({
 
     void (async () => {
       try {
-        const response = await fetch("/api/setup/restart", { method: "POST" });
+        const response = await fetch("/api/setup/restart", {
+          method: "POST",
+          headers: { "x-cpm-restart-token": restartToken },
+        });
         if (!response.ok && response.status !== 202) {
           const body = (await response.json().catch(() => null)) as { error?: string } | null;
           if (!cancelled) {
@@ -146,7 +152,7 @@ export default function RestartDialog({
     return () => {
       cancelled = true;
     };
-  }, [goOn]);
+  }, [goOn, restartToken]);
 
   const waiting = phase === "stopping" || phase === "starting" || phase === "ready";
 

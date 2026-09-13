@@ -12,7 +12,8 @@
  * state is the completion flag, because "signed in, settings not saved yet" and "signed in,
  * finished" are otherwise identical.
  */
-import { and, eq } from "drizzle-orm";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { and, eq, lt } from "drizzle-orm";
 import db, { nowIso } from "./db";
 import { accounts, settings, users } from "./db/schema";
 import { getUserCount } from "./models/user";
@@ -97,6 +98,96 @@ export async function getMigrationSource(): Promise<string | null> {
     .where(eq(settings.key, MIGRATION_SOURCE_KEY))
     .limit(1);
   return row?.value ?? null;
+}
+
+/**
+ * The restart the migration screen asks for. Once an import brings accounts, restarting is no
+ * longer open to anyone, so the browser that ran the import is handed this single-use token for
+ * that one request. Stored hashed; the plaintext exists only in the migrate response.
+ */
+const RESTART_TOKEN_KEY = "setup:restart_token";
+const RESTART_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+/** When a restart was last accepted. In the database because it has to outlive the exit it allows. */
+const RESTART_REQUESTED_KEY = "setup:restart_requested_at";
+export const RESTART_COOLDOWN_MS = 60 * 1000;
+
+function hashRestartToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export async function issueRestartToken(): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  const value = JSON.stringify({
+    hash: hashRestartToken(token),
+    expiresAt: Date.now() + RESTART_TOKEN_TTL_MS,
+  });
+  const now = nowIso();
+  await db
+    .insert(settings)
+    .values({ key: RESTART_TOKEN_KEY, value, updatedAt: now })
+    .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: now } });
+  return token;
+}
+
+/** Whether `token` is the unexpired one issued, spending it if so. */
+export async function consumeRestartToken(token: string | null): Promise<boolean> {
+  if (!token) return false;
+  const [row] = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, RESTART_TOKEN_KEY))
+    .limit(1);
+  if (!row) return false;
+
+  let stored: { hash?: unknown; expiresAt?: unknown };
+  try {
+    stored = JSON.parse(row.value);
+  } catch {
+    return false;
+  }
+  if (typeof stored.hash !== "string" || typeof stored.expiresAt !== "number") return false;
+  if (stored.expiresAt <= Date.now()) return false;
+
+  const presented = Buffer.from(hashRestartToken(token), "hex");
+  const expected = Buffer.from(stored.hash, "hex");
+  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) return false;
+
+  // Deleted by value, so two requests racing with the same token cannot both spend it.
+  const spent = await db
+    .delete(settings)
+    .where(and(eq(settings.key, RESTART_TOKEN_KEY), eq(settings.value, row.value)))
+    .returning({ key: settings.key });
+  return spent.length > 0;
+}
+
+/**
+ * Claim the one restart allowed per cooldown, atomically: the stamp only moves when the previous
+ * one is older than the cooldown. ISO timestamps compare correctly as text.
+ */
+export async function claimRestartSlot(
+  now = Date.now(),
+): Promise<{ ok: true } | { ok: false; retryAfterMs: number }> {
+  const stamp = new Date(now).toISOString();
+  const cutoff = new Date(now - RESTART_COOLDOWN_MS).toISOString();
+  const claimed = await db
+    .insert(settings)
+    .values({ key: RESTART_REQUESTED_KEY, value: stamp, updatedAt: stamp })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: { value: stamp, updatedAt: stamp },
+      setWhere: lt(settings.value, cutoff),
+    })
+    .returning({ key: settings.key });
+  if (claimed.length > 0) return { ok: true };
+
+  const [row] = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, RESTART_REQUESTED_KEY))
+    .limit(1);
+  const last = row ? Date.parse(row.value) : now;
+  return { ok: false, retryAfterMs: Math.max(0, last + RESTART_COOLDOWN_MS - now) };
 }
 
 /** Record that the operator chose not to migrate, so the offer is not made again. */
