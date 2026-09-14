@@ -35,6 +35,7 @@ import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/action
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
 import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import { useFormatter, useNow, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 
 interface ActiveSession {
@@ -433,14 +434,12 @@ export default function ProfileClient({
 
   const formatDate = (iso: string | null): string => {
     if (!iso) return t("never");
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return format.dateTime(new Date(iso), TIMESTAMP_STYLES.dateTimeShort);
   };
+
+  /** A line stating a time gets the UTC instant as its tooltip; "never" has none to give. */
+  const withUtc = (iso: string | null, line: ReactNode) =>
+    iso ? <UtcTooltip value={iso}>{line}</UtcTooltip> : line;
 
   const isExpired = (expiresAt: string | null): boolean => {
     if (!expiresAt) return false;
@@ -589,17 +588,25 @@ export default function ProfileClient({
                   label={describeDevice(s.userAgent, deviceWords)}
                   description={
                     <HStack gap={3} wrap="wrap" vAlign="center">
-                      <Text type="body" size="xsm" color="secondary">
-                        {t("signedIn", { when: format.relativeTime(new Date(s.createdAt), now) })}
-                      </Text>
+                      {withUtc(
+                        s.createdAt,
+                        <Text type="body" size="xsm" color="secondary">
+                          {t("signedIn", {
+                            when: format.relativeTime(new Date(s.createdAt), now),
+                          })}
+                        </Text>,
+                      )}
                       {s.ipAddress && (
                         <Text type="body" size="xsm" color="secondary">
                           {t("ipAddress", { address: s.ipAddress })}
                         </Text>
                       )}
-                      <Text type="body" size="xsm" color="secondary">
-                        {t("expiresOn", { date: formatDate(s.expiresAt) })}
-                      </Text>
+                      {withUtc(
+                        s.expiresAt,
+                        <Text type="body" size="xsm" color="secondary">
+                          {t("expiresOn", { date: formatDate(s.expiresAt) })}
+                        </Text>,
+                      )}
                     </HStack>
                   }
                   endContent={
@@ -718,19 +725,27 @@ export default function ProfileClient({
                       label={token.name}
                       description={
                         <HStack gap={3} wrap="wrap" vAlign="center">
-                          <Text type="body" size="xsm" color="secondary">
-                            {t("createdOn", { date: formatDate(token.createdAt) })}
-                          </Text>
-                          <Text type="body" size="xsm" color="secondary">
-                            {t("used", { when: formatDate(token.lastUsedAt) })}
-                          </Text>
-                          {token.expiresAt && (
+                          {withUtc(
+                            token.createdAt,
                             <Text type="body" size="xsm" color="secondary">
-                              {expired
-                                ? t("expiredOn", { date: formatDate(token.expiresAt) })
-                                : t("expiresOn", { date: formatDate(token.expiresAt) })}
-                            </Text>
+                              {t("createdOn", { date: formatDate(token.createdAt) })}
+                            </Text>,
                           )}
+                          {withUtc(
+                            token.lastUsedAt,
+                            <Text type="body" size="xsm" color="secondary">
+                              {t("used", { when: formatDate(token.lastUsedAt) })}
+                            </Text>,
+                          )}
+                          {token.expiresAt &&
+                            withUtc(
+                              token.expiresAt,
+                              <Text type="body" size="xsm" color="secondary">
+                                {expired
+                                  ? t("expiredOn", { date: formatDate(token.expiresAt) })
+                                  : t("expiresOn", { date: formatDate(token.expiresAt) })}
+                              </Text>,
+                            )}
                         </HStack>
                       }
                       endContent={

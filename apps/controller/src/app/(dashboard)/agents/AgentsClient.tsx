@@ -30,6 +30,7 @@ import { StatTiles } from "@/components/ui/StatTiles";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Timestamp } from "@/components/ui/Timestamp";
 import type { LogAccessFix } from "@/src/lib/agent/log-access";
 import { rebuildAgentCaddyAction, renameAgentAction } from "./actions";
 
@@ -54,22 +55,8 @@ export type AgentRow = {
 /**
  * Relative where that is the useful reading - an agent seen four hours ago is the thing worth
  * noticing - and absolute once it is old enough that "14 days ago" stops meaning anything.
- * Client-side, because the server does not know the reader's timezone, and through Intl so the
- * wording follows the reader's locale rather than being English baked into the component.
  */
-function formatLastSeen(iso: string | null): string | null {
-  if (!iso) return null;
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  const seconds = Math.round((at.getTime() - Date.now()) / 1000);
-  const relative = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (Math.abs(seconds) < 60) return relative.format(seconds, "second");
-  const minutes = Math.round(seconds / 60);
-  if (Math.abs(minutes) < 60) return relative.format(minutes, "minute");
-  const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 48) return relative.format(hours, "hour");
-  return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
+const LAST_SEEN_RELATIVE_MS = 48 * 60 * 60 * 1000;
 
 export default function AgentsClient({
   agents,
@@ -254,7 +241,15 @@ export default function AgentsClient({
                     {t("lastSeen")}
                   </Text>
                   <Text type="body" size="sm">
-                    {formatLastSeen(agent.lastSeenAt) ?? t("never")}
+                    {agent.lastSeenAt ? (
+                      <Timestamp
+                        value={agent.lastSeenAt}
+                        style="dateTimeShort"
+                        relativeWithinMs={LAST_SEEN_RELATIVE_MS}
+                      />
+                    ) : (
+                      t("never")
+                    )}
                   </Text>
                 </VStack>
               </HStack>

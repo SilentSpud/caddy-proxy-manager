@@ -11,7 +11,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { ActivityStrip, type ActivityBucket } from "@/components/ui/ActivityStrip";
-import { formatDateTimeUtc } from "@/src/lib/date-format";
+import { Timestamp } from "@/components/ui/Timestamp";
 import { useTranslations } from "next-intl";
 
 type EventRow = {
@@ -75,11 +75,11 @@ export default function AuditLogClient({
   const columns: Column<EventRow>[] = [
     {
       id: "created_at",
-      label: t("timeUtc"),
+      label: t("time"),
       width: 180,
       render: (r) => (
         <Text type="body" size="sm" color="secondary">
-          {formatDateTimeUtc(r.createdAt)}
+          <Timestamp value={r.createdAt} />
         </Text>
       ),
     },
@@ -121,7 +121,7 @@ export default function AuditLogClient({
         <HStack justify="between" vAlign="center" gap={2}>
           <Badge label={r.user} />
           <Text type="body" size="xsm" color="secondary">
-            {formatDateTimeUtc(r.createdAt)}
+            <Timestamp value={r.createdAt} />
           </Text>
         </HStack>
         <Text type="body" size="sm">

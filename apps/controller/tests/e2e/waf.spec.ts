@@ -2,17 +2,26 @@ import { test, expect } from '@playwright/test';
 import { expectStaged } from '../helpers/staged-settings';
 
 test.describe('WAF', () => {
+  // A zone away from UTC, so a range read as UTC - or in the runner's own zone - fails.
+  test.use({ timezoneId: 'America/New_York' });
+
   test('WAF events period filters support presets, custom range, and reset to all time', async ({
     page,
+    context,
   }) => {
     const customFrom = '2026-05-01T09:00';
     const customTo = '2026-05-02T09:30';
-    // The WAF page pins datetime-local values to UTC (see parseDateTimeLocalUtc),
-    // so compute the expected epochs in UTC rather than the runner's timezone.
-    const expectedFrom = Math.floor(new Date(`${customFrom}Z`).getTime() / 1000);
-    const expectedTo = Math.floor(new Date(`${customTo}Z`).getTime() / 1000);
+    // The range fields are local time. New York is UTC-4 in May.
+    const expectedFrom = Math.floor(Date.parse('2026-05-01T13:00:00Z') / 1000);
+    const expectedTo = Math.floor(Date.parse('2026-05-02T13:30:00Z') / 1000);
 
     await page.goto('/waf');
+    // The first render is UTC until the browser records its zone and the page refreshes; wait for
+    // that, or the refresh can land mid-way through the filter clicks below.
+    await expect
+      .poll(async () => (await context.cookies()).find((c) => c.name === 'cpm-tz')?.value)
+      .toBe('America/New_York');
+    await page.waitForLoadState('networkidle');
 
     await page.getByRole('radio', { name: '24h' }).click();
     await expect(page).toHaveURL(/range=24h/);
@@ -31,10 +40,10 @@ test.describe('WAF', () => {
     // DateTimeInput is no longer a native datetime-local control: it renders a
     // date combobox (accepting unambiguous ISO input) plus a separate time
     // field, each committing its pending text on blur.
-    const fromDate = page.getByRole('combobox', { name: 'From (UTC)', exact: true });
-    const fromTime = page.getByLabel('From (UTC) time', { exact: true });
-    const toDate = page.getByRole('combobox', { name: 'To (UTC)', exact: true });
-    const toTime = page.getByLabel('To (UTC) time', { exact: true });
+    const fromDate = page.getByRole('combobox', { name: 'From', exact: true });
+    const fromTime = page.getByLabel('From time', { exact: true });
+    const toDate = page.getByRole('combobox', { name: 'To', exact: true });
+    const toTime = page.getByLabel('To time', { exact: true });
     await expect(fromDate).toBeVisible();
 
     const [fromDay, fromClock] = customFrom.split('T');

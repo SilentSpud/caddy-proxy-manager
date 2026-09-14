@@ -177,6 +177,12 @@ path. With no cookie the locale is negotiated from `Accept-Language`, then refin
 from `navigator.languages` - Chrome trims the header to one language, so the client sees choices the
 server cannot.
 
+Timestamps render in the reader's time zone, which the browser writes to a cookie (`cpm-tz`,
+`src/lib/time-zone.ts`) and `src/i18n/request.ts` hands to next-intl, so the server render and the
+browser's agree. Show one with `components/ui/Timestamp.tsx`: local text, and the UTC instant in a
+tooltip for searching logs. Never `toLocaleString()` - it formats in whatever zone and locale the
+runtime has, which differs between the container and the browser.
+
 Two things that are not obvious and will cost an afternoon:
 
 - **`createNextIntlPlugin` must not be used.** It reads `next/package.json` and throws under Vite.

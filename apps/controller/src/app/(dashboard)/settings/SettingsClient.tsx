@@ -63,7 +63,8 @@ import type { OAuthProviderView } from "@/src/lib/oauth-provider-view";
 import type { AgentStatus } from "@cpm/shared";
 import type { AgentResult } from "@/src/lib/agent/client";
 import type { PairedAgent } from "@/src/lib/models/agents";
-import { useTranslations } from "next-intl";
+import { useFormatter, useNow, useTranslations } from "next-intl";
+import { UtcTooltip } from "@/components/ui/Timestamp";
 import {
   updateDnsProviderSettingsAction,
   updateGeneralSettingsAction,
@@ -1738,25 +1739,6 @@ function BrandingSection({
 
 // ─── Section: Updates ────────────────────────────────────────────────────────
 
-/** "3 hours ago", for a timestamp whose exact minute nobody needs. */
-function timeAgo(iso: string): string {
-  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
-  const units: Array<[number, Intl.RelativeTimeFormatUnit]> = [
-    [60, "second"],
-    [60, "minute"],
-    [24, "hour"],
-    [7, "day"],
-  ];
-  let value = seconds;
-  let unit: Intl.RelativeTimeFormatUnit = "second";
-  for (const [step, next] of units) {
-    if (value < step) break;
-    value = Math.round(value / step);
-    unit = next;
-  }
-  return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(-value, unit);
-}
-
 function UpdatesSection({
   updates,
   updatesState,
@@ -1767,6 +1749,8 @@ function UpdatesSection({
   updatesFormAction: (payload: FormData) => void;
 }) {
   const t = useTranslations("settings");
+  const format = useFormatter();
+  const now = useNow();
   const [enabled, setEnabled] = useState(updates.enabled);
   const [repository, setRepository] = useState(updates.repository);
   const [checking, setChecking] = useState(false);
@@ -1820,13 +1804,23 @@ function UpdatesSection({
             isDisabled={!enabled}
           />
 
-          <Text size="xsm" color="secondary">
-            {!updates.enabled
-              ? t("updateNotChecking")
-              : updates.checkedAt
-                ? t("updateLastChecked", { when: timeAgo(updates.checkedAt) })
-                : t("updateNeverChecked")}
-          </Text>
+          {updates.enabled && updates.checkedAt ? (
+            <UtcTooltip value={updates.checkedAt}>
+              {/* The server and the browser read the clock moments apart, so "3 minutes ago" can
+                  differ by a second between the two renders. */}
+              <Text size="xsm" color="secondary">
+                <span suppressHydrationWarning>
+                  {t("updateLastChecked", {
+                    when: format.relativeTime(new Date(updates.checkedAt), now),
+                  })}
+                </span>
+              </Text>
+            </UtcTooltip>
+          ) : (
+            <Text size="xsm" color="secondary">
+              {!updates.enabled ? t("updateNotChecking") : t("updateNeverChecked")}
+            </Text>
+          )}
 
           <HStack gap={2} justify="end">
             <Button

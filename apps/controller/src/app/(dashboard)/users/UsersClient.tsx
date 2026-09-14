@@ -25,7 +25,8 @@ import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-at
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import {
   createUserAction,
   updateUserRoleAction,
@@ -71,16 +72,6 @@ const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
   user: "blue",
   viewer: "neutral",
 };
-
-/**
- * Rendered on the client on purpose: the server has no way to know the reader's timezone, and a
- * date rendered in the server's would be wrong for everyone else.
- */
-function formatSignIn(iso: string) {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
 
 function userLabel(user: UserEntry) {
   return user.name ?? user.email.split("@")[0];
@@ -329,6 +320,7 @@ function UserRow({
   onRefresh: () => void;
 }) {
   const t = useTranslations("users");
+  const format = useFormatter();
   const isDisabled = user.status !== "active";
   const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | null>(null);
 
@@ -346,11 +338,22 @@ function UserRow({
           <Text type="body" size="xsm" color="secondary" maxLines={1}>
             {user.email} · {user.provider}
           </Text>
-          <Text type="supporting" color="secondary" maxLines={1}>
-            {user.lastSessionAt
-              ? t("lastSignedIn", { when: formatSignIn(user.lastSessionAt) })
-              : t("noActiveSession")}
-          </Text>
+          {user.lastSessionAt ? (
+            <UtcTooltip value={user.lastSessionAt}>
+              <Text type="supporting" color="secondary" maxLines={1}>
+                {t("lastSignedIn", {
+                  when: format.dateTime(
+                    new Date(user.lastSessionAt),
+                    TIMESTAMP_STYLES.dateTimeShort,
+                  ),
+                })}
+              </Text>
+            </UtcTooltip>
+          ) : (
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {t("noActiveSession")}
+            </Text>
+          )}
         </VStack>
       </HStack>
 

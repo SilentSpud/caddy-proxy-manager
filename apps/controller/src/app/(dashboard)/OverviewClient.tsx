@@ -21,8 +21,9 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
 
 // ApexCharts renders on the client only, for the reason given in AnalyticsClient: v7's
@@ -194,14 +195,17 @@ function formatBytes(bytes: number): string {
 }
 
 /** A bucket label short enough for an axis, at the resolution the range implies. */
-function formatBucket(ts: number, rangeSeconds: number): string {
+function formatBucket(
+  format: ReturnType<typeof useFormatter>,
+  ts: number,
+  rangeSeconds: number,
+): string {
   const d = new Date(ts * 1000);
-  if (rangeSeconds > 7 * 86400)
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  if (rangeSeconds > 7 * 86400) return format.dateTime(d, { day: "numeric", month: "short" });
   if (rangeSeconds > 86400) {
-    return d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit" });
+    return format.dateTime(d, { day: "numeric", month: "short", hour: "2-digit" });
   }
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return format.dateTime(d, { hour: "2-digit", minute: "2-digit" });
 }
 
 const RANGE_SECONDS: Record<Interval, number> = {
@@ -295,6 +299,7 @@ export default function OverviewClient({
   isAdmin?: boolean;
 }) {
   const t = useTranslations("overview");
+  const format = useFormatter();
   const emptyValue = useEmptyValue();
   const chartTheme = useChartTheme();
 
@@ -411,7 +416,7 @@ export default function OverviewClient({
       stroke: { curve: "smooth", width: 2 },
       dataLabels: { enabled: false },
       xaxis: {
-        categories: timeline.map((b) => formatBucket(b.ts, rangeSeconds)),
+        categories: timeline.map((b) => formatBucket(format, b.ts, rangeSeconds)),
         labels: { rotate: 0, style: { colors: chartTheme.labelColor, fontSize: "11px" } },
         axisBorder: { show: false },
         axisTicks: { show: false },
@@ -451,7 +456,7 @@ export default function OverviewClient({
         },
       },
     };
-  }, [chartTheme, plotted, chartSeries, isOverlay, timeline, rangeSeconds]);
+  }, [chartTheme, plotted, chartSeries, isOverlay, timeline, rangeSeconds, format]);
 
   /**
    * One row of the server log, whichever store it came from.
@@ -482,7 +487,7 @@ export default function OverviewClient({
         width: pixel(116),
         renderCell: (row) => (
           <Text type="code" size="sm" color="secondary">
-            {new Date(row.ts * 1000).toLocaleTimeString()}
+            <Timestamp value={row.ts * 1000} style="time" />
           </Text>
         ),
       },

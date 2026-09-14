@@ -33,12 +33,12 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { formatDateTimeUtc } from "@/src/lib/date-format";
+import { Timestamp } from "@/components/ui/Timestamp";
 import { FilterChip } from "@/src/components/mobile/FilterChip";
 import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 
 import { useChartTheme } from "./chart-theme";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { CountryBreakdown } from "./CountryBreakdown";
 import type { MapMetric } from "./WorldMapInner";
@@ -197,17 +197,18 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
-function formatTs(ts: number, rangeSeconds: number): string {
+/** An axis label at the resolution the range implies, on the reader's clock. */
+function formatTs(
+  format: ReturnType<typeof useFormatter>,
+  ts: number,
+  rangeSeconds: number,
+): string {
   const d = new Date(ts * 1000);
-  if (rangeSeconds <= 86400)
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (rangeSeconds <= 7 * 86400)
-    return (
-      d.toLocaleDateString([], { weekday: "short" }) +
-      " " +
-      d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    );
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  if (rangeSeconds <= 86400) return format.dateTime(d, { hour: "2-digit", minute: "2-digit" });
+  if (rangeSeconds <= 7 * 86400) {
+    return format.dateTime(d, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  }
+  return format.dateTime(d, { month: "short", day: "numeric" });
 }
 
 // ── Local DateTimePicker ───────────────────────────────────────────────────────
@@ -391,6 +392,7 @@ function asArray<T>(value: unknown): T[] {
 
 export default function AnalyticsClient() {
   const t = useTranslations("analytics");
+  const format = useFormatter();
   const emptyValue = useEmptyValue();
   const [interval, setIntervalVal] = useState<DisplayInterval>("1h");
   const [selectedHosts, setSelectedHosts] = useState<string[]>([]);
@@ -521,7 +523,7 @@ export default function AnalyticsClient() {
       stroke: { curve: "smooth", width: 2 },
       dataLabels: { enabled: false },
       xaxis: {
-        categories: timeline.map((b) => formatTs(b.ts, rangeSeconds)),
+        categories: timeline.map((b) => formatTs(format, b.ts, rangeSeconds)),
         labels: { rotate: 0, style: { colors: chartTheme.labelColor, fontSize: "11px" } },
         axisBorder: { show: false },
         axisTicks: { show: false },
@@ -530,7 +532,7 @@ export default function AnalyticsClient() {
       legend: { labels: { colors: chartTheme.labelColor } },
       tooltip: { theme: chartTheme.mode, shared: true, intersect: false },
     }),
-    [chartTheme, timeline, rangeSeconds],
+    [chartTheme, timeline, rangeSeconds, format],
   );
   const timelineSeries = useMemo(
     () => [
@@ -759,11 +761,11 @@ export default function AnalyticsClient() {
   const blockedColumns: TableColumn<BlockedRow>[] = [
     {
       key: "ts",
-      header: t("timeUtc"),
-      width: pixel(170),
+      header: t("time"),
+      width: pixel(190),
       renderCell: (row) => (
         <Text type="body" size="sm" color="secondary">
-          {formatDateTimeUtc(row.ts * 1000)}
+          <Timestamp value={row.ts * 1000} />
         </Text>
       ),
     },

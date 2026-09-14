@@ -45,7 +45,8 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   // Fill the gaps the query leaves out, so the strip always has 24 bars and a quiet hour reads as
   // a quiet hour rather than as a missing one.
   const counts = new Map(activity.map((bucket) => [bucket.hour, bucket.count]));
-  // The hour in the reader's own clock notation. UTC, as the strip's title says.
+  // The hour each bar starts at, on the reader's clock. The buckets are UTC hours, so in a zone
+  // with a half-hour offset they read 14:30, 15:30 - still exactly when each one began.
   const format = await getFormatter();
   const buckets = Array.from({ length: 24 }, (_, index) => {
     const at = new Date(since.getTime() + index * 60 * 60 * 1000);
@@ -54,7 +55,6 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
       label: format.dateTime(new Date(`${key}:00:00.000Z`), {
         hour: "numeric",
         minute: "2-digit",
-        timeZone: "UTC",
       }),
       count: counts.get(key) ?? 0,
     };

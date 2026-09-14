@@ -52,6 +52,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { Timestamp, UtcTooltip } from "@/components/ui/Timestamp";
 import { generatePassword } from "@/src/lib/password-generator";
 import {
   createAccessListAction,
@@ -81,15 +82,6 @@ function fmtRelative(iso: string | null, t: Translate): string {
   if (diff < 86400 * 30) return t("relative.daysAgo", { count: Math.floor(diff / 86400) });
   if (diff < 86400 * 365) return t("relative.monthsAgo", { count: Math.floor(diff / 86400 / 30) });
   return t("relative.yearsAgo", { count: Math.floor(diff / 86400 / 365) });
-}
-
-function fmtDate(iso: string | null, emptyValue: string): string {
-  if (!iso) return emptyValue;
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 type StrengthVariant = "neutral" | "error" | "warning" | "accent" | "success";
@@ -263,7 +255,7 @@ function MembersTab({
       width: pixel(140),
       renderCell: (row) => (
         <Text type="body" size="xsm" color="secondary">
-          {fmtDate(row.createdAt, emptyValue)}
+          {row.createdAt ? <Timestamp value={row.createdAt} style="date" /> : emptyValue}
         </Text>
       ),
     },
@@ -504,10 +496,16 @@ function SettingsTab({
       <Card padding={3}>
         <MetadataList>
           <MetadataListItem label={t("created")}>
-            {fmtDate(list.createdAt, emptyValue)}
+            {list.createdAt ? <Timestamp value={list.createdAt} style="date" /> : emptyValue}
           </MetadataListItem>
           <MetadataListItem label={t("lastUpdated")}>
-            {fmtRelative(list.updatedAt, t)}
+            {list.updatedAt ? (
+              <UtcTooltip value={list.updatedAt}>
+                <span>{fmtRelative(list.updatedAt, t)}</span>
+              </UtcTooltip>
+            ) : (
+              fmtRelative(null, t)
+            )}
           </MetadataListItem>
           <MetadataListItem label={t("listId")}>
             <Text type="code" size="sm">

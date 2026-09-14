@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { getLocale, getMessages, getTranslations } from "next-intl/server";
+import { getLocale, getMessages, getTimeZone, getTranslations } from "next-intl/server";
 import { getLocaleDirection } from "@astryxdesign/core/i18n";
 import "./globals.css";
 import Providers from "./providers";
@@ -38,6 +38,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // switcher has to tell "chose English" from "we guessed English".
   const locale = await getLocale();
   const messages = await getMessages();
+  // Resolved from the time zone cookie in the same request config, and handed to the client
+  // provider so the browser formats timestamps in the zone the server just did.
+  const timeZone = await getTimeZone();
   const localePreference = parsePreference(cookieStore.get(LOCALE_COOKIE)?.value);
 
   return (
@@ -56,6 +59,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           locale={locale}
           localePreference={localePreference}
           messages={messages}
+          timeZone={timeZone}
         >
           {children}
         </Providers>

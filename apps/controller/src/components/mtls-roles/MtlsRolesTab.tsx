@@ -18,7 +18,8 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { MtlsRole, MtlsRoleWithCertificates } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES } from "@/components/ui/Timestamp";
 
 /** Per-position card tints. Decorative only, so they use the theme's non-semantic variants. */
 const CARD_VARIANTS = ["orange", "cyan", "purple", "green", "red"] as const;
@@ -342,6 +343,7 @@ function CertAssignmentRow({
   onToggle: () => void;
 }) {
   const t = useTranslations("mtlsRoles");
+  const format = useFormatter();
   const checkboxRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -360,7 +362,9 @@ function CertAssignmentRow({
         />
       }
       label={cert.commonName}
-      description={t("expiresOn", { date: new Date(cert.validTo).toLocaleDateString() })}
+      description={t("expiresOn", {
+        date: format.dateTime(new Date(cert.validTo), TIMESTAMP_STYLES.date),
+      })}
       endContent={isAssigned ? <Badge label={t("assigned")} /> : undefined}
       isDisabled={isLoading}
     />

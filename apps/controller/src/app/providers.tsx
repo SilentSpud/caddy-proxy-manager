@@ -7,6 +7,7 @@ import { NextIntlClientProvider } from "next-intl";
 import type { AbstractIntlMessages } from "next-intl";
 import { LinkProvider } from "@astryxdesign/core/Link";
 import { LocaleProvider } from "@/src/components/locale/LocaleProvider";
+import { TimeZoneSync } from "@/src/components/locale/TimeZoneSync";
 import { ThemeModeProvider } from "@/src/components/theme/ThemeModeProvider";
 import type { Locale, LocalePreference } from "@/src/lib/locale";
 import type { ThemeMode } from "@/src/lib/theme-mode";
@@ -17,20 +18,24 @@ export default function Providers({
   locale,
   localePreference,
   messages,
+  timeZone,
 }: {
   children: ReactNode;
   initialThemeMode: ThemeMode;
   locale: Locale;
   localePreference: LocalePreference;
   messages: AbstractIntlMessages;
+  timeZone: string;
 }) {
   return (
     /* `locale` and `messages` are passed explicitly rather than inherited from the request config.
        vinext renders RSC and SSR in separate environments, and next-intl's server context does not
        cross that boundary - left to infer them, the provider throws during the SSR pass and the
        page 500s with the RSC payload already rendered correctly. The time zone likewise: without
-       it the SSR pass logs ENVIRONMENT_FALLBACK. UTC, matching src/i18n/request.ts. */
-    <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
+       it the SSR pass logs ENVIRONMENT_FALLBACK, and a different one here than on the server
+       would render every timestamp twice, differently. */
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
+      <TimeZoneSync timeZone={timeZone} />
       {/* Holds the language preference and hands the locale to Astryx, whose own components carry
           strings this app never writes. */}
       <LocaleProvider locale={locale} preference={localePreference}>

@@ -47,11 +47,12 @@ import { SearchField } from "@/components/ui/SearchField";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { nativeAttrs } from "@/components/ui/native-input-attrs";
 import { bytesToMib, MAX_BODY_LIMIT_MIB, MIN_BODY_LIMIT_MIB } from "@/src/lib/caddy-waf";
-import { formatDateTimeUtc } from "@/src/lib/date-format";
+import { fromZonedWallTime, toZonedWallTime } from "@/src/lib/date-format";
+import { Timestamp } from "@/components/ui/Timestamp";
 import type { WafEvent, WafEventStats } from "@/lib/models/waf-events";
 import type { WafSettings } from "@/lib/settings";
 import { withRowIds } from "@/lib/row-id";
-import { useTranslations } from "next-intl";
+import { useTimeZone, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import {
   suppressWafRuleGloballyAction,
@@ -78,26 +79,11 @@ type Props = {
 
 type RangeOption = Props["initialRange"];
 
-// UTC counterparts of the datetime-local input helpers, so the custom-range
-// fields agree with the UTC timestamps shown in the event list and render the
-// same on the server as in the browser.
-function formatDateTimeLocalUtc(unixTs: number | null): string {
-  if (!unixTs) return "";
-  const d = new Date(unixTs * 1000);
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const min = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-}
-
-function parseDateTimeLocalUtc(value: string): number | null {
-  if (!value) return null;
-  // "YYYY-MM-DDTHH:mm" parses as local time per spec; the trailing "Z" pins it
-  // to UTC so it matches the displayed timestamps.
-  const ts = Math.floor(new Date(`${value}Z`).getTime() / 1000);
-  return Number.isFinite(ts) ? ts : null;
+// The custom-range fields hold wall-clock values in the zone the event list is shown in, so a range
+// typed from the times on screen selects exactly those events. The zone is next-intl's rather than
+// the browser's own, so the fields also render the same on the server as in the browser.
+function pickerValue(unixTs: number | null, timeZone: string): string {
+  return unixTs ? toZonedWallTime(unixTs, timeZone) : "";
 }
 
 /* ── Audit data types ─────────────────────────────────────────────────────── */
@@ -657,9 +643,9 @@ function EventDetailPanel({
 
         <Card variant="muted" padding={4}>
           <MetadataList columns="multi">
-            <MetadataListItem label={t("timeUtc")}>
+            <MetadataListItem label={t("time")}>
               <Text type="body" size="sm">
-                {formatDateTimeUtc(event.ts * 1000)}
+                <Timestamp value={event.ts * 1000} />
               </Text>
             </MetadataListItem>
             <MetadataListItem label={t("host")}>
@@ -979,6 +965,8 @@ export default function WafEventsClient({
   globalWaf,
 }: Props) {
   const t = useTranslations("waf");
+  // Always set by the provider (see app/providers.tsx); UTC only satisfies the type.
+  const timeZone = useTimeZone() ?? "UTC";
   const emptyValue = useEmptyValue();
   const router = useRouter();
   const pathname = usePathname();
@@ -986,8 +974,8 @@ export default function WafEventsClient({
   const [tab, setTab] = useState("events");
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [range, setRange] = useState<RangeOption>(initialRange);
-  const [customFrom, setCustomFrom] = useState(formatDateTimeLocalUtc(initialFrom));
-  const [customTo, setCustomTo] = useState(formatDateTimeLocalUtc(initialTo));
+  const [customFrom, setCustomFrom] = useState(pickerValue(initialFrom, timeZone));
+  const [customTo, setCustomTo] = useState(pickerValue(initialTo, timeZone));
   const [selected, setSelected] = useState<WafEvent | null>(null);
   // Phone-only chrome: the range sheet, and search tucked behind its icon until it is wanted.
   const isNarrow = useMediaQuery("(max-width: 767px)");
@@ -1040,9 +1028,9 @@ export default function WafEventsClient({
   }, [initialSearch]);
   useEffect(() => {
     setRange(initialRange);
-    setCustomFrom(formatDateTimeLocalUtc(initialFrom));
-    setCustomTo(formatDateTimeLocalUtc(initialTo));
-  }, [initialRange, initialFrom, initialTo]);
+    setCustomFrom(pickerValue(initialFrom, timeZone));
+    setCustomTo(pickerValue(initialTo, timeZone));
+  }, [initialRange, initialFrom, initialTo, timeZone]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateSearch = useCallback(
@@ -1084,8 +1072,8 @@ export default function WafEventsClient({
 
       params.set("range", nextRange);
       if (nextRange === "custom") {
-        const fromTs = parseDateTimeLocalUtc(nextFrom ?? "");
-        const toTs = parseDateTimeLocalUtc(nextTo ?? "");
+        const fromTs = fromZonedWallTime(nextFrom ?? "", timeZone);
+        const toTs = fromZonedWallTime(nextTo ?? "", timeZone);
         if (fromTs == null || toTs == null || fromTs >= toTs) {
           toast.error(t("invalidTimeRangeError"));
           return;
@@ -1099,7 +1087,7 @@ export default function WafEventsClient({
 
       router.push(`${pathname}?${params.toString()}`);
     },
-    [pathname, router, searchParams, t],
+    [pathname, router, searchParams, t, timeZone],
   );
 
   const activateCustom = useCallback(() => {
@@ -1107,10 +1095,10 @@ export default function WafEventsClient({
     if (!customFrom || !customTo) {
       const now = new Date();
       const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      setCustomFrom(formatDateTimeLocalUtc(Math.floor(dayAgo.getTime() / 1000)));
-      setCustomTo(formatDateTimeLocalUtc(Math.floor(now.getTime() / 1000)));
+      setCustomFrom(pickerValue(Math.floor(dayAgo.getTime() / 1000), timeZone));
+      setCustomTo(pickerValue(Math.floor(now.getTime() / 1000), timeZone));
     }
-  }, [customFrom, customTo]);
+  }, [customFrom, customTo, timeZone]);
 
   const handleRangeChange = useCallback(
     (next: string) => {
@@ -1134,7 +1122,7 @@ export default function WafEventsClient({
             <SeverityChip severity={event.severity} />
           </HStack>
           <Text type="body" size="xsm" color="secondary">
-            {formatDateTimeUtc(event.ts * 1000)}
+            <Timestamp value={event.ts * 1000} />
           </Text>
         </HStack>
         <Text type="code" size="xsm" color="secondary">
@@ -1152,13 +1140,11 @@ export default function WafEventsClient({
   const columns: Column<WafEvent>[] = [
     {
       id: "ts",
-      label: t("timeUtc"),
-      width: 150,
-      // formatDateTimeUtc pins locale and timezone, so the server- and client-rendered text are
-      // identical: no hydration mismatch, and no locale-dependent dots vs slashes (issue #233).
+      label: t("time"),
+      width: 170,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
-          {formatDateTimeUtc(r.ts * 1000)}
+          <Timestamp value={r.ts * 1000} />
         </Text>
       ),
     },
@@ -1358,13 +1344,13 @@ export default function WafEventsClient({
             {range === "custom" && (
               <HStack gap={2} vAlign="end" wrap="wrap">
                 <DateTimeInput
-                  label={t("fromUtc")}
+                  label={t("rangeFrom")}
                   size="sm"
                   value={(customFrom || undefined) as ISODateTimeString | undefined}
                   onChange={(v) => setCustomFrom(v ?? "")}
                 />
                 <DateTimeInput
-                  label={t("toUtc")}
+                  label={t("rangeTo")}
                   size="sm"
                   value={(customTo || undefined) as ISODateTimeString | undefined}
                   onChange={(v) => setCustomTo(v ?? "")}

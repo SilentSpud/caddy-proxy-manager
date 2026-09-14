@@ -26,7 +26,8 @@ import type { MtlsConfig } from "@/lib/models/proxy-hosts";
 import type { MtlsAccessRule } from "@/lib/models/mtls-access-rules";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES } from "@/components/ui/Timestamp";
 
 type Props = {
   value?: MtlsConfig | null;
@@ -44,6 +45,7 @@ export function MtlsFields({
   mtlsRoles = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
+  const format = useFormatter();
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [selectedCertIds, setSelectedCertIds] = useState<number[]>(
     value?.trusted_client_cert_ids ?? [],
@@ -252,7 +254,10 @@ export function MtlsFields({
                                 endContent={
                                   <Text type="body" size="xsm" color="secondary">
                                     {t("certExpires", {
-                                      date: new Date(cert.validTo).toLocaleDateString(),
+                                      date: format.dateTime(
+                                        new Date(cert.validTo),
+                                        TIMESTAMP_STYLES.date,
+                                      ),
                                     })}
                                   </Text>
                                 }
