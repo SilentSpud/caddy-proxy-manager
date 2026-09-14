@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
+import { broadcastRestart } from "@/src/lib/agent/registry";
 import { scheduleProcessRestart } from "@/src/lib/process-restart";
 import {
   claimRestartSlot,
@@ -25,6 +26,9 @@ import {
  * socket, no agent and no privilege this process does not already hold. A deployment running
  * without a supervisor does not come back - the setup screen watches for exactly that and says so,
  * rather than leaving the operator on a page that never loads.
+ *
+ * Every attached agent is asked to do the same, restarting its Caddy first. That does go through
+ * Docker, on the agent's side, which is the side that already has it.
  */
 
 /** Sent by the migration screen; the value is the single-use token the migrate response issued. */
@@ -73,6 +77,15 @@ export async function POST(request: NextRequest): Promise<Response> {
         headers: { "Retry-After": String(Math.ceil(slot.retryAfterMs / 1000)) },
       },
     );
+  }
+
+  // The agents and their Caddys restart too, asked before this process schedules its own exit so
+  // the frame is on the stream while there is still a stream. An agent paired against the empty
+  // database, and a Caddy configured from it, are as stale as this process is; both come back to a
+  // controller that answers from the imported one.
+  const asked = broadcastRestart("the controller migrated its database and is restarting");
+  if (asked > 0) {
+    console.log(`Asked ${asked} agent(s) to restart Caddy and themselves after the migration`);
   }
 
   scheduleProcessRestart(

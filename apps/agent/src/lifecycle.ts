@@ -56,6 +56,11 @@ export type LifecycleDeps = {
   store: AgentStore;
   docker: DockerHost;
   operations: Operations;
+  /**
+   * End the process, for a restart the controller asked for. The entrypoint supplies its shutdown
+   * so the socket and store are released first; a test supplies a spy.
+   */
+  exit?: (reason: string) => void;
 };
 
 /**
@@ -382,7 +387,32 @@ export class AgentLifecycle {
       case "command":
         await this.execute(event.command);
         return;
+      case "restart":
+        await this.restart(event.reason);
+        return;
     }
+  }
+
+  /**
+   * Restart Caddy, then this process.
+   *
+   * The controller sends this as it restarts itself after a migration, so the whole stack comes
+   * back reading the database it now has rather than what each part read at boot. Caddy only when
+   * it is running: before setup finishes it is not, and starting it here would answer 80 and 443
+   * before the controller has said it may.
+   *
+   * The process exits rather than running `compose restart agent`: stopping this container ends
+   * the compose command before it can start the container again, and an explicit stop is one
+   * `restart: unless-stopped` does not undo. An exit it does.
+   */
+  private async restart(reason: string): Promise<void> {
+    console.log(`[agent] restart requested: ${reason}`);
+    if (await this.deps.docker.caddyRunning().catch(() => false)) {
+      console.log("[agent] restarting Caddy");
+      const result = await this.deps.docker.restartCaddy();
+      if (!result.ok) console.error("[agent] could not restart Caddy:", result.output);
+    }
+    (this.deps.exit ?? (() => process.exit(0)))(reason);
   }
 
   // ─── Reconciliation ────────────────────────────────────────────────────────

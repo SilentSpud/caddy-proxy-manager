@@ -24,9 +24,10 @@ const { attach, detach, recordStatus, settleResults, resetRegistry } = await imp
 
 /** One thing the controller pushed to this agent. */
 export type AgentRequestLog = {
-  kind: 'hello' | 'desired-state' | 'command';
+  kind: 'hello' | 'desired-state' | 'command' | 'restart';
   state?: AgentDesiredState;
   command?: AgentCommand;
+  reason?: string;
 };
 
 export type FakeAgent = {
@@ -167,10 +168,17 @@ export async function startFakeAgent(
       | { type: 'hello' }
       | { type: 'ping' }
       | { type: 'desired-state'; state: AgentDesiredState }
-      | { type: 'command'; command: AgentCommand },
+      | { type: 'command'; command: AgentCommand }
+      | { type: 'restart'; reason: string },
   ): void {
     // Keepalives are an event now rather than a comment frame, and carry nothing to act on.
     if (event.type === 'ping') return;
+
+    // Logged and nothing more: the real agent restarts Caddy and exits, and the fake has neither.
+    if (event.type === 'restart') {
+      requests.push({ kind: 'restart', reason: event.reason });
+      return;
+    }
 
     if (event.type === 'hello') {
       requests.push({ kind: 'hello' });

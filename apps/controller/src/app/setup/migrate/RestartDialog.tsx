@@ -198,7 +198,7 @@ export default function RestartDialog({
                     <Text size="sm" color="secondary">
                       {t("composeRestartHelp")}
                     </Text>
-                    <Code>docker compose restart web</Code>
+                    <Code>docker compose --profile caddy restart web agent caddy</Code>
                   </VStack>
                 )}
 

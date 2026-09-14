@@ -273,6 +273,22 @@ export async function broadcastDesiredState(
   }
 }
 
+/**
+ * Ask every attached agent to restart Caddy and then itself. Returns how many were asked.
+ *
+ * Nothing is awaited: the agents answer with their absence, and the caller is about to exit too.
+ */
+export function broadcastRestart(reason: string): number {
+  let asked = 0;
+  for (const agent of connectedAgents()) {
+    const connection = connections.get(agent.agentId);
+    if (!connection) continue;
+    if (connection.send({ type: "restart", reason })) asked++;
+    else detach(connection.agentId);
+  }
+  return asked;
+}
+
 // ─── Commands ────────────────────────────────────────────────────────────────
 
 /**
