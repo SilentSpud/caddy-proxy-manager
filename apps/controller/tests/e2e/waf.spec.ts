@@ -116,10 +116,10 @@ test.describe('WAF', () => {
       await expect(owaspCheckbox).toBeChecked();
     }
 
+    // The button never disables while the action runs, so waiting for it to be
+    // enabled returned before the save landed and the reload read the old values.
     await page.getByRole('button', { name: /save waf settings/i }).click();
-    await expect(page.getByRole('button', { name: /save waf settings/i })).toBeEnabled({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/settings saved/i)).toBeVisible({ timeout: 10000 });
 
     // Navigate away and back to verify persistence
     await page.goto('/hosts');

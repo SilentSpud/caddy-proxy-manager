@@ -34,10 +34,10 @@ test.describe
         await expect(owaspCheckbox).toBeChecked();
       }
 
+      // Wait for the action's banner: the button never disables, so it being
+      // enabled says nothing about whether the save has landed.
       await page.getByRole('button', { name: /save waf settings/i }).click();
-      await expect(page.getByRole('button', { name: /save waf settings/i })).toBeEnabled({
-        timeout: 10_000,
-      });
+      await expect(page.getByText(/settings saved/i)).toBeVisible({ timeout: 10_000 });
 
       await createProxyHost(page, {
         name: 'Functional WAF Custom Path Rule Test',
