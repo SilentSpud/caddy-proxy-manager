@@ -97,7 +97,9 @@ describe("relaying", () => {
     expect(calls.length).toBeGreaterThan(1);
     expect(calls.flatMap((call) => call.rows)).toHaveLength(12);
     for (const call of calls) {
-      expect(JSON.stringify(call.rows).length).toBeLessThan(MAX_ANALYTICS_REQUEST_BYTES);
+      expect(Buffer.byteLength(JSON.stringify(call.rows))).toBeLessThan(
+        MAX_ANALYTICS_REQUEST_BYTES,
+      );
     }
   });
 

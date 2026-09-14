@@ -2058,10 +2058,7 @@ function GeoipSection({
             value={enabled}
             onChange={setEnabled}
           />
-          <InfoAlert title={t("geoipDownloadsTitle")}>
-            It checks MaxMind on the interval below using these credentials. Agents fetch the
-            databases from this controller rather than each holding a licence key.
-          </InfoAlert>
+          <InfoAlert title={t("geoipDownloadsTitle")}>{t("geoipDownloadsDescription")}</InfoAlert>
           <Text size="sm" color="secondary">
             {geoip.installedEditions.length > 0
               ? `Installed: ${geoip.installedEditions.join(", ")}.`

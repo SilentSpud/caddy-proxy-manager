@@ -659,15 +659,16 @@ async function updateGeoipSettingsActionUnlocked(
 
     revalidatePath("/settings");
     revalidatePath("/proxy-hosts");
+    const t = await getTranslations("settings");
     if (!enabled) {
-      return { success: true, message: "GeoIP disabled. Country matching is no longer offered." };
+      return { success: true, message: t("geoipSavedDisabled") };
     }
     return {
       success: true,
       message:
         accountId.trim().length > 0 && hasKey
-          ? "GeoIP enabled - downloading the databases from MaxMind."
-          : "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
+          ? t("geoipSavedEnabled")
+          : t("geoipSavedNeedsCredentials"),
     };
   } catch (error) {
     console.error("Failed to save GeoIP settings:", error);
