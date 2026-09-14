@@ -9,6 +9,8 @@ WORKDIR /app
 # Every workspace manifest, not just the agent's: `bun install` resolves the whole workspace graph
 # up front and fails on a member it cannot read. bunfig.toml pins the isolated linker.
 COPY package.json bun.lock bunfig.toml ./
+# patchedDependencies in package.json: a frozen install refuses to run without the files it names.
+COPY patches ./patches
 COPY apps/controller/package.json ./apps/controller/
 COPY apps/agent/package.json ./apps/agent/
 COPY apps/site/package.json ./apps/site/
