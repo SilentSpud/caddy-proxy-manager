@@ -64,7 +64,7 @@ import type { AgentStatus } from "@cpm/shared";
 import type { AgentResult } from "@/src/lib/agent/client";
 import type { PairedAgent } from "@/src/lib/models/agents";
 import { useFormatter, useNow, useTranslations } from "next-intl";
-import { UtcTooltip } from "@/components/ui/Timestamp";
+import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import {
   updateDnsProviderSettingsAction,
   updateGeneralSettingsAction,
@@ -1983,6 +1983,7 @@ function AnalyticsSection({
  */
 function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
   const t = useTranslations("settings");
+  const format = useFormatter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<string | null>(null);
 
@@ -1998,11 +1999,19 @@ function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
   return (
     <VStack gap={2}>
       <HStack gap={2} vAlign="center">
-        <Text size="sm" color="secondary">
-          {geoip.lastCheckedAt
-            ? t("geoipLastChecked", { when: new Date(geoip.lastCheckedAt).toLocaleString() })
-            : t("geoipNeverChecked")}
-        </Text>
+        {geoip.lastCheckedAt ? (
+          <UtcTooltip value={geoip.lastCheckedAt}>
+            <Text size="sm" color="secondary">
+              {t("geoipLastChecked", {
+                when: format.dateTime(new Date(geoip.lastCheckedAt), TIMESTAMP_STYLES.dateTime),
+              })}
+            </Text>
+          </UtcTooltip>
+        ) : (
+          <Text size="sm" color="secondary">
+            {t("geoipNeverChecked")}
+          </Text>
+        )}
         <Button
           variant="secondary"
           size="sm"

@@ -18,7 +18,8 @@ import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import {
   deleteCaCertificateAction,
   issueClientCertificateAction,
@@ -54,8 +55,8 @@ function sanitizeFilenameSegment(value: string): string {
   );
 }
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString();
+function formatDateTime(format: ReturnType<typeof useFormatter>, value: string): string {
+  return format.dateTime(new Date(value), TIMESTAMP_STYLES.dateTimeShort);
 }
 
 function formatFingerprint(value: string): string {
@@ -245,6 +246,7 @@ export function ManageIssuedClientCertsDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("caCertificates");
+  const format = useFormatter();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [items, setItems] = useState<IssuedClientCertificate[]>(issuedCerts);
@@ -331,28 +333,34 @@ export function ManageIssuedClientCertsDialog({
                         variant={item.revokedAt ? "neutral" : "success"}
                         label={item.revokedAt ? t("revoked") : t("active")}
                       />
-                      <Badge
-                        variant={expired ? "error" : "neutral"}
-                        label={
-                          expired
-                            ? t("expiredOn", { date: formatDateTime(item.validTo) })
-                            : t("expiresOn", { date: formatDateTime(item.validTo) })
-                        }
-                      />
+                      <UtcTooltip value={item.validTo}>
+                        <Badge
+                          variant={expired ? "error" : "neutral"}
+                          label={
+                            expired
+                              ? t("expiredOn", { date: formatDateTime(format, item.validTo) })
+                              : t("expiresOn", { date: formatDateTime(format, item.validTo) })
+                          }
+                        />
+                      </UtcTooltip>
                     </HStack>
                   </HStack>
-                  <Text type="body" size="sm" color="secondary">
-                    {t("issuedLine", { date: formatDateTime(item.createdAt) })}
-                  </Text>
+                  <UtcTooltip value={item.createdAt}>
+                    <Text type="body" size="sm" color="secondary">
+                      {t("issuedLine", { date: formatDateTime(format, item.createdAt) })}
+                    </Text>
+                  </UtcTooltip>
                   <Text type="code" size="sm" color="secondary">
                     {t("fingerprintLine", {
                       fingerprint: formatFingerprint(item.fingerprintSha256),
                     })}
                   </Text>
                   {item.revokedAt ? (
-                    <Text type="body" size="sm" color="secondary">
-                      {t("revokedLine", { date: formatDateTime(item.revokedAt) })}
-                    </Text>
+                    <UtcTooltip value={item.revokedAt}>
+                      <Text type="body" size="sm" color="secondary">
+                        {t("revokedLine", { date: formatDateTime(format, item.revokedAt) })}
+                      </Text>
+                    </UtcTooltip>
                   ) : (
                     <HStack justify="end">
                       <Button

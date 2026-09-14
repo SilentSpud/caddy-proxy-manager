@@ -15,7 +15,7 @@
  * expiring certificates at, and an instance that finishes setup without one issues its first
  * certificate with nobody to tell.
  */
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Center } from "@astryxdesign/core/Center";
 import { Divider } from "@astryxdesign/core/Divider";
@@ -218,16 +218,40 @@ function GateSwitch({
   value: boolean;
   onChange: (next: boolean) => void;
 }) {
+  // The label and description are drawn here rather than by the Switch, whose label only takes a
+  // string: the variable a value came from belongs beside the name it sets, not on a row below.
+  // The Switch keeps its own label, visually hidden, as its accessible name. It generates its input
+  // id internally, so the visible label learns it after mount and points at it, which keeps a click
+  // on the text toggling the switch.
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [inputId, setInputId] = useState<string>();
+  useEffect(() => setInputId(inputRef.current?.id), []);
+
   return (
     <VStack gap={2}>
-      <Switch
-        label={field.label}
-        description={field.description}
-        htmlName={field.key}
-        value={value}
-        onChange={onChange}
-      />
-      {field.source === "environment" && <Badge label={field.env} />}
+      <HStack gap={3} vAlign="start">
+        <Switch
+          ref={inputRef}
+          label={field.label}
+          isLabelHidden
+          htmlName={field.key}
+          value={value}
+          onChange={onChange}
+        />
+        <label htmlFor={inputId} style={{ cursor: "pointer" }}>
+          <VStack gap={0}>
+            <HStack gap={2} vAlign="center" wrap="wrap">
+              <Text size="sm" weight="medium">
+                {field.label}
+              </Text>
+              {field.source === "environment" && <Badge label={field.env} />}
+            </HStack>
+            <Text size="xsm" color="secondary">
+              {field.description}
+            </Text>
+          </VStack>
+        </label>
+      </HStack>
       {value && <Divider />}
     </VStack>
   );
