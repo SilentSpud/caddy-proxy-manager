@@ -5,6 +5,8 @@ import db from "./db";
 import * as schema from "./db/schema";
 import { eq } from "drizzle-orm";
 import { config } from "./config";
+import { extraTrustedOrigins } from "./auth-trusted-origins";
+import { getPublicBaseUrl } from "./public-url";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
 import type { OAuthProvider } from "./models/oauth-providers";
 import type { GenericOAuthConfig } from "better-auth/plugins";
@@ -201,7 +203,7 @@ export function enforceSafeUserDefaults<T extends object>(
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: as cachedAuth above - the return type depends on a plugin list only known at runtime
-async function createAuth(): Promise<any> {
+async function createAuth(baseURL: string): Promise<any> {
   const oauthConfigs = await loadProviders();
   const trustedProviderIds = [...cachedTrustedProviderIds];
 
@@ -215,13 +217,17 @@ async function createAuth(): Promise<any> {
       schema,
     }),
     secret: config.sessionSecret,
-    baseURL: config.baseUrl,
+    // The Public URL, not BASE_URL alone: OAuth redirect URIs are built from this, and they have to
+    // match what the Settings page tells the operator to register.
+    baseURL,
     basePath: "/api/auth",
     // Only trust the Host header when the operator explicitly opts in. baseURL already pins the
     // canonical origin; trustHost is needed only behind reverse proxies that rewrite Host
     // without setting X-Forwarded-Host.
     trustHost: process.env.AUTH_TRUST_HOST === "true",
-    trustedOrigins: [config.baseUrl],
+    // BASE_URL is trusted by Better Auth itself; this adds the stored Public URL, and the browser's
+    // own address while setup is unfinished. See auth-trusted-origins.ts.
+    trustedOrigins: extraTrustedOrigins,
     advanced: {
       database: {
         generateId: "serial",
@@ -421,16 +427,27 @@ async function createAuth(): Promise<any> {
   });
 }
 
+/** The Public URL the cached instance was built with. */
+let cachedBaseUrl: string | null = null;
+
 export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
+  // Read on every call - the settings module caches it, and clears that cache on save - because the
+  // Public URL changes at runtime: setup and Settings both write it, and neither restarts the app.
+  const baseURL = await getPublicBaseUrl();
+
   // Rebuild if providers failed to load initially and are now available
   if (cachedAuth && !providersLoadedSuccessfully) {
     cachedProviders = null;
     cachedAuth = null;
   }
+  if (cachedAuth && cachedBaseUrl !== baseURL) {
+    cachedAuth = null;
+  }
   if (!cachedAuth) {
     // Cache the promise, not the resolved instance: concurrent first requests would otherwise each
     // build their own Better Auth instance and the last one to finish would win.
-    cachedAuth = createAuth();
+    cachedBaseUrl = baseURL;
+    cachedAuth = createAuth(baseURL);
   }
   return await cachedAuth;
 }
