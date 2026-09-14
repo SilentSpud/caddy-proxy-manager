@@ -174,7 +174,9 @@ function oauthCard(existing: string[]) {
   };
 }
 
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
+// Both IPv6 spellings: the URL standard serialises `hostname` with the brackets, and Bun follows
+// it, but a runtime that strips them would otherwise read loopback as a public address.
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
 /**
  * The address this page was reached at, offered as the Public URL when the configured one is only
