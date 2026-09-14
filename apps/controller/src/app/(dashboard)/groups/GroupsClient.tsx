@@ -247,9 +247,7 @@ export default function GroupsClient({
                     )}
                   </VStack>
                   <HStack gap={2} vAlign="center" wrap="wrap">
-                    <Badge
-                      label={`${group.members.length} member${group.members.length !== 1 ? "s" : ""}`}
-                    />
+                    <Badge label={t("memberCount", { count: group.members.length })} />
                     {/* The grant is the point of a group, so it reads from the card rather than
                         only from inside the dialog that edits it. */}
                     {grantCounts(group).total === 0 ? (
@@ -301,7 +299,7 @@ export default function GroupsClient({
                     <IconButton
                       variant="ghost"
                       size="sm"
-                      label={`${t("access")} - ${group.name}`}
+                      label={t("accessNamed", { name: group.name })}
                       tooltip={t("access")}
                       icon={<ShieldCheck />}
                       onClick={() => setAccessGroup(group)}
@@ -309,7 +307,7 @@ export default function GroupsClient({
                     <IconButton
                       variant="ghost"
                       size="sm"
-                      label={`Delete group ${group.name}`}
+                      label={t("deleteGroupNamed", { name: group.name })}
                       tooltip={t("deleteGroup")}
                       icon={<Trash2 />}
                       onClick={() => setDeleteGroup(group)}
@@ -379,7 +377,10 @@ export default function GroupsClient({
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              label={`Remove ${displayName(member)} from ${group.name}`}
+                              label={t("removeMemberFrom", {
+                                member: displayName(member),
+                                group: group.name,
+                              })}
                               tooltip={t("removeMember")}
                               icon={<UserMinus />}
                               onClick={async () => {
@@ -409,8 +410,8 @@ export default function GroupsClient({
           deleteGroup === null
             ? ""
             : deleteGroup.source === "oidc"
-              ? `Delete group "${deleteGroup.name}"? It is managed by an identity provider and will be recreated the next time a member signs in.`
-              : `Delete group "${deleteGroup.name}"?`
+              ? t("deleteGroupConfirmIdp", { name: deleteGroup.name })
+              : t("deleteGroupConfirm", { name: deleteGroup.name })
         }
         actionLabel={t("deleteGroup")}
         onAction={async () => {

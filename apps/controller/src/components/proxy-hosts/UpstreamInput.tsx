@@ -88,7 +88,7 @@ export function UpstreamInput({
     <VStack gap={2}>
       <input type="hidden" name={name} value={serializedValue} />
       <Text type="body" size="sm" weight="semibold">
-        {t("upstreamsInputLabel")}{" "}
+        {t("upstreamsInputLabel")}
       </Text>
 
       <VStack gap={3}>
@@ -103,7 +103,7 @@ export function UpstreamInput({
               onChange={(next) => handleProtocolChange(entry.rowId, next as string)}
             />
             <TextInput
-              label={`Upstream ${index + 1}`}
+              label={t("upstreamLabel", { index: index + 1 })}
               isLabelHidden
               value={entry.address}
               onChange={(next) => handleAddressChange(entry.rowId, next)}
@@ -113,12 +113,12 @@ export function UpstreamInput({
             <IconButton
               variant="ghost"
               size="sm"
-              label={`Remove upstream ${index + 1}`}
+              label={t("removeUpstreamLabel", { index: index + 1 })}
               icon={<MinusCircle />}
               isDisabled={isOnlyEntry}
               // Explains the disabled state on hover, replacing a title on a
               // wrapper span that screen readers never announced.
-              tooltip={isOnlyEntry ? "At least one upstream is required" : "Remove upstream"}
+              tooltip={isOnlyEntry ? t("atLeastOneUpstreamRequired") : t("removeUpstream")}
               onClick={() => handleRemove(entry.rowId)}
             />
           </HStack>

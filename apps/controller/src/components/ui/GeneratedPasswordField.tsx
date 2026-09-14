@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, Eye, EyeOff, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { HStack } from "@astryxdesign/core/Stack";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { Popover } from "@astryxdesign/core/Popover";
+import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { generatePassword } from "@/src/lib/password-generator";
 import {
@@ -60,6 +62,10 @@ export function GeneratedPasswordField({
   const t = useTranslations("ui.passwordField");
   const [isRevealed, setIsRevealed] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
+  // The clipboard API only exists in a secure context, so on plain http the copy button can never
+  // work - it explains that instead. Read after mount: the server render has no window to ask.
+  const [canCopy, setCanCopy] = useState(true);
+  useEffect(() => setCanCopy(window.isSecureContext), []);
 
   const generate = () => {
     const password = generatePassword();
@@ -71,6 +77,11 @@ export function GeneratedPasswordField({
 
   const copy = async () => {
     if (!value) return;
+    if (!canCopy) {
+      // Revealed so the value the popover asks them to copy is there to select.
+      setIsRevealed(true);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(value);
       setHasCopied(true);
@@ -78,8 +89,8 @@ export function GeneratedPasswordField({
       // and the tick is next to the thing it is about.
       setTimeout(() => setHasCopied(false), 2_000);
     } catch {
-      // Clipboard access is denied outside a secure context and in some embedded webviews. The
-      // value is revealed and selectable, so there is a way through without an error to explain.
+      // Clipboard access can still be denied in some embedded webviews. The value is revealed and
+      // selectable, so there is a way through without an error to explain.
     }
   };
 
@@ -118,14 +129,32 @@ export function GeneratedPasswordField({
         isDisabled={isDisabled || !value}
         onClick={() => setIsRevealed((shown) => !shown)}
       />
-      <IconButton
-        variant="secondary"
-        label={hasCopied ? t("copiedLabel") : t("copyLabel")}
-        tooltip={hasCopied ? t("copiedLabel") : t("copyLabel")}
-        icon={hasCopied ? <Check /> : <Copy />}
-        isDisabled={isDisabled || !value}
-        onClick={copy}
-      />
+      <Popover
+        isEnabled={!canCopy}
+        label={t("copyUnavailableTitle")}
+        placement="below"
+        alignment="end"
+        width={280}
+        content={
+          <VStack gap={1} padding={3}>
+            <Text size="sm" weight="medium">
+              {t("copyUnavailableTitle")}
+            </Text>
+            <Text size="sm" color="secondary">
+              {t("copyUnavailableDescription")}
+            </Text>
+          </VStack>
+        }
+      >
+        <IconButton
+          variant="secondary"
+          label={hasCopied ? t("copiedLabel") : t("copyLabel")}
+          tooltip={hasCopied ? t("copiedLabel") : t("copyLabel")}
+          icon={hasCopied ? <Check /> : <Copy />}
+          isDisabled={isDisabled || !value}
+          onClick={copy}
+        />
+      </Popover>
     </HStack>
   );
 }

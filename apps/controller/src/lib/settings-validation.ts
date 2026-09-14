@@ -25,7 +25,7 @@ const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 // obvious `[^\s@]+\.[^\s@]+` lets both sides consume dots, so the two alternatives overlap and a
 // non-matching address backtracks quadratically -- CodeQL js/polynomial-redos. The 320-character
 // cap below bounds the damage either way; this just removes the sharp edge.
-const EMAIL_ADDRESS = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+export const EMAIL_ADDRESS = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 const CONTINENTS = new Set(["AF", "AN", "AS", "EU", "NA", "OC", "SA"]);
 
 function invalid(message: string): never {

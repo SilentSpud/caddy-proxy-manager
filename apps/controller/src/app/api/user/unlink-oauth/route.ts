@@ -19,13 +19,14 @@ export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
   if (originCheck) return originCheck;
 
+  const t = await getTranslations("profile");
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const tApi = await getTranslations("auth.apiErrors");
+      return NextResponse.json({ error: tApi("unauthorized") }, { status: 401 });
     }
 
-    const t = await getTranslations("profile");
     const userId = Number(session.user.id);
     // The change-password budget: every route verifying this password shares one counter.
     const rateLimitKey = `password-change:${userId}`;
@@ -45,15 +46,13 @@ export async function POST(request: NextRequest) {
     const user = await getUserById(userId);
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      const tApi = await getTranslations("auth.apiErrors");
+      return NextResponse.json({ error: tApi("userNotFound") }, { status: 404 });
     }
 
     // Must have a password before unlinking OAuth
     if (!user.passwordHash) {
-      return NextResponse.json(
-        { error: "Cannot unlink OAuth: You must set a password first" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: t("unlinkPasswordRequired") }, { status: 400 });
     }
 
     // Check if user has any OAuth account links
@@ -63,7 +62,7 @@ export async function POST(request: NextRequest) {
       .where(and(eq(accounts.userId, userId), ne(accounts.providerId, "credential")));
 
     if (oauthAccounts.length === 0) {
-      return NextResponse.json({ error: "No OAuth account to unlink" }, { status: 400 });
+      return NextResponse.json({ error: t("noOauthToUnlink") }, { status: 400 });
     }
 
     const body = await request.json().catch(() => ({}));
@@ -99,12 +98,10 @@ export async function POST(request: NextRequest) {
       data: JSON.stringify({ provider: previousProvider }),
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "OAuth account unlinked successfully",
-    });
+    // No message: the profile page says its own, and reloads.
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("OAuth unlink error:", error);
-    return NextResponse.json({ error: "Failed to unlink OAuth account" }, { status: 500 });
+    return NextResponse.json({ error: t("unlinkFailed") }, { status: 500 });
   }
 }

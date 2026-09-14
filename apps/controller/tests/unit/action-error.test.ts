@@ -36,6 +36,23 @@ describe('extractErrorMessage', () => {
     expect(seen.values).toEqual({ count: 3, name: 'x' });
   });
 
+  it('list-formats a list param with the formatter it is given', () => {
+    const seen: { values?: Record<string, string | number> } = {};
+    const error = domainError('caCertificateInUse', { names: ['a', 'b', 'c'] });
+    const format = {
+      list: (value: Iterable<string>) => [...value].join(' / '),
+    } as unknown as NonNullable<Parameters<typeof extractErrorMessage>[3]>;
+    extractErrorMessage(translator(seen), error, 'fallback', format);
+    expect(seen.values).toEqual({ names: 'a / b / c' });
+  });
+
+  it('joins a list param as the English does when no formatter is given', () => {
+    const seen: { values?: Record<string, string | number> } = {};
+    const error = domainError('caCertificateInUse', { names: ['a', 'b'] });
+    extractErrorMessage(translator(seen), error, 'fallback');
+    expect(seen.values).toEqual({ names: 'a, b' });
+  });
+
   it('keeps the English sentence on an ordinary Error, which carries no code', () => {
     expect(extractErrorMessage(translator(), new Error('Upstream refused'), 'fallback')).toBe(
       'Upstream refused',

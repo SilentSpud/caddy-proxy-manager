@@ -23,10 +23,11 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { GeoBlockSettings } from "@/lib/settings";
 import type { GeoBlockMode } from "@/lib/models/proxy-hosts";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
-import { COUNTRIES, flagEmoji } from "./countries";
+import { regionName } from "@/lib/region-names";
+import { COUNTRY_CODES, flagEmoji } from "./countries";
 import { CheckboxInput, Switch } from "@/src/components/ui/FormBooleanControls";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 // ─── GeoIpStatus ─────────────────────────────────────────────────────────────
 
@@ -57,21 +58,21 @@ function GeoIpStatus() {
   const noneLoaded = !status?.country && !status?.asn;
 
   const label = off
-    ? "GeoIP off"
+    ? t("geoipStatus.off")
     : allLoaded
-      ? "GeoIP ready"
+      ? t("geoipStatus.ready")
       : noneLoaded
-        ? "GeoIP missing"
-        : "GeoIP partial";
+        ? t("geoipStatus.missing")
+        : t("geoipStatus.partial");
   const tooltip = off
-    ? "GeoIP is switched off in Settings → GeoIP Databases - country, continent and ASN blocking will not work."
+    ? t("geoipStatus.offHelp")
     : noneLoaded
-      ? "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → GeoIP Databases."
+      ? t("geoipStatus.missingHelp")
       : !status?.country
-        ? "GeoLite2-Country database missing - country/continent blocking disabled"
+        ? t("geoipStatus.countryMissingHelp")
         : !status?.asn
-          ? "GeoLite2-ASN database missing - ASN blocking disabled"
-          : "GeoLite2-Country and GeoLite2-ASN databases loaded";
+          ? t("geoipStatus.asnMissingHelp")
+          : t("geoipStatus.loadedHelp");
 
   return (
     <Tooltip content={tooltip}>
@@ -83,24 +84,24 @@ function GeoIpStatus() {
 // ─── Pickers ──────────────────────────────────────────────────────────────────
 
 const CONTINENTS = [
-  { code: "AF", name: "Africa", emoji: "🌍" },
-  { code: "AN", name: "Antarctica", emoji: "🧊" },
-  { code: "AS", name: "Asia", emoji: "🌏" },
-  { code: "EU", name: "Europe", emoji: "🌍" },
-  { code: "NA", name: "N. America", emoji: "🌎" },
-  { code: "OC", name: "Oceania", emoji: "🌏" },
-  { code: "SA", name: "S. America", emoji: "🌎" },
-];
+  { code: "AF", nameKey: "continentNames.africa", emoji: "🌍" },
+  { code: "AN", nameKey: "continentNames.antarctica", emoji: "🧊" },
+  { code: "AS", nameKey: "continentNames.asia", emoji: "🌏" },
+  { code: "EU", nameKey: "continentNames.europe", emoji: "🌍" },
+  { code: "NA", nameKey: "continentNames.northAmerica", emoji: "🌎" },
+  { code: "OC", nameKey: "continentNames.oceania", emoji: "🌏" },
+  { code: "SA", nameKey: "continentNames.southAmerica", emoji: "🌎" },
+] as const;
 
-const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({
-  value: c.code,
-  label: `${flagEmoji(c.code)}  ${c.name} (${c.code})`,
-}));
-
-const CONTINENT_OPTIONS = CONTINENTS.map((c) => ({
-  value: c.code,
-  label: `${c.emoji}  ${c.name} (${c.code})`,
-}));
+/**
+ * Every country as a picker option, named and sorted in `locale`. The name is part of the label,
+ * so the search matches what the reader sees; the code stays in it for anyone searching by code.
+ */
+function countryOptions(locale: string) {
+  return COUNTRY_CODES.map((code) => ({ code, name: regionName(code, locale) }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale))
+    .map(({ code, name }) => ({ value: code, label: `${flagEmoji(code)}  ${name} (${code})` }));
+}
 
 /**
  * MultiSelector replaces ~200 lines of hand-built chips. The hidden input keeps the submitted
@@ -165,6 +166,7 @@ function TagInput({
   validate,
   uppercase = false,
 }: TagInputProps) {
+  const t = useTranslations("proxyHosts");
   const [tags, setTags] = useState<string[]>(initialValues);
   const [draft, setDraft] = useState("");
 
@@ -187,7 +189,7 @@ function TagInput({
               key={tag}
               size="sm"
               label={tag}
-              onRemove={() => setTags((prev) => prev.filter((t) => t !== tag))}
+              onRemove={() => setTags((prev) => prev.filter((existing) => existing !== tag))}
             />
           ))}
         </HStack>
@@ -213,7 +215,7 @@ function TagInput({
         <IconButton
           variant="ghost"
           size="sm"
-          label={`Add to ${label}`}
+          label={t("addToLabel", { label })}
           icon={<Plus />}
           onClick={() => commit(draft)}
         />
@@ -284,7 +286,7 @@ function ResponseHeadersEditor({ initialHeaders }: { initialHeaders: Record<stri
               <IconButton
                 variant="ghost"
                 size="sm"
-                label={`Remove header ${i + 1}`}
+                label={t("removeHeaderLabel", { index: i + 1 })}
                 icon={<X />}
                 onClick={() => setRows((prev) => prev.filter((r) => r.rowId !== row.rowId))}
               />
@@ -306,6 +308,8 @@ type RulesPanelProps = {
 
 function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
   const t = useTranslations("proxyHosts");
+  const locale = useLocale();
+  const countryOptionsForLocale = useMemo(() => countryOptions(locale), [locale]);
   const cap = prefix === "block" ? "Block" : "Allow";
   const countries =
     prefix === "block" ? (initial?.block_countries ?? []) : (initial?.allow_countries ?? []);
@@ -314,6 +318,10 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
   const asns = prefix === "block" ? (initial?.block_asns ?? []) : (initial?.allow_asns ?? []);
   const cidrs = prefix === "block" ? (initial?.block_cidrs ?? []) : (initial?.allow_cidrs ?? []);
   const ips = prefix === "block" ? (initial?.block_ips ?? []) : (initial?.allow_ips ?? []);
+  const continentOptions = CONTINENTS.map((c) => ({
+    value: c.code,
+    label: `${c.emoji}  ${t(c.nameKey)} (${c.code})`,
+  }));
 
   return (
     <VStack gap={6}>
@@ -321,9 +329,9 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
         key={`${prefix}-countries-${resetKey}`}
         name={`geoblock${cap}Countries`}
         label={t("countries")}
-        options={COUNTRY_OPTIONS}
+        options={countryOptionsForLocale}
         initialValues={countries}
-        searchPlaceholder="Search countries…"
+        searchPlaceholder={t("searchCountries")}
       />
 
       <Divider />
@@ -332,7 +340,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
         key={`${prefix}-continents-${resetKey}`}
         name={`geoblock${cap}Continents`}
         label={t("continents")}
-        options={CONTINENT_OPTIONS}
+        options={continentOptions}
         initialValues={continents}
       />
 
@@ -344,7 +352,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
         label={t("asns")}
         initialValues={asns.map(String)}
         placeholder="13335, 15169…"
-        helperText="Autonomous System Numbers - press Enter to add"
+        helperText={t("asnsHelp")}
         validate={(v) => /^\d+$/.test(v)}
       />
 
@@ -355,7 +363,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
           label={t("cidrs")}
           initialValues={cidrs}
           placeholder="10.0.0.0/8…"
-          helperText="Press Enter to add"
+          helperText={t("pressEnterToAdd")}
         />
         <TagInput
           key={`${prefix}-ips-${resetKey}`}
@@ -363,7 +371,7 @@ function RulesPanel({ prefix, initial, resetKey = 0 }: RulesPanelProps) {
           label={t("ipAddresses")}
           initialValues={ips}
           placeholder="1.2.3.4…"
-          helperText="Press Enter to add"
+          helperText={t("pressEnterToAdd")}
         />
       </Grid>
     </VStack>
@@ -544,7 +552,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
               </div>
             </VStack>
 
-            <Collapsible trigger="Trusted Proxies & Block Response">
+            <Collapsible trigger={t("trustedProxiesBlockResponse")}>
               <VStack gap={4}>
                 <TagInput
                   key={`trusted-proxies-${resetKey}`}
@@ -552,7 +560,7 @@ export function GeoBlockFields({ initialValues, showModeSelector = true }: GeoBl
                   label={t("trustedProxies")}
                   initialValues={initial?.trusted_proxies ?? []}
                   placeholder={t("trustedProxiesPlaceholder")}
-                  helperText="Used to parse X-Forwarded-For. Use private_ranges for all RFC-1918 ranges."
+                  helperText={t("trustedProxiesHelp")}
                 />
 
                 <CheckboxInput

@@ -40,6 +40,7 @@ import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
+import { useEmptyValue } from "@/components/ui/empty-value";
 import { useTranslations } from "next-intl";
 import {
   CreateHostDialog,
@@ -93,31 +94,47 @@ type Props = {
   canEditRawConfig?: boolean;
 };
 
+type FeatureLabelKey =
+  | "tls"
+  | "features.auth"
+  | "features.authentik"
+  | "features.forwardAuth"
+  | "features.tailnet"
+  | "features.waf"
+  | "features.geo"
+  | "features.lb"
+  | "features.mtls"
+  | "redirects"
+  | "features.rewrite"
+  | "features.allows"
+  | "features.blocks"
+  | "pathRewrites";
+
 /** The feature badges as data. `variant` marks the two meaning "traffic is being restricted". */
 const FEATURES: ReadonlyArray<{
   key: string;
-  label: string;
+  labelKey: FeatureLabelKey;
   icon?: ReactNode;
   variant?: "info" | "warning";
   isOn: (host: ProxyHost) => boolean;
 }> = [
-  { key: "tls", label: "TLS", variant: "info", isOn: (h) => Boolean(h.certificateId) },
+  { key: "tls", labelKey: "tls", variant: "info", isOn: (h) => Boolean(h.certificateId) },
   {
     key: "auth",
-    label: "Auth",
+    labelKey: "features.auth",
     icon: <Shield />,
     variant: "warning",
     isOn: (h) => Boolean(h.accessListId),
   },
   {
     key: "authentik",
-    label: "Authentik",
+    labelKey: "features.authentik",
     icon: <UserCheck />,
     isOn: (h) => Boolean(h.authentik?.enabled),
   },
   {
     key: "forward-auth",
-    label: "Forward Auth",
+    labelKey: "features.forwardAuth",
     icon: <LogIn />,
     isOn: (h) => Boolean(h.cpmForwardAuth?.enabled),
   },
@@ -125,32 +142,57 @@ const FEATURES: ReadonlyArray<{
     key: "tailscale",
     // "Tailnet only" is the one worth seeing from the list: it means the host is not reachable
     // from the public listener at all, which is otherwise invisible until you open it.
-    label: "Tailnet",
+    labelKey: "features.tailnet",
     icon: <Network />,
     variant: "info",
     isOn: (h) => Boolean(h.tailscale?.serve),
   },
-  { key: "waf", label: "WAF", icon: <Bug />, isOn: (h) => Boolean(h.waf?.enabled) },
-  { key: "geo", label: "Geo", icon: <MapPin />, isOn: (h) => Boolean(h.geoblock?.enabled) },
-  { key: "lb", label: "LB", icon: <Scale />, isOn: (h) => Boolean(h.loadBalancer?.enabled) },
-  { key: "mtls", label: "mTLS", icon: <KeyRound />, isOn: (h) => Boolean(h.mtls?.enabled) },
+  { key: "waf", labelKey: "features.waf", icon: <Bug />, isOn: (h) => Boolean(h.waf?.enabled) },
+  {
+    key: "geo",
+    labelKey: "features.geo",
+    icon: <MapPin />,
+    isOn: (h) => Boolean(h.geoblock?.enabled),
+  },
+  {
+    key: "lb",
+    labelKey: "features.lb",
+    icon: <Scale />,
+    isOn: (h) => Boolean(h.loadBalancer?.enabled),
+  },
+  {
+    key: "mtls",
+    labelKey: "features.mtls",
+    icon: <KeyRound />,
+    isOn: (h) => Boolean(h.mtls?.enabled),
+  },
   {
     key: "redirects",
-    label: "Redirects",
+    labelKey: "redirects",
     icon: <CornerRightDown />,
     isOn: (h) => h.redirects?.length > 0,
   },
-  { key: "rewrite", label: "Rewrite", icon: <Replace />, isOn: (h) => Boolean(h.rewrite) },
+  {
+    key: "rewrite",
+    labelKey: "features.rewrite",
+    icon: <Replace />,
+    isOn: (h) => Boolean(h.rewrite),
+  },
   {
     key: "path-allows",
-    label: "Allows",
+    labelKey: "features.allows",
     icon: <ShieldCheck />,
     isOn: (h) => h.pathAllows?.length > 0,
   },
-  { key: "path-blocks", label: "Blocks", icon: <Ban />, isOn: (h) => h.pathBlocks?.length > 0 },
+  {
+    key: "path-blocks",
+    labelKey: "features.blocks",
+    icon: <Ban />,
+    isOn: (h) => h.pathBlocks?.length > 0,
+  },
   {
     key: "path-rewrites",
-    label: "Path Rewrites",
+    labelKey: "pathRewrites",
     icon: <GitBranch />,
     isOn: (h) => h.pathRewrites?.length > 0,
   },
@@ -185,23 +227,24 @@ function HostActions({
   /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
   canCreate: boolean;
 }) {
+  const t = useTranslations("proxyHosts");
   return (
     <HStack gap={2} vAlign="center" justify="end">
       <Switch
-        label={`Enable ${host.name}`}
+        label={t("enableHostLabel", { name: host.name })}
         isLabelHidden
         value={host.enabled}
         onChange={onToggle}
       />
       <MoreMenu
-        label={`Actions for ${host.name}`}
+        label={t("hostActionsLabel", { name: host.name })}
         size="sm"
         alignment="end"
         items={[
-          { label: "Edit", onClick: onEdit },
-          ...(canCreate ? [{ label: "Duplicate", onClick: onDuplicate }] : []),
+          { label: t("edit"), onClick: onEdit },
+          ...(canCreate ? [{ label: t("duplicate"), onClick: onDuplicate }] : []),
           { type: "divider" },
-          { label: "Delete", variant: "destructive", onClick: onDelete },
+          { label: t("delete"), variant: "destructive", onClick: onDelete },
         ]}
       />
     </HStack>
@@ -234,6 +277,7 @@ export default function ProxyHostsClient({
   canEditRawConfig = false,
 }: Props) {
   const t = useTranslations("proxyHosts");
+  const emptyValue = useEmptyValue();
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<ProxyHost | null>(null);
@@ -303,7 +347,7 @@ export default function ProxyHostsClient({
   const columns: Column<ProxyHost>[] = [
     {
       id: "name",
-      label: "Name / Domain",
+      label: t("nameDomain"),
       sortKey: "name",
       render: (host) => (
         <HStack gap={3} vAlign="center">
@@ -321,7 +365,7 @@ export default function ProxyHostsClient({
     },
     {
       id: "target",
-      label: "Upstream",
+      label: t("upstream"),
       sortKey: "upstreams",
       render: (host) => (
         <HStack gap={2} vAlign="center">
@@ -341,7 +385,7 @@ export default function ProxyHostsClient({
         if (!name) {
           return (
             <Text type="body" size="xsm" color="secondary">
-              &mdash;
+              {emptyValue}
             </Text>
           );
         }
@@ -407,14 +451,14 @@ export default function ProxyHostsClient({
         if (active.length === 0) {
           return (
             <Text type="body" size="xsm" color="secondary">
-              &mdash;
+              {emptyValue}
             </Text>
           );
         }
         return (
           <HStack gap={1} wrap="wrap">
             {active.map((f) => (
-              <Badge key={f.key} variant={f.variant} icon={f.icon} label={f.label} />
+              <Badge key={f.key} variant={f.variant} icon={f.icon} label={t(f.labelKey)} />
             ))}
           </HStack>
         );
@@ -422,7 +466,7 @@ export default function ProxyHostsClient({
     },
     {
       id: "status",
-      label: "Status",
+      label: t("status"),
       sortKey: "enabled",
       width: 110,
       render: (host) => <StatusChip status={host.enabled ? "active" : "inactive"} />,
@@ -480,7 +524,7 @@ export default function ProxyHostsClient({
         action={
           canCreate
             ? {
-                label: "Create Host",
+                label: t("createHost"),
                 onClick: () => {
                   setDialogKey((k) => k + 1);
                   setCreateOpen(true);
@@ -555,11 +599,11 @@ export default function ProxyHostsClient({
         columns={columns}
         data={hosts}
         keyField="id"
-        emptyMessage={searchTerm ? "No hosts match your search" : "No proxy hosts found"}
+        emptyMessage={searchTerm ? t("noHostsMatchSearch") : t("noProxyHostsFound")}
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}
-        rowStatus={(host) => (host.enabled ? null : { color: "gray", label: "Disabled" })}
+        rowStatus={(host) => (host.enabled ? null : { color: "gray", label: t("filterDisabled") })}
       />
 
       <CreateHostDialog

@@ -198,10 +198,11 @@ const SEVERITY_VARIANTS: Record<string, "error" | "warning" | "info"> = {
 
 /* ── Chips ───────────────────────────────────────────────────────────────── */
 function SeverityChip({ severity }: { severity: string | null }) {
+  const emptyValue = useEmptyValue();
   if (!severity) {
     return (
       <Text type="body" size="xsm" color="secondary">
-        &mdash;
+        {emptyValue}
       </Text>
     );
   }
@@ -309,10 +310,11 @@ function WafStatusCard({ stats, isEnabled }: { stats: WafEventStats; isEnabled: 
 
 /* ── Audit panel ─────────────────────────────────────────────────────────── */
 function HeadersGrid({ headers }: { headers?: Record<string, string | string[]> }) {
+  const emptyValue = useEmptyValue();
   if (!headers || Object.keys(headers).length === 0) {
     return (
       <Text type="body" size="xsm" color="secondary">
-        &mdash;
+        {emptyValue}
       </Text>
     );
   }
@@ -386,7 +388,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
         <Tab value="overview" label={t("overview")} />
         <Tab value="request" label={t("request")} />
         <Tab value="response" label={t("response")} />
-        {msgs.length > 0 && <Tab value="matches" label={`Matches (${msgs.length})`} />}
+        {msgs.length > 0 && <Tab value="matches" label={t("matchesTab", { count: msgs.length })} />}
       </TabList>
 
       <Card variant="muted" padding={4}>
@@ -427,7 +429,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
                         <VStack gap={2}>
                           <HStack gap={2} vAlign="center">
                             <Text type="code" size="xsm" weight="semibold">
-                              Rule {m.details?.ruleId ?? emptyValue}
+                              {t("ruleLabel", { id: m.details?.ruleId ?? emptyValue })}
                             </Text>
                             <SeverityChip severity={m.details?.severity ?? null} />
                           </HStack>
@@ -483,7 +485,7 @@ function AuditPanel({ rawData }: { rawData: string | null }) {
               )}
               <DetailRow label={t("contentLength")}>
                 <Text type="code" size="xsm">
-                  {req.length ?? 0} bytes
+                  {t("contentLengthBytes", { length: req.length ?? 0 })}
                 </Text>
               </DetailRow>
             </VStack>
@@ -612,9 +614,9 @@ function EventDetailPanel({
     startTransition(async () => {
       const result = await suppressWafRuleGloballyAction(event.ruleId!);
       if (result.success) {
-        toast.success(result.message ?? "Done");
+        toast.success(result.message ?? t("actionDone"));
         onSuppressGlobal(event.ruleId!);
-      } else toast.error(result.message ?? "Failed");
+      } else toast.error(result.message ?? t("actionFailed"));
     });
   }
 
@@ -623,9 +625,9 @@ function EventDetailPanel({
     startTransition(async () => {
       const result = await suppressWafRuleForHostAction(event.ruleId!, event.host!);
       if (result.success) {
-        toast.success(result.message ?? "Done");
+        toast.success(result.message ?? t("actionDone"));
         onSuppressHost(event.ruleId!, event.host!);
-      } else toast.error(result.message ?? "Failed");
+      } else toast.error(result.message ?? t("actionFailed"));
     });
   }
 
@@ -702,7 +704,7 @@ function EventDetailPanel({
               size="sm"
               variant="secondary"
               icon={<ShieldOff />}
-              label={isGloballySuppressed ? "Suppressed Globally" : "Suppress Globally"}
+              label={isGloballySuppressed ? t("suppressedGlobally") : t("suppressGlobally")}
               isDisabled={pending || isGloballySuppressed}
               onClick={handleSuppressGlobally}
             />
@@ -712,7 +714,9 @@ function EventDetailPanel({
                 variant="secondary"
                 icon={<ShieldOff />}
                 label={
-                  isHostSuppressed ? `Suppressed for ${event.host}` : `Suppress for ${event.host}`
+                  isHostSuppressed
+                    ? t("suppressedForHost", { host: event.host })
+                    : t("suppressForHost", { host: event.host })
                 }
                 isDisabled={pending || isHostSuppressed}
                 onClick={handleSuppressForHost}
@@ -763,9 +767,9 @@ function GlobalSuppressedRules({
     startTransition(async () => {
       const result = await removeWafRuleGloballyAction(ruleId);
       if (result.success) {
-        toast.success(result.message ?? "Done");
+        toast.success(result.message ?? t("actionDone"));
         onRemove(ruleId);
-      } else toast.error(result.message ?? "Failed");
+      } else toast.error(result.message ?? t("actionFailed"));
     });
   }
 
@@ -773,7 +777,7 @@ function GlobalSuppressedRules({
     const n = parseInt(addInput.trim(), 10);
     if (!Number.isInteger(n) || n <= 0) return;
     if (excluded.includes(n)) {
-      toast.error(`Rule ${n} is already suppressed.`);
+      toast.error(t("ruleAlreadySuppressed", { id: n }));
       return;
     }
     setLookupPending(true);
@@ -790,13 +794,13 @@ function GlobalSuppressedRules({
     startTransition(async () => {
       const result = await suppressWafRuleGloballyAction(pendingRule.id);
       if (result.success) {
-        toast.success(result.message ?? "Done");
+        toast.success(result.message ?? t("actionDone"));
         onAdd(pendingRule.id, pendingRule.message);
         setMessages((prev) => ({ ...prev, [pendingRule.id]: pendingRule.message }));
         setAddInput("");
         setPendingRule(null);
       } else {
-        toast.error(result.message ?? "Failed");
+        toast.error(result.message ?? t("actionFailed"));
       }
     });
   }
@@ -807,12 +811,12 @@ function GlobalSuppressedRules({
     return String(id).includes(q) || (messages[id] ?? "").toLowerCase().includes(q);
   });
 
-  const noDescription = "No description available - rule has not triggered yet";
+  const noDescription = t("noRuleDescription");
 
   return (
     <VStack gap={4}>
       <VStack gap={2}>
-        <Heading level={2}>Global WAF Rule Exclusions</Heading>
+        <Heading level={2}>{t("globalRuleExclusions")}</Heading>
         <Text type="body" size="sm" color="secondary">
           {t("globalExclusionsHelp")}
         </Text>
@@ -854,7 +858,7 @@ function GlobalSuppressedRules({
           <Card variant="muted" padding={3} maxWidth={480}>
             <VStack gap={2}>
               <Text type="code" size="sm" weight="bold">
-                Rule {pendingRule.id}
+                {t("ruleLabel", { id: pendingRule.id })}
               </Text>
               <Text type="body" size="xsm" color="secondary">
                 {pendingRule.message ?? noDescription}
@@ -900,7 +904,7 @@ function GlobalSuppressedRules({
         <EmptyState
           icon={<ShieldOff />}
           title={t("noGloballySuppressedRules")}
-          description='Add a rule above or open a WAF event and click "Suppress Globally".'
+          description={t("suppressedRulesEmptyDescription")}
         />
       ) : filtered.length === 0 ? (
         <Text type="body" size="sm" color="secondary">
@@ -913,7 +917,7 @@ function GlobalSuppressedRules({
               <HStack gap={4} vAlign="center" justify="between">
                 <VStack gap={0}>
                   <Text type="code" size="sm" weight="bold">
-                    Rule {id}
+                    {t("ruleLabel", { id })}
                   </Text>
                   <Text type="body" size="xsm" color="secondary">
                     {messages[id] ?? noDescription}
@@ -921,7 +925,7 @@ function GlobalSuppressedRules({
                 </VStack>
                 <IconButton
                   variant="ghost"
-                  label={`Remove suppression for rule ${id}`}
+                  label={t("removeSuppressionForRule", { id })}
                   tooltip={t("removeSuppression")}
                   icon={<Trash2 />}
                   isDisabled={pending}
@@ -937,41 +941,28 @@ function GlobalSuppressedRules({
 }
 
 /* ── Main client component ───────────────────────────────────────────────── */
-const RANGE_OPTIONS: { value: RangeOption; label: string }[] = [
-  { value: "all", label: "All time" },
-  { value: "24h", label: "24h" },
-  { value: "7d", label: "7d" },
-  { value: "30d", label: "30d" },
-  { value: "custom", label: "Custom" },
-];
-
 /** Stored body limits are bytes; the form asks for whole MiB. Unset means "inherit the default". */
 function bodyLimitMib(bytes: number | undefined): number | null {
   const mib = bytesToMib(bytes);
   return mib ? Number(mib) : null;
 }
 
-const BODY_LIMIT_ACTIONS = [
-  { value: "", label: "Default" },
-  { value: "Reject", label: "Reject" },
-  { value: "ProcessPartial", label: "Partial" },
-];
-
+/** Labels are message keys: the catalog is only reachable from inside the component. */
 const WAF_TEMPLATES = [
   {
-    label: "Allow IP",
+    labelKey: "templateAllowIp",
     snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
   },
   {
-    label: "Disable WAF for path",
+    labelKey: "templateDisableWafForPath",
     snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
   },
-  { label: "Remove XSS rules", snippet: `SecRuleRemoveByTag "attack-xss"` },
+  { labelKey: "templateRemoveXssRules", snippet: `SecRuleRemoveByTag "attack-xss"` },
   {
-    label: "Block User-Agent",
+    labelKey: "templateBlockUserAgent",
     snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
   },
-];
+] as const;
 
 export default function WafEventsClient({
   events,
@@ -1029,6 +1020,20 @@ export default function WafEventsClient({
   // Coraza is a compiled-in plugin. With it off the settings below would be stored and then never
   // reach Caddy, so the form says so up front rather than accepting a rule set that does nothing.
   const wafModuleDisabledReason = useDisabledReason("waf");
+
+  const rangeOptions: { value: RangeOption; label: string }[] = [
+    { value: "all", label: t("rangeAllTime") },
+    { value: "24h", label: "24h" },
+    { value: "7d", label: "7d" },
+    { value: "30d", label: "30d" },
+    { value: "custom", label: t("rangeCustom") },
+  ];
+
+  const bodyLimitActions = [
+    { value: "", label: t("bodyLimitActionDefault") },
+    { value: "Reject", label: t("bodyLimitActionReject") },
+    { value: "ProcessPartial", label: t("bodyLimitActionPartial") },
+  ];
 
   useEffect(() => {
     setSearchTerm(initialSearch);
@@ -1137,7 +1142,7 @@ export default function WafEventsClient({
         </Text>
         {event.ruleId && (
           <Text type="body" size="xsm" color="secondary">
-            Rule #{event.ruleId}
+            {t("ruleNumber", { id: event.ruleId })}
           </Text>
         )}
       </VStack>
@@ -1147,7 +1152,7 @@ export default function WafEventsClient({
   const columns: Column<WafEvent>[] = [
     {
       id: "ts",
-      label: "Time (UTC)",
+      label: t("timeUtc"),
       width: 150,
       // formatDateTimeUtc pins locale and timezone, so the server- and client-rendered text are
       // identical: no hydration mismatch, and no locale-dependent dots vs slashes (issue #233).
@@ -1159,19 +1164,19 @@ export default function WafEventsClient({
     },
     {
       id: "blocked",
-      label: "Action",
+      label: t("action"),
       width: 90,
       render: (r) => <BlockedChip blocked={r.blocked} />,
     },
     {
       id: "severity",
-      label: "Severity",
+      label: t("severity"),
       width: 100,
       render: (r) => <SeverityChip severity={r.severity} />,
     },
     {
       id: "host",
-      label: "Host",
+      label: t("host"),
       width: 130,
       render: (r) =>
         r.host ? (
@@ -1182,13 +1187,13 @@ export default function WafEventsClient({
           </Tooltip>
         ) : (
           <Text type="body" size="xsm" color="secondary">
-            &mdash;
+            {emptyValue}
           </Text>
         ),
     },
     {
       id: "clientIp",
-      label: "Client IP",
+      label: t("clientIp"),
       width: 130,
       render: (r) => (
         <HStack gap={1} vAlign="center">
@@ -1201,7 +1206,7 @@ export default function WafEventsClient({
     },
     {
       id: "method",
-      label: "Request",
+      label: t("request"),
       width: 200,
       render: (r) => (
         <HStack gap={2} vAlign="center">
@@ -1218,7 +1223,7 @@ export default function WafEventsClient({
     },
     {
       id: "ruleId",
-      label: "Rule ID",
+      label: t("ruleId"),
       width: 80,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
@@ -1269,7 +1274,7 @@ export default function WafEventsClient({
     <VStack gap={4}>
       <HStack justify="between" vAlign="center" gap={2}>
         <VStack gap={1}>
-          <Heading level={1}>WAF</Heading>
+          <Heading level={1}>{t("waf")}</Heading>
           <Text type="body" color="secondary" className="cpm-desktop-only">
             {t("pageDescription")}
           </Text>
@@ -1329,14 +1334,14 @@ export default function WafEventsClient({
                 value={range}
                 onChange={handleRangeChange}
               >
-                {RANGE_OPTIONS.map((o) => (
+                {rangeOptions.map((o) => (
                   <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
                 ))}
               </SegmentedControl>
             </div>
             <div className="cpm-chip-row cpm-mobile-flex">
               <FilterChip
-                label={RANGE_OPTIONS.find((o) => o.value === range)?.label ?? range}
+                label={rangeOptions.find((o) => o.value === range)?.label ?? range}
                 aria-label={t("timeRange")}
                 isActive={range !== "all"}
                 onClick={() => setRangeSheetOpen(true)}
@@ -1347,7 +1352,7 @@ export default function WafEventsClient({
               isOpen={rangeSheetOpen}
               onOpenChange={setRangeSheetOpen}
               value={range}
-              options={RANGE_OPTIONS}
+              options={rangeOptions}
               onChange={handleRangeChange}
             />
             {range === "custom" && (
@@ -1415,7 +1420,7 @@ export default function WafEventsClient({
                   pagination={pagination}
                   onRowClick={(row) => setSelected((prev) => (prev?.id === row.id ? null : row))}
                   rowStatus={(row) =>
-                    row.id === selected?.id ? { color: "accent", label: "Selected" } : null
+                    row.id === selected?.id ? { color: "accent", label: t("selected") } : null
                   }
                   mobileCard={mobileCard}
                 />
@@ -1451,7 +1456,7 @@ export default function WafEventsClient({
       {tab === "settings" && (
         <VStack gap={6} maxWidth={720}>
           <VStack gap={1}>
-            <Heading level={2}>WAF Settings</Heading>
+            <Heading level={2}>{t("wafSettings")}</Heading>
             <Text type="body" size="sm" color="secondary">
               {t("globalSettingsDescription")}
             </Text>
@@ -1521,7 +1526,7 @@ export default function WafEventsClient({
                 value={wafLimitAction}
                 onChange={setWafLimitAction}
               >
-                {BODY_LIMIT_ACTIONS.map((o) => (
+                {bodyLimitActions.map((o) => (
                   <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
                 ))}
               </SegmentedControl>
@@ -1551,17 +1556,17 @@ export default function WafEventsClient({
                 }
               >
                 <VStack gap={2}>
-                  {WAF_TEMPLATES.map((t) => (
+                  {WAF_TEMPLATES.map((template) => (
                     <Button
-                      key={t.label}
+                      key={template.labelKey}
                       type="button"
                       size="sm"
                       variant="secondary"
                       icon={<Copy />}
-                      label={t.label}
+                      label={t(template.labelKey)}
                       onClick={() =>
                         setWafCustomDirectives((prev) =>
-                          prev ? `${prev}\n${t.snippet}` : t.snippet,
+                          prev ? `${prev}\n${template.snippet}` : template.snippet,
                         )
                       }
                     />

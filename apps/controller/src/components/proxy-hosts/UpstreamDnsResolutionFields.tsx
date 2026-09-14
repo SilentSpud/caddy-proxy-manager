@@ -54,10 +54,8 @@ export function UpstreamDnsResolutionFields({
 
   const summary =
     currentMode === "inherit" && currentFamily === "inherit"
-      ? "Using global upstream DNS pinning defaults"
-      : `Override: ${currentMode === "inherit" ? "inherit mode" : currentMode}, ${
-          currentFamily === "inherit" ? "inherit family" : currentFamily
-        }`;
+      ? t("dnsPinningSummaryInherit")
+      : t("dnsPinningSummaryOverride", { mode: currentMode, family: currentFamily });
 
   return (
     <Card>

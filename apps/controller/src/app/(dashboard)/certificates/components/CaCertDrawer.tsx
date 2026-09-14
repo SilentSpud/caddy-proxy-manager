@@ -91,16 +91,16 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
 
   const activeForm = isEdit ? EDIT_FORM : tab === "generate" ? GENERATE_FORM : IMPORT_FORM;
   const submitLabel = isEdit
-    ? "Save"
+    ? t("save")
     : tab === "generate"
-      ? "Generate CA Certificate"
-      : "Add CA Certificate";
+      ? t("generateCaCertificate")
+      : t("addCaCertificate");
 
   return (
     <AppDialog
       open={open}
       onClose={handleClose}
-      title={isEdit ? "Edit CA Certificate" : "Add CA Certificate"}
+      title={isEdit ? t("editCaCertificate") : t("addCaCertificate")}
       maxWidth="md"
       actions={
         <>
@@ -188,7 +188,7 @@ export function CaCertDrawer({ open, cert, onClose }: Props) {
                   min={1}
                   max={3650}
                   isIntegerOnly
-                  units="days"
+                  units={t("days")}
                 />
               </VStack>
             </form>

@@ -3,6 +3,7 @@ import { auth, checkSameOrigin } from "./auth";
 import { validateToken } from "./models/api-tokens";
 import { randomUUID } from "node:crypto";
 import { ApiClientError } from "./api-errors";
+import { DomainError } from "./domain-error";
 
 export class ApiAuthError extends Error {
   status: number;
@@ -99,6 +100,10 @@ export function apiErrorResponse(error: unknown): NextResponse {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   if (error instanceof ApiClientError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  // A model error that names its 4xx - one that used to be an ApiClientError - is just as safe.
+  if (error instanceof DomainError && error.status !== undefined) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   if (error instanceof NotFoundError) {

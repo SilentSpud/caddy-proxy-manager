@@ -12,6 +12,7 @@
  */
 
 import { APP_VERSION } from "./app-version";
+import { type StoredErrorCode, domainError, storedErrorCode } from "./domain-error";
 import { getSetting, setSetting } from "./settings";
 
 const CACHE_KEY = "update_check";
@@ -37,9 +38,17 @@ type CachedCheck = {
   checkedAt: string;
   latest: string | null;
   error: string | null;
+  /** The code behind `error`, when it had one. Absent from a result stored before codes were. */
+  errorCode?: StoredErrorCode | null;
   /** What was checked. A changed repository setting makes the stored result irrelevant. */
   repository: string;
 };
+
+/** Store a failure as its English and, when it has one, its code. */
+function recordFailure(result: CachedCheck, failure: Error): void {
+  result.error = failure.message;
+  result.errorCode = storedErrorCode(failure);
+}
 
 export type UpdateStatus = {
   enabled: boolean;
@@ -50,6 +59,8 @@ export type UpdateStatus = {
   checkedAt: string | null;
   /** Why the last check failed, for a page that would otherwise just say nothing. */
   error: string | null;
+  /** Its code, for `storedErrorMessage` to say it in the reader's language. */
+  errorCode: StoredErrorCode | null;
   repository: string;
 };
 
@@ -156,16 +167,17 @@ export function nextPageUrl(header: string | null, host: string): string | null 
   try {
     next = new URL(match[1], expected);
   } catch {
-    throw new Error("The registry sent a pagination link that is not a URL");
+    throw domainError("registryPaginationNotUrl");
   }
 
   // Origin rather than hostname: a link that downgrades to http, or moves to another port, is as
   // much a different destination as one that names another host. Both origins are named because
   // this text is what an operator is shown, and "somewhere else" would not tell them where.
   if (next.origin !== expected.origin) {
-    throw new Error(
-      `The registry paginated to ${next.origin}, not ${expected.origin} - this check will not follow that`,
-    );
+    throw domainError("registryPaginatedElsewhere", {
+      origin: next.origin,
+      expected: expected.origin,
+    });
   }
   return next.toString();
 }
@@ -190,16 +202,14 @@ export function tokenRealmUrl(realm: string, host: string): URL {
   try {
     url = new URL(realm);
   } catch {
-    throw new Error("The registry sent an auth realm that is not a URL");
+    throw domainError("registryRealmNotUrl");
   }
 
   const registry = new URL(`https://${host}/`);
   const knownService =
     url.port === "" && (TOKEN_SERVICE_HOSTS[registry.hostname] ?? []).includes(url.hostname);
   if (url.protocol !== "https:" || (url.host !== registry.host && !knownService)) {
-    throw new Error(
-      `The registry sent its auth challenge to ${url.origin}, not ${registry.origin} - this check will not follow that`,
-    );
+    throw domainError("registryRealmElsewhere", { origin: url.origin, expected: registry.origin });
   }
   return url;
 }
@@ -234,8 +244,7 @@ async function listTags(host: string, repository: string, signal: AbortSignal): 
 
     if (response.status === 401 && !token) {
       const challenge = parseChallenge(response.headers.get("www-authenticate") ?? "");
-      if (!challenge)
-        throw new Error("The registry asked for credentials this check cannot supply");
+      if (!challenge) throw domainError("registryCredentialsRequired");
 
       const tokenUrl = tokenRealmUrl(challenge.realm, host);
       if (challenge.service) tokenUrl.searchParams.set("service", challenge.service);
@@ -247,11 +256,12 @@ async function listTags(host: string, repository: string, signal: AbortSignal): 
         // A redirect would carry the request past the check above.
         redirect: "error",
       });
-      if (!tokenResponse.ok)
-        throw new Error(`The registry refused an anonymous token (HTTP ${tokenResponse.status})`);
+      if (!tokenResponse.ok) {
+        throw domainError("registryTokenRefused", { status: tokenResponse.status });
+      }
       const issued = (await tokenResponse.json()) as { token?: string; access_token?: string };
       token = issued.token ?? issued.access_token ?? null;
-      if (!token) throw new Error("The registry issued no token");
+      if (!token) throw domainError("registryNoToken");
 
       response = await fetch(url, {
         headers: { ...headers, authorization: `Bearer ${token}` },
@@ -259,8 +269,8 @@ async function listTags(host: string, repository: string, signal: AbortSignal): 
       });
     }
 
-    if (response.status === 404) throw new Error("No such repository, or it is not public");
-    if (!response.ok) throw new Error(`The registry answered HTTP ${response.status}`);
+    if (response.status === 404) throw domainError("registryRepositoryNotFound");
+    if (!response.ok) throw domainError("registryHttpStatus", { status: response.status });
 
     const body = (await response.json()) as { tags?: string[] | null };
     if (Array.isArray(body.tags)) tags.push(...body.tags);
@@ -305,12 +315,13 @@ export async function checkForUpdates(): Promise<CachedCheck> {
       checkedAt: new Date().toISOString(),
       latest: null,
       error: null,
+      errorCode: null,
       repository,
     };
 
     const parsed = parseRepository(repository);
     if (!parsed) {
-      result.error = `"${repository}" is not a registry path like ghcr.io/owner/name`;
+      recordFailure(result, domainError("updateRepositoryInvalid", { repository }));
     } else {
       try {
         const tags = await listTags(
@@ -319,14 +330,16 @@ export async function checkForUpdates(): Promise<CachedCheck> {
           AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         );
         result.latest = newestRelease(tags);
-        if (!result.latest) result.error = "The registry has no released version tags";
+        if (!result.latest) recordFailure(result, domainError("updateNoReleases"));
       } catch (error) {
-        result.error =
+        recordFailure(
+          result,
           error instanceof Error && error.name === "TimeoutError"
-            ? "The registry did not answer in time"
+            ? domainError("updateTimedOut")
             : error instanceof Error
-              ? error.message
-              : "The check failed";
+              ? error
+              : domainError("checkFailed"),
+        );
       }
     }
 
@@ -361,6 +374,7 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
       updateAvailable: false,
       checkedAt: null,
       error: null,
+      errorCode: null,
       repository,
     };
   }
@@ -374,6 +388,7 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
     updateAvailable: false,
     checkedAt: cached?.repository === repository ? cached.checkedAt : null,
     error: cached?.repository === repository ? (cached.error ?? null) : null,
+    errorCode: cached?.repository === repository ? (cached.errorCode ?? null) : null,
     repository,
   };
 

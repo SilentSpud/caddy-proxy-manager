@@ -12,8 +12,8 @@ import { useTranslations } from "next-intl";
 type ToggleSetting = {
   stateKey: "hstsSubdomains" | "skipHttpsHostnameValidation";
   fieldName: "hstsSubdomains" | "skipHttpsHostnameValidation";
-  label: string;
-  description: string;
+  labelKey: "hstsSubdomains" | "skipHttpsValidation";
+  descriptionKey: "hstsSubdomainsHelp" | "skipHttpsValidationHelp";
 };
 
 type SettingsTogglesProps = {
@@ -26,14 +26,14 @@ const SETTINGS: ToggleSetting[] = [
   {
     stateKey: "hstsSubdomains",
     fieldName: "hstsSubdomains",
-    label: "HSTS Subdomains",
-    description: "Include subdomains in the Strict-Transport-Security header",
+    labelKey: "hstsSubdomains",
+    descriptionKey: "hstsSubdomainsHelp",
   },
   {
     stateKey: "skipHttpsHostnameValidation",
     fieldName: "skipHttpsHostnameValidation",
-    label: "Skip HTTPS Validation",
-    description: "Skip SSL certificate hostname verification for backend connections",
+    labelKey: "skipHttpsValidation",
+    descriptionKey: "skipHttpsValidationHelp",
   },
 ];
 
@@ -61,11 +61,9 @@ export function SettingsToggles({
           border and background tinted with primary/5 when active. */}
       <Banner
         status={values.enabled ? "success" : "warning"}
-        title={values.enabled ? "Proxy Host Enabled" : "Proxy Host Paused"}
+        title={values.enabled ? t("proxyHostEnabledTitle") : t("proxyHostPausedTitle")}
         description={
-          values.enabled
-            ? "This host is active and routing traffic"
-            : "This host is disabled and will not respond to requests"
+          values.enabled ? t("proxyHostActiveDescription") : t("proxyHostPausedDescription")
         }
         endContent={
           <Switch
@@ -88,8 +86,8 @@ export function SettingsToggles({
               {index > 0 && <Divider />}
               <input type="hidden" name={`${setting.fieldName}Present`} value="1" />
               <Switch
-                label={setting.label}
-                description={setting.description}
+                label={t(setting.labelKey)}
+                description={t(setting.descriptionKey)}
                 htmlName={setting.fieldName}
                 labelPosition="start"
                 labelSpacing="spread"

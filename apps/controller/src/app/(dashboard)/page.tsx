@@ -5,12 +5,14 @@ import { accessLists, auditEvents, certificates, proxyHosts, users } from "@/src
 import { count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { getAnalyticsSummary } from "@/src/lib/analytics-db";
 import { isDomainCoveredByCert } from "@/src/lib/cert-domain-match";
+import { auditSummaryText } from "@/src/lib/audit-summary";
 import type { Metadata } from "next";
 
 import type { StatCard } from "./OverviewClient";
 import { getTranslations } from "next-intl/server";
 
 async function loadStats(): Promise<StatCard[]> {
+  const t = await getTranslations("overview");
   const [
     proxyHostCountResult,
     proxyHostEnabledResult,
@@ -82,7 +84,7 @@ async function loadStats(): Promise<StatCard[]> {
   // server/client boundary, and an element would carry its styling with it.
   return [
     {
-      label: "Proxy Hosts",
+      label: t("statProxyHosts"),
       icon: "proxyHosts",
       // A disabled host still holds its domain and still shows in the list, so the
       // headline is what is actually being served and the total sits beside it.
@@ -91,12 +93,17 @@ async function loadStats(): Promise<StatCard[]> {
       href: "/proxy-hosts",
     },
     {
-      label: "Certificates",
+      label: t("statCertificates"),
       icon: "certificates",
       count: certificatesCount,
       href: "/certificates",
     },
-    { label: "Access Lists", icon: "accessLists", count: accessListsCount, href: "/access-lists" },
+    {
+      label: t("statAccessLists"),
+      icon: "accessLists",
+      count: accessListsCount,
+      href: "/access-lists",
+    },
   ];
 }
 
@@ -108,12 +115,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function OverviewPage() {
   const session = await requireUser();
   const isAdmin = session.user.role === "admin";
+  const t = await getTranslations("overview");
 
   // Non-admin users see a minimal welcome page
   if (!isAdmin) {
     return (
       <OverviewClient
-        userName={session.user.name ?? session.user.email ?? "User"}
+        userName={session.user.name ?? session.user.email ?? t("userNameFallback")}
         stats={[]}
         trafficSummary={null}
         recentEvents={[]}
@@ -153,10 +161,12 @@ export default async function OverviewPage() {
   ]);
 
   const actorNames = await loadActorNames(recentEventsRaw.map((event) => event.userId));
+  // See the audit log page: summaries are stored in English and translated on the way out.
+  const tSummaries = await getTranslations();
 
   return (
     <OverviewClient
-      userName={session.user.name ?? session.user.email ?? "Admin"}
+      userName={session.user.name ?? session.user.email ?? t("adminNameFallback")}
       stats={stats}
       trafficSummary={trafficSummary}
       isAdmin={true}
@@ -166,7 +176,9 @@ export default async function OverviewPage() {
         action: event.action,
         entityType: event.entityType,
         actor: event.userId === null ? null : (actorNames.get(event.userId) ?? null),
-        summary: event.summary ?? `${event.action} on ${event.entityType}`,
+        summary:
+          auditSummaryText(tSummaries, event) ??
+          t("eventSummaryFallback", { action: event.action, entityType: event.entityType }),
         createdAt: toIso(event.createdAt)!,
       }))}
     />

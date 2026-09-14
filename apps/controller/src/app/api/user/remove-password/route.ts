@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { getUserById, listUserOAuthProviders, removeUserPassword } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
@@ -17,10 +18,11 @@ export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
   if (originCheck) return originCheck;
 
+  const t = await getTranslations();
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: t("auth.apiErrors.unauthorized") }, { status: 401 });
     }
 
     const userId = Number(session.user.id);
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
     const rateCheck = await isRateLimited(rateLimitKey);
     if (rateCheck.blocked) {
       return NextResponse.json(
-        { error: "Too many attempts. Please try again later." },
+        { error: t("auth.apiErrors.tooManyAttempts") },
         {
           status: 429,
           headers: rateCheck.retryAfterMs
@@ -42,19 +44,16 @@ export async function POST(request: NextRequest) {
 
     const user = await getUserById(userId);
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: t("auth.apiErrors.userNotFound") }, { status: 404 });
     }
     if (!user.passwordHash) {
-      return NextResponse.json(
-        { error: "This account has no password to remove" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: t("profile.noPasswordToRemove") }, { status: 400 });
     }
 
     const providers = await listUserOAuthProviders(userId);
     if (providers.length === 0) {
       return NextResponse.json(
-        { error: "Link a single sign-on provider before removing your password" },
+        { error: t("profile.linkProviderBeforeRemovingPassword") },
         { status: 400 },
       );
     }
@@ -62,11 +61,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     if (!currentPassword) {
-      return NextResponse.json({ error: "Current password is required" }, { status: 400 });
+      return NextResponse.json({ error: t("profile.currentPasswordRequired") }, { status: 400 });
     }
     if (!(await verifyPassword(currentPassword, user.passwordHash))) {
       await registerFailedAttempt(rateLimitKey);
-      return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
+      return NextResponse.json({ error: t("profile.currentPasswordIncorrect") }, { status: 401 });
     }
     resetAttempts(rateLimitKey);
 
@@ -84,6 +83,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Remove password error:", error);
-    return NextResponse.json({ error: "Failed to remove password" }, { status: 500 });
+    return NextResponse.json({ error: t("profile.removePasswordFailed") }, { status: 500 });
   }
 }

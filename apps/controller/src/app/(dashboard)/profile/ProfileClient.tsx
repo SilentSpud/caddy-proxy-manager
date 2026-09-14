@@ -30,12 +30,11 @@ import { MAX_AVATAR_FILE_KB } from "@/src/lib/avatar-limits";
 import { authClient } from "@/src/lib/auth-client";
 import { Key, Link, LogIn, Lock, LogOut, Monitor, Plus, Trash2, Unlink, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
 import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
-import { useTranslations } from "next-intl";
+import { useFormatter, useNow, useTranslations } from "next-intl";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 
 interface ActiveSession {
@@ -83,14 +82,6 @@ function describeDevice(ua: string | null, words: DeviceWords): string {
             ? "Linux"
             : "";
   return os ? words.onOs(browser, os) : browser;
-}
-
-function relativeTime(iso: string): string {
-  try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true });
-  } catch {
-    return iso;
-  }
 }
 
 interface UserData {
@@ -158,6 +149,10 @@ export default function ProfileClient({
   const t = useTranslations("profile");
   // Unscoped as well, for the password rule - it is shared with every other password field.
   const tRoot = useTranslations();
+  // "Signed in 3 days ago" in the UI's language. `now` is passed explicitly: without it next-intl
+  // reports an environment fallback for every call.
+  const format = useFormatter();
+  const now = useNow();
   const deviceWords: DeviceWords = {
     unknown: t("deviceUnknown"),
     browser: t("deviceBrowser"),
@@ -437,7 +432,7 @@ export default function ProfileClient({
   };
 
   const formatDate = (iso: string | null): string => {
-    if (!iso) return "Never";
+    if (!iso) return t("never");
     return new Date(iso).toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
@@ -454,7 +449,7 @@ export default function ProfileClient({
 
   return (
     <VStack gap={6}>
-      <Heading level={1}>Profile &amp; Account Settings</Heading>
+      <Heading level={1}>{t("title")}</Heading>
 
       {error && (
         <Banner
@@ -595,15 +590,15 @@ export default function ProfileClient({
                   description={
                     <HStack gap={3} wrap="wrap" vAlign="center">
                       <Text type="body" size="xsm" color="secondary">
-                        Signed in {relativeTime(s.createdAt)}
+                        {t("signedIn", { when: format.relativeTime(new Date(s.createdAt), now) })}
                       </Text>
                       {s.ipAddress && (
                         <Text type="body" size="xsm" color="secondary">
-                          IP {s.ipAddress}
+                          {t("ipAddress", { address: s.ipAddress })}
                         </Text>
                       )}
                       <Text type="body" size="xsm" color="secondary">
-                        Expires {formatDate(s.expiresAt)}
+                        {t("expiresOn", { date: formatDate(s.expiresAt) })}
                       </Text>
                     </HStack>
                   }
@@ -636,9 +631,10 @@ export default function ProfileClient({
             {hasOAuth ? (
               <VStack gap={2}>
                 <Text type="body" size="sm" color="secondary">
-                  {linkedNames.length === 1
-                    ? `Your account is linked to ${linkedNames[0]}`
-                    : `Your account is linked to: ${linkedNames.join(", ")}`}
+                  {t("linkedTo", {
+                    count: linkedNames.length,
+                    providers: linkedNames.join(", "),
+                  })}
                 </Text>
 
                 {!localPasswordsEnabled ? (
@@ -684,7 +680,7 @@ export default function ProfileClient({
                       variant="secondary"
                       width="100%"
                       icon={<LogIn />}
-                      label={`Link ${provider.name}`}
+                      label={t("linkProvider", { provider: provider.name })}
                       onClick={() => handleLinkOAuth(provider.id)}
                     />
                   ))}
@@ -723,14 +719,16 @@ export default function ProfileClient({
                       description={
                         <HStack gap={3} wrap="wrap" vAlign="center">
                           <Text type="body" size="xsm" color="secondary">
-                            Created {formatDate(token.createdAt)}
+                            {t("createdOn", { date: formatDate(token.createdAt) })}
                           </Text>
                           <Text type="body" size="xsm" color="secondary">
                             {t("used", { when: formatDate(token.lastUsedAt) })}
                           </Text>
                           {token.expiresAt && (
                             <Text type="body" size="xsm" color="secondary">
-                              {expired ? t("expired") : t("expires")} {formatDate(token.expiresAt)}
+                              {expired
+                                ? t("expiredOn", { date: formatDate(token.expiresAt) })
+                                : t("expiresOn", { date: formatDate(token.expiresAt) })}
                             </Text>
                           )}
                         </HStack>
@@ -743,7 +741,7 @@ export default function ProfileClient({
                               type="submit"
                               variant="ghost"
                               size="sm"
-                              label={`Delete token ${token.name}`}
+                              label={t("deleteTokenNamed", { name: token.name })}
                               tooltip={t("deleteToken")}
                               icon={<Trash2 />}
                             />

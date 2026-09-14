@@ -11,6 +11,8 @@
 import { geoipDatabaseAgeDays, geoipEnabled, installedGeoipDatabases } from "../agent/geoip";
 import { editionsBehind, getGeoipUpdateCheck } from "../geoip/update-check";
 import { getGeoipDownloadState } from "../geoip/updater";
+import { geoipDownloadErrorMessage } from "../geoip/messages";
+import { storedErrorMessage } from "../actions";
 import { isAnalyticsEnabled } from "../clickhouse/client";
 import * as registry from "./registry";
 import { resolveSetting, saveSettings, type SettingSource } from "./resolve";
@@ -84,7 +86,11 @@ export async function analyticsView(): Promise<AnalyticsView> {
   };
 }
 
-export async function geoipView(): Promise<GeoipView> {
+/**
+ * `t` is the root translator: the stored check and download failures are said in the reader's
+ * language here, so the page and its health summary both get sentences.
+ */
+export async function geoipView(t: Parameters<typeof storedErrorMessage>[0]): Promise<GeoipView> {
   const installed = installedGeoipDatabases();
   const interval = await resolveSetting(registry.geoipUpdateIntervalHours);
   const [toggle, enabled, accountId, licenseKey, check, downloads] = await Promise.all([
@@ -109,9 +115,9 @@ export async function geoipView(): Promise<GeoipView> {
     installedEditions: installed.map((database) => database.edition),
     databaseAgeDays: geoipDatabaseAgeDays(installed),
     lastCheckedAt: check.checkedAt,
-    checkError: check.error,
+    checkError: check.error ? storedErrorMessage(t, check.error, check.errorCode) : null,
     editionsBehind: editionsBehind(check.available, installed),
-    downloadError: downloads.error,
+    downloadError: geoipDownloadErrorMessage(t, downloads.error, downloads.failures),
     updateIntervalHours: interval.value,
   };
 }

@@ -18,7 +18,8 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { regionName } from "@/src/lib/region-names";
 
 export type CountryBreakdownData = {
   countryCode: string;
@@ -139,13 +140,12 @@ export function CountryBreakdownView({
   onClose: () => void;
 }) {
   const t = useTranslations("analytics");
+  const locale = useLocale();
 
-  // Intl rather than a hand-kept table, so the name follows the reader's locale. "XX" is the code
-  // for requests GeoIP could not place, which no locale has a name for.
-  const name =
-    code === "XX"
-      ? t("unplacedCountry")
-      : (new Intl.DisplayNames(undefined, { type: "region" }).of(code) ?? code);
+  // Named in the UI's locale rather than the browser's, so the header matches the map's popup and
+  // the server and client render the same text. "XX" is the code for requests GeoIP could not
+  // place, which no locale has a name for.
+  const name = code === "XX" ? t("unplacedCountry") : regionName(code, locale);
   const share = totalRequests > 0 && data ? ((data.total / totalRequests) * 100).toFixed(1) : null;
 
   return (

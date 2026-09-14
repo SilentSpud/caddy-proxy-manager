@@ -595,7 +595,7 @@ export default function OverviewClient({
     return (
       <VStack gap={8}>
         <VStack gap={1}>
-          <Heading level={1}>Welcome back, {userName}</Heading>
+          <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
           <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
             {t("pageDescription")}
           </Text>
@@ -610,7 +610,7 @@ export default function OverviewClient({
     <VStack gap={5}>
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={1}>
-          <Heading level={1}>Welcome back, {userName}</Heading>
+          <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
           {/* Not on a phone, like every page's description: read once, then only in the way. */}
           <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
             {t("pageDescription")}
@@ -643,11 +643,13 @@ export default function OverviewClient({
         {stats.map((stat) => (
           <ClickableCard
             key={stat.label}
-            label={
-              stat.total === undefined
-                ? `${stat.label}: ${stat.count}`
-                : `${stat.label}: ${t("statEnabledOf", { enabled: stat.count, total: stat.total })}`
-            }
+            label={t("statCardLabel", {
+              label: stat.label,
+              value:
+                stat.total === undefined
+                  ? stat.count
+                  : t("statEnabledOf", { enabled: stat.count, total: stat.total }),
+            })}
             href={stat.href}
             padding={4}
           >
@@ -758,8 +760,10 @@ export default function OverviewClient({
       {/* Kept so the 24h headline stays on the page even when a longer range is selected. */}
       {trafficSummary && trafficSummary.totalRequests > 0 && (
         <Text type="body" size="xsm" color="secondary">
-          {t("traffic24h")}: {trafficSummary.totalRequests.toLocaleString()} &middot; {t("blocked")}{" "}
-          {trafficSummary.blockedPercent}%
+          {t("traffic24hSummary", {
+            total: trafficSummary.totalRequests.toLocaleString(),
+            percent: trafficSummary.blockedPercent,
+          })}
         </Text>
       )}
     </VStack>

@@ -19,6 +19,8 @@ export type DiffLine = {
   /** Line number in the staged document; null for a removed line or a gap. */
   line: number | null;
   text: string;
+  /** For a gap, how many lines it stands for, so the review sheet can say so in its own words. */
+  skipped?: number;
 };
 
 export type ConfigDiff = {
@@ -199,7 +201,7 @@ function collapse(ops: Op[], context: number): DiffLine[] {
   ops.forEach((op, index) => {
     if (keep.has(index)) {
       if (skipped > 0) {
-        lines.push({ kind: "gap", line: null, text: `${skipped} unchanged lines` });
+        lines.push({ kind: "gap", line: null, text: `${skipped} unchanged lines`, skipped });
         skipped = 0;
       }
       lines.push(op);
@@ -208,7 +210,7 @@ function collapse(ops: Op[], context: number): DiffLine[] {
     skipped += 1;
   });
   if (skipped > 0) {
-    lines.push({ kind: "gap", line: null, text: `${skipped} unchanged lines` });
+    lines.push({ kind: "gap", line: null, text: `${skipped} unchanged lines`, skipped });
   }
   return lines;
 }

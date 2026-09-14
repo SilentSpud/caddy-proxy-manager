@@ -294,7 +294,7 @@ export async function importLegacyDatabase(
             if (error instanceof LegacySecretError) {
               // Named, because "which of thirty tables" is the first thing anyone asks. The row is
               // not identified: its id would say little and its contents are the secret itself.
-              throw new LegacySecretError(`${error.message} (reading ${table.name})`);
+              throw new LegacySecretError(error.reason, table.name);
             }
             throw error;
           }

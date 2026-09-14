@@ -105,9 +105,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
       // Banner supplies its own status icon; only the in-flight spinner needs
       // to replace it.
       icon={isSpinning ? <Spinner size="sm" /> : undefined}
-      title={
-        diff.needsApply ? "Docker port changes pending" : (status.message ?? "Docker port status")
-      }
+      title={diff.needsApply ? t("portsChangesPending") : (status.message ?? t("portsStatus"))}
       description={
         <VStack gap={1}>
           {diff.needsApply && (

@@ -28,9 +28,12 @@ export type MigrationGroupId =
 
 export type MigrationGroup = {
   id: MigrationGroupId;
-  /** What the setup page calls it. */
+  /**
+   * What the setup page calls it. The page renders `setup.migrationGroups.<id>.label`, which holds
+   * this same English - change both, or tests/unit/migration-messages.test.ts fails.
+   */
   label: string;
-  /** One sentence on what is and is not in it, shown under the label. */
+  /** One sentence on what is and is not in it, shown under the label. Mirrored the same way. */
   description: string;
   /** The schema table names - the `pgTable` name, not the exported identifier. */
   tables: string[];

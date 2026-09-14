@@ -62,7 +62,7 @@ export function TailscaleFields({
         <HStack justify="between" vAlign="center" gap={4}>
           <VStack gap={1}>
             <Text type="body" size="sm" weight="semibold">
-              {t("tailscale")}{" "}
+              {t("tailscale")}
             </Text>
             <Text type="body" size="sm" color="secondary">
               {t("tailscaleDescription")}
@@ -179,8 +179,10 @@ export function TailscaleFields({
 
         {upstreamNode.trim() !== "" && (
           <Text type="body" size="sm" color="secondary">
-            Upstreams are dialled through <Code>{upstreamNode.trim()}</Code>. Use a MagicDNS name or
-            a tailnet IP in the Upstreams field above.
+            {t.rich("upstreamDialledThrough", {
+              node: upstreamNode.trim(),
+              code: (chunks) => <Code>{chunks}</Code>,
+            })}
           </Text>
         )}
       </VStack>

@@ -27,6 +27,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Fab } from "@/src/components/mobile/Fab";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { StatTiles } from "@/components/ui/StatTiles";
+import { useEmptyValue } from "@/components/ui/empty-value";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { LogAccessFix } from "@/src/lib/agent/log-access";
@@ -80,6 +81,7 @@ export default function AgentsClient({
   isAdmin: boolean;
 }) {
   const t = useTranslations("agents");
+  const emptyValue = useEmptyValue();
   const router = useRouter();
 
   function describeFix(fix: LogAccessFix): string {
@@ -111,7 +113,11 @@ export default function AgentsClient({
   // One version across the fleet is the answer people want; anything else is the problem.
   const versions = new Set(agents.map((agent) => agent.version).filter(Boolean));
   const versionLabel =
-    versions.size === 0 ? "-" : versions.size === 1 ? `v${[...versions][0]}` : `${versions.size}`;
+    versions.size === 0
+      ? emptyValue
+      : versions.size === 1
+        ? `v${[...versions][0]}`
+        : `${versions.size}`;
 
   async function rebuild(agent: AgentRow) {
     setBusyId(agent.id);

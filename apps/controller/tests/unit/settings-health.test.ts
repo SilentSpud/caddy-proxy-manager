@@ -4,7 +4,16 @@
  * tile, and a silent one hides a misconfiguration that looks fine on every individual page.
  */
 import { describe, it, expect } from 'bun:test';
+import { createTranslator } from 'next-intl';
+import messages from '../../messages/en.json';
 import { needsAttention, sectionHealth, type HealthInput } from '../../src/lib/settings/health';
+
+// The real catalog rather than a stub, so the wording assertions below still hold the English.
+const t = createTranslator({ locale: 'en', messages, namespace: 'settings' });
+
+function health(healthInput: HealthInput) {
+  return sectionHealth(healthInput, t);
+}
 
 /**
  * A GeoipView, defaulted to a healthy deployment.
@@ -67,11 +76,11 @@ function find(sections: ReturnType<typeof sectionHealth>, id: string) {
 
 describe('sectionHealth', () => {
   it('reports a healthy deployment with nothing needing attention', () => {
-    expect(needsAttention(sectionHealth(input()))).toHaveLength(0);
+    expect(needsAttention(health(input()))).toHaveLength(0);
   });
 
   it('flags geo-block running without a GeoIP database', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoBlock: { enabled: true, block_countries: ['CN'] } as HealthInput['geoBlock'],
         geoip: geoipView({ enabled: true, installedEditions: [], databaseAgeDays: null }),
@@ -84,7 +93,7 @@ describe('sectionHealth', () => {
   });
 
   it('does not flag geo-block once a database is installed', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoBlock: { enabled: true, block_countries: ['CN'] } as HealthInput['geoBlock'],
         geoip: geoipView({
@@ -100,7 +109,7 @@ describe('sectionHealth', () => {
   });
 
   it('flags geo-block with no trusted proxy ranges, where every client IP is the proxy', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoBlock: { enabled: true, block_countries: ['CN'] } as HealthInput['geoBlock'],
         geoip: geoipView({
@@ -118,7 +127,7 @@ describe('sectionHealth', () => {
   });
 
   it('leaves trusted proxies alone when geo-block is off', () => {
-    const sections = sectionHealth(input({ trustedProxies: { ranges: [] }, geoBlock: null }));
+    const sections = health(input({ trustedProxies: { ranges: [] }, geoBlock: null }));
 
     // Unset, not broken: plenty of deployments have no proxy in front of them.
     expect(find(sections, 'trusted-proxies').status).toBe('unset');
@@ -127,7 +136,7 @@ describe('sectionHealth', () => {
   it('does not cry stale on age alone, because MaxMind may simply not have published', () => {
     // The whole reason the update check exists: an old file is only a fault if something newer
     // was available and was not fetched.
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoip: geoipView({
           enabled: true,
@@ -144,7 +153,7 @@ describe('sectionHealth', () => {
   });
 
   it('flags a database MaxMind has already superseded', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoip: geoipView({
           enabled: true,
@@ -162,7 +171,7 @@ describe('sectionHealth', () => {
   });
 
   it('says why the download behind an out-of-date database failed', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoip: geoipView({
           enabled: true,
@@ -181,7 +190,7 @@ describe('sectionHealth', () => {
     const now = Date.parse('2026-09-10T12:00:00Z');
     const checkedHoursAgo = (hours: number, updateIntervalHours: number) =>
       find(
-        sectionHealth(
+        health(
           input({
             now,
             geoip: geoipView({
@@ -203,7 +212,7 @@ describe('sectionHealth', () => {
 
   it('flags an update check that has missed two daily runs', () => {
     const now = Date.parse('2026-09-10T12:00:00Z');
-    const sections = sectionHealth(
+    const sections = health(
       input({
         now,
         geoip: geoipView({
@@ -222,7 +231,7 @@ describe('sectionHealth', () => {
 
   it('reports why the last update check failed', () => {
     const now = Date.parse('2026-09-10T12:00:00Z');
-    const sections = sectionHealth(
+    const sections = health(
       input({
         now,
         geoip: geoipView({
@@ -239,7 +248,7 @@ describe('sectionHealth', () => {
   });
 
   it('treats a check that has never run as stalled', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoip: geoipView({
           enabled: true,
@@ -254,7 +263,7 @@ describe('sectionHealth', () => {
   });
 
   it('tolerates a database a few days old, since GeoLite2 ships twice a week', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoip: geoipView({
           enabled: true,
@@ -268,7 +277,7 @@ describe('sectionHealth', () => {
   });
 
   it('flags geo-block matching against a superseded database, not just a missing one', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoBlock: { enabled: true, block_countries: ['CN'] } as HealthInput['geoBlock'],
         geoip: geoipView({
@@ -286,7 +295,7 @@ describe('sectionHealth', () => {
   });
 
   it('says "updated today" rather than "0 days old"', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         geoip: geoipView({
           enabled: true,
@@ -300,21 +309,21 @@ describe('sectionHealth', () => {
   });
 
   it('flags a paired agent that is not connected', () => {
-    const sections = sectionHealth(input({ agentsPaired: 2, agentsConnected: 0 }));
+    const sections = health(input({ agentsPaired: 2, agentsConnected: 0 }));
 
     expect(find(sections, 'agent').status).toBe('attention');
     expect(find(sections, 'agent').detail).toContain('cannot reach Caddy');
   });
 
   it('treats no agent at all as unset rather than broken', () => {
-    const sections = sectionHealth(input({ agentsPaired: 0, agentsConnected: 0 }));
+    const sections = health(input({ agentsPaired: 0, agentsConnected: 0 }));
 
     expect(find(sections, 'agent').status).toBe('unset');
     expect(needsAttention(sections)).toHaveLength(0);
   });
 
   it('marks an env-managed setting as such rather than as a fault', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         analytics: {
           enabled: true,
@@ -335,7 +344,7 @@ describe('sectionHealth', () => {
   });
 
   it('reports a missing DNS provider as unset with a reason', () => {
-    const sections = sectionHealth(input({ dnsProvider: { providers: {}, default: null } }));
+    const sections = health(input({ dnsProvider: { providers: {}, default: null } }));
 
     const dns = find(sections, 'dns-providers');
     expect(dns.status).toBe('unset');
@@ -343,7 +352,7 @@ describe('sectionHealth', () => {
   });
 
   it('marks the tile whose storage key an operator has staged', () => {
-    const sections = sectionHealth(input({ stagedKeys: new Set(['trusted_proxies']) }));
+    const sections = health(input({ stagedKeys: new Set(['trusted_proxies']) }));
 
     expect(find(sections, 'trusted-proxies').staged).toBe(true);
     expect(find(sections, 'acme').staged).toBe(false);
@@ -351,17 +360,17 @@ describe('sectionHealth', () => {
 
   it('counts a staged legacy cloudflare blob against the DNS providers tile', () => {
     // Two keys feed one section; missing the second would leave a staged edit with no tile.
-    const sections = sectionHealth(input({ stagedKeys: new Set(['cloudflare']) }));
+    const sections = health(input({ stagedKeys: new Set(['cloudflare']) }));
 
     expect(find(sections, 'dns-providers').staged).toBe(true);
   });
 
   it('describes a stock Caddy build without inventing a plugin count', () => {
-    expect(find(sectionHealth(input()), 'caddy-build').value).toBe('Stock build');
+    expect(find(health(input()), 'caddy-build').value).toBe('Stock build');
   });
 
   it('counts custom and disabled modules from the record shape', () => {
-    const sections = sectionHealth(
+    const sections = health(
       input({
         caddyBuild: {
           modules: { 'caddy-dns/cloudflare': true, 'caddy-l4': false },

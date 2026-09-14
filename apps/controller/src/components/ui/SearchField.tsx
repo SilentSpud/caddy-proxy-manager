@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { TextInput } from "@astryxdesign/core/TextInput";
 
 type SearchFieldProps = {
@@ -17,18 +18,19 @@ type SearchFieldProps = {
 export function SearchField({
   value,
   onChange,
-  placeholder = "Search...",
-  label = "Search",
+  placeholder,
+  label,
   width = 280,
   hasAutoFocus,
 }: SearchFieldProps) {
+  const t = useTranslations("ui");
   return (
     <TextInput
-      label={label}
+      label={label ?? t("searchLabel")}
       isLabelHidden
       value={value ?? ""}
       onChange={onChange}
-      placeholder={placeholder}
+      placeholder={placeholder ?? t("searchPlaceholder")}
       startIcon={<Search />}
       hasClear
       width={width}

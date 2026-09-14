@@ -25,6 +25,13 @@ describe('withTranslatedErrors', () => {
     await expect(failing).rejects.toThrow(messages.errors.cannotDeleteOwnAccount);
   });
 
+  it('formats a list param, as the CA delete dialog shows the hosts still using it', async () => {
+    const failing = withTranslatedErrors(async () => {
+      throw domainError('caCertificateInUse', { names: ['alpha', 'beta'] }, { status: 409 });
+    });
+    await expect(failing).rejects.toThrow('CA certificate is in use by proxy host(s): alpha, beta');
+  });
+
   it('hands on a plain Error untouched, so redirect() still signals', async () => {
     // next/navigation throws to redirect. Converting that would turn a redirect into an error page.
     const redirectSignal = new Error('NEXT_REDIRECT');

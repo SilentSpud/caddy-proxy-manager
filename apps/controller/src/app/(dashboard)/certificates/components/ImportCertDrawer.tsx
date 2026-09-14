@@ -74,7 +74,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
     <AppDialog
       open={open}
       onClose={handleClose}
-      title={isEdit ? "Edit Certificate" : "Import Certificate"}
+      title={isEdit ? t("editCertificate") : t("importCertificate")}
       maxWidth="md"
       actions={
         <>
@@ -89,7 +89,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
           <Button
             type="submit"
             form={FORM_ID}
-            label={isEdit ? "Save Changes" : "Import Certificate"}
+            label={isEdit ? t("saveChanges") : t("importCertificate")}
             isLoading={isPending}
             isDisabled={isPending}
           />
@@ -162,8 +162,8 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
               </div>
               <IconButton
                 variant="ghost"
-                label={showKey ? "Hide private key" : "Show private key"}
-                tooltip={showKey ? "Hide" : "Show"}
+                label={showKey ? t("hidePrivateKey") : t("showPrivateKey")}
+                tooltip={showKey ? t("hide") : t("show")}
                 icon={showKey ? <EyeOff /> : <Eye />}
                 onClick={() => setShowKey((v) => !v)}
               />

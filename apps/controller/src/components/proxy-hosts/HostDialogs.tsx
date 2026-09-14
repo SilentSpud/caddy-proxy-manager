@@ -93,7 +93,7 @@ function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
       id: list.id,
       name: list.entries.length === 0 ? t("accessListNoMembers", { name: list.name }) : list.name,
     })),
-    "None",
+    t("none"),
   );
 }
 
@@ -144,7 +144,7 @@ export function CreateHostDialog({
   const t = useTranslations("proxyHosts");
   const [state, formAction] = useActionState(createProxyHostAction, INITIAL_ACTION_STATE);
 
-  const [name, setName] = useState(initialData ? `${initialData.name} (Copy)` : "");
+  const [name, setName] = useState(initialData ? t("copyName", { name: initialData.name }) : "");
   const [domains, setDomains] = useState(initialData?.domains.join("\n") ?? defaultDomain ?? "");
   const [certificateId, setCertificateId] = useState(
     String(initialData?.certificateId ?? NONE_VALUE),
@@ -157,7 +157,7 @@ export function CreateHostDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={initialData ? "Duplicate Proxy Host" : "Create Proxy Host"}
+      title={initialData ? t("duplicateProxyHost") : t("createProxyHost")}
       maxWidth="lg"
       submitLabel={t("create")}
       onSubmit={() => {
@@ -194,7 +194,7 @@ export function CreateHostDialog({
           <Selector
             label={t("certificate")}
             htmlName="certificateId"
-            options={toOptions(certificates, "Managed by Caddy (Auto)")}
+            options={toOptions(certificates, t("managedByCaddyAuto"))}
             value={certificateId}
             onChange={(next) => setCertificateId(next as string)}
           />
@@ -321,7 +321,7 @@ export function EditHostDialog({
           <Selector
             label={t("certificate")}
             htmlName="certificateId"
-            options={toOptions(certificates, "Managed by Caddy (Auto)")}
+            options={toOptions(certificates, t("managedByCaddyAuto"))}
             value={certificateId}
             onChange={(next) => setCertificateId(next as string)}
           />
@@ -405,17 +405,20 @@ export function DeleteHostDialog({
         <VStack gap={4}>
           <ActionStatus status={state.status} message={state.message} />
           <Text type="body" size="sm">
-            Are you sure you want to delete the proxy host <strong>{host.name}</strong>?
+            {t.rich("deleteConfirm", {
+              name: host.name,
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </Text>
           <VStack gap={1}>
             <Text type="body" size="sm" color="secondary">
               {t("deleteDescription")}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              • Domains: {host.domains.join(", ")}
+              {t("deleteDomainsLine", { domains: host.domains.join(", ") })}
             </Text>
             <Text type="body" size="sm" color="secondary">
-              • Upstreams: {host.upstreams.join(", ")}
+              {t("deleteUpstreamsLine", { upstreams: host.upstreams.join(", ") })}
             </Text>
           </VStack>
           <Banner status="warning" title={t("deleteWarning")} />

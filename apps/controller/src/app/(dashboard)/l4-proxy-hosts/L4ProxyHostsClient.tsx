@@ -44,16 +44,19 @@ type Props = {
   canCreate?: boolean;
 };
 
-function formatMatcher(host: L4ProxyHost): string {
+function formatMatcher(
+  host: L4ProxyHost,
+  t: ReturnType<typeof useTranslations<"l4ProxyHosts">>,
+): string {
   switch (host.matcherType) {
     case "tls_sni":
-      return `SNI: ${host.matcherValue.join(", ")}`;
+      return t("matcherSummarySni", { hostnames: host.matcherValue.join(", ") });
     case "http_host":
-      return `Host: ${host.matcherValue.join(", ")}`;
+      return t("matcherSummaryHost", { hostnames: host.matcherValue.join(", ") });
     case "proxy_protocol":
-      return "Proxy Protocol";
+      return t("optMatcherProxyProtocol");
     default:
-      return "None";
+      return t("optProxyProtocolNone");
   }
 }
 
@@ -86,23 +89,24 @@ function HostActions({
   /** Duplicating makes a new host, so it goes with the Create button rather than with Edit. */
   canCreate: boolean;
 }) {
+  const t = useTranslations("l4ProxyHosts");
   return (
     <HStack gap={2} vAlign="center" justify="end">
       <Switch
-        label={`Enable ${host.name}`}
+        label={t("enableHostNamed", { name: host.name })}
         isLabelHidden
         value={host.enabled}
         onChange={onToggle}
       />
       <MoreMenu
-        label={`Actions for ${host.name}`}
+        label={t("actionsForHost", { name: host.name })}
         size="sm"
         alignment="end"
         items={[
-          { label: "Edit", onClick: onEdit },
-          ...(canCreate ? [{ label: "Duplicate", onClick: onDuplicate }] : []),
+          { label: t("edit"), onClick: onEdit },
+          ...(canCreate ? [{ label: t("duplicate"), onClick: onDuplicate }] : []),
           { type: "divider" },
-          { label: "Delete", variant: "destructive", onClick: onDelete },
+          { label: t("delete"), variant: "destructive", onClick: onDelete },
         ]}
       />
     </HStack>
@@ -199,7 +203,7 @@ export default function L4ProxyHostsClient({
   const columns: Column<L4ProxyHost>[] = [
     {
       id: "name",
-      label: "Name / Matcher",
+      label: t("columnNameMatcher"),
       sortKey: "name",
       render: (host) => (
         <HStack gap={3} vAlign="center">
@@ -209,7 +213,7 @@ export default function L4ProxyHostsClient({
               {host.name}
             </Text>
             <Text type="body" size="xsm" color="secondary">
-              {formatMatcher(host)}
+              {formatMatcher(host, t)}
             </Text>
           </VStack>
         </HStack>
@@ -217,14 +221,14 @@ export default function L4ProxyHostsClient({
     },
     {
       id: "protocol",
-      label: "Protocol",
+      label: t("protocol"),
       sortKey: "protocol",
       width: 90,
       render: (host) => <ProtocolBadge protocol={host.protocol} />,
     },
     {
       id: "listen",
-      label: "Listen",
+      label: t("listen"),
       sortKey: "listenAddress",
       render: (host) => (
         <Text type="code" size="sm" weight="medium" hasTabularNumbers>
@@ -234,7 +238,7 @@ export default function L4ProxyHostsClient({
     },
     {
       id: "upstreams",
-      label: "Upstreams",
+      label: t("upstreams"),
       render: (host) => (
         <HStack gap={2} vAlign="center">
           <Icon icon={ArrowRight} size="xsm" color="secondary" />
@@ -246,7 +250,7 @@ export default function L4ProxyHostsClient({
     },
     {
       id: "status",
-      label: "Status",
+      label: t("status"),
       sortKey: "enabled",
       width: 110,
       render: (host) => <StatusChip status={host.enabled ? "active" : "inactive"} />,
@@ -289,7 +293,7 @@ export default function L4ProxyHostsClient({
         <Banner
           status="warning"
           title={t("l4DisabledTitle")}
-          description={`${l4DisabledReason} Hosts below are saved but are not being served.`}
+          description={t("l4DisabledDescription", { reason: l4DisabledReason })}
         />
       )}
 
@@ -301,7 +305,7 @@ export default function L4ProxyHostsClient({
         action={
           canCreate
             ? {
-                label: "Create L4 Host",
+                label: t("createL4Host"),
                 onClick: openCreate,
                 isDisabled: Boolean(l4DisabledReason),
               }
@@ -347,11 +351,11 @@ export default function L4ProxyHostsClient({
         columns={columns}
         data={hosts}
         keyField="id"
-        emptyMessage={searchTerm ? "No L4 hosts match your search" : "No L4 proxy hosts found"}
+        emptyMessage={searchTerm ? t("searchEmptyMessage") : t("emptyMessage")}
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}
-        rowStatus={(host) => (host.enabled ? null : { color: "gray", label: "Disabled" })}
+        rowStatus={(host) => (host.enabled ? null : { color: "gray", label: t("disabled") })}
       />
 
       <CreateL4HostDialog

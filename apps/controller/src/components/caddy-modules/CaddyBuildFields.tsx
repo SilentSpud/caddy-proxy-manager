@@ -27,9 +27,12 @@ import {
   type CaddyCustomModule,
   type CaddyModuleCategory,
   type CaddyModuleDefinition,
+  customModuleProblem,
   customModuleSpec,
   validateCustomModule,
 } from "@/src/lib/caddy-modules";
+import { caddyModuleDescription, caddyModuleName } from "@/src/lib/caddy-module-messages";
+import { extractErrorMessage } from "@/src/lib/actions";
 
 type BuildStatus = {
   state: "idle" | "pending" | "building" | "applied" | "failed";
@@ -53,10 +56,13 @@ type CustomModuleRow = CaddyCustomModule & { uid: string };
 let rowIdCounter = 0;
 const nextRowId = () => `custom-${++rowIdCounter}`;
 
-const CATEGORY_LABELS: Record<CaddyModuleCategory, string> = {
-  proxy: "Proxying",
-  security: "Security",
-  dns: "ACME DNS-01 providers",
+const CATEGORY_LABEL_KEYS: Record<
+  CaddyModuleCategory,
+  "categoryProxy" | "categorySecurity" | "categoryDns"
+> = {
+  proxy: "categoryProxy",
+  security: "categorySecurity",
+  dns: "categoryDns",
 };
 
 const CATEGORY_ORDER: CaddyModuleCategory[] = ["proxy", "security", "dns"];
@@ -102,6 +108,8 @@ export function CaddyBuildFields({
   >;
 }) {
   const t = useTranslations("caddyModules");
+  // Custom module problems are domain error codes, which live at the catalog root.
+  const tRoot = useTranslations();
   const [target, setTarget] = useState<number>(FLEET);
   // Whether the selected agent tracks the fleet rather than carrying a selection of its own.
   // Saving with this on clears the agent's row instead of writing a frozen copy of today's fleet.
@@ -280,7 +288,7 @@ export function CaddyBuildFields({
         <Card key={category} padding={4}>
           <VStack gap={3}>
             <HStack justify="between" align="center">
-              <Heading level={2}>{CATEGORY_LABELS[category]}</Heading>
+              <Heading level={2}>{t(CATEGORY_LABEL_KEYS[category])}</Heading>
               <Badge label={`${group.filter((m) => modules[m.id]).length}/${group.length}`} />
             </HStack>
             <Divider />
@@ -298,7 +306,7 @@ export function CaddyBuildFields({
 
       <Card padding={4}>
         <VStack gap={3}>
-          <Heading level={2}>Custom modules</Heading>
+          <Heading level={2}>{t("customModulesTitle")}</Heading>
           <Divider />
           <Text type="body" size="xsm" color="secondary">
             {t("customModuleHelp")}
@@ -311,7 +319,8 @@ export function CaddyBuildFields({
           )}
 
           {customModules.map((entry) => {
-            const error = entry.modulePath.trim() ? validateCustomModule(entry) : null;
+            const problem = entry.modulePath.trim() ? customModuleProblem(entry) : null;
+            const error = problem ? extractErrorMessage(tRoot, problem, problem.message) : null;
             return (
               <Card key={entry.uid} variant="muted" padding={3}>
                 <VStack gap={2}>
@@ -367,7 +376,7 @@ export function CaddyBuildFields({
         value={dockerfilePreview}
         isReadOnly
         height="md"
-        description={`${enabledCount} module(s) selected. This is exactly what the rebuild runs.`}
+        description={t("modulesSelected", { count: enabledCount })}
       />
 
       {/* Every control above is React state, so the values reach the server
@@ -400,11 +409,12 @@ function ModuleToggle({
   value: boolean;
   onChange: (next: boolean) => void;
 }) {
+  const t = useTranslations();
   return (
     <VStack gap={1}>
-      <Switch label={module.name} value={value} onChange={onChange} />
+      <Switch label={caddyModuleName(t, module)} value={value} onChange={onChange} />
       <Text type="body" size="xsm" color="secondary">
-        {module.description}{" "}
+        {caddyModuleDescription(t, module)}{" "}
         {module.docsUrl && (
           <Link href={module.docsUrl} target="_blank" rel="noreferrer">
             {module.modulePath}
@@ -435,7 +445,7 @@ function RebuildBanner({
       <Banner
         status="success"
         title={t("modulesCurrentStatus")}
-        description={`${diff.appliedSpecs.length} module(s) compiled in.`}
+        description={t("modulesCompiledIn", { count: diff.appliedSpecs.length })}
       />
     );
   }
@@ -448,10 +458,10 @@ function RebuildBanner({
       icon={inFlight ? <Spinner size="sm" /> : undefined}
       title={
         inFlight
-          ? (status.message ?? "Rebuilding Caddy…")
+          ? (status.message ?? t("rebuildingCaddy"))
           : status.state === "failed"
-            ? "The last rebuild failed"
-            : "Rebuild required"
+            ? t("lastRebuildFailed")
+            : t("rebuildRequired")
       }
       description={
         <VStack gap={2}>

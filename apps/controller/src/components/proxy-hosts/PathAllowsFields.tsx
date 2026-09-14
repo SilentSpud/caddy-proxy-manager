@@ -40,7 +40,7 @@ export function PathAllowsFields({ initialData = [] }: Props) {
           {rules.map((rule, i) => (
             <HStack key={rule.rowId} gap={2} vAlign="end">
               <TextInput
-                label={`Path ${i + 1}`}
+                label={t("pathLabel", { index: i + 1 })}
                 isLabelHidden={i > 0}
                 size="sm"
                 placeholder="/secret"
@@ -50,7 +50,7 @@ export function PathAllowsFields({ initialData = [] }: Props) {
               <IconButton
                 variant="ghost"
                 size="sm"
-                label={`Remove path allow ${i + 1}`}
+                label={t("removePathAllowLabel", { index: i + 1 })}
                 icon={<Trash2 />}
                 onClick={() => removeRule(rule.rowId)}
               />

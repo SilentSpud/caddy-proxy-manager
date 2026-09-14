@@ -39,15 +39,17 @@ export default function SetupDoneClient({
         <FormCard title={t("legacyDatabaseBackupTitle")}>
           <VStack gap={3}>
             <Text size="sm" color="secondary">
-              The file at <Code>{source}</Code> was read, not modified. Download it now if you want
-              a copy - once you are satisfied the migration is correct, it can be deleted.
+              {t.rich("legacyDatabaseBackupDescription", {
+                source,
+                code: (chunks) => <Code>{chunks}</Code>,
+              })}
             </Text>
             <Banner
               status="warning"
               title={t("legacyDatabaseUnusedTitle")}
               description={t("legacyDatabaseUnusedDescription")}
             />
-            <Link href="/api/setup/backup">Download the old database</Link>
+            <Link href="/api/setup/backup">{t("legacyDatabaseDownloadLink")}</Link>
           </VStack>
         </FormCard>
 
@@ -55,18 +57,16 @@ export default function SetupDoneClient({
           {cleanup.command ? (
             <VStack gap={3}>
               <Text size="sm" color="secondary">
-                These are stored in the database now and are no longer read from the environment:{" "}
-                <Code>{cleanup.comment.join(" ")}</Code>. Run this beside your{" "}
-                <Code>docker-compose.yml</Code> to comment them out of your <Code>.env</Code>. It
-                edits nothing else, leaves a <Code>.env.bak</Code> next to it, and comments rather
-                than deletes so you keep a copy of the values.
+                {t.rich("environmentCleanupDescription", {
+                  variables: cleanup.comment.join(" "),
+                  code: (chunks) => <Code>{chunks}</Code>,
+                })}
               </Text>
               <Code>{cleanup.command}</Code>
               <Text size="sm" color="secondary">
-                If this deployment's environment comes from somewhere else - Compose's own{" "}
-                <Code>environment:</Code> block, Swarm or Kubernetes secrets, a systemd unit -
-                remove those variables from wherever you set them instead. Either way it is
-                optional: a variable that is still set is simply ignored now that a value is stored.
+                {t.rich("environmentCleanupElsewhere", {
+                  code: (chunks) => <Code>{chunks}</Code>,
+                })}
               </Text>
             </VStack>
           ) : (

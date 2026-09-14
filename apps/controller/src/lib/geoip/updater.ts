@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:f
 import { basename, dirname } from "node:path";
 import { GEOIP_EDITIONS, type GeoipEdition } from "@cpm/shared";
 import { geoipDatabasePath, geoipEnabled } from "../agent/geoip";
+import { type StoredErrorCode, domainError, storedErrorCode } from "../domain-error";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 import { checkGeoipUpdates, geoipCredentials } from "./update-check";
@@ -33,18 +34,32 @@ const STATE_KEY = "geoip_downloads";
 const METADATA_MARKER = Buffer.from([0xab, 0xcd, 0xef, ...Buffer.from("MaxMind.com", "ascii")]);
 const METADATA_SEARCH_BYTES = 128 * 1024;
 
+/** One edition that would not download: its English, and the code when it had one. */
+export type GeoipDownloadFailure = {
+  edition: string;
+  message: string;
+  code: StoredErrorCode | null;
+};
+
 export type GeoipDownloadState = {
   /** When the updater last ran with GeoIP enabled and credentials set, or null if never. */
   ranAt: string | null;
-  /** Why the last run failed, when any part of it did. */
+  /** Why the last run failed, when any part of it did, joined in English. */
   error: string | null;
+  /** The same failures one by one, so a page can say them in its reader's language. */
+  failures: GeoipDownloadFailure[];
   /** Edition to the MaxMind build date, ISO `YYYY-MM-DD`, of the file on disk. */
   builds: Partial<Record<GeoipEdition, string>>;
 };
 
 export type GeoipUpdateResult = {
   downloaded: GeoipEdition[];
+  /** Every failure of the run, the check's included, joined in English. */
   error: string | null;
+  /** The check's failure, when it failed; see `geoipUpdateErrorMessage`. */
+  checkError?: { message: string; code: StoredErrorCode | null } | null;
+  /** The downloads that failed. */
+  failures?: GeoipDownloadFailure[];
   /** Set when nothing was attempted, so a caller can say why. */
   skipped?: "disabled" | "unconfigured";
 };
@@ -54,6 +69,8 @@ export async function getGeoipDownloadState(): Promise<GeoipDownloadState> {
   return {
     ranAt: stored?.ranAt ?? null,
     error: stored?.error ?? null,
+    // A state stored before failures were kept one by one has only the joined English.
+    failures: stored?.failures ?? [],
     builds: stored?.builds ?? {},
   };
 }
@@ -69,7 +86,7 @@ export async function readCapped(
   const declared = Number(response.headers.get("content-length") ?? 0);
   if (declared > maxBytes) {
     await response.body?.cancel();
-    throw new Error(`the download declared ${declared} bytes, over the ${maxBytes} byte limit`);
+    throw domainError("geoipDownloadDeclaredTooLarge", { declared, max: maxBytes });
   }
 
   const chunks: Uint8Array[] = [];
@@ -82,7 +99,7 @@ export async function readCapped(
       total += value.byteLength;
       if (total > maxBytes) {
         await reader.cancel();
-        throw new Error(`the download exceeded the ${maxBytes} byte limit`);
+        throw domainError("geoipDownloadTooLarge", { max: maxBytes });
       }
       chunks.push(value);
     }
@@ -123,15 +140,15 @@ export async function fetchGeoipArchive(
   // so the Authorization header must not follow the redirect.
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("location");
-    if (!location) throw new Error("MaxMind redirected without saying where");
+    if (!location) throw domainError("maxmindRedirectWithoutLocation");
     response = await fetchImpl(new URL(location, url).toString(), { signal });
   }
 
   if (response.status === 401) {
-    throw new Error("MaxMind rejected the account ID or licence key");
+    throw domainError("maxmindCredentialsRejected");
   }
   if (!response.ok) {
-    throw new Error(`MaxMind answered HTTP ${response.status}`);
+    throw domainError("maxmindHttpStatus", { status: response.status });
   }
   return readCapped(response);
 }
@@ -159,17 +176,17 @@ export async function extractGeoipDatabase(
   try {
     files = await new Bun.Archive(archive).files("**/*.mmdb");
   } catch {
-    throw new Error("the download is not a readable archive");
+    throw domainError("geoipArchiveUnreadable");
   }
 
   for (const [path, file] of files) {
     if (basename(path) !== `${edition}.mmdb`) continue;
     const bytes = new Uint8Array(await file.arrayBuffer());
-    if (!looksLikeMmdb(bytes)) throw new Error(`${edition}.mmdb in the download is not a database`);
+    if (!looksLikeMmdb(bytes)) throw domainError("geoipDatabaseInvalid", { edition });
     const date = /_(\d{4})(\d{2})(\d{2})\//.exec(path);
     return { bytes, build: date ? `${date[1]}-${date[2]}-${date[3]}` : null };
   }
-  throw new Error(`the download has no ${edition}.mmdb in it`);
+  throw domainError("geoipDatabaseMissing", { edition });
 }
 
 /**
@@ -223,7 +240,7 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
 
   const downloaded: GeoipEdition[] = [];
   // Download failures only: a failed check is already stored, and shown, by the check itself.
-  const failures: string[] = [];
+  const failures: GeoipDownloadFailure[] = [];
   for (const edition of GEOIP_EDITIONS) {
     const available = check.available[edition];
     // With the check failed the answer is unknown, and a file already here is kept rather than
@@ -248,16 +265,20 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[geoip] could not download ${edition}: ${message}`);
-      failures.push(`${edition}: ${message}`);
+      failures.push({ edition, message, code: storedErrorCode(error) });
     }
   }
 
-  const stored = failures.length > 0 ? failures.join("; ") : null;
+  const stored =
+    failures.length > 0
+      ? failures.map((failure) => `${failure.edition}: ${failure.message}`).join("; ")
+      : null;
   // A cache of what is on disk, not configuration, so it must not land in a staged change set.
   await outsideStagingScope(() =>
     setSetting<GeoipDownloadState>(STATE_KEY, {
       ranAt: new Date().toISOString(),
       error: stored,
+      failures,
       builds,
     }),
   );
@@ -268,7 +289,12 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
     await pushFleetConfig();
   }
   const error = [check.error, stored].filter(Boolean).join("; ");
-  return { downloaded, error: error || null };
+  return {
+    downloaded,
+    error: error || null,
+    checkError: check.error ? { message: check.error, code: check.errorCode ?? null } : null,
+    failures,
+  };
 }
 
 /**

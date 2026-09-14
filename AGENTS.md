@@ -37,8 +37,9 @@ them. Three things make that work, and all three live in `apps/site/astro.config
 
 - **The controller's tsconfig paths are repeated as Vite aliases**, so its `@/lib/...` imports
   resolve from the site. `apps/site/tsconfig.json` mirrors them again for tsc.
-- **`next-intl` and `next/navigation` resolve to shims.** Only `useTranslations` is used from the
-  first, which `use-intl` provides framework-agnostically; the second is reached by `DataTable`
+- **`next-intl` and `next/navigation` resolve to shims.** Only the client hooks are used from the
+  first (`useTranslations`, `useLocale`, `useFormatter`), which `use-intl` provides
+  framework-agnostically; the second is reached by `DataTable`
   alone, and the shim makes the query string reactive so a demo can sort and page for real. The
   controller's `src/lib/auth-client` is shimmed too, so the sign-in demo never posts to
   `/api/auth/*` on the docs site; every attempt fails the way a wrong password does.

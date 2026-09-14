@@ -22,6 +22,7 @@ import type {
   CaddyBuildStatus,
   L4PortsStatus,
 } from "@cpm/shared";
+import { type DomainErrorCode, domainErrorMessage } from "../domain-error";
 import { pushDesiredState } from "./desired-state";
 import {
   AgentCommandError,
@@ -51,7 +52,8 @@ export class AgentRequestError extends Error {
 /** One agent's answer, kept separate from the others so a partial failure is visible. */
 export type AgentResult<T> =
   | { agent: string; ok: true; value: T }
-  | { agent: string; ok: false; error: string };
+  /** `code` is set when this side wrote `error`, so a page can say it in its reader's language. */
+  | { agent: string; ok: false; error: string; code?: DomainErrorCode };
 
 function noAgentError(): AgentUnavailableError {
   return new AgentUnavailableError(
@@ -144,7 +146,12 @@ export async function getAllAgentStatuses(): Promise<AgentResult<AgentStatus>[]>
   return connectedAgents().map((agent) =>
     agent.status
       ? { agent: agent.name, ok: true as const, value: agent.status }
-      : { agent: agent.name, ok: false as const, error: "Connected, but has not reported yet." },
+      : {
+          agent: agent.name,
+          ok: false as const,
+          error: domainErrorMessage("agentNotReported"),
+          code: "agentNotReported" as const,
+        },
   );
 }
 

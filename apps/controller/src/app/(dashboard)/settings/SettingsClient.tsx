@@ -39,6 +39,7 @@ import type {
   DefaultResponseSettings,
 } from "@/lib/settings";
 import type { DnsProviderApiStatus, DnsProviderDefinition } from "@/src/lib/dns-providers";
+import { dnsProviderDescription, dnsProviderFieldText } from "@/src/lib/dns-provider-messages";
 import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
 import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
@@ -444,19 +445,19 @@ function GeneralSection({
 // ─── Section: Default Response ──────────────────────────────────────────────
 
 const DEFAULT_RESPONSE_MODES = [
-  { value: "caddy", label: "Caddy native behavior" },
-  { value: "respond", label: "Custom HTTP response" },
-  { value: "redirect", label: "Redirect" },
-  { value: "abort", label: "No response (abort connection)" },
-];
+  { value: "caddy", labelKey: "defaultResponseModeCaddy" },
+  { value: "respond", labelKey: "defaultResponseModeRespond" },
+  { value: "redirect", labelKey: "defaultResponseModeRedirect" },
+  { value: "abort", labelKey: "defaultResponseModeAbort" },
+] as const;
 
 const REDIRECT_STATUS_OPTIONS = [
-  { value: "301", label: "301 Permanent" },
-  { value: "302", label: "302 Temporary" },
-  { value: "303", label: "303 See Other" },
-  { value: "307", label: "307 Temporary" },
-  { value: "308", label: "308 Permanent" },
-];
+  { value: "301", labelKey: "redirectStatus301" },
+  { value: "302", labelKey: "redirectStatus302" },
+  { value: "303", labelKey: "redirectStatus303" },
+  { value: "307", labelKey: "redirectStatus307" },
+  { value: "308", labelKey: "redirectStatus308" },
+] as const;
 
 function DefaultResponseSection({
   defaultResponse,
@@ -509,7 +510,10 @@ function DefaultResponseSection({
               label={t("behavior")}
               description={t("defaultResponseBehaviorHelp")}
               htmlName="mode"
-              options={DEFAULT_RESPONSE_MODES}
+              options={DEFAULT_RESPONSE_MODES.map(({ value, labelKey }) => ({
+                value,
+                label: t(labelKey),
+              }))}
               value={mode}
               onChange={(v) => setMode(v as DefaultResponseSettings["mode"])}
             />
@@ -545,7 +549,10 @@ function DefaultResponseSection({
                   label={t("redirectStatus")}
                   description={t("defaultRedirectStatusHelp")}
                   htmlName="status"
-                  options={REDIRECT_STATUS_OPTIONS}
+                  options={REDIRECT_STATUS_OPTIONS.map(({ value, labelKey }) => ({
+                    value,
+                    label: t(labelKey),
+                  }))}
                   value={redirectStatus}
                   onChange={setRedirectStatus}
                 />
@@ -640,32 +647,37 @@ function AcmeSection({
 // ─── Section: DNS Providers ──────────────────────────────────────────────────
 
 function DnsProviderCredentialFields({ providerDef }: { providerDef: DnsProviderDefinition }) {
+  const t = useTranslations("settings");
   // Keyed on the provider so switching providers resets the credentials instead of carrying the
   // previous provider's values across.
   const [values, setValues] = useState<Record<string, string>>({});
+  const description = dnsProviderDescription(t, providerDef);
 
   return (
     <>
-      {providerDef.description && (
+      {description && (
         <Text type="body" size="xsm" color="secondary">
-          {providerDef.description}
+          {description}
         </Text>
       )}
-      {providerDef.fields.map((field) => (
-        <TextInput
-          key={field.key}
-          {...(field.type === "password" ? AUTOFILL_NEW_PASSWORD : AUTOFILL_OFF)}
-          label={field.label}
-          isOptional={!field.required}
-          isRequired={field.required}
-          description={field.description ?? undefined}
-          type={field.type === "password" ? "password" : "text"}
-          htmlName={`credential_${field.key}`}
-          value={values[field.key] ?? ""}
-          onChange={(v) => setValues((prev) => ({ ...prev, [field.key]: v }))}
-          placeholder={field.placeholder ?? ""}
-        />
-      ))}
+      {providerDef.fields.map((field) => {
+        const text = dnsProviderFieldText(t, providerDef, field);
+        return (
+          <TextInput
+            key={field.key}
+            {...(field.type === "password" ? AUTOFILL_NEW_PASSWORD : AUTOFILL_OFF)}
+            label={text.label}
+            isOptional={!field.required}
+            isRequired={field.required}
+            description={text.description}
+            type={field.type === "password" ? "password" : "text"}
+            htmlName={`credential_${field.key}`}
+            value={values[field.key] ?? ""}
+            onChange={(v) => setValues((prev) => ({ ...prev, [field.key]: v }))}
+            placeholder={text.placeholder ?? ""}
+          />
+        );
+      })}
     </>
   );
 }
@@ -705,16 +717,17 @@ function DnsProvidersSection({
   ).length;
 
   const providerOptions = [
-    { value: "none", label: "Select..." },
+    { value: "none", label: t("dnsProviderSelectPlaceholder") },
     ...dnsProviderDefinitions.map((p) => ({
       value: p.name,
-      label: `${p.displayName}${configuredProviders.includes(p.name) ? " (update)" : ""}`,
+      // The display name is the provider's brand, so it stays as the registry spells it.
+      label: configuredProviders.includes(p.name)
+        ? t("dnsProviderOptionUpdate", { name: p.displayName })
+        : p.displayName,
       // Kept in the list rather than filtered out, so an admin looking for a provider finds it and
       // learns why it is unavailable.
       disabled: !isProviderAvailable(p.name),
-      description: isProviderAvailable(p.name)
-        ? undefined
-        : "Its caddy-dns module is disabled in Settings → Caddy Build",
+      description: isProviderAvailable(p.name) ? undefined : t("dnsProviderModuleDisabledOption"),
     })),
   ];
 
@@ -774,13 +787,17 @@ function DnsProvidersSection({
       )}
 
       <FormCard
-        title={configuredProviders.length > 0 ? "Add or update provider" : "Add a provider"}
+        title={
+          configuredProviders.length > 0
+            ? t("addOrUpdateDnsProviderTitle")
+            : t("addDnsProviderTitle")
+        }
         footer={
           <Button
             type="submit"
             form="dnsp-add-form"
             size="sm"
-            label={hasProvider && isUpdate ? "Update provider" : "Add provider"}
+            label={hasProvider && isUpdate ? t("updateDnsProvider") : t("addDnsProvider")}
             isDisabled={!hasProvider}
           />
         }
@@ -792,8 +809,11 @@ function DnsProvidersSection({
               label={t("provider")}
               description={
                 unavailableCount > 0
-                  ? `${dnsProviderDefinitions.length} providers supported - ${unavailableCount} unavailable because their Caddy module is disabled`
-                  : `${dnsProviderDefinitions.length} providers supported`
+                  ? t("dnsProvidersSupportedWithUnavailable", {
+                      count: dnsProviderDefinitions.length,
+                      unavailable: unavailableCount,
+                    })
+                  : t("dnsProvidersSupported", { count: dnsProviderDefinitions.length })
               }
               htmlName="provider"
               options={providerOptions}
@@ -902,10 +922,10 @@ function DnsResolversSection({
 // ─── Section: Upstream DNS Pinning ───────────────────────────────────────────
 
 const FAMILY_OPTIONS = [
-  { value: "both", label: "Both (Prefer IPv6)" },
-  { value: "ipv6", label: "IPv6 only" },
-  { value: "ipv4", label: "IPv4 only" },
-];
+  { value: "both", labelKey: "addressFamilyBoth" },
+  { value: "ipv6", labelKey: "addressFamilyIpv6" },
+  { value: "ipv4", labelKey: "addressFamilyIpv4" },
+] as const;
 
 function UpstreamDnsSection({
   upstreamDnsResolution,
@@ -942,7 +962,7 @@ function UpstreamDnsSection({
               label={t("addressFamily")}
               description={t("dnsAddressFamilyHelp")}
               htmlName="family"
-              options={FAMILY_OPTIONS}
+              options={FAMILY_OPTIONS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }))}
               value={family}
               onChange={setFamily}
               width={280}
@@ -1309,8 +1329,7 @@ function TailscaleSection({
           )}
           {moduleDisabledReason && (
             <WarnAlert title={t("tailscaleModuleDisabledTitle")}>
-              {moduleDisabledReason} These settings still save, but no host is served on the tailnet
-              until the module is compiled in.
+              {t("tailscaleModuleDisabledBody", { reason: moduleDisabledReason })}
             </WarnAlert>
           )}
           <ModuleGated feature="tailscale">
@@ -1324,9 +1343,7 @@ function TailscaleSection({
             />
           </ModuleGated>
           <InfoAlert title={t("trustedProxiesInfoTitle")}>
-            The node runs in userspace inside the Caddy container - no <Code>tailscaled</Code>, no
-            TUN device, no extra ports published. Its identity is kept in the state directory below,
-            so it survives a container recreate.
+            {t.rich("tailscaleUserspaceNote", { code: (chunks) => <Code>{chunks}</Code> })}
           </InfoAlert>
           <TextInput
             {...AUTOFILL_NEW_PASSWORD}
@@ -1334,9 +1351,7 @@ function TailscaleSection({
             type="password"
             isOptional
             description={
-              tailscale.hasAuthKey
-                ? "An auth key is stored. Leave this empty to keep it."
-                : "A reusable auth key from the Tailscale admin console. A Caddy placeholder such as {env.TS_AUTHKEY} works too, and keeps the key out of the database."
+              tailscale.hasAuthKey ? t("tailscaleAuthKeyStored") : t("tailscaleAuthKeyHelp")
             }
             htmlName="tailscaleAuthKey"
             value={authKey}
@@ -1355,7 +1370,7 @@ function TailscaleSection({
             {...AUTOFILL_OFF}
             label={t("tags")}
             isOptional
-            description='ACL tags applied when a node registers, comma-separated. Most reusable auth keys require at least one, e.g. "tag:caddy".'
+            description={t("tailscaleTagsHelp")}
             htmlName="tailscaleTags"
             value={tags}
             onChange={setTags}
@@ -1404,8 +1419,8 @@ function TailscaleSection({
                 isOptional
                 description={
                   tailscale.hasApiAccessToken
-                    ? "A token is stored. Leave this empty to keep it."
-                    : "A tskey-api-… token from the Tailscale admin console. Read access to keys is enough."
+                    ? t("tailscaleApiTokenStored")
+                    : t("tailscaleApiTokenHelp")
                 }
                 htmlName="tailscaleApiAccessToken"
                 value={apiAccessToken}
@@ -1415,9 +1430,7 @@ function TailscaleSection({
                 {...AUTOFILL_OFF}
                 label={t("tailnet")}
                 isOptional
-                description={
-                  'Which tailnet to ask. "-" means the token\'s own, which is right unless you administer several.'
-                }
+                description={t("tailscaleTailnetHelp")}
                 htmlName="tailscaleApiTailnet"
                 value={apiTailnet}
                 onChange={setApiTailnet}
@@ -1426,10 +1439,9 @@ function TailscaleSection({
             </>
           ) : (
             <WarnAlert title={t("tailscaleKeyValidationDisabledTitle")}>
-              Nothing here can tell a revoked or expired key from a working one - that is only
-              discovered when Caddy tries to register the node, and a node that will not come up
-              makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy
-              host on any agent can be updated.
+              {t.rich("tailscaleKeyValidationDisabledBody", {
+                em: (chunks) => <em>{chunks}</em>,
+              })}
             </WarnAlert>
           )}
           <SaveButton label={t("saveTailscaleSettings")} />
@@ -1679,7 +1691,7 @@ function BrandingSection({
               // has only just picked, and that preview is the point of this control.
               <img
                 src={preview ?? currentSrc}
-                alt={preview ? "The favicon you selected" : "The current favicon"}
+                alt={preview ? t("faviconSelectedAlt") : t("faviconCurrentAlt")}
                 width={32}
                 height={32}
                 style={{ width: 32, height: 32, objectFit: "contain" }}
@@ -1687,10 +1699,10 @@ function BrandingSection({
             )}
             <Text size="sm" color="secondary">
               {preview
-                ? `Selected: ${chosen}. Save to apply it.`
+                ? t("faviconSelected", { name: String(chosen) })
                 : hasFavicon
-                  ? "A custom favicon is set."
-                  : "No custom favicon - browsers show their own default."}
+                  ? t("faviconCustomSet")
+                  : t("faviconNone")}
             </Text>
           </HStack>
 
@@ -1774,19 +1786,18 @@ function UpdatesSection({
           )}
 
           {updates.updateAvailable ? (
-            <WarnAlert title={`Version ${updates.latest} has been published`}>
-              You are running {updates.current}. Pull the new images and recreate the stack to move
-              to it.
+            <WarnAlert title={t("updateAvailableTitle", { version: updates.latest ?? "" })}>
+              {t("updateAvailableBody", { current: updates.current })}
             </WarnAlert>
           ) : (
-            <InfoAlert title={`Running ${updates.current}`}>
+            <InfoAlert title={t("runningVersionTitle", { version: updates.current })}>
               {updates.error
-                ? `The last check did not complete: ${updates.error}`
+                ? t("updateCheckIncomplete", { error: updates.error })
                 : updates.latest
-                  ? `${updates.latest} is the newest release published, so this is up to date.`
+                  ? t("updateUpToDate", { latest: updates.latest })
                   : updates.enabled
-                    ? "No check has completed yet. Save or check now to run one."
-                    : "Update checks are off, so nothing is known about newer releases."}
+                    ? t("updateNoCheckYet")
+                    : t("updateChecksOff")}
             </InfoAlert>
           )}
 
@@ -1811,10 +1822,10 @@ function UpdatesSection({
 
           <Text size="xsm" color="secondary">
             {!updates.enabled
-              ? "Not checking."
+              ? t("updateNotChecking")
               : updates.checkedAt
-                ? `Last checked ${timeAgo(updates.checkedAt)}.`
-                : "Never checked."}
+                ? t("updateLastChecked", { when: timeAgo(updates.checkedAt) })
+                : t("updateNeverChecked")}
           </Text>
 
           <HStack gap={2} justify="end">
@@ -1822,7 +1833,7 @@ function UpdatesSection({
               type="button"
               size="sm"
               variant="secondary"
-              label={checking ? "Checking…" : "Check now"}
+              label={checking ? t("dashboardDnsChecking") : t("geoipCheckNow")}
               isDisabled={!enabled || checking}
               onClick={async () => {
                 setChecking(true);
@@ -1856,8 +1867,7 @@ function InferredNote({ source, children }: { source: string; children: ReactNod
   if (source === "environment") {
     return (
       <InfoAlert title={t("environmentOverrideTitle")}>
-        Saving here stores the value in the database, which takes precedence from then on. The
-        variable can be removed from your <Code>.env</Code> afterwards.
+        {t.rich("inferredEnvironmentNote", { code: (chunks) => <Code>{chunks}</Code> })}
       </InfoAlert>
     );
   }
@@ -1889,8 +1899,10 @@ function AnalyticsSection({
         <VStack gap={3}>
           {analytics.inferred && (
             <InferredNote source={analytics.source}>
-              Analytics are {analytics.enabled ? "on" : "off"} because a ClickHouse password is
-              {analytics.hasPassword ? " " : " not "}set. Saving makes the choice explicit.
+              {t("analyticsInferredNote", {
+                state: analytics.enabled ? "on" : "off",
+                password: analytics.hasPassword ? "set" : "unset",
+              })}
             </InferredNote>
           )}
           {analyticsState?.message && (
@@ -1905,14 +1917,11 @@ function AnalyticsSection({
           />
           {canManageServices ? (
             <InfoAlert title={t("managedAnalyticsTitle")}>
-              No <Code>COMPOSE_PROFILES</Code> entry is needed. The first start pulls the ClickHouse
-              image, which can take several minutes; turning analytics off stops the container and
-              leaves its data volume intact.
+              {t.rich("analyticsManagedNote", { code: (chunks) => <Code>{chunks}</Code> })}
             </InfoAlert>
           ) : (
             <WarnAlert title={t("agentManagementUnavailableTitle")}>
-              These settings still decide whether analytics run. Starting ClickHouse itself needs
-              <Code>clickhouse</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
+              {t.rich("analyticsUnmanagedNote", { code: (chunks) => <Code>{chunks}</Code> })}
             </WarnAlert>
           )}
           {/* Tells the action a password already exists, so "enabled with an empty field" is a
@@ -1938,8 +1947,8 @@ function AnalyticsSection({
             isOptional={analytics.hasPassword}
             description={
               analytics.hasPassword
-                ? "A password is stored. Leave this empty to keep it."
-                : "Required - the ClickHouse container refuses to start without one."
+                ? t("clickhousePasswordStored")
+                : t("clickhousePasswordRequired")
             }
             htmlName="clickhousePassword"
             value={password}
@@ -2043,9 +2052,10 @@ function GeoipSection({
         <VStack gap={3}>
           {geoip.inferred && (
             <InferredNote source={geoip.source}>
-              GeoIP is {geoip.enabled ? "on" : "off"} because the databases are
-              {geoip.installedEditions.length > 0 ? " " : " not "}present on disk. Saving makes the
-              choice explicit.
+              {t("geoipInferredNote", {
+                state: geoip.enabled ? "on" : "off",
+                present: geoip.installedEditions.length > 0 ? "yes" : "no",
+              })}
             </InferredNote>
           )}
           {geoipState?.message && (
@@ -2061,8 +2071,8 @@ function GeoipSection({
           <InfoAlert title={t("geoipDownloadsTitle")}>{t("geoipDownloadsDescription")}</InfoAlert>
           <Text size="sm" color="secondary">
             {geoip.installedEditions.length > 0
-              ? `Installed: ${geoip.installedEditions.join(", ")}.`
-              : "No databases are installed yet."}
+              ? t("geoipInstalled", { editions: geoip.installedEditions.join(", ") })
+              : t("geoipNoneInstalled")}
           </Text>
           <GeoipUpdateCheckLine geoip={geoip} />
           <input type="hidden" name="hasLicenseKey" value={geoip.hasLicenseKey ? "yes" : "no"} />
@@ -2081,9 +2091,7 @@ function GeoipSection({
             type="password"
             isOptional
             description={
-              geoip.hasLicenseKey
-                ? "A licence key is stored. Leave this empty to keep it."
-                : "Issued alongside the account ID at maxmind.com."
+              geoip.hasLicenseKey ? t("maxmindLicenceKeyStored") : t("maxmindLicenceKeyHelp")
             }
             htmlName="geoipLicenseKey"
             value={licenseKey}
@@ -2108,11 +2116,11 @@ function GeoipSection({
 
 // ─── Section: Agent ──────────────────────────────────────────────────────────
 
-/** Human date for a timestamp the agent or the pairing recorded. */
-function whenText(iso: string | null): string {
-  if (!iso) return "never";
+/** Human date for a timestamp the agent or the pairing recorded, or `never` when there is none. */
+function whenText(iso: string | null, never: string): string {
+  if (!iso) return never;
   const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? "never" : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? never : parsed.toLocaleString();
 }
 
 /** One agent's line in the fleet list: what it is, and whether it is answering. */
@@ -2140,25 +2148,32 @@ function AgentRow({
             </Text>
             {status ? (
               <Text size="xsm" color="secondary">
-                v{status.version} · {status.mode} · project {status.composeProject}
+                {t("agentRowSummary", {
+                  version: status.version,
+                  mode: status.mode,
+                  project: status.composeProject,
+                })}
               </Text>
             ) : (
               <Badge variant="error" label={t("notAnswering")} />
             )}
           </HStack>
           <Text size="xsm" color="secondary">
-            last reported {whenText(lastSeenAt)}
+            {t("agentLastReported", { when: whenText(lastSeenAt, t("agentNeverReported")) })}
           </Text>
           {status && (
             <Text size="xsm" color="secondary">
-              {status.l4Ports.applied.length} published port(s) · ports:{" "}
-              {status.l4Ports.status.state} · build: {status.caddyBuild.status.state}
+              {t("agentRowPorts", {
+                count: status.l4Ports.applied.length,
+                portsState: status.l4Ports.status.state,
+                buildState: status.caddyBuild.status.state,
+              })}
             </Text>
           )}
         </VStack>
         {onRemove}
       </HStack>
-      {error && <WarnAlert title={`${name} is not reachable`}>{error}</WarnAlert>}
+      {error && <WarnAlert title={t("agentNotReachableTitle", { name })}>{error}</WarnAlert>}
     </VStack>
   );
 }
@@ -2197,7 +2212,7 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
 
   return (
     <>
-      <FormCard title={usingPaired ? "Agents" : "Current agent"}>
+      <FormCard title={usingPaired ? t("agentsTitle") : t("currentAgentTitle")}>
         <VStack gap={3}>
           <Text size="sm" color="secondary">
             {t("agentsDescription")}
@@ -2205,17 +2220,13 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
 
           {usingPaired && paired.length > 1 && (
             <InfoAlert title={t("sharedAgentConfigTitle")}>
-              Proxy hosts, certificates and published ports belong to this controller, not to a
-              host. A change is applied to all {paired.length} agents or to none of them, so the
-              fleet cannot drift apart.
+              {t("sharedAgentConfigBody", { count: paired.length })}
             </InfoAlert>
           )}
 
           {statuses.length === 0 ? (
             <WarnAlert title={t("agentsUnavailableTitle")}>
-              {usingPaired
-                ? "Nothing was reached. Layer-4 ports, Caddy rebuilds and config changes will all fail until an agent answers."
-                : "Start the agent container, or pair a remote one below. Everything else keeps working without it."}
+              {usingPaired ? t("agentsNothingReached") : t("agentsStartContainer")}
             </WarnAlert>
           ) : (
             <VStack gap={3}>
@@ -2223,7 +2234,7 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
                 <>
                   <InfoAlert title={t("localAgentTitle")}>{t("localAgentDescription")}</InfoAlert>
                   <AgentRow
-                    name="Local agent"
+                    name={t("localAgentName")}
                     status={statuses[0]?.ok ? statuses[0].value : null}
                     error={statuses[0]?.ok ? null : (statuses[0]?.error ?? null)}
                     lastSeenAt={null}
@@ -2272,9 +2283,7 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
 
           {usingPaired && (
             <Text size="xsm" color="secondary">
-              {answering} of {paired.length} answering. Unpairing forgets this side only - the agent
-              keeps the secret until it is restarted or paired again, so restart it too if you are
-              removing an agent you no longer trust.
+              {t("agentsAnsweringNote", { answering, total: paired.length })}
             </Text>
           )}
         </VStack>
@@ -2426,18 +2435,14 @@ function MetricsSection({
         </form>
       </FormCard>
       <InfoAlert title={t("metricsInfoTitle")}>
-        {`Scrape http://caddy-proxy-manager-caddy:${metrics?.port ?? 9090}/metrics from within the Docker network.`}
+        {/* A string, not a number: ICU would group a port of 10000 as "10,000". */}
+        {t("metricsScrapeNote", { port: String(metrics?.port ?? 9090) })}
       </InfoAlert>
     </>
   );
 }
 
 // ─── Section: Access Logging ─────────────────────────────────────────────────
-
-const LOG_FORMAT_OPTIONS = [
-  { value: "json", label: "JSON" },
-  { value: "console", label: "Console (Common Log Format)" },
-];
 
 function LoggingSection({
   logging,
@@ -2469,7 +2474,11 @@ function LoggingSection({
             <Selector
               label={t("format")}
               htmlName="format"
-              options={LOG_FORMAT_OPTIONS}
+              // JSON is the format's name, not a description of it.
+              options={[
+                { value: "json", label: "JSON" },
+                { value: "console", label: t("logFormatConsole") },
+              ]}
               value={format}
               onChange={setFormat}
               width={280}

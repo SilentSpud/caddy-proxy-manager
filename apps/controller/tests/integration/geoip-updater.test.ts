@@ -127,7 +127,12 @@ describe('updateGeoipDatabases', () => {
   it('downloads every missing edition and tells the agents', async () => {
     const result = await updateGeoipDatabases(fakeMaxMind);
 
-    expect(result).toEqual({ downloaded: [...EDITIONS], error: null });
+    expect(result).toEqual({
+      downloaded: [...EDITIONS],
+      error: null,
+      checkError: null,
+      failures: [],
+    });
     for (const edition of EDITIONS) {
       expect(readFileSync(join(dir, `${edition}.mmdb`), 'latin1')).toStartWith(
         `${edition} 20260908`,
@@ -183,6 +188,14 @@ describe('updateGeoipDatabases', () => {
     expect(existsSync(join(dir, 'GeoLite2-ASN.mmdb'))).toBe(false);
     const state = await getGeoipDownloadState();
     expect(state.error).toContain('GeoLite2-ASN: the download is not a readable archive');
+    // Kept one by one with the code, so the settings page can say it in its reader's language.
+    expect(state.failures).toEqual([
+      {
+        edition: 'GeoLite2-ASN',
+        message: 'the download is not a readable archive',
+        code: { code: 'geoipArchiveUnreadable', params: {} },
+      },
+    ]);
     expect(state.builds['GeoLite2-ASN']).toBeUndefined();
 
     // Retried on the next run, since it is still missing.

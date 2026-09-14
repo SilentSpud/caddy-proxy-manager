@@ -274,7 +274,8 @@ export async function createL4ProxyHostAction(
 
     await createL4ProxyHost(input, userId);
     revalidatePath("/l4-proxy-hosts");
-    return actionSuccess("L4 proxy host created and queued for Caddy reload.");
+    const t = await getTranslations("l4ProxyHosts");
+    return actionSuccess(t("hostCreated"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to create L4 proxy host:", error);
@@ -325,7 +326,8 @@ export async function updateL4ProxyHostAction(
 
     await updateL4ProxyHost(id, input, userId);
     revalidatePath("/l4-proxy-hosts");
-    return actionSuccess("L4 proxy host updated.");
+    const t = await getTranslations("l4ProxyHosts");
+    return actionSuccess(t("hostUpdated"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to update L4 proxy host:", id, error);
@@ -343,7 +345,8 @@ export async function deleteL4ProxyHostAction(
     assertCanManage(access, "l4ProxyHost", id);
     await deleteL4ProxyHost(id, access.userId);
     revalidatePath("/l4-proxy-hosts");
-    return actionSuccess("L4 proxy host deleted.");
+    const t = await getTranslations("l4ProxyHosts");
+    return actionSuccess(t("hostDeleted"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to delete L4 proxy host:", id, error);
@@ -357,7 +360,8 @@ export async function toggleL4ProxyHostAction(id: number, enabled: boolean): Pro
     assertCanManage(access, "l4ProxyHost", id);
     await updateL4ProxyHost(id, { enabled }, access.userId);
     revalidatePath("/l4-proxy-hosts");
-    return actionSuccess(`L4 proxy host ${enabled ? "enabled" : "disabled"}.`);
+    const t = await getTranslations("l4ProxyHosts");
+    return actionSuccess(enabled ? t("hostEnabledMessage") : t("hostDisabledMessage"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to toggle L4 proxy host:", id, error);

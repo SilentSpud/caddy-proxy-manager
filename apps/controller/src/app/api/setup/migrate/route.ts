@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { importLegacyDatabase } from "@/src/lib/migration/import";
 import { scanForLegacyDatabases } from "@/src/lib/migration/legacy-database";
 import {
@@ -41,19 +42,21 @@ function json(body: MigrateResponse, status: number): Response {
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
+  // The setup page shows `error` as it arrives, so every one is said in the reader's language.
+  const t = await getTranslations("setup");
   if ((await isSetupCompleted()) || (await hasAnySignIn())) {
-    return json({ ok: false, error: "Setup has already been completed." }, 409);
+    return json({ ok: false, error: t("errors.alreadyCompleted") }, 409);
   }
 
   let body: { path?: unknown; groups?: unknown; legacyKey?: unknown };
   try {
     body = await request.json();
   } catch {
-    return json({ ok: false, error: "Expected a JSON body." }, 400);
+    return json({ ok: false, error: t("migrateErrors.expectedJson") }, 400);
   }
 
   const path = typeof body.path === "string" ? body.path.trim() : "";
-  if (!path) return json({ ok: false, error: "Choose a database to migrate." }, 400);
+  if (!path) return json({ ok: false, error: t("migrateErrors.chooseDatabase") }, 400);
 
   // Re-derived here rather than trusted: the checkboxes close over each group's dependencies as
   // they are ticked, but this arrives as a list of strings and could have been sent without them.
@@ -63,10 +66,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     Array.isArray(body.groups) ? body.groups.filter((g): g is string => typeof g === "string") : [],
   );
   if (groups.length === 0) {
-    return json(
-      { ok: false, error: "Choose at least one thing to migrate, or start fresh instead." },
-      400,
-    );
+    return json({ ok: false, error: t("migrateErrors.chooseGroups") }, 400);
   }
 
   // Matched against the scan rather than used, and this is the whole guard.
@@ -83,15 +83,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   // reading the known directories, and each was inspected on the way out.
   const chosen = scanForLegacyDatabases().candidates.find((candidate) => candidate.path === path);
   if (!chosen) {
-    return json(
-      {
-        ok: false,
-        error:
-          "That is not one of the databases found on this host. Reload the page and choose one of " +
-          "the files it offers.",
-      },
-      400,
-    );
+    return json({ ok: false, error: t("migrateErrors.unknownDatabase") }, 400);
   }
 
   // The old database's secrets, and whether this deployment's SESSION_SECRET reads them.
@@ -107,10 +99,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         {
           ok: false,
           code: "legacy-key-required",
-          error:
-            "This database's secrets - certificate keys, provider credentials, agent secrets - are " +
-            "encrypted with the SESSION_SECRET the old installation ran with, which is not the one " +
-            "this deployment uses. Enter the old value to bring them across.",
+          error: t("migrateErrors.legacyKeyRequired"),
         },
         400,
       );
@@ -120,9 +109,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         {
           ok: false,
           code: "legacy-key-invalid",
-          error:
-            "That SESSION_SECRET does not decrypt this database's secrets. Take it from the `.env` " +
-            "the old installation ran with, exactly as it appears there.",
+          error: t("migrateErrors.legacyKeyInvalid"),
         },
         400,
       );
@@ -141,24 +128,23 @@ export async function POST(request: NextRequest): Promise<Response> {
     // under a third key - a database whose secret was rotated more than once. Nothing was written:
     // every row is converted before any is inserted, so this is a refusal, not a partial import.
     if (error instanceof LegacySecretError) {
+      const sentence =
+        error.reason === "keyMissing"
+          ? t("migrateErrors.secretKeyMissing")
+          : t("migrateErrors.secretKeyWrong");
+      const reason = error.table
+        ? t("migrateErrors.secretUnreadableInTable", { reason: sentence, table: error.table })
+        : sentence;
       return json(
         {
           ok: false,
           code: "legacy-key-invalid",
-          error: `${error.message} Nothing was written - the import stops before writing when a value cannot be read.`,
+          error: t("migrateErrors.nothingWritten", { reason }),
         },
         400,
       );
     }
-    return json(
-      {
-        ok: false,
-        error:
-          "The migration failed partway through. The database may be partly populated - empty it " +
-          "before trying again, so a retry does not merge two attempts.",
-      },
-      500,
-    );
+    return json({ ok: false, error: t("migrateErrors.failedPartway") }, 500);
   }
 
   // Where to go next is asked of the database rather than of the checkboxes: migrating an enabled

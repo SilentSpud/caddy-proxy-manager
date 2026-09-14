@@ -34,6 +34,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SettingsPage() {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
+  // The root translator, for the stored GeoIP failures the health tiles repeat.
+  const tRoot = await getTranslations();
 
   const [
     dnsProvider,
@@ -57,7 +59,7 @@ export default async function SettingsPage() {
     getTrustedProxiesSettings(),
     getDefaultResponseSettings(),
     getGeoBlockSettings(),
-    geoipView(),
+    geoipView(tRoot),
     analyticsView(),
     getMetricsSettings(),
     getCaddyBuildSettings(),
@@ -73,22 +75,26 @@ export default async function SettingsPage() {
       .catch(() => 0),
   ]);
 
-  const sections = sectionHealth({
-    dnsProvider,
-    acmeConfigured: Boolean(acme?.caUrl),
-    certificateCount: certificates.length,
-    trustedProxies,
-    defaultResponse,
-    geoBlock,
-    geoip,
-    analytics,
-    metrics,
-    caddyBuild,
-    oauthProviderCount: oauthProviders.length,
-    agentsConnected: connected,
-    agentsPaired: paired.length,
-    stagedKeys: keys,
-  });
+  const t = await getTranslations("settings");
+  const sections = sectionHealth(
+    {
+      dnsProvider,
+      acmeConfigured: Boolean(acme?.caUrl),
+      certificateCount: certificates.length,
+      trustedProxies,
+      defaultResponse,
+      geoBlock,
+      geoip,
+      analytics,
+      metrics,
+      caddyBuild,
+      oauthProviderCount: oauthProviders.length,
+      agentsConnected: connected,
+      agentsPaired: paired.length,
+      stagedKeys: keys,
+    },
+    t,
+  );
 
   return <SettingsHome sections={sections} attention={needsAttention(sections)} staged={staged} />;
 }

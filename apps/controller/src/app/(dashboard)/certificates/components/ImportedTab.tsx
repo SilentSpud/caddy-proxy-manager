@@ -13,6 +13,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable } from "@/components/ui/DataTable";
+import { useEmptyValue } from "@/components/ui/empty-value";
 import { deleteCertificateAction } from "../actions";
 import type { CertExpiryStatus, ImportedCertView, ManagedCertView } from "../page";
 import { RelativeTime } from "./RelativeTime";
@@ -72,13 +73,13 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
   return (
     <>
       <MoreMenu
-        label={`Actions for certificate ${cert.name}`}
+        label={t("actionsForCertificate", { name: cert.name })}
         size="sm"
         alignment="end"
         items={[
-          { label: "Edit", onClick: onEdit },
+          { label: t("edit"), onClick: onEdit },
           {
-            label: "Delete",
+            label: t("delete"),
             variant: "destructive",
             onClick: () => {
               setError(null);
@@ -100,8 +101,8 @@ function ActionsMenu({ cert, onEdit }: { cert: ImportedCertView; onEdit: () => v
         title={t("deleteImportedCertificate")}
         description={
           error
-            ? `Delete imported certificate ${cert.name}? This cannot be undone. ${error}`
-            : `Delete imported certificate ${cert.name}? This cannot be undone.`
+            ? t("deleteImportedCertificateConfirmWithError", { name: cert.name, error })
+            : t("deleteImportedCertificateConfirm", { name: cert.name })
         }
         actionLabel={t("deleteCertificate")}
         onAction={handleDelete}
@@ -136,6 +137,7 @@ function importedMobileCard(c: ImportedCertView, onEdit: () => void) {
 
 export function ImportedTab({ importedCerts, managedCerts, search, statusFilter }: Props) {
   const t = useTranslations("certificates");
+  const emptyValue = useEmptyValue();
   const [drawerCert, setDrawerCert] = useState<ImportedCertView | null | false>(false);
   const mobileCardRenderer = (c: ImportedCertView) => importedMobileCard(c, () => setDrawerCert(c));
 
@@ -151,7 +153,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
   const columns = [
     {
       id: "name",
-      label: "Name",
+      label: t("name"),
       render: (c: ImportedCertView) => (
         <HStack gap={3} vAlign="center">
           <Icon icon={FileKey} size="sm" color={expiryIconColor(c.expiryStatus)} />
@@ -163,21 +165,21 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
     },
     {
       id: "domains",
-      label: "Domains",
+      label: t("domains"),
       render: (c: ImportedCertView) => <DomainsCell domains={c.domains} />,
     },
     {
       id: "expiry",
-      label: "Expires",
+      label: t("expires"),
       render: (c: ImportedCertView) => <RelativeTime validTo={c.validTo} status={c.expiryStatus} />,
     },
     {
       id: "usedBy",
-      label: "Used by",
+      label: t("usedBy"),
       render: (c: ImportedCertView) =>
         c.usedBy.length === 0 ? (
           <Text type="body" size="sm" color="secondary">
-            &mdash;
+            {emptyValue}
           </Text>
         ) : (
           <HStack gap={1} wrap="wrap">
@@ -216,9 +218,9 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
         mobileCard={mobileCardRenderer}
         rowStatus={(c) =>
           c.expiryStatus === "expired"
-            ? { color: "error", icon: "error", label: "Expired" }
+            ? { color: "error", icon: "error", label: t("expired") }
             : c.expiryStatus === "expiring_soon"
-              ? { color: "warning", icon: "warning", label: "Expiring soon" }
+              ? { color: "warning", icon: "warning", label: t("expiringSoon") }
               : null
         }
       />
@@ -251,7 +253,7 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
   const columns = [
     {
       id: "name",
-      label: "Name",
+      label: t("name"),
       render: (c: ManagedCertView) => (
         <Text type="body" size="sm" weight="semibold">
           {c.name}
@@ -260,7 +262,7 @@ function LegacyManagedTable({ managedCerts }: { managedCerts: ManagedCertView[] 
     },
     {
       id: "domains",
-      label: "Domains",
+      label: t("domains"),
       render: (c: ManagedCertView) => (
         <Text type="code" size="sm" color="secondary">
           {c.domainNames.join(", ")}

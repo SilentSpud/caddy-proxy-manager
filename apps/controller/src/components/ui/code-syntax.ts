@@ -19,14 +19,16 @@ export type CodeEditorLanguage =
   | "seclang"
   | "plaintext";
 
-/** What the language is called in the corner of the editor. */
-export const LANGUAGE_LABELS: Record<CodeEditorLanguage, string> = {
+/**
+ * What the language is called in the corner of the editor. Names, so not translated - plain text
+ * is described in words rather than named, and comes from the message catalog in CodeEditor.
+ */
+export const LANGUAGE_LABELS: Record<Exclude<CodeEditorLanguage, "plaintext">, string> = {
   json: "JSON",
   caddyfile: "Caddyfile",
   dockerfile: "Dockerfile",
   html: "HTML",
   seclang: "SecLang",
-  plaintext: "Text",
 };
 
 /**

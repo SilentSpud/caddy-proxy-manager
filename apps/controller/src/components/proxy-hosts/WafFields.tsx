@@ -32,19 +32,19 @@ function bodyLimitMib(bytes: number | undefined): number | null {
 
 const QUICK_TEMPLATES = [
   {
-    label: "Allow IP",
+    labelKey: "wafTemplates.allowIp",
     snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
   },
   {
-    label: "Disable WAF for path",
+    labelKey: "wafTemplates.disableWafForPath",
     snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
   },
-  { label: "Remove XSS rules", snippet: `SecRuleRemoveByTag "attack-xss"` },
+  { labelKey: "wafTemplates.removeXssRules", snippet: `SecRuleRemoveByTag "attack-xss"` },
   {
-    label: "Block User-Agent",
+    labelKey: "wafTemplates.blockUserAgent",
     snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
   },
-];
+] as const;
 
 type Props = {
   value?: WafHostConfig | null;
@@ -174,7 +174,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               </Text>
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
-                  label={`Max body size (MiB, up to ${MAX_BODY_LIMIT_MIB})`}
+                  label={t("maxBodySizeMib", { max: MAX_BODY_LIMIT_MIB })}
                   value={bodyLimitMb}
                   onChange={setBodyLimitMb}
                   min={MIN_BODY_LIMIT_MIB}
@@ -224,17 +224,19 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               description={t("customWafDirectivesHelp")}
             />
 
-            <Collapsible trigger="Quick Templates">
+            <Collapsible trigger={t("quickTemplates")}>
               <VStack gap={2} hAlign="start">
-                {QUICK_TEMPLATES.map((t) => (
+                {QUICK_TEMPLATES.map((template) => (
                   <Button
-                    key={t.label}
+                    key={template.labelKey}
                     size="sm"
                     variant="secondary"
-                    label={t.label}
+                    label={t(template.labelKey)}
                     icon={<ClipboardCopy />}
                     onClick={() =>
-                      setCustomDirectives((prev) => (prev ? `${prev}\n${t.snippet}` : t.snippet))
+                      setCustomDirectives((prev) =>
+                        prev ? `${prev}\n${template.snippet}` : template.snippet,
+                      )
                     }
                   />
                 ))}

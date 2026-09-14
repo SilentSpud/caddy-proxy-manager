@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { createOAuthProvider, listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { isAppRole } from "@/src/lib/oidc-groups";
@@ -20,7 +21,11 @@ import {
 import { activateDashboardHost } from "@/src/lib/dashboard-host";
 // SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
 // JSON groups and one to the registry, and this action now saves through both.
-import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
+import {
+  EMAIL_ADDRESS,
+  SettingsValidationError,
+  validateSettingsGroup,
+} from "@/src/lib/settings-validation";
 import {
   getMigrationSource,
   isSetupCompleted,
@@ -45,9 +50,10 @@ export async function saveSetupSettings(
   _previous: SetupSettingsState,
   formData: FormData,
 ): Promise<SetupSettingsState> {
+  const t = await getTranslations("setup.errors");
   const session = await auth();
   if (!session?.user) {
-    return { error: "You need to be signed in to finish setup." };
+    return { error: t("signInToFinish") };
   }
   if (await isSetupCompleted()) {
     redirect("/");
@@ -58,7 +64,7 @@ export async function saveSetupSettings(
   // ordinary user reaching this step, which is what the check below still refuses.
   const promoted = await promoteFirstSetupAdmin(Number(session.user.id));
   if (!promoted && session.user.role !== "admin") {
-    return { error: "You need to be signed in as an administrator to finish setup." };
+    return { error: t("adminToFinish") };
   }
 
   // Read from the registry rather than iterating the form, so a setting the form did not post is
@@ -111,20 +117,30 @@ export async function saveSetupSettings(
   if (values[analyticsEnabled.key] === true) {
     const password = values[clickhousePassword.key] ?? resolved.get(clickhousePassword.key)?.value;
     if (typeof password !== "string" || password.trim() === "") {
-      return {
-        error: "Analytics need a ClickHouse password, or switch analytics off to continue.",
-      };
+      return { error: t("analyticsPasswordRequired") };
     }
   }
 
   // Not a registry setting: `general` is a JSON object older than the registry, and the Settings
   // page and the v1 API both read it from there. Validated through the same function that API
   // route uses rather than by hand, so the rules and the wording cannot drift apart.
+  //
+  // The two refusals an operator can actually cause are checked first, in their language. The
+  // validator's own wording is REST's - field paths like `general.acmeEmail` - and stays only as
+  // the backstop for anything this form cannot post.
+  const defaultDomain = String(formData.get("defaultDomain") ?? "").trim();
+  const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
+  if (defaultDomain.length === 0 || defaultDomain.length > 253) {
+    return { error: t("defaultDomainInvalid") };
+  }
+  if (acmeEmail.length > 320 || (acmeEmail !== "" && !EMAIL_ADDRESS.test(acmeEmail))) {
+    return { error: t("acmeEmailInvalid") };
+  }
+
   let general: GeneralSettings;
   try {
-    const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
     general = validateSettingsGroup("general", {
-      defaultDomain: String(formData.get("defaultDomain") ?? "").trim(),
+      defaultDomain,
       // Omitted rather than empty when blank: the validator treats the key as optional, and
       // storing "" would hand an empty contact to the ACME issuer instead of leaving it unset.
       ...(acmeEmail === "" ? {} : { acmeEmail }),
@@ -144,7 +160,7 @@ export async function saveSetupSettings(
       return { error: error.message };
     }
     console.error("Setup: failed to save settings", error);
-    return { error: "Could not save the configuration. Try again." };
+    return { error: t("settingsSaveFailed") };
   }
 
   // Analytics and GeoIP decide whether a container runs, and the operator has just chosen. Without
@@ -195,11 +211,12 @@ async function createProviderFromForm(formData: FormData): Promise<string | null
 
   const filled = [name, clientId, clientSecret, issuer].filter((value) => value !== "");
   if (filled.length === 0) return null;
+  const t = await getTranslations("setup.errors");
   if (filled.length < 4) {
-    return "An identity provider needs a display name, issuer URL, client ID and client secret - or leave all four blank to skip it.";
+    return t("identityProviderIncomplete");
   }
   if (!/^https?:\/\/\S+$/.test(issuer)) {
-    return "The issuer must be a URL starting with http:// or https://.";
+    return t("issuerMustBeUrl");
   }
 
   // Re-checked here rather than trusted from the render: the page was drawn before the form was
@@ -239,7 +256,7 @@ async function createProviderFromForm(formData: FormData): Promise<string | null
     });
   } catch (error) {
     console.error("Setup: failed to create the OAuth provider", error);
-    return "The settings were saved, but the identity provider could not be created. Check its values and try again.";
+    return t("identityProviderCreateFailed");
   }
 
   return null;

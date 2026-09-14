@@ -47,7 +47,10 @@ export function nextIntlServerMock() {
     getTranslations: async (namespace?: string) => testTranslator(namespace),
     getLocale: async () => 'en',
     getMessages: async () => messages,
-    getFormatter: async () => ({}),
+    getFormatter: async () => ({
+      list: (value: Iterable<string>, options?: Intl.ListFormatOptions) =>
+        new Intl.ListFormat('en', options).format(value),
+    }),
     getNow: async () => new Date(),
     getTimeZone: async () => 'UTC',
   };

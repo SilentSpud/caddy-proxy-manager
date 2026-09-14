@@ -39,16 +39,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (originCheck) return originCheck;
 
   if (await isSetupCompleted()) {
-    return Response.json(
-      { ok: false, error: "Setup has already been completed." },
-      { status: 409 },
-    );
+    const t = await getTranslations("setup");
+    return Response.json({ ok: false, error: t("errors.alreadyCompleted") }, { status: 409 });
   }
   if (!(await getMigrationSource())) {
-    return Response.json(
-      { ok: false, error: "Nothing has been migrated on this instance." },
-      { status: 409 },
-    );
+    const t = await getTranslations("setup");
+    return Response.json({ ok: false, error: t("migrateErrors.nothingMigrated") }, { status: 409 });
   }
 
   // Before anything can sign in, the instance is unauthenticated by design - whoever reaches it can

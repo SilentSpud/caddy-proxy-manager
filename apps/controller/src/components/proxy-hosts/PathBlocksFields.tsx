@@ -92,7 +92,7 @@ export function PathBlocksFields({ initialData = [] }: Props) {
               <IconButton
                 variant="ghost"
                 size="sm"
-                label={`Remove path block ${i + 1}`}
+                label={t("removePathBlockLabel", { index: i + 1 })}
                 icon={<Trash2 />}
                 onClick={() => removeRule(rule.rowId)}
               />

@@ -171,8 +171,9 @@ function countryFlag(code: string): string {
   );
 }
 
-function parseUA(ua: string): string {
-  if (!ua) return "Unknown";
+/** `unknown` is the label for an empty agent string, passed in because it comes from the catalog. */
+function parseUA(ua: string, unknown: string): string {
+  if (!ua) return unknown;
   if (/Googlebot/i.test(ua)) return "Googlebot";
   if (/bingbot/i.test(ua)) return "Bingbot";
   if (/DuckDuckBot/i.test(ua)) return "DuckDuckBot";
@@ -221,9 +222,10 @@ function DateTimePicker({
   onChange: (v: Dayjs | null) => void;
   placeholder?: string;
 }) {
+  const t = useTranslations("analytics");
   return (
     <DateTimeInput
-      label={placeholder ?? "Pick date & time"}
+      label={placeholder ?? t("pickDateTime")}
       isLabelHidden
       value={
         (value ? value.format("YYYY-MM-DDTHH:mm") : undefined) as ISODateTimeString | undefined
@@ -325,7 +327,7 @@ function HostsCombobox({
         value={selectedHosts}
         onChange={onChange}
         hasSearch
-        searchPlaceholder="Search hosts..."
+        searchPlaceholder={t("searchHostsPlaceholder")}
         hasSelectAll
         triggerDisplay="badges"
         maxBadges={2}
@@ -346,6 +348,18 @@ function HostsCombobox({
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
+/** A non-2xx the server gave no reason for. Carries the parts so the page can word it from the catalog. */
+class UnexplainedStatusError extends Error {
+  path: string;
+  status: number;
+
+  constructor(path: string, status: number) {
+    super(`${path} failed with status ${status}`);
+    this.path = path;
+    this.status = status;
+  }
+}
+
 /**
  * Fetch JSON, treating a non-2xx as a failure. The analytics endpoints answer errors with
  * `{ error: "…" }`, which parsed without checking `response.ok` lands an object in array-typed
@@ -361,7 +375,9 @@ async function fetchJson(url: string): Promise<unknown> {
         : "";
     // Errors thrown by the ClickHouse client often carry an empty message, so always fall back to
     // something renderable - an empty string is falsy and would leave the banner invisible.
-    throw new Error(reported || `${url.split("?")[0]} failed with status ${response.status}`);
+    throw reported
+      ? new Error(reported)
+      : new UnexplainedStatusError(url.split("?")[0], response.status);
   }
   return body;
 }
@@ -458,7 +474,13 @@ export default function AnalyticsClient() {
       })
       .catch((err: unknown) => {
         // Reset to empty rather than leaving stale data next to an error banner.
-        setLoadError(err instanceof Error ? err.message : t("loadErrorToast"));
+        setLoadError(
+          err instanceof UnexplainedStatusError
+            ? t("requestFailedWithStatus", { path: err.path, status: err.status })
+            : err instanceof Error
+              ? err.message
+              : t("loadErrorToast"),
+        );
         setSummary(null);
         setTimeline([]);
         setCountries([]);
@@ -512,10 +534,10 @@ export default function AnalyticsClient() {
   );
   const timelineSeries = useMemo(
     () => [
-      { name: "Allowed", data: timeline.map((b) => b.total - b.blocked) },
-      { name: "Blocked", data: timeline.map((b) => b.blocked) },
+      { name: t("seriesAllowed"), data: timeline.map((b) => b.total - b.blocked) },
+      { name: t("metricBlocked"), data: timeline.map((b) => b.blocked) },
     ],
-    [timeline],
+    [timeline, t],
   );
 
   const donutOptions = useMemo<ApexOptions>(
@@ -545,16 +567,16 @@ export default function AnalyticsClient() {
       plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
       dataLabels: { enabled: false },
       xaxis: {
-        categories: userAgents.map((u) => parseUA(u.userAgent)),
+        categories: userAgents.map((u) => parseUA(u.userAgent, t("unknownUserAgent"))),
         labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } },
       },
       yaxis: { labels: { style: { colors: chartTheme.labelColor, fontSize: "12px" } } },
     }),
-    [chartTheme, userAgents],
+    [chartTheme, userAgents, t],
   );
   const barSeries = useMemo(
-    () => [{ name: "Requests", data: userAgents.map((u) => u.count) }],
-    [userAgents],
+    () => [{ name: t("metricRequests"), data: userAgents.map((u) => u.count) }],
+    [userAgents, t],
   );
 
   const wafBarOptions = useMemo<ApexOptions>(
@@ -573,8 +595,8 @@ export default function AnalyticsClient() {
     [chartTheme, wafStats],
   );
   const wafBarSeries = useMemo(
-    () => [{ name: "Hits", data: (wafStats?.topRules ?? []).map((r) => r.count) }],
-    [wafStats],
+    () => [{ name: t("hits"), data: (wafStats?.topRules ?? []).map((r) => r.count) }],
+    [wafStats, t],
   );
 
   const wafByCountry = new Map((wafStats?.byCountry ?? []).map((r) => [r.countryCode, r.count]));
@@ -612,13 +634,13 @@ export default function AnalyticsClient() {
   // invisible to assistive tech.
   const countryStatus = useTableRowStatus<CountryRow>({
     getStatus: (row) =>
-      row.countryCode === selectedCountry ? { color: "accent", label: "Selected" } : null,
+      row.countryCode === selectedCountry ? { color: "accent", label: t("selected") } : null,
   });
 
   const countryColumns: TableColumn<CountryRow>[] = [
     {
       key: "countryCode",
-      header: "Country",
+      header: t("country"),
       width: proportional(1),
       // The whole row used to be the click target for filtering the map, which no keyboard user
       // could reach. The country itself is the control now.
@@ -646,7 +668,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "total",
-      header: "Total",
+      header: t("total"),
       align: "end",
       width: pixel(90),
       renderCell: (row) => (
@@ -668,7 +690,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "waf",
-      header: "WAF",
+      header: t("waf"),
       align: "end",
       width: pixel(80),
       renderCell: (row) => (
@@ -679,7 +701,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "blocked",
-      header: "Blocked",
+      header: t("metricBlocked"),
       align: "end",
       width: pixel(90),
       renderCell: (row) => (
@@ -700,7 +722,7 @@ export default function AnalyticsClient() {
   const protocolColumns: TableColumn<ProtoRow>[] = [
     {
       key: "proto",
-      header: "Protocol",
+      header: t("protocol"),
       width: proportional(1),
       renderCell: (row) => (
         <Text type="body" size="sm">
@@ -710,7 +732,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "count",
-      header: "Requests",
+      header: t("metricRequests"),
       align: "end",
       width: pixel(110),
       renderCell: (row) => (
@@ -721,7 +743,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "percent",
-      header: "Share",
+      header: t("share"),
       align: "end",
       width: pixel(80),
       renderCell: (row) => (
@@ -737,7 +759,7 @@ export default function AnalyticsClient() {
   const blockedColumns: TableColumn<BlockedRow>[] = [
     {
       key: "ts",
-      header: "Time (UTC)",
+      header: t("timeUtc"),
       width: pixel(170),
       renderCell: (row) => (
         <Text type="body" size="sm" color="secondary">
@@ -747,7 +769,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "clientIp",
-      header: "IP",
+      header: t("ip"),
       width: pixel(130),
       renderCell: (row) => (
         <Text type="code" size="sm">
@@ -757,7 +779,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "countryCode",
-      header: "Country",
+      header: t("country"),
       width: pixel(100),
       renderCell: (row) => (
         <Text type="body" size="sm">
@@ -767,7 +789,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "host",
-      header: "Host",
+      header: t("host"),
       width: pixel(160),
       renderCell: (row) => (
         <Text type="body" size="sm" maxLines={1}>
@@ -777,7 +799,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "method",
-      header: "Method",
+      header: t("method"),
       width: pixel(90),
       renderCell: (row) => (
         <Text type="code" size="sm">
@@ -787,7 +809,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "uri",
-      header: "URI",
+      header: t("uri"),
       width: proportional(1),
       renderCell: (row) => (
         <Tooltip content={row.uri}>
@@ -799,7 +821,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "status",
-      header: "Status",
+      header: t("status"),
       width: pixel(80),
       align: "end",
       renderCell: (row) => <Badge variant="error" label={String(row.status)} />,
@@ -811,7 +833,7 @@ export default function AnalyticsClient() {
   const wafRuleColumns: TableColumn<WafRuleRow>[] = [
     {
       key: "ruleId",
-      header: "Rule",
+      header: t("rule"),
       width: pixel(90),
       renderCell: (row) => (
         <Text type="code" size="sm">
@@ -821,7 +843,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "message",
-      header: "Description",
+      header: t("description"),
       width: proportional(1),
       renderCell: (row) =>
         row.message ? (
@@ -838,7 +860,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "count",
-      header: "Hits",
+      header: t("hits"),
       width: pixel(80),
       align: "end",
       renderCell: (row) => (
@@ -849,7 +871,7 @@ export default function AnalyticsClient() {
     },
     {
       key: "hosts",
-      header: "Triggered by",
+      header: t("triggeredBy"),
       width: proportional(1),
       renderCell: (row) => (
         <HStack gap={1} wrap="wrap">
@@ -871,7 +893,7 @@ export default function AnalyticsClient() {
           <Text type="label" size="xsm" color="secondary" className="cpm-desktop-only">
             {t("trafficIntelligence")}
           </Text>
-          <Heading level={1}>Analytics</Heading>
+          <Heading level={1}>{t("analytics")}</Heading>
         </VStack>
         <HStack gap={3} vAlign="center" wrap="wrap">
           {/* Was six buttons whose selected state read only as a filled
@@ -909,7 +931,7 @@ export default function AnalyticsClient() {
             <HStack gap={2} vAlign="center" wrap="wrap">
               <DateTimePicker value={customFrom} onChange={setCustomFrom} placeholder={t("from")} />
               <Text type="body" size="xsm" color="secondary">
-                &ndash;
+                -
               </Text>
               <DateTimePicker value={customTo} onChange={setCustomTo} placeholder={t("to")} />
             </HStack>
@@ -947,8 +969,9 @@ export default function AnalyticsClient() {
           title={t("accessLoggingDisabledTitle")}
           description={
             <Text type="body" size="sm">
-              No traffic data is being collected.{" "}
-              <AstryxLink href="/settings">Enable logging in Settings</AstryxLink>.
+              {t.rich("accessLoggingDisabledDescription", {
+                link: (chunks) => <AstryxLink href="/settings">{chunks}</AstryxLink>,
+              })}
             </Text>
           }
         />
@@ -998,7 +1021,7 @@ export default function AnalyticsClient() {
                   ))}
                 </Grid>
                 <Text type="body" size="sm" color="secondary">
-                  {t("wafEvents")}: {(wafStats?.total ?? 0).toLocaleString()}
+                  {t("wafEventsCount", { count: (wafStats?.total ?? 0).toLocaleString() })}
                 </Text>
               </VStack>
             </Card>
@@ -1016,7 +1039,7 @@ export default function AnalyticsClient() {
               value={summary.blockedRequests.toLocaleString()}
               sub={
                 (wafStats?.total ?? 0) > 0
-                  ? `${wafStats!.total.toLocaleString()} from WAF`
+                  ? t("blockedFromWaf", { count: wafStats!.total.toLocaleString() })
                   : undefined
               }
               tone={summary.blockedRequests > 0 ? "error" : undefined}
@@ -1024,7 +1047,7 @@ export default function AnalyticsClient() {
             <StatCard
               label={t("blockRate")}
               value={`${summary.blockedPercent}%`}
-              sub={`${formatBytes(summary.bytesServed)} served`}
+              sub={t("bytesServed", { bytes: formatBytes(summary.bytesServed) })}
               tone={summary.blockedPercent > 10 ? "warning" : undefined}
             />
             <StatCard
@@ -1032,8 +1055,8 @@ export default function AnalyticsClient() {
               value={(wafStats?.total ?? 0).toLocaleString()}
               sub={
                 wafStats && wafStats.topRules.length > 0
-                  ? `${wafStats.topRules.length} rules triggered`
-                  : "No WAF events"
+                  ? t("rulesTriggered", { count: wafStats.topRules.length })
+                  : t("noWafEvents")
               }
               tone={(wafStats?.total ?? 0) > 0 ? "warning" : undefined}
             />

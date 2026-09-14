@@ -18,12 +18,15 @@ import {
   CADDY_MODULES,
   type CaddyCustomModule,
   type CaddyFeatureId,
+  type CaddyModuleDefinition,
+  customModuleProblem,
   customModuleSpec,
   findCaddyModule,
   modulesForFeature,
   normalizeModulePath,
   validateCustomModule,
 } from "./caddy-modules";
+import { domainError } from "./domain-error";
 import { type CaddyBuildSettings, getCaddyBuildSettings } from "./settings";
 
 import {
@@ -246,11 +249,15 @@ export function isDnsProviderUsable(
   return availability.desiredIds.has(module.id) && availability.appliedPaths.has(module.modulePath);
 }
 
-/** Names the module(s) an operator has to enable to get a feature back. */
-export function featureModuleNames(feature: CaddyFeatureId): string {
-  return modulesForFeature(feature)
-    .map((m) => m.name)
-    .join(", ");
+/**
+ * Names the module(s) an operator has to enable to get a feature back. `nameOf` is how a caller
+ * with a reader says each name; without one it is the registry's English.
+ */
+export function featureModuleNames(
+  feature: CaddyFeatureId,
+  nameOf: (module: CaddyModuleDefinition) => string = (module) => module.name,
+): string {
+  return modulesForFeature(feature).map(nameOf).join(", ");
 }
 
 // ─── Build ───────────────────────────────────────────────────────────────────
@@ -264,8 +271,8 @@ export async function applyCaddyBuild(agentRowId?: number): Promise<CaddyBuildSt
 
   for (const entry of settings?.customModules ?? []) {
     if (!entry.enabled) continue;
-    const error = validateCustomModule(entry);
-    if (error) throw new Error(error);
+    const problem = customModuleProblem(entry);
+    if (problem) throw problem;
   }
 
   // Re-apply the config before the rebuild. Caddy runs with `--resume`, so a recreated container
@@ -300,12 +307,12 @@ export function sanitizeCaddyBuildSettings(input: {
   for (const entry of input.customModules ?? []) {
     const modulePath = normalizeModulePath(entry.modulePath ?? "");
     if (!modulePath) continue;
-    const error = validateCustomModule({ ...entry, modulePath });
-    if (error) throw new Error(error);
+    const problem = customModuleProblem({ ...entry, modulePath });
+    if (problem) throw problem;
     // A duplicate path fails the build with a confusing "module already required" error,
     // long after the admin left the page.
     if (seen.has(modulePath)) {
-      throw new Error(`Duplicate custom module "${modulePath}"`);
+      throw domainError("customModuleDuplicate", { path: modulePath }, { status: 400 });
     }
     seen.add(modulePath);
     customModules.push({
@@ -326,7 +333,9 @@ const GATED_FEATURES: CaddyFeatureId[] = ["l4", "geoblock", "waf", "tailscale", 
  * The serializable snapshot the dashboard hands to client components. Gates on *desired*, not
  * applied - a control following applied would stay greyed out right after being switched on.
  */
-export async function getModuleGateState(): Promise<{
+export async function getModuleGateState(
+  nameOf?: (module: CaddyModuleDefinition) => string,
+): Promise<{
   features: Record<CaddyFeatureId, boolean>;
   moduleNames: Record<CaddyFeatureId, string>;
   enabledModuleIds: string[] | null;
@@ -341,7 +350,7 @@ export async function getModuleGateState(): Promise<{
   const moduleNames = {} as Record<CaddyFeatureId, string>;
   for (const feature of GATED_FEATURES) {
     features[feature] = availability.desired.has(feature);
-    moduleNames[feature] = featureModuleNames(feature);
+    moduleNames[feature] = featureModuleNames(feature, nameOf);
   }
 
   return {

@@ -10,6 +10,8 @@
  * resolver has no business pulling those in to answer a question about storage keys.
  */
 
+import type { useTranslations } from "next-intl";
+
 /**
  * `label` is what the review sheet calls a staged change. Deliberately not the navigation's label
  * for the same section - the rail says "Global Geoblocking" where a change list reads better as
@@ -56,4 +58,30 @@ for (const [id, entry] of Object.entries(SECTION_STORAGE_KEYS)) {
 /** The section a storage key belongs to, with its change-list label, or null if nothing claims it. */
 export function sectionForStorageKey(key: string): { id: string; label: string } | null {
   return SECTION_BY_STORAGE_KEY.get(key) ?? null;
+}
+
+// ─── Messages ────────────────────────────────────────────────────────────────
+
+/*
+ * `label` above stays the English source; the review sheet renders `settings.stagedLabels.*`
+ * through this instead. The key is composed from the section id at runtime, which TypeScript cannot
+ * check, so `tests/unit/section-keys-messages.test.ts` asserts every section has an entry reading
+ * exactly as its `label`. The next-intl import is type-only, so this file still pulls in nothing.
+ */
+
+type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
+
+/** A section id as a catalog key segment: `default-response` is `defaultResponse`. */
+export function stagedLabelMessageName(id: string): string {
+  return id.replace(/-([a-z0-9])/g, (_, next: string) => next.toUpperCase());
+}
+
+/** What the review sheet calls a staged change. A key no section claims keeps its own name. */
+export function stagedChangeLabel(
+  t: SettingsTranslator,
+  change: { sectionId: string | null; label: string },
+): string {
+  if (!change.sectionId || !(change.sectionId in SECTION_STORAGE_KEYS)) return change.label;
+  const translate = t as unknown as (key: string) => string;
+  return translate(`stagedLabels.${stagedLabelMessageName(change.sectionId)}`);
 }

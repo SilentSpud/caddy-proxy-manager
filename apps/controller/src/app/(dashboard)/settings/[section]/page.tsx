@@ -38,6 +38,7 @@ import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { storedErrorMessage } from "@/src/lib/actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -61,6 +62,8 @@ export default async function SettingsSectionPage({
   // pending rather than what is stored. Without it a staged edit looks like it was discarded the
   // moment the page reloaded.
   const overlay = await stagedOverlay(userId);
+  // The root translator, for the stored update-check and GeoIP failures this page shows.
+  const tRoot = await getTranslations();
 
   // The agent and staging reads sit outside the staged scope on purpose - they are not settings -
   // but run alongside it: the scope is AsyncLocalStorage, so a sibling promise cannot see the
@@ -121,7 +124,7 @@ export default async function SettingsSectionPage({
         getTailscaleSettings(),
         getDashboardSettings(),
         analyticsView(),
-        geoipView(),
+        geoipView(tRoot),
         getFavicon(),
         getUpdateStatus(),
       ]),
@@ -187,7 +190,10 @@ export default async function SettingsSectionPage({
       // Only whether one exists: the image itself is served by its own route, so shipping it in
       // this page's HTML would be a couple of hundred kilobytes of base64 for nothing.
       hasFavicon={favicon !== null}
-      updates={updates}
+      updates={{
+        ...updates,
+        error: updates.error ? storedErrorMessage(tRoot, updates.error, updates.errorCode) : null,
+      }}
       analytics={analytics}
       geoip={geoip}
       // Starting or stopping the optional containers needs an agent to run compose. Without one the
@@ -196,7 +202,15 @@ export default async function SettingsSectionPage({
       baseUrl={publicBaseUrl}
       agents={{
         paired: pairedAgents,
-        statuses: agentStatuses,
+        // A failure this side worded, such as an agent that has not reported yet, carries a code.
+        statuses: agentStatuses.map((result) =>
+          result.ok || !result.code
+            ? result
+            : {
+                ...result,
+                error: storedErrorMessage(tRoot, result.error, { code: result.code, params: {} }),
+              },
+        ),
         autoPairingDisabled: autoPairingOff,
       }}
     />

@@ -1,3 +1,11 @@
+import {
+  DomainError,
+  type DomainErrorCode,
+  type DomainErrorParams,
+  domainError,
+  domainErrorMessage,
+} from "./domain-error";
+
 export type DefaultResponseMode = "caddy" | "respond" | "redirect" | "abort";
 
 export type DefaultResponseSettings = {
@@ -16,15 +24,19 @@ export type CaddyDefaultResponseRoute = {
 const HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
-export class DefaultResponseValidationError extends Error {
-  constructor(message: string) {
-    super(message);
+/**
+ * A default response that cannot be stored. A `DomainError`, so the settings screen says it in the
+ * reader's language, while `/api/v1` still catches this class and answers 400 with the English.
+ */
+export class DefaultResponseValidationError extends DomainError {
+  constructor(code: DomainErrorCode, params: DomainErrorParams = {}) {
+    super(code, params, domainErrorMessage(code, params));
     this.name = "DefaultResponseValidationError";
   }
 }
 
-function invalid(message: string): never {
-  throw new DefaultResponseValidationError(message);
+function invalid(code: DomainErrorCode, params: DomainErrorParams = {}): never {
+  throw new DefaultResponseValidationError(code, params);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,7 +54,7 @@ function hasForbiddenControlCharacter(value: string, allowTab: boolean): boolean
 function normalizeHeaders(value: unknown): Record<string, string> | undefined {
   if (value === undefined || value === null) return undefined;
   if (!isRecord(value)) {
-    invalid("Default response headers must be an object");
+    invalid("defaultResponseHeadersNotObject");
   }
 
   const headers: Record<string, string> = {};
@@ -50,14 +62,14 @@ function normalizeHeaders(value: unknown): Record<string, string> | undefined {
   for (const [rawName, rawValue] of Object.entries(value)) {
     const name = rawName.trim();
     if (!HEADER_NAME_PATTERN.test(name)) {
-      invalid(`Invalid default response header name: ${rawName}`);
+      invalid("defaultResponseHeaderNameInvalid", { name: rawName });
     }
     const foldedName = name.toLowerCase();
     if (seenNames.has(foldedName)) {
-      invalid(`Duplicate default response header name: ${name}`);
+      invalid("defaultResponseHeaderNameDuplicate", { name });
     }
     if (typeof rawValue !== "string" || hasForbiddenControlCharacter(rawValue, true)) {
-      invalid(`Invalid value for default response header: ${name}`);
+      invalid("defaultResponseHeaderValueInvalid", { name });
     }
     seenNames.add(foldedName);
     headers[name] = rawValue.trim();
@@ -73,12 +85,12 @@ function normalizeHeaders(value: unknown): Record<string, string> | undefined {
  */
 export function normalizeDefaultResponseSettings(value: unknown): DefaultResponseSettings {
   if (!isRecord(value)) {
-    invalid("Default response settings must be an object");
+    invalid("defaultResponseSettingsNotObject");
   }
 
   const mode = value.mode;
   if (mode !== "caddy" && mode !== "respond" && mode !== "redirect" && mode !== "abort") {
-    invalid("Default response mode must be caddy, respond, redirect, or abort");
+    invalid("defaultResponseModeInvalid");
   }
 
   if (mode === "caddy" || mode === "abort") {
@@ -90,14 +102,14 @@ export function normalizeDefaultResponseSettings(value: unknown): DefaultRespons
   if (mode === "redirect") {
     const status = value.status === undefined ? 302 : value.status;
     if (typeof status !== "number" || !Number.isInteger(status) || !REDIRECT_STATUSES.has(status)) {
-      invalid("Default redirect status must be 301, 302, 303, 307, or 308");
+      invalid("defaultRedirectStatusInvalid");
     }
     if (
       typeof value.redirectUrl !== "string" ||
       value.redirectUrl.trim().length === 0 ||
       hasForbiddenControlCharacter(value.redirectUrl, false)
     ) {
-      invalid("Default redirect URL is required and must not contain control characters");
+      invalid("defaultRedirectUrlInvalid");
     }
     return {
       mode,
@@ -109,10 +121,10 @@ export function normalizeDefaultResponseSettings(value: unknown): DefaultRespons
 
   const status = value.status === undefined ? 404 : value.status;
   if (typeof status !== "number" || !Number.isInteger(status) || status < 200 || status > 599) {
-    invalid("Default response status must be an integer from 200 to 599");
+    invalid("defaultResponseStatusInvalid");
   }
   if (value.body !== undefined && typeof value.body !== "string") {
-    invalid("Default response body must be a string");
+    invalid("defaultResponseBodyNotString");
   }
 
   return {
@@ -121,6 +133,27 @@ export function normalizeDefaultResponseSettings(value: unknown): DefaultRespons
     body: value.body ?? "",
     ...(headers ? { headers } : {}),
   };
+}
+
+/**
+ * The settings form's headers box: one `Name: value` per line, blank lines skipped. Only shape is
+ * checked here - `normalizeDefaultResponseSettings` still validates the names and values.
+ */
+export function parseDefaultResponseHeaders(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== "string" || value.trim().length === 0) return undefined;
+
+  const headers: Record<string, string> = {};
+  for (const rawLine of value.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const separator = line.indexOf(":");
+    if (separator <= 0) {
+      // A code, because this reaches the settings screen; see `domain-error.ts`.
+      throw domainError("defaultResponseHeaderLineInvalid", { line: rawLine });
+    }
+    headers[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+  }
+  return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
 function caddyHeaders(

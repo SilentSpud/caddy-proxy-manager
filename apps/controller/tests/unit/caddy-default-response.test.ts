@@ -42,8 +42,11 @@ import { buildCaddyDocument } from '../../src/lib/caddy';
 import { saveDefaultResponseSettings } from '../../src/lib/settings';
 import {
   buildDefaultResponseRoute,
+  DefaultResponseValidationError,
   normalizeDefaultResponseSettings,
+  parseDefaultResponseHeaders,
 } from '../../src/lib/caddy-default-response';
+import { DomainError } from '../../src/lib/domain-error';
 import * as schema from '../../src/lib/db/schema';
 
 type CpmServer = { listen?: string[]; routes?: Array<Record<string, unknown>> };
@@ -221,5 +224,102 @@ describe('buildCaddyDocument default response', () => {
     expect(routes.length).toBeGreaterThan(0);
     expect(routes.every((route) => route.match !== undefined)).toBe(true);
     expect(JSON.stringify(routes)).toContain('known.example.test');
+  });
+});
+
+describe('parseDefaultResponseHeaders', () => {
+  it('reads one Name: value per line and skips blank lines', () => {
+    expect(parseDefaultResponseHeaders('X-One: 1\r\n\n  X-Two :  two: parts  ')).toEqual({
+      'X-One': '1',
+      'X-Two': 'two: parts',
+    });
+  });
+
+  it('treats an empty box, or no box, as no headers', () => {
+    expect(parseDefaultResponseHeaders('  \n ')).toBeUndefined();
+    expect(parseDefaultResponseHeaders(null)).toBeUndefined();
+  });
+
+  it('refuses a line with no name by code, carrying the line as written', () => {
+    let caught: unknown;
+    try {
+      parseDefaultResponseHeaders('X-Ok: 1\n: no name');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(DomainError);
+    expect((caught as DomainError).code).toBe('defaultResponseHeaderLineInvalid');
+    expect((caught as DomainError).params).toEqual({ line: ': no name' });
+    expect((caught as DomainError).message).toBe('Invalid response header line: : no name');
+  });
+});
+
+describe('normalizeDefaultResponseSettings refusals', () => {
+  /** The error it throws for `value`, so the code and the English can both be checked. */
+  function refusal(value: unknown): DomainError {
+    try {
+      normalizeDefaultResponseSettings(value);
+    } catch (error) {
+      return error as DomainError;
+    }
+    throw new Error('expected a refusal');
+  }
+
+  it('raises codes whose English is what /api/v1 has always returned', () => {
+    const cases: Array<[unknown, string, string]> = [
+      [[], 'defaultResponseSettingsNotObject', 'Default response settings must be an object'],
+      [
+        { mode: 'teapot' },
+        'defaultResponseModeInvalid',
+        'Default response mode must be caddy, respond, redirect, or abort',
+      ],
+      [
+        { mode: 'respond', headers: [] },
+        'defaultResponseHeadersNotObject',
+        'Default response headers must be an object',
+      ],
+      [
+        { mode: 'respond', headers: { 'Bad Name': 'x' } },
+        'defaultResponseHeaderNameInvalid',
+        'Invalid default response header name: Bad Name',
+      ],
+      [
+        { mode: 'respond', headers: { 'X-A': '1', 'x-a': '2' } },
+        'defaultResponseHeaderNameDuplicate',
+        'Duplicate default response header name: x-a',
+      ],
+      [
+        { mode: 'respond', headers: { 'X-A': 'bad ' } },
+        'defaultResponseHeaderValueInvalid',
+        'Invalid value for default response header: X-A',
+      ],
+      [
+        { mode: 'redirect', status: 200, redirectUrl: 'https://example.test' },
+        'defaultRedirectStatusInvalid',
+        'Default redirect status must be 301, 302, 303, 307, or 308',
+      ],
+      [
+        { mode: 'redirect', redirectUrl: ' ' },
+        'defaultRedirectUrlInvalid',
+        'Default redirect URL is required and must not contain control characters',
+      ],
+      [
+        { mode: 'respond', status: 103 },
+        'defaultResponseStatusInvalid',
+        'Default response status must be an integer from 200 to 599',
+      ],
+      [
+        { mode: 'respond', body: 7 },
+        'defaultResponseBodyNotString',
+        'Default response body must be a string',
+      ],
+    ];
+    for (const [value, code, message] of cases) {
+      const error = refusal(value);
+      expect(error).toBeInstanceOf(DefaultResponseValidationError);
+      expect(error).toBeInstanceOf(DomainError);
+      expect(error.code as string).toBe(code);
+      expect(error.message).toBe(message);
+    }
   });
 });

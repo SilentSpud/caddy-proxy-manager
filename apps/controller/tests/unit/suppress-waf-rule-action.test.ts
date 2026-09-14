@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '@/tests/helpers/next-intl';
+
+// The action's messages come from the catalog, and getTranslations has no request scope here.
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 // Mock all dependencies of the server action before importing it.
 vi.mock('next/cache', () => ({

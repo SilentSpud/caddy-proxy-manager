@@ -56,7 +56,7 @@ export function PathRewritesFields({ initialData = [] }: Props) {
               <IconButton
                 variant="ghost"
                 size="sm"
-                label={`Remove path rewrite ${i + 1}`}
+                label={t("removePathRewriteLabel", { index: i + 1 })}
                 icon={<Trash2 />}
                 onClick={() => removeRule(rule.rowId)}
               />

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '@/tests/helpers/next-intl';
+
+// updateGeneralSettingsAction reads its messages from the catalog; there is no request scope here.
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 vi.mock('@/src/lib/settings', () => ({
   getGeneralSettings: vi.fn(),
@@ -335,9 +339,7 @@ describe('PUT /api/v1/settings/[group]', () => {
 
   it('returns 400 when default response validation fails', async () => {
     mockSaveDefaultResponse.mockRejectedValueOnce(
-      new DefaultResponseValidationError(
-        'Default response status must be an integer from 200 to 599',
-      ),
+      new DefaultResponseValidationError('defaultResponseStatusInvalid'),
     );
 
     const response = await PUT(

@@ -33,6 +33,7 @@ import {
   type MigrationGroupId,
   withRequiredGroups,
 } from "@/src/lib/migration/selection";
+import { migrationGroupDescription, migrationGroupLabel } from "@/src/lib/migration/messages";
 import { skipMigration } from "./actions";
 import RestartDialog from "./RestartDialog";
 import { useTranslations } from "next-intl";
@@ -113,14 +114,15 @@ export default function SetupMigrateClient({
    */
   const { effective, lockedBy } = useMemo(() => {
     const resolved = new Set(withRequiredGroups(picked));
-    const locks = new Map<MigrationGroupId, string[]>();
+    // Ids rather than labels, so the names are translated where they are rendered.
+    const locks = new Map<MigrationGroupId, MigrationGroupId[]>();
     const chosen = new Set(picked);
 
     for (const group of MIGRATION_GROUPS) {
       if (!chosen.has(group.id)) continue;
       for (const required of withRequiredGroups([group.id])) {
         if (required === group.id) continue;
-        locks.set(required, [...(locks.get(required) ?? []), group.label]);
+        locks.set(required, [...(locks.get(required) ?? []), group.id]);
       }
     }
 
@@ -161,11 +163,7 @@ export default function SetupMigrateClient({
       // The import copies thirty tables and can outlast a proxy's idle timeout. Saying so beats a
       // bare "failed", because trying again on a half-populated database is the one thing not to
       // do here.
-      setError(
-        "The connection dropped before the migration reported back. Check whether it completed " +
-          "before running it again: a second run against a partly populated database is not " +
-          "supported.",
-      );
+      setError(t("migrationConnectionDropped"));
     } finally {
       setRunning(false);
     }
@@ -243,13 +241,13 @@ export default function SetupMigrateClient({
                         </Text>
                         <HStack gap={3}>
                           <Text size="xsm" color="secondary">
-                            {entry.users} user(s)
+                            {t("migrationCandidateUsers", { count: entry.users })}
                           </Text>
                           <Text size="xsm" color="secondary">
-                            {entry.proxyHosts} proxy host(s)
+                            {t("migrationCandidateProxyHosts", { count: entry.proxyHosts })}
                           </Text>
                           <Text size="xsm" color="secondary">
-                            {entry.certificates} certificate(s)
+                            {t("migrationCandidateCertificates", { count: entry.certificates })}
                           </Text>
                           <Text size="xsm" color="secondary">
                             {formatSize(entry.sizeBytes)}
@@ -257,7 +255,7 @@ export default function SetupMigrateClient({
                         </HStack>
                         {entry.lastUpdatedAt && (
                           <Text size="xsm" color="secondary">
-                            Last written {entry.lastUpdatedAt}
+                            {t("migrationCandidateLastWritten", { date: entry.lastUpdatedAt })}
                           </Text>
                         )}
                       </VStack>
@@ -285,22 +283,30 @@ export default function SetupMigrateClient({
                   {t("migrationSelectionHelp")}
                 </Text>
                 {MIGRATION_GROUPS.map((group) => {
-                  const requiredBy = lockedBy.get(group.id);
+                  const requiredBy = lockedBy
+                    .get(group.id)
+                    ?.map((id) => migrationGroupLabel(t, id))
+                    .join(", ");
                   const rows = candidate?.groupCounts?.[group.id];
-                  const suffix = rows === undefined ? "" : ` - ${rows} row(s)`;
+                  const label = migrationGroupLabel(t, group.id);
+                  const description = migrationGroupDescription(t, group.id);
                   return (
                     <CheckboxInput
                       key={group.id}
-                      label={`${group.label}${suffix}`}
+                      label={
+                        rows === undefined
+                          ? label
+                          : t("migrationGroupWithRows", { group: label, rows })
+                      }
                       description={
                         requiredBy
-                          ? `${group.description} Required by ${requiredBy.join(", ")}.`
-                          : group.description
+                          ? t("migrationGroupRequiredBy", { description, groups: requiredBy })
+                          : description
                       }
                       value={effective.has(group.id)}
                       isDisabled={requiredBy !== undefined}
                       disabledMessage={
-                        requiredBy && `Untick ${requiredBy.join(", ")} first to leave this behind.`
+                        requiredBy && t("migrationGroupUntickFirst", { groups: requiredBy })
                       }
                       onChange={(checked) => toggle(group.id, checked)}
                     />
@@ -315,8 +321,8 @@ export default function SetupMigrateClient({
                 title={t("accountsExcludedTitle")}
                 description={
                   migratingOAuth
-                    ? "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next - unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead."
-                    : "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator, or configure single sign-on, on the next screen."
+                    ? t("accountsExcludedOAuthDescription")
+                    : t("accountsExcludedDescription")
                 }
               />
             )}
@@ -325,10 +331,9 @@ export default function SetupMigrateClient({
               <FormCard title={t("legacySecretRequiredTitle")}>
                 <VStack gap={3}>
                   <Text size="sm" color="secondary">
-                    Certificate private keys, DNS provider credentials, OAuth client secrets and
-                    agent secrets in this file are encrypted with the <code>SESSION_SECRET</code>{" "}
-                    the old installation ran with, and this deployment has a different one. Enter
-                    the old value to bring them across.
+                    {t.rich("legacySecretRequiredDescription", {
+                      code: (chunks) => <code>{chunks}</code>,
+                    })}
                   </Text>
                   <TextInput
                     {...AUTOFILL_OFF}

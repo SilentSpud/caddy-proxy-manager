@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuth } from "./auth-server";
+import { domainError } from "./domain-error";
 import { getUserById } from "./models/user";
 
 export type Session = {
@@ -131,7 +132,7 @@ export async function requireUser(): Promise<Session> {
 export async function requireAdmin(): Promise<Session> {
   const session = await requireUser();
   if (session.user.role !== "admin") {
-    throw new Error("Administrator privileges required");
+    throw domainError("adminRequired");
   }
   return session;
 }
@@ -148,7 +149,7 @@ export async function requireManager(): Promise<Session> {
   if (session.user.role !== "admin" && session.user.role !== "operator") {
     // Role-neutral: this gate admits operators too, and borrowing requireAdmin's wording would
     // tell an operator who was refused for a different reason to go and find an administrator.
-    throw new Error("You do not have access to that.");
+    throw domainError("accessDenied");
   }
   return session;
 }

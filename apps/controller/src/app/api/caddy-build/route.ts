@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
+import { extractErrorMessage } from "@/src/lib/actions";
 import { applyCaddyBuild, getCaddyBuildDiff, getCaddyBuildStatus } from "@/src/lib/caddy-build";
+import { DomainError } from "@/src/lib/domain-error";
 
 /**
  * GET /api/caddy-build - the module diff plus the agent's rebuild status. Polled by the settings
@@ -36,6 +39,15 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json({ status });
   } catch (error) {
+    // Not `/api/v1`: the settings panel shows this error as it arrives, so a refusal with a code -
+    // a custom module path the build would choke on - is said in the reader's language.
+    if (error instanceof DomainError) {
+      const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
+      return NextResponse.json(
+        { error: extractErrorMessage(t, error, error.message, format) },
+        { status: error.status ?? 400 },
+      );
+    }
     return apiErrorResponse(error);
   }
 }

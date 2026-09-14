@@ -59,7 +59,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
       {filtered.length === 0 && !createOpen && (
         <EmptyState
           icon={<ShieldCheck />}
-          title={search ? "No roles match your search." : "No mTLS roles yet."}
+          title={search ? t("noRolesMatchSearch") : t("noRolesYet")}
           description={t("pageDescription")}
         />
       )}
@@ -87,7 +87,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
 
   async function handleCreate() {
     if (!name.trim()) {
-      setError("Name is required");
+      setError(t("nameRequired"));
       return;
     }
     setSubmitting(true);
@@ -100,14 +100,14 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setError(d.error || `Failed (${res.status})`);
+        setError(d.error || t("requestFailed", { status: res.status }));
         setSubmitting(false);
         return;
       }
       onClose();
       window.location.reload();
     } catch {
-      setError("Network error");
+      setError(t("networkError"));
       setSubmitting(false);
     }
   }
@@ -223,7 +223,7 @@ function RoleCard({
     window.location.reload();
   }
 
-  const certCountLabel = `${assignedIds.size} ${assignedIds.size === 1 ? "certificate" : "certificates"}`;
+  const certCountLabel = t("certificateCount", { count: assignedIds.size });
 
   return (
     <Card variant={variant} padding={5}>
@@ -322,7 +322,7 @@ function RoleCard({
         isOpen={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={t("deleteRole")}
-        description={`Delete role "${role.name}"? Proxy hosts referencing it will lose this grouping.`}
+        description={t("deleteRoleConfirm", { name: role.name })}
         actionLabel={t("deleteRole")}
         onAction={handleDelete}
       />
@@ -352,7 +352,7 @@ function CertAssignmentRow({
       startContent={
         <CheckboxInput
           ref={checkboxRef}
-          label={`Assign ${cert.commonName} to this role`}
+          label={t("assignToRole", { name: cert.commonName })}
           isLabelHidden
           value={isAssigned}
           isDisabled={isLoading}
@@ -360,7 +360,7 @@ function CertAssignmentRow({
         />
       }
       label={cert.commonName}
-      description={`expires ${new Date(cert.validTo).toLocaleDateString()}`}
+      description={t("expiresOn", { date: new Date(cert.validTo).toLocaleDateString() })}
       endContent={isAssigned ? <Badge label={t("assigned")} /> : undefined}
       isDisabled={isLoading}
     />

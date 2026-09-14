@@ -7,7 +7,7 @@
  * catalog. Anything that is not a `DomainError` is rethrown untouched, which is what keeps
  * `redirect()` working: it signals by throwing.
  */
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { DomainError } from "./domain-error";
 import { extractErrorMessage } from "./actions";
 
@@ -16,7 +16,8 @@ export async function withTranslatedErrors<T>(run: () => Promise<T>): Promise<T>
     return await run();
   } catch (error) {
     if (!(error instanceof DomainError)) throw error;
-    const t = await getTranslations();
-    throw new Error(extractErrorMessage(t, error, error.message));
+    // The formatter is for list params, such as the hosts still using a CA being deleted.
+    const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
+    throw new Error(extractErrorMessage(t, error, error.message, format));
   }
 }

@@ -4,7 +4,9 @@
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
+import { nextIntlServerMock } from '../helpers/next-intl';
 
+vi.mock('next-intl/server', () => nextIntlServerMock());
 vi.mock('@/src/lib/models/user', () => ({
   getUserById: vi.fn(),
   updateUserProfile: vi.fn(),

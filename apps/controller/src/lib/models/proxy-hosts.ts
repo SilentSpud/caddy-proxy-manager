@@ -8,13 +8,13 @@ import { type GeoBlockSettings, getDnsProviderSettings, getTailscaleSettings } f
 import { normalizeProxyHostDomains } from "../proxy-host-domains";
 import { stripCaddyPlaceholders } from "../caddy-utils";
 import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets";
-import { ApiValidationError } from "../api-errors";
 import {
-  bodyLimitRangeMessage,
+  CORAZA_MAX_BODY_LIMIT,
+  CORAZA_MIN_BODY_LIMIT,
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
 } from "../caddy-waf";
-import { normalizeNodeName, validateNodeName } from "../caddy-tailscale";
+import { type NodeNameField, nodeNameProblem, normalizeNodeName } from "../caddy-tailscale";
 import { domainError } from "../domain-error";
 import { agentIdsForHost, setHostAgents } from "./host-agents";
 
@@ -37,9 +37,10 @@ export async function assertWildcardIssuable(domains: string[], certificateId: n
     dnsSettings?.default && dnsSettings.providers[dnsSettings.default],
   );
   if (!hasDnsProvider) {
-    throw new ApiValidationError(
-      `Wildcard domain "${wildcardDomains[0]}" requires a DNS provider for the ACME DNS-01 challenge. ` +
-        `Configure a default DNS provider in settings, or assign a certificate to this host.`,
+    throw domainError(
+      "wildcardDomainNeedsDnsProvider",
+      { domain: wildcardDomains[0] },
+      { status: 400 },
     );
   }
 }
@@ -54,9 +55,7 @@ function validateUpstreamProtocol(upstream: string): void {
   if (schemeMatch) {
     const scheme = schemeMatch[1].toLowerCase();
     if (scheme !== "http" && scheme !== "https") {
-      throw new ApiValidationError(
-        `Invalid upstream protocol "${scheme}://". Only http:// and https:// are allowed`,
-      );
+      throw domainError("upstreamProtocolInvalid", { scheme }, { status: 400 });
     }
   }
 }
@@ -403,30 +402,38 @@ export type MtlsConfig = {
  * write with a clear message instead.
  */
 function validateWafMeta(waf: WafHostConfig): WafHostConfig {
+  // Codes rather than sentences: the host form reaches these too (a custom directive, or an
+  // in-memory limit above the request limit), while `/api/v1` keeps its 400 and the same English.
+  // The bounds go as strings, or the catalog would format 1073741824 with separators.
+  const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
+  const outOfRange = {
+    request_body_limit: "hostWafRequestBodyLimitOutOfRange",
+    request_body_in_memory_limit: "hostWafInMemoryBodyLimitOutOfRange",
+  } as const;
   for (const key of ["request_body_limit", "request_body_in_memory_limit"] as const) {
     const value = waf[key];
     if (value === undefined || value === null) continue;
-    if (!isValidBodyLimit(value)) throw new ApiValidationError(bodyLimitRangeMessage(`waf.${key}`));
+    if (!isValidBodyLimit(value)) throw domainError(outOfRange[key], bounds, { status: 400 });
   }
   const action = waf.request_body_limit_action;
   if (action !== undefined && action !== "Reject" && action !== "ProcessPartial") {
-    throw new ApiValidationError("waf.request_body_limit_action must be Reject or ProcessPartial");
+    throw domainError("hostWafBodyLimitActionInvalid", {}, { status: 400 });
   }
   if (
     typeof waf.request_body_limit === "number" &&
     typeof waf.request_body_in_memory_limit === "number" &&
     waf.request_body_in_memory_limit > waf.request_body_limit
   ) {
-    throw new ApiValidationError(
-      "waf.request_body_in_memory_limit must not exceed waf.request_body_limit",
-    );
+    throw domainError("hostWafInMemoryBodyLimitExceedsLimit", {}, { status: 400 });
   }
   // Safe to echo: findInvalidBodyLimitDirective only ever returns a line that
   // matched `<known directive name> <digits>`, never free-form user text.
   const badDirective = findInvalidBodyLimitDirective(waf.custom_directives);
   if (badDirective) {
-    throw new ApiValidationError(
-      `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
+    throw domainError(
+      "hostWafDirectiveBodyLimitOutOfRange",
+      { directive: badDirective, ...bounds },
+      { status: 400 },
     );
   }
   return waf;
@@ -492,9 +499,7 @@ function sanitizeMtlsMeta(meta: MtlsConfig | undefined): MtlsConfig | undefined 
     !normalized.trusted_role_ids &&
     !normalized.ca_certificate_ids
   ) {
-    throw new ApiValidationError(
-      "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
-    );
+    throw domainError("mtlsNoTrustMaterial", {}, { status: 400 });
   }
 
   return normalized;
@@ -552,9 +557,10 @@ type TailscaleMeta = {
   upstream_node?: string;
 };
 
-function assertNodeName(name: string, label: string): void {
-  const error = validateNodeName(name, label);
-  if (error) throw new ApiValidationError(error);
+function assertNodeName(name: string, field: NodeNameField): void {
+  // A 400 with the same English for `/api/v1`, and a code the proxy host actions can translate.
+  const problem = nodeNameProblem(name, field);
+  if (problem) throw problem;
 }
 
 /** Path patterns reach a Caddy matcher verbatim, so they are stripped like every other path list. */
@@ -580,13 +586,13 @@ function normalizeTailscaleInput(
   const serve = input.serve ?? existing?.serve ?? false;
 
   const node = input.node !== undefined ? normalizeNodeName(input.node) : (existing?.node ?? "");
-  if (node) assertNodeName(node, "Tailscale node name");
+  if (node) assertNodeName(node, "node");
 
   const upstreamNode =
     input.upstreamNode !== undefined
       ? normalizeNodeName(input.upstreamNode)
       : (existing?.upstream_node ?? "");
-  if (upstreamNode) assertNodeName(upstreamNode, "Tailscale upstream node name");
+  if (upstreamNode) assertNodeName(upstreamNode, "upstreamNode");
 
   const next: TailscaleMeta = {};
   if (serve) {
@@ -677,11 +683,7 @@ async function assertTailscaleServable(meta: string | null): Promise<void> {
   const settings = await getTailscaleSettings();
   if (settings?.authKey.trim()) return;
 
-  throw new ApiValidationError(
-    "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node " +
-      "cannot register, and Caddy would reject the whole configuration - every proxy host would " +
-      "stop being updated, not just this one. Add an auth key in Settings → Tailscale first.",
-  );
+  throw domainError("tailscaleAuthKeyMissingForHost", {}, { status: 400 });
 }
 
 function hydrateTailscale(meta: TailscaleMeta | undefined): TailscaleHostConfig | null {
@@ -2722,7 +2724,7 @@ async function assertCaddyfileAdapts(
   if (!snippet?.trim()) return;
   const error = await validateCaddyfileSnippet(snippet, agentRowIds);
   if (error) {
-    throw new ApiValidationError(`Custom Caddyfile: ${error}`);
+    throw domainError("customCaddyfileInvalid", { error }, { status: 400 });
   }
 }
 

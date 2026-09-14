@@ -271,7 +271,7 @@ export function CodeEditor({
           {readOnly ? "" : t("codeEditor.keyboardHint")}
         </Text>
         <Text type="body" size="xsm" color="secondary">
-          {LANGUAGE_LABELS[language]}
+          {language === "plaintext" ? t("codeEditor.plaintextLabel") : LANGUAGE_LABELS[language]}
         </Text>
       </HStack>
     </Field>

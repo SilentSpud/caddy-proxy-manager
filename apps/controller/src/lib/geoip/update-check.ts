@@ -10,6 +10,7 @@
  * so an unreachable endpoint is retried on the same schedule as a success rather than every render.
  */
 
+import { type StoredErrorCode, domainError, storedErrorCode } from "../domain-error";
 import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 
@@ -33,6 +34,8 @@ export type GeoipUpdateCheck = {
   checkedAt: string;
   /** Null when the check succeeded. Cached either way - see the note above. */
   error: string | null;
+  /** The code behind `error`, when it had one. Absent from a result stored before codes were. */
+  errorCode?: StoredErrorCode | null;
   /** Edition id to the date MaxMind last built it, ISO `YYYY-MM-DD`. */
   available: Record<string, string>;
 };
@@ -41,6 +44,7 @@ export type GeoipUpdateCheckStatus = {
   /** When MaxMind was last asked, or null when it never has been. */
   checkedAt: string | null;
   error: string | null;
+  errorCode: StoredErrorCode | null;
   available: Record<string, string>;
 };
 
@@ -87,10 +91,10 @@ export async function fetchGeoipMetadata(
   });
 
   if (response.status === 401) {
-    throw new Error("MaxMind rejected the account ID or licence key");
+    throw domainError("maxmindCredentialsRejected");
   }
   if (!response.ok) {
-    throw new Error(`MaxMind answered HTTP ${response.status}`);
+    throw domainError("maxmindHttpStatus", { status: response.status });
   }
 
   const body = (await response.json()) as MetadataResponse;
@@ -124,22 +128,28 @@ export async function checkGeoipUpdates(
     const result: GeoipUpdateCheck = {
       checkedAt: new Date().toISOString(),
       error: null,
+      errorCode: null,
       available: {},
+    };
+    const recordFailure = (failure: Error) => {
+      result.error = failure.message;
+      result.errorCode = storedErrorCode(failure);
     };
 
     const { accountId, licenseKey } = await geoipCredentials();
     if (!accountId || !licenseKey) {
-      result.error = "No MaxMind account ID and licence key are configured";
+      recordFailure(domainError("maxmindCredentialsMissing"));
     } else {
       try {
         result.available = await fetchGeoipMetadata(editions, accountId, licenseKey, fetchImpl);
       } catch (error) {
-        result.error =
+        recordFailure(
           error instanceof Error && error.name === "TimeoutError"
-            ? "MaxMind did not answer in time"
+            ? domainError("maxmindTimedOut")
             : error instanceof Error
-              ? error.message
-              : "The check failed";
+              ? error
+              : domainError("checkFailed"),
+        );
       }
     }
 
@@ -176,6 +186,7 @@ export async function getGeoipUpdateCheck(
   return {
     checkedAt: cached?.checkedAt ?? null,
     error: cached?.error ?? null,
+    errorCode: cached?.errorCode ?? null,
     available: cached?.available ?? {},
   };
 }

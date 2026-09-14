@@ -6,20 +6,24 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Text } from "@astryxdesign/core/Text";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { useTranslations } from "next-intl";
 import type { CertExpiryStatus } from "../page";
 
-function formatRelative(validTo: string): string {
+function formatRelative(
+  t: ReturnType<typeof useTranslations<"certificates">>,
+  validTo: string,
+): string {
   const diff = new Date(validTo).getTime() - Date.now();
   const absDiff = Math.abs(diff);
   const days = Math.floor(absDiff / 86400000);
   const hours = Math.floor(absDiff / 3600000);
 
   if (diff < 0) {
-    if (days >= 1) return `Expired ${days}d ago`;
-    return `Expired ${hours}h ago`;
+    if (days >= 1) return t("expiredDaysAgo", { count: days });
+    return t("expiredHoursAgo", { count: hours });
   }
-  if (days >= 1) return `${days}d`;
-  return `${hours}h`;
+  if (days >= 1) return t("expiresInDays", { count: days });
+  return t("expiresInHours", { count: hours });
 }
 
 function formatFull(validTo: string): string {
@@ -47,6 +51,7 @@ export function RelativeTime({
   validTo: string | null;
   status: CertExpiryStatus | null;
 }) {
+  const t = useTranslations("certificates");
   const emptyValue = useEmptyValue();
 
   if (validTo === null || status === null) {
@@ -61,7 +66,7 @@ export function RelativeTime({
 
   return (
     <Tooltip content={formatFull(validTo)}>
-      <Badge variant={config.variant} icon={config.icon} label={formatRelative(validTo)} />
+      <Badge variant={config.variant} icon={config.icon} label={formatRelative(t, validTo)} />
     </Tooltip>
   );
 }

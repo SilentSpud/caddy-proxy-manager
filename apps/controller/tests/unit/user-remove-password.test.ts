@@ -6,6 +6,9 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import type { TestDb } from '../helpers/db';
+import { nextIntlServerMock } from '../helpers/next-intl';
+
+vi.mock('next-intl/server', () => nextIntlServerMock());
 
 const ctx = vi.hoisted(() => ({ db: null as unknown as TestDb, userId: 0 }));
 

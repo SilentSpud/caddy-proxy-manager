@@ -6,7 +6,6 @@ import { logAuditEvent } from "../audit";
 import { l4ProxyHosts } from "../db/schema";
 import { and, asc, desc, eq, count, inArray, like, or, sql } from "drizzle-orm";
 import { domainError } from "../domain-error";
-import { ApiValidationError } from "../api-errors";
 import { assertNoNewAdminDialTargets } from "./admin-dial-targets";
 import { setHostAgents } from "./host-agents";
 
@@ -474,9 +473,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
     // has to be bracketed here, as it does everywhere else in this stack.
     const parsed = splitHostPort(input.listenAddress);
     if (parsed === null) {
-      throw new ApiValidationError(
-        "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535",
-      );
+      throw domainError("l4ListenAddressInvalid", {}, { status: 400 });
     }
     if (RESERVED_L4_PORTS.has(parsed.port)) {
       throw domainError("l4ListenPortReserved", { port: parsed.port });
@@ -488,7 +485,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
   }
 
   if (input.matcherType !== undefined && !VALID_MATCHER_TYPES.includes(input.matcherType)) {
-    throw new ApiValidationError(`Matcher type must be one of: ${VALID_MATCHER_TYPES.join(", ")}`);
+    throw domainError("l4MatcherTypeInvalid", { types: VALID_MATCHER_TYPES }, { status: 400 });
   }
 
   if (input.matcherType === "tls_sni" || input.matcherType === "http_host") {
@@ -512,9 +509,7 @@ function validateL4Input(input: L4ProxyHostInput | Partial<L4ProxyHostInput>, is
       // A bare IPv6 literal contains colons and would have passed a `includes(":")` check while
       // naming no port at all.
       if (splitHostPort(upstream) === null || splitHostPort(upstream)?.host === "") {
-        throw new ApiValidationError(
-          `Upstream '${upstream}' must be in 'host:port' or '[IPv6]:port' format`,
-        );
+        throw domainError("l4UpstreamInvalid", { upstream }, { status: 400 });
       }
     }
   }

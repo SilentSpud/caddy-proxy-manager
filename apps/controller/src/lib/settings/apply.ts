@@ -18,15 +18,19 @@ import { domainError } from "../domain-error";
 export type RevisionRow = {
   id: number;
   appliedByName: string | null;
+  /** The stored change list. Kept as written, since the migration copies it; the UI renders `keys`. */
   summary: string;
+  /** The storage keys the apply committed, for the review sheet to name in the reader's language. */
+  keys: string[];
   outcome: "applied" | "failed";
   error: string | null;
   appliedAt: string;
 };
 
+/** `error` is what the revision stores; `cause` is what the action renders, in the reader's language. */
 export type ApplyOutcome =
   | { ok: true; revision: number }
-  | { ok: false; error: string; revision: number };
+  | { ok: false; error: string; cause: Error; revision: number };
 
 /**
  * Render the config Caddy would receive if this operator applied now.
@@ -77,12 +81,17 @@ export async function applyStagedSettings(
     await discardAllStaged(userId);
 
     const keys = staged.map((entry) => entry.key);
-    let error: string | null = null;
+    const fallback = domainError("applyCaddyConfigFailed");
+    let failure: Error | null = null;
     try {
       await applyCaddyConfig();
     } catch (cause) {
-      error = cause instanceof Error ? cause.message : "Failed to apply Caddy configuration";
+      // Something that is not an Error, or caddy.ts's CaddyApplyError carrying this very sentence:
+      // either way the code stands in, so the action can say it translated. The English is the same.
+      failure = cause instanceof Error && cause.message !== fallback.message ? cause : fallback;
     }
+    // Stored in English as before: the revision row is history, not a message for one reader.
+    const error = failure?.message ?? null;
 
     const [row] = await db
       .insert(settingsRevisions)
@@ -98,7 +107,9 @@ export async function applyStagedSettings(
       .returning({ id: settingsRevisions.id });
 
     const revision = row?.id ?? 0;
-    return error ? { ok: false, error, revision } : { ok: true, revision };
+    return failure
+      ? { ok: false, error: failure.message, cause: failure, revision }
+      : { ok: true, revision };
   });
 }
 
@@ -109,6 +120,7 @@ export async function recentRevisions(limit = 3): Promise<RevisionRow[]> {
       id: settingsRevisions.id,
       appliedByName: settingsRevisions.appliedByName,
       summary: settingsRevisions.summary,
+      keys: settingsRevisions.keys,
       outcome: settingsRevisions.outcome,
       error: settingsRevisions.error,
       appliedAt: settingsRevisions.appliedAt,
@@ -119,6 +131,19 @@ export async function recentRevisions(limit = 3): Promise<RevisionRow[]> {
 
   return rows.map((row) => ({
     ...row,
+    keys: parseRevisionKeys(row.keys),
     outcome: row.outcome === "failed" ? "failed" : "applied",
   }));
+}
+
+/** An unreadable column yields no keys, and the sheet falls back to the stored summary. */
+function parseRevisionKeys(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((key): key is string => typeof key === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }

@@ -57,11 +57,11 @@ type Props = {
 };
 
 const ROLE_OPTIONS = [
-  { value: "admin", label: "Admin" },
-  { value: "operator", label: "Operator" },
-  { value: "user", label: "User" },
-  { value: "viewer", label: "Viewer" },
-];
+  { value: "admin", labelKey: "roles.admin" },
+  { value: "operator", labelKey: "roles.operator" },
+  { value: "user", labelKey: "roles.user" },
+  { value: "viewer", labelKey: "roles.viewer" },
+] as const;
 
 /** Role tint. Admin reads as elevated privilege, the rest are informational. */
 const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
@@ -88,6 +88,7 @@ function userLabel(user: UserEntry) {
 
 export default function UsersClient({ users, localUsersEnabled = true }: Props) {
   const t = useTranslations("users");
+  const roleOptions = ROLE_OPTIONS.map((role) => ({ value: role.value, label: t(role.labelKey) }));
   const router = useRouter();
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -168,7 +169,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
               <Tab
                 key={role.value}
                 value={role.value}
-                label={role.label}
+                label={t(role.labelKey)}
                 endContent={<Badge label={roleCounts[role.value as UserEntry["role"]]} />}
               />
             ))}
@@ -189,7 +190,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
         <HStack gap={3} vAlign="center">
           <Text type="body" size="sm" color="secondary">
-            {filtered.length} user{filtered.length !== 1 ? "s" : ""}
+            {t("userCount", { count: filtered.length })}
           </Text>
           {localUsersEnabled && (
             <>
@@ -252,7 +253,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
                 <Selector
                   data-testid="create-role"
                   label={t("role")}
-                  options={ROLE_OPTIONS}
+                  options={roleOptions}
                   value={createRole}
                   onChange={(v) => setCreateRole(v as UserEntry["role"])}
                 />
@@ -340,7 +341,7 @@ function UserRow({
             <Text type="body" size="sm" weight="medium" maxLines={1}>
               {userLabel(user)}
             </Text>
-            {isDisabled && <Badge variant="error" label="disabled" />}
+            {isDisabled && <Badge variant="error" label={t("disabledBadge")} />}
           </HStack>
           <Text type="body" size="xsm" color="secondary" maxLines={1}>
             {user.email} · {user.provider}
@@ -360,7 +361,7 @@ function UserRow({
             <IconButton
               variant="ghost"
               size="sm"
-              label={`Disable user ${userLabel(user)}`}
+              label={t("disableUserNamed", { name: userLabel(user) })}
               tooltip={t("disableUser")}
               icon={<Ban />}
               onClick={() => setConfirmKind("disable")}
@@ -369,7 +370,7 @@ function UserRow({
             <IconButton
               variant="ghost"
               size="sm"
-              label={`Enable user ${userLabel(user)}`}
+              label={t("enableUserNamed", { name: userLabel(user) })}
               tooltip={t("enableUser")}
               icon={<CheckCircle2 />}
               onClick={async () => {
@@ -383,7 +384,7 @@ function UserRow({
           <IconButton
             variant="ghost"
             size="sm"
-            label={`Edit user ${userLabel(user)}`}
+            label={t("editUserNamed", { name: userLabel(user) })}
             tooltip={t("editUser")}
             icon={<Pencil />}
             onClick={onEdit}
@@ -391,7 +392,7 @@ function UserRow({
           <IconButton
             variant="ghost"
             size="sm"
-            label={`Delete user ${userLabel(user)}`}
+            label={t("deleteUserNamed", { name: userLabel(user) })}
             tooltip={t("deleteUser")}
             icon={<Trash2 />}
             onClick={() => setConfirmKind("delete")}
@@ -404,13 +405,13 @@ function UserRow({
       <AlertDialog
         isOpen={confirmKind !== null}
         onOpenChange={(open) => !open && setConfirmKind(null)}
-        title={confirmKind === "delete" ? "Delete user" : "Disable user"}
+        title={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
         description={
           confirmKind === "delete"
-            ? `Permanently delete user "${user.name ?? user.email}"? This cannot be undone.`
-            : `Disable user "${user.name ?? user.email}"?`
+            ? t("deleteUserConfirm", { name: user.name ?? user.email })
+            : t("disableUserConfirm", { name: user.name ?? user.email })
         }
-        actionLabel={confirmKind === "delete" ? "Delete user" : "Disable user"}
+        actionLabel={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
         onAction={async () => {
           const result =
             confirmKind === "delete"
@@ -438,6 +439,10 @@ function EditUserRow({
   onSave: () => void;
 }) {
   const t = useTranslations("users");
+  const roleOptions = ROLE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
   const [role, setRole] = useState(user.role);
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
@@ -447,7 +452,7 @@ function EditUserRow({
       <HStack gap={2} vAlign="center">
         <Icon icon={Pencil} size="sm" />
         <Text type="body" size="sm" weight="medium">
-          Editing {user.name ?? user.email}
+          {t("editingNamed", { name: user.name ?? user.email })}
         </Text>
       </HStack>
       <form
@@ -481,7 +486,7 @@ function EditUserRow({
             />
             <Selector
               label={t("role")}
-              options={ROLE_OPTIONS}
+              options={roleOptions}
               value={role}
               onChange={(v) => setRole(v as UserEntry["role"])}
             />

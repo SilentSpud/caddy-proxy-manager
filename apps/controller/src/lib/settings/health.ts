@@ -10,6 +10,7 @@
  * grid that waited on a round trip per section would be slower than the page it replaced.
  */
 
+import type { useTranslations } from "next-intl";
 import type { AnalyticsView, GeoipView } from "./optional-features";
 import { storageKeysForSection } from "./section-keys";
 import type {
@@ -23,6 +24,9 @@ import type {
 
 export type SectionStatus = "ok" | "attention" | "unset" | "env";
 
+/** Type-only: the page passes its server translator, the tests one built over the catalog. */
+type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
+
 export type SectionHealth = {
   /** Matches the section ids the settings navigation uses, so a tile links straight to it. */
   id: string;
@@ -30,7 +34,7 @@ export type SectionHealth = {
   name: string;
   group: "traffic" | "access" | "runtime";
   status: SectionStatus;
-  /** One line of current state. Rendered as-is; already translated by the caller where needed. */
+  /** One line of current state, already in the reader's language. Rendered as-is. */
   value: string;
   /** Why it needs attention, when it does. */
   detail?: string;
@@ -57,7 +61,11 @@ export type HealthInput = {
   now?: number;
 };
 
-export function sectionHealth(input: HealthInput): SectionHealth[] {
+/**
+ * Counts go into the messages as strings: they were template literals before, and ICU would group
+ * a number of 1000 or more ("1,000"), which is not what these lines have ever said.
+ */
+export function sectionHealth(input: HealthInput, t: SettingsTranslator): SectionHealth[] {
   const staged = (id: string) => storageKeysForSection(id).some((key) => input.stagedKeys.has(key));
 
   const sections: SectionHealth[] = [];
@@ -66,26 +74,30 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   const activeProvider = input.dnsProvider?.default ?? null;
   sections.push({
     id: "dns-providers",
-    name: "DNS Providers",
+    name: t("sections.dnsProviders.name"),
     group: "traffic",
     status: activeProvider ? "ok" : "unset",
     value: activeProvider
-      ? `${activeProvider}${providers.length > 1 ? ` and ${providers.length - 1} more` : ""}`
-      : "No provider - DNS-01 unavailable",
-    detail: activeProvider
-      ? undefined
-      : "Wildcard certificates and internal-only hosts need a DNS provider to solve the challenge.",
+      ? providers.length > 1
+        ? t("health.dnsProviders.valueMore", {
+            provider: activeProvider,
+            count: String(providers.length - 1),
+          })
+        : activeProvider
+      : t("health.dnsProviders.valueNone"),
+    detail: activeProvider ? undefined : t("health.dnsProviders.detailNone"),
     staged: staged("dns-providers"),
   });
 
+  const certificateCount = String(input.certificateCount);
   sections.push({
     id: "acme",
-    name: "ACME Server",
+    name: t("sections.acme.name"),
     group: "traffic",
     status: "ok",
     value: input.acmeConfigured
-      ? `Custom directory - ${input.certificateCount} certificates`
-      : `Let's Encrypt - ${input.certificateCount} certificates`,
+      ? t("health.acme.valueCustom", { count: certificateCount })
+      : t("health.acme.valueLetsEncrypt", { count: certificateCount }),
     staged: staged("acme"),
   });
 
@@ -95,38 +107,39 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   const geoBlockNeedsProxies = Boolean(input.geoBlock?.enabled) && ranges.length === 0;
   sections.push({
     id: "trusted-proxies",
-    name: "Trusted Proxies",
+    name: t("sections.trustedProxies.name"),
     group: "traffic",
     status: geoBlockNeedsProxies ? "attention" : ranges.length > 0 ? "ok" : "unset",
-    value: ranges.length > 0 ? `${ranges.length} ranges trusted` : "No ranges trusted",
-    detail: geoBlockNeedsProxies
-      ? "Geo-Block is on but no proxy ranges are trusted, so every request is matched on the address Caddy sees, not the real client IP."
-      : undefined,
+    value:
+      ranges.length > 0
+        ? t("health.trustedProxies.valueRanges", { count: String(ranges.length) })
+        : t("health.trustedProxies.valueNone"),
+    detail: geoBlockNeedsProxies ? t("health.trustedProxies.detailGeoBlock") : undefined,
     staged: staged("trusted-proxies"),
   });
 
   const hasDefaultResponse = Boolean(input.defaultResponse);
   sections.push({
     id: "default-response",
-    name: "Default Response",
+    name: t("sections.defaultResponse.name"),
     group: "traffic",
     status: hasDefaultResponse ? "ok" : "unset",
-    value: hasDefaultResponse ? "Configured" : "Not set",
-    detail: hasDefaultResponse
-      ? undefined
-      : "Requests for unknown hostnames and direct IP hits fall through to the first matching host.",
+    value: hasDefaultResponse
+      ? t("health.defaultResponse.valueConfigured")
+      : t("health.defaultResponse.valueUnset"),
+    detail: hasDefaultResponse ? undefined : t("health.defaultResponse.detailUnset"),
     staged: staged("default-response"),
   });
 
   sections.push({
     id: "oauth",
-    name: "OAuth Providers",
+    name: t("sections.oauth.name"),
     group: "access",
     status: input.oauthProviderCount > 0 ? "ok" : "unset",
     value:
       input.oauthProviderCount > 0
-        ? `${input.oauthProviderCount} providers`
-        : "Local accounts only",
+        ? t("health.oauth.valueProviders", { count: String(input.oauthProviderCount) })
+        : t("health.oauth.valueLocalOnly"),
     staged: staged("oauth"),
   });
 
@@ -134,6 +147,7 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   // ever completed, so every lookup misses.
   const geoipEmpty = input.geoip.enabled && input.geoip.installedEditions.length === 0;
   const ageDays = input.geoip.databaseAgeDays;
+  const installed = String(input.geoip.installedEditions.length);
 
   /**
    * Behind is the definitive answer, and it needs no threshold: MaxMind has built something newer
@@ -150,32 +164,37 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   const stalledAfterMs = 2 * input.geoip.updateIntervalHours * 60 * 60 * 1000;
   const checkStalled = input.geoip.enabled && !(checkAgeMs < stalledAfterMs);
   const geoipAttention = geoipEmpty || behind.length > 0 || checkStalled;
-  const downloadFailure = input.geoip.downloadError
-    ? ` The last download failed: ${input.geoip.downloadError}`
-    : "";
+  const downloadError = input.geoip.downloadError;
 
   sections.push({
     id: "geoip",
-    name: "GeoIP",
+    name: t("health.geoip.name"),
     group: "access",
     status: geoipAttention ? "attention" : input.geoip.enabled ? "ok" : "unset",
     value: !input.geoip.enabled
-      ? "Off"
+      ? t("health.off")
       : geoipEmpty
-        ? "No database installed"
+        ? t("health.geoip.valueEmpty")
         : behind.length > 0
-          ? `${behind.length} of ${input.geoip.installedEditions.length} databases out of date`
+          ? t("health.geoip.valueBehind", { behind: String(behind.length), installed })
           : ageDays === 0
-            ? `${input.geoip.installedEditions.length} databases, updated today`
-            : `${input.geoip.installedEditions.length} databases, ${ageDays} days old`,
+            ? t("health.geoip.valueToday", { count: installed })
+            : t("health.geoip.valueAge", { count: installed, days: String(ageDays) }),
     detail: geoipEmpty
-      ? `GeoIP is enabled but no MaxMind database has been downloaded, so country lookups return nothing.${downloadFailure || " Check the account ID and licence key."}`
+      ? downloadError
+        ? t("health.geoip.detailEmptyDownloadFailed", { error: downloadError })
+        : t("health.geoip.detailEmpty")
       : behind.length > 0
-        ? `MaxMind has published a newer ${behind.join(", ")} than the copy on disk, and the controller has not downloaded it.${downloadFailure}`
+        ? downloadError
+          ? t("health.geoip.detailBehindDownloadFailed", {
+              editions: behind.join(", "),
+              error: downloadError,
+            })
+          : t("health.geoip.detailBehind", { editions: behind.join(", ") })
         : checkStalled
           ? input.geoip.checkError
-            ? `MaxMind could not be reached to check for updates: ${input.geoip.checkError}`
-            : "MaxMind has not been asked for updates recently, so whether these databases are current is unknown."
+            ? t("health.geoip.detailCheckFailed", { error: input.geoip.checkError })
+            : t("health.geoip.detailCheckStalled")
           : undefined,
     staged: staged("geoip"),
   });
@@ -187,7 +206,7 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   const blockingOnStaleData = Boolean(input.geoBlock?.enabled) && behind.length > 0;
   sections.push({
     id: "geoblock",
-    name: "Geo-Block",
+    name: t("health.geoblock.name"),
     group: "access",
     status:
       blockingWithoutData || blockingOnStaleData
@@ -195,11 +214,13 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
         : input.geoBlock?.enabled
           ? "ok"
           : "unset",
-    value: input.geoBlock?.enabled ? `Denying ${blockedCountries} countries` : "Off",
+    value: input.geoBlock?.enabled
+      ? t("health.geoblock.valueDenying", { count: String(blockedCountries) })
+      : t("health.off"),
     detail: blockingWithoutData
-      ? "Country rules are configured but no GeoIP database is installed, so nothing is being blocked."
+      ? t("health.geoblock.detailNoData")
       : blockingOnStaleData
-        ? "Country rules are being matched against a database MaxMind has already superseded, so recently reassigned address ranges resolve to the wrong country."
+        ? t("health.geoblock.detailStaleData")
         : undefined,
     staged: staged("geoblock"),
   });
@@ -207,17 +228,20 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   const agentsMissing = input.agentsPaired > 0 && input.agentsConnected === 0;
   sections.push({
     id: "agent",
-    name: "Agent",
+    name: t("sections.agent.name"),
     group: "runtime",
     status: input.agentsPaired === 0 ? "unset" : agentsMissing ? "attention" : "ok",
     value:
       input.agentsPaired === 0
-        ? "No agent paired"
-        : `${input.agentsConnected} of ${input.agentsPaired} connected`,
+        ? t("health.agent.valueNone")
+        : t("health.agent.valueConnected", {
+            connected: String(input.agentsConnected),
+            paired: String(input.agentsPaired),
+          }),
     detail: agentsMissing
-      ? "No paired agent is holding its event stream open, so configuration changes cannot reach Caddy."
+      ? t("health.agent.detailMissing")
       : input.agentsPaired === 0
-        ? "Without an agent nothing starts or reconfigures the Caddy container."
+        ? t("health.agent.detailNone")
         : undefined,
     staged: staged("agent"),
   });
@@ -230,19 +254,27 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   const custom = input.caddyBuild?.customModules?.length ?? 0;
   sections.push({
     id: "caddy-build",
-    name: "Caddy Build",
+    name: t("sections.caddyBuild.name"),
     group: "runtime",
     status: "ok",
-    value: custom > 0 || disabled > 0 ? `${custom} custom, ${disabled} disabled` : "Stock build",
+    value:
+      custom > 0 || disabled > 0
+        ? t("health.caddyBuild.valueCustom", {
+            custom: String(custom),
+            disabled: String(disabled),
+          })
+        : t("health.caddyBuild.valueStock"),
     staged: staged("caddy-build"),
   });
 
   sections.push({
     id: "metrics",
-    name: "Metrics",
+    name: t("health.metrics.name"),
     group: "runtime",
     status: input.metrics?.enabled ? "ok" : "unset",
-    value: input.metrics?.enabled ? `Exposed on port ${input.metrics.port ?? 9090}` : "Off",
+    value: input.metrics?.enabled
+      ? t("health.metrics.valuePort", { port: String(input.metrics.port ?? 9090) })
+      : t("health.off"),
     staged: staged("metrics"),
   });
 
@@ -251,15 +283,13 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
   const analyticsFromEnv = input.analytics.source === "environment";
   sections.push({
     id: "analytics",
-    name: "Analytics",
+    name: t("sections.analytics.name"),
     group: "runtime",
     status: analyticsFromEnv ? "env" : input.analytics.enabled ? "ok" : "unset",
     value: input.analytics.enabled
-      ? `ClickHouse - ${input.analytics.retentionDays} day retention`
-      : "Off",
-    detail: analyticsFromEnv
-      ? "Set in the environment, so this instance cannot change it here."
-      : undefined,
+      ? t("health.analytics.valueRetention", { days: String(input.analytics.retentionDays) })
+      : t("health.off"),
+    detail: analyticsFromEnv ? t("health.analytics.detailEnv") : undefined,
     staged: staged("analytics"),
   });
 

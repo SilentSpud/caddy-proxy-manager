@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/src/lib/auth";
 import { createApiToken, deleteApiToken } from "@/src/lib/models/api-tokens";
+import { withTranslatedErrors } from "@/src/lib/translated-action";
 
 export async function createApiTokenAction(
   formData: FormData,
@@ -12,12 +14,17 @@ export async function createApiTokenAction(
   const name = String(formData.get("name") ?? "").trim();
 
   if (!name) {
-    return { error: "Name is required" };
+    const t = await getTranslations("errors");
+    return { error: t("nameRequired") };
   }
 
   const expiresAt = formData.get("expires_at") ? String(formData.get("expires_at")) : undefined;
 
-  const { rawToken } = await createApiToken(name, userId, expiresAt || undefined);
+  // The model refuses a long name, a full quota and a bad expiry with a code; this says it in the
+  // reader's language before the client shows the thrown message.
+  const { rawToken } = await withTranslatedErrors(() =>
+    createApiToken(name, userId, expiresAt || undefined),
+  );
   revalidatePath("/profile");
   return { rawToken };
 }

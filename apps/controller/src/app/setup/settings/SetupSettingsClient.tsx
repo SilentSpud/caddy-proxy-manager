@@ -5,8 +5,8 @@
  *
  * Fields are generated rather than written out, so adding a setting to
  * src/lib/settings/registry.ts puts it on this page and on the migration screen at the same time.
- * A value that came from the environment is labelled as such - that is the operator's cue that
- * saving here is what lets them delete it from their `.env`.
+ * A value that came from the environment is badged with its variable name - that is the operator's
+ * cue that saving here is what lets them delete it from their `.env`.
  *
  * The Defaults card is the exception, and is written out by hand because it is not a registry
  * setting: primary domain and ACME contact live together in the `general` JSON object that
@@ -28,7 +28,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-attrs";
-import { FormCard, InfoAlert, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
+import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { saveSetupSettings } from "./actions";
 import { useTranslations } from "next-intl";
@@ -116,13 +116,6 @@ export default function SetupSettingsClient({
     return !gate || values[gate.key] === true;
   };
 
-  // Only what is actually on screen. A hidden field is not migrated either, so counting it would
-  // tell the operator a value had been copied into the database and invite them to delete it from
-  // their .env - where it is still the only copy.
-  const migratedCount = fields.filter(
-    (field) => field.source === "environment" && isVisible(field),
-  ).length;
-
   return (
     <Center>
       <VStack gap={5} padding={5}>
@@ -131,12 +124,6 @@ export default function SetupSettingsClient({
           <Heading level={1}>{t("settingsStep.heading")}</Heading>
           <Text color="secondary">{t("databaseSettingsDescription")}</Text>
         </VStack>
-
-        {migratedCount > 0 && (
-          <InfoAlert title={`${migratedCount} value(s) came from your .env file`}>
-            {t("environmentMigrationDescription")}
-          </InfoAlert>
-        )}
 
         <form action={submit}>
           <VStack gap={4}>
@@ -240,7 +227,7 @@ function GateSwitch({
         value={value}
         onChange={onChange}
       />
-      {field.source === "environment" && <Badge label={`from ${field.env}`} />}
+      {field.source === "environment" && <Badge label={field.env} />}
       {value && <Divider />}
     </VStack>
   );
@@ -255,12 +242,13 @@ function SettingRow({
   value: string | boolean | undefined;
   onChange: (next: string | boolean) => void;
 }) {
+  const t = useTranslations("setup");
   const label = (
     <HStack gap={2} align="center">
       <Text size="sm" weight="medium">
         {field.label}
       </Text>
-      {field.source === "environment" && <Badge label={`from ${field.env}`} />}
+      {field.source === "environment" && <Badge label={field.env} />}
     </HStack>
   );
 
@@ -278,9 +266,9 @@ function SettingRow({
           value={typeof value === "string" ? value : ""}
           onChange={(next: string) => onChange(next)}
           options={[
-            { value: "", label: "Let the Settings toggle decide" },
-            { value: "true", label: "Required" },
-            { value: "false", label: "Not required" },
+            { value: "", label: t("tristateInferred") },
+            { value: "true", label: t("tristateRequired") },
+            { value: "false", label: t("tristateNotRequired") },
           ]}
         />
       </VStack>
@@ -303,7 +291,7 @@ function SettingRow({
 
   const description =
     field.secret && field.source !== "default"
-      ? `${field.description} Leave blank to keep the current value.`
+      ? t("secretKeepCurrent", { description: field.description })
       : field.description;
 
   // Only a secret this deployment gets to choose; a licence key or a client secret is issued
@@ -373,7 +361,7 @@ function IdentityProviderCard({
       <FormCard title={t("identityProvider")}>
         <Banner
           status="info"
-          title={`Already configured: ${card.existing.join(", ")}`}
+          title={t("alreadyConfigured", { providers: card.existing.join(", ") })}
           description={t("providerManagementHelp")}
         />
       </FormCard>
@@ -429,7 +417,7 @@ function IdentityProviderCard({
           width="100%"
         />
 
-        <Collapsible defaultIsOpen={false} trigger={<Text size="sm">More options</Text>}>
+        <Collapsible defaultIsOpen={false} trigger={<Text size="sm">{t("moreOptions")}</Text>}>
           <VStack gap={3} padding={2}>
             <Text size="xsm" color="secondary">
               {t("manualEndpointsHelp")}
@@ -540,9 +528,9 @@ function IdentityProviderCard({
               value={value.defaultRole}
               onChange={(next: string) => set("defaultRole")(next)}
               options={[
-                { value: "viewer", label: "Viewer" },
-                { value: "user", label: "User" },
-                { value: "admin", label: "Admin" },
+                { value: "viewer", label: t("roleViewer") },
+                { value: "user", label: t("roleUser") },
+                { value: "admin", label: t("roleAdmin") },
               ]}
             />
           </VStack>

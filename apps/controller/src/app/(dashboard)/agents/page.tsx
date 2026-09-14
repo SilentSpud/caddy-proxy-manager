@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import AgentsClient, { type AgentRow } from "./AgentsClient";
+import { storedErrorMessage } from "@/src/lib/actions";
 import { getAllAgentStatuses, listAgentOptions } from "@/src/lib/agent/client";
 import { logAccessFixes } from "@/src/lib/agent/log-access";
 import { connectedAgents } from "@/src/lib/agent/registry";
@@ -24,6 +25,8 @@ function countAssigned(assignments: Map<number, number[]>, agentRowId: number): 
 
 export default async function AgentsPage() {
   const access = await requireAccess();
+  // For a status failure this side worded, such as an agent that has not reported yet.
+  const tRoot = await getTranslations();
 
   const [paired, statuses, httpAssignments, l4Assignments, agentOptions] = await Promise.all([
     listAgents(),
@@ -54,7 +57,13 @@ export default async function AgentsPage() {
         version: status?.version ?? null,
         buildState: status?.caddyBuild.status.state ?? "idle",
         buildMessage:
-          reported?.ok === false ? reported.error : (status?.caddyBuild.status.message ?? null),
+          reported?.ok === false
+            ? storedErrorMessage(
+                tRoot,
+                reported.error,
+                reported.code ? { code: reported.code, params: {} } : null,
+              )
+            : (status?.caddyBuild.status.message ?? null),
         hasOwnBuildSettings: agent.hasOwnBuildSettings,
         assignedHttpHosts: countAssigned(httpAssignments, agent.id),
         assignedL4Hosts: countAssigned(l4Assignments, agent.id),

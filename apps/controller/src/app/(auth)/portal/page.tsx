@@ -19,11 +19,14 @@ interface PortalPageProps {
   searchParams: Promise<{ rd?: string; rid?: string; error?: string }>;
 }
 
-export const metadata: Metadata = {
-  // Absolute: the portal fronts other people's apps, so it does not
-  // announce the product in the tab title the way the dashboard does.
-  title: { absolute: "Authentication Required" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("auth");
+  return {
+    // Absolute: the portal fronts other people's apps, so it does not
+    // announce the product in the tab title the way the dashboard does.
+    title: { absolute: t("authenticationRequired") },
+  };
+}
 
 export default async function PortalPage({ searchParams }: PortalPageProps) {
   const params = await searchParams;
