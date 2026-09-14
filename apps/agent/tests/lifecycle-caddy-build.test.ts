@@ -29,7 +29,7 @@ function desired(caddyModules: string[]): AgentDesiredState {
   return {
     l4Ports: [],
     caddyModules,
-    services: { services: { clickhouse: false, geoipupdate: false }, env: {} },
+    services: { services: { clickhouse: false }, env: {} },
     fleetConfig: {} as AgentDesiredState["fleetConfig"],
     caddyEnabled: false,
   };

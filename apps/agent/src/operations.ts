@@ -330,10 +330,7 @@ export class Operations {
       const env = composeEnv(request.env);
 
       const failures: string[] = [];
-      const applied: Record<ManagedServiceName, boolean> = {
-        clickhouse: false,
-        geoipupdate: false,
-      };
+      const applied: Record<ManagedServiceName, boolean> = { clickhouse: false };
 
       for (const name of MANAGED_SERVICES) {
         const enable = request.services[name] === true;
@@ -345,8 +342,7 @@ export class Operations {
           applied[name] = enable;
           continue;
         }
-        // Each service is independent, so one failing must not leave the other unattempted -
-        // a missing MaxMind subscription should not also take analytics down.
+        // Each service is independent, so one failing must not leave the rest unattempted.
         const detail = result.timedOut
           ? `abandoned after ${this.config.serviceTimeoutSeconds}s`
           : tail(result.output, 4);

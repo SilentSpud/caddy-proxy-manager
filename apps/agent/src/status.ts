@@ -8,7 +8,7 @@
 
 import type { AgentStatus, ManagedServiceName, ManagedServicesStatus } from "@cpm/shared";
 import { accessLogPresent } from "./analytics/log-parser";
-import { analyticsEnabled } from "./analytics/clickhouse";
+import { analyticsEnabled } from "./analytics/relay";
 import { checkLogAccess } from "./analytics/log-access";
 import type { AgentConfig } from "./config";
 import type { AgentStore } from "./db";

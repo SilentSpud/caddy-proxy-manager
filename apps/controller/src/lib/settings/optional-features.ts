@@ -1,14 +1,16 @@
 /**
  * The two optional features, as the Settings page reads and writes them.
  *
- * Analytics and GeoIP are the only settings whose value decides whether a *container* runs, so they
- * need more than the registry's read/write: saving one has to drop the ClickHouse client's cached
- * configuration, re-push the fleet credentials, and ask the agents to start or stop the service.
- * That sequence is here rather than in the server action so the ordering is stated once.
+ * Analytics and GeoIP are the only settings whose value decides whether a whole service runs, so
+ * they need more than the registry's read/write: saving one has to drop the ClickHouse client's
+ * cached configuration, re-push the fleet credentials, ask the agents to start or stop ClickHouse,
+ * and set the GeoIP downloader going. That sequence is here rather than in the server action so the
+ * ordering is stated once.
  */
 
 import { geoipDatabaseAgeDays, geoipEnabled, installedGeoipDatabases } from "../agent/geoip";
 import { editionsBehind, getGeoipUpdateCheck } from "../geoip/update-check";
+import { getGeoipDownloadState } from "../geoip/updater";
 import { isAnalyticsEnabled } from "../clickhouse/client";
 import * as registry from "./registry";
 import { resolveSetting, saveSettings, type SettingSource } from "./resolve";
@@ -33,10 +35,10 @@ export type GeoipView = {
   source: SettingSource;
   accountId: string;
   hasLicenseKey: boolean;
-  /** Which MaxMind databases are on disk right now. Empty before geoipupdate's first run. */
+  /** Which MaxMind databases are on disk right now. Empty before the first download. */
   installedEditions: string[];
   /**
-   * Whole days since geoipupdate last wrote a database, or null when none are installed.
+   * Whole days since a database was last written, or null when none are installed.
    *
    * The number that says whether the updater is still running: MaxMind publishes GeoLite2 twice a
    * week, so a working deployment never gets far past a few days.
@@ -53,6 +55,10 @@ export type GeoipView = {
    * from "the updater has stopped fetching what MaxMind published".
    */
   editionsBehind: string[];
+  /** Why the updater's last download failed, when one did. */
+  downloadError: string | null;
+  /** Hours between the updater's checks. */
+  updateIntervalHours: number;
 };
 
 export async function analyticsView(): Promise<AnalyticsView> {
@@ -80,13 +86,18 @@ export async function analyticsView(): Promise<AnalyticsView> {
 
 export async function geoipView(): Promise<GeoipView> {
   const installed = installedGeoipDatabases();
-  const [toggle, enabled, accountId, licenseKey, check] = await Promise.all([
+  const interval = await resolveSetting(registry.geoipUpdateIntervalHours);
+  const [toggle, enabled, accountId, licenseKey, check, downloads] = await Promise.all([
     resolveSetting(registry.geoipEnabled),
     geoipEnabled(),
     resolveSetting(registry.geoipAccountId),
     resolveSetting(registry.geoipLicenseKey),
-    // Refreshes behind this call when stale; never waits on MaxMind.
-    getGeoipUpdateCheck(installed.map((database) => database.edition)),
+    // Refreshes behind this call once older than the interval; never waits on MaxMind.
+    getGeoipUpdateCheck(
+      installed.map((database) => database.edition),
+      interval.value * 60 * 60 * 1000,
+    ),
+    getGeoipDownloadState(),
   ]);
 
   return {
@@ -100,6 +111,8 @@ export async function geoipView(): Promise<GeoipView> {
     lastCheckedAt: check.checkedAt,
     checkError: check.error,
     editionsBehind: editionsBehind(check.available, installed),
+    downloadError: downloads.error,
+    updateIntervalHours: interval.value,
   };
 }
 
@@ -142,6 +155,10 @@ export async function propagateOptionalFeatureSettings(): Promise<void> {
   await invalidateClickHouseConfig();
   await pushFleetConfig();
   await applyManagedServices();
+
+  // Not awaited: a first download is tens of megabytes, and saving should not wait on MaxMind.
+  const { updateGeoipDatabases } = await import("../geoip/updater");
+  void updateGeoipDatabases();
 }
 
 /**
@@ -180,10 +197,12 @@ export async function saveGeoipSettings(input: {
   enabled: boolean;
   accountId: string;
   licenseKey: string;
+  updateIntervalHours: number;
 }): Promise<void> {
   const values: Record<string, unknown> = {
     [registry.geoipEnabled.key]: input.enabled,
     [registry.geoipAccountId.key]: input.accountId,
+    [registry.geoipUpdateIntervalHours.key]: input.updateIntervalHours,
   };
   if (input.licenseKey.trim().length > 0) {
     values[registry.geoipLicenseKey.key] = input.licenseKey;

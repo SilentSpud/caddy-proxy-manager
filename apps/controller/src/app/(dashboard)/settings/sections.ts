@@ -175,7 +175,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         name: "GeoIP Databases",
         desc: "MaxMind subscription and whether country lookups run at all",
         icon: Globe2,
-        env: ["GEOIP_ENABLED", "GEOIPUPDATE_ACCOUNT_ID", "GEOIPUPDATE_LICENSE_KEY"],
+        env: [
+          "GEOIP_ENABLED",
+          "GEOIPUPDATE_ACCOUNT_ID",
+          "GEOIPUPDATE_LICENSE_KEY",
+          "GEOIP_UPDATE_INTERVAL_HOURS",
+        ],
       },
       {
         id: "geoblock",

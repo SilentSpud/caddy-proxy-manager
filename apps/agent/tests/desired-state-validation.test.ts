@@ -181,7 +181,7 @@ describe("operations refuse an invalid frame", () => {
 
   it("never hands a non-allowlisted variable to docker", async () => {
     operations.applyManagedServices({
-      services: { clickhouse: true, geoipupdate: false },
+      services: { clickhouse: true },
       env: {
         CLICKHOUSE_PASSWORD: "s3cret",
         DOCKER_HOST: "tcp://attacker:2375",
@@ -203,7 +203,7 @@ describe("operations refuse an invalid frame", () => {
 
   it("fails the services operation on a value with a line break", async () => {
     operations.applyManagedServices({
-      services: { clickhouse: true, geoipupdate: false },
+      services: { clickhouse: true },
       env: { CLICKHOUSE_PASSWORD: "a\nEVIL=1" },
     });
     for (let i = 0; i < 100 && store.managedServicesStatus().state === "applying"; i++) {

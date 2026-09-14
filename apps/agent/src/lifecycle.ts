@@ -24,6 +24,7 @@ import {
   type AgentLifecycle as Lifecycle,
   type AgentLocalState,
   type AgentServerEvent,
+  MANAGED_SERVICES,
   MAX_CADDY_CONFIG_BYTES,
   SHIPPED_CADDY_MODULES,
 } from "@cpm/shared";
@@ -564,9 +565,7 @@ function sameServices(
   applied: Record<string, boolean> | null,
 ): boolean {
   if (applied === null) return false;
-  const keys = new Set([...Object.keys(wanted), ...Object.keys(applied)]);
-  for (const key of keys) {
-    if ((wanted[key] ?? false) !== (applied[key] ?? false)) return false;
-  }
-  return true;
+  // Only what this agent manages: a controller of another version may name a service it does not,
+  // and diffing that would re-apply on every frame.
+  return MANAGED_SERVICES.every((name) => (wanted[name] ?? false) === (applied[name] ?? false));
 }

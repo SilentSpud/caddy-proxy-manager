@@ -137,9 +137,9 @@ services:
       UPDATE_IMAGE_REPOSITORY: ${UPDATE_IMAGE_REPOSITORY:-ghcr.io/silentspud/caddy-proxy-manager}
 
       # Optional analytics and GeoIP. Both are Settings toggles now: a stored value wins over the
-      # variable, and the agent starts or stops the container to match - so neither the profile nor
+      # variable, and the agent starts or stops ClickHouse to match - so neither the profile nor
       # these need setting on a stack with an agent. They remain for a first start, and for a
-      # deployment with no agent, where Docker is the only thing that can start those services.
+      # deployment with no agent, where Docker is the only thing that can start ClickHouse.
       # Unset means "decide from whether the credentials below are configured", which is what
       # earlier releases did.
       ANALYTICS_ENABLED: ${ANALYTICS_ENABLED:-}
@@ -150,15 +150,17 @@ services:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics}
       # Days of analytics kept before deletion.
       CLICKHOUSE_RETENTION_DAYS: ${CLICKHOUSE_RETENTION_DAYS:-30}
-      # Only Compose reads these, to run geoipupdate. Listed here so the controller can show an
-      # operator what is currently configured before they save it into the database.
+      # MaxMind credentials for the GeoLite2 databases, which the controller downloads onto its data
+      # volume itself. Prefer Settings → GeoIP, where the licence key is encrypted at rest.
       GEOIPUPDATE_ACCOUNT_ID: ${GEOIPUPDATE_ACCOUNT_ID:-}
       GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY:-}
+      # Hours between checks for newer databases. A Settings field; this is a first-start default.
+      GEOIP_UPDATE_INTERVAL_HOURS: ${GEOIP_UPDATE_INTERVAL_HOURS:-24}
     group_add:
       - "${CADDY_GID:-10000}"  # caddy's GID, so web can write /logs
     volumes:
+      # Also holds the GeoLite2 databases, under geoip/.
       - caddy-manager-data:/app/data
-      - geoip-data:/usr/share/GeoIP:ro,z
       # Caddy's logs are read by the agent now, not here. Still mounted because the controller
       # generates the log configuration and an operator reaching for them expects them present.
       - caddy-logs:/logs
@@ -222,10 +224,10 @@ services:
       # neither owns nor shares a group with), rotation keeps working but cleanup silently stops
       # and the disk fills. On the host: chgrp <PGID> <host-dir> && chmod 2770 <host-dir>
       - caddy-logs:/logs
-      # The agent's copy of the MaxMind databases, not the geoip-data volume geoipupdate writes: the
-      # agent fetches them from the controller onto its own volume, which it can write without
-      # running as root. Only the geoip subdirectory, and read-only - the rest of that volume holds
-      # the agent's pairing secrets. A volume subpath needs Docker Engine 26 or later.
+      # The agent's copy of the MaxMind databases: the agent fetches them from the controller onto
+      # its own volume, which it can write without running as root. Only the geoip subdirectory, and
+      # read-only - the rest of that volume holds the agent's pairing secrets. A volume subpath needs
+      # Docker Engine 26 or later.
       - type: volume
         source: agent-data
         target: /usr/share/GeoIP
@@ -259,8 +261,8 @@ services:
     restart: unless-stopped
     environment:
       # Each grant is used by the agent's compose calls. Containers: create, start, stop and inspect
-      # caddy, clickhouse and geoipupdate. Networks: compose inspects them on every up. Volumes and
-      # images: a managed service's first start creates its volume and pulls its image.
+      # caddy and clickhouse. Networks: compose inspects them on every up. Volumes and images: a
+      # managed service's first start creates its volume and pulls its image.
       CONTAINERS: 1
       POST: 1
       NETWORKS: 1
@@ -320,27 +322,24 @@ services:
       # Pinned as admin.listen into every config the agent forwards, since the controller's own admin
       # block binds every interface, caddy-network included. Must match caddy's CADDY_ADMIN_LISTEN.
       CADDY_ADMIN_LISTEN: caddy-admin:2019
-      # Analytics: the agent parses this host's Caddy logs and writes the events itself, using
-      # credentials the controller pushes. Nothing to configure here - the controller decides
-      # whether analytics are on at all.
+      # Analytics: the agent parses this host's Caddy logs and relays the events to the controller,
+      # which writes them. Nothing to configure here - the controller decides whether analytics are
+      # on at all.
       # Seconds before a Caddy rebuild is abandoned.
       CADDY_BUILD_TIMEOUT: "${CADDY_BUILD_TIMEOUT:-1800}"
-      # Seconds before starting clickhouse or geoipupdate on the controller's behalf is abandoned.
-      # Generous: the first start of either pulls its image.
+      # Seconds before starting clickhouse on the controller's behalf is abandoned. Generous: its
+      # first start pulls the image.
       SERVICE_START_TIMEOUT: "${SERVICE_START_TIMEOUT:-900}"
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       # What the services the agent runs interpolate. It never reads .env, which holds
       # SESSION_SECRET and POSTGRES_PASSWORD, so these are forwarded from it here instead. A variable
-      # an override file interpolates into caddy, clickhouse or geoipupdate belongs here too.
+      # an override file interpolates into caddy or clickhouse belongs here too.
       PUID: ${PUID:-}
       PGID: ${PGID:-}
       DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN:-}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-      GEOIPUPDATE_ACCOUNT_ID: ${GEOIPUPDATE_ACCOUNT_ID:-}
-      GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY:-}
-      HOSTNAME: ${HOSTNAME:-}
     # The agent runs as its own user, so it reaches other containers' files through their groups.
     group_add:
       # Caddy's, to read its logs and truncate the WAF audit log. Must match caddy's PGID.
@@ -366,12 +365,10 @@ services:
       - socket-proxy
       # Caddy's admin API, which it proxies for, and the controller.
       - caddy-admin
-      # ClickHouse, which it writes this host's analytics into.
-      - analytics
       # Egress, for a controller on another host.
       - caddy-network
 
-  # The controller's database. No profile: unlike clickhouse and geoipupdate this is not optional,
+  # The controller's database. No profile: unlike clickhouse this is not optional,
   # since SQLite support was removed. Unpublished on purpose - nothing outside the compose network
   # needs it, and publishing 5432 is how a database ends up on the internet.
   postgres:
@@ -416,8 +413,8 @@ services:
       # An empty value still cannot start ClickHouse; the controller refuses to enable analytics
       # without one, which is where that check now lives.
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-      # No CREATE USER, GRANT or ROLE: the controller needs only table DDL, and every paired agent is
-      # handed this same account.
+      # No CREATE USER, GRANT or ROLE: the controller needs only table DDL, and nothing but the
+      # controller holds this account.
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 0
     volumes:
       - clickhouse-data:/var/lib/clickhouse
@@ -437,23 +434,6 @@ services:
         soft: 262144
         hard: 262144
 
-  # Optional, and started the same way: Settings → GeoIP, or the profile without an agent.
-  geoipupdate:
-    container_name: geoipupdate-${HOSTNAME}
-    image: ghcr.io/maxmind/geoipupdate:v8.0.0@sha256:51e70dd6f16cd3e4d845ac02d09940b10772a75b9d741427d235a78570923c1d
-    profiles: [geoipupdate]
-    restart: always
-    environment:
-      - GEOIPUPDATE_ACCOUNT_ID=${GEOIPUPDATE_ACCOUNT_ID:-}
-      - GEOIPUPDATE_LICENSE_KEY=${GEOIPUPDATE_LICENSE_KEY:-}
-      - 'GEOIPUPDATE_EDITION_IDS=GeoLite2-ASN GeoLite2-City GeoLite2-Country'
-      - GEOIPUPDATE_FREQUENCY=72
-    volumes:
-      - geoip-data:/usr/share/GeoIP:z
-    # It talks to MaxMind and nothing in the stack, so only the default network, for egress.
-    networks:
-      - default
-
 networks:
   caddy-network:
     driver: bridge
@@ -469,7 +449,7 @@ networks:
   database:
     driver: bridge
     internal: true
-  # ClickHouse, web that reads it, and the agent that writes it.
+  # ClickHouse and web, which writes to it and reads it. Agents relay their events through web.
   analytics:
     driver: bridge
     internal: true
@@ -484,7 +464,6 @@ volumes:
   caddy-data:
   caddy-config:
   caddy-logs:
-  geoip-data:
   clickhouse-data:
   postgres-data:
   acme-ca:

@@ -1,9 +1,8 @@
 /**
  * The MaxMind databases the controller holds, and how an agent is told to fetch them.
  *
- * The files come from the `geoipupdate` container into a shared volume. The controller does not
- * manage them beyond serving them: it holds the subscription, and agents on other hosts reach them
- * through it rather than each holding a licence key.
+ * The controller downloads them itself (../geoip/updater.ts). It holds the subscription, and agents
+ * on other hosts reach the files through it rather than each holding a licence key.
  */
 
 import { existsSync, statSync } from "node:fs";
@@ -17,13 +16,14 @@ import {
 import { config } from "../config";
 
 /**
- * Where the geoipupdate container leaves them, and where Caddy reads them.
+ * Where the updater writes them: the data volume, which is the one this non-root process can write.
+ * Caddy reads each agent's copy, never this one.
  *
- * Read per call rather than captured at module load: this is a mount point, and freezing it at
- * import makes the value depend on which module happened to load first.
+ * Read per call rather than captured at module load: tests repoint it, and freezing it at import
+ * makes the value depend on which module happened to load first.
  */
 function geoipDir(): string {
-  return process.env.GEOIP_DIR || "/usr/share/GeoIP";
+  return process.env.GEOIP_DIR || join(process.cwd(), "data", "geoip");
 }
 
 export function geoipDatabasePath(edition: GeoipEdition): string {
@@ -34,7 +34,7 @@ export function geoipDatabasePath(edition: GeoipEdition): string {
  * A strong ETag for a database file.
  *
  * Size and mtime rather than a content hash: these files are tens of megabytes, this runs on every
- * agent's daily check, and geoipupdate replaces the file wholesale - so a changed file always has
+ * agent's daily check, and the updater replaces the file wholesale - so a changed file always has
  * a changed mtime, and hashing it would buy nothing but I/O.
  */
 export function geoipEtag(path: string): string {
@@ -50,9 +50,9 @@ export function installedGeoipEditions(): GeoipEdition[] {
 export type GeoipDatabaseInfo = {
   edition: GeoipEdition;
   /**
-   * When geoipupdate last wrote this file.
+   * When this file was last written.
    *
-   * The file's own mtime, for the same reason `geoipEtag` trusts it: geoipupdate replaces a
+   * The file's own mtime, for the same reason `geoipEtag` trusts it: the updater replaces a
    * database wholesale, so the write time is when this host last took delivery of one.
    *
    * MaxMind stamps its own `build_epoch` inside the file, which would be the age of the *data*
@@ -98,8 +98,8 @@ export function geoipDatabaseAgeDays(
  *
  * The toggle is tri-state, and unset infers the answer rather than defaulting: before it existed,
  * "has GeoIP" meant "the databases are on disk", and an upgrade must not read as someone having
- * turned the feature off. Credentials count too, so enabling it on a host whose geoipupdate has
- * not finished its first download yet does not immediately report itself as unconfigured.
+ * turned the feature off. Credentials count too, so enabling it before the first download has
+ * finished does not immediately report itself as unconfigured.
  */
 export async function geoipEnabled(): Promise<boolean> {
   const [registry, { getSetting }] = await Promise.all([

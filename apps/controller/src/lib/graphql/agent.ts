@@ -8,20 +8,23 @@
  *
  * **Why it lives in the same schema as the operator API.** Two schemas would mean two endpoints,
  * two servers and two sets of transport decisions, for a difference that is entirely about which
- * credential arrives. The gate is per field instead: `agentEvents`, `agentStatus` and
- * `agentCommandResults` require a signed agent and reject a Bearer token, and every other field
- * requires a user and rejects a signature. Nothing is reachable by both.
+ * credential arrives. The gate is per field instead: `agentEvents` and the `agent*` mutations
+ * require a signed agent and reject a Bearer token, and every other field requires a user and
+ * rejects a signature. Nothing is reachable by both.
  *
  * **Pairing is deliberately still REST.** It runs before there is a secret to sign with, so it
  * cannot use this path - the exchange is what produces the credential everything here depends on.
  */
 
 import {
+  MAX_ANALYTICS_REQUEST_BYTES,
   MAX_CADDY_CONFIG_BYTES,
+  type AgentAnalyticsResult,
   type AgentCommandResult,
   type AgentServerEvent,
   type AgentStatus,
 } from "@cpm/shared";
+import { AnalyticsIngestError, ingestAnalytics } from "../agent/analytics-ingest";
 import { attach, isConnected, recordStatus, settleResults } from "../agent/registry";
 import { buildDesiredState } from "../agent/desired-state";
 import { verifyAgentRequest } from "../agent/verify";
@@ -130,6 +133,25 @@ export const agentResolvers = {
 
       settleResults(agent.agentId, args.results);
       return true;
+    },
+
+    agentAnalytics: async (
+      _: unknown,
+      args: { kind: string; rows: unknown[] },
+      context: GraphQLContext,
+    ): Promise<AgentAnalyticsResult> => {
+      const agent = await requireAgent(context, MAX_ANALYTICS_REQUEST_BYTES);
+
+      // No connection check, unlike a status: rows parsed while the stream was down still describe
+      // real traffic, and refusing them would only have the agent send them again.
+      try {
+        return await ingestAnalytics(agent.agentId, args.kind, args.rows);
+      } catch (error) {
+        if (error instanceof AnalyticsIngestError) {
+          throw new GraphQLError(error.message, { extensions: { code: error.code } });
+        }
+        throw error;
+      }
     },
   },
 };

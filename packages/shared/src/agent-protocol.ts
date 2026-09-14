@@ -92,11 +92,12 @@ export type ManagedServicesStatus = AgentOperationStatus<ManagedServicesState>;
 /**
  * The optional compose services the agent may start and stop.
  *
- * Both sit behind a compose profile, which is why they need an agent at all: a profile is decided
+ * Each sits behind a compose profile, which is why it needs an agent at all: a profile is decided
  * when the operator runs `docker compose up`, so nothing inside the stack can turn one on. The
- * agent runs the compose CLI, so it can - see `ManagedServicesRequest`.
+ * agent runs the compose CLI, so it can - see `ManagedServicesRequest`. `geoipupdate` was one until
+ * the controller began downloading the databases itself; an older agent reads its absence as off.
  */
-export const MANAGED_SERVICES = ["clickhouse", "geoipupdate"] as const;
+export const MANAGED_SERVICES = ["clickhouse"] as const;
 export type ManagedServiceName = (typeof MANAGED_SERVICES)[number];
 
 /**
@@ -110,8 +111,6 @@ export const MANAGED_SERVICE_ENV_KEYS = [
   "CLICKHOUSE_USER",
   "CLICKHOUSE_PASSWORD",
   "CLICKHOUSE_DB",
-  "GEOIPUPDATE_ACCOUNT_ID",
-  "GEOIPUPDATE_LICENSE_KEY",
 ] as const;
 export type ManagedServiceEnvKey = (typeof MANAGED_SERVICE_ENV_KEYS)[number];
 
@@ -259,26 +258,26 @@ export type GeoipEdition = (typeof GEOIP_EDITIONS)[number];
 
 export type FleetConfig = {
   /**
-   * Where to write analytics, or null when the deployment has none.
-   *
-   * The agent inserts its own events rather than shipping them to the controller: a controller on
-   * another host cannot read the Caddy log file at all, and proxying every request through it
-   * would put the busiest write path in the fleet through a machine that has nothing to do with it.
+   * Always null. Agents once got the controller's ClickHouse credentials here and inserted their
+   * own events; they relay them through `AGENT_OPERATIONS.analytics` now. Still sent, as null, so an
+   * older agent reads analytics as off rather than tripping over a field that went missing.
    */
-  clickhouse: {
-    url: string;
-    user: string;
-    password: string;
-    database: string;
-  } | null;
+  clickhouse: null;
+
+  /**
+   * Whether to parse this host's Caddy logs and relay the events to the controller.
+   *
+   * The agent parses because only it can read the log. The controller writes, so no agent holds a
+   * ClickHouse credential or needs ClickHouse reachable from its host.
+   */
+  analytics: boolean;
 
   /**
    * Where to fetch the MaxMind databases, or null when the controller has none.
    *
    * The controller holds the subscription and the files; agents reach them through it rather than
    * each host holding a licence key of its own. Pulled rather than pushed because these are tens
-   * of megabytes - the only route in the protocol that runs agent-to-controller, and the reason
-   * `AGENT_ID_HEADER` exists.
+   * of megabytes, over a signed route of their own rather than GraphQL.
    *
    * `url` is the controller's public address. An agent prefers the address it is paired with,
    * joined to `CONTROLLER_GEOIP_ROUTE`: an agent beside the controller would otherwise fetch through
@@ -377,7 +376,22 @@ export const AGENT_OPERATIONS = {
   status: "mutation AgentStatus($status: JSON!) { agentStatus(status: $status) }",
   commandResults:
     "mutation AgentCommandResults($results: [JSON!]!) { agentCommandResults(results: $results) }",
+  analytics:
+    "mutation AgentAnalytics($kind: String!, $rows: [JSON!]!) { agentAnalytics(kind: $kind, rows: $rows) }",
 } as const;
+
+/** The two kinds of row `AGENT_OPERATIONS.analytics` carries. */
+export const AGENT_ANALYTICS_KINDS = ["traffic", "waf"] as const;
+export type AgentAnalyticsKind = (typeof AGENT_ANALYTICS_KINDS)[number];
+
+/** What the controller did with a relayed batch. A malformed row is dropped, not fatal. */
+export type AgentAnalyticsResult = { accepted: number; rejected: number };
+
+/**
+ * Largest relayed analytics request. The agent splits a batch to fit: a refused batch is resent
+ * every pass, so one that could never fit would stall that host's analytics for good.
+ */
+export const MAX_ANALYTICS_REQUEST_BYTES = 8 * 1024 * 1024;
 
 /**
  * Where an agent fetches the MaxMind databases, as `<route>/<edition>` under its controller.

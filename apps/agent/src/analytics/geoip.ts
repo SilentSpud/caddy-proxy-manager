@@ -10,7 +10,7 @@
  * needs no second credential.
  *
  * Every agent fetches, the one beside the controller included: the files land on the agent's own
- * volume, which Caddy mounts read-only, rather than on the root-owned volume geoipupdate writes.
+ * volume, which Caddy mounts read-only, rather than on the controller's.
  */
 
 import { createHmac } from "node:crypto";

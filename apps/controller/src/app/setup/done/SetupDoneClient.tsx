@@ -79,7 +79,7 @@ export default function SetupDoneClient({
             <Banner
               status="warning"
               title={t("composeSettingsTitle")}
-              description={`Docker Compose provisions the clickhouse and geoipupdate containers from ${cleanup.keep.join(", ")}, and it cannot read the database - so the command above leaves them alone. Without an agent they have to stay: Docker is the only thing that can start those containers there. With an agent the saved values are passed to Compose for you, and these lines can go as well - but drop clickhouse and geoipupdate from COMPOSE_PROFILES at the same time, or your own docker compose up -d keeps recreating the containers from the now-stale values in the file.`}
+              description={t("composeSettingsDescription", { variables: cleanup.keep.join(", ") })}
             />
           )}
         </FormCard>

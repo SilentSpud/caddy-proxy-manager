@@ -1,13 +1,13 @@
 /**
  * Coraza's audit log, turned into WAF events. Runs on the agent for the same reason the access-log
  * parser does: the file is on this host. Its two seams are the same - the parse offset lives in the
- * agent's SQLite, and the rows go straight to ClickHouse.
+ * agent's SQLite, and the rows are relayed to the controller.
  */
 import { existsSync, statSync, truncateSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
 import type { WafEventRow } from "@cpm/shared";
 import type { AgentStore } from "../db";
-import { insertWafEvents } from "./clickhouse";
+import { relayWafEvents } from "./relay";
 import { readLines } from "./log-read";
 import { geoipCountryDb, wafAuditLogPath, wafRulesLogPath } from "./paths";
 
@@ -253,7 +253,7 @@ let warnedTruncateFailed = false;
 
 async function insertBatch(rows: WafEventRow[]): Promise<void> {
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    await insertWafEvents(rows.slice(i, i + BATCH_SIZE));
+    await relayWafEvents(rows.slice(i, i + BATCH_SIZE));
   }
 }
 

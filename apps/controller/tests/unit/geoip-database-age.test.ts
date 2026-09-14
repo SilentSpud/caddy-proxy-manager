@@ -2,7 +2,7 @@
  * Reading how old the MaxMind databases on disk are.
  *
  * The age comes from the file's mtime, on the same reasoning `geoipEtag` already relies on:
- * geoipupdate replaces a database wholesale, so the write time is when this host last took
+ * the updater replaces a database wholesale, so the write time is when this host last took
  * delivery of one. What matters here is that a missing directory or a file that vanishes
  * mid-read degrades to "unknown", never to a settings page that fails.
  */
@@ -32,7 +32,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-/** Write a database file and backdate it, the way an old geoipupdate run would have left it. */
+/** Write a database file and backdate it, the way a download that many days ago would have left it. */
 function writeDatabase(edition: string, ageDays: number): void {
   const path = join(dir, `${edition}.mmdb`);
   writeFileSync(path, 'not a real database, only its mtime is read');

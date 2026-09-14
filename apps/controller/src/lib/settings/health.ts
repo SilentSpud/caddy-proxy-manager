@@ -130,8 +130,8 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
     staged: staged("oauth"),
   });
 
-  // Enabled with nothing on disk is the one GeoIP state that silently does nothing: geoipupdate
-  // has never completed, so every lookup misses.
+  // Enabled with nothing on disk is the one GeoIP state that silently does nothing: no download has
+  // ever completed, so every lookup misses.
   const geoipEmpty = input.geoip.enabled && input.geoip.installedEditions.length === 0;
   const ageDays = input.geoip.databaseAgeDays;
 
@@ -141,14 +141,18 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
    * that apart from MaxMind simply not having published.
    */
   const behind = input.geoip.enabled ? input.geoip.editionsBehind : [];
-  // A check that has not run for a day is its own problem: without it, "behind" is unknowable and
+  // A check that has missed two scheduled runs is its own problem: without it, "behind" is unknowable and
   // the tile would quietly fall back to guessing from the file's age.
   const now = input.now ?? Date.now();
   const checkAgeMs = input.geoip.lastCheckedAt
     ? now - Date.parse(input.geoip.lastCheckedAt)
     : Number.POSITIVE_INFINITY;
-  const checkStalled = input.geoip.enabled && !(checkAgeMs < 24 * 60 * 60 * 1000);
+  const stalledAfterMs = 2 * input.geoip.updateIntervalHours * 60 * 60 * 1000;
+  const checkStalled = input.geoip.enabled && !(checkAgeMs < stalledAfterMs);
   const geoipAttention = geoipEmpty || behind.length > 0 || checkStalled;
+  const downloadFailure = input.geoip.downloadError
+    ? ` The last download failed: ${input.geoip.downloadError}`
+    : "";
 
   sections.push({
     id: "geoip",
@@ -165,9 +169,9 @@ export function sectionHealth(input: HealthInput): SectionHealth[] {
             ? `${input.geoip.installedEditions.length} databases, updated today`
             : `${input.geoip.installedEditions.length} databases, ${ageDays} days old`,
     detail: geoipEmpty
-      ? "GeoIP is enabled but no MaxMind database has been downloaded, so country lookups return nothing. Check the account ID and licence key."
+      ? `GeoIP is enabled but no MaxMind database has been downloaded, so country lookups return nothing.${downloadFailure || " Check the account ID and licence key."}`
       : behind.length > 0
-        ? `MaxMind has published a newer ${behind.join(", ")} than the copy on disk, so geoipupdate is not fetching. Check its credentials and whether the container is running.`
+        ? `MaxMind has published a newer ${behind.join(", ")} than the copy on disk, and the controller has not downloaded it.${downloadFailure}`
         : checkStalled
           ? input.geoip.checkError
             ? `MaxMind could not be reached to check for updates: ${input.geoip.checkError}`

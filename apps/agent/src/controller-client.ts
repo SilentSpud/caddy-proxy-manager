@@ -17,6 +17,8 @@ import {
   AGENT_NONCE_HEADER,
   AGENT_SIGNATURE_HEADER,
   AGENT_TIMESTAMP_HEADER,
+  type AgentAnalyticsKind,
+  type AgentAnalyticsResult,
   type AgentCommandResult,
   type AgentPairRequest,
   type AgentPairResponse,
@@ -32,6 +34,9 @@ const PAIR_TIMEOUT_MS = 15_000;
 
 /** Status and command results are small; neither should wait on a stalled connection for long. */
 const POST_TIMEOUT_MS = 15_000;
+
+/** A relayed batch can be megabytes, and the controller writes it to ClickHouse before answering. */
+const ANALYTICS_TIMEOUT_MS = 60_000;
 
 /**
  * Hex SHA-256 of a request body - of the empty string when there is none.
@@ -133,13 +138,14 @@ export class ControllerClient {
     secret: string,
     query: string,
     variables: Record<string, unknown>,
+    timeoutMs = POST_TIMEOUT_MS,
   ): Promise<T> {
     const body = JSON.stringify({ query, variables });
     const response = await this.send(
       CONTROLLER_AGENT_ROUTES.graphql,
       "POST",
       body,
-      POST_TIMEOUT_MS,
+      timeoutMs,
       secret,
     );
 
@@ -184,6 +190,21 @@ export class ControllerClient {
   async postResults(secret: string, results: AgentCommandResult[]): Promise<void> {
     if (results.length === 0) return;
     await this.operation(secret, AGENT_OPERATIONS.commandResults, { results });
+  }
+
+  /** Hand parsed log rows to the controller to write. Throws on a refusal, like every mutation. */
+  async postAnalytics(
+    secret: string,
+    kind: AgentAnalyticsKind,
+    rows: readonly unknown[],
+  ): Promise<AgentAnalyticsResult> {
+    const data = await this.operation<{ agentAnalytics: AgentAnalyticsResult }>(
+      secret,
+      AGENT_OPERATIONS.analytics,
+      { kind, rows },
+      ANALYTICS_TIMEOUT_MS,
+    );
+    return data.agentAnalytics;
   }
 
   /**

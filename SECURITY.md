@@ -64,15 +64,15 @@ Our CI/CD pipeline implements multiple security layers:
 - **Networks follow who needs whom.** `caddy-network` holds Caddy, web, the agent (for egress) and
   the upstreams you attach. Caddy's admin API, PostgreSQL and ClickHouse each sit on an internal
   network (`caddy-admin`, `database`, `analytics`) shared only with the containers that use them,
-  so a container attached to be proxied reaches none of them. `geoipupdate` has only the default
-  network, for egress to MaxMind.
+  so a container attached to be proxied reaches none of them. Web downloads the GeoLite2 databases
+  from MaxMind over its `caddy-network` egress.
 - `/acme-ca`, which decides the CA Caddy trusts for ACME, is owned by web's user with mode `0755`,
   and Caddy mounts it read-only. A volume created by an earlier release keeps its old `0777` mode
   until tightened by hand; the README's upgrade notes show how.
 
 ### The Agent Is Root on Its Host
 
-The agent recreates Caddy and starts ClickHouse and `geoipupdate` through the Docker API, which it
+The agent recreates Caddy and starts ClickHouse through the Docker API, which it
 reaches only through `docker-socket-proxy`. That proxy allows containers, images, volumes, networks
 and BuildKit's `/grpc` and `/session`, with `POST`, and denies exec, the legacy `/build`, swarm,
 secrets, auth, events and everything else.
@@ -149,7 +149,7 @@ Once setup completes the flag is stored, and the setup screens redirect away for
 
 The agent dials the controller; the controller never dials the agent. Pairing, the event stream
 (`/api/agent/v1/events`, one SSE stream per agent), status reports, command results
-(`POST /api/agent/v1/command-results`) and the GeoLite2 download are all agent-to-controller
+(`POST /api/agent/v1/command-results`), relayed analytics events and the GeoLite2 download are all agent-to-controller
 requests. Configuration goes down the stream as desired state. A Caddy admin call is the one
 command the controller waits on: it goes down the stream with a correlation id, and the agent posts
 the answer back.
@@ -202,12 +202,16 @@ the open bind, where only leaving port 2019 unpublished bounds who can reach it.
 stale timestamp, disabled agent, unknown database edition are all identical from outside, so
 nothing can learn the route exists or which agent ids are real without already holding a secret.
 
-**ClickHouse credentials travel to every agent.** Each host parses its own Caddy logs and inserts
-the events itself, using credentials the controller pushes. It is the same account the controller
-creates tables and reads with, not an insert-only one, so every agent host holding it can read, alter
-or drop every host's analytics. The account has no access management
-(`CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 0`), so it cannot create users or grant itself more. On a
-fleet spread across hosts you do not equally trust, weigh that before turning analytics on.
+**The MaxMind licence key stays on the controller.** The controller downloads the databases itself
+and agents fetch them through that route, so no agent is ever sent the key. Each download's archive
+is checked for a MaxMind database before it replaces the file agents are served.
+
+**Agents hold no ClickHouse credential.** Each host parses its own Caddy logs and relays the events
+to the controller as a signed request. The controller checks every field, drops a malformed row,
+records the agent that sent each one (`agent_id`) and writes it itself. A compromised agent can
+still report false events for any host name, but they are attributable to it, and it cannot read,
+alter or drop anyone's analytics. The one exception is the agent in the controller's own stack,
+which is sent the ClickHouse password because Compose needs it to start the container there.
 
 **`SESSION_SECRET` is the root of all of it.** It derives the key that encrypts DNS provider
 credentials, imported private keys, agent secrets and the secret settings. Rotating it makes every

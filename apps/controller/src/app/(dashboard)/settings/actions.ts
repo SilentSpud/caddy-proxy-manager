@@ -650,19 +650,25 @@ async function updateGeoipSettingsActionUnlocked(
     const licenseKey = String(formData.get("geoipLicenseKey") ?? "");
     const hasKey = formData.get("hasLicenseKey") === "yes" || licenseKey.trim().length > 0;
 
-    await saveGeoipSettings({ enabled, accountId, licenseKey });
+    await saveGeoipSettings({
+      enabled,
+      accountId,
+      licenseKey,
+      updateIntervalHours: Number(formData.get("geoipUpdateIntervalHours") ?? 24),
+    });
 
     revalidatePath("/settings");
     revalidatePath("/proxy-hosts");
+    const t = await getTranslations("settings");
     if (!enabled) {
-      return { success: true, message: "GeoIP disabled. Country matching is no longer offered." };
+      return { success: true, message: t("geoipSavedDisabled") };
     }
     return {
       success: true,
       message:
         accountId.trim().length > 0 && hasKey
-          ? "GeoIP enabled - the agent is starting geoipupdate to download the databases."
-          : "GeoIP enabled. Add a MaxMind account ID and licence key to download the databases.",
+          ? t("geoipSavedEnabled")
+          : t("geoipSavedNeedsCredentials"),
     };
   } catch (error) {
     console.error("Failed to save GeoIP settings:", error);
@@ -1798,24 +1804,32 @@ export const updateGeoipSettingsAction = serializedSettingsAction(
 );
 
 /**
- * Ask MaxMind now whether a newer database exists.
+ * Ask MaxMind now whether a newer database exists, and download it if so.
  *
- * Applies immediately rather than staging: it writes only the cached check result, and staging a
- * "have you got anything newer" would be nonsense - there is nothing for an operator to review.
+ * Applies immediately rather than staging: it writes only the databases and the cached results, and
+ * staging "fetch what MaxMind has" would be nonsense - there is nothing for an operator to review.
  */
-export async function checkGeoipUpdatesAction(): Promise<ActionResult> {
+export async function updateGeoipDatabasesAction(): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const { installedGeoipEditions } = await import("@/src/lib/agent/geoip");
-    const { checkGeoipUpdates } = await import("@/src/lib/geoip/update-check");
+    const { updateGeoipDatabases } = await import("@/src/lib/geoip/updater");
 
-    const result = await checkGeoipUpdates(installedGeoipEditions());
+    const result = await updateGeoipDatabases();
     revalidatePath("/settings", "layout");
 
     const t = await getTranslations("settings");
-    return result.error
-      ? { success: false, message: result.error }
-      : { success: true, message: t("geoipCheckedNow") };
+    if (result.skipped === "disabled") return { success: false, message: t("geoipUpdateDisabled") };
+    if (result.skipped === "unconfigured") {
+      return { success: false, message: t("geoipUpdateUnconfigured") };
+    }
+    if (result.error) return { success: false, message: result.error };
+    return {
+      success: true,
+      message:
+        result.downloaded.length > 0
+          ? t("geoipDownloadedNow", { editions: result.downloaded.join(", ") })
+          : t("geoipCheckedNow"),
+    };
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to check MaxMind for updates:", error);

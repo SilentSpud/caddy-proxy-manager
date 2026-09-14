@@ -96,7 +96,7 @@ export function issueBootstrapToken(agentId: string | null, now = Date.now()): b
   return true;
 }
 
-async function bundledAgentId(): Promise<string | null> {
+export async function bundledAgentId(): Promise<string | null> {
   const value = await getSetting<string>(BUNDLED_AGENT_KEY);
   return typeof value === "string" && value.length > 0 ? value : null;
 }

@@ -320,8 +320,6 @@ volumes:
     name: caddy-config-test
   caddy-logs:
     name: caddy-logs-test
-  geoip-data:
-    name: geoip-data-test
   clickhouse-data:
     name: clickhouse-data-test
   acme-ca:

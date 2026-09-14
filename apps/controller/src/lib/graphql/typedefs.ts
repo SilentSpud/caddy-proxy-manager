@@ -269,6 +269,12 @@ export const typeDefs = /* GraphQL */ `
 
     """Results for the Caddy admin calls the controller is blocked on. Signed agents only."""
     agentCommandResults(results: [JSON!]!): Boolean!
+
+    """
+    Parsed Caddy log rows for the controller to write to ClickHouse. Signed agents only. Malformed
+    rows are dropped and counted: the answer is { accepted, rejected }.
+    """
+    agentAnalytics(kind: String!, rows: [JSON!]!): JSON!
   }
 
   """

@@ -1,15 +1,13 @@
 /**
  * Asking MaxMind whether a newer database exists, and remembering when we last asked.
  *
- * The file on disk only says when a download last *landed*. geoipupdate leaves no trace of a run
- * that found nothing new - its lock file is created once and never rewritten - so an operator
- * cannot tell "MaxMind has published nothing since Tuesday" from "the updater died on Tuesday".
- * This closes that gap by checking for itself and storing when it did.
+ * The file on disk only says when a download last *landed*, and a run that found nothing new leaves
+ * no trace there - so an operator cannot tell "MaxMind has published nothing since Tuesday" from
+ * "the updater has failed since Tuesday". This closes that gap by storing when MaxMind was asked.
  *
- * Same shape as ./../updates.ts, deliberately: nothing in this process runs on a schedule, so a
- * read refreshes a stale answer behind the caller and returns what was already known. A page never
- * waits on MaxMind, and a failure is cached so an unreachable endpoint is retried on the same
- * schedule as a success rather than on every render.
+ * The updater (./updater.ts) asks on every tick. A page read also refreshes a stale answer behind
+ * the caller, the same shape as ../updates.ts, so a page never waits on MaxMind; a failure is cached
+ * so an unreachable endpoint is retried on the same schedule as a success rather than every render.
  */
 
 import { getSetting, setSetting } from "../settings";
@@ -20,13 +18,13 @@ const CACHE_KEY = "geoip_update_check";
 /**
  * MaxMind's metadata endpoint: the database's build date and checksum, without downloading it.
  *
- * The same endpoint geoipupdate itself uses to decide whether to fetch, so a check here costs what
- * its check costs - a few hundred bytes - rather than tens of megabytes.
+ * The endpoint MaxMind documents for deciding whether to download, so a check costs a few hundred
+ * bytes rather than tens of megabytes.
  */
 const METADATA_URL = "https://updates.maxmind.com/geoip/updates/metadata";
 
 /** How long an answer stands before a read kicks off a refresh behind it. */
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** MaxMind must not hold a page open; the cached answer is served regardless. */
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -50,7 +48,7 @@ type MetadataResponse = {
   databases?: { edition_id?: unknown; date?: unknown }[] | null;
 };
 
-async function credentials(): Promise<{ accountId: string; licenseKey: string }> {
+export async function geoipCredentials(): Promise<{ accountId: string; licenseKey: string }> {
   const [registry, { getSetting: resolve }] = await Promise.all([
     import("../settings/registry"),
     import("../settings/resolve"),
@@ -116,7 +114,10 @@ let inFlight: Promise<GeoipUpdateCheck> | null = null;
  * Exported so the GeoIP settings section can offer a "check now" button: the whole point of the
  * stored timestamp is that an operator can see the check happen rather than wonder.
  */
-export async function checkGeoipUpdates(editions: readonly string[]): Promise<GeoipUpdateCheck> {
+export async function checkGeoipUpdates(
+  editions: readonly string[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<GeoipUpdateCheck> {
   if (inFlight) return inFlight;
 
   inFlight = (async (): Promise<GeoipUpdateCheck> => {
@@ -126,12 +127,12 @@ export async function checkGeoipUpdates(editions: readonly string[]): Promise<Ge
       available: {},
     };
 
-    const { accountId, licenseKey } = await credentials();
+    const { accountId, licenseKey } = await geoipCredentials();
     if (!accountId || !licenseKey) {
       result.error = "No MaxMind account ID and licence key are configured";
     } else {
       try {
-        result.available = await fetchGeoipMetadata(editions, accountId, licenseKey);
+        result.available = await fetchGeoipMetadata(editions, accountId, licenseKey, fetchImpl);
       } catch (error) {
         result.error =
           error instanceof Error && error.name === "TimeoutError"
@@ -161,11 +162,12 @@ export async function checkGeoipUpdates(editions: readonly string[]): Promise<Ge
  */
 export async function getGeoipUpdateCheck(
   editions: readonly string[],
+  ttlMs = DEFAULT_TTL_MS,
 ): Promise<GeoipUpdateCheckStatus> {
   const cached = await getSetting<GeoipUpdateCheck>(CACHE_KEY);
 
   const age = cached ? Date.now() - Date.parse(cached.checkedAt) : Number.POSITIVE_INFINITY;
-  if (!Number.isFinite(age) || age > CACHE_TTL_MS) {
+  if (!Number.isFinite(age) || age > ttlMs) {
     // Deliberately not awaited, and its failure is already recorded in the stored result - an
     // unhandled rejection here would take down the render this was meant not to block.
     void checkGeoipUpdates(editions).catch(() => {});

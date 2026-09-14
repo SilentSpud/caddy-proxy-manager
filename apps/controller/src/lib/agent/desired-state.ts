@@ -23,7 +23,7 @@ export async function buildDesiredState(agentRowId?: number): Promise<AgentDesir
   const [l4Ports, buildDiff, services, fleetConfig, setupDone] = await Promise.all([
     getRequiredL4Ports(agentRowId),
     getCaddyBuildDiff(agentRowId),
-    desiredManagedServices(),
+    desiredManagedServices(agentRowId),
     currentFleetConfig(),
     isSetupCompleted(),
   ]);
