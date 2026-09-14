@@ -317,6 +317,11 @@ export class DockerHost {
     });
   }
 
+  /** Restart Caddy in place. Its profile is named for the same reason startCaddy names it. */
+  async restartCaddy(): Promise<CommandResult> {
+    return this.compose(["--profile", "caddy", "restart", "caddy"], { timeoutSeconds: 120 });
+  }
+
   /**
    * Stop Caddy, leaving its container, certificates and config volumes in place.
    *

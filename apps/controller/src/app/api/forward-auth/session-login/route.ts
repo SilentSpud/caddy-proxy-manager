@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
-import { config } from "@/src/lib/config";
+import { isPublicOrigin } from "@/src/lib/public-url";
 import {
   createForwardAuthSession,
   createExchangeCode,
@@ -17,10 +17,9 @@ import { logAuditEvent } from "@/src/lib/audit";
 export async function POST(request: NextRequest) {
   const t = await getTranslations("auth.apiErrors");
   try {
-    // CSRF: verify the request originates from the CPM portal
-    const origin = request.headers.get("origin");
-    const baseOrigin = new URL(config.baseUrl).origin;
-    if (!origin || origin !== baseOrigin) {
+    // CSRF: verify the request originates from the CPM portal, on whichever of this instance's own
+    // addresses it was served from.
+    if (!(await isPublicOrigin(request.headers.get("origin")))) {
       return NextResponse.json({ error: t("forbidden") }, { status: 403 });
     }
 

@@ -4,6 +4,7 @@ import { verifyPassword } from "@/src/lib/password";
 import db from "@/src/lib/db";
 import { config } from "@/src/lib/config";
 import { getClientIp } from "@/src/lib/client-ip";
+import { isPublicOrigin } from "@/src/lib/public-url";
 import {
   createForwardAuthSession,
   createExchangeCode,
@@ -26,10 +27,9 @@ import {
 export async function POST(request: NextRequest) {
   const t = await getTranslations("auth.apiErrors");
   try {
-    // CSRF: verify the request originates from the CPM portal
-    const origin = request.headers.get("origin");
-    const baseOrigin = new URL(config.baseUrl).origin;
-    if (!origin || origin !== baseOrigin) {
+    // CSRF: verify the request originates from the CPM portal, on whichever of this instance's own
+    // addresses it was served from.
+    if (!(await isPublicOrigin(request.headers.get("origin")))) {
       return NextResponse.json({ error: t("forbidden") }, { status: 403 });
     }
 

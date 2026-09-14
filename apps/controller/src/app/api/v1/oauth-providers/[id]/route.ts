@@ -12,17 +12,17 @@ import {
 } from "@/src/lib/oauth-provider-view";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { invalidateProviderCache } from "@/src/lib/auth-server";
-import { config } from "@/src/lib/config";
+import { getPublicBaseUrl } from "@/src/lib/public-url";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "no-store" };
 
-function redactClientId(provider: OAuthProviderView) {
+async function redactClientId(provider: OAuthProviderView) {
   const clientId = provider.clientId;
   return {
     ...provider,
     clientId: clientId.length > 4 ? `••••${clientId.slice(-4)}` : "••••",
     // What the operator must register as the redirect URI at the IdP.
-    callbackUrl: oauthCallbackUrl(config.baseUrl, provider.id),
+    callbackUrl: oauthCallbackUrl(await getPublicBaseUrl(), provider.id),
   };
 }
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!provider) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(redactClientId(toOAuthProviderView(provider)), {
+    return NextResponse.json(await redactClientId(toOAuthProviderView(provider)), {
       headers: PRIVATE_RESPONSE_HEADERS,
     });
   } catch (error) {
@@ -82,7 +82,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data: JSON.stringify({ providerId: updated.id, fields: Object.keys(body) }),
     });
 
-    return NextResponse.json(redactClientId(toOAuthProviderView(updated)), {
+    return NextResponse.json(await redactClientId(toOAuthProviderView(updated)), {
       headers: PRIVATE_RESPONSE_HEADERS,
     });
   } catch (error) {

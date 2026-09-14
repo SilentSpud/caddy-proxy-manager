@@ -499,6 +499,12 @@ export type AgentCommand = {
 export type AgentServerEvent =
   | { type: "desired-state"; state: AgentDesiredState }
   | { type: "command"; command: AgentCommand }
+  /**
+   * Restart Caddy, then the agent process itself. No answer: the process that would receive one
+   * is exiting too. Sent when the controller restarts after migrating its database, so every part
+   * of the stack comes back reading the same configuration.
+   */
+  | { type: "restart"; reason: string }
   /** Sent once when the stream opens, so the agent can log what it is attached to. */
   | { type: "hello"; controllerId: string; controllerName: string }
   /**

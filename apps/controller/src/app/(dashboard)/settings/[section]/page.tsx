@@ -30,6 +30,7 @@ import { analyticsView, geoipView } from "@/src/lib/settings/optional-features";
 import { DNS_PROVIDERS } from "@/src/lib/dns-providers";
 import { redactTailscaleSettingsForApi } from "@/src/lib/caddy-tailscale";
 import { config } from "@/src/lib/config";
+import { getPublicBaseUrl } from "@/src/lib/public-url";
 import { requireAdmin } from "@/src/lib/auth";
 import { stagedView } from "@/src/lib/settings/staged-view";
 import { stagedOverlay } from "@/src/lib/settings/staging";
@@ -96,6 +97,7 @@ export default async function SettingsSectionPage({
     staged,
     agentOptions,
     autoPairingOff,
+    publicBaseUrl,
   ] = await Promise.all([
     withStagedReads(overlay, () =>
       Promise.all([
@@ -130,6 +132,8 @@ export default async function SettingsSectionPage({
     stagedView(userId),
     listAgentOptions().catch(() => []),
     autoPairingDisabled().catch(() => false),
+    // Outside the staged scope: the callback URLs shown must be the ones sign-in uses right now.
+    getPublicBaseUrl(),
   ]);
   const connectedAgentIds = new Set(agentOptions.filter((a) => a.connected).map((a) => a.id));
 
@@ -189,7 +193,7 @@ export default async function SettingsSectionPage({
       // Starting or stopping the optional containers needs an agent to run compose. Without one the
       // settings still save and still gate the features; only the container management is missing.
       canManageServices={agentStatuses.some((result) => result.ok)}
-      baseUrl={config.baseUrl}
+      baseUrl={publicBaseUrl}
       agents={{
         paired: pairedAgents,
         statuses: agentStatuses,

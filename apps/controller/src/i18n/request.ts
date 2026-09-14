@@ -17,5 +17,8 @@ export default getRequestConfig(async () => {
   return {
     locale,
     messages: (await import(`../../messages/${locale}.json`)).default,
+    // Pinned so server and browser format alike; lib/date-format.ts shows timestamps in UTC too.
+    // Unset, next-intl logs ENVIRONMENT_FALLBACK on the first server render of any translated page.
+    timeZone: "UTC",
   };
 });

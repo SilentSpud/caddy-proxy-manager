@@ -36,6 +36,7 @@ import { auth } from '@/src/lib/auth';
 import { scheduleProcessRestart } from '../../src/lib/process-restart';
 import { issueRestartToken, markSetupCompleted, recordMigrationSource } from '../../src/lib/setup';
 import { settings, users } from '../../src/lib/db/schema';
+import { clearAgentEnv, startFakeAgent } from '../helpers/fake-agent';
 
 const mockAuth = vi.mocked(auth);
 const mockRestart = vi.mocked(scheduleProcessRestart);
@@ -77,6 +78,7 @@ async function clearCooldown() {
 beforeEach(async () => {
   mockRestart.mockClear();
   mockAuth.mockResolvedValue(null);
+  clearAgentEnv();
   await ctx.db.delete(settings);
   await ctx.db.delete(users);
   await recordMigrationSource('/data/legacy.db');
@@ -175,6 +177,30 @@ describe('POST /api/setup/restart in any state', () => {
 
     expect(response.status).toBe(403);
     expect(mockRestart).not.toHaveBeenCalled();
+  });
+
+  it('asks every attached agent to restart Caddy and itself, before its own exit', async () => {
+    const agent = await startFakeAgent();
+
+    const response = await post();
+    await Bun.sleep(5);
+
+    expect(response.status).toBe(202);
+    expect(agent.requests.filter((r) => r.kind === 'restart')).toHaveLength(1);
+    expect(mockRestart).toHaveBeenCalledTimes(1);
+    await agent.stop();
+  });
+
+  it('does not ask the agents when the restart itself is refused', async () => {
+    const agent = await startFakeAgent();
+    await markSetupCompleted();
+
+    const response = await post();
+    await Bun.sleep(5);
+
+    expect(response.status).toBe(409);
+    expect(agent.requests.filter((r) => r.kind === 'restart')).toHaveLength(0);
+    await agent.stop();
   });
 
   it('refuses once setup is complete', async () => {

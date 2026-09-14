@@ -83,9 +83,21 @@ export async function register() {
       // So the monitor's first pass does not build and load the same document again.
       (await import("./lib/caddy-monitor")).noteStartupApply();
     } catch (error) {
-      console.error("Failed to apply Caddy configuration on startup:", error);
       // Don't throw - Caddy may not be ready yet, or the config may be applied later; this keeps
       // proxy hosts working after a container restart
+      const { CaddyApplyError } = await import("./lib/caddy-apply-error");
+      if (error instanceof CaddyApplyError && error.code === "CADDY_UNREACHABLE") {
+        // The usual first start: the agent has not paired yet, so it has not started Caddy.
+        console.log("Caddy is not reachable yet - its configuration is applied once it comes up");
+      } else if (error instanceof CaddyApplyError) {
+        // The message and code, not the error: logCaddyApplyFailure already logged the details
+        // under an error ID, and Bun prints a stack by quoting the minified bundle line it names.
+        console.error(
+          `Failed to apply Caddy configuration on startup: ${error.message} (${error.code})`,
+        );
+      } else {
+        console.error("Failed to apply Caddy configuration on startup:", error);
+      }
     }
 
     // Start Caddy health monitoring to detect restarts and auto-reapply config

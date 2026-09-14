@@ -67,6 +67,7 @@ import {
 } from "./caddy-tailscale";
 import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
 import { caddyAdminRequest } from "./caddy-admin";
+import { getPublicBaseUrl } from "./public-url";
 import {
   accessListEntries,
   certificates,
@@ -1317,6 +1318,9 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
   // the whole config.
   const geoblockUsable = isFeatureUsable(context.moduleAvailability, "geoblock");
   const wafUsable = isFeatureUsable(context.moduleAvailability, "waf");
+  // Where a forward-auth host sends an unauthenticated visitor: the Public URL, so a value stored
+  // by setup is honoured. Read once; every host's portal redirect is built from the same address.
+  const portalBaseUrl = await getPublicBaseUrl();
 
   // Parsed once per row: the adapt pre-pass and the per-host loop both read it.
   const metaByRow = new Map<ProxyHostRow, ProxyHostMeta>();
@@ -1930,7 +1934,7 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
                       status_code: 302,
                       headers: {
                         Location: [
-                          `${config.baseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri}`,
+                          `${portalBaseUrl}/portal?rd={http.request.scheme}://{http.request.hostport}{http.request.uri}`,
                         ],
                       },
                     },

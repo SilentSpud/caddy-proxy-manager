@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -25,17 +26,36 @@ export default async function SetupSettingsPage() {
     redirect(SETUP_PATHS[stage]);
   }
 
-  const [resolved, gates, general, providers] = await Promise.all([
+  const [resolved, gates, general, providers, requestHeaders] = await Promise.all([
     resolveAllSettings(),
     gateDefaults(),
     getGeneralSettings(),
     listOAuthProviders(),
+    headers(),
   ]);
+  const proposedBaseUrl = proposeBaseUrl(resolved.get(baseUrl.key), requestHeaders);
 
   // Secrets are never sent to the browser. An operator re-entering one is a small cost next to a
   // page that ships the ClickHouse password in its HTML.
   const fields: SettingField[] = SETTING_DEFINITIONS.map((definition) => {
     const current = resolved.get(definition.key);
+    if (definition.key === baseUrl.key && proposedBaseUrl) {
+      return {
+        key: definition.key,
+        env: definition.env,
+        group: definition.group,
+        label: settingLabel(t, definition.key),
+        description: settingDescription(t, definition.key),
+        kind: "string",
+        secret: false,
+        generatable: false,
+        gate: false,
+        value: proposedBaseUrl,
+        // Not "environment": this is not the .env's value, and counting it as migrated would invite
+        // the operator to delete a variable whose value was never copied.
+        source: "default",
+      };
+    }
     return {
       key: definition.key,
       env: definition.env,
@@ -152,6 +172,39 @@ function oauthCard(existing: string[]) {
       syncGroups: oauth.syncGroups,
     },
   };
+}
+
+// Both IPv6 spellings: the URL standard serialises `hostname` with the brackets, and Bun follows
+// it, but a runtime that strips them would otherwise read loopback as a public address.
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+/**
+ * The address this page was reached at, offered as the Public URL when the configured one is only
+ * a loopback default - Compose sets BASE_URL to http://localhost:3000 for anyone who did not, so an
+ * operator setting up over the network would otherwise save a URL nobody else can reach. Null when
+ * a value was stored, when the configured URL names a real host, or when this page was itself
+ * reached over loopback.
+ *
+ * The scheme comes from X-Forwarded-Proto, which a client can set. It only fills in a field the
+ * operator reviews and can edit before saving.
+ */
+function proposeBaseUrl(
+  current: { value: unknown; source: string } | undefined,
+  requestHeaders: Headers,
+): string | null {
+  if (current?.source === "stored") return null;
+  const host = requestHeaders.get("host");
+  if (!host) return null;
+  try {
+    if (!LOOPBACK_HOSTNAMES.has(new URL(String(current?.value ?? baseUrl.default)).hostname)) {
+      return null;
+    }
+    const scheme = requestHeaders.get("x-forwarded-proto") === "https" ? "https" : "http";
+    const reached = new URL(`${scheme}://${host}`);
+    return LOOPBACK_HOSTNAMES.has(reached.hostname) ? null : reached.origin;
+  } catch {
+    return null;
+  }
 }
 
 /**

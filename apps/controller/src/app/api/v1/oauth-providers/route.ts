@@ -8,27 +8,30 @@ import {
 } from "@/src/lib/oauth-provider-view";
 import { createAuditEvent } from "@/src/lib/models/audit";
 import { invalidateProviderCache } from "@/src/lib/auth-server";
-import { config } from "@/src/lib/config";
+import { getPublicBaseUrl } from "@/src/lib/public-url";
 
 const PRIVATE_RESPONSE_HEADERS = { "Cache-Control": "no-store" };
 
-function redactClientId(provider: OAuthProviderView) {
+function redactClientId(provider: OAuthProviderView, baseUrl: string) {
   const clientId = provider.clientId;
   return {
     ...provider,
     clientId: clientId.length > 4 ? `••••${clientId.slice(-4)}` : "••••",
     // What the operator must register as the redirect URI at the IdP.
-    callbackUrl: oauthCallbackUrl(config.baseUrl, provider.id),
+    callbackUrl: oauthCallbackUrl(baseUrl, provider.id),
   };
 }
 
 export async function GET(request: NextRequest) {
   try {
     await requireApiAdmin(request);
-    const providers = await listOAuthProviders();
-    return NextResponse.json(providers.map(redactClientId), {
-      headers: PRIVATE_RESPONSE_HEADERS,
-    });
+    const [providers, baseUrl] = await Promise.all([listOAuthProviders(), getPublicBaseUrl()]);
+    return NextResponse.json(
+      providers.map((provider) => redactClientId(provider, baseUrl)),
+      {
+        headers: PRIVATE_RESPONSE_HEADERS,
+      },
+    );
   } catch (error) {
     return apiErrorResponse(error);
   }
@@ -83,10 +86,13 @@ export async function POST(request: NextRequest) {
       data: JSON.stringify({ providerId: provider.id, name: provider.name, type: provider.type }),
     });
 
-    return NextResponse.json(redactClientId(toOAuthProviderView(provider)), {
-      status: 201,
-      headers: PRIVATE_RESPONSE_HEADERS,
-    });
+    return NextResponse.json(
+      redactClientId(toOAuthProviderView(provider), await getPublicBaseUrl()),
+      {
+        status: 201,
+        headers: PRIVATE_RESPONSE_HEADERS,
+      },
+    );
   } catch (error) {
     return apiErrorResponse(error);
   }

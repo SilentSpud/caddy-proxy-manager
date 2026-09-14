@@ -28,8 +28,9 @@ export default function Providers({
     /* `locale` and `messages` are passed explicitly rather than inherited from the request config.
        vinext renders RSC and SSR in separate environments, and next-intl's server context does not
        cross that boundary - left to infer them, the provider throws during the SSR pass and the
-       page 500s with the RSC payload already rendered correctly. */
-    <NextIntlClientProvider locale={locale} messages={messages}>
+       page 500s with the RSC payload already rendered correctly. The time zone likewise: without
+       it the SSR pass logs ENVIRONMENT_FALLBACK. UTC, matching src/i18n/request.ts. */
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
       {/* Holds the language preference and hands the locale to Astryx, whose own components carry
           strings this app never writes. */}
       <LocaleProvider locale={locale} preference={localePreference}>

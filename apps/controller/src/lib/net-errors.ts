@@ -12,6 +12,9 @@ const CONNECTION_ERROR_CODES = new Set([
   "FailedToOpenSocket", // Bun, connection could not be established at all
   "ENOTFOUND", // DNS lookup failed
   "EAI_AGAIN", // DNS lookup failed, temporarily
+  // Bun's DNS lookup timed out. What an internal Docker network gives for a service that is not
+  // running: the embedded resolver forwards the unknown name upstream, and there is no upstream.
+  "ETIMEOUT",
   "ECONNRESET", // peer closed mid-handshake
   "EHOSTUNREACH",
   "ENETUNREACH",

@@ -29,6 +29,12 @@ describe('isConnectionError', () => {
     );
   });
 
+  it("matches Bun's DNS timeout for a service not running on an internal network", () => {
+    const error = new Error('DNS lookup timed out');
+    Object.assign(error, { name: 'DNSException', code: 'ETIMEOUT', syscall: 'getaddrinfo' });
+    expect(isConnectionError(error)).toBe(true);
+  });
+
   it("matches Node's shape, where the code hangs off the cause", () => {
     const error = new TypeError('fetch failed');
     Object.assign(error, { cause: coded('ECONNREFUSED') });

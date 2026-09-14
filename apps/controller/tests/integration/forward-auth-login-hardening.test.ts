@@ -107,12 +107,17 @@ async function setup(name = 'Alice') {
   return { user, host };
 }
 
-function attempt(password: string, rid: string, ip = `203.0.113.${++ipCounter % 250}`) {
+function attempt(
+  password: string,
+  rid: string,
+  ip = `203.0.113.${++ipCounter % 250}`,
+  origin = 'http://localhost:3000',
+) {
   return login(
     new NextRequest('http://localhost:3000/api/forward-auth/login', {
       method: 'POST',
       headers: {
-        origin: 'http://localhost:3000',
+        origin,
         'content-type': 'application/json',
         'x-forwarded-for': ip,
       },
@@ -158,6 +163,24 @@ describe('forward-auth login', () => {
     expect(((await response.json()) as { redirectTo: string }).redirectTo).toStartWith(
       'https://app.example.com/.cpm-auth/callback?code=',
     );
+  });
+
+  it('accepts the portal served from the stored Public URL, and still refuses anywhere else', async () => {
+    await setup();
+    const { baseUrl } = await import('../../src/lib/settings/registry');
+    const { clearStoredSetting, saveSettings } = await import('../../src/lib/settings/resolve');
+    await saveSettings({ [baseUrl.key]: 'https://proxy.example.com' });
+    try {
+      const rid = await createRedirectIntent(TARGET);
+      expect((await attempt(PASSWORD, rid, undefined, 'https://attacker.example')).status).toBe(
+        403,
+      );
+      expect((await attempt(PASSWORD, rid, undefined, 'https://proxy.example.com')).status).toBe(
+        200,
+      );
+    } finally {
+      await clearStoredSetting(baseUrl.key);
+    }
   });
 
   it('backs off the account however many addresses the guesses come from', async () => {

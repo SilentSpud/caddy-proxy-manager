@@ -178,7 +178,15 @@ const operations = new Operations(config, store, docker);
 
 operations.clearStaleStatuses();
 
-const lifecycle = new AgentLifecycle({ config, store, docker, operations });
+const lifecycle = new AgentLifecycle({
+  config,
+  store,
+  docker,
+  operations,
+  // The controller's restart goes through the same shutdown a signal does, so the socket file and
+  // the store are released before `restart: unless-stopped` brings this container back.
+  exit: (reason) => shutdown(`restart (${reason})`),
+});
 
 // A socket file left by a killed process makes bind fail with EADDRINUSE, which reads as "the port
 // is taken" for something that has no port.
