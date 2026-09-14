@@ -15,6 +15,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import { LocaleSwitcher } from "@/src/components/locale/LocaleSwitcher";
@@ -110,6 +111,7 @@ export default function DashboardLayoutClient({
   user,
   avatar,
   appName,
+  demoMode = false,
   updateAvailable,
   stagedKeys,
   morePins,
@@ -118,6 +120,8 @@ export default function DashboardLayoutClient({
   user: User;
   avatar: ResolvedAvatar;
   appName: string;
+  /** DEMO_MODE is on, so nothing saved here reaches a Caddy. */
+  demoMode?: boolean;
   /** A newer release exists in the registry. Surfaced beside the version it replaces. */
   updateAvailable: boolean;
   /** Settings keys this operator has staged, so the settings rail can mark their sections. */
@@ -172,6 +176,15 @@ export default function DashboardLayoutClient({
     </>
   ) : null;
   const content = <div className="cpm-mobile-content">{children}</div>;
+  // Not dismissable: a visitor who forgets they are in a demo will wonder why their site is down.
+  const banner = demoMode ? (
+    <Banner
+      status="info"
+      container="section"
+      title={t("demoBannerTitle")}
+      description={t("demoBannerDescription")}
+    />
+  ) : undefined;
 
   // Settings takes the rail over rather than nesting its own panel inside the page. One rail, and
   // its first row is the way back - see ./settings/SettingsSideNav.tsx.
@@ -179,6 +192,7 @@ export default function DashboardLayoutClient({
     return (
       <>
         <AppShell
+          banner={banner}
           contentPadding={0}
           mobileNav={false}
           sideNav={
@@ -198,6 +212,7 @@ export default function DashboardLayoutClient({
   return (
     <>
       <AppShell
+        banner={banner}
         contentPadding={isFullBleed ? 0 : 6}
         mobileNav={false}
         sideNav={

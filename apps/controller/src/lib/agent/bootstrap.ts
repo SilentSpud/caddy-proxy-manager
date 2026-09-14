@@ -21,6 +21,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { chmodSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AGENT_BOOTSTRAP_FILE, AGENT_BOOTSTRAP_TOKEN_PATTERN } from "@cpm/shared";
+import { isDemoMode } from "../demo-mode";
 import { findAgentRowByAgentId, listAgents } from "../models/agents";
 import { clearSetting, getSetting, setSetting } from "../settings";
 
@@ -79,6 +80,8 @@ function removeToken(): void {
  * release whose agent ran as root would keep that mode, unreadable to the agent that no longer is.
  */
 export function issueBootstrapToken(agentId: string | null, now = Date.now()): boolean {
+  // The bundled agent would pair and start a real Caddy.
+  if (isDemoMode()) return false;
   const path = bootstrapPath();
   // Long enough that guessing is hopeless, and shaped so it cannot be confused with a typed code.
   const token = randomBytes(32).toString("hex");

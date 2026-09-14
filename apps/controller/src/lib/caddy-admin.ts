@@ -13,6 +13,7 @@
 import http from "node:http";
 import https from "node:https";
 import { loadsConfig, pinAdminListen } from "@cpm/shared";
+import { isDemoMode } from "./demo-mode";
 
 export type CaddyAdminRequest = {
   /** Path relative to the configured admin API root, e.g. "/load" or "/config/". */
@@ -82,6 +83,12 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
   timeoutMs,
   contentType,
 }) => {
+  // Demo mode installs an in-memory transport at startup; this is what keeps a module that grabbed
+  // the real one from reaching a Caddy anyway.
+  if (isDemoMode()) {
+    throw new Error("The real Caddy admin transport was used in demo mode.");
+  }
+
   // Backstop for the guard installed by tests/setup.bun.ts: if a test swaps the real transport
   // back in, fail loudly instead of quietly opening a socket to whatever is listening on the
   // admin port. CPM_TEST is set by tests/helpers/env.ts - `bun test` sets no marker of its own.
@@ -135,32 +142,36 @@ export const httpCaddyAdminTransport: CaddyAdminTransport = async ({
 /**
  * Production transport: ask the primary agent to make the request against its own Caddy.
  *
- * Falls back to a direct connection when no agent answers, so a development setup that runs Caddy
- * without the agent container keeps working. That fallback is the only remaining use of this app's
- * own `CADDY_API_URL`.
+ * Falls back to `direct` when no agent answers, so a development setup that runs Caddy without the
+ * agent container keeps working. That fallback is the only remaining use of this app's own
+ * `CADDY_API_URL`; demo mode passes an in-memory Caddy instead.
  */
-export const agentCaddyAdminTransport: CaddyAdminTransport = async (request) => {
-  const { caddyAdminViaAgent, AgentUnavailableError } = await import("./agent/client");
-  try {
-    const response = await caddyAdminViaAgent(
-      {
-        path: request.path,
-        method: request.method,
-        body: request.body,
-        contentType: request.contentType,
-      },
-      request.agentId,
-    );
-    return { status: response.status, text: response.text, headers: response.headers };
-  } catch (error) {
-    // Never for a pinned request: what was meant for one agent must not land on this app's own
-    // CADDY_API_URL because that agent went away mid-apply.
-    if (error instanceof AgentUnavailableError && request.agentId === undefined) {
-      return httpCaddyAdminTransport(request);
+export function agentCaddyAdminTransportWith(direct: CaddyAdminTransport): CaddyAdminTransport {
+  return async (request) => {
+    const { caddyAdminViaAgent, AgentUnavailableError } = await import("./agent/client");
+    try {
+      const response = await caddyAdminViaAgent(
+        {
+          path: request.path,
+          method: request.method,
+          body: request.body,
+          contentType: request.contentType,
+        },
+        request.agentId,
+      );
+      return { status: response.status, text: response.text, headers: response.headers };
+    } catch (error) {
+      // Never for a pinned request: what was meant for one agent must not land on this app's own
+      // CADDY_API_URL because that agent went away mid-apply.
+      if (error instanceof AgentUnavailableError && request.agentId === undefined) {
+        return direct(request);
+      }
+      throw error;
     }
-    throw error;
-  }
-};
+  };
+}
+
+export const agentCaddyAdminTransport = agentCaddyAdminTransportWith(httpCaddyAdminTransport);
 
 let transport: CaddyAdminTransport = agentCaddyAdminTransport;
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { requireUser } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
+import { isDemoMode } from "@/src/lib/demo-mode";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
 import { getTranslations } from "next-intl/server";
@@ -62,6 +63,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         user={session.user}
         avatar={avatar}
         appName={config.appName}
+        demoMode={isDemoMode()}
         updateAvailable={updates.updateAvailable}
         stagedKeys={staged}
         morePins={morePins}

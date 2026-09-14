@@ -28,6 +28,7 @@ import { AnalyticsIngestError, ingestAnalytics } from "../agent/analytics-ingest
 import { attach, isConnected, recordStatus, settleResults } from "../agent/registry";
 import { buildDesiredState } from "../agent/desired-state";
 import { verifyAgentRequest } from "../agent/verify";
+import { isDemoMode } from "../demo-mode";
 import { getControllerId, recordAgentContact } from "../models/agents";
 import { getSetting } from "../settings";
 import type { GraphQLContext } from "./context";
@@ -56,6 +57,14 @@ export async function requireAgent(
   context: GraphQLContext,
   maxBytes: number,
 ): Promise<VerifiedAgent> {
+  // An agent paired before demo mode was switched on would configure its real Caddy. Not tagged
+  // AGENT_UNAUTHORIZED: the agent drops its pairing on that, and only retries on anything else.
+  if (isDemoMode()) {
+    throw new GraphQLError("This controller is in demo mode and does not accept agents.", {
+      extensions: { code: "DEMO_MODE" },
+    });
+  }
+
   const raw = await context.rawBody();
   if (raw.length > maxBytes) {
     throw new GraphQLError("That request is too large.", {

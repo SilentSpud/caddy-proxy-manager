@@ -20,6 +20,13 @@ export async function register() {
       }
     }
 
+    const { isDemoMode } = await import("./lib/demo-mode");
+    const demoMode = isDemoMode();
+    if (demoMode) {
+      (await import("./lib/demo/start")).installDemoCaddy();
+      console.log("Demo mode: no Caddy server is configured and no DNS records are changed");
+    }
+
     const { ensureAdminUser } = await import("./lib/init-db");
     try {
       await ensureAdminUser();
@@ -72,6 +79,15 @@ export async function register() {
     } catch (error) {
       console.error("Failed to harden legacy certificate storage");
       if (process.env.NODE_ENV === "production") throw error;
+    }
+
+    // Attached before the startup apply, so the config lands on the demo agent's in-memory Caddy.
+    if (demoMode) {
+      try {
+        await (await import("./lib/demo/start")).startSimulatedAgent();
+      } catch (error) {
+        console.error("Failed to start the demo agent:", error);
+      }
     }
 
     // Apply Caddy configuration from database on startup

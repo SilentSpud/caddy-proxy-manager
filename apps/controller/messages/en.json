@@ -1031,6 +1031,8 @@
     "avatarAlt": "User",
     "certificates": "Certificates",
     "defaultUserName": "Administrator",
+    "demoBannerDescription": "Changes are saved, but no Caddy server is configured and no DNS records are changed.",
+    "demoBannerTitle": "Demo mode",
     "groups": "Groups",
     "hosts": "Hosts",
     "l4ProxyHosts": "L4 Proxy Hosts",
