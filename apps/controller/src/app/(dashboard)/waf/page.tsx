@@ -8,6 +8,8 @@ import {
   getWafRuleMessages,
 } from "@/src/lib/models/waf-events";
 import { getWafSettings } from "@/src/lib/settings";
+import { stagedOverlay } from "@/src/lib/settings/staging";
+import { withStagedReads } from "@/src/lib/settings/staging-context";
 import { listProxyHosts } from "@/src/lib/models/proxy-hosts";
 import { requireAdmin } from "@/src/lib/auth";
 import type { Metadata } from "next";
@@ -61,7 +63,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function WafPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const resolvedSearchParams = await searchParams;
   const { page: pageParam, search: searchParam } = resolvedSearchParams;
   const { range, from, to } = parseRange(resolvedSearchParams);
@@ -69,11 +71,15 @@ export default async function WafPage({ searchParams }: PageProps) {
   const search = searchParam?.trim() || undefined;
   const offset = (page - 1) * PER_PAGE;
 
+  // The settings form here saves through a staged action, so read it the way the settings pages do:
+  // against this operator's staged set. Otherwise a staged edit looks discarded after a reload.
+  const overlay = await stagedOverlay(Number(session.user.id));
+
   const [events, total, stats, globalWaf, hosts] = await Promise.all([
     listWafEvents(PER_PAGE, offset, search, from, to),
     countWafEvents(search, from, to),
     getWafEventStats(search, from, to),
-    getWafSettings(),
+    withStagedReads(overlay, () => getWafSettings()),
     listProxyHosts(),
   ]);
 
