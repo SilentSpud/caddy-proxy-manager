@@ -15,7 +15,6 @@
       "name": "@cpm/agent",
       "version": "3.0.0-rc.4",
       "dependencies": {
-        "@clickhouse/client": "^1.23.1",
         "@cpm/shared": "workspace:*",
         "maxmind": "^5.0.7",
         "yargs": "^18.1.0",

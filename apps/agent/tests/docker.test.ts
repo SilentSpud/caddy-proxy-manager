@@ -556,49 +556,57 @@ describe("optional services", () => {
     expect(seen?.CLICKHOUSE_PASSWORD).toBe("s3cret");
   });
 
-  it("starts what was asked for and stops what was not", async () => {
-    operations.applyManagedServices({
-      services: { clickhouse: true, geoipupdate: false },
-      env: {},
-    });
+  it("starts what was asked for", async () => {
+    operations.applyManagedServices({ services: { clickhouse: true }, env: {} });
     await settle();
 
     const composeCalls = spawned.filter((a) => a[1] === "compose").map((a) => a.join(" "));
     expect(composeCalls.some((c) => c.includes("--profile clickhouse") && c.includes(" up "))).toBe(
       true,
     );
-    expect(
-      composeCalls.some((c) => c.includes("--profile geoipupdate") && c.includes(" stop ")),
-    ).toBe(true);
-    expect(store.appliedManagedServices()).toEqual({ clickhouse: true, geoipupdate: false });
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: true });
   });
 
-  it("attempts every service even when one fails", async () => {
-    // A missing MaxMind subscription must not also take analytics down.
-    results.push({ exitCode: 0, stdout: "proj" }); // project detection
-    results.push({ exitCode: 1, stdout: "no such image" }); // clickhouse up
-    results.push({ exitCode: 0, stdout: "" }); // geoipupdate stop
+  it("stops what was not asked for", async () => {
+    operations.applyManagedServices({ services: { clickhouse: false }, env: {} });
+    await settle();
 
+    const composeCalls = spawned.filter((a) => a[1] === "compose").map((a) => a.join(" "));
+    expect(
+      composeCalls.some((c) => c.includes("--profile clickhouse") && c.includes(" stop ")),
+    ).toBe(true);
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false });
+  });
+
+  it("leaves alone a service it no longer manages", async () => {
+    // An older controller still names geoipupdate, whose service the compose file no longer has.
     operations.applyManagedServices({
-      services: { clickhouse: true, geoipupdate: false },
+      services: { clickhouse: false, geoipupdate: true } as { clickhouse: boolean },
       env: {},
     });
+    await settle();
+
+    const composeCalls = spawned.filter((a) => a[1] === "compose").map((a) => a.join(" "));
+    expect(composeCalls.some((c) => c.includes("geoipupdate"))).toBe(false);
+  });
+
+  it("records a service that failed to start as not applied", async () => {
+    results.push({ exitCode: 0, stdout: "proj" }); // project detection
+    results.push({ exitCode: 1, stdout: "no such image" }); // clickhouse up
+
+    operations.applyManagedServices({ services: { clickhouse: true }, env: {} });
     await settle();
 
     const status = store.managedServicesStatus();
     expect(status.state).toBe("failed");
     expect(status.message).toContain("clickhouse");
-    // The one that worked is still recorded, so the next reconcile does not undo it.
-    expect(store.appliedManagedServices()).toEqual({ clickhouse: false, geoipupdate: false });
+    expect(store.appliedManagedServices()).toEqual({ clickhouse: false });
   });
 
   it("refuses to run alongside a rebuild", async () => {
     operations.applyCaddyBuild(["github.com/a/b"]);
     expect(() =>
-      operations.applyManagedServices({
-        services: { clickhouse: true, geoipupdate: false },
-        env: {},
-      }),
+      operations.applyManagedServices({ services: { clickhouse: true }, env: {} }),
     ).toThrow(/caddy-build/);
   });
 });

@@ -123,25 +123,27 @@ development, silently ignored in production.
 Give Compose the real default, not `${VAR:-}`, for anything parsed as `Number(process.env.X ?? d)`
 - `??` does not catch the empty string that form produces, so the fallback lands as 0.
 
-### The two optional containers
+### The optional container
 
-`clickhouse` and `geoipupdate` sit behind Compose profiles, so whether they exist is decided on the
-host before anything in the stack runs. The agent gets around that: it runs the Compose CLI, and
-`--profile <name>` on one invocation enables that profile for that invocation. `Settings →
-Analytics` and `Settings → GeoIP` drive it through `lib/agent/managed-services.ts`.
+`clickhouse` sits behind a Compose profile, so whether it exists is decided on the host before
+anything in the stack runs. The agent gets around that: it runs the Compose CLI, and `--profile
+<name>` on one invocation enables that profile for that invocation. `Settings → Analytics` drives it
+through `lib/agent/managed-services.ts`. GeoIP has no container: the controller downloads the
+MaxMind databases onto its data volume itself (`lib/geoip/updater.ts`), and agents fetch them from
+it.
 
-Two consequences to keep in mind when touching either:
+Keep in mind when touching it:
 
-- **A credential those services need must reach Compose through the agent's child environment**, not
+- **A credential a managed service needs must reach Compose through the agent's child environment**, not
   a generated env file - Compose reads the process environment at a higher precedence than any
   `--env-file`, and a value passed that way needs no quoting. `MANAGED_SERVICE_ENV_KEYS` is the
   allowlist; widening it means the controller can set that variable on a spawned `docker`.
-- **Nothing in the base compose file may guard those services' variables with `${VAR:?}`.**
+- **Nothing in the base compose file may guard a managed service's variables with `${VAR:?}`.**
   Interpolation happens per file before Compose decides what to act on, so a `:?` fails every
   invocation naming the project - including ones for unrelated services - on a deployment that
   keeps the value in the database instead of `.env`.
 - **The agent never reads `.env`.** It passes `--env-file /dev/null` and its own placeholders for the
-  two `:?` variables, so a variable the `caddy`, `clickhouse` or `geoipupdate` definitions
+  two `:?` variables, so a variable the `caddy` or `clickhouse` definitions
   interpolate must also be forwarded under `agent.environment`, or the agent's compose sees its
   default.
 

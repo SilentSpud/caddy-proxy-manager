@@ -92,24 +92,6 @@ export async function invalidateClickHouseConfig(): Promise<void> {
   }
 }
 
-/**
- * The credentials an agent needs to write its own events, or null when analytics are off.
- *
- * Agents insert directly rather than shipping events here: an agent on another host holds the only
- * copy of its Caddy log, and relaying every request through the controller would put the busiest
- * write path in the fleet through a machine with nothing to do with it.
- */
-export async function analyticsCredentialsForAgents(): Promise<{
-  url: string;
-  user: string;
-  password: string;
-  database: string;
-} | null> {
-  const { enabled, url, user, password, database } = await chConfig();
-  if (!enabled) return null;
-  return { url, user, password, database };
-}
-
 /** Whether traffic and WAF events are being recorded. */
 export async function isAnalyticsEnabled(): Promise<boolean> {
   return (await chConfig()).enabled;
@@ -164,7 +146,8 @@ CREATE TABLE IF NOT EXISTS traffic_events (
     proto        LowCardinality(String) DEFAULT '' CODEC(ZSTD(3)),
     bytes_sent   UInt64            DEFAULT 0 CODEC(Delta, ZSTD),
     user_agent   String            DEFAULT '' CODEC(ZSTD(3)),
-    is_blocked   Bool              DEFAULT false
+    is_blocked   Bool              DEFAULT false,
+    agent_id     LowCardinality(String) DEFAULT ''
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(ts)
 ORDER BY (host, ts)
@@ -184,7 +167,8 @@ CREATE TABLE IF NOT EXISTS waf_events (
     rule_message Nullable(String)  CODEC(ZSTD(3)),
     severity     LowCardinality(Nullable(String)),
     raw_data     Nullable(String)  CODEC(ZSTD(3)),
-    blocked      Bool              DEFAULT true
+    blocked      Bool              DEFAULT true,
+    agent_id     LowCardinality(String) DEFAULT ''
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(ts)
 ORDER BY (host, ts)
@@ -192,7 +176,7 @@ TTL ts + INTERVAL ${retentionDays} DAY DELETE
 SETTINGS index_granularity = 8192
 `;
 
-// Migrations applied to existing tables on startup (idempotent MODIFY COLUMN).
+// Migrations applied to existing tables on startup, each idempotent.
 const TRAFFIC_EVENTS_MIGRATIONS = [
   `ALTER TABLE traffic_events MODIFY COLUMN ts DateTime CODEC(Delta, ZSTD)`,
   `ALTER TABLE traffic_events MODIFY COLUMN client_ip String CODEC(ZSTD(3))`,
@@ -203,6 +187,7 @@ const TRAFFIC_EVENTS_MIGRATIONS = [
   `ALTER TABLE traffic_events MODIFY COLUMN proto LowCardinality(String) DEFAULT '' CODEC(ZSTD(3))`,
   `ALTER TABLE traffic_events MODIFY COLUMN bytes_sent UInt64 DEFAULT 0 CODEC(Delta, ZSTD)`,
   `ALTER TABLE traffic_events MODIFY COLUMN user_agent String DEFAULT '' CODEC(ZSTD(3))`,
+  `ALTER TABLE traffic_events ADD COLUMN IF NOT EXISTS agent_id LowCardinality(String) DEFAULT ''`,
 ];
 
 const WAF_EVENTS_MIGRATIONS = [
@@ -215,6 +200,7 @@ const WAF_EVENTS_MIGRATIONS = [
   `ALTER TABLE waf_events MODIFY COLUMN severity LowCardinality(Nullable(String))`,
   `ALTER TABLE waf_events MODIFY COLUMN rule_message Nullable(String) CODEC(ZSTD(3))`,
   `ALTER TABLE waf_events MODIFY COLUMN raw_data Nullable(String) CODEC(ZSTD(3))`,
+  `ALTER TABLE waf_events ADD COLUMN IF NOT EXISTS agent_id LowCardinality(String) DEFAULT ''`,
 ];
 
 const RETENTION_TABLES = ["traffic_events", "waf_events"] as const;
@@ -370,7 +356,8 @@ export interface WafEventRow {
   uri: string;
 }
 
-export async function insertTrafficEvents(rows: TrafficEventRow[]): Promise<void> {
+/** `agentId` is the agent that relayed the rows, recorded so a false event is attributable. */
+export async function insertTrafficEvents(rows: TrafficEventRow[], agentId = ""): Promise<void> {
   if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
   const ch = await getClient();
   // Convert unix timestamp to ClickHouse DateTime string
@@ -378,17 +365,19 @@ export async function insertTrafficEvents(rows: TrafficEventRow[]): Promise<void
     ...r,
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     is_blocked: r.is_blocked ? 1 : 0,
+    agent_id: agentId,
   }));
   await ch.insert({ table: "traffic_events", values, format: "JSONEachRow" });
 }
 
-export async function insertWafEvents(rows: WafEventRow[]): Promise<void> {
+export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promise<void> {
   if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
   const ch = await getClient();
   const values = rows.map((r) => ({
     ...r,
     ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
     blocked: r.blocked ? 1 : 0,
+    agent_id: agentId,
   }));
   await ch.insert({ table: "waf_events", values, format: "JSONEachRow" });
 }

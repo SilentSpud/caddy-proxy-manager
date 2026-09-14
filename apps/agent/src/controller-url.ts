@@ -6,7 +6,7 @@
  * dashboard URL. Quietly trimming it would send a pairing code somewhere they did not mean.
  *
  * The link is not just control traffic: the pair response carries the shared secret, and desired
- * state carries the ClickHouse password and the MaxMind key. So plain http is the default only
+ * state can carry the ClickHouse password. So plain http is the default only
  * where it cannot leave the host or the compose network, and is refused towards a public address.
  */
 

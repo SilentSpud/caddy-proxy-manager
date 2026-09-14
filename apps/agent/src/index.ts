@@ -210,8 +210,8 @@ function shutdown(signal: string): void {
   lifecycle.stop();
   void Promise.resolve(stopAnalytics())
     .catch(() => {
-      // Shutting down regardless: a ClickHouse connection that will not close cleanly must not
-      // stop the socket from being released.
+      // Shutting down regardless: a parser that will not stop cleanly must not keep the socket
+      // from being released.
     })
     .then(() => server.stop(true))
     .then(() => {

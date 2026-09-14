@@ -50,11 +50,36 @@ vi.mock('../../src/lib/agent/desired-state', () => ({
   buildDesiredState: async () => ({
     l4Ports: [],
     caddyModules: [],
-    services: { services: { clickhouse: false, geoipupdate: false }, env: {} },
-    fleetConfig: { clickhouse: null, geoip: null },
+    services: { services: { clickhouse: false }, env: {} },
+    fleetConfig: { clickhouse: null, analytics: false, geoip: null },
     caddyEnabled: true,
   }),
 }));
+
+// What becomes of relayed rows is agent/analytics-ingest's business; these tests pin the gate.
+const ingest = vi.hoisted(() => ({
+  calls: [] as { agentId: string; kind: unknown; rows: unknown[] }[],
+  failure: null as Error | null,
+}));
+vi.mock('../../src/lib/agent/analytics-ingest', () => {
+  class AnalyticsIngestError extends Error {
+    constructor(
+      readonly code: string,
+      message: string,
+    ) {
+      super(message);
+    }
+  }
+  return {
+    AnalyticsIngestError,
+    ingestAnalytics: async (agentId: string, kind: unknown, rows: unknown[]) => {
+      if (ingest.failure) throw ingest.failure;
+      ingest.calls.push({ agentId, kind, rows });
+      return { accepted: rows.length, rejected: 0 };
+    },
+  };
+});
+const { AnalyticsIngestError } = await import('../../src/lib/agent/analytics-ingest');
 
 import { graphql, subscribe, parse } from 'graphql';
 import type { ExecutionResult } from 'graphql';
@@ -184,6 +209,57 @@ describe('the agent mutations', () => {
     });
 
     expect(result.errors?.[0]?.message).toContain('not connected');
+  });
+});
+
+describe('the analytics relay', () => {
+  afterEach(() => {
+    ingest.calls = [];
+    ingest.failure = null;
+  });
+
+  it('writes rows from a signed agent, with or without an open subscription', async () => {
+    // Rows parsed while the stream was down still describe real traffic.
+    const result = await graphql({
+      schema,
+      source: AGENT_OPERATIONS.analytics,
+      contextValue: agentContext(),
+      variableValues: { kind: 'traffic', rows: [{ host: 'a' }, { host: 'b' }] },
+    });
+
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.agentAnalytics).toEqual({ accepted: 2, rejected: 0 });
+    expect(ingest.calls).toEqual([
+      { agentId: 'a1', kind: 'traffic', rows: [{ host: 'a' }, { host: 'b' }] },
+    ]);
+  });
+
+  it('refuses rows that are not signed by a paired agent', async () => {
+    verifyResult = { ok: false, status: 401, error: 'Unknown agent' };
+
+    const result = await graphql({
+      schema,
+      source: AGENT_OPERATIONS.analytics,
+      contextValue: userContext('admin'),
+      variableValues: { kind: 'traffic', rows: [{}] },
+    });
+
+    expect(result.errors?.[0]?.message).toBe('Unknown agent');
+    expect(ingest.calls).toEqual([]);
+  });
+
+  it('passes a refusal on with its code, so the agent keeps its place and resends', async () => {
+    ingest.failure = new AnalyticsIngestError('ANALYTICS_DISABLED', 'Analytics are switched off.');
+
+    const result = await graphql({
+      schema,
+      source: AGENT_OPERATIONS.analytics,
+      contextValue: agentContext(),
+      variableValues: { kind: 'waf', rows: [{}] },
+    });
+
+    expect(result.errors?.[0]?.message).toBe('Analytics are switched off.');
+    expect(result.errors?.[0]?.extensions?.code).toBe('ANALYTICS_DISABLED');
   });
 });
 

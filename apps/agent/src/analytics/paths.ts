@@ -28,9 +28,8 @@ export function logsDir(): string {
 /**
  * The agent's copy of the databases, on its own volume.
  *
- * Not the `geoip-data` volume geoipupdate writes: that one is root's, and the agent does not run as
- * root. Caddy mounts this directory read-only in its place, so the agent owning it is the whole
- * permission story.
+ * The agent does not run as root, so its own volume is the one place it can write them. Caddy mounts
+ * this directory read-only, so the agent owning it is the whole permission story.
  */
 export function geoipDir(): string {
   return process.env.GEOIP_DIR || join(process.env.DATA_DIR || "/data", "geoip");

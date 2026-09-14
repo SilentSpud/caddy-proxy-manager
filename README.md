@@ -41,12 +41,43 @@ docker compose up -d
 Then open `http://localhost:3000` and follow [First Run](#first-run) - every URL redirects there
 until setup is finished. There is no administrator to sign in as until you create one.
 
-Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-data`, `agent-data`,
-`caddy-data`, `caddy-config`, `caddy-logs`, `geoip-data`, `acme-ca`, and `clickhouse-data` when
-analytics are on.
+Data persists in Docker volumes: `postgres-data` (the database), `caddy-manager-data` (which also
+holds the GeoIP databases), `agent-data`, `caddy-data`, `caddy-config`, `caddy-logs`, `acme-ca`, and
+`clickhouse-data` when analytics are on.
 
 Requires **Docker Engine 26 or later**: Caddy mounts a subdirectory of the agent's volume, and
 volume subpaths arrived in 26.0.
+
+### Upgrading to relayed analytics
+
+Agents no longer write to ClickHouse: they send the events they parse to the controller, which checks
+them and writes them itself. Upgrade every agent along with the controller - an older agent is sent
+no ClickHouse credentials and records nothing until it is upgraded. Then:
+
+- **Nothing on an agent's host needs to reach ClickHouse.** If you published ClickHouse's port or
+  joined a remote agent to the `analytics` network for that, undo it.
+- **Only the agent in the controller's stack runs ClickHouse.** Agents elsewhere were asked to start
+  a `clickhouse` container of their own, which nothing read. They stop it now; delete its volume on
+  those hosts with `docker volume rm <project>_clickhouse-data`. A deployment whose bundled agent
+  paired before the controller recorded which agent that is keeps asking every agent, until the
+  bundled agent next pairs itself.
+
+### Upgrading from the geoipupdate container
+
+The controller now downloads the GeoLite2 databases itself, so the `geoipupdate` container and the
+`geoip-data` volume are gone from `docker-compose.yml`. There is nothing to reconfigure: it uses the
+account ID and licence key already saved under **Settings → GeoIP** (or still in `.env`), downloads
+fresh databases onto `caddy-manager-data` on its first start, and every agent picks them up from
+there. After pulling the new `docker-compose.yml`, on the controller host and on every agent host:
+
+```bash
+docker compose up -d --remove-orphans
+docker volume rm <project>_geoip-data
+```
+
+`--remove-orphans` removes the old `geoipupdate-<HOSTNAME>` container, which nothing starts or stops
+any more. The volume only exists on hosts that ran it. Delete `HOSTNAME` from `.env`, and
+`geoipupdate` from `COMPOSE_PROFILES` if you listed it there.
 
 ### Upgrading to the non-root agent
 
@@ -80,12 +111,12 @@ port and module overrides. Then check:
 
 - **`CADDY_API_URL` in `.env`.** Delete it, or set `http://caddy-admin:2019`: `caddy` can resolve to
   Caddy's `caddy-network` address, where the admin API no longer answers.
-- **A `docker-compose.override.yml` that interpolates variables** into `caddy`, `clickhouse` or
-  `geoipupdate`. The agent's Compose sees only the agent's environment now, so forward each one
+- **A `docker-compose.override.yml` that interpolates variables** into `caddy` or `clickhouse`.
+  The agent's Compose sees only the agent's environment now, so forward each one
   under `agent.environment` in the override, as `MY_VAR: ${MY_VAR:-}`.
 - **`.env` stays `0600`.** If you loosened it so the agent could read it, tighten it again.
-- **Analytics or GeoIP already on.** Their containers keep the old network until recreated; switch
-  each off and on again under Settings so the agent recreates it with the stored credentials.
+- **Analytics already on.** The ClickHouse container keeps the old network until recreated; switch
+  analytics off and on again under Settings so the agent recreates it with the stored credentials.
 - **An `acme-ca` volume from an earlier release** keeps its old `0777` mode. Tighten it with
   `docker run --rm -v <project>_acme-ca:/acme-ca alpine sh -c 'chown 10001:10001 /acme-ca && chmod 0755 /acme-ca'`,
   using web's `PUID`/`PGID` if you changed them.
@@ -285,12 +316,13 @@ is still honoured as an override until a value is stored.
 | Use GeoIP for country lookups and geo blocking. Leave unset to decide from whether the databases are present | `GEOIP_ENABLED` | Unset |
 | MaxMind account ID, for GeoLite2 downloads | `GEOIPUPDATE_ACCOUNT_ID` | None |
 | MaxMind license key. Encrypted at rest | `GEOIPUPDATE_LICENSE_KEY` | None |
+| Hours between checks for newer MaxMind databases, 1-168 | `GEOIP_UPDATE_INTERVAL_HOURS` | `24` |
 
-> Compose reads `CLICKHOUSE_PASSWORD`, `GEOIPUPDATE_ACCOUNT_ID` and `GEOIPUPDATE_LICENSE_KEY` too,
-> to provision the `clickhouse` and `geoipupdate` containers. **With an agent running the stack you
-> do not need to keep them in `.env`**: the agent starts those containers itself and passes the
-> saved values to Compose. Without an agent, Docker is the only thing that can start them and it
-> cannot read the database - so there they must stay in `.env`.
+> Compose reads `CLICKHOUSE_PASSWORD` too, to provision the `clickhouse` container. **With an agent
+> running the stack you do not need to keep it in `.env`**: the agent starts ClickHouse itself and
+> passes the saved value to Compose. Without an agent, Docker is the only thing that can start it
+> and it cannot read the database - so there it must stay in `.env`. The MaxMind credentials are
+> read by the controller alone, and can go from `.env` once saved.
 
 ### Stays in `.env`
 
@@ -313,13 +345,12 @@ is still honoured as an override until a value is stored.
 | `L4_PORTS_DIR` | Directory where the controller leaves the bootstrap token the agent in its own stack pairs with. For non-Docker deployments | `/app/data` | No |
 | `LEGACY_KEY_CUTOFF_DATE` | Cutoff after which secrets still encrypted with the legacy key are refused, forcing re-encryption. ISO 8601 date, or `never` | Built-in date | No |
 | `LEGACY_SQLITE_PATH` | Pins which pre-3.0 database the migration flow offers, instead of scanning the usual locations | Unset (scan) | No |
-| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`, `geoipupdate`. Only needed without an agent - with one, **Settings → Analytics** and **Settings → GeoIP** start and stop those containers regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
+| `COMPOSE_PROFILES` | Compose profiles to activate: `clickhouse`. Only needed without an agent - with one, **Settings → Analytics** starts and stops ClickHouse regardless of this. `.env.example` ships it empty, since the bundled compose file runs an agent | Empty | No |
 | `PUID` / `PGID` | Build args setting the UID/GID containers run as. Match your host user to avoid volume permission issues (`id -u` / `id -g`) | `10001`/`10001` (web)<br/>`10000`/`10000` (caddy) | No |
 | `AGENT_PUID` / `AGENT_PGID` | Build args setting the UID/GID the agent runs as | `10002`/`10002` | No |
 | `CADDY_GID` | Caddy's GID, added to the web and agent containers' supplementary groups so they can use Caddy's logs. Must match Caddy's `PGID` | `10000` | No |
 | `CONTROLLER_GID` | The controller's GID, added to the agent's supplementary groups so it can read the bootstrap token. Must match web's `PGID` | `10001` | No |
 | `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard - see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
-| `HOSTNAME` | Suffix for the geoipupdate container name (`geoipupdate-<HOSTNAME>`). Compose-only. Bash on Linux defines it without exporting, so Compose sees nothing and the name degrades to `geoipupdate-`; set it in `.env` to pin it | Shell's `HOSTNAME`, if exported | No |
 
 ### The agent's environment
 
@@ -341,7 +372,7 @@ changeable at runtime - it describes the host the agent is bolted to. So it stay
 | `CADDY_CONTAINER_NAME` | The container the agent recreates | `caddy-proxy-manager-caddy` |
 | `CADDY_BUILD_TIMEOUT` | Seconds before a Caddy rebuild is abandoned | `1800` |
 | `CADDY_HEALTH_TIMEOUT` | Seconds to wait for Caddy to report healthy after a recreate | `60` |
-| `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`, `geoipupdate`) is abandoned. Generous because the first start pulls the image | `900` |
+| `SERVICE_START_TIMEOUT` | Seconds before starting an optional service (`clickhouse`) is abandoned. Generous because the first start pulls the image | `900` |
 | `DOCKER_HOST` | The Docker API. Points at `docker-socket-proxy`, never the raw socket | `tcp://docker-socket-proxy:2375` |
 | `COMPOSE_PROJECT_NAME` / `COMPOSE_HOST_DIR` / `COMPOSE_EXTRA_FILE` / `COMPOSE_SKIP_OVERRIDE` | Compose overrides: an explicit project name, a `--project-directory` for a host path the agent cannot see, an extra `-f` file, and skipping `docker-compose.override.yml`. The last two exist for the test rigs. `COMPOSE_HOST_DIR` is only needed where the project directory cannot be worked out from the compose labels - a UNC path, or a Docker Desktop old enough to expose drives at `/host_mnt/<letter>`; the agent logs a warning naming it when that happens | Auto-detected |
 | `CADDY_ACCESS_LOG` / `WAF_AUDIT_LOG` / `WAF_RULES_LOG` | Where the agent reads Caddy's logs from | `/logs/...` |
@@ -533,12 +564,11 @@ Comments rather than deletes, so you keep the values - some of them are the only
 you have. Cleaning up is optional either way: a variable that is still set is ignored once a value
 is stored.
 
-The variables Compose itself reads - `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DB`,
-`GEOIPUPDATE_ACCOUNT_ID`, `GEOIPUPDATE_LICENSE_KEY` - are held back from that command and listed
+The variables Compose itself reads for ClickHouse are held back from that command and listed
 separately, because removing them is a two-step change the command cannot make on its own. Without
-an agent they stay: Docker is the only thing that can start those two containers, and it cannot read
-the database. With an agent they can go too, as long as you drop `clickhouse` and `geoipupdate` from
-`COMPOSE_PROFILES` in the same pass - see [Pick one owner](#enabling-and-disabling-analytics).
+an agent they stay: Docker is the only thing that can start ClickHouse, and it cannot read the
+database. With an agent they can go too, as long as you drop `clickhouse` from `COMPOSE_PROFILES` in
+the same pass - see [Pick one owner](#enabling-and-disabling-analytics).
 
 Starting with a SQLite `DATABASE_URL` still set fails immediately, with a message saying so. That
 is deliberate: silently starting against an empty database would look like total data loss.
@@ -710,30 +740,26 @@ Rules can be **block** or **allow**. Allow rules take precedence over block rule
 
 ### GeoIP Setup
 
-Geo blocking requires MaxMind GeoLite2 Country and/or ASN databases. Use the bundled `geoipupdate` service:
+Geo blocking requires MaxMind GeoLite2 Country and/or ASN databases, which the controller downloads
+itself:
 
 1. Register for a free MaxMind account at [maxmind.com](https://www.maxmind.com/)
 2. Generate a license key with `GeoLite2-Country` and `GeoLite2-ASN` permissions
 3. Open **Settings → GeoIP Databases**, tick **Use GeoIP**, and enter the account ID and licence key
 
-That is the whole setup on a stack with an agent - saving starts the `geoipupdate` container, no
-Compose profile needed. Turning the toggle off stops it again and hides country matching from the
-proxy-host forms.
+That is the whole setup, with or without an agent. The controller downloads the Country, ASN and
+City databases onto `caddy-manager-data`, asks MaxMind for newer builds once a day (the interval is
+a field under **Settings → GeoIP**), and
+downloads only an edition that changed. **Settings → GeoIP** shows when it last checked, and **Check
+now** runs it on demand. Turning the toggle off stops the downloads and hides country matching from
+the proxy-host forms; the databases already on disk are kept.
 
-Without an agent, put the credentials in `.env` and start the profile by hand instead:
+The controller needs outbound HTTPS to `updates.maxmind.com`, `download.maxmind.com`, and the
+Cloudflare R2 storage MaxMind redirects downloads to. Without an account ID and licence key nothing
+is downloaded, but GeoIP still works with databases you place in `/app/data/geoip` yourself.
 
-```env
-GEOIPUPDATE_ACCOUNT_ID=your-account-id
-GEOIPUPDATE_LICENSE_KEY=your-license-key
-```
-
-```bash
-docker compose --profile geoipupdate up -d
-```
-
-`geoipupdate` stores the databases in the `geoip-data` volume, which the controller serves them from.
-Every agent - the one in the same stack included - fetches its own copy onto `agent-data`, and Caddy
-mounts that copy read-only.
+Every agent - the one in the same stack included - fetches its own copy from the controller onto
+`agent-data`, and Caddy mounts that copy read-only.
 
 ---
 
@@ -775,17 +801,6 @@ docker compose up -d
 Leaving `COMPOSE_PROFILES` empty and omitting `CLICKHOUSE_PASSWORD` disables analytics there. The
 web container starts normally without ClickHouse, the Analytics page explains that it is not
 enabled, and no data is collected.
-
-### Combining profiles
-
-To run both without an agent, list both:
-
-```env
-COMPOSE_PROFILES=clickhouse,geoipupdate
-CLICKHOUSE_PASSWORD=…
-GEOIPUPDATE_ACCOUNT_ID=…
-GEOIPUPDATE_LICENSE_KEY=…
-```
 
 ---
 
@@ -836,29 +851,27 @@ Every request is signed with a shared secret using HMAC-SHA256 over the method, 
 body. The secret never travels with a request, and the signature covers the path, so a captured
 read cannot be replayed as a write.
 
-### Analytics are written by the agent
+### Analytics are parsed by the agent and written by the controller
 
 Caddy's access and WAF logs are files on the agent's host - a controller elsewhere cannot read them
-at all. So the agent parses them and inserts the events into ClickHouse itself, using credentials
-the controller pushes to it. ClickHouse still lives with the controller; only the write path moved.
+at all. So the agent parses them and relays the events to the controller in batches, every 30
+seconds, signed with its pairing secret like every other request. The controller checks each row,
+records which agent sent it, and writes it to ClickHouse. No agent holds a ClickHouse credential, and
+ClickHouse never has to be reachable from an agent's host.
 
-Nothing to configure: enabling analytics on the controller (`CLICKHOUSE_PASSWORD`) is what causes
-the credentials to be pushed, and turning it off pushes `null` and stops the agent writing. The
-push happens at startup and whenever those settings change.
-
-Worth knowing before enabling analytics on a fleet: the credential pushed is the same ClickHouse
-account the controller reads with, not an insert-only one, and it goes to every agent host.
+Nothing to configure: enabling analytics on the controller is what switches the parsers on, and
+turning it off switches them off. While the controller is unreachable an agent keeps its place in
+the log, and sends what it missed once the controller is back.
 
 ### GeoIP databases come from the controller
 
-The controller holds the MaxMind subscription and the `geoipupdate` container that refreshes the
-databases. Every agent fetches them through the controller rather than needing a licence key of its
-own, checking daily and downloading only when the copy it has is out of date. It writes them to its
-own volume, which Caddy mounts read-only, so geo-blocking works on every host in the fleet without
-the agent needing root to write where `geoipupdate` does.
+The controller holds the MaxMind subscription and downloads the databases itself. Every agent
+fetches them through the controller rather than needing a licence key of its own, checking daily -
+and whenever the controller has just downloaded a new build - and fetching only when the copy it
+has is out of date. It writes them to its own volume, which Caddy mounts read-only, so geo-blocking
+works on every host in the fleet without the agent holding a licence key or running as root.
 
-This is the only request that runs agent-to-controller, and it is signed with the same pairing
-secret - no extra credential. It goes to the address the agent is paired with, so an agent that can
+The request is signed with the same pairing secret - no extra credential. It goes to the address the agent is paired with, so an agent that can
 reach its controller at all can fetch them. An agent that cannot keeps using whatever database it
 already has.
 

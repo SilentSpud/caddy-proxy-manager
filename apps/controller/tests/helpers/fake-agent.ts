@@ -143,8 +143,8 @@ export async function startFakeAgent(
     initialState: {
       l4Ports: [],
       caddyModules: [],
-      services: { services: { clickhouse: false, geoipupdate: false }, env: {} },
-      fleetConfig: { clickhouse: null, geoip: null },
+      services: { services: { clickhouse: false }, env: {} },
+      fleetConfig: { clickhouse: null, analytics: false, geoip: null },
       caddyEnabled: true,
     },
   });

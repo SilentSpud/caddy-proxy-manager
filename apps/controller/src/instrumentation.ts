@@ -138,6 +138,14 @@ export async function register() {
       console.error("Failed to apply the optional services on the agents:", error);
     }
 
+    // A tick reaches MaxMind only while GeoIP is on with credentials set.
+    const { startGeoipUpdater } = await import("./lib/geoip/updater");
+    try {
+      startGeoipUpdater();
+    } catch (error) {
+      console.error("Failed to start the GeoIP updater:", error);
+    }
+
     process.on("SIGTERM", () => {
       closeClickHouse();
     });

@@ -1,14 +1,15 @@
 /**
  * Running the log parsers, and starting or stopping them as the controller's configuration changes.
  *
- * Analytics are optional, so this is entirely driven by what the controller pushes: credentials
- * start the parsers, `null` stops them, and a deployment that never enables analytics never opens
- * a log file at all.
+ * Analytics are optional, so this is entirely driven by what the controller pushes: its `analytics`
+ * flag starts the parsers and the relay behind them, and a deployment that never enables analytics
+ * never opens a log file at all.
  */
 
 import type { FleetConfig } from "@cpm/shared";
 import type { AgentStore } from "../db";
-import { analyticsEnabled, closeAnalytics, configureAnalytics } from "./clickhouse";
+import { ControllerClient } from "../controller-client";
+import { type AnalyticsSink, analyticsEnabled, configureAnalytics } from "./relay";
 import { geoipControllerUrl, syncGeoipDatabases } from "./geoip";
 import {
   initLogParser,
@@ -40,8 +41,8 @@ let geoipTimer: NodeJS.Timeout | null = null;
  * Idempotent: the controller pushes on every startup and whenever the settings change, and a
  * repeat of the configuration already in force must not restart a working parser.
  *
- * `controllerId` names which paired controller pushed this, so the GeoIP fetch - the one request
- * that runs the other way - can be signed with the secret shared with that controller.
+ * `controllerId` names which paired controller pushed this, so the GeoIP fetch and the analytics
+ * relay can be signed with the secret shared with that controller.
  */
 export async function applyFleetConfig(
   store: AgentStore,
@@ -51,7 +52,7 @@ export async function applyFleetConfig(
   bindTrafficStore(store);
   bindWafStore(store);
 
-  await configureAnalytics(config.clickhouse);
+  configureAnalytics(config.analytics === true ? analyticsSink(store, controllerId) : null);
 
   if (analyticsEnabled() && !running) await start();
   else if (!analyticsEnabled() && running) await stop();
@@ -63,7 +64,7 @@ export async function applyFleetConfig(
  * Fetch the GeoIP databases now, and daily after that.
  *
  * Skipped only when the controller offered none. The agent beside the controller fetches too:
- * Caddy reads the agent's copy, not the one geoipupdate writes for the controller.
+ * Caddy reads the agent's copy, not the controller's.
  */
 function scheduleGeoipSync(store: AgentStore, config: FleetConfig, controllerId: string): void {
   if (geoipTimer) {
@@ -88,6 +89,15 @@ function scheduleGeoipSync(store: AgentStore, config: FleetConfig, controllerId:
   run();
   geoipTimer = setInterval(run, GEOIP_REFRESH_MS);
   geoipTimer.unref();
+}
+
+/** Where relayed rows go: the controller this agent is paired with, signed with its secret. */
+function analyticsSink(store: AgentStore, controllerId: string): AnalyticsSink | null {
+  const secret = store.findController(controllerId)?.secret;
+  const url = store.pairedControllerUrl();
+  // Both exist for any agent that is connected; without either there is nothing to sign or send.
+  if (!secret || !url) return null;
+  return { client: new ControllerClient(url, store.agentId()), secret };
 }
 
 async function start(): Promise<void> {
@@ -122,7 +132,7 @@ export async function stop(): Promise<void> {
   timers = [];
   stopLogParser();
   stopWafLogParser();
-  await closeAnalytics();
+  configureAnalytics(null);
   console.log("[analytics] log parsers stopped");
 }
 

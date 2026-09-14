@@ -75,7 +75,7 @@ import {
   updateFaviconAction,
   updateUpdateSettingsAction,
   checkForUpdatesAction,
-  checkGeoipUpdatesAction,
+  updateGeoipDatabasesAction,
   updatePasswordPolicySettingsAction,
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
@@ -372,12 +372,7 @@ export default function SettingsClient({
           />
         )}
         {active === "geoip" && (
-          <GeoipSection
-            geoip={geoip}
-            canManageServices={canManageServices}
-            geoipState={geoipState}
-            geoipFormAction={geoipFormAction}
-          />
+          <GeoipSection geoip={geoip} geoipState={geoipState} geoipFormAction={geoipFormAction} />
         )}
         {active === "metrics" && (
           <MetricsSection
@@ -1979,9 +1974,9 @@ function AnalyticsSection({
 /**
  * When MaxMind was last asked for a newer database, and a way to ask now.
  *
- * The file's own date cannot answer "is the updater still working": geoipupdate leaves no trace of
- * a run that found nothing new, so without this an operator cannot tell a quiet week at MaxMind
- * from a container that died.
+ * The file's own date cannot answer "is the updater still working": a run that finds nothing new
+ * leaves no trace on disk, so without this an operator cannot tell a quiet week at MaxMind from an
+ * updater that keeps failing.
  */
 function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
   const t = useTranslations("settings");
@@ -1991,7 +1986,7 @@ function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
   const checkNow = () => {
     setResult(null);
     startTransition(async () => {
-      const outcome = await checkGeoipUpdatesAction();
+      const outcome = await updateGeoipDatabasesAction();
       setResult(outcome.message ?? null);
     });
   };
@@ -2014,6 +2009,9 @@ function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
         />
       </HStack>
       {geoip.checkError && <WarnAlert title={geoip.checkError} />}
+      {geoip.downloadError && (
+        <WarnAlert title={t("geoipDownloadFailed", { error: geoip.downloadError })} />
+      )}
       {behind.length > 0 && <WarnAlert title={t("geoipBehind", { editions: behind.join(", ") })} />}
       {result && (
         <Text size="sm" color="secondary">
@@ -2026,12 +2024,10 @@ function GeoipUpdateCheckLine({ geoip }: { geoip: GeoipView }) {
 
 function GeoipSection({
   geoip,
-  canManageServices,
   geoipState,
   geoipFormAction,
 }: {
   geoip: GeoipView;
-  canManageServices: boolean;
   geoipState: { success: boolean; message?: string } | null;
   geoipFormAction: (payload: FormData) => void;
 }) {
@@ -2039,6 +2035,7 @@ function GeoipSection({
   const [enabled, setEnabled] = useState(geoip.enabled);
   const [accountId, setAccountId] = useState(geoip.accountId);
   const [licenseKey, setLicenseKey] = useState("");
+  const [intervalHours, setIntervalHours] = useState(geoip.updateIntervalHours);
 
   return (
     <FormCard title={t("maxmindGeolite2")}>
@@ -2061,18 +2058,10 @@ function GeoipSection({
             value={enabled}
             onChange={setEnabled}
           />
-          {canManageServices ? (
-            <InfoAlert title={t("managedGeoipTitle")}>
-              No <Code>COMPOSE_PROFILES</Code> entry is needed. It downloads the databases on a
-              schedule using the credentials below, and agents on other hosts fetch them from this
-              controller rather than each holding a licence key.
-            </InfoAlert>
-          ) : (
-            <WarnAlert title={t("agentManagementUnavailableTitle")}>
-              These settings still decide whether GeoIP is used. Downloading the databases needs
-              <Code>geoipupdate</Code> in <Code>COMPOSE_PROFILES</Code> on the host.
-            </WarnAlert>
-          )}
+          <InfoAlert title={t("geoipDownloadsTitle")}>
+            It checks MaxMind on the interval below using these credentials. Agents fetch the
+            databases from this controller rather than each holding a licence key.
+          </InfoAlert>
           <Text size="sm" color="secondary">
             {geoip.installedEditions.length > 0
               ? `Installed: ${geoip.installedEditions.join(", ")}.`
@@ -2102,6 +2091,16 @@ function GeoipSection({
             htmlName="geoipLicenseKey"
             value={licenseKey}
             onChange={setLicenseKey}
+          />
+          <NumberInput
+            label={t("geoipUpdateInterval")}
+            description={t("geoipUpdateIntervalHelp")}
+            htmlName="geoipUpdateIntervalHours"
+            value={intervalHours}
+            onChange={setIntervalHours}
+            isIntegerOnly
+            min={1}
+            max={168}
           />
           <SaveButton label={t("saveGeoipSettings")} />
         </VStack>

@@ -3,14 +3,14 @@
  *
  * This runs on the agent rather than the controller because the log is a file on *this* host: a
  * controller elsewhere cannot read it at all. Moved here verbatim apart from its two seams - the
- * parse offset now lives in the agent's own SQLite, and the rows go straight to ClickHouse with
- * credentials the controller pushed.
+ * parse offset now lives in the agent's own SQLite, and the rows are relayed to the controller,
+ * which writes them.
  */
 import { existsSync, statSync } from "node:fs";
 import maxmind, { type CountryResponse } from "maxmind";
 import type { TrafficEventRow } from "@cpm/shared";
 import type { AgentStore } from "../db";
-import { insertTrafficEvents } from "./clickhouse";
+import { relayTrafficEvents } from "./relay";
 import { readLines as readLinesFrom } from "./log-read";
 import { accessLogPath, geoipCountryDb } from "./paths";
 
@@ -213,7 +213,7 @@ export async function readLines(
 
 async function insertBatch(rows: TrafficEventRow[]): Promise<void> {
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    await insertTrafficEvents(rows.slice(i, i + BATCH_SIZE));
+    await relayTrafficEvents(rows.slice(i, i + BATCH_SIZE));
   }
 }
 

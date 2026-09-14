@@ -16,9 +16,8 @@ Two things are fixed when a container is created and cannot be changed by reload
 - **Published ports**, which [L4 hosts](../l4-proxy/) need.
 - **Compiled-in plugins**, which [Caddy Build](../caddy-build/) changes.
 
-The agent also starts and stops the optional containers - ClickHouse for [analytics](../analytics/),
-`geoipupdate` for [geo blocking](../geo-blocking/) - so those become toggles in Settings rather than
-compose profiles you edit by hand.
+The agent also starts and stops the optional ClickHouse container for [analytics](../analytics/),
+so it becomes a toggle in Settings rather than a compose profile you edit by hand.
 
 ## The agent dials out
 

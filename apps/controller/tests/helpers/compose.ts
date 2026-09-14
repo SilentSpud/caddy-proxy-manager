@@ -49,4 +49,4 @@ export const COMPOSE_ARGS = EXTRA_FILE ? [...BASE_ARGS, '-f', EXTRA_FILE] : BASE
  * next run's agent then resumes the previous run's pairing against a fresh controller database,
  * gets refused, and stops Caddy for the rest of the run. A profile with no containers is a no-op.
  */
-export const TEARDOWN_PROFILES = 'caddy,clickhouse,geoipupdate,tools';
+export const TEARDOWN_PROFILES = 'caddy,clickhouse,tools';

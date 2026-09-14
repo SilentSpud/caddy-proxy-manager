@@ -42,11 +42,11 @@ export type SettingDefinition<T extends SettingValue = SettingValue> = {
   /** A secret this deployment chooses for itself, so the UI may offer to generate one. */
   generatable?: boolean;
   /**
-   * Docker Compose reads this variable too, to provision `clickhouse` or `geoipupdate`.
+   * Docker Compose reads this variable too, to provision `clickhouse`.
    *
    * Storing one of these in the database does not free the variable on its own. Compose cannot
    * read the database, so where there is no agent to hand it the saved values it is still the only
-   * thing that can start those containers, and deleting the line leaves them unprovisionable. With
+   * thing that can start that container, and deleting the line leaves it unprovisionable. With
    * an agent the line can go, but only together with the service's Compose profile. Either way it
    * is not a change the migration flow can safely make for the operator, so it lists these
    * separately instead of commenting them out with the rest.
@@ -579,15 +579,16 @@ export const geoipEnabled = optionalBooleanSetting({
   gate: true,
   label: "Enable GeoIP",
   description:
-    "Country lookups for analytics and geo blocking. With an agent running the stack, turning " +
-    "this on also starts the geoipupdate container. Leave unset to decide from whether the " +
-    "databases are already present.",
+    "Country lookups for analytics and geo blocking. With a MaxMind account ID and licence key, " +
+    "turning this on also has the controller download the databases. Leave unset to decide from " +
+    "whether the databases are already present.",
 });
 
+// The names say geoipupdate, the container that once read these. Kept: they are storage keys, and
+// the variables are what an upgrading deployment's .env still sets.
 export const geoipAccountId = stringSetting({
   name: "geoipupdate_account_id",
   env: "GEOIPUPDATE_ACCOUNT_ID",
-  composeReads: true,
   group: "geoip",
   label: "MaxMind account ID",
   description: "Needed to download GeoLite2 databases, which geo blocking depends on.",
@@ -598,11 +599,23 @@ export const geoipAccountId = stringSetting({
 export const geoipLicenseKey = secretSetting({
   name: "geoipupdate_license_key",
   env: "GEOIPUPDATE_LICENSE_KEY",
-  composeReads: true,
   group: "geoip",
   label: "MaxMind license key",
   description: "Issued alongside the account ID at maxmind.com.",
   default: "",
+});
+
+export const geoipUpdateIntervalHours = numberSetting({
+  name: "geoip_update_interval_hours",
+  env: "GEOIP_UPDATE_INTERVAL_HOURS",
+  group: "geoip",
+  label: "Update check interval (hours)",
+  description:
+    "How often the controller asks MaxMind for newer databases. MaxMind rebuilds GeoLite ASN " +
+    "daily, and Country and City on Tuesdays and Fridays. A check downloads only what changed.",
+  default: 24,
+  min: 1,
+  max: 168,
 });
 
 /** Every definition, in the order the setup and settings pages render them. */
@@ -636,6 +649,7 @@ export const SETTING_DEFINITIONS = [
   geoipEnabled,
   geoipAccountId,
   geoipLicenseKey,
+  geoipUpdateIntervalHours,
 ] as const satisfies readonly SettingDefinition[];
 
 export const SETTINGS_BY_KEY: ReadonlyMap<string, SettingDefinition> = new Map(

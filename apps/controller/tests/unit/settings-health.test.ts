@@ -24,6 +24,8 @@ function geoipView(overrides: Partial<HealthInput['geoip']> = {}): HealthInput['
     lastCheckedAt: new Date().toISOString(),
     checkError: null,
     editionsBehind: [],
+    downloadError: null,
+    updateIntervalHours: 24,
     ...overrides,
   };
 }
@@ -156,10 +158,50 @@ describe('sectionHealth', () => {
     const geoip = find(sections, 'geoip');
     expect(geoip.status).toBe('attention');
     expect(geoip.value).toBe('1 of 2 databases out of date');
-    expect(geoip.detail).toContain('geoipupdate is not fetching');
+    expect(geoip.detail).toContain('has not downloaded it');
   });
 
-  it('flags an update check that has not run for a day', () => {
+  it('says why the download behind an out-of-date database failed', () => {
+    const sections = sectionHealth(
+      input({
+        geoip: geoipView({
+          enabled: true,
+          installedEditions: ['GeoLite2-Country'],
+          databaseAgeDays: 9,
+          editionsBehind: ['GeoLite2-Country'],
+          downloadError: 'GeoLite2-Country: MaxMind answered HTTP 429',
+        }),
+      }),
+    );
+
+    expect(find(sections, 'geoip').detail).toContain('The last download failed: GeoLite2-Country');
+  });
+
+  it('measures a stalled check against the configured interval', () => {
+    const now = Date.parse('2026-09-10T12:00:00Z');
+    const checkedHoursAgo = (hours: number, updateIntervalHours: number) =>
+      find(
+        sectionHealth(
+          input({
+            now,
+            geoip: geoipView({
+              enabled: true,
+              installedEditions: ['GeoLite2-Country'],
+              databaseAgeDays: 1,
+              updateIntervalHours,
+              lastCheckedAt: new Date(now - hours * 60 * 60 * 1000).toISOString(),
+            }),
+          }),
+        ),
+        'geoip',
+      ).status;
+
+    // Two runs of a weekly interval is a fortnight; two of an hourly one is two hours.
+    expect(checkedHoursAgo(100, 168)).toBe('ok');
+    expect(checkedHoursAgo(3, 1)).toBe('attention');
+  });
+
+  it('flags an update check that has missed two daily runs', () => {
     const now = Date.parse('2026-09-10T12:00:00Z');
     const sections = sectionHealth(
       input({
@@ -168,7 +210,7 @@ describe('sectionHealth', () => {
           enabled: true,
           installedEditions: ['GeoLite2-Country'],
           databaseAgeDays: 1,
-          lastCheckedAt: new Date(now - 30 * 60 * 60 * 1000).toISOString(),
+          lastCheckedAt: new Date(now - 50 * 60 * 60 * 1000).toISOString(),
         }),
       }),
     );
@@ -187,7 +229,7 @@ describe('sectionHealth', () => {
           enabled: true,
           installedEditions: ['GeoLite2-Country'],
           databaseAgeDays: 1,
-          lastCheckedAt: new Date(now - 30 * 60 * 60 * 1000).toISOString(),
+          lastCheckedAt: new Date(now - 50 * 60 * 60 * 1000).toISOString(),
           checkError: 'MaxMind rejected the account ID or licence key',
         }),
       }),

@@ -24,12 +24,13 @@ describe('planEnvCleanup', () => {
       'GEOIPUPDATE_LICENSE_KEY',
     ]);
 
-    // Compose provisions clickhouse and geoipupdate from these and cannot read the database, so
-    // commenting them out would break the next `docker compose up` on a stack with no agent.
-    expect(keep).toEqual(['CLICKHOUSE_PASSWORD', 'GEOIPUPDATE_LICENSE_KEY']);
-    expect(comment).toEqual(['APP_NAME']);
+    // Compose provisions clickhouse from its password and cannot read the database, so commenting
+    // it out would break the next `docker compose up` on a stack with no agent. Only the controller
+    // reads the MaxMind key now, so that one can go.
+    expect(keep).toEqual(['CLICKHOUSE_PASSWORD']);
+    expect(comment).toEqual(['APP_NAME', 'GEOIPUPDATE_LICENSE_KEY']);
     expect(command).not.toContain('CLICKHOUSE_PASSWORD');
-    expect(command).not.toContain('GEOIPUPDATE_LICENSE_KEY');
+    expect(command).toContain('GEOIPUPDATE_LICENSE_KEY');
   });
 
   it('ignores a name that is not a setting', () => {

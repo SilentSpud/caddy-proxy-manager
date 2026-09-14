@@ -61,6 +61,6 @@ geoblock trusted-proxy list, so the two cannot silently disagree.
 
 </Steps>
 
-On a stack with an [agent](../agent/) that is the whole setup - saving starts the `geoipupdate`
-container. Turning the toggle off stops it again and hides country matching from the host forms.
-Without an agent, put the credentials in `.env` and start the compose profile by hand.
+That is the whole setup. The controller downloads the databases, checks MaxMind for updates once a
+day by default, and every [agent](../agent/) fetches them from it. Turning the toggle off hides country
+matching from the host forms.
