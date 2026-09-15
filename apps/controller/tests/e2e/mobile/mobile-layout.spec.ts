@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openCreateHostDialog } from '../../helpers/proxy-api';
+import { waitForHydration } from '../../helpers/hydration';
 
 // Force a mobile viewport even under the desktop Chromium project so these
 // checks validate responsive behavior instead of self-skipping.
@@ -62,6 +63,7 @@ test.describe('Mobile layout', () => {
 
   test('the drawer stops offering to be customized once it has been', async ({ page }) => {
     await page.goto('/more/customize');
+    await waitForHydration(page);
     await page.getByRole('button', { name: 'Done' }).click();
     await expect(page).toHaveURL('/more');
 
