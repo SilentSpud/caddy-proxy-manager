@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';
 import { expectStaged } from '../../helpers/staged-settings';
 import { httpGet, waitForRoute } from '../../helpers/http';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-waf-custom-path.test';
 const ECHO_BODY = 'echo-ok';
@@ -18,6 +19,7 @@ test.describe
       page,
     }) => {
       await page.goto('/waf');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /settings/i }).click();
       await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 

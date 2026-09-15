@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-rewrite.test';
 
@@ -11,6 +12,7 @@ test.describe
   .serial('Path Prefix Rewrite', () => {
     test('setup: create proxy host with path prefix rewrite', async ({ page }) => {
       await page.goto('/proxy-hosts');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 

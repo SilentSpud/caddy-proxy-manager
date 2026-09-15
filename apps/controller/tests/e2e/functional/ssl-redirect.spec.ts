@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test';
 import { httpGet, waitForRoute } from '../../helpers/http';
 import { injectFormFields } from '../../helpers/http';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-ssl.test';
 
@@ -14,6 +15,7 @@ test.describe
       // Navigate to proxy-hosts and open the create dialog manually so we can
       // inject ssl_forced=true without the ssl_forced_present bypass.
       await page.goto('/proxy-hosts');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 

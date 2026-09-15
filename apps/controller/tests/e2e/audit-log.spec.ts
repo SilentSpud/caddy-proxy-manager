@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 test.describe('Audit Log', () => {
   test('audit log page loads without redirecting to login', async ({ page }) => {
@@ -19,6 +20,7 @@ test.describe('Audit Log', () => {
   test('creating a proxy host creates audit log entry', async ({ page }) => {
     // Create a proxy host
     await page.goto('/proxy-hosts');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /create host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 

@@ -5,6 +5,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { httpGet, injectFormFields, waitForRoute } from '../../helpers/http';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-redirects-adv.test';
 
@@ -26,6 +27,7 @@ test.describe
   .serial('Redirect Rules - full URLs, cross-domain, wildcards', () => {
     test('setup: create proxy host with advanced redirect rules', async ({ page }) => {
       await page.goto('/proxy-hosts');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 

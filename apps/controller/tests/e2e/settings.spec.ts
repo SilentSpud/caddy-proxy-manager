@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
 import { goToSettingsSection, SETTINGS_SIDEBAR } from '../helpers/settings-nav';
+import { waitForHydration } from '../helpers/hydration';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,7 @@ test.describe('Settings - Cmd-K palette', () => {
 
   test('clicking the search button opens the command palette', async ({ page }) => {
     await page.goto('/settings/general');
+    await waitForHydration(page);
     await page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...').click();
     await expect(page.getByRole('dialog')).toBeVisible();
   });

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { goToSettingsSection } from '../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../helpers/staged-settings';
+import { waitForHydration } from '../helpers/hydration';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const API_AUTHENTIK_SETTINGS = 'http://localhost:3000/api/v1/settings/authentik';
@@ -275,6 +276,7 @@ test.describe('Proxy Hosts', () => {
       await applyStagedChanges(page);
 
       await page.goto('/proxy-hosts');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /create host/i }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
 

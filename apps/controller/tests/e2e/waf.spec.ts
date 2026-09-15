@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { expectStaged } from '../helpers/staged-settings';
+import { waitForHydration } from '../helpers/hydration';
 
 test.describe('WAF', () => {
   // A zone away from UTC, so a range read as UTC - or in the runner's own zone - fails.
@@ -91,6 +92,7 @@ test.describe('WAF', () => {
 
   test('WAF page has Save WAF settings button', async ({ page }) => {
     await page.goto('/waf');
+    await waitForHydration(page);
     // Save button is on the Settings tab
     await page.getByRole('button', { name: /settings/i }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
@@ -105,6 +107,7 @@ test.describe('WAF', () => {
 
   test('WAF settings toggle persists after save and navigation', async ({ page }) => {
     await page.goto('/waf');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /settings/i }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
@@ -135,6 +138,7 @@ test.describe('WAF', () => {
     await page.goto('/hosts');
     await expect(page).not.toHaveURL(/login/);
     await page.goto('/waf');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /settings/i }).click();
 
     await expect(wafSwitch).toBeChecked();

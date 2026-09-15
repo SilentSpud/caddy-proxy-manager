@@ -45,6 +45,7 @@ test.describe('Profile', () => {
 
   test('change password: new password too short shows validation error', async ({ page }) => {
     await page.goto('/profile');
+    await waitForHydration(page);
 
     await page.getByRole('button', { name: /change password|set password/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
