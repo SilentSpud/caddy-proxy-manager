@@ -21,11 +21,8 @@ import {
 import { activateDashboardHost } from "@/src/lib/dashboard-host";
 // SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
 // JSON groups and one to the registry, and this action now saves through both.
-import {
-  EMAIL_ADDRESS,
-  SettingsValidationError,
-  validateSettingsGroup,
-} from "@/src/lib/settings-validation";
+import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
+import { isEmailAddress } from "@/src/lib/email-address";
 import {
   getMigrationSource,
   isSetupCompleted,
@@ -133,7 +130,7 @@ export async function saveSetupSettings(
   if (defaultDomain.length === 0 || defaultDomain.length > 253) {
     return { error: t("defaultDomainInvalid") };
   }
-  if (acmeEmail.length > 320 || (acmeEmail !== "" && !EMAIL_ADDRESS.test(acmeEmail))) {
+  if (acmeEmail !== "" && !isEmailAddress(acmeEmail, "public")) {
     return { error: t("acmeEmailInvalid") };
   }
 

@@ -20,6 +20,7 @@ import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { Fab } from "@/src/components/mobile/Fab";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatTiles } from "@/components/ui/StatTiles";
+import { EmailInput } from "@/src/components/ui/EmailInput";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
@@ -220,12 +221,11 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
           >
             <VStack gap={3}>
               <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
-                <TextInput
+                <EmailInput
                   {...NATIVE_REQUIRED}
                   {...AUTOFILL_EMAIL}
                   data-testid="create-email"
                   label={t("email")}
-                  type="email"
                   htmlName="email"
                   value={createEmail}
                   onChange={setCreateEmail}
@@ -479,7 +479,7 @@ function EditUserRow({
               onChange={setName}
               placeholder={t("displayName")}
             />
-            <TextInput
+            <EmailInput
               {...AUTOFILL_EMAIL}
               label={t("email")}
               htmlName="email"

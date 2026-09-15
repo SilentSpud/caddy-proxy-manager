@@ -27,6 +27,7 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { EmailInput } from "@/src/components/ui/EmailInput";
 import { EnvTokens } from "@/src/components/ui/EnvTokens";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-attrs";
@@ -173,10 +174,10 @@ export default function SetupSettingsClient({
                   isRequired
                   width="100%"
                 />
-                <TextInput
+                <EmailInput
+                  domain="public"
                   label={t("acmeContactEmail")}
                   description={t("acmeEmailHelp")}
-                  type="email"
                   htmlName="acmeEmail"
                   value={acmeEmail}
                   onChange={setAcmeEmail}

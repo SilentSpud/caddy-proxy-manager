@@ -20,6 +20,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { EmailInput } from "@/src/components/ui/EmailInput";
 import {
   AUTOFILL_NEW_PASSWORD,
   AUTOFILL_OFF,
@@ -428,10 +429,10 @@ function GeneralSection({
             onChange={setDefaultDomain}
             isRequired
           />
-          <TextInput
+          <EmailInput
+            domain="public"
             label={t("acmeContactEmail")}
             description={t("acmeEmailHelp")}
-            type="email"
             htmlName="acmeEmail"
             value={acmeEmail}
             onChange={setAcmeEmail}

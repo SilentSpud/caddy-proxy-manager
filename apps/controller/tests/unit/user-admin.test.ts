@@ -6,6 +6,7 @@ import { describe, expect, it } from 'bun:test';
 import { DomainError } from '@/src/lib/domain-error';
 import {
   assertAcceptablePassword,
+  assertEmailAddress,
   assertNotSelf,
   assertUserRole,
   assertUserStatus,
@@ -43,6 +44,18 @@ describe('acting on your own account', () => {
       'Cannot delete your own account',
     );
     expect(() => assertNotSelf(3, 4, 'cannotDeleteOwnAccount')).not.toThrow();
+  });
+});
+
+describe('an address an administrator types', () => {
+  it('is refused when it cannot be an email address', () => {
+    expect(() => assertEmailAddress('not-an-email')).toThrow(DomainError);
+    expect(() => assertEmailAddress('name@example..com')).toThrow(DomainError);
+  });
+
+  it('accepts the dotless address setup gives the first administrator', () => {
+    expect(() => assertEmailAddress('admin@localhost')).not.toThrow();
+    expect(() => assertEmailAddress('new@example.com')).not.toThrow();
   });
 });
 

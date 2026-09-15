@@ -656,6 +656,7 @@
     "deleteUserFailed": "Failed to delete user",
     "discardStagedFailed": "Failed to discard changes",
     "emailAndPasswordRequired": "Email and password are required",
+    "emailInvalid": "Enter a valid email address, such as name@example.com",
     "environmentOAuthProviderDeletionForbidden": "Cannot delete an environment-sourced OAuth provider",
     "exportPasswordRequired": "Export password is required",
     "failedToCreateAccessList": "Failed to create access list",

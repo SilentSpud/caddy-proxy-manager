@@ -5,6 +5,7 @@ import { requireAdmin } from "@/src/lib/auth";
 import { extractErrorMessage, storedErrorMessage } from "@/src/lib/actions";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { domainError } from "@/src/lib/domain-error";
+import { isEmailAddress } from "@/src/lib/email-address";
 import { dnsProviderFieldText } from "@/src/lib/dns-provider-messages";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { validateSettingsGroup } from "@/src/lib/settings-validation";
@@ -188,9 +189,14 @@ async function updateGeneralSettingsActionUnlocked(
   const t = await getTranslations("settings");
   try {
     await requireAdmin();
+    const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
+    // The CA only refuses a malformed contact at the next issuance, long after this save.
+    if (acmeEmail !== "" && !isEmailAddress(acmeEmail, "public")) {
+      throw domainError("emailInvalid");
+    }
     await saveGeneralSettings({
       defaultDomain: String(formData.get("defaultDomain") ?? ""),
-      acmeEmail: formData.get("acmeEmail") ? String(formData.get("acmeEmail")) : undefined,
+      acmeEmail: acmeEmail || undefined,
     });
     revalidatePath("/settings");
     return { success: true, message: t("results.generalSaved") };

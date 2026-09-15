@@ -12,6 +12,8 @@ import {
   updateUserStatus,
   deleteUser,
 } from "@/src/lib/models/user";
+import { domainErrorMessage } from "@/src/lib/domain-error";
+import { isEmailAddress } from "@/src/lib/email-address";
 import { isUserRole, isUserStatus } from "@/src/lib/user-admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
@@ -56,6 +58,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     if (hasStatus && !isUserStatus(body.status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+    // Before any write, like the two above, so a bad address cannot land half an update.
+    if (
+      body.email !== undefined &&
+      (typeof body.email !== "string" || !isEmailAddress(body.email.trim()))
+    ) {
+      return NextResponse.json({ error: domainErrorMessage("emailInvalid") }, { status: 400 });
     }
 
     // Handle role change
