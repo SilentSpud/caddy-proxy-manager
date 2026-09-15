@@ -138,16 +138,19 @@ test.describe('Settings - sidebar navigation', () => {
   test('only one section is visible at a time', async ({ page }) => {
     await page.goto('/settings/general');
 
-    // On General, the ACME section's save button must not be in the document at all.
-    await expect(page.getByRole('button', { name: /save general settings/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /save acme settings/i })).not.toBeVisible();
+    // On General, the ACME section must not be in the document at all. Every section's button now
+    // reads just "Save", so the section heading is what tells them apart.
+    await expect(page.getByRole('heading', { name: 'General', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'ACME Server', exact: true })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
 
     await page
       .locator(SETTINGS_SIDEBAR)
       .getByRole('link', { name: 'ACME Server', exact: true })
       .click();
-    await expect(page.getByRole('button', { name: /save acme settings/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /save general settings/i })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'ACME Server', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'General', exact: true })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
   });
 });
 
@@ -228,15 +231,15 @@ test.describe('Settings - General', () => {
     await goToSection(page, 'General');
     await expect(page.locator('input[name="defaultDomain"]')).toBeVisible();
     await expect(page.locator('input[name="acmeEmail"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save general settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('fill primary domain and save', async ({ page }) => {
     await goToSection(page, 'General');
     const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('test.local');
-    await page.getByRole('button', { name: /save general settings/i }).click();
-    await expect(page.getByRole('button', { name: /save general settings/i })).toBeEnabled({
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled({
       timeout: 10_000,
     });
   });
@@ -245,7 +248,7 @@ test.describe('Settings - General', () => {
     await goToSection(page, 'General');
     const domainInput = page.locator('input[name="defaultDomain"]');
     await domainInput.fill('persist-test.local');
-    await page.getByRole('button', { name: /save general settings/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
 
     // Reload and navigate back
@@ -254,7 +257,7 @@ test.describe('Settings - General', () => {
 
     // Reset
     await page.locator('input[name="defaultDomain"]').fill('caddyproxymanager.com');
-    await page.getByRole('button', { name: /save general settings/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
   });
 
@@ -268,7 +271,7 @@ test.describe('Settings - General', () => {
     // the database and would hide exactly this.
     await goToSection(page, 'General');
     const domain = page.locator('input[name="defaultDomain"]');
-    const save = page.getByRole('button', { name: /save general settings/i });
+    const save = page.getByRole('button', { name: 'Save', exact: true });
     const original = await domain.inputValue();
 
     await domain.fill('reset-check.local');
@@ -309,7 +312,7 @@ test.describe('Settings - Default Response', () => {
     await expect(page.locator('input[name="status"]')).toHaveValue('404');
     await expect(page.locator('textarea[name="body"]')).toBeVisible();
     await expect(page.locator('textarea[name="headers"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save default response/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('saves and reloads a custom response through the settings form', async ({ page }) => {
@@ -322,7 +325,7 @@ test.describe('Settings - Default Response', () => {
     await page
       .locator('textarea[name="headers"]')
       .fill('Content-Type: text/plain; charset=utf-8\nX-Cpm-Ui: saved');
-    await page.getByRole('button', { name: /save default response/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Staged. Review and apply to send it to Caddy.')).toBeVisible({
       timeout: 10_000,
     });
@@ -340,7 +343,7 @@ test.describe('Settings - Default Response', () => {
 
     await behavior.click();
     await page.getByRole('option', { name: 'Caddy native behavior' }).click();
-    await page.getByRole('button', { name: /save default response/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Staged. Review and apply to send it to Caddy.')).toBeVisible({
       timeout: 10_000,
     });
@@ -367,13 +370,13 @@ test.describe('Settings - ACME Server', () => {
     await goToSection(page, 'ACME Server');
     await expect(page.locator('input[name="caUrl"]')).toBeVisible();
     await expect(page.locator('textarea[name="caRootPem"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save acme settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('saves a custom directory URL and persists it', async ({ page }) => {
     await goToSection(page, 'ACME Server');
     await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
-    await page.getByRole('button', { name: /save acme settings/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
 
     await goToSection(page, 'ACME Server');
@@ -383,14 +386,14 @@ test.describe('Settings - ACME Server', () => {
   test('rejects a non-HTTPS directory URL', async ({ page }) => {
     await goToSection(page, 'ACME Server');
     await page.locator('input[name="caUrl"]').fill('http://ca.internal.example.com/directory');
-    await page.getByRole('button', { name: /save acme settings/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText(/must use HTTPS/i)).toBeVisible({ timeout: 10_000 });
   });
 
   test('UI save is reflected in the REST API once applied', async ({ page }) => {
     await goToSection(page, 'ACME Server');
     await page.locator('input[name="caUrl"]').fill(CUSTOM_DIR);
-    await page.getByRole('button', { name: /save acme settings/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
 
     // Staged, so the API still reports the applied value - which is the point of staging.
@@ -450,7 +453,7 @@ test.describe('Settings - DNS Resolvers', () => {
     await expect(page.getByLabel('Enable custom DNS resolvers')).toBeVisible();
     await expect(page.locator('textarea[name="resolvers"]')).toBeVisible();
     await expect(page.locator('textarea[name="fallbacks"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save dns settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('timeout field is visible', async ({ page }) => {
@@ -466,7 +469,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
     await goToSection(page, 'Upstream DNS Pinning');
     await expect(page.getByRole('heading', { name: 'Upstream DNS Pinning' })).toBeVisible();
     await expect(page.getByLabel('Enable upstream DNS pinning')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save upstream dns/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('address family selector shows three options', async ({ page }) => {
@@ -486,7 +489,7 @@ test.describe('Settings - Upstream DNS Pinning', () => {
     // save in the mounted state resets to the same value and hides the bug entirely.
     await goToSection(page, 'Upstream DNS Pinning');
     const toggle = page.getByLabel('Enable upstream DNS pinning');
-    const save = page.getByRole('button', { name: /save upstream dns/i });
+    const save = page.getByRole('button', { name: 'Save', exact: true });
 
     const initial = await toggle.isChecked();
     await toggle.click();
@@ -516,7 +519,7 @@ test.describe('Settings - Authentik Defaults', () => {
     await expect(page.locator('input[name="outpostDomain"]')).toBeVisible();
     await expect(page.locator('input[name="outpostUpstream"]')).toBeVisible();
     await expect(page.locator('input[name="authEndpoint"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save authentik/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('fields have appropriate placeholders', async ({ page }) => {
@@ -654,7 +657,7 @@ test.describe('Settings - Global Geoblocking', () => {
   test('section renders with save button', async ({ page }) => {
     await goToSection(page, 'Global Geoblocking');
     await expect(page.getByRole('heading', { name: 'Global Geoblocking' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /save geoblocking/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 });
 
@@ -666,7 +669,7 @@ test.describe('Settings - Metrics & Monitoring', () => {
     await expect(page.getByRole('heading', { name: 'Metrics & Monitoring' })).toBeVisible();
     await expect(page.getByLabel('Enable metrics endpoint')).toBeVisible();
     await expect(page.locator('input[name="port"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save metrics/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('port field has default value 9090', async ({ page }) => {
@@ -687,7 +690,7 @@ test.describe('Settings - Access Logging', () => {
     await goToSection(page, 'Access Logging');
     await expect(page.getByRole('heading', { name: 'Access Logging' })).toBeVisible();
     await expect(page.getByLabel('Enable access logging')).toBeVisible();
-    await expect(page.getByRole('button', { name: /save logging/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('format selector has JSON and Console options', async ({ page }) => {
@@ -837,7 +840,7 @@ test.describe('Settings - form data round-trip via API', () => {
   test('general settings: UI save is reflected in API', async ({ page }) => {
     await goToSection(page, 'General');
     await page.locator('input[name="defaultDomain"]').fill('api-roundtrip.local');
-    await page.getByRole('button', { name: /save general settings/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
@@ -859,7 +862,7 @@ test.describe('Settings - form data round-trip via API', () => {
       await enableCheckbox.click();
     }
     await page.locator('input[name="port"]').fill('9191');
-    await page.getByRole('button', { name: /save metrics/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 
@@ -885,7 +888,7 @@ test.describe('Settings - form data round-trip via API', () => {
     // Change format to console
     await page.getByRole('combobox', { name: 'Format' }).click();
     await page.getByRole('option', { name: /console/i }).click();
-    await page.getByRole('button', { name: /save logging/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page, 10_000);
     await applyStagedChanges(page);
 

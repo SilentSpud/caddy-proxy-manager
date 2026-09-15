@@ -22,6 +22,7 @@ import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useFormatter, useTranslations } from "next-intl";
+import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
@@ -261,7 +262,7 @@ function Tile({
   return (
     <SelectableCard label={label} isSelected={isSelected} onChange={onSelect} padding={4}>
       <VStack gap={1}>
-        <Text type="body" size="sm" weight="semibold" color="secondary" maxLines={1}>
+        <Text type="body" weight="semibold" maxLines={1} style={CARD_TITLE_STYLE}>
           {label}
         </Text>
         <Text type="large" weight="semibold" hasTabularNumbers>
@@ -495,7 +496,9 @@ export default function OverviewClient({
         // One column for "what happened": an HTTP status, or the kind of change.
         key: "what",
         header: t("logStatus"),
-        width: pixel(104),
+        // A share of the spare width rather than a fixed one: audit actions run as long as
+        // `forward_auth_access_denied`, which any width that suits an HTTP status cuts off.
+        width: proportional(1),
         renderCell: (row) =>
           row.kind === "traffic" ? (
             <HStack gap={1} vAlign="center">
@@ -512,7 +515,7 @@ export default function OverviewClient({
       {
         key: "detail",
         header: t("logDetail"),
-        width: proportional(1),
+        width: proportional(3),
         renderCell: (row) =>
           row.kind === "traffic" ? (
             <VStack gap={0}>
@@ -671,7 +674,7 @@ export default function OverviewClient({
                     </Text>
                   )}
                 </HStack>
-                <Text type="body" size="sm" color="secondary">
+                <Text type="body" style={CARD_TITLE_STYLE}>
                   {stat.label}
                 </Text>
               </VStack>
@@ -745,9 +748,9 @@ export default function OverviewClient({
               isCompact
             />
           ) : (
-            // Table brings its own scroll wrapper, and its two fixed columns and truncating
-            // third come to a 320px minimum, so it fits any card it can be read in. Wrapping
-            // it again in an overflow-x box only added a second scroller - and one axis set
+            // Table brings its own scroll wrapper, and its fixed column plus two proportional ones
+            // (120px floor each) come to a 356px minimum, so it fits any card it can be read in.
+            // Wrapping it again in an overflow-x box only added a second scroller - and one axis set
             // to `auto` turns the other from `visible` into `auto` too, which is where the
             // stray vertical scrollbar came from.
             <Table data={logRows} columns={logColumns} idKey="id" />

@@ -26,11 +26,29 @@ import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
 import { formatAppVersion } from "@/src/lib/app-version";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import {
+  type Destination,
   type DestinationId,
   moreDestinations,
+  RAIL_GROUPS,
+  type RailGroup,
   resolveDrawer,
   visibleDestinations,
 } from "@/src/lib/nav/destinations";
+
+const RAIL_GROUP_LABELS: Record<
+  RailGroup,
+  | "railGroupHosts"
+  | "railGroupAccess"
+  | "railGroupSecurity"
+  | "railGroupObservability"
+  | "railGroupSystem"
+> = {
+  hosts: "railGroupHosts",
+  access: "railGroupAccess",
+  security: "railGroupSecurity",
+  observability: "railGroupObservability",
+  system: "railGroupSystem",
+};
 
 type User = {
   id: string;
@@ -144,6 +162,22 @@ export default function DashboardLayoutClient({
   const railItems = visibleDestinations(user.role).filter((d) => d.id !== "profile");
   const drawerItems = resolveDrawer(morePins, user.role);
 
+  // An element rather than the component, as the Settings rail passes it: SideNavItem draws a
+  // component at its small size, and the two rails read as different apps side by side.
+  const renderRailItem = ({ id, href, labelKey }: Destination) => {
+    const RailIcon = DESTINATION_ICONS[id];
+    return (
+      <SideNavItem
+        key={href}
+        as={Link}
+        href={href}
+        label={t(labelKey)}
+        icon={<RailIcon />}
+        isSelected={pathname === href}
+      />
+    );
+  };
+
   const closeMore = useCallback(() => setMoreOpenOn(null), []);
   const toggleMore = useCallback(
     () => setMoreOpenOn((openOn) => (openOn === pathname ? null : pathname)),
@@ -242,18 +276,20 @@ export default function DashboardLayoutClient({
             }
             footer={<UserFooter user={user} avatar={avatar} />}
           >
+            {/* Laid out like the Settings rail: ungrouped pages first under a hidden title, then one
+                titled section per group, each skipped when this role can open nothing in it. */}
             <SideNavSection title={t("sectionLabel")} isHeaderHidden>
-              {railItems.map(({ id, href, labelKey }) => (
-                <SideNavItem
-                  key={href}
-                  as={Link}
-                  href={href}
-                  label={t(labelKey)}
-                  icon={DESTINATION_ICONS[id]}
-                  isSelected={pathname === href}
-                />
-              ))}
+              {railItems.filter((d) => !d.railGroup).map(renderRailItem)}
             </SideNavSection>
+            {RAIL_GROUPS.map((group) => {
+              const items = railItems.filter((d) => d.railGroup === group);
+              if (items.length === 0) return null;
+              return (
+                <SideNavSection key={group} title={t(RAIL_GROUP_LABELS[group])}>
+                  {items.map(renderRailItem)}
+                </SideNavSection>
+              );
+            })}
           </SideNav>
         }
       >

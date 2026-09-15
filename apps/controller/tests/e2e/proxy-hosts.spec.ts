@@ -268,7 +268,7 @@ test.describe('Proxy Hosts', () => {
       await page.locator('input[name="outpostDomain"]').fill(defaultSettings.outpostDomain);
       await page.locator('input[name="outpostUpstream"]').fill(defaultSettings.outpostUpstream);
       await page.locator('input[name="authEndpoint"]').fill(defaultSettings.authEndpoint);
-      await page.getByRole('button', { name: /save authentik defaults/i }).click();
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
       // Settings saves stage rather than write through, and the host form prefills from the applied
       // defaults - so the change has to be applied before the dialog can reflect it.
       await expectStaged(page);

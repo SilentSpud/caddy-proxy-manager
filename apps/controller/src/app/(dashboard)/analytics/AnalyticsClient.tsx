@@ -40,6 +40,7 @@ import { OptionSheet } from "@/src/components/mobile/OptionSheet";
 import { useChartTheme } from "./chart-theme";
 import { useFormatter, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { CountryBreakdown } from "./CountryBreakdown";
 import type { MapMetric } from "./WorldMapInner";
 
@@ -263,7 +264,7 @@ function StatCard({
   return (
     <Card padding={5} height="100%">
       <VStack gap={1}>
-        <Text type="label" size="xsm" color="secondary">
+        <Text type="body" style={CARD_TITLE_STYLE}>
           {label}
         </Text>
         <Text type="display-3" hasTabularNumbers>
@@ -993,7 +994,7 @@ export default function AnalyticsClient() {
             <Card padding={4}>
               <VStack gap={3}>
                 <VStack gap={0}>
-                  <Text type="label" size="xsm" color="secondary">
+                  <Text type="body" style={CARD_TITLE_STYLE}>
                     {t("totalRequests")}
                   </Text>
                   <Text type="display-3" hasTabularNumbers>

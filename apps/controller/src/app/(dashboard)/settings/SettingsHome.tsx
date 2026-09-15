@@ -16,6 +16,7 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
+import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import type { SectionHealth } from "@/src/lib/settings/health";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import SettingsFrame from "./SettingsFrame";
@@ -163,7 +164,7 @@ function SectionTile({ section }: { section: SectionHealth }) {
       <Card padding={3} height="100%">
         <VStack gap={2}>
           <HStack gap={2} vAlign="center">
-            <Text type="label" style={{ flexGrow: 1, minWidth: 0 }}>
+            <Text type="body" style={{ ...CARD_TITLE_STYLE, flexGrow: 1, minWidth: 0 }}>
               {section.name}
             </Text>
             {section.staged && <Badge variant="warning" label={t("homeStagedBadge")} />}

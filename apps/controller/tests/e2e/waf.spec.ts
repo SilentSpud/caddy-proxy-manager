@@ -93,7 +93,7 @@ test.describe('WAF', () => {
     await page.goto('/waf');
     // Save button is on the Settings tab
     await page.getByRole('button', { name: /settings/i }).click();
-    await expect(page.getByRole('button', { name: /save waf settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('WAF page has tabs', async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe('WAF', () => {
   test('WAF settings toggle persists after save and navigation', async ({ page }) => {
     await page.goto('/waf');
     await page.getByRole('button', { name: /settings/i }).click();
-    await expect(page.getByRole('button', { name: /save waf settings/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
     // These were addressed by hand-written DOM ids that the astryx controls do
     // not emit; both expose a proper role and label, and their checked state is
@@ -128,7 +128,7 @@ test.describe('WAF', () => {
 
     // The button never disables while the action runs, so waiting for it to be
     // enabled returned before the edit was staged and the reload read the old values.
-    await page.getByRole('button', { name: /save waf settings/i }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expectStaged(page);
 
     // Navigate away and back to verify persistence

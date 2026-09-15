@@ -437,7 +437,7 @@ function GeneralSection({
             value={acmeEmail}
             onChange={setAcmeEmail}
           />
-          <SaveButton label={t("saveGeneralSettings")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -587,7 +587,7 @@ function DefaultResponseSection({
               <WarnAlert title={t("abortResponseTitle")}>{t("abortResponseDescription")}</WarnAlert>
             )}
 
-            <SaveButton label={t("saveDefaultResponse")} />
+            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -639,7 +639,7 @@ function AcmeSection({
             placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
             rows={6}
           />
-          <SaveButton label={t("saveAcmeSettings")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -912,7 +912,7 @@ function DnsResolversSection({
               placeholder="5s"
               width={160}
             />
-            <SaveButton label={t("saveDnsSettings")} />
+            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -969,7 +969,7 @@ function UpstreamDnsSection({
               onChange={setFamily}
               width={280}
             />
-            <SaveButton label={t("saveUpstreamDnsPinning")} />
+            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -1106,11 +1106,11 @@ function DashboardHostSection({
                   variant="primary"
                   type="button"
                   onClick={() => setConfirmDisable(true)}
-                  label={t("saveDashboardHost")}
+                  label={t("save")}
                 />
               </HStack>
             ) : (
-              <SaveButton label={t("saveDashboardHost")} />
+              <SaveButton />
             )}
           </VStack>
         </form>
@@ -1227,7 +1227,7 @@ function TrustedProxiesSection({
               value={defaultGeoblock}
               onChange={setDefaultGeoblock}
             />
-            <SaveButton label={t("saveTrustedProxiesSettings")} />
+            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -1249,7 +1249,6 @@ function GeoBlockSection({
   geoBlockState: { success: boolean; message?: string } | null;
   geoBlockFormAction: (payload: FormData) => void;
 }) {
-  const t = useTranslations("settings");
   return (
     <FormCard>
       <form action={geoBlockFormAction}>
@@ -1261,7 +1260,7 @@ function GeoBlockSection({
             initialValues={{ geoblock: globalGeoBlock ?? null, geoblock_mode: "merge" }}
             showModeSelector={false}
           />
-          <SaveButton label={t("saveGeoblockingSettings")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1291,7 +1290,7 @@ function ErrorPagesSection({
             {t("globalErrorPagesHelp")}
           </Text>
           <ErrorPagesFields initialData={globalErrorPages?.rules ?? []} />
-          <SaveButton label={t("saveErrorPages")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1446,7 +1445,7 @@ function TailscaleSection({
               })}
             </WarnAlert>
           )}
-          <SaveButton label={t("saveTailscaleSettings")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1502,7 +1501,7 @@ function AuthentikSection({
             onChange={setAuthEndpoint}
             placeholder="/outpost.goauthentik.io/auth/caddy"
           />
-          <SaveButton label={t("saveAuthentikDefaults")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -1576,7 +1575,7 @@ function PasswordPolicySection({
             onChange={setRequireChange}
             isDisabled={passwordPolicy.fromEnv}
           />
-          <SaveButton label={t("savePasswordPolicy")} isDisabled={passwordPolicy.fromEnv} />
+          <SaveButton isDisabled={passwordPolicy.fromEnv} />
         </VStack>
       </form>
     </FormCard>
@@ -1617,7 +1616,7 @@ function AvatarsSection({
             onChange={setGravatarEnabled}
             isDisabled={avatars.fromEnv}
           />
-          <SaveButton label={t("saveAvatarSettings")} isDisabled={avatars.fromEnv} />
+          <SaveButton isDisabled={avatars.fromEnv} />
         </VStack>
       </form>
     </FormCard>
@@ -1730,7 +1729,13 @@ function BrandingSection({
                 label={t("removeFavicon")}
               />
             )}
-            <Button type="submit" size="sm" label={t("saveFavicon")} isDisabled={!preview} />
+            <Button
+              type="submit"
+              // Pink once a file is chosen, like every other save with something waiting to be saved.
+              variant={preview ? "primary" : "secondary"}
+              label={t("save")}
+              isDisabled={!preview}
+            />
           </HStack>
         </VStack>
       </form>
@@ -1840,7 +1845,7 @@ function UpdatesSection({
                 }
               }}
             />
-            <SaveButton label={t("saveUpdateSettings")} />
+            <SaveButton />
           </HStack>
         </VStack>
       </form>
@@ -1966,7 +1971,7 @@ function AnalyticsSection({
             min={1}
             max={3650}
           />
-          <SaveButton label={t("saveAnalyticsSettings")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -2111,7 +2116,7 @@ function GeoipSection({
             min={1}
             max={168}
           />
-          <SaveButton label={t("saveGeoipSettings")} />
+          <SaveButton />
         </VStack>
       </form>
     </FormCard>
@@ -2371,7 +2376,6 @@ function CaddyBuildSection({
   agents?: { id: number; name: string; connected: boolean }[];
   agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
 }) {
-  const t = useTranslations("settings");
   return (
     <form action={caddyBuildFormAction}>
       <VStack gap={4}>
@@ -2387,7 +2391,7 @@ function CaddyBuildSection({
           agents={agents ?? []}
           agentSelections={agentBuildSelections ?? {}}
         />
-        <SaveButton label={t("saveModuleSelection")} />
+        <SaveButton />
       </VStack>
     </form>
   );
@@ -2434,7 +2438,7 @@ function MetricsSection({
               max={65535}
               width={160}
             />
-            <SaveButton label={t("saveMetricsSettings")} />
+            <SaveButton />
           </VStack>
         </form>
       </FormCard>
@@ -2487,7 +2491,7 @@ function LoggingSection({
               onChange={setFormat}
               width={280}
             />
-            <SaveButton label={t("saveLoggingSettings")} />
+            <SaveButton />
           </VStack>
         </form>
       </FormCard>

@@ -9,6 +9,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   DESTINATIONS,
   MORE_DRAWER_SLOTS,
+  RAIL_GROUPS,
   isDestinationId,
   moreDestinations,
   resolveDrawer,
@@ -85,6 +86,19 @@ describe('resolveDrawer', () => {
   it('treats an empty saved choice as a real, empty drawer rather than the defaults', () => {
     // Null means "never chose"; an empty list means "chose nothing", and only All pages remains.
     expect(resolveDrawer([], 'admin')).toEqual([]);
+  });
+});
+
+describe('rail groups', () => {
+  it('titles every rail page but Overview, which sits above the sections', () => {
+    const ungrouped = ids(DESTINATIONS.filter((d) => d.id !== 'profile' && !d.railGroup));
+    expect(ungrouped).toEqual(['overview']);
+  });
+
+  it('only uses the groups the rail renders', () => {
+    for (const d of DESTINATIONS) {
+      if (d.railGroup) expect(RAIL_GROUPS, d.id).toContain(d.railGroup);
+    }
   });
 });
 

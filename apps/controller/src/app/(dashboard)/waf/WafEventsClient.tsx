@@ -9,7 +9,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Check, Copy, MoreHorizontal, Search, ShieldOff, Trash2, X } from "lucide-react";
@@ -29,6 +29,7 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Field } from "@astryxdesign/core/Field";
 import { Switch } from "@astryxdesign/core/Switch";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
@@ -54,6 +55,8 @@ import type { WafSettings } from "@/lib/settings";
 import { withRowIds } from "@/lib/row-id";
 import { useTimeZone, useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
+import { SaveButton } from "@/components/ui/FormLayout";
 import {
   suppressWafRuleGloballyAction,
   suppressWafRuleForHostAction,
@@ -236,7 +239,7 @@ function StatsBar({ stats }: { stats: WafEventStats }) {
             <Text type="display-3" color={color} hasTabularNumbers>
               {value}
             </Text>
-            <Text type="body" size="xsm" weight="medium" color="secondary">
+            <Text type="body" weight="medium" style={CARD_TITLE_STYLE}>
               {label}
             </Text>
           </VStack>
@@ -1017,10 +1020,17 @@ export default function WafEventsClient({
     { value: "custom", label: t("rangeCustom") },
   ];
 
+  const limitActionId = useId();
+  // Each option says what it does, shown for the one selected: a single line covering all three
+  // left "Default" unexplained.
   const bodyLimitActions = [
-    { value: "", label: t("bodyLimitActionDefault") },
-    { value: "Reject", label: t("bodyLimitActionReject") },
-    { value: "ProcessPartial", label: t("bodyLimitActionPartial") },
+    { value: "", label: t("bodyLimitActionDefault"), help: t("overLimitActionHelpDefault") },
+    { value: "Reject", label: t("bodyLimitActionReject"), help: t("overLimitActionHelpReject") },
+    {
+      value: "ProcessPartial",
+      label: t("bodyLimitActionPartial"),
+      help: t("overLimitActionHelpPartial"),
+    },
   ];
 
   useEffect(() => {
@@ -1440,7 +1450,7 @@ export default function WafEventsClient({
       )}
 
       {tab === "settings" && (
-        <VStack gap={6} maxWidth={720}>
+        <VStack gap={6}>
           <VStack gap={1}>
             <Heading level={2}>{t("wafSettings")}</Heading>
             <Text type="body" size="sm" color="secondary">
@@ -1506,19 +1516,24 @@ export default function WafEventsClient({
                 />
               </HStack>
               <input type="hidden" name="wafRequestBodyLimitAction" value={wafLimitAction} />
-              <SegmentedControl
+              {/* SegmentedControl's own label is only an aria-label; Field draws the visible one. */}
+              <Field
                 label={t("overLimitAction")}
-                size="sm"
-                value={wafLimitAction}
-                onChange={setWafLimitAction}
+                inputID={limitActionId}
+                isGroupLabel
+                description={bodyLimitActions.find((o) => o.value === wafLimitAction)?.help}
               >
-                {bodyLimitActions.map((o) => (
-                  <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
-                ))}
-              </SegmentedControl>
-              <Text type="body" size="xsm" color="secondary">
-                {t("wafOverLimitActionHelp")}
-              </Text>
+                <SegmentedControl
+                  label={t("overLimitAction")}
+                  size="sm"
+                  value={wafLimitAction}
+                  onChange={setWafLimitAction}
+                >
+                  {bodyLimitActions.map((o) => (
+                    <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+                  ))}
+                </SegmentedControl>
+              </Field>
               <CodeEditor
                 label={t("customSeclangDirectives")}
                 language="seclang"
@@ -1541,7 +1556,7 @@ export default function WafEventsClient({
                   </Text>
                 }
               >
-                <VStack gap={2}>
+                <HStack gap={2} wrap="wrap">
                   {WAF_TEMPLATES.map((template) => (
                     <Button
                       key={template.labelKey}
@@ -1557,12 +1572,10 @@ export default function WafEventsClient({
                       }
                     />
                   ))}
-                </VStack>
+                </HStack>
               </Collapsible>
               <Banner status="info" title={t("exclusionsTabHelp")} />
-              <HStack justify="end">
-                <Button type="submit" label={t("saveWafSettings")} />
-              </HStack>
+              <SaveButton label={t("save")} />
             </VStack>
           </form>
         </VStack>
