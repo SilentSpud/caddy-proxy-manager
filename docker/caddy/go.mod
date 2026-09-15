@@ -20,6 +20,7 @@ require (
 	github.com/caddy-dns/njalla v1.0.0
 	github.com/caddy-dns/ovh v1.1.0
 	github.com/caddy-dns/porkbun v0.3.1
+	github.com/caddy-dns/rfc2136 v1.0.0
 	github.com/caddy-dns/route53 v1.6.2
 	github.com/caddy-dns/spaceship v1.0.0
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
@@ -136,6 +137,7 @@ require (
 	github.com/libdns/njalla v1.0.0 // indirect
 	github.com/libdns/ovh v1.1.0 // indirect
 	github.com/libdns/porkbun v1.0.1 // indirect
+	github.com/libdns/rfc2136 v1.0.0 // indirect
 	github.com/libdns/route53 v1.6.2 // indirect
 	github.com/libdns/spaceship v1.0.0 // indirect
 	github.com/libdns/vultr/v2 v2.0.4 // indirect

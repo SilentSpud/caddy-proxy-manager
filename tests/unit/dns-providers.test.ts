@@ -410,6 +410,55 @@ describe("DNS provider registry", () => {
     });
   });
 
+  it("registers RFC2136 with the Caddy module path and TSIG credential fields", () => {
+    const provider = getProviderDefinition("rfc2136");
+
+    expect(provider).toMatchObject({
+      name: "rfc2136",
+      displayName: "RFC2136 (BIND / TSIG)",
+      docsUrl: "https://github.com/caddy-dns/rfc2136",
+      modulePath: "github.com/caddy-dns/rfc2136",
+    });
+    expect(provider?.fields).toEqual([
+      { key: "key_name", label: "TSIG Key Name", type: "string", required: true, placeholder: "my-transfer-key", description: "Name of the TSIG key as defined on the DNS server (miND/domain form accepted)." },
+      { key: "key_alg", label: "TSIG Algorithm", type: "string", required: true, placeholder: "hmac-sha256", description: "HMAC algorithm of the TSIG key, e.g. hmac-sha256, hmac-sha512, or hmac-md5." },
+      { key: "key", label: "TSIG Key Secret", type: "password", required: true, placeholder: "base64 secret", description: "The base64-encoded TSIG shared secret (from the key statement or `tsig-keygen`)." },
+      { key: "server", label: "DNS Server", type: "string", required: true, placeholder: "1.2.3.4:53", description: "Authoritative DNS server address that accepts RFC 2136 dynamic updates (host:port)." },
+      ...challengeOptionFields(),
+    ]);
+    expect(DNS_PROVIDERS.map((p) => p.name)).toContain("rfc2136");
+  });
+
+  it("encrypts, decrypts, and emits RFC2136 credentials for Caddy DNS challenges", () => {
+    const encrypted = encryptProviderCredentials("rfc2136", {
+      key_name: "transfer-key",
+      key_alg: "hmac-sha256",
+      key: "cWnu6Ju9zOki4f7Q+da2KKGo0KOXbCf6Pej6hW3geC4=",
+      server: "1.2.3.4:53",
+    });
+
+    expect(isEncryptedSecret(encrypted.key)).toBe(true);
+    expect(isEncryptedSecret(encrypted.key_name)).toBe(false);
+    expect(isEncryptedSecret(encrypted.key_alg)).toBe(false);
+    expect(isEncryptedSecret(encrypted.server)).toBe(false);
+    expect(decryptProviderCredentials("rfc2136", encrypted)).toEqual({
+      key_name: "transfer-key",
+      key_alg: "hmac-sha256",
+      key: "cWnu6Ju9zOki4f7Q+da2KKGo0KOXbCf6Pej6hW3geC4=",
+      server: "1.2.3.4:53",
+    });
+    expect(buildDnsChallengeConfig("rfc2136", encrypted, ["1.1.1.1"])).toEqual({
+      provider: {
+        name: "rfc2136",
+        key_name: "transfer-key",
+        key_alg: "hmac-sha256",
+        key: "cWnu6Ju9zOki4f7Q+da2KKGo0KOXbCf6Pej6hW3geC4=",
+        server: "1.2.3.4:53",
+      },
+      resolvers: ["1.1.1.1"],
+    });
+  });
+
   it("applies netcup propagation defaults and keeps them out of the provider module config", () => {
     const challenge = buildDnsChallengeConfig(
       "netcup",
