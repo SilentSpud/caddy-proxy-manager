@@ -89,12 +89,12 @@ beforeEach(() => {
 });
 
 describe('mapOAuthProvider - group mapping hooks', () => {
-  it('attaches no claim hooks for a provider that does not use groups', () => {
+  it('attaches no claim hooks for a provider that does not use groups', async () => {
     const cfg = mapOAuthProvider(provider());
     expect(cfg.getUserInfo).toBeUndefined();
     // mapProfileToUser is always present - it reports emailVerified for the auto-link gate - so
     // what matters here is that it derives nothing from the group claim.
-    expect(cfg.mapProfileToUser?.({ groups: ['CPM_Admin'] } as never)).toEqual({
+    expect(await cfg.mapProfileToUser?.({ groups: ['CPM_Admin'] } as never)).toEqual({
       emailVerified: false,
     });
   });

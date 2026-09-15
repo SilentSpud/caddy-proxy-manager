@@ -20,7 +20,7 @@ import {
 import { fetchOidcClaims, toOAuthUserInfo } from "./oidc-claims";
 import { recordPendingOidcSync, reconcileOidcUserAfterSignIn } from "./services/oidc-group-sync";
 import { bindSessionToIdpSession, recordSessionBindingFromIdToken } from "./services/oidc-logout";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getOAuthState } from "better-auth/api";
 import { hashPassword, verifyPassword } from "./password";
 import { MIN_PASSWORD_LENGTH } from "./password-policy";
 import { SIGN_UP_EMAIL_PATH, signUpPasswordError } from "./auth-signup-policy";
@@ -41,14 +41,35 @@ function profileEmailVerified(profile: Record<string, unknown>): boolean {
   return claim === true || claim === "true";
 }
 
+/**
+ * Whether this OAuth callback finishes an explicit link: a signed-in user pressed "Link" on their
+ * profile. better-auth parses the flow's state before it asks the provider for the profile, and
+ * only `/link-social` puts `link` into that state. Outside a request there is no state to read.
+ */
+async function isExplicitLinkCallback(): Promise<boolean> {
+  try {
+    return Boolean((await getOAuthState())?.link);
+  } catch {
+    return false;
+  }
+}
+
 export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
-  // Ownership of an existing CPM account is asserted by the operator through the provider's
-  // auto-link switch, never by the IdP alone. Reporting the claim only for auto-link providers
-  // keeps a provider that merely returns `email_verified: true` from attaching itself to a local
-  // account. Every mapProfileToUser below must report it - better-auth otherwise falls back to
-  // the raw profile's own emailVerified, which is exactly the ungated claim.
-  const mapEmailVerified = (profile: Record<string, unknown>) => ({
-    emailVerified: p.autoLink === true && profileEmailVerified(profile),
+  // Two different questions reach better-auth's one "is this provider trusted" gate:
+  //
+  // - A sign-in claiming the CPM account with the same email. Ownership is asserted by the
+  //   operator through the provider's auto-link switch, never by the IdP alone - reporting the
+  //   claim only for auto-link providers keeps a provider that merely returns
+  //   `email_verified: true` from attaching itself to someone's local account.
+  // - An explicit link from the profile page. The session already proves who owns the CPM
+  //   account and the provider login proves the identity, so no email trust is involved, and
+  //   gating it on auto-link made manual linking impossible exactly where it is the only option.
+  //
+  // Every mapProfileToUser below must report this - better-auth otherwise falls back to the raw
+  // profile's own emailVerified, which is exactly the ungated claim.
+  const mapEmailVerified = async (profile: Record<string, unknown>) => ({
+    emailVerified:
+      (await isExplicitLinkCallback()) || (p.autoLink === true && profileEmailVerified(profile)),
   });
 
   const cfg: GenericOAuthConfig = {
@@ -271,6 +292,9 @@ async function createAuth(baseURL: string): Promise<any> {
         // emailVerified is never set and the default gate would refuse every
         // link. The per-provider trust decision above is the ownership signal.
         requireLocalEmailVerified: false,
+        // Read only by explicit linking, where the session proves the account's owner. Without
+        // it the administrator setup creates - `name@localhost` - could never link any provider.
+        allowDifferentEmails: true,
       },
     },
     verification: { modelName: "verifications" },

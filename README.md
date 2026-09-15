@@ -1413,12 +1413,12 @@ Failures answer `400` with an `error_description` naming the check that failed. 
 
 **Account linking:**
 
-Attaching an OAuth identity to an existing CPM user requires **Auto-link accounts** to be enabled for that provider (**Settings → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers). The switch marks the provider as trusted to prove that its identity owns the CPM account carrying the same email address, so leave it off for any IdP where users can register an arbitrary email themselves.
+A signed-in user can always attach an OAuth identity to their own account from **Profile → OAuth Connections**, whatever the provider's settings. Their session proves who owns the CPM account and the provider login proves the identity, so the provider's email does not have to match - which is what lets the administrator setup creates (`name@localhost`) link one at all.
 
-With it enabled:
+**Auto-link accounts** (**Settings → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers) governs only what happens when someone *signs in* through the provider and a CPM user already has the same email address:
 
-- Signing in through the provider links the identity to the existing user with the matching email.
-- **Profile → OAuth Connections** can link the provider to the signed-in account. The provider's email must match the signed-in user's email.
+- **On:** the sign-in links the identity to that existing user. The switch marks the provider as trusted to prove its identity owns the CPM account carrying that email, so leave it off for any IdP where users can register an arbitrary email themselves.
+- **Off:** the sign-in is refused, and the user links the provider from their profile instead.
 
 With it disabled, both paths are refused and the provider redirects to `/api/auth/error?error=account_not_linked`.
 

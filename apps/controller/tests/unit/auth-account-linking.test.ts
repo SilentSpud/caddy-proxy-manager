@@ -97,6 +97,12 @@ vi.mock('better-auth/plugins', () => ({
   username: () => ({}),
 }));
 
+// The OAuth flow's state, as better-auth exposes it during a callback. Everything else in the
+// module stays real; only whether the flow is an explicit link is controlled here.
+const { getOAuthStateMock } = vi.hoisted(() => ({ getOAuthStateMock: vi.fn() }));
+const actualApi = await import('better-auth/api');
+vi.mock('better-auth/api', () => ({ ...actualApi, getOAuthState: getOAuthStateMock }));
+
 import { getAuth, mapOAuthProvider } from '../../src/lib/auth-server';
 import type { OAuthProvider } from '../../src/lib/models/oauth-providers';
 
@@ -167,6 +173,35 @@ describe('mapOAuthProvider - email_verified claim mapping', () => {
     expect(mapped.emailVerified).toBe(false);
   });
 
+  it('lets a signed-in user link a provider without auto-link from their profile', async () => {
+    // Explicit linking: the session proves who owns the account, the provider login proves the
+    // identity. Auto-link governs only a sign-in claiming an account by email.
+    getOAuthStateMock.mockResolvedValueOnce({ link: { userId: '1', email: 'admin@localhost' } });
+    const mapped = await mapProfile(
+      { ...baseProvider, autoLink: false },
+      { email: 'someone@idp.example' },
+    );
+    expect(mapped.emailVerified).toBe(true);
+  });
+
+  it('still refuses a sign-in claiming an account through a provider without auto-link', async () => {
+    getOAuthStateMock.mockResolvedValueOnce({ callbackURL: '/', link: undefined });
+    const mapped = await mapProfile(
+      { ...baseProvider, autoLink: false },
+      { email: 'victim@example.com', email_verified: true },
+    );
+    expect(mapped.emailVerified).toBe(false);
+  });
+
+  it('falls back to the auto-link rule when there is no OAuth request state', async () => {
+    getOAuthStateMock.mockRejectedValueOnce(new Error('No request state found'));
+    const mapped = await mapProfile(
+      { ...baseProvider, autoLink: false },
+      { email: 'victim@example.com', email_verified: true },
+    );
+    expect(mapped.emailVerified).toBe(false);
+  });
+
   it('leaves identity fields to Better Auth rather than overriding them', async () => {
     const mapped = await mapProfile(
       { ...baseProvider, autoLink: true },
@@ -200,5 +235,11 @@ describe('better-auth account.accountLinking (wired into the real config)', () =
 
   it('does not implicitly disable linking', () => {
     expect(options.account.accountLinking.disableImplicitLinking).toBeUndefined();
+  });
+
+  it('lets an explicit link use a provider email that differs from the account', () => {
+    // Only the explicit link paths read this. Setup's administrator is `name@localhost`, which
+    // no provider will ever return.
+    expect(options.account.accountLinking.allowDifferentEmails).toBe(true);
   });
 });
