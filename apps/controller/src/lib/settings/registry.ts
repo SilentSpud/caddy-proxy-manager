@@ -495,8 +495,8 @@ export const analyticsEnabled = optionalBooleanSetting({
   label: "Enable analytics",
   description:
     "Collect traffic and WAF events. With an agent running the stack, turning this on also starts " +
-    "the ClickHouse container - no Compose profile needed. Leave unset to decide from whether a " +
-    "password is configured below.",
+    "the ClickHouse container - no Compose profile needed. If left unset, analytics is on only " +
+    "when a password is configured below.",
 });
 
 export const clickhouseUrl = stringSetting({
@@ -580,9 +580,9 @@ export const geoipEnabled = optionalBooleanSetting({
   gate: true,
   label: "Enable GeoIP",
   description:
-    "Country lookups for analytics and geo blocking. With a MaxMind account ID and licence key, " +
-    "turning this on also has the controller download the databases. Leave unset to decide from " +
-    "whether the databases are already present.",
+    "Country lookups for analytics and geo blocking. If a MaxMind account ID and licence key are " +
+    "set, turning this on also makes the controller download the databases. If left unset, GeoIP " +
+    "is on only when the databases are already present.",
 });
 
 // The names say geoipupdate, the container that once read these. Kept: they are storage keys, and

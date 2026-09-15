@@ -1900,7 +1900,7 @@
     "registerNodesAsEphemeral": "Register nodes as ephemeral",
     "registry": {
       "analytics_enabled": {
-        "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. Leave unset to decide from whether a password is configured below.",
+        "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. If left unset, analytics is on only when a password is configured below.",
         "label": "Enable analytics"
       },
       "app_name": {
@@ -1984,7 +1984,7 @@
         "label": "Internal forward-auth address"
       },
       "geoip_enabled": {
-        "description": "Country lookups for analytics and geo blocking. With a MaxMind account ID and licence key, turning this on also has the controller download the databases. Leave unset to decide from whether the databases are already present.",
+        "description": "Country lookups for analytics and geo blocking. If a MaxMind account ID and licence key are set, turning this on also makes the controller download the databases. If left unset, GeoIP is on only when the databases are already present.",
         "label": "Enable GeoIP"
       },
       "geoip_update_interval_hours": {
@@ -2796,6 +2796,7 @@
     },
     "emptyDatabaseRequiredDescription": "This copies rows with their original identifiers, so it expects nothing to have been created here yet. Running it against a database that is already in use is not supported.",
     "emptyDatabaseRequiredTitle": "Migrate into an empty database",
+    "envBadgeLegend": "Purple badges are the environment variable each setting can also be set by.",
     "environmentCleanupEmptyDescription": "Nothing to remove - none of the settings you migrated were configured by an environment variable.",
     "environmentCleanupTitle": "Tidy up your .env",
     "errors": {
@@ -2827,6 +2828,8 @@
     "identityProvider": "Identity provider",
     "identityProviderDescription": "Sign in through an OIDC provider, as well as or instead of local accounts. Leave these blank to skip - one can be added from Settings at any time.",
     "identityProviderOptional": "Identity provider (optional)",
+    "importedBadgeLegend": "Blue badges mark values imported from environment variables that are already set.",
+    "importedFromEnvironment": "Imported from env",
     "issuerUrl": "Issuer URL",
     "issuerUrlHelp": "The provider's OIDC issuer. Its endpoints are discovered from here.",
     "legacyDatabaseBackupTitle": "Keep a copy of the old database",

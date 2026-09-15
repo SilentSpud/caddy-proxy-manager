@@ -307,13 +307,13 @@ is still honoured as an override until a value is stored.
 | How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
 | Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/silentspud/caddy-proxy-manager` |
-| Collect traffic and WAF events. Leave unset to decide from whether a password is set | `ANALYTICS_ENABLED` | Unset |
+| Collect traffic and WAF events. If left unset, analytics is on only when a password is set | `ANALYTICS_ENABLED` | Unset |
 | ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
 | ClickHouse user | `CLICKHOUSE_USER` | `cpm` |
 | ClickHouse password. Required for analytics - the container will not start without one. Encrypted at rest | `CLICKHOUSE_PASSWORD` | None |
 | ClickHouse database | `CLICKHOUSE_DB` | `analytics` |
 | Days of analytics kept. Lowering it migrates the tables' TTL on the next start | `CLICKHOUSE_RETENTION_DAYS` | `30` |
-| Use GeoIP for country lookups and geo blocking. Leave unset to decide from whether the databases are present | `GEOIP_ENABLED` | Unset |
+| Use GeoIP for country lookups and geo blocking. If left unset, GeoIP is on only when the databases are present | `GEOIP_ENABLED` | Unset |
 | MaxMind account ID, for GeoLite2 downloads | `GEOIPUPDATE_ACCOUNT_ID` | None |
 | MaxMind license key. Encrypted at rest | `GEOIPUPDATE_LICENSE_KEY` | None |
 | Hours between checks for newer MaxMind databases, 1-168 | `GEOIP_UPDATE_INTERVAL_HOURS` | `24` |
