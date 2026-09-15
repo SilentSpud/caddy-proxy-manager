@@ -89,7 +89,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     staged: staged("dns-providers"),
   });
 
-  const certificateCount = String(input.certificateCount);
+  const certificateCount = input.certificateCount;
   sections.push({
     id: "acme",
     name: t("sections.acme.name"),
@@ -112,7 +112,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     status: geoBlockNeedsProxies ? "attention" : ranges.length > 0 ? "ok" : "unset",
     value:
       ranges.length > 0
-        ? t("health.trustedProxies.valueRanges", { count: String(ranges.length) })
+        ? t("health.trustedProxies.valueRanges", { count: ranges.length })
         : t("health.trustedProxies.valueNone"),
     detail: geoBlockNeedsProxies ? t("health.trustedProxies.detailGeoBlock") : undefined,
     staged: staged("trusted-proxies"),
@@ -138,7 +138,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     status: input.oauthProviderCount > 0 ? "ok" : "unset",
     value:
       input.oauthProviderCount > 0
-        ? t("health.oauth.valueProviders", { count: String(input.oauthProviderCount) })
+        ? t("health.oauth.valueProviders", { count: input.oauthProviderCount })
         : t("health.oauth.valueLocalOnly"),
     staged: staged("oauth"),
   });
@@ -147,7 +147,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
   // ever completed, so every lookup misses.
   const geoipEmpty = input.geoip.enabled && input.geoip.installedEditions.length === 0;
   const ageDays = input.geoip.databaseAgeDays;
-  const installed = String(input.geoip.installedEditions.length);
+  const installed = input.geoip.installedEditions.length;
 
   /**
    * Behind is the definitive answer, and it needs no threshold: MaxMind has built something newer
@@ -179,7 +179,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
           ? t("health.geoip.valueBehind", { behind: String(behind.length), installed })
           : ageDays === 0
             ? t("health.geoip.valueToday", { count: installed })
-            : t("health.geoip.valueAge", { count: installed, days: String(ageDays) }),
+            : t("health.geoip.valueAge", { count: installed, days: ageDays ?? 0 }),
     detail: geoipEmpty
       ? downloadError
         ? t("health.geoip.detailEmptyDownloadFailed", { error: downloadError })
@@ -215,7 +215,7 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
           ? "ok"
           : "unset",
     value: input.geoBlock?.enabled
-      ? t("health.geoblock.valueDenying", { count: String(blockedCountries) })
+      ? t("health.geoblock.valueDenying", { count: blockedCountries })
       : t("health.off"),
     detail: blockingWithoutData
       ? t("health.geoblock.detailNoData")

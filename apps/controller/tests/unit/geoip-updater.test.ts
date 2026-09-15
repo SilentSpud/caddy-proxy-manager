@@ -109,7 +109,7 @@ describe('readCapped', () => {
   });
 
   it('stops reading a body that runs past the limit', async () => {
-    await expect(readCapped(streamOf(11), 10)).rejects.toThrow(/exceeded the 10 byte limit/);
+    await expect(readCapped(streamOf(11), 10)).rejects.toThrow(/exceeded the 10-byte limit/);
   });
 });
 

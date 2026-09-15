@@ -601,7 +601,7 @@ export const geoipLicenseKey = secretSetting({
   name: "geoipupdate_license_key",
   env: "GEOIPUPDATE_LICENSE_KEY",
   group: "geoip",
-  label: "MaxMind license key",
+  label: "MaxMind licence key",
   description: "Issued alongside the account ID at maxmind.com.",
   default: "",
 });
