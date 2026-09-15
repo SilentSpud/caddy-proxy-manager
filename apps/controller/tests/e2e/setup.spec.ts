@@ -180,7 +180,7 @@ test.describe('First-run setup', () => {
     await expect(page.getByRole('switch', { name: 'Enable analytics' })).toBeChecked();
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
 
-    await expect(page.getByText(/need a ClickHouse password/i)).toBeVisible();
+    await expect(page.getByText(/needs a ClickHouse password/i)).toBeVisible();
     // Still on the settings step: nothing was saved and setup is not finished.
     await expect(page).toHaveURL(/\/setup\/settings$/);
   });
