@@ -131,15 +131,20 @@ describe('mapOAuthProvider — OAuth self-registration gating (M2)', () => {
     expect(cfg.disableImplicitSignUp).toBe(true);
   });
 
-  it('uses a trusted stable account issuer and the Better Auth 1.7 config shape', () => {
+  it('uses the Better Auth 1.7.4 config shape: providerId is the config-pinned namespace', () => {
     const cfg = mapOAuthProvider(sampleProvider);
 
-    expect(cfg.accountIssuer).toBe('https://idp.example/');
+    // In Better Auth 1.7.4 the OAuth account key is (providerId, accountId):
+    // the account namespace comes from the always-config-pinned providerId,
+    // so the `accountIssuer` option was removed. Discovery still derives from
+    // the configured issuer, and the provider namespace is never a claim.
+    expect(cfg.providerId).toBe('p1');
     expect(cfg.discoveryUrl).toBe('https://idp.example/.well-known/openid-configuration');
     expect(cfg).not.toHaveProperty('issuer');
+    expect(cfg).not.toHaveProperty('accountIssuer');
   });
 
-  it('isolates issuerless OAuth providers in an encoded synthetic namespace', () => {
+  it('keeps issuerless OAuth providers namespace-isolated via providerId', () => {
     const cfg = mapOAuthProvider({
       ...sampleProvider,
       id: 'team/provider',
@@ -148,6 +153,62 @@ describe('mapOAuthProvider — OAuth self-registration gating (M2)', () => {
       tokenUrl: 'https://idp.example/token',
     });
 
-    expect(cfg.accountIssuer).toBe('local:oauth:team%2Fprovider');
+    expect(cfg.providerId).toBe('team/provider');
+    expect(cfg).not.toHaveProperty('accountIssuer');
+  });
+});
+
+describe('better-auth account.create.before hook — pins the CPM issuer namespace', () => {
+  // Better Auth 1.7.4 removed `issuer` from the account schema and keys
+  // external identities by (providerId, accountId). CPM keeps a NOT NULL
+  // `accounts.issuer` column for its own identity bookkeeping, and derives it
+  // here before insert so the credential and OAuth namespaces stay isolated.
+  it('is configured as a function', () => {
+    const auth = getAuth() as any;
+    expect(typeof auth.options?.databaseHooks?.account?.create?.before).toBe('function');
+  });
+
+  it('stamps the credential namespace onto local password accounts', async () => {
+    const auth = getAuth() as any;
+    const hook = auth.options.databaseHooks.account.create.before;
+
+    const result = await hook({ userId: '1', providerId: 'credential', accountId: '1' });
+
+    expect(result.data.issuer).toBe('local:credential');
+  });
+
+  it('stamps an encoded synthetic OAuth namespace for issuerless providers', async () => {
+    const auth = getAuth() as any;
+    const hook = auth.options.databaseHooks.account.create.before;
+
+    const result = await hook({ userId: '2', providerId: 'team/provider', accountId: 'abc' });
+
+    expect(result.data.issuer).toBe('local:oauth:team%2Fprovider');
+  });
+
+  it('pins a configured provider to its operator-set issuer', async () => {
+    const { oauthProviders } = await import('../../src/lib/db/schema');
+    const db = (await import('../../src/lib/db')).default;
+    const NOW = '2026-01-01T00:00:00.000Z';
+    await db.insert(oauthProviders).values({
+      id: 'p1',
+      name: 'Some IdP',
+      type: 'oidc',
+      clientId: 'cid',
+      clientSecret: 'secret',
+      issuer: 'https://idp.example/',
+      scopes: 'openid email profile',
+      autoLink: true,
+      enabled: true,
+      source: 'ui',
+      createdAt: NOW,
+      updatedAt: NOW,
+    }).run();
+
+    const auth = getAuth() as any;
+    const hook = auth.options.databaseHooks.account.create.before;
+    const result = await hook({ userId: '3', providerId: 'p1', accountId: 'sub-123' });
+
+    expect(result.data.issuer).toBe('https://idp.example/');
   });
 });

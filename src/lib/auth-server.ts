@@ -7,7 +7,10 @@ import { config } from "./config";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
 import type { OAuthProvider } from "./models/oauth-providers";
 import type { GenericOAuthConfig } from "better-auth/plugins";
-import { resolveOAuthAccountIssuer } from "./account-issuer";
+import {
+  CREDENTIAL_ACCOUNT_ISSUER,
+  resolveOAuthAccountIssuer,
+} from "./account-issuer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedAuth: any = null;
@@ -37,10 +40,6 @@ export function mapOAuthProvider(p: OAuthProvider): GenericOAuthConfig {
     // auto-provisioning of an unknown identity is gated. Controlled by its own
     // flag, independent of credential self-registration.
     disableImplicitSignUp: !config.auth.allowOauthRegistration,
-    // Better Auth 1.7 scopes external identities by (issuer, accountId).
-    // Pin the namespace to trusted application configuration so a provider
-    // cannot choose or change its account namespace through profile claims.
-    accountIssuer: resolveOAuthAccountIssuer(p.id, p.issuer),
     // Ownership of an existing CPM account is asserted by the operator through
     // the provider's auto-link switch, never by the IdP alone. Reporting the
     // claim only for auto-link providers keeps a provider that merely returns
@@ -211,6 +210,27 @@ function createAuth(): any {
             if (data.accessToken) data.accessToken = encryptSecret(data.accessToken);
             if (data.refreshToken) data.refreshToken = encryptSecret(data.refreshToken);
             if (data.idToken) data.idToken = encryptSecret(data.idToken);
+            // Better Auth 1.7.4 removed `issuer` from the account schema and
+            // keys external identities by (providerId, accountId). CPM's
+            // `accounts` table keeps a NOT NULL `issuer` column for its own
+            // identity bookkeeping, so derive it here before insert: the
+            // credential namespace for local password accounts, or the
+            // provider's pinned/synthetic OAuth issuer otherwise.
+            const providerId = typeof data.providerId === "string" ? data.providerId : null;
+            if (providerId) {
+              const configured = providerId === "credential"
+                ? null
+                : await db
+                    .select({ issuer: schema.oauthProviders.issuer })
+                    .from(schema.oauthProviders)
+                    .where(eq(schema.oauthProviders.id, providerId))
+                    .get();
+              // `issuer` is a CPM-only column absent from Better Auth 1.7.4's
+              // account model, so assign through the widened record type.
+              (data as Record<string, unknown>).issuer = configured === null
+                ? CREDENTIAL_ACCOUNT_ISSUER
+                : resolveOAuthAccountIssuer(providerId, configured?.issuer);
+            }
             return { data };
           },
           after: async (account) => {
