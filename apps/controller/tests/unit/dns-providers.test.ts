@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 import {
   DNS_PROVIDERS,
-  buildDnsChallengeConfig,
   challengeOptionFields,
-  decryptProviderCredentials,
-  encryptProviderCredentials,
   getProviderDefinition,
   isValidDnsDuration,
   redactDnsProviderSettingsForApi,
   redactLegacyCloudflareSettingsForApi,
 } from '@/src/lib/dns-providers';
+import {
+  buildDnsChallengeConfig,
+  decryptProviderCredentials,
+  encryptProviderCredentials,
+} from '@/src/lib/dns-provider-credentials';
 import { isEncryptedSecret } from '@/src/lib/secret';
 
 const NETCUP_CHALLENGE_DEFAULTS = { propagation_delay: '600s', propagation_timeout: '900s' };

@@ -12,7 +12,8 @@ export type SimulatedCaddy = (request: CaddyAdminProxyRequest) => CaddyAdminProx
 const JSON_HEADERS = { "content-type": "application/json" };
 
 function answer(status: number, body: unknown): CaddyAdminProxyResponse {
-  return { status, text: body === "" ? "" : JSON.stringify(body), headers: JSON_HEADERS };
+  // A copy per response: the config readback adds an ETag, which must not stick to every answer.
+  return { status, text: body === "" ? "" : JSON.stringify(body), headers: { ...JSON_HEADERS } };
 }
 
 /** Walk `/config/apps/http/...` the way Caddy does: a missing key reads as null, not an error. */
@@ -28,6 +29,9 @@ function readPath(config: unknown, path: string): unknown {
 export function createSimulatedCaddy(): SimulatedCaddy {
   // Caddy starts with an empty config, and the monitor reads `{}` as one that needs applying.
   let loaded: Record<string, unknown> = {};
+  // Real Caddy tags each config it serves. Without one the monitor falls back to "does it have
+  // apps", and a demo with no hosts loads none - so it read every check as a restart and reapplied.
+  let generation = 0;
 
   return ({ method, path, body }) => {
     const route = path.split("?")[0];
@@ -43,11 +47,15 @@ export function createSimulatedCaddy(): SimulatedCaddy {
         return answer(400, { error: "loading config: config must be a JSON object" });
       }
       loaded = parsed as Record<string, unknown>;
+      generation++;
       return answer(200, "");
     }
 
     if (method === "GET" && route.startsWith("/config/")) {
-      return answer(200, readPath(loaded, route.slice("/config/".length)));
+      const response = answer(200, readPath(loaded, route.slice("/config/".length)));
+      // Only once something is loaded: an untagged empty config is what a restarted Caddy serves.
+      if (generation > 0) response.headers.etag = `"demo-${generation}"`;
+      return response;
     }
 
     // Parsing a Caddyfile takes Caddy itself. Accepting the snippet with a warning keeps the host

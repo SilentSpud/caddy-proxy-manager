@@ -67,11 +67,8 @@ import type {
   GeoBlockSettings,
   WafSettings,
 } from "@/src/lib/settings";
-import {
-  getProviderDefinition,
-  encryptProviderCredentials,
-  isValidDnsDuration,
-} from "@/src/lib/dns-providers";
+import { getProviderDefinition, isValidDnsDuration } from "@/src/lib/dns-providers";
+import { encryptProviderCredentials } from "@/src/lib/dns-provider-credentials";
 import { clearFavicon, FaviconValidationError, saveFavicon } from "@/src/lib/branding";
 import { parseCheckbox, parseCsv } from "@/src/lib/form-parse";
 import { checkTailscaleAuthKey } from "@/src/lib/tailscale-api";

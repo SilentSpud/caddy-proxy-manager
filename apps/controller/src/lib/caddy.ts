@@ -65,7 +65,8 @@ import {
   tailscaleListenAddresses,
   TAILSCALE_DEFAULT_NODE,
 } from "./caddy-tailscale";
-import { buildDnsChallengeConfig, type DnsProviderCredentials } from "./dns-providers";
+import type { DnsProviderCredentials } from "./dns-providers";
+import { buildDnsChallengeConfig } from "./dns-provider-credentials";
 import { caddyAdminRequest } from "./caddy-admin";
 import { getPublicBaseUrl } from "./public-url";
 import {

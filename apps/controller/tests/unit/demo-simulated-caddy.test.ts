@@ -25,6 +25,19 @@ describe('simulated Caddy', () => {
     expect(caddy({ method: 'GET', path: '/config/apps/tls' }).text).toBe('null');
   });
 
+  it('tags each loaded config, as real Caddy does, so the monitor does not see a restart', () => {
+    const caddy = createSimulatedCaddy();
+    expect(caddy({ method: 'GET', path: '/config/' }).headers.etag).toBeUndefined();
+
+    caddy({ method: 'POST', path: '/load', body: '{}' });
+    const first = caddy({ method: 'GET', path: '/config/' }).headers.etag;
+    expect(first).toBeDefined();
+    expect(caddy({ method: 'GET', path: '/config/' }).headers.etag).toBe(first);
+
+    caddy({ method: 'POST', path: '/load', body: '{}' });
+    expect(caddy({ method: 'GET', path: '/config/' }).headers.etag).not.toBe(first);
+  });
+
   it('refuses a config that is not a JSON object, and keeps the previous one', () => {
     const caddy = createSimulatedCaddy();
     caddy({ method: 'POST', path: '/load', body: '{"apps":{}}' });
