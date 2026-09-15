@@ -1,6 +1,6 @@
 "use client";
 
-import { type ComponentProps, useState } from "react";
+import { type ComponentProps, type FocusEvent, useState } from "react";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useTranslations } from "next-intl";
 import { type EmailDomain, isEmailAddress } from "@/src/lib/email-address";
@@ -24,8 +24,15 @@ export function EmailInput({ domain = "any", value, ...props }: EmailInputProps)
   const trimmed = value.trim();
   const invalid = touched && trimmed !== "" && !isEmailAddress(trimmed, domain);
 
-  // TextInput does not type onBlur but forwards it to the <input>, as with native-input-attrs.
-  const onBlur = { onBlur: () => setTouched(true) } as Record<string, unknown>;
+  // TextInput does not type onBlur but forwards it to the <input>, as with native-input-attrs. A
+  // handler the consumer passed the same way is chained rather than replaced.
+  const consumerOnBlur = (props as Record<string, unknown>).onBlur;
+  const onBlur = {
+    onBlur: (event: FocusEvent<HTMLInputElement>) => {
+      setTouched(true);
+      if (typeof consumerOnBlur === "function") consumerOnBlur(event);
+    },
+  } as Record<string, unknown>;
 
   return (
     <TextInput
