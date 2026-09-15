@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { updateUserProfile } from "@/src/lib/models/user";
 import { createAuditEvent } from "@/src/lib/models/audit";
@@ -8,10 +9,11 @@ export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
   if (originCheck) return originCheck;
 
+  const t = await getTranslations();
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: t("auth.apiErrors.unauthorized") }, { status: 401 });
     }
 
     const userId = Number(session.user.id);
@@ -20,21 +22,18 @@ export async function POST(request: NextRequest) {
 
     // Validate avatarUrl is either null or a base64 image string
     if (avatarUrl !== null && typeof avatarUrl !== "string") {
-      return NextResponse.json({ error: "Invalid avatar data" }, { status: 400 });
+      return NextResponse.json({ error: t("profile.avatarInvalid") }, { status: 400 });
     }
 
     // If avatarUrl is provided, validate it's a base64 image (png/jpeg/webp only)
     if (avatarUrl !== null) {
       const match = avatarUrl.match(/^data:(image\/(png|jpeg|jpg|webp));base64,/i);
       if (!match) {
-        return NextResponse.json(
-          { error: "Avatar must be a base64-encoded PNG, JPEG, or WebP image" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: t("profile.avatarFormatInvalid") }, { status: 400 });
       }
 
       if (avatarUrl.length > MAX_AVATAR_DATA_URL_LENGTH) {
-        return NextResponse.json({ error: "Avatar image is too large" }, { status: 400 });
+        return NextResponse.json({ error: t("profile.avatarImageTooLarge") }, { status: 400 });
       }
     }
 
@@ -44,7 +43,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!updatedUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: t("auth.apiErrors.userNotFound") }, { status: 404 });
     }
 
     // Audit log
@@ -63,6 +62,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Avatar update error:", error);
-    return NextResponse.json({ error: "Failed to update avatar" }, { status: 500 });
+    return NextResponse.json({ error: t("profile.avatarUpdateFailed") }, { status: 500 });
   }
 }

@@ -56,7 +56,7 @@ test.describe('Branding - custom favicon', () => {
       mimeType: 'image/png',
       buffer: PNG,
     });
-    await page.getByRole('button', { name: 'Save favicon' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Favicon updated')).toBeVisible({ timeout: 15_000 });
 
     const response = await page.request.get(FAVICON_URL);
@@ -74,7 +74,7 @@ test.describe('Branding - custom favicon', () => {
       mimeType: 'image/png',
       buffer: PNG,
     });
-    await page.getByRole('button', { name: 'Save favicon' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Favicon updated')).toBeVisible({ timeout: 15_000 });
     expect((await page.request.get(FAVICON_URL)).status()).toBe(200);
 
@@ -93,7 +93,7 @@ test.describe('Branding - custom favicon', () => {
       mimeType: 'image/png',
       buffer: Buffer.from('<html><script>alert(document.domain)</script></html>'),
     });
-    await page.getByRole('button', { name: 'Save favicon' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText(/does not look like an image/i)).toBeVisible({ timeout: 15_000 });
     expect((await page.request.get(FAVICON_URL)).status()).toBe(404);

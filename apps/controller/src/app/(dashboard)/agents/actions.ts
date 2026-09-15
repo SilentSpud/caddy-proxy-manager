@@ -30,7 +30,8 @@ export async function rebuildAgentCaddyAction(
     assertCanManage(access, "agent", agentRowId);
     const status = await applyCaddyBuild(agentRowId);
     revalidatePath("/agents");
-    return actionSuccess(status.message ?? "Rebuild triggered.");
+    const t = await getTranslations("agents");
+    return actionSuccess(status.message ?? t("rebuildTriggered"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to trigger a Caddy rebuild for agent:", agentRowId, error);
@@ -48,10 +49,11 @@ export async function renameAgentAction(
     const access = await requireAccess();
     assertCanManage(access, "agent", agentRowId);
     const name = String(formData?.get("name") ?? "").trim();
-    if (!name) return actionError(await getTranslations(), null, "A name is required.");
+    const t = await getTranslations();
+    if (!name) return actionError(t, null, t("agents.nameRequired"));
     await renameAgent(agentRowId, name);
     revalidatePath("/agents");
-    return actionSuccess("Agent renamed.");
+    return actionSuccess(t("agents.renamed"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to rename agent:", agentRowId, error);

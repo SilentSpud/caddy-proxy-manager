@@ -21,8 +21,15 @@ import type { ReactNode } from "react";
 import { CommandPalette } from "@astryxdesign/core/CommandPalette";
 import { createStaticSource } from "@astryxdesign/core/Typeahead/utils";
 import { Text } from "@astryxdesign/core/Text";
-import { useEffect, useState } from "react";
-import { SETTINGS_GROUPS, SETTINGS_ITEMS, groupForSection } from "./sections";
+import { useEffect, useMemo, useState } from "react";
+import {
+  SETTINGS_GROUPS,
+  SETTINGS_ITEMS,
+  groupForSection,
+  settingsGroupLabel,
+  settingsSectionDescription,
+  settingsSectionName,
+} from "./sections";
 import { storageKeysForSection } from "@/src/lib/settings/section-keys";
 
 type PaletteItem = {
@@ -31,26 +38,33 @@ type PaletteItem = {
   auxiliaryData: { desc: string; group: string; env: string[] };
 };
 
-const PALETTE_ITEMS: PaletteItem[] = SETTINGS_ITEMS.map((item) => ({
-  id: item.id,
-  label: item.name,
-  auxiliaryData: {
-    desc: item.desc,
-    group: groupForSection(item.id)?.label ?? "",
-    env: [...(item.env ?? []), ...(item.envSearch ?? [])],
-  },
-}));
+type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
 
 // Keywords let a search match a setting's description or its group - and its environment
 // variables, so an operator who knows a setting only as the line in their `.env` can search for
-// that name and land on the page that owns it.
-const PALETTE_SOURCE = createStaticSource(PALETTE_ITEMS, {
-  keywords: (item) => [
-    item.auxiliaryData.desc,
-    item.auxiliaryData.group,
-    ...item.auxiliaryData.env,
-  ],
-});
+// that name and land on the page that owns it. Built per render rather than at module scope,
+// because the names it matches are the reader's language; the variable names are the same in all.
+function paletteSource(t: SettingsTranslator) {
+  const items: PaletteItem[] = SETTINGS_ITEMS.map((item) => {
+    const group = groupForSection(item.id);
+    return {
+      id: item.id,
+      label: settingsSectionName(t, item),
+      auxiliaryData: {
+        desc: settingsSectionDescription(t, item),
+        group: group ? settingsGroupLabel(t, group) : "",
+        env: [...(item.env ?? []), ...(item.envSearch ?? [])],
+      },
+    };
+  });
+  return createStaticSource(items, {
+    keywords: (item) => [
+      item.auxiliaryData.desc,
+      item.auxiliaryData.group,
+      ...item.auxiliaryData.env,
+    ],
+  });
+}
 
 export default function SettingsSideNav({
   footer,
@@ -67,6 +81,7 @@ export default function SettingsSideNav({
   const router = useRouter();
   const staged = new Set(stagedKeys);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const searchSource = useMemo(() => paletteSource(t), [t]);
 
   // The shortcut binds here rather than in the page, because the palette moved into the rail with
   // the rest of navigation - and the rail is mounted on every settings route.
@@ -107,7 +122,7 @@ export default function SettingsSideNav({
       </SideNavSection>
 
       {SETTINGS_GROUPS.map((group) => (
-        <SideNavSection key={group.id} title={group.label}>
+        <SideNavSection key={group.id} title={settingsGroupLabel(t, group)}>
           {group.items.map((item) => {
             const isStaged = storageKeysForSection(item.id).some((key) => staged.has(key));
             return (
@@ -115,7 +130,7 @@ export default function SettingsSideNav({
                 key={item.id}
                 as={Link}
                 href={`/settings/${item.id}`}
-                label={item.name}
+                label={settingsSectionName(t, item)}
                 icon={<item.icon />}
                 isSelected={pathname === `/settings/${item.id}`}
                 // The state rides as a description, not as part of the name. A link's name is its
@@ -134,7 +149,7 @@ export default function SettingsSideNav({
         isOpen={paletteOpen}
         onOpenChange={setPaletteOpen}
         label={t("settingsSearchLabel")}
-        searchSource={PALETTE_SOURCE}
+        searchSource={searchSource}
         emptySearchText={t("settingsSearchEmpty")}
         onValueChange={(id) => {
           router.push(`/settings/${id}`);

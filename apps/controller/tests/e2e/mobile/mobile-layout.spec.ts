@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openCreateHostDialog } from '../../helpers/proxy-api';
+import { waitForHydration } from '../../helpers/hydration';
 
 // Force a mobile viewport even under the desktop Chromium project so these
 // checks validate responsive behavior instead of self-skipping.
@@ -42,6 +43,7 @@ test.describe('Mobile layout', () => {
 
   test('picking a page in the drawer goes there and closes the drawer', async ({ page }) => {
     await page.goto('/');
+    await waitForHydration(page);
     await page.getByRole('button', { name: 'More', exact: true }).click();
     const drawer = page.getByRole('dialog', { name: 'Jump to' });
     await drawer.getByRole('link', { name: 'Users', exact: true }).click();
@@ -51,6 +53,7 @@ test.describe('Mobile layout', () => {
 
   test('All pages in the drawer opens the full More page', async ({ page }) => {
     await page.goto('/');
+    await waitForHydration(page);
     await page.getByRole('button', { name: 'More', exact: true }).click();
     await page
       .getByRole('dialog', { name: 'Jump to' })
@@ -62,10 +65,12 @@ test.describe('Mobile layout', () => {
 
   test('the drawer stops offering to be customized once it has been', async ({ page }) => {
     await page.goto('/more/customize');
+    await waitForHydration(page);
     await page.getByRole('button', { name: 'Done' }).click();
     await expect(page).toHaveURL('/more');
 
     await page.goto('/');
+    await waitForHydration(page);
     await page.getByRole('button', { name: 'More', exact: true }).click();
     const drawer = page.getByRole('dialog', { name: 'Jump to' });
     await expect(drawer.getByRole('link', { name: 'All pages' })).toBeVisible();

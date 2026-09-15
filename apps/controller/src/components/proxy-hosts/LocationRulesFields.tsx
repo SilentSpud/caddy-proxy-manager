@@ -145,7 +145,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                   <IconButton
                     variant="ghost"
                     size="sm"
-                    label={`Remove location rule ${i + 1}`}
+                    label={t("removeLocationRuleLabel", { index: i + 1 })}
                     icon={<Trash2 />}
                     onClick={() => removeRule(rule.rowId)}
                   />
@@ -153,7 +153,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
 
                 <VStack gap={2}>
                   <Text type="body" size="xsm" color="secondary" weight="medium">
-                    {t("upstreams")}{" "}
+                    {t("upstreams")}
                   </Text>
                   {rule.upstreams.map((up, j) => {
                     const isOnlyUpstream = rule.upstreams.length === 1;
@@ -171,7 +171,7 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                           }
                         />
                         <TextInput
-                          label={`Upstream ${j + 1}`}
+                          label={t("upstreamLabel", { index: j + 1 })}
                           isLabelHidden
                           size="sm"
                           value={up.address}
@@ -181,11 +181,11 @@ export function LocationRulesFields({ initialData = [] }: Props) {
                         <IconButton
                           variant="ghost"
                           size="sm"
-                          label={`Remove upstream ${j + 1}`}
+                          label={t("removeUpstreamLabel", { index: j + 1 })}
                           icon={<MinusCircle />}
                           isDisabled={isOnlyUpstream}
                           tooltip={
-                            isOnlyUpstream ? "At least one upstream is required" : "Remove upstream"
+                            isOnlyUpstream ? t("atLeastOneUpstreamRequired") : t("removeUpstream")
                           }
                           onClick={() => removeUpstream(rule.rowId, up.rowId)}
                         />

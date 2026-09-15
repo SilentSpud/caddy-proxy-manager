@@ -81,10 +81,13 @@ function Line({
   text,
   tokens,
   number,
+  isPlaceholder = false,
 }: {
   text: string;
   tokens: { type: string; start: number; end: number }[];
   number: number;
+  /** Dims the text but not the number, so an empty field still shows where line 1 is. */
+  isPlaceholder?: boolean;
 }) {
   const parts = [];
   let at = 0;
@@ -116,7 +119,13 @@ function Line({
       >
         {number}
       </span>
-      {parts.length > 0 ? parts : ZERO_WIDTH_SPACE}
+      {isPlaceholder ? (
+        <span style={{ opacity: 0.5 }}>{text || ZERO_WIDTH_SPACE}</span>
+      ) : parts.length > 0 ? (
+        parts
+      ) : (
+        ZERO_WIDTH_SPACE
+      )}
     </span>
   );
 }
@@ -142,7 +151,13 @@ export function CodeEditor({
   useInsertionEffect(() => ensureHighlightStyles(), []);
 
   const readOnly = Boolean(isReadOnly || isDisabled);
-  const lines = useMemo(() => value.split("\n"), [value]);
+  // An empty field numbers its placeholder's lines too. Unnumbered, the gutter was only a wide
+  // blank margin, which read as padding rather than as room for line numbers.
+  const showsPlaceholder = value === "" && Boolean(placeholder);
+  const lines = useMemo(
+    () => (showsPlaceholder ? (placeholder ?? "") : value).split("\n"),
+    [showsPlaceholder, placeholder, value],
+  );
   const tokenLines = useMemo(() => tokenizeCode(value, language), [value, language]);
 
   /**
@@ -201,6 +216,20 @@ export function CodeEditor({
         }}
       >
         <div style={{ position: "relative", minHeight: "100%" }}>
+          {/* The gutter's separator, as tall as the content rather than the viewport so it scrolls
+              with the numbers. Halfway between the numbers' right edge and the text. */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: `${GUTTER - PAD_X / 2}px`,
+              borderRight: "1px solid var(--color-border)",
+              pointerEvents: "none",
+            }}
+          />
           <pre
             aria-hidden="true"
             style={{ ...textLayer, color: "var(--color-text-primary)", pointerEvents: "none" }}
@@ -208,22 +237,19 @@ export function CodeEditor({
             {/* The theme gives `code` its own font and a line-height of its own, which would put
                 every line 2px out of step with the textarea. Take the <pre>'s instead. */}
             <code style={{ display: "block", font: "inherit", lineHeight: "inherit" }}>
-              {value === "" && placeholder ? (
-                <span style={{ display: "block", opacity: 0.5 }}>{placeholder}</span>
-              ) : (
-                lines.map((line, index) => (
-                  <Line
-                    // A line has no identity beyond its position: inserting one really does
-                    // renumber every line after it, which is what an index key describes. Nothing
-                    // here holds state for React to move to the wrong row.
-                    // biome-ignore lint/suspicious/noArrayIndexKey: see above
-                    key={index}
-                    text={line}
-                    tokens={tokenLines[index] ?? []}
-                    number={index + 1}
-                  />
-                ))
-              )}
+              {lines.map((line, index) => (
+                <Line
+                  // A line has no identity beyond its position: inserting one really does
+                  // renumber every line after it, which is what an index key describes. Nothing
+                  // here holds state for React to move to the wrong row.
+                  // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                  key={index}
+                  text={line}
+                  tokens={showsPlaceholder ? [] : (tokenLines[index] ?? [])}
+                  number={index + 1}
+                  isPlaceholder={showsPlaceholder}
+                />
+              ))}
             </code>
           </pre>
 
@@ -271,7 +297,7 @@ export function CodeEditor({
           {readOnly ? "" : t("codeEditor.keyboardHint")}
         </Text>
         <Text type="body" size="xsm" color="secondary">
-          {LANGUAGE_LABELS[language]}
+          {language === "plaintext" ? t("codeEditor.plaintextLabel") : LANGUAGE_LABELS[language]}
         </Text>
       </HStack>
     </Field>

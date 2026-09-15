@@ -20,12 +20,14 @@ import { ListPageHeader } from "@/components/ui/ListPageHeader";
 import { Fab } from "@/src/components/mobile/Fab";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatTiles } from "@/components/ui/StatTiles";
+import { EmailInput } from "@/src/components/ui/EmailInput";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import {
   createUserAction,
   updateUserRoleAction,
@@ -57,11 +59,11 @@ type Props = {
 };
 
 const ROLE_OPTIONS = [
-  { value: "admin", label: "Admin" },
-  { value: "operator", label: "Operator" },
-  { value: "user", label: "User" },
-  { value: "viewer", label: "Viewer" },
-];
+  { value: "admin", labelKey: "roles.admin" },
+  { value: "operator", labelKey: "roles.operator" },
+  { value: "user", labelKey: "roles.user" },
+  { value: "viewer", labelKey: "roles.viewer" },
+] as const;
 
 /** Role tint. Admin reads as elevated privilege, the rest are informational. */
 const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
@@ -72,22 +74,13 @@ const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
   viewer: "neutral",
 };
 
-/**
- * Rendered on the client on purpose: the server has no way to know the reader's timezone, and a
- * date rendered in the server's would be wrong for everyone else.
- */
-function formatSignIn(iso: string) {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
 function userLabel(user: UserEntry) {
   return user.name ?? user.email.split("@")[0];
 }
 
 export default function UsersClient({ users, localUsersEnabled = true }: Props) {
   const t = useTranslations("users");
+  const roleOptions = ROLE_OPTIONS.map((role) => ({ value: role.value, label: t(role.labelKey) }));
   const router = useRouter();
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -168,7 +161,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
               <Tab
                 key={role.value}
                 value={role.value}
-                label={role.label}
+                label={t(role.labelKey)}
                 endContent={<Badge label={roleCounts[role.value as UserEntry["role"]]} />}
               />
             ))}
@@ -189,7 +182,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
       <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
         <HStack gap={3} vAlign="center">
           <Text type="body" size="sm" color="secondary">
-            {filtered.length} user{filtered.length !== 1 ? "s" : ""}
+            {t("userCount", { count: filtered.length })}
           </Text>
           {localUsersEnabled && (
             <>
@@ -228,12 +221,11 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
           >
             <VStack gap={3}>
               <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
-                <TextInput
+                <EmailInput
                   {...NATIVE_REQUIRED}
                   {...AUTOFILL_EMAIL}
                   data-testid="create-email"
                   label={t("email")}
-                  type="email"
                   htmlName="email"
                   value={createEmail}
                   onChange={setCreateEmail}
@@ -252,7 +244,7 @@ export default function UsersClient({ users, localUsersEnabled = true }: Props) 
                 <Selector
                   data-testid="create-role"
                   label={t("role")}
-                  options={ROLE_OPTIONS}
+                  options={roleOptions}
                   value={createRole}
                   onChange={(v) => setCreateRole(v as UserEntry["role"])}
                 />
@@ -328,6 +320,7 @@ function UserRow({
   onRefresh: () => void;
 }) {
   const t = useTranslations("users");
+  const format = useFormatter();
   const isDisabled = user.status !== "active";
   const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | null>(null);
 
@@ -340,16 +333,27 @@ function UserRow({
             <Text type="body" size="sm" weight="medium" maxLines={1}>
               {userLabel(user)}
             </Text>
-            {isDisabled && <Badge variant="error" label="disabled" />}
+            {isDisabled && <Badge variant="error" label={t("disabledBadge")} />}
           </HStack>
           <Text type="body" size="xsm" color="secondary" maxLines={1}>
             {user.email} · {user.provider}
           </Text>
-          <Text type="supporting" color="secondary" maxLines={1}>
-            {user.lastSessionAt
-              ? t("lastSignedIn", { when: formatSignIn(user.lastSessionAt) })
-              : t("noActiveSession")}
-          </Text>
+          {user.lastSessionAt ? (
+            <UtcTooltip value={user.lastSessionAt}>
+              <Text type="supporting" color="secondary" maxLines={1}>
+                {t("lastSignedIn", {
+                  when: format.dateTime(
+                    new Date(user.lastSessionAt),
+                    TIMESTAMP_STYLES.dateTimeShort,
+                  ),
+                })}
+              </Text>
+            </UtcTooltip>
+          ) : (
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {t("noActiveSession")}
+            </Text>
+          )}
         </VStack>
       </HStack>
 
@@ -360,7 +364,7 @@ function UserRow({
             <IconButton
               variant="ghost"
               size="sm"
-              label={`Disable user ${userLabel(user)}`}
+              label={t("disableUserNamed", { name: userLabel(user) })}
               tooltip={t("disableUser")}
               icon={<Ban />}
               onClick={() => setConfirmKind("disable")}
@@ -369,7 +373,7 @@ function UserRow({
             <IconButton
               variant="ghost"
               size="sm"
-              label={`Enable user ${userLabel(user)}`}
+              label={t("enableUserNamed", { name: userLabel(user) })}
               tooltip={t("enableUser")}
               icon={<CheckCircle2 />}
               onClick={async () => {
@@ -383,7 +387,7 @@ function UserRow({
           <IconButton
             variant="ghost"
             size="sm"
-            label={`Edit user ${userLabel(user)}`}
+            label={t("editUserNamed", { name: userLabel(user) })}
             tooltip={t("editUser")}
             icon={<Pencil />}
             onClick={onEdit}
@@ -391,7 +395,7 @@ function UserRow({
           <IconButton
             variant="ghost"
             size="sm"
-            label={`Delete user ${userLabel(user)}`}
+            label={t("deleteUserNamed", { name: userLabel(user) })}
             tooltip={t("deleteUser")}
             icon={<Trash2 />}
             onClick={() => setConfirmKind("delete")}
@@ -404,13 +408,13 @@ function UserRow({
       <AlertDialog
         isOpen={confirmKind !== null}
         onOpenChange={(open) => !open && setConfirmKind(null)}
-        title={confirmKind === "delete" ? "Delete user" : "Disable user"}
+        title={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
         description={
           confirmKind === "delete"
-            ? `Permanently delete user "${user.name ?? user.email}"? This cannot be undone.`
-            : `Disable user "${user.name ?? user.email}"?`
+            ? t("deleteUserConfirm", { name: user.name ?? user.email })
+            : t("disableUserConfirm", { name: user.name ?? user.email })
         }
-        actionLabel={confirmKind === "delete" ? "Delete user" : "Disable user"}
+        actionLabel={confirmKind === "delete" ? t("deleteUser") : t("disableUser")}
         onAction={async () => {
           const result =
             confirmKind === "delete"
@@ -438,6 +442,10 @@ function EditUserRow({
   onSave: () => void;
 }) {
   const t = useTranslations("users");
+  const roleOptions = ROLE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
   const [role, setRole] = useState(user.role);
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
@@ -447,7 +455,7 @@ function EditUserRow({
       <HStack gap={2} vAlign="center">
         <Icon icon={Pencil} size="sm" />
         <Text type="body" size="sm" weight="medium">
-          Editing {user.name ?? user.email}
+          {t("editingNamed", { name: user.name ?? user.email })}
         </Text>
       </HStack>
       <form
@@ -471,7 +479,7 @@ function EditUserRow({
               onChange={setName}
               placeholder={t("displayName")}
             />
-            <TextInput
+            <EmailInput
               {...AUTOFILL_EMAIL}
               label={t("email")}
               htmlName="email"
@@ -481,7 +489,7 @@ function EditUserRow({
             />
             <Selector
               label={t("role")}
-              options={ROLE_OPTIONS}
+              options={roleOptions}
               value={role}
               onChange={(v) => setRole(v as UserEntry["role"])}
             />

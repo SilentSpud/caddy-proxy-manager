@@ -34,7 +34,7 @@ vi.mock('../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 import { createProxyHost } from '../../src/lib/models/proxy-hosts';
 import { buildCaddyDocument } from '../../src/lib/caddy';
 import * as schema from '../../src/lib/db/schema';
-import { ApiValidationError } from '../../src/lib/api-errors';
+import { DomainError } from '../../src/lib/domain-error';
 
 const EMPTY_ROLE_ID = 999; // a role with no active certs (simulates all-revoked / empty role)
 
@@ -143,8 +143,9 @@ describe('mTLS fail-closed when trust resolves to zero active certs', () => {
       },
       1,
     );
-    await expect(failure).rejects.toBeInstanceOf(ApiValidationError);
+    await expect(failure).rejects.toBeInstanceOf(DomainError);
     await expect(failure).rejects.toMatchObject({
+      code: 'mtlsNoTrustMaterial',
       status: 400,
       message: expect.stringMatching(/no trusted client certificates, roles, or CA/i),
     });

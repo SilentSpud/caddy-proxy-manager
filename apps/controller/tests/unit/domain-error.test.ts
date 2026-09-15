@@ -57,8 +57,14 @@ describe('domain error codes', () => {
   });
 
   it('interpolates params into the English wording', () => {
-    // No code takes params today; this pins the mechanism so the first one that does is covered.
-    const error = domainError('nameRequired', { unused: 1 });
-    expect(error.message).not.toContain('{');
+    const error = domainError('defaultResponseHeaderLineInvalid', { line: 'no colon here' });
+    expect(error.message).toBe('Invalid response header line: no colon here');
+    expect(error.params).toEqual({ line: 'no colon here' });
+  });
+
+  it('leaves braces inside a param value alone', () => {
+    // The value is substituted, never re-scanned, so a header line holding `{x}` survives intact.
+    const error = domainError('defaultResponseHeaderLineInvalid', { line: '{x}' });
+    expect(error.message).toBe('Invalid response header line: {x}');
   });
 });

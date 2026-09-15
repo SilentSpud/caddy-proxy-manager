@@ -7,8 +7,9 @@ import {
 } from "@/src/lib/models/audit";
 import { listUsers } from "@/src/lib/models/user";
 import { requireAdmin } from "@/src/lib/auth";
+import { auditSummaryText } from "@/src/lib/audit-summary";
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 const PER_PAGE = 50;
 
@@ -44,13 +45,25 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   // Fill the gaps the query leaves out, so the strip always has 24 bars and a quiet hour reads as
   // a quiet hour rather than as a missing one.
   const counts = new Map(activity.map((bucket) => [bucket.hour, bucket.count]));
+  // The hour each bar starts at, on the reader's clock. The buckets are UTC hours, so in a zone
+  // with a half-hour offset they read 14:30, 15:30 - still exactly when each one began.
+  const format = await getFormatter();
   const buckets = Array.from({ length: 24 }, (_, index) => {
     const at = new Date(since.getTime() + index * 60 * 60 * 1000);
     const key = at.toISOString().slice(0, 13);
-    return { label: `${key.slice(11)}:00 UTC`, count: counts.get(key) ?? 0 };
+    return {
+      label: format.dateTime(new Date(`${key}:00:00.000Z`), {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      count: counts.get(key) ?? 0,
+    };
   });
 
   const userMap = new Map(users.map((user) => [user.id, user]));
+  const t = await getTranslations("auditLog");
+  // The summaries' keys are composed at runtime, which the root translator is typed for.
+  const tSummaries = await getTranslations();
 
   return (
     <AuditLogClient
@@ -59,10 +72,14 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
         createdAt: event.createdAt,
         action: event.action,
         entityType: event.entityType,
-        summary: event.summary ?? `${event.action} on ${event.entityType}`,
+        summary:
+          auditSummaryText(tSummaries, event) ??
+          t("summaryFallback", { action: event.action, entityType: event.entityType }),
         user: event.userId
-          ? (userMap.get(event.userId)?.name ?? userMap.get(event.userId)?.email ?? "System")
-          : "System",
+          ? (userMap.get(event.userId)?.name ??
+            userMap.get(event.userId)?.email ??
+            t("systemActor"))
+          : t("systemActor"),
       }))}
       pagination={{ total, page, perPage: PER_PAGE }}
       initialSearch={search ?? ""}

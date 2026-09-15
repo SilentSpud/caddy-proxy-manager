@@ -19,17 +19,20 @@ export async function POST(request: NextRequest) {
   const originCheck = checkSameOrigin(request);
   if (originCheck) return originCheck;
 
+  // Outside the try: the catch below answers in the reader's language too. The profile screen and
+  // the forced password change both show `error` as it comes.
+  const t = await getTranslations();
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: t("auth.apiErrors.unauthorized") }, { status: 401 });
     }
 
     // No local passwords exist in OIDC-only mode - setting one would create a
     // credential path around the IdP.
     if (config.auth.disableLocalUsers) {
       return NextResponse.json(
-        { error: "Password management is disabled. Sign-in is handled by the OIDC provider." },
+        { error: t("auth.apiErrors.passwordManagementDisabled") },
         { status: 403 },
       );
     }
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest) {
     const rateCheck = await isRateLimited(rateLimitKey);
     if (rateCheck.blocked) {
       return NextResponse.json(
-        { error: "Too many attempts. Please try again later." },
+        { error: t("auth.apiErrors.tooManyAttempts") },
         {
           status: 429,
           headers: rateCheck.retryAfterMs
@@ -52,7 +55,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
-    const t = await getTranslations();
     const policyError = passwordPolicyMessage(
       t,
       newPassword ?? "",
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     const user = await getUserById(userId);
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: t("auth.apiErrors.userNotFound") }, { status: 404 });
     }
 
     const currentSession = await getCurrentSessionInfo(request);
@@ -74,13 +76,19 @@ export async function POST(request: NextRequest) {
     // If user has a password, verify current password
     if (user.passwordHash) {
       if (!currentPassword) {
-        return NextResponse.json({ error: "Current password is required" }, { status: 400 });
+        return NextResponse.json(
+          { error: t("auth.apiErrors.currentPasswordRequired") },
+          { status: 400 },
+        );
       }
 
       const isValid = await verifyPassword(currentPassword, user.passwordHash);
       if (!isValid) {
         await registerFailedAttempt(rateLimitKey);
-        return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
+        return NextResponse.json(
+          { error: t("auth.apiErrors.currentPasswordIncorrect") },
+          { status: 401 },
+        );
       }
     } else if (!isFreshSession(currentSession)) {
       // A first password is a new way in, and a password lets the IdP be unlinked afterwards - so a
@@ -124,6 +132,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Password change error:", error);
-    return NextResponse.json({ error: "Failed to change password" }, { status: 500 });
+    return NextResponse.json({ error: t("auth.passwordChange.failed") }, { status: 500 });
   }
 }

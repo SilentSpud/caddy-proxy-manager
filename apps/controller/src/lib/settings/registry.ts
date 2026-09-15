@@ -14,6 +14,7 @@
  * - `CERTS_DIRECTORY`, `ACME_CA_ROOT_DIR`, `L4_PORTS_DIR`. Container paths describing where Caddy's
  *   files live on a particular host. They belong to the agent, and phase 5 moves them there.
  * - `INSTANCE_*`. The sync feature they configure is removed in phase 5.
+ * - `DEMO_MODE`. A safety switch: stored, anyone with Settings access could turn the demo real.
  * - Anything that has to be read before the database can be: the connection string and pool size,
  *   `SESSION_SECRET` (it encrypts the database's own secrets), `NODE_ENV`, `PORT`/`HOST`, the
  *   standalone-binary bootstrap paths, whatever Compose reads on the host, and the agent's own
@@ -494,8 +495,8 @@ export const analyticsEnabled = optionalBooleanSetting({
   label: "Enable analytics",
   description:
     "Collect traffic and WAF events. With an agent running the stack, turning this on also starts " +
-    "the ClickHouse container - no Compose profile needed. Leave unset to decide from whether a " +
-    "password is configured below.",
+    "the ClickHouse container - no Compose profile needed. If left unset, analytics is on only " +
+    "when a password is configured below.",
 });
 
 export const clickhouseUrl = stringSetting({
@@ -579,9 +580,9 @@ export const geoipEnabled = optionalBooleanSetting({
   gate: true,
   label: "Enable GeoIP",
   description:
-    "Country lookups for analytics and geo blocking. With a MaxMind account ID and licence key, " +
-    "turning this on also has the controller download the databases. Leave unset to decide from " +
-    "whether the databases are already present.",
+    "Country lookups for analytics and geo blocking. If a MaxMind account ID and licence key are " +
+    "set, turning this on also makes the controller download the databases. If left unset, GeoIP " +
+    "is on only when the databases are already present.",
 });
 
 // The names say geoipupdate, the container that once read these. Kept: they are storage keys, and
@@ -600,7 +601,7 @@ export const geoipLicenseKey = secretSetting({
   name: "geoipupdate_license_key",
   env: "GEOIPUPDATE_LICENSE_KEY",
   group: "geoip",
-  label: "MaxMind license key",
+  label: "MaxMind licence key",
   description: "Issued alongside the account ID at maxmind.com.",
   default: "",
 });

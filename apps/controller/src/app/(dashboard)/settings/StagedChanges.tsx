@@ -19,9 +19,11 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Spinner } from "@astryxdesign/core/Spinner";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import type { DiffLine } from "@/src/lib/settings/config-diff";
+import type { RevisionRow } from "@/src/lib/settings/apply";
+import { sectionForStorageKey, stagedChangeLabel } from "@/src/lib/settings/section-keys";
 import type { StagedView } from "@/src/lib/settings/staged-view";
 import { applyStagedSettingsAction, discardStagedSettingsAction } from "./actions";
 
@@ -96,6 +98,7 @@ function ReviewSheet({
   onClose: () => void;
 }) {
   const t = useTranslations("settings");
+  const format = useFormatter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -146,7 +149,7 @@ function ReviewSheet({
             {view.changes.map((change) => (
               <HStack key={change.key} gap={2} vAlign="start">
                 <VStack gap={0} style={{ flexGrow: 1, minWidth: 0 }}>
-                  <Text type="label">{change.label}</Text>
+                  <Text type="label">{stagedChangeLabel(t, change)}</Text>
                   <Text type="supporting" color="secondary">
                     {change.key}
                   </Text>
@@ -171,7 +174,7 @@ function ReviewSheet({
                       #{revision.id}
                     </Text>
                     <Text type="supporting" color="secondary" maxLines={1}>
-                      {revision.summary}
+                      {revisionSummary(t, format, revision)}
                     </Text>
                     <div style={{ flexGrow: 1 }} />
                     {revision.outcome === "failed" && (
@@ -225,6 +228,24 @@ function ReviewSheet({
   );
 }
 
+/**
+ * What a past apply changed, named the way the change list above names it. The stored summary is
+ * the raw storage keys, so it only shows for a revision whose keys column cannot be read.
+ */
+function revisionSummary(
+  t: ReturnType<typeof useTranslations<"settings">>,
+  format: ReturnType<typeof useFormatter>,
+  revision: RevisionRow,
+): string {
+  if (revision.keys.length === 0) return revision.summary;
+  const labels = revision.keys.map((key) => {
+    const known = sectionForStorageKey(key);
+    return stagedChangeLabel(t, { sectionId: known?.id ?? null, label: known?.label ?? key });
+  });
+  // Several keys can belong to one section; it is named once.
+  return format.list(new Set(labels), { type: "unit" });
+}
+
 /** Colours come from the status tokens rather than raw hex, so the diff follows the theme. */
 const DIFF_BACKGROUND: Record<DiffLine["kind"], string | undefined> = {
   added: "var(--color-success-muted)",
@@ -234,6 +255,7 @@ const DIFF_BACKGROUND: Record<DiffLine["kind"], string | undefined> = {
 };
 
 function DiffView({ lines }: { lines: DiffLine[] }) {
+  const t = useTranslations("settings");
   return (
     <div
       style={{
@@ -271,7 +293,9 @@ function DiffView({ lines }: { lines: DiffLine[] }) {
             }}
           >
             {line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " "}
-            {line.kind === "gap" ? ` ${line.text} ` : line.text}
+            {line.kind === "gap"
+              ? ` ${t("reviewUnchangedLines", { count: line.skipped ?? 0 })} `
+              : line.text}
           </span>
         </div>
       ))}

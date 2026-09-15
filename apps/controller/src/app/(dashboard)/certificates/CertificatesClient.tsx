@@ -175,10 +175,10 @@ export default function CertificatesClient({
             onChange={setSearch}
             placeholder={
               activeTab === "acme"
-                ? "Search by host or domain…"
+                ? t("searchByHostOrDomain")
                 : activeTab === "imported"
-                  ? "Search by name or domain…"
-                  : "Search by name…"
+                  ? t("searchByNameOrDomain")
+                  : t("searchByName")
             }
             label={t("searchCertificates")}
           />

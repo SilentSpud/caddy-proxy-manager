@@ -1,6 +1,6 @@
 {
   "name": "caddy-proxy-manager",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "Web UI for managing Caddy reverse proxies",
   "type": "module",
   "private": true,
@@ -62,5 +62,8 @@
     "@astryxdesign/core",
     "@tree-sitter-grammars/tree-sitter-yaml",
     "core-js-pure"
-  ]
+  ],
+  "patchedDependencies": {
+    "vinext@1.0.0-beta.9": "patches/vinext@1.0.0-beta.9.patch"
+  }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ClipboardCopy, ShieldOff } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -10,6 +10,7 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Icon } from "@astryxdesign/core/Icon";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { Field } from "@astryxdesign/core/Field";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -32,19 +33,19 @@ function bodyLimitMib(bytes: number | undefined): number | null {
 
 const QUICK_TEMPLATES = [
   {
-    label: "Allow IP",
+    labelKey: "wafTemplates.allowIp",
     snippet: `SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:9000,phase:1,allow,nolog,msg:'Allow IP'"`,
   },
   {
-    label: "Disable WAF for path",
+    labelKey: "wafTemplates.disableWafForPath",
     snippet: `SecRule REQUEST_URI "@beginsWith /api/" "id:9001,phase:1,ctl:ruleEngine=Off,nolog"`,
   },
-  { label: "Remove XSS rules", snippet: `SecRuleRemoveByTag "attack-xss"` },
+  { labelKey: "wafTemplates.removeXssRules", snippet: `SecRuleRemoveByTag "attack-xss"` },
   {
-    label: "Block User-Agent",
+    labelKey: "wafTemplates.blockUserAgent",
     snippet: `SecRule REQUEST_HEADERS:User-Agent "@contains badbot" "id:9002,phase:1,deny,status:403,log"`,
   },
-];
+] as const;
 
 type Props = {
   value?: WafHostConfig | null;
@@ -71,6 +72,12 @@ export function WafFields({ value, showModeSelector = true }: Props) {
   const [limitAction, setLimitAction] = useState<LimitAction>(
     value?.request_body_limit_action ?? "inherit",
   );
+  const limitActionId = useId();
+  const limitActionHelp: Record<LimitAction, string> = {
+    inherit: t("overLimitActionHelpInherit"),
+    Reject: t("overLimitActionHelpReject"),
+    ProcessPartial: t("overLimitActionHelpPartial"),
+  };
 
   return (
     <Card>
@@ -174,7 +181,7 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               </Text>
               <HStack gap={3} vAlign="start" wrap="wrap">
                 <NumberInput
-                  label={`Max body size (MiB, up to ${MAX_BODY_LIMIT_MIB})`}
+                  label={t("maxBodySizeMib", { max: MAX_BODY_LIMIT_MIB })}
                   value={bodyLimitMb}
                   onChange={setBodyLimitMb}
                   min={MIN_BODY_LIMIT_MIB}
@@ -196,18 +203,23 @@ export function WafFields({ value, showModeSelector = true }: Props) {
                   placeholder={t("inherit")}
                 />
               </HStack>
-              <SegmentedControl
+              {/* SegmentedControl's own label is only an aria-label; Field draws the visible one. */}
+              <Field
                 label={t("overLimitAction")}
-                value={limitAction}
-                onChange={(next) => setLimitAction(next as LimitAction)}
+                inputID={limitActionId}
+                isGroupLabel
+                description={limitActionHelp[limitAction]}
               >
-                <SegmentedControlItem value="inherit" label={t("inherit")} />
-                <SegmentedControlItem value="Reject" label={t("reject")} />
-                <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
-              </SegmentedControl>
-              <Text type="body" size="xsm" color="secondary">
-                {t("wafOverLimitActionHelp")}
-              </Text>
+                <SegmentedControl
+                  label={t("overLimitAction")}
+                  value={limitAction}
+                  onChange={(next) => setLimitAction(next as LimitAction)}
+                >
+                  <SegmentedControlItem value="inherit" label={t("inherit")} />
+                  <SegmentedControlItem value="Reject" label={t("reject")} />
+                  <SegmentedControlItem value="ProcessPartial" label={t("partial")} />
+                </SegmentedControl>
+              </Field>
             </VStack>
 
             <Divider />
@@ -224,21 +236,23 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               description={t("customWafDirectivesHelp")}
             />
 
-            <Collapsible trigger="Quick Templates">
-              <VStack gap={2} hAlign="start">
-                {QUICK_TEMPLATES.map((t) => (
+            <Collapsible trigger={t("quickTemplates")}>
+              <HStack gap={2} wrap="wrap">
+                {QUICK_TEMPLATES.map((template) => (
                   <Button
-                    key={t.label}
+                    key={template.labelKey}
                     size="sm"
                     variant="secondary"
-                    label={t.label}
+                    label={t(template.labelKey)}
                     icon={<ClipboardCopy />}
                     onClick={() =>
-                      setCustomDirectives((prev) => (prev ? `${prev}\n${t.snippet}` : t.snippet))
+                      setCustomDirectives((prev) =>
+                        prev ? `${prev}\n${template.snippet}` : template.snippet,
+                      )
                     }
                   />
                 ))}
-              </VStack>
+              </HStack>
             </Collapsible>
           </VStack>
         )}

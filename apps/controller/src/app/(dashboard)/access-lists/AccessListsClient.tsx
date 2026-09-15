@@ -52,6 +52,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { Timestamp, UtcTooltip } from "@/components/ui/Timestamp";
 import { generatePassword } from "@/src/lib/password-generator";
 import {
   createAccessListAction,
@@ -70,43 +71,48 @@ type Props = {
 
 // --- Helpers ---
 
-function fmtRelative(iso: string | null): string {
-  if (!iso) return "never";
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
-  if (diff < 86400 * 365) return `${Math.floor(diff / 86400 / 30)}mo ago`;
-  return `${Math.floor(diff / 86400 / 365)}y ago`;
-}
+type Translate = ReturnType<typeof useTranslations<"accessLists">>;
 
-function fmtDate(iso: string | null, emptyValue: string): string {
-  if (!iso) return emptyValue;
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+function fmtRelative(iso: string | null, t: Translate): string {
+  if (!iso) return t("relative.never");
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return t("relative.justNow");
+  if (diff < 3600) return t("relative.minutesAgo", { count: Math.floor(diff / 60) });
+  if (diff < 86400) return t("relative.hoursAgo", { count: Math.floor(diff / 3600) });
+  if (diff < 86400 * 30) return t("relative.daysAgo", { count: Math.floor(diff / 86400) });
+  if (diff < 86400 * 365) return t("relative.monthsAgo", { count: Math.floor(diff / 86400 / 30) });
+  return t("relative.yearsAgo", { count: Math.floor(diff / 86400 / 365) });
 }
 
 type StrengthVariant = "neutral" | "error" | "warning" | "accent" | "success";
 
-function pwStrength(pw: string): { score: number; label: string; variant: StrengthVariant } {
-  if (!pw) return { score: 0, label: "Empty", variant: "neutral" };
+type StrengthLabelKey =
+  | "strength.empty"
+  | "strength.weak"
+  | "strength.fair"
+  | "strength.good"
+  | "strength.strong"
+  | "strength.excellent";
+
+function pwStrength(pw: string): {
+  score: number;
+  labelKey: StrengthLabelKey;
+  variant: StrengthVariant;
+} {
+  if (!pw) return { score: 0, labelKey: "strength.empty", variant: "neutral" };
   let s = 0;
   if (pw.length >= 8) s++;
   if (pw.length >= 14) s++;
   if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
   if (/\d/.test(pw)) s++;
   if (/[^A-Za-z0-9]/.test(pw)) s++;
-  const map: { label: string; variant: StrengthVariant }[] = [
-    { label: "Empty", variant: "neutral" },
-    { label: "Weak", variant: "error" },
-    { label: "Fair", variant: "warning" },
-    { label: "Good", variant: "accent" },
-    { label: "Strong", variant: "success" },
-    { label: "Excellent", variant: "success" },
+  const map: { labelKey: StrengthLabelKey; variant: StrengthVariant }[] = [
+    { labelKey: "strength.empty", variant: "neutral" },
+    { labelKey: "strength.weak", variant: "error" },
+    { labelKey: "strength.fair", variant: "warning" },
+    { labelKey: "strength.good", variant: "accent" },
+    { labelKey: "strength.strong", variant: "success" },
+    { labelKey: "strength.excellent", variant: "success" },
   ];
   return { score: s, ...map[s] };
 }
@@ -140,7 +146,7 @@ function MembersTab({
     const ids = Array.from(selected);
     const updated = await bulkDeleteEntriesAction(list.id, ids);
     if (updated) onListUpdated(updated);
-    toast.success(`Removed ${ids.length} ${ids.length === 1 ? "member" : "members"}`);
+    toast.success(t("removedMembersToast", { count: ids.length }));
     setSelected(new Set());
   };
 
@@ -148,7 +154,9 @@ function MembersTab({
     const entry = list.entries.find((e) => e.id === id);
     const updated = await deleteAccessEntryAction(list.id, id);
     if (updated) onListUpdated(updated);
-    toast.success(`Removed ${entry?.username ?? "member"}`);
+    toast.success(
+      entry ? t("removedNamedToast", { username: entry.username }) : t("removedMemberToast"),
+    );
   };
 
   const regen = async (id: number) => {
@@ -178,7 +186,7 @@ function MembersTab({
       onListUpdated(updated);
       setDraft({ username: "", password: "" });
       setAdding(false);
-      toast.success(`Added ${draft.username.trim()}`);
+      toast.success(t("addedToast", { username: draft.username.trim() }));
     } finally {
       setSubmitting(false);
     }
@@ -213,7 +221,7 @@ function MembersTab({
   const columns: TableColumn<MemberRow>[] = [
     {
       key: "username",
-      header: "Username",
+      header: t("username"),
       width: proportional(1),
       renderCell: (row) => (
         <Text type="code" size="sm" weight="medium">
@@ -223,7 +231,7 @@ function MembersTab({
     },
     {
       key: "password",
-      header: "Password",
+      header: t("password"),
       width: pixel(180),
       renderCell: (row) => (
         <HStack gap={1} vAlign="center">
@@ -233,7 +241,7 @@ function MembersTab({
           <IconButton
             variant="ghost"
             size="sm"
-            label={`Regenerate password for ${row.username}`}
+            label={t("regeneratePasswordFor", { username: row.username })}
             tooltip={t("regeneratePasswordTooltip")}
             icon={<RefreshCw />}
             onClick={() => regen(row.id)}
@@ -243,11 +251,11 @@ function MembersTab({
     },
     {
       key: "createdAt",
-      header: "Added",
+      header: t("columnAdded"),
       width: pixel(140),
       renderCell: (row) => (
         <Text type="body" size="xsm" color="secondary">
-          {fmtDate(row.createdAt, emptyValue)}
+          {row.createdAt ? <Timestamp value={row.createdAt} style="date" /> : emptyValue}
         </Text>
       ),
     },
@@ -261,7 +269,7 @@ function MembersTab({
         <IconButton
           variant="ghost"
           size="sm"
-          label={`Remove ${row.username}`}
+          label={t("removeNamed", { username: row.username })}
           tooltip={t("remove")}
           icon={<Trash2 />}
           onClick={() => removeOne(row.id)}
@@ -277,7 +285,7 @@ function MembersTab({
           {selected.size > 0 ? (
             <>
               <Text type="body" size="sm" weight="medium">
-                {selected.size} selected
+                {t("selectedCount", { count: selected.size })}
               </Text>
               <Button
                 variant="ghost"
@@ -295,7 +303,7 @@ function MembersTab({
             </>
           ) : (
             <Text type="body" size="sm" color="secondary">
-              {list.entries.length} {list.entries.length === 1 ? "member" : "members"}
+              {t("memberCount", { count: list.entries.length })}
             </Text>
           )}
         </HStack>
@@ -340,11 +348,11 @@ function MembersTab({
                 // ProgressBar replaces a hand-sized coloured sliver that
                 // conveyed strength by width and colour alone.
                 <ProgressBar
-                  label={`Password strength: ${strength.label}`}
+                  label={t("passwordStrength", { strength: t(strength.labelKey) })}
                   value={(strength.score / 5) * 100}
                   variant={strength.variant}
                   hasValueLabel
-                  formatValueLabel={() => strength.label}
+                  formatValueLabel={() => t(strength.labelKey)}
                 />
               )}
             </VStack>
@@ -441,7 +449,7 @@ function SettingsTab({
     setDeleting(true);
     try {
       await deleteAccessListAction(list.id);
-      toast.success(`Deleted "${list.name}"`);
+      toast.success(t("deletedToast", { name: list.name }));
       onDeleted();
     } finally {
       setDeleting(false);
@@ -488,10 +496,16 @@ function SettingsTab({
       <Card padding={3}>
         <MetadataList>
           <MetadataListItem label={t("created")}>
-            {fmtDate(list.createdAt, emptyValue)}
+            {list.createdAt ? <Timestamp value={list.createdAt} style="date" /> : emptyValue}
           </MetadataListItem>
           <MetadataListItem label={t("lastUpdated")}>
-            {fmtRelative(list.updatedAt)}
+            {list.updatedAt ? (
+              <UtcTooltip value={list.updatedAt}>
+                <span>{fmtRelative(list.updatedAt, t)}</span>
+              </UtcTooltip>
+            ) : (
+              fmtRelative(null, t)
+            )}
           </MetadataListItem>
           <MetadataListItem label={t("listId")}>
             <Text type="code" size="sm">
@@ -511,18 +525,18 @@ function SettingsTab({
         <VStack gap={3}>
           <Text type="body" size="xsm" color="secondary">
             {usageCount > 0
-              ? `This list is currently used by ${usageCount} proxy ${usageCount === 1 ? "host" : "hosts"}. Those hosts will be left without authentication.`
-              : "Once deleted, the credentials cannot be recovered."}
+              ? t("deleteInUseWarning", { count: usageCount })
+              : t("deleteUnusedWarning")}
           </Text>
           <TextInput
             {...AUTOFILL_OFF}
-            label={`Type ${list.name} to confirm`}
+            label={t("typeNameToConfirm", { name: list.name })}
             size="sm"
             value={confirm}
             onChange={setConfirm}
             placeholder={list.name}
             width={448}
-            status={confirmMismatch ? { type: "error", message: "Name does not match" } : undefined}
+            status={confirmMismatch ? { type: "error", message: t("nameDoesNotMatch") } : undefined}
           />
           <HStack>
             <Button
@@ -558,8 +572,7 @@ function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
   return (
     <VStack gap={3}>
       <Text type="body" size="sm" color="secondary">
-        This access list guards {hosts.length} proxy {hosts.length === 1 ? "host" : "hosts"}.
-        Removing the list, or any of its members, will affect access to these hosts.
+        {t("usageSummary", { count: hosts.length })}
       </Text>
       <List hasDividers>
         {hosts.map((h) => (
@@ -568,9 +581,7 @@ function UsageTab({ hosts }: { hosts: AccessListUsage[] }) {
             startContent={<Icon icon={Globe} size="sm" color="secondary" />}
             label={h.domains[0] ?? h.name}
             description={
-              h.domains.length > 1
-                ? `+${h.domains.length - 1} more domain${h.domains.length - 1 > 1 ? "s" : ""}`
-                : undefined
+              h.domains.length > 1 ? t("moreDomains", { count: h.domains.length - 1 }) : undefined
             }
             endContent={
               <Badge
@@ -622,18 +633,15 @@ function DetailPane({
             {list.name}
           </Heading>
           <Text type="body" size="sm" color="secondary">
-            {list.description || "No description"}
+            {list.description || t("noDescription")}
           </Text>
           <HStack gap={2} wrap="wrap" vAlign="center">
+            <Badge icon={<Users />} label={t("memberCount", { count: list.entries.length })} />
+            <Badge icon={<Globe />} label={t("hostCount", { count: usage.length })} />
             <Badge
-              icon={<Users />}
-              label={`${list.entries.length} ${list.entries.length === 1 ? "member" : "members"}`}
+              icon={<Clock />}
+              label={t("updatedBadge", { when: fmtRelative(list.updatedAt, t) })}
             />
-            <Badge
-              icon={<Globe />}
-              label={`${usage.length} ${usage.length === 1 ? "host" : "hosts"}`}
-            />
-            <Badge icon={<Clock />} label={`updated ${fmtRelative(list.updatedAt)}`} />
             {list.entries.length === 0 && <Badge variant="error" label={t("noMembersBadge")} />}
             {usage.length === 0 && <Badge variant="warning" label={t("unusedBadge")} />}
           </HStack>
@@ -726,7 +734,7 @@ function NewListDialog({
       });
       onCreate(list);
       onClose();
-      toast.success(`Created "${list.name}"`);
+      toast.success(t("createdToast", { name: list.name }));
     } finally {
       setSubmitting(false);
     }
@@ -774,32 +782,32 @@ function NewListDialog({
             <HStack key={s.rowId} gap={2} vAlign="end">
               <TextInput
                 {...AUTOFILL_OFF}
-                label={`Username for seed member ${i + 1}`}
+                label={t("seedUsernameLabel", { index: i + 1 })}
                 isLabelHidden
                 size="sm"
                 value={s.username}
                 onChange={(v) =>
                   setSeed(seed.map((x) => (x.rowId === s.rowId ? { ...x, username: v } : x)))
                 }
-                placeholder="username"
+                placeholder={t("seedUsernamePlaceholder")}
                 width="100%"
               />
               <TextInput
                 {...AUTOFILL_OFF}
-                label={`Password for seed member ${i + 1}`}
+                label={t("seedPasswordLabel", { index: i + 1 })}
                 isLabelHidden
                 size="sm"
                 value={s.password}
                 onChange={(v) =>
                   setSeed(seed.map((x) => (x.rowId === s.rowId ? { ...x, password: v } : x)))
                 }
-                placeholder="password"
+                placeholder={t("seedPasswordPlaceholder")}
                 width="100%"
               />
               <IconButton
                 variant="secondary"
                 size="sm"
-                label={`Generate a password for seed member ${i + 1}`}
+                label={t("seedGeneratePasswordLabel", { index: i + 1 })}
                 tooltip={t("generatePassword")}
                 icon={<Sparkles />}
                 onClick={() =>
@@ -813,7 +821,7 @@ function NewListDialog({
               <IconButton
                 variant="ghost"
                 size="sm"
-                label={`Remove seed member ${i + 1}`}
+                label={t("seedRemoveLabel", { index: i + 1 })}
                 tooltip={t("remove")}
                 icon={<X />}
                 onClick={() =>
@@ -843,11 +851,14 @@ function NewListDialog({
 
 // --- Lists Rail (left sidebar) ---
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "recent", label: "Recent" },
-  { value: "name", label: "Name" },
-  { value: "members", label: "Members" },
-  { value: "usage", label: "Usage" },
+const SORT_OPTIONS: {
+  value: SortKey;
+  labelKey: "sortRecent" | "name" | "members" | "sortUsage";
+}[] = [
+  { value: "recent", labelKey: "sortRecent" },
+  { value: "name", labelKey: "name" },
+  { value: "members", labelKey: "members" },
+  { value: "usage", labelKey: "sortUsage" },
 ];
 
 function ListsRail({
@@ -937,7 +948,7 @@ function ListsRail({
           onChange={(v) => setSort(v as SortKey)}
         >
           {SORT_OPTIONS.map((o) => (
-            <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+            <SegmentedControlItem key={o.value} value={o.value} label={t(o.labelKey)} />
           ))}
         </SegmentedControl>
       </div>

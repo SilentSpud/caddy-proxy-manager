@@ -35,6 +35,7 @@ import {
   replaceAgentSecret,
 } from "@/src/lib/models/agents";
 import { getClientIp } from "@/src/lib/client-ip";
+import { isDemoMode } from "@/src/lib/demo-mode";
 import { getSetting } from "@/src/lib/settings";
 
 /** A pairing body is four short fields; anything larger is not one. */
@@ -43,6 +44,9 @@ const MAX_BODY_BYTES = 4 * 1024;
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
 export async function POST(request: Request) {
+  // A paired agent runs a real Caddy. 403 rather than 401, which an agent reads as a bad code.
+  if (isDemoMode()) return bad("This controller is in demo mode and does not pair agents.", 403);
+
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) return bad("That request is too large to be a pairing.", 413);
 

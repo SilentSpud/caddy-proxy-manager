@@ -95,13 +95,16 @@ export async function deleteCaCertificateAction(
   const session = await requireAdmin();
   const userId = Number(session.user.id);
   try {
-    await deleteCaCertificate(id, userId);
+    // Wrapped so a `DomainError` ("not found") is already in the reader's language by the time the
+    // catch below hands its message to the dialog. `requireAdmin` stays outside: its redirect throws.
+    await withTranslatedErrors(() => deleteCaCertificate(id, userId));
     revalidatePath("/certificates");
     return { success: true };
   } catch (e) {
+    const t = await getTranslations("caCertificates");
     return {
       success: false,
-      error: e instanceof Error ? e.message : "Failed to delete CA certificate",
+      error: e instanceof Error ? e.message : t("deleteCaCertificateFailed"),
     };
   }
 }

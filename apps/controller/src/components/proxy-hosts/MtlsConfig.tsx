@@ -26,7 +26,8 @@ import type { MtlsConfig } from "@/lib/models/proxy-hosts";
 import type { MtlsAccessRule } from "@/lib/models/mtls-access-rules";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES } from "@/components/ui/Timestamp";
 
 type Props = {
   value?: MtlsConfig | null;
@@ -44,6 +45,7 @@ export function MtlsFields({
   mtlsRoles = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
+  const format = useFormatter();
   const [enabled, setEnabled] = useState(value?.enabled ?? false);
   const [selectedCertIds, setSelectedCertIds] = useState<number[]>(
     value?.trusted_client_cert_ids ?? [],
@@ -183,7 +185,9 @@ export function MtlsFields({
                     value={String(role.id)}
                     label={role.name}
                     description={role.description ?? undefined}
-                    endContent={<Badge label={`${role.certificateCount} certs`} />}
+                    endContent={
+                      <Badge label={t("trustedRoleCertCount", { count: role.certificateCount })} />
+                    }
                   />
                 ))}
               </CheckboxList>
@@ -204,7 +208,7 @@ export function MtlsFields({
                 <VStack gap={2}>
                   {Array.from(certsByCA.entries()).map(([caId, certs]) => {
                     const ca = caCertificates.find((c) => c.id === caId);
-                    const caName = ca?.name ?? `CA #${caId}`;
+                    const caName = ca?.name ?? t("caFallbackName", { id: caId });
                     const allSelected = certs.every((c) => selectedCertIds.includes(c.id));
                     const someSelected = certs.some((c) => selectedCertIds.includes(c.id));
                     const selectedCount = certs.filter((c) =>
@@ -228,7 +232,7 @@ export function MtlsFields({
                           </HStack>
                           <Divider />
                           <CheckboxList
-                            label={`Certificates issued by ${caName}`}
+                            label={t("certificatesIssuedBy", { name: caName })}
                             isLabelHidden
                             value={certs
                               .filter((c) => selectedCertIds.includes(c.id))
@@ -249,7 +253,12 @@ export function MtlsFields({
                                 label={cert.commonName}
                                 endContent={
                                   <Text type="body" size="xsm" color="secondary">
-                                    expires {new Date(cert.validTo).toLocaleDateString()}
+                                    {t("certExpires", {
+                                      date: format.dateTime(
+                                        new Date(cert.validTo),
+                                        TIMESTAMP_STYLES.date,
+                                      ),
+                                    })}
                                   </Text>
                                 }
                               />
@@ -341,14 +350,14 @@ export function MtlsFields({
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              label={`Edit rule ${rule.pathPattern}`}
+                              label={t("editRuleLabel", { path: rule.pathPattern })}
                               icon={<Pencil />}
                               onClick={() => setEditRule(rule)}
                             />
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              label={`Delete rule ${rule.pathPattern}`}
+                              label={t("deleteRuleLabel", { path: rule.pathPattern })}
                               icon={<Trash2 />}
                               onClick={() => deleteRule(rule.id)}
                             />
@@ -422,7 +431,7 @@ function RuleDialog({
 
   async function handleSubmit() {
     if (!pathPattern.trim()) {
-      setError("Path pattern is required");
+      setError(t("pathPatternRequired"));
       return;
     }
     setSubmitting(true);
@@ -445,14 +454,14 @@ function RuleDialog({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || `Failed (${res.status})`);
+        setError(data.error || t("requestFailedStatus", { status: String(res.status) }));
         setSubmitting(false);
         return;
       }
       onSaved();
       onClose();
     } catch {
-      setError("Network error");
+      setError(t("networkError"));
       setSubmitting(false);
     }
   }

@@ -18,7 +18,8 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { MtlsRole, MtlsRoleWithCertificates } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES } from "@/components/ui/Timestamp";
 
 /** Per-position card tints. Decorative only, so they use the theme's non-semantic variants. */
 const CARD_VARIANTS = ["orange", "cyan", "purple", "green", "red"] as const;
@@ -59,7 +60,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
       {filtered.length === 0 && !createOpen && (
         <EmptyState
           icon={<ShieldCheck />}
-          title={search ? "No roles match your search." : "No mTLS roles yet."}
+          title={search ? t("noRolesMatchSearch") : t("noRolesYet")}
           description={t("pageDescription")}
         />
       )}
@@ -87,7 +88,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
 
   async function handleCreate() {
     if (!name.trim()) {
-      setError("Name is required");
+      setError(t("nameRequired"));
       return;
     }
     setSubmitting(true);
@@ -100,14 +101,14 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setError(d.error || `Failed (${res.status})`);
+        setError(d.error || t("requestFailed", { status: res.status }));
         setSubmitting(false);
         return;
       }
       onClose();
       window.location.reload();
     } catch {
-      setError("Network error");
+      setError(t("networkError"));
       setSubmitting(false);
     }
   }
@@ -223,7 +224,7 @@ function RoleCard({
     window.location.reload();
   }
 
-  const certCountLabel = `${assignedIds.size} ${assignedIds.size === 1 ? "certificate" : "certificates"}`;
+  const certCountLabel = t("certificateCount", { count: assignedIds.size });
 
   return (
     <Card variant={variant} padding={5}>
@@ -322,7 +323,7 @@ function RoleCard({
         isOpen={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={t("deleteRole")}
-        description={`Delete role "${role.name}"? Proxy hosts referencing it will lose this grouping.`}
+        description={t("deleteRoleConfirm", { name: role.name })}
         actionLabel={t("deleteRole")}
         onAction={handleDelete}
       />
@@ -342,6 +343,7 @@ function CertAssignmentRow({
   onToggle: () => void;
 }) {
   const t = useTranslations("mtlsRoles");
+  const format = useFormatter();
   const checkboxRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -352,7 +354,7 @@ function CertAssignmentRow({
       startContent={
         <CheckboxInput
           ref={checkboxRef}
-          label={`Assign ${cert.commonName} to this role`}
+          label={t("assignToRole", { name: cert.commonName })}
           isLabelHidden
           value={isAssigned}
           isDisabled={isLoading}
@@ -360,7 +362,9 @@ function CertAssignmentRow({
         />
       }
       label={cert.commonName}
-      description={`expires ${new Date(cert.validTo).toLocaleDateString()}`}
+      description={t("expiresOn", {
+        date: format.dateTime(new Date(cert.validTo), TIMESTAMP_STYLES.date),
+      })}
       endContent={isAssigned ? <Badge label={t("assigned")} /> : undefined}
       isDisabled={isLoading}
     />

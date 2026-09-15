@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 test.describe('Profile', () => {
   test('profile page loads without redirecting to login', async ({ page }) => {
@@ -22,6 +23,7 @@ test.describe('Profile', () => {
 
   test('change password: wrong current password shows error', async ({ page }) => {
     await page.goto('/profile');
+    await waitForHydration(page);
 
     await page.getByRole('button', { name: /change password|set password/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -43,6 +45,7 @@ test.describe('Profile', () => {
 
   test('change password: new password too short shows validation error', async ({ page }) => {
     await page.goto('/profile');
+    await waitForHydration(page);
 
     await page.getByRole('button', { name: /change password|set password/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();

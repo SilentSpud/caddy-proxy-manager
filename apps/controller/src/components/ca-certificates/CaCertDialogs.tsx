@@ -18,7 +18,8 @@ import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
 import {
   deleteCaCertificateAction,
   issueClientCertificateAction,
@@ -54,8 +55,8 @@ function sanitizeFilenameSegment(value: string): string {
   );
 }
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString();
+function formatDateTime(format: ReturnType<typeof useFormatter>, value: string): string {
+  return format.dateTime(new Date(value), TIMESTAMP_STYLES.dateTimeShort);
 }
 
 function formatFingerprint(value: string): string {
@@ -213,7 +214,7 @@ export function IssueClientCertDialog({
               min={1}
               max={3650}
               isIntegerOnly
-              units="days"
+              units={t("days")}
             />
             <GeneratedPasswordField
               label={t("exportPassword")}
@@ -245,6 +246,7 @@ export function ManageIssuedClientCertsDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("caCertificates");
+  const format = useFormatter();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [items, setItems] = useState<IssuedClientCertificate[]>(issuedCerts);
@@ -295,23 +297,21 @@ export function ManageIssuedClientCertsDialog({
         <Banner
           status="info"
           title={t("revokeWarningTitle")}
-          description={`Revoking a client certificate removes it from the trusted mTLS client certificate pool for hosts using ${cert.name}.`}
+          description={t("revokeWarningDescription", { name: cert.name })}
         />
         {error && (
           <Banner status="error" title={t("couldNotRevokeCertificate")} description={error} />
         )}
         {revokedCount > 0 && (
           <Switch
-            label={`Show revoked (${revokedCount})`}
+            label={t("showRevokedCount", { count: revokedCount })}
             value={showRevoked}
             onChange={setShowRevoked}
           />
         )}
         {visibleItems.length === 0 ? (
           <Text type="body" size="sm" color="secondary">
-            {items.length === 0
-              ? "No issued client certificates are currently tracked for this CA. Certificates issued from this UI will appear here and can then be revoked individually."
-              : 'No active client certificates. Enable "Show revoked" to view revoked certificates.'}
+            {items.length === 0 ? t("issuedCertificatesEmpty") : t("activeCertificatesEmpty")}
           </Text>
         ) : (
           visibleItems.map((item) => {
@@ -325,34 +325,42 @@ export function ManageIssuedClientCertsDialog({
                         {item.commonName}
                       </Text>
                       <Text type="body" size="sm" color="secondary">
-                        Serial {item.serialNumber}
+                        {t("serialLine", { serial: item.serialNumber })}
                       </Text>
                     </VStack>
                     <HStack gap={1} wrap="wrap" justify="end">
                       <Badge
                         variant={item.revokedAt ? "neutral" : "success"}
-                        label={item.revokedAt ? "Revoked" : "Active"}
+                        label={item.revokedAt ? t("revoked") : t("active")}
                       />
-                      <Badge
-                        variant={expired ? "error" : "neutral"}
-                        label={
-                          expired
-                            ? `Expired ${formatDateTime(item.validTo)}`
-                            : `Expires ${formatDateTime(item.validTo)}`
-                        }
-                      />
+                      <UtcTooltip value={item.validTo}>
+                        <Badge
+                          variant={expired ? "error" : "neutral"}
+                          label={
+                            expired
+                              ? t("expiredOn", { date: formatDateTime(format, item.validTo) })
+                              : t("expiresOn", { date: formatDateTime(format, item.validTo) })
+                          }
+                        />
+                      </UtcTooltip>
                     </HStack>
                   </HStack>
-                  <Text type="body" size="sm" color="secondary">
-                    Issued {formatDateTime(item.createdAt)}
-                  </Text>
+                  <UtcTooltip value={item.createdAt}>
+                    <Text type="body" size="sm" color="secondary">
+                      {t("issuedLine", { date: formatDateTime(format, item.createdAt) })}
+                    </Text>
+                  </UtcTooltip>
                   <Text type="code" size="sm" color="secondary">
-                    SHA-256 {formatFingerprint(item.fingerprintSha256)}
+                    {t("fingerprintLine", {
+                      fingerprint: formatFingerprint(item.fingerprintSha256),
+                    })}
                   </Text>
                   {item.revokedAt ? (
-                    <Text type="body" size="sm" color="secondary">
-                      Revoked {formatDateTime(item.revokedAt)}
-                    </Text>
+                    <UtcTooltip value={item.revokedAt}>
+                      <Text type="body" size="sm" color="secondary">
+                        {t("revokedLine", { date: formatDateTime(format, item.revokedAt) })}
+                      </Text>
+                    </UtcTooltip>
                   ) : (
                     <HStack justify="end">
                       <Button
@@ -394,7 +402,7 @@ export function DeleteCaCertDialog({
       if (result.success) {
         onClose();
       } else {
-        setError(result.error ?? "Failed to delete");
+        setError(result.error ?? t("deleteFailed"));
       }
     });
   }
@@ -425,8 +433,10 @@ export function DeleteCaCertDialog({
     >
       <VStack gap={4}>
         <Text type="body" size="sm" color="secondary">
-          Delete CA certificate <strong>{cert.name}</strong>? This cannot be undone. Proxy hosts
-          using this CA for mTLS will stop requiring client certificates.
+          {t.rich("deleteCaCertificateConfirm", {
+            name: cert.name,
+            strong: (chunks) => <strong>{chunks}</strong>,
+          })}
         </Text>
         {error && (
           <Banner status="error" title={t("couldNotDeleteCertificate")} description={error} />

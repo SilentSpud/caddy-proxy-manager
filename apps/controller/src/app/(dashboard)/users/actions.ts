@@ -18,6 +18,7 @@ import { getTranslations } from "next-intl/server";
 import { actionError, actionSuccess, type ActionState } from "@/src/lib/actions";
 import {
   assertAcceptablePassword,
+  assertEmailAddress,
   assertNotSelf,
   assertUserRole,
   assertUserStatus,
@@ -39,6 +40,7 @@ async function createUserActionUntranslated(formData: FormData) {
   if (!email || !password) {
     throw domainError("emailAndPasswordRequired");
   }
+  assertEmailAddress(email);
   assertAcceptablePassword(password);
 
   const passwordHash = await hashPassword(password);
@@ -110,6 +112,7 @@ async function updateUserInfoActionUntranslated(userId: number, formData: FormDa
 
   const name = formData.get("name") ? String(formData.get("name")).trim() : undefined;
   const email = formData.get("email") ? String(formData.get("email")).trim() : undefined;
+  if (email !== undefined) assertEmailAddress(email);
 
   await updateUserProfile(userId, { name, email });
 

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createSelfSignedServerCertificate } from '../helpers/certs';
+import { waitForHydration } from '../helpers/hydration';
 
 test.describe('Certificates', () => {
   test('page loads with tabs visible', async ({ page }) => {
@@ -160,6 +161,7 @@ test.describe('Certificates', () => {
 
     try {
       await page.goto('/certificates');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /imported/i }).click();
 
       await expect(page.getByText(certName, { exact: true }).last()).toBeVisible({
@@ -213,6 +215,7 @@ test.describe('Certificates', () => {
     let createdId: number | null = null;
     try {
       await page.goto('/certificates');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /imported/i }).click();
 
       // Open the Import drawer. The "Add"/"Import" trigger varies by viewport,

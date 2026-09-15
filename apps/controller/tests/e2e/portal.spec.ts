@@ -11,13 +11,13 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Portal login page', () => {
   test('shows error when no redirect URI is provided', async ({ page }) => {
     await page.goto('/portal');
-    await expect(page.getByText('Authentication Required')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Authentication Required' })).toBeVisible();
     await expect(page.getByText('No redirect destination specified.')).toBeVisible();
   });
 
   test('shows login form when redirect URI is provided', async ({ page }) => {
     await page.goto('/portal?rd=http://example.com');
-    await expect(page.getByText('Authentication Required')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Authentication Required' })).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
 
     // Identifier first: step one is the username on its own.
@@ -58,19 +58,19 @@ test.describe('Portal login page', () => {
   test('rejects javascript: URI - no rid is created', async ({ page }) => {
     await page.goto('/portal?rd=javascript:alert(1)');
     // Form shows (hasRedirect is true) but no rid is created - login will fail
-    await expect(page.getByText('Authentication Required')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Authentication Required' })).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
   });
 
   test('rejects data: URI - no rid is created', async ({ page }) => {
     await page.goto('/portal?rd=data:text/html,<h1>evil</h1>');
-    await expect(page.getByText('Authentication Required')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Authentication Required' })).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
   });
 
   test('rejects file: URI - no rid is created', async ({ page }) => {
     await page.goto('/portal?rd=file:///etc/passwd');
-    await expect(page.getByText('Authentication Required')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Authentication Required' })).toBeVisible();
     await expect(page.getByText('Sign in to continue')).toBeVisible();
   });
 
@@ -93,7 +93,7 @@ test.describe('Portal login page', () => {
     // When returning from OAuth, the portal gets ?rid=<opaque>
     // With a fake rid it should still show the login form (not "No redirect destination")
     await page.goto('/portal?rid=abc123fakeopaqueid');
-    await expect(page.getByText('Authentication Required')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Authentication Required' })).toBeVisible();
     // It has a redirect (the rid), so it should show the form, not the "no destination" message
     await expect(page.getByText('No redirect destination specified.')).not.toBeVisible();
   });

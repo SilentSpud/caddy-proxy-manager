@@ -15,6 +15,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { Badge } from "@astryxdesign/core/Badge";
+import { Banner } from "@astryxdesign/core/Banner";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import { LocaleSwitcher } from "@/src/components/locale/LocaleSwitcher";
@@ -25,11 +26,29 @@ import { useThemeMode } from "@/src/components/theme/ThemeModeProvider";
 import { formatAppVersion } from "@/src/lib/app-version";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import {
+  type Destination,
   type DestinationId,
   moreDestinations,
+  RAIL_GROUPS,
+  type RailGroup,
   resolveDrawer,
   visibleDestinations,
 } from "@/src/lib/nav/destinations";
+
+const RAIL_GROUP_LABELS: Record<
+  RailGroup,
+  | "railGroupHosts"
+  | "railGroupAccess"
+  | "railGroupSecurity"
+  | "railGroupObservability"
+  | "railGroupSystem"
+> = {
+  hosts: "railGroupHosts",
+  access: "railGroupAccess",
+  security: "railGroupSecurity",
+  observability: "railGroupObservability",
+  system: "railGroupSystem",
+};
 
 type User = {
   id: string;
@@ -110,6 +129,7 @@ export default function DashboardLayoutClient({
   user,
   avatar,
   appName,
+  demoMode = false,
   updateAvailable,
   stagedKeys,
   morePins,
@@ -118,6 +138,8 @@ export default function DashboardLayoutClient({
   user: User;
   avatar: ResolvedAvatar;
   appName: string;
+  /** DEMO_MODE is on, so nothing saved here reaches a Caddy. */
+  demoMode?: boolean;
   /** A newer release exists in the registry. Surfaced beside the version it replaces. */
   updateAvailable: boolean;
   /** Settings keys this operator has staged, so the settings rail can mark their sections. */
@@ -139,6 +161,22 @@ export default function DashboardLayoutClient({
   // phone, where there is no footer.
   const railItems = visibleDestinations(user.role).filter((d) => d.id !== "profile");
   const drawerItems = resolveDrawer(morePins, user.role);
+
+  // An element rather than the component, as the Settings rail passes it: SideNavItem draws a
+  // component at its small size, and the two rails read as different apps side by side.
+  const renderRailItem = ({ id, href, labelKey }: Destination) => {
+    const RailIcon = DESTINATION_ICONS[id];
+    return (
+      <SideNavItem
+        key={href}
+        as={Link}
+        href={href}
+        label={t(labelKey)}
+        icon={<RailIcon />}
+        isSelected={pathname === href}
+      />
+    );
+  };
 
   const closeMore = useCallback(() => setMoreOpenOn(null), []);
   const toggleMore = useCallback(
@@ -172,6 +210,15 @@ export default function DashboardLayoutClient({
     </>
   ) : null;
   const content = <div className="cpm-mobile-content">{children}</div>;
+  // Not dismissable: a visitor who forgets they are in a demo will wonder why their site is down.
+  const banner = demoMode ? (
+    <Banner
+      status="info"
+      container="section"
+      title={t("demoBannerTitle")}
+      description={t("demoBannerDescription")}
+    />
+  ) : undefined;
 
   // Settings takes the rail over rather than nesting its own panel inside the page. One rail, and
   // its first row is the way back - see ./settings/SettingsSideNav.tsx.
@@ -179,6 +226,7 @@ export default function DashboardLayoutClient({
     return (
       <>
         <AppShell
+          banner={banner}
           contentPadding={0}
           mobileNav={false}
           sideNav={
@@ -198,6 +246,7 @@ export default function DashboardLayoutClient({
   return (
     <>
       <AppShell
+        banner={banner}
         contentPadding={isFullBleed ? 0 : 6}
         mobileNav={false}
         sideNav={
@@ -227,18 +276,20 @@ export default function DashboardLayoutClient({
             }
             footer={<UserFooter user={user} avatar={avatar} />}
           >
+            {/* Laid out like the Settings rail: ungrouped pages first under a hidden title, then one
+                titled section per group, each skipped when this role can open nothing in it. */}
             <SideNavSection title={t("sectionLabel")} isHeaderHidden>
-              {railItems.map(({ id, href, labelKey }) => (
-                <SideNavItem
-                  key={href}
-                  as={Link}
-                  href={href}
-                  label={t(labelKey)}
-                  icon={DESTINATION_ICONS[id]}
-                  isSelected={pathname === href}
-                />
-              ))}
+              {railItems.filter((d) => !d.railGroup).map(renderRailItem)}
             </SideNavSection>
+            {RAIL_GROUPS.map((group) => {
+              const items = railItems.filter((d) => d.railGroup === group);
+              if (items.length === 0) return null;
+              return (
+                <SideNavSection key={group} title={t(RAIL_GROUP_LABELS[group])}>
+                  {items.map(renderRailItem)}
+                </SideNavSection>
+              );
+            })}
           </SideNav>
         }
       >

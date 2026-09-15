@@ -25,6 +25,16 @@ export type DestinationId =
 /** How the More page groups what the tab bar cannot hold. */
 export type MoreGroup = "access" | "security" | "reference" | "instance";
 
+/** The titled sections of the desktop rail, in order, laid out like the Settings rail's. */
+export type RailGroup = "hosts" | "access" | "security" | "observability" | "system";
+export const RAIL_GROUPS: readonly RailGroup[] = [
+  "hosts",
+  "access",
+  "security",
+  "observability",
+  "system",
+];
+
 /**
  * A key in the `nav` message namespace. Spelled out rather than `string` so next-intl's typed
  * keys still catch a typo here as a build error.
@@ -59,6 +69,8 @@ export type Destination = {
   operator: boolean;
   /** Set for the pages that live behind More on a phone; unset for the ones the tab bar names. */
   moreGroup?: MoreGroup;
+  /** Its section in the desktop rail. Unset sits above the titled sections, as Overview does. */
+  railGroup?: RailGroup;
 };
 
 export const DESTINATIONS: readonly Destination[] = [
@@ -67,6 +79,7 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "proxy-hosts",
     href: "/proxy-hosts",
     labelKey: "proxyHosts",
+    railGroup: "hosts",
     adminOnly: true,
     operator: true,
   },
@@ -74,14 +87,23 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "l4-proxy-hosts",
     href: "/l4-proxy-hosts",
     labelKey: "l4ProxyHosts",
+    railGroup: "hosts",
     adminOnly: true,
     operator: true,
   },
-  { id: "agents", href: "/agents", labelKey: "agents", adminOnly: true, operator: true },
+  {
+    id: "agents",
+    href: "/agents",
+    labelKey: "agents",
+    railGroup: "hosts",
+    adminOnly: true,
+    operator: true,
+  },
   {
     id: "access-lists",
     href: "/access-lists",
     labelKey: "accessLists",
+    railGroup: "access",
     adminOnly: true,
     operator: false,
     moreGroup: "access",
@@ -90,6 +112,7 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "groups",
     href: "/groups",
     labelKey: "groups",
+    railGroup: "access",
     adminOnly: true,
     operator: false,
     moreGroup: "access",
@@ -98,6 +121,7 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "users",
     href: "/users",
     labelKey: "users",
+    railGroup: "access",
     adminOnly: true,
     operator: false,
     moreGroup: "access",
@@ -106,6 +130,7 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "certificates",
     href: "/certificates",
     labelKey: "certificates",
+    railGroup: "security",
     adminOnly: true,
     operator: false,
     moreGroup: "security",
@@ -114,15 +139,24 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "waf",
     href: "/waf",
     labelKey: "waf",
+    railGroup: "security",
     adminOnly: true,
     operator: false,
     moreGroup: "security",
   },
-  { id: "analytics", href: "/analytics", labelKey: "analytics", adminOnly: true, operator: false },
+  {
+    id: "analytics",
+    href: "/analytics",
+    labelKey: "analytics",
+    railGroup: "observability",
+    adminOnly: true,
+    operator: false,
+  },
   {
     id: "audit-log",
     href: "/audit-log",
     labelKey: "auditLog",
+    railGroup: "observability",
     adminOnly: true,
     operator: false,
     moreGroup: "reference",
@@ -131,6 +165,7 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "api-docs",
     href: "/api-docs",
     labelKey: "apiDocs",
+    railGroup: "system",
     adminOnly: true,
     operator: false,
     moreGroup: "reference",
@@ -139,6 +174,7 @@ export const DESTINATIONS: readonly Destination[] = [
     id: "settings",
     href: "/settings",
     labelKey: "settings",
+    railGroup: "system",
     adminOnly: true,
     operator: false,
     moreGroup: "instance",

@@ -5,6 +5,7 @@
  */
 
 import { domainError } from "./domain-error";
+import { isEmailAddress } from "./email-address";
 import { APP_ROLES, type AppRole } from "./oidc-groups";
 import { isPasswordAcceptable, MIN_PASSWORD_LENGTH } from "./password-policy";
 
@@ -36,6 +37,14 @@ export function assertNotSelf(
   code: "cannotChangeOwnRole" | "cannotChangeOwnStatus" | "cannotDeleteOwnAccount",
 ): void {
   if (actorId === targetId) throw domainError(code);
+}
+
+/**
+ * Email syntax for an account an administrator creates or edits. Not in the model: an OAuth sign-in
+ * writes whatever address its provider asserts, and refusing it there would lock that user out.
+ */
+export function assertEmailAddress(email: string): void {
+  if (!isEmailAddress(email)) throw domainError("emailInvalid");
 }
 
 /** The password policy, for a password an administrator chooses on someone else's behalf. */

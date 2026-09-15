@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 import { requireUser } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
+import { isDemoMode } from "@/src/lib/demo-mode";
 import { resolveAvatar } from "@/src/lib/avatar";
 import { isGravatarEnabled } from "@/src/lib/settings";
+import { getTranslations } from "next-intl/server";
 import { getModuleGateState } from "@/src/lib/caddy-build";
+import { caddyModuleName } from "@/src/lib/caddy-module-messages";
 import { getUpdateStatus } from "@/src/lib/updates";
 import { ModuleGateProvider } from "@/components/caddy-modules/ModuleGate";
 import { requiresLegacyPasswordChange } from "@/src/lib/services/legacy-password";
@@ -15,6 +18,8 @@ import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireUser();
   const userId = Number(session.user.id);
+  // For the module names the gate's tooltip gives; the catalog is already loaded for the request.
+  const t = await getTranslations();
 
   // Every read below is independent, so they share one round trip; this runs on every dashboard
   // navigation, which is what makes the serial version worth avoiding.
@@ -25,7 +30,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       // Resolved once for the whole dashboard rather than per page: every page that
       // shows a module-backed control needs the same answer, and it only changes
       // when an admin saves Settings → Caddy Build.
-      getModuleGateState(),
+      getModuleGateState((module) => caddyModuleName(t, module)),
       // A cache read, and a background refresh when it has gone stale - never a network round trip
       // on the render path. See lib/updates.ts.
       getUpdateStatus(),
@@ -58,6 +63,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         user={session.user}
         avatar={avatar}
         appName={config.appName}
+        demoMode={isDemoMode()}
         updateAvailable={updates.updateAvailable}
         stagedKeys={staged}
         morePins={morePins}

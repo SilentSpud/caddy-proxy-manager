@@ -60,7 +60,53 @@
     "unusedListTitle": "Not used by any proxy host",
     "usedBy": "Used by",
     "username": "Username",
-    "usernameAlreadyExists": "Username already exists"
+    "usernameAlreadyExists": "Username already exists",
+    "strength": {
+      "empty": "Empty",
+      "weak": "Weak",
+      "fair": "Fair",
+      "good": "Good",
+      "strong": "Strong",
+      "excellent": "Excellent"
+    },
+    "relative": {
+      "never": "never",
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago",
+      "monthsAgo": "{count}mo ago",
+      "yearsAgo": "{count}y ago"
+    },
+    "columnAdded": "Added",
+    "regeneratePasswordFor": "Regenerate password for {username}",
+    "removeNamed": "Remove {username}",
+    "passwordStrength": "Password strength: {strength}",
+    "typeNameToConfirm": "Type {name} to confirm",
+    "nameDoesNotMatch": "Name does not match",
+    "moreDomains": "{count, plural, one {+# more domain} other {+# more domains}}",
+    "memberCount": "{count, plural, one {# member} other {# members}}",
+    "hostCount": "{count, plural, one {# host} other {# hosts}}",
+    "updatedBadge": "updated {when}",
+    "seedUsernameLabel": "Username for seed member {index}",
+    "seedUsernamePlaceholder": "username",
+    "seedPasswordLabel": "Password for seed member {index}",
+    "seedPasswordPlaceholder": "password",
+    "seedGeneratePasswordLabel": "Generate a password for seed member {index}",
+    "seedRemoveLabel": "Remove seed member {index}",
+    "sortRecent": "Recent",
+    "sortUsage": "Usage",
+    "removedMembersToast": "Removed {count, plural, one {# member} other {# members}}",
+    "removedNamedToast": "Removed {username}",
+    "removedMemberToast": "Removed member",
+    "addedToast": "Added {username}",
+    "deletedToast": "Deleted \"{name}\"",
+    "createdToast": "Created \"{name}\"",
+    "selectedCount": "{count} selected",
+    "deleteInUseWarning": "This list is currently used by {count, plural, one {# proxy host} other {# proxy hosts}}. Those hosts will be left without authentication.",
+    "deleteUnusedWarning": "Once deleted, the credentials cannot be recovered.",
+    "usageSummary": "This access list guards {count, plural, one {# proxy host} other {# proxy hosts}}. Removing the list, or any of its members, will affect access to these hosts.",
+    "noDescription": "No description"
   },
   "agents": {
     "assignedAgents": "Assigned agents",
@@ -100,7 +146,10 @@
     "title": "Agents",
     "unassignedHint": "Plus every host that is not assigned to any agent.",
     "version": "Version",
-    "versionNote": "Across the fleet"
+    "versionNote": "Across the fleet",
+    "rebuildTriggered": "Rebuild triggered.",
+    "nameRequired": "A name is required.",
+    "renamed": "Agent renamed."
   },
   "analytics": {
     "accessLoggingDisabledTitle": "Caddy access logging is not enabled",
@@ -150,7 +199,36 @@
     "unconfiguredHostsHelp": "Hosts that received traffic but are not configured as proxy hosts in Caddy.",
     "uniqueIps": "Unique IPs",
     "unplacedCountry": "Not placed by GeoIP",
-    "wafEvents": "WAF Events"
+    "wafEvents": "WAF Events",
+    "unknownUserAgent": "Unknown",
+    "pickDateTime": "Pick date & time",
+    "searchHostsPlaceholder": "Search hosts...",
+    "seriesAllowed": "Allowed",
+    "hits": "Hits",
+    "selected": "Selected",
+    "country": "Country",
+    "total": "Total",
+    "waf": "WAF",
+    "protocol": "Protocol",
+    "share": "Share",
+    "time": "Time",
+    "ip": "IP",
+    "host": "Host",
+    "method": "Method",
+    "uri": "URI",
+    "status": "Status",
+    "rule": "Rule",
+    "description": "Description",
+    "triggeredBy": "Triggered by",
+    "blockedFromWaf": "{count} from WAF",
+    "bytesServed": "{bytes} served",
+    "rulesTriggered": "{count, plural, one {# rule triggered} other {# rules triggered}}",
+    "noWafEvents": "No WAF events",
+    "analytics": "Analytics",
+    "accessLoggingDisabledDescription": "No traffic data is being collected. <link>Enable logging in Settings</link>.",
+    "wafEventsCount": "WAF Events: {count}",
+    "requestFailedWithStatus": "{path} failed with status {status}",
+    "territory": "Territory"
   },
   "apiDocs": {
     "graphqlEndpoint": "GraphQL endpoint",
@@ -162,7 +240,7 @@
   },
   "auditLog": {
     "activityPeak": "Busiest hour: {label}, {count, plural, one {# event} other {# events}}.",
-    "activityTitle": "Activity, last 24 hours (UTC)",
+    "activityTitle": "Activity, last 24 hours",
     "actorsNote": "{count, plural, one {# distinct actor} other {# distinct actors}}",
     "auditLog": "Audit Log",
     "event": "Event",
@@ -175,8 +253,77 @@
     "resourceKinds": "Resource kinds touched",
     "resourceKindsNote": "In the last 24 hours",
     "searchAuditLog": "Search audit log...",
-    "timeUtc": "Time (UTC)",
-    "user": "User"
+    "time": "Time",
+    "user": "User",
+    "systemActor": "System",
+    "summaryFallback": "{action} on {entityType}",
+    "summaries": {
+      "accessListCreated": "Created access list {name}",
+      "accessListDeleted": "Deleted access list {name}",
+      "accessListEntryAdded": "Added user {username} to access list {list}",
+      "accessListEntryRemoved": "Removed entry from access list {list}",
+      "accessListUpdated": "Updated access list {name}",
+      "avatarDeleted": "User removed profile picture",
+      "avatarUpdated": "User updated profile picture",
+      "caCertificateCreated": "Created CA certificate {name}",
+      "caCertificateDeleted": "Deleted CA certificate {name}",
+      "caCertificateUpdated": "Updated CA certificate {name}",
+      "certificateCreated": "Created certificate {name}",
+      "certificateDeleted": "Deleted certificate {name}",
+      "certificateUpdated": "Updated certificate {name}",
+      "clientCertificateIssued": "Issued client certificate {name}",
+      "clientCertificateRevoked": "Revoked client certificate {name}",
+      "forwardAuthAccessDenied": "Forward auth access denied for user {email} to host {host}",
+      "forwardAuthAccessUpdated": "Updated forward auth access for proxy host {id}",
+      "forwardAuthLogin": "Forward auth login for user {email} to {host}",
+      "forwardAuthLoginFailed": "Forward auth login failed for user {email}",
+      "forwardAuthLoginFailedUsername": "Forward auth login failed for username: {username}",
+      "forwardAuthSessionLogin": "Forward auth login (session) for user {email} to {host}",
+      "groupCreated": "Created group {name}",
+      "groupDeleted": "Deleted group {name}",
+      "groupGrantsUpdated": "Updated the management grants for group {id}",
+      "groupMappingsUpdated": "Updated the IdP group mappings for group {id}",
+      "groupMemberAdded": "Added user {id} to group {group}",
+      "groupMemberRemoved": "Removed user {id} from group {group}",
+      "groupUpdated": "Updated group {name}",
+      "l4ProxyHostCreated": "Created L4 proxy host {name}",
+      "l4ProxyHostDeleted": "Deleted L4 proxy host {name}",
+      "l4ProxyHostUpdated": "Updated L4 proxy host {name}",
+      "loginSuccess": "User signed in",
+      "mtlsAccessRuleCreated": "Created mTLS access rule for path {path} on proxy host {hostId}",
+      "mtlsAccessRuleDeleted": "Deleted mTLS access rule for path {path}",
+      "mtlsAccessRuleUpdated": "Updated mTLS access rule for path {path}",
+      "mtlsCertificateAssigned": "Assigned cert {cert} to role {role}",
+      "mtlsCertificateUnassigned": "Removed cert from role {role}",
+      "mtlsRoleCreated": "Created mTLS role {name}",
+      "mtlsRoleDeleted": "Deleted mTLS role {name}",
+      "mtlsRoleUpdated": "Updated mTLS role {name}",
+      "oauthProviderCreated": "Created OAuth provider \"{name}\"",
+      "oauthProviderCreatedFromSettings": "OAuth provider \"{name}\" created",
+      "oauthProviderDeleted": "Deleted OAuth provider \"{name}\"",
+      "oauthProviderMadePrimary": "Made OAuth provider \"{id}\" primary",
+      "oauthProviderPrimaryCleared": "Cleared the primary OAuth provider",
+      "oauthProviderUpdated": "Updated OAuth provider \"{name}\"",
+      "oauthUnlinked": "User unlinked OAuth account: {provider}",
+      "oidcBackchannelLogout": "Sessions for user {id} ended by a back-channel logout from {provider}",
+      "oidcGroupSyncAdded": "Group membership for user {id} synced from {provider}: added to {added}",
+      "oidcGroupSyncAddedRemoved": "Group membership for user {id} synced from {provider}: added to {added}; removed from {removed}",
+      "oidcGroupSyncRemoved": "Group membership for user {id} synced from {provider}: removed from {removed}",
+      "oidcRoleSync": "Role for user {id} set to \"{role}\" from {provider} groups (was \"{previous}\")",
+      "oidcRoleSyncSkipped": "Kept admin role for user {id}: {provider} groups mapped to \"{role}\" but no other active admin exists",
+      "passwordChanged": "User changed their password",
+      "passwordRemoved": "User removed their password; signs in with {providers}",
+      "passwordSet": "User set a password",
+      "proxyHostCreated": "Created proxy host {name}",
+      "proxyHostDeleted": "Deleted proxy host {name}",
+      "proxyHostUpdated": "Updated proxy host {name}",
+      "setupFirstAdmin": "User {id} became the first administrator by signing in during setup",
+      "userCreated": "Created user {id} ({email}) with role {role}",
+      "userDeleted": "Deleted user {id}",
+      "userProfileUpdated": "Updated user {id} profile",
+      "userRoleChanged": "Changed user {id} role to {role}",
+      "userStatusChanged": "Changed user {id} status to {status}"
+    }
   },
   "auth": {
     "apiErrors": {
@@ -189,7 +336,13 @@
       "noAccessToApplication": "You do not have access to this application.",
       "notAuthenticated": "Not authenticated",
       "passwordSignInDisabled": "Password sign-in is disabled. Use single sign-on.",
-      "tooManyLoginAttempts": "Too many login attempts. Please try again later."
+      "tooManyLoginAttempts": "Too many login attempts. Please try again later.",
+      "currentPasswordIncorrect": "Current password is incorrect",
+      "currentPasswordRequired": "Current password is required",
+      "passwordManagementDisabled": "Password management is disabled. Sign-in is handled by the OIDC provider.",
+      "tooManyAttempts": "Too many attempts. Please try again later.",
+      "unauthorized": "Unauthorized",
+      "userNotFound": "User not found"
     },
     "authenticationRequired": "Authentication Required",
     "authorizeFailed": "Failed to authorize access.",
@@ -203,7 +356,6 @@
       "credentialsRequired": "Username and password are required.",
       "errorTitle": "Could not sign in",
       "failed": "Login failed.",
-      "invalidCredentials": "Invalid username or password.",
       "metaTitle": "Sign In",
       "noMethodDescription": "Single sign-on is the only way to sign in, but no provider is configured. Configure one with the OAUTH_* environment variables.",
       "noMethodTitle": "No sign-in method available",
@@ -211,7 +363,6 @@
       "oauthFailedCode": "Single sign-on did not complete ({code}). Try again, or sign in another way.",
       "password": "Password",
       "passwordRequired": "Enter your password.",
-      "rateLimited": "Too many login attempts. Try again in a few minutes.",
       "signingInWith": "Signing in with {provider}…",
       "ssoDivider": "Or continue with single sign-on",
       "submit": "Sign in",
@@ -245,7 +396,16 @@
     "signingInAs": "Signing in as {account}",
     "unexpectedError": "An unexpected error occurred.",
     "unexpectedErrorTryAgain": "An unexpected error occurred. Please try again.",
-    "username": "Username"
+    "username": "Username",
+    "errors": {
+      "emailNotVerified": "Email not verified",
+      "invalidUsername": "Username is invalid",
+      "invalidUsernameOrPassword": "Invalid username or password",
+      "tooManyRequests": "Too many requests. Please try again later.",
+      "unknown": "Sign-in did not complete. Try again.",
+      "usernameTooLong": "Username is too long",
+      "usernameTooShort": "Username is too short"
+    }
   },
   "caCertificates": {
     "cancel": "Cancel",
@@ -272,7 +432,23 @@
     "revoke": "Revoke",
     "revokeFailed": "Failed to revoke certificate",
     "revokeWarningTitle": "Revoking removes trust",
-    "validity": "Validity"
+    "validity": "Validity",
+    "revokeWarningDescription": "Revoking a client certificate removes it from the trusted mTLS client certificate pool for hosts using {name}.",
+    "showRevokedCount": "Show revoked ({count})",
+    "revoked": "Revoked",
+    "active": "Active",
+    "expiredOn": "Expired {date}",
+    "expiresOn": "Expires {date}",
+    "days": "days",
+    "issuedCertificatesEmpty": "No issued client certificates are currently tracked for this CA. Certificates issued from this UI will appear here and can then be revoked individually.",
+    "activeCertificatesEmpty": "No active client certificates. Enable \"Show revoked\" to view revoked certificates.",
+    "serialLine": "Serial {serial}",
+    "issuedLine": "Issued {date}",
+    "fingerprintLine": "SHA-256 {fingerprint}",
+    "revokedLine": "Revoked {date}",
+    "deleteCaCertificateConfirm": "Delete CA certificate <strong>{name}</strong>? This cannot be undone. Proxy hosts using this CA for mTLS will stop requiring client certificates.",
+    "deleteFailed": "Failed to delete",
+    "deleteCaCertificateFailed": "Failed to delete CA certificate"
   },
   "caddyModules": {
     "addModule": "Add module",
@@ -299,7 +475,49 @@
     "rebuildRequiredTitle": "Plugins are compiled into Caddy",
     "remove": "Remove",
     "removing": "Removing:",
-    "version": "Version"
+    "version": "Version",
+    "categoryProxy": "Proxying",
+    "categorySecurity": "Security",
+    "categoryDns": "ACME DNS-01 providers",
+    "modulesSelected": "{count, plural, one {# module selected. This is exactly what the rebuild runs.} other {# modules selected. This is exactly what the rebuild runs.}}",
+    "modulesCompiledIn": "{count, plural, one {# module compiled in.} other {# modules compiled in.}}",
+    "rebuildingCaddy": "Rebuilding Caddy…",
+    "lastRebuildFailed": "The last rebuild failed",
+    "rebuildRequired": "Rebuild required",
+    "customModulesTitle": "Custom modules",
+    "disabledReasonNamed": "Requires the {name} Caddy module. Enable it in Settings → Caddy Build and rebuild Caddy.",
+    "disabledReasonUnnamed": "Requires a Caddy module that is not enabled. See Settings → Caddy Build.",
+    "modules": {
+      "caddyL4": {
+        "name": "Layer 4 Proxy",
+        "description": "TCP/UDP proxying. Required by L4 Proxy Hosts and by the agent that binds their ports."
+      },
+      "caddyTailscale": {
+        "name": "Tailscale",
+        "description": "Runs Tailscale inside Caddy. Required to serve a proxy host on your tailnet, to gate one on Tailscale identity, and to reach an upstream over the tailnet."
+      },
+      "caddyBlocker": {
+        "name": "Request Blocker",
+        "description": "Country, continent, ASN, and CIDR blocking. Required by global geoblocking and by per-host geoblock rules."
+      },
+      "corazaWaf": {
+        "name": "Coraza WAF",
+        "description": "ModSecurity-compatible web application firewall with the OWASP Core Rule Set. Required by the WAF settings and the WAF events page."
+      }
+    },
+    "dnsModuleName": "{provider} DNS",
+    "dnsModuleDescription": "ACME DNS-01 challenge support for {provider}. Required to issue certificates through this provider.",
+    "conflicts": {
+      "summary": "Cannot disable those modules yet: {problems}. Turn the feature off first.",
+      "l4Hosts": "{count, plural, one {# enabled L4 proxy host needs} other {# enabled L4 proxy hosts need}} the Layer 4 Proxy module",
+      "globalWaf": "global WAF is switched on and needs the Coraza WAF module",
+      "globalGeoblock": "global geoblocking is switched on and needs the Request Blocker module",
+      "hostWaf": "{count, plural, one {# proxy host has per-host WAF enabled and needs} other {# proxy hosts have per-host WAF enabled and need}} the Coraza WAF module",
+      "hostGeoblock": "{count, plural, one {# proxy host has per-host geoblocking enabled and needs} other {# proxy hosts have per-host geoblocking enabled and need}} the Request Blocker module",
+      "tailnetHosts": "{count, plural, one {# proxy host is served on the tailnet and needs} other {# proxy hosts are served on the tailnet and need}} the Tailscale module",
+      "defaultDnsProvider": "{provider} is the default DNS provider and needs its caddy-dns module",
+      "dnsProviderCredentials": "{provider} has DNS credentials configured and needs its caddy-dns module"
+    }
   },
   "certificates": {
     "acme": "ACME",
@@ -355,7 +573,53 @@
     "searchCertificates": "Search certificates",
     "sslTlsCertificates": "SSL/TLS Certificates",
     "stored": "Stored",
-    "validity": "Validity"
+    "validity": "Validity",
+    "proxyHost": "Proxy Host",
+    "status": "Status",
+    "disabled": "Disabled",
+    "expired": "Expired",
+    "active": "Active",
+    "expiringSoon": "Expiring soon",
+    "healthy": "Healthy",
+    "activeCount": "{count} active",
+    "activeOfTotal": "{active}/{total} active",
+    "moreCount": "+{count} more",
+    "useManageToViewAll": "Use \"Manage\" to view all",
+    "actionsForCaCertificate": "Actions for CA certificate {name}",
+    "actionsForCertificate": "Actions for certificate {name}",
+    "issueClientCert": "Issue Client Cert",
+    "edit": "Edit",
+    "privateKey": "Private Key",
+    "issuedCerts": "Issued Certs",
+    "added": "Added",
+    "noCaCertificatesConfigured": "No CA certificates configured",
+    "deleteImportedCertificateConfirm": "Delete imported certificate {name}? This cannot be undone.",
+    "deleteImportedCertificateConfirmWithError": "Delete imported certificate {name}? This cannot be undone. {error}",
+    "domains": "Domains",
+    "expires": "Expires",
+    "usedBy": "Used by",
+    "save": "Save",
+    "saveChanges": "Save Changes",
+    "generateCaCertificate": "Generate CA Certificate",
+    "editCaCertificate": "Edit CA Certificate",
+    "editCertificate": "Edit Certificate",
+    "days": "days",
+    "hidePrivateKey": "Hide private key",
+    "showPrivateKey": "Show private key",
+    "hide": "Hide",
+    "show": "Show",
+    "searchByHostOrDomain": "Search by host or domain…",
+    "searchByNameOrDomain": "Search by name or domain…",
+    "searchByName": "Search by name…",
+    "addedToday": "today",
+    "addedYesterday": "yesterday",
+    "addedDaysAgo": "{count}d ago",
+    "addedMonthsAgo": "{count}mo ago",
+    "addedYearsAgo": "{count}y ago",
+    "expiredDaysAgo": "Expired {count}d ago",
+    "expiredHoursAgo": "Expired {count}h ago",
+    "expiresInDays": "{count}d",
+    "expiresInHours": "{count}h"
   },
   "common": {
     "locale": {
@@ -366,7 +630,8 @@
     "theme": {
       "toDark": "Switch to dark theme",
       "toLight": "Switch to light theme"
-    }
+    },
+    "metaDescription": "Web UI for managing Caddy reverse proxies, certificates, and access control."
   },
   "errors": {
     "accessListEntryNotFound": "Entry not found",
@@ -379,7 +644,7 @@
     "cannotDeleteOwnAccount": "Cannot delete your own account",
     "certificateDomainsRequired": "At least one domain is required for a certificate",
     "certificateNotFound": "Certificate not found",
-    "certificatePemInvalid": "Invalid certificate PEM: could not parse as X.509 certificate",
+    "certificatePemInvalid": "Invalid certificate PEM: could not parse as an X.509 certificate",
     "certificatePemRequired": "Certificate PEM is required",
     "commonNameRequired": "Common name is required",
     "createL4HostFailed": "Failed to create L4 proxy host.",
@@ -391,6 +656,7 @@
     "deleteUserFailed": "Failed to delete user",
     "discardStagedFailed": "Failed to discard changes",
     "emailAndPasswordRequired": "Email and password are required",
+    "emailInvalid": "Enter a valid email address, such as name@example.com",
     "environmentOAuthProviderDeletionForbidden": "Cannot delete an environment-sourced OAuth provider",
     "exportPasswordRequired": "Export password is required",
     "failedToCreateAccessList": "Failed to create access list",
@@ -440,17 +706,100 @@
     "tokenExpiryInPast": "expires_at must be in the future",
     "tokenExpiryInvalid": "expires_at must be a valid ISO 8601 date",
     "tooManyRedirectIntents": "Too many sign-in attempts are in progress. Try again in a few minutes.",
-    "udpTlsTerminationUnsupported": "TLS termination is only supported with TCP protocol",
+    "udpTlsTerminationUnsupported": "TLS termination is only supported with the TCP protocol",
     "updateL4HostFailed": "Failed to update L4 proxy host.",
     "updateProxyHostFailed": "Failed to update proxy host. Please check the logs for details.",
     "updateUserInfoFailed": "Failed to update the user",
     "updateUserRoleFailed": "Failed to change the user's role",
     "updateUserStatusFailed": "Failed to change the user's status",
-    "upstreamsRequired": "At least one upstream must be specified"
+    "upstreamsRequired": "At least one upstream must be specified",
+    "defaultResponseHeaderLineInvalid": "Invalid response header line: {line}",
+    "hostWafInMemoryBodyLimitInvalid": "WAF in-memory body limit must be a whole number of MiB between {min} and {max}",
+    "hostWafRequestBodyLimitInvalid": "WAF request body limit must be a whole number of MiB between {min} and {max}",
+    "wafInMemoryBodyLimitInvalid": "In-memory body limit must be a whole number of MiB between {min} and {max}",
+    "wafRequestBodyLimitInvalid": "Request body limit must be a whole number of MiB between {min} and {max}",
+    "applyCaddyConfigFailed": "Failed to apply Caddy configuration",
+    "caCertificateInUse": "CA certificate is in use by proxy host(s): {names}",
+    "defaultRedirectStatusInvalid": "Default redirect status must be 301, 302, 303, 307, or 308",
+    "defaultRedirectUrlInvalid": "Default redirect URL is required and must not contain control characters",
+    "defaultResponseBodyNotString": "Default response body must be a string",
+    "defaultResponseHeaderNameDuplicate": "Duplicate default response header name: {name}",
+    "defaultResponseHeaderNameInvalid": "Invalid default response header name: {name}",
+    "defaultResponseHeaderValueInvalid": "Invalid value for default response header: {name}",
+    "defaultResponseHeadersNotObject": "Default response headers must be an object",
+    "defaultResponseModeInvalid": "Default response mode must be caddy, respond, redirect, or abort",
+    "defaultResponseSettingsNotObject": "Default response settings must be an object",
+    "defaultResponseStatusInvalid": "Default response status must be an integer from 200 to 599",
+    "hostWafBodyLimitActionInvalid": "waf.request_body_limit_action must be Reject or ProcessPartial",
+    "hostWafDirectiveBodyLimitOutOfRange": "waf.custom_directives has an out-of-range body limit: \"{directive}\" - the byte count must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
+    "hostWafInMemoryBodyLimitExceedsLimit": "waf.request_body_in_memory_limit must not exceed waf.request_body_limit",
+    "hostWafInMemoryBodyLimitOutOfRange": "waf.request_body_in_memory_limit must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
+    "hostWafRequestBodyLimitOutOfRange": "waf.request_body_limit must be an integer between {min} and {max} bytes (1 GiB is Coraza's hard maximum)",
+    "adminRequired": "Administrator privileges required",
+    "accessDenied": "You do not have access to that.",
+    "tailscaleNodeNameRequired": "Tailscale node name is required",
+    "tailscaleNodeNameInvalid": "Tailscale node name \"{name}\" is not a valid tailnet machine name. Use lowercase letters, digits and hyphens, e.g. \"caddy\".",
+    "tailscaleUpstreamNodeNameRequired": "Tailscale upstream node name is required",
+    "tailscaleUpstreamNodeNameInvalid": "Tailscale upstream node name \"{name}\" is not a valid tailnet machine name. Use lowercase letters, digits and hyphens, e.g. \"caddy\".",
+    "tailscaleDefaultNodeRequired": "Default node name is required",
+    "tailscaleDefaultNodeInvalid": "Default node name \"{name}\" is not a valid tailnet machine name. Use lowercase letters, digits and hyphens, e.g. \"caddy\".",
+    "tailscaleAuthKeyTooLong": "Tailscale auth key is implausibly long",
+    "tailscaleAuthKeyInvalidCharacters": "Tailscale auth key must not contain whitespace or control characters",
+    "tailscaleControlUrlInvalid": "Control server URL \"{url}\" is not a valid URL",
+    "tailscaleControlUrlProtocol": "Control server URL must be http or https",
+    "tailscaleStateDirNotAbsolute": "State directory must be an absolute path inside the container",
+    "tailscaleStateDirControlCharacter": "State directory contains a control character",
+    "tailscaleApiTokenTooLong": "API access token is implausibly long",
+    "tailscaleApiTokenInvalidCharacters": "API access token must not contain whitespace or control characters",
+    "tailscaleTailnetInvalid": "Tailnet \"{tailnet}\" is not valid. Use \"-\" for the token's own tailnet.",
+    "tailscaleTooManyTags": "At most {max} Tailscale tags are supported",
+    "tailscaleTagInvalid": "Tailscale tag \"{tag}\" is not valid. Tags look like \"tag:caddy\".",
+    "customModulePathRequired": "Module path is required",
+    "customModulePathTooLong": "Module path is too long: {path}…",
+    "customModulePathInvalid": "Invalid module path \"{path}\". Expected a Go module path such as github.com/owner/repo",
+    "customModulePathMissingHost": "Invalid module path \"{path}\". Expected a host and a path, such as github.com/owner/repo",
+    "customModuleVersionInvalid": "Invalid version \"{version}\" for {path}. Expected a tag, branch, or commit such as v1.2.3",
+    "customModuleDuplicate": "Duplicate custom module \"{path}\"",
+    "faviconEmpty": "That file is empty.",
+    "faviconTooLarge": "That file is {size} KB. The limit is {limit} KB.",
+    "faviconNotImage": "That does not look like an image. Use a PNG, ICO, SVG, WebP, GIF or JPEG.",
+    "checkFailed": "The check failed",
+    "updateRepositoryInvalid": "\"{repository}\" is not a registry path like ghcr.io/owner/name",
+    "updateNoReleases": "The registry has no released version tags",
+    "updateTimedOut": "The registry did not answer in time",
+    "registryPaginationNotUrl": "The registry sent a pagination link that is not a URL",
+    "registryPaginatedElsewhere": "The registry paginated to {origin}, not {expected} - this check will not follow that",
+    "registryRealmNotUrl": "The registry sent an auth realm that is not a URL",
+    "registryRealmElsewhere": "The registry sent its auth challenge to {origin}, not {expected} - this check will not follow that",
+    "registryCredentialsRequired": "The registry asked for credentials this check cannot supply",
+    "registryTokenRefused": "The registry refused an anonymous token (HTTP {status})",
+    "registryNoToken": "The registry issued no token",
+    "registryRepositoryNotFound": "No such repository, or it is not public",
+    "registryHttpStatus": "The registry answered HTTP {status}",
+    "maxmindCredentialsMissing": "MaxMind account ID and licence key are not configured",
+    "maxmindTimedOut": "MaxMind did not answer in time",
+    "maxmindCredentialsRejected": "MaxMind rejected the account ID or licence key",
+    "maxmindHttpStatus": "MaxMind answered HTTP {status}",
+    "maxmindRedirectWithoutLocation": "MaxMind redirected without saying where",
+    "geoipDownloadDeclaredTooLarge": "the download declared {declared} bytes, over the {max}-byte limit",
+    "geoipDownloadTooLarge": "the download exceeded the {max}-byte limit",
+    "geoipArchiveUnreadable": "the download is not a readable archive",
+    "geoipDatabaseInvalid": "{edition}.mmdb in the download is not a database",
+    "geoipDatabaseMissing": "the download has no {edition}.mmdb in it",
+    "apiTokenNameTooLong": "Token name must be {max} characters or fewer",
+    "apiTokenLimitReached": "Maximum of {max} API tokens per user",
+    "l4ListenAddressInvalid": "Listen address must be ':PORT', 'HOST:PORT', or '[IPv6]:PORT', with a port between 1 and 65535",
+    "l4MatcherTypeInvalid": "Matcher type must be one of: {types}",
+    "l4UpstreamInvalid": "Upstream \"{upstream}\" must be in 'host:port' or '[IPv6]:port' format",
+    "wildcardDomainNeedsDnsProvider": "Wildcard domain \"{domain}\" requires a DNS provider for the ACME DNS-01 challenge. Configure a default DNS provider in settings, or assign a certificate to this host.",
+    "upstreamProtocolInvalid": "Invalid upstream protocol \"{scheme}://\". Only http:// and https:// are allowed",
+    "mtlsNoTrustMaterial": "mTLS is enabled but no trusted client certificates, roles, or CA certificates are selected. Select at least one or disable mTLS.",
+    "tailscaleAuthKeyMissingForHost": "This host uses Tailscale, but no Tailscale auth key is configured. Without one the node cannot register, and Caddy would reject the whole configuration - every proxy host would stop being updated, not just this one. Add an auth key in Settings → Tailscale first.",
+    "customCaddyfileInvalid": "Custom Caddyfile: {error}",
+    "agentNotReported": "Connected, but has not reported yet."
   },
   "groups": {
     "access": "Access",
-    "accessFor": "Access for",
     "addMember": "Add member",
     "agentGrants": "{count, plural, one {# agent} other {# agents}}",
     "agents": "Agents",
@@ -497,7 +846,14 @@
     "removeMember": "Remove member",
     "saveAccess": "Save access",
     "withoutGrants": "Manage nothing",
-    "withoutGrantsNote": "Useful only for forward auth"
+    "withoutGrantsNote": "Useful only for forward auth",
+    "memberCount": "{count, plural, one {# member} other {# members}}",
+    "accessNamed": "Access - {name}",
+    "deleteGroupNamed": "Delete group {name}",
+    "removeMemberFrom": "Remove {member} from {group}",
+    "deleteGroupConfirm": "Delete group \"{name}\"?",
+    "deleteGroupConfirmIdp": "Delete group \"{name}\"? It is managed by an identity provider and will be recreated the next time a member signs in.",
+    "accessForGroup": "Access for {name}"
   },
   "l4ProxyHosts": {
     "acceptInboundProxyProtocol": "Accept inbound PROXY protocol",
@@ -589,7 +945,7 @@
     "pageDescription": "Define TCP/UDP stream proxies powered by caddy-l4. Port mappings are applied automatically.",
     "passiveHealthCheck": "Passive Health Check",
     "policy": "Policy",
-    "portsApplyDescription": "The caddy container needs to be recreated to expose L4 ports.",
+    "portsApplyDescription": "The Caddy container needs to be recreated to expose L4 ports.",
     "protocol": "Protocol",
     "required": "Required:",
     "resolutionMode": "Resolution Mode",
@@ -608,7 +964,37 @@
     "upstreamDnsPinning": "Upstream DNS Pinning",
     "upstreamProxyProtocolLabel": "Send PROXY protocol to upstream",
     "upstreams": "Upstreams",
-    "upstreamsHelp": "One per line in host:port format."
+    "upstreamsHelp": "One per line in host:port format.",
+    "matcherSummarySni": "SNI: {hostnames}",
+    "matcherSummaryHost": "Host: {hostnames}",
+    "enableHostNamed": "Enable {name}",
+    "actionsForHost": "Actions for {name}",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "columnNameMatcher": "Name / Matcher",
+    "status": "Status",
+    "l4DisabledDescription": "{reason} Hosts below are saved but are not being served.",
+    "createL4Host": "Create L4 Host",
+    "searchEmptyMessage": "No L4 hosts match your search",
+    "emptyMessage": "No L4 proxy hosts found",
+    "disabled": "Disabled",
+    "hostEnabledTitle": "L4 Host Enabled",
+    "hostPausedTitle": "L4 Host Paused",
+    "hostEnabledDescription": "This host is active and proxying connections",
+    "hostPausedDescription": "This host is disabled and will not accept connections",
+    "sniHostnames": "SNI Hostnames",
+    "httpHostnames": "HTTP Hostnames",
+    "duplicateL4ProxyHost": "Duplicate L4 Proxy Host",
+    "createL4ProxyHost": "Create L4 Proxy Host",
+    "duplicateName": "{name} (Copy)",
+    "deleteConfirm": "Are you sure you want to delete the L4 proxy host <strong>{name}</strong>?",
+    "portsChangesPending": "Docker port changes pending",
+    "portsStatus": "Docker port status",
+    "hostCreated": "L4 proxy host created and queued for Caddy reload.",
+    "hostUpdated": "L4 proxy host updated.",
+    "hostDeleted": "L4 proxy host deleted.",
+    "hostEnabledMessage": "L4 proxy host enabled.",
+    "hostDisabledMessage": "L4 proxy host disabled."
   },
   "mtlsRoles": {
     "assigned": "Assigned",
@@ -626,7 +1012,16 @@
     "namePlaceholder": "e.g. admin",
     "optional": "Optional",
     "pageDescription": "Roles group client certificates for access control on proxy hosts.",
-    "save": "Save"
+    "save": "Save",
+    "noRolesMatchSearch": "No roles match your search.",
+    "noRolesYet": "No mTLS roles yet.",
+    "certificateCount": "{count, plural, one {# certificate} other {# certificates}}",
+    "deleteRoleConfirm": "Delete role \"{name}\"? Proxy hosts referencing it will lose this grouping.",
+    "assignToRole": "Assign {name} to this role",
+    "expiresOn": "expires {date}",
+    "nameRequired": "Name is required",
+    "requestFailed": "Failed ({status})",
+    "networkError": "Network error"
   },
   "nav": {
     "accessLists": "Access Lists",
@@ -637,6 +1032,8 @@
     "avatarAlt": "User",
     "certificates": "Certificates",
     "defaultUserName": "Administrator",
+    "demoBannerDescription": "Changes are saved, but no Caddy server is configured and no DNS records are changed.",
+    "demoBannerTitle": "Demo mode",
     "groups": "Groups",
     "hosts": "Hosts",
     "l4ProxyHosts": "L4 Proxy Hosts",
@@ -668,6 +1065,11 @@
     "overview": "Overview",
     "profile": "Profile",
     "proxyHosts": "Proxy Hosts",
+    "railGroupAccess": "Access",
+    "railGroupHosts": "Hosts",
+    "railGroupObservability": "Observability",
+    "railGroupSecurity": "Security",
+    "railGroupSystem": "System",
     "sectionLabel": "Navigation",
     "settings": "Settings",
     "updateBadge": "Update",
@@ -677,7 +1079,6 @@
   "overview": {
     "activityEmptyMessage": "No activity recorded yet.",
     "actorSystem": "system",
-    "blocked": "Blocked",
     "loadFailedTitle": "Could not load traffic for this range.",
     "loading": "Loading",
     "logBlocked": "Blocked",
@@ -704,9 +1105,17 @@
     "statEnabledOf": "{enabled} of {total} enabled",
     "statOfTotal": "of {total}",
     "timeRange": "Time range",
-    "traffic24h": "Traffic (24h)",
     "trafficCardLabel": "Traffic in the last 24 hours",
-    "viewAnalytics": "View analytics"
+    "viewAnalytics": "View analytics",
+    "statProxyHosts": "Proxy Hosts",
+    "statCertificates": "Certificates",
+    "statAccessLists": "Access Lists",
+    "userNameFallback": "User",
+    "adminNameFallback": "Admin",
+    "eventSummaryFallback": "{action} on {entityType}",
+    "welcomeBack": "Welcome back, {name}",
+    "traffic24hSummary": "Traffic (24h): {total} · Blocked {percent}%",
+    "statCardLabel": "{label}: {value}"
   },
   "passwordPolicy": {
     "error": "{subject} {failures}",
@@ -734,15 +1143,15 @@
     "activeSessions": "Active Sessions",
     "apiTokenCreated": "API token created successfully",
     "apiTokens": "API Tokens",
-    "apiTokensDescription": "Create tokens for programmatic access to the API using the header Authorization: Bearer <token>",
+    "apiTokensDescription": "Create tokens for programmatic access to the API using the header Authorization: Bearer '<token>'",
     "authenticationMethod": "Authentication Method",
-    "avatarDeleteError": "An error occurred while deleting avatar",
+    "avatarDeleteError": "An error occurred while deleting the avatar",
     "avatarDeleteFailed": "Failed to delete avatar",
     "avatarMustBeImage": "Please upload an image file",
     "avatarRemoved": "Avatar removed successfully. Refreshing...",
     "avatarTooLarge": "Image must be smaller than {max} KB",
     "avatarUpdated": "Avatar updated successfully. Refreshing...",
-    "avatarUploadError": "An error occurred while uploading avatar",
+    "avatarUploadError": "An error occurred while uploading the avatar",
     "avatarUploadFailed": "Failed to upload avatar",
     "avatarUploadHelp": "Recommended: square image, max {max} KB",
     "changePassword": "Change Password",
@@ -758,14 +1167,13 @@
     "email": "Email",
     "errorTitle": "Something went wrong",
     "expired": "Expired",
-    "expires": "Expires",
     "expiresAt": "Expires at",
     "linkError": "An error occurred while linking OAuth",
     "passwordRemoved": "Password removed. Reloading...",
     "removePassword": "Remove Password",
     "removePasswordDescription": "After this you can only sign in with {providers}. If that provider stops working, an admin has to set a password for you. Enter your current password to confirm.",
     "removePasswordFailed": "Failed to remove password",
-    "linkStartFailed": "Failed to start OAuth linking. Enable \"Auto-link accounts\" for this provider first.",
+    "linkStartFailed": "Failed to start OAuth linking.",
     "name": "Name",
     "newPassword": "New Password",
     "noApiTokensYet": "No API tokens yet",
@@ -777,7 +1185,7 @@
     "oauthPasswordDescription": "Setting a password will allow you to sign in with either OAuth or credentials.",
     "oauthUnlinked": "OAuth account unlinked successfully. Reloading...",
     "password": "Password",
-    "passwordChangeError": "An error occurred while changing password",
+    "passwordChangeError": "An error occurred while changing the password",
     "passwordChangeFailed": "Failed to change password",
     "passwordChanged": "Password changed successfully",
     "passwordIsSet": "Password is set",
@@ -806,11 +1214,28 @@
     "unlinkOauth": "Unlink OAuth",
     "unlinkOauthAccount": "Unlink OAuth Account",
     "unlinkOauthConfirm": "After this you can only sign in with your username and password, not {providers}. Enter your current password to confirm.",
-    "unlinkPasswordRequired": "Cannot unlink OAuth: You must set a password first",
+    "unlinkPasswordRequired": "Cannot unlink OAuth: you must set a password first",
     "unlinkPasswordRequiredDescription": "To unlink OAuth, you must first set a password as a fallback authentication method.",
     "unlinkPasswordRequiredTitle": "Set a password first",
     "uploadProfilePicture": "Upload profile picture",
-    "used": "Used {when}"
+    "used": "Used {when}",
+    "linkProvider": "Link {provider}",
+    "deleteTokenNamed": "Delete token {name}",
+    "title": "Profile & Account Settings",
+    "signedIn": "Signed in {when}",
+    "ipAddress": "IP {address}",
+    "expiresOn": "Expires {date}",
+    "expiredOn": "Expired {date}",
+    "createdOn": "Created {date}",
+    "linkedTo": "{count, plural, one {Your account is linked to {providers}} other {Your account is linked to: {providers}}}",
+    "never": "Never",
+    "noOauthToUnlink": "No OAuth account to unlink",
+    "noPasswordToRemove": "This account has no password to remove",
+    "linkProviderBeforeRemovingPassword": "Link a single sign-on provider before removing your password",
+    "avatarInvalid": "Invalid avatar data",
+    "avatarFormatInvalid": "Avatar must be a base64-encoded PNG, JPEG, or WebP image",
+    "avatarImageTooLarge": "Avatar image is too large",
+    "avatarUpdateFailed": "Failed to update avatar"
   },
   "proxyHosts": {
     "accessList": "Access List",
@@ -931,7 +1356,7 @@
     "forwardAuthAccessDeniedTitle": "Nobody can access this host",
     "forwardAuthExcludedPathsHelp": "Paths to exclude from authentication. These paths bypass forward auth while all other paths remain protected. Ignored if Protected Paths is set.",
     "forwardAuthGroupsEmptyDescription": "Create groups on the Groups page.",
-    "forwardAuthProtectedPathsHelp": "Leave empty to protect entire domain. Comma-separated paths to protect specific routes only.",
+    "forwardAuthProtectedPathsHelp": "Leave empty to protect the entire domain. Comma-separated paths to protect specific routes only.",
     "forwardAuthSubjectsEmptyTitle": "No groups or users yet",
     "forwardTheIdentityUpstream": "Forward the identity upstream",
     "fromPath": "From Path",
@@ -1050,6 +1475,9 @@
     "outpostDomain": "Outpost Domain",
     "outpostUpstreamUrl": "Outpost Upstream URL",
     "overLimitAction": "Over-limit action",
+    "overLimitActionHelpInherit": "Uses the action set on the WAF settings page.",
+    "overLimitActionHelpPartial": "The request is forwarded whole, but only the part of its body within the limit is inspected - the rest reaches the upstream unchecked.",
+    "overLimitActionHelpReject": "A request whose body is over the limit is refused with 413 Payload Too Large and never reaches the upstream.",
     "overrideGlobal": "Override global",
     "overrideUpstreamPort": "Override upstream port",
     "owaspCrsHelp": "Covers SQLi, XSS, LFI, RCE and hundreds of other attack patterns",
@@ -1127,7 +1555,7 @@
     "tryInterval": "Try Interval",
     "tryIntervalHelp": "Wait between attempts",
     "unhealthyLatency": "Unhealthy Latency",
-    "unhealthyLatencyHelp": "Latency threshold for unhealthy",
+    "unhealthyLatencyHelp": "Latency above which an upstream is marked unhealthy",
     "unhealthyStatusCodes": "Unhealthy Status Codes",
     "unhealthyStatusCodesHelp": "Comma-separated status codes",
     "upstreamDnsPinning": "Upstream DNS Pinning",
@@ -1138,9 +1566,115 @@
     "value": "Value",
     "wafBodyLimitsDescription": "Coraza buffers request bodies for inspection and rejects anything larger than its limit - 12.5 MiB with the OWASP CRS loaded. Raise it for hosts that receive large uploads. Leave blank to inherit.",
     "wafDescription": "Inspect and block malicious requests via Coraza / OWASP CRS",
-    "wafOverLimitActionHelp": "Reject returns 413; Partial inspects what fits and forwards the rest.",
     "wafRuleExclusionsHelp": "Rules listed here are disabled via SecRuleRemoveById",
-    "webApplicationFirewall": "Web Application Firewall"
+    "webApplicationFirewall": "Web Application Firewall",
+    "features": {
+      "auth": "Auth",
+      "authentik": "Authentik",
+      "forwardAuth": "Forward Auth",
+      "tailnet": "Tailnet",
+      "waf": "WAF",
+      "geo": "Geo",
+      "lb": "LB",
+      "mtls": "mTLS",
+      "rewrite": "Rewrite",
+      "allows": "Allows",
+      "blocks": "Blocks"
+    },
+    "enableHostLabel": "Enable {name}",
+    "hostActionsLabel": "Actions for {name}",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "nameDomain": "Name / Domain",
+    "upstream": "Upstream",
+    "createHost": "Create Host",
+    "noHostsMatchSearch": "No hosts match your search",
+    "noProxyHostsFound": "No proxy hosts found",
+    "none": "None",
+    "copyName": "{name} (Copy)",
+    "duplicateProxyHost": "Duplicate Proxy Host",
+    "createProxyHost": "Create Proxy Host",
+    "managedByCaddyAuto": "Managed by Caddy (Auto)",
+    "hstsSubdomains": "HSTS Subdomains",
+    "hstsSubdomainsHelp": "Include subdomains in the Strict-Transport-Security header",
+    "skipHttpsValidation": "Skip HTTPS Validation",
+    "skipHttpsValidationHelp": "Skip SSL certificate hostname verification for backend connections",
+    "proxyHostEnabledTitle": "Proxy Host Enabled",
+    "proxyHostPausedTitle": "Proxy Host Paused",
+    "proxyHostActiveDescription": "This host is active and routing traffic",
+    "proxyHostPausedDescription": "This host is disabled and will not respond to requests",
+    "wafTemplates": {
+      "allowIp": "Allow IP",
+      "disableWafForPath": "Disable WAF for path",
+      "removeXssRules": "Remove XSS rules",
+      "blockUserAgent": "Block User-Agent"
+    },
+    "maxBodySizeMib": "Max body size (MiB, up to {max})",
+    "quickTemplates": "Quick Templates",
+    "caFallbackName": "CA #{id}",
+    "certificatesIssuedBy": "Certificates issued by {name}",
+    "editRuleLabel": "Edit rule {path}",
+    "deleteRuleLabel": "Delete rule {path}",
+    "removeLocationRuleLabel": "Remove location rule {index}",
+    "upstreamLabel": "Upstream {index}",
+    "removeUpstreamLabel": "Remove upstream {index}",
+    "atLeastOneUpstreamRequired": "At least one upstream is required",
+    "removeUpstream": "Remove upstream",
+    "geoipStatus": {
+      "off": "GeoIP off",
+      "ready": "GeoIP ready",
+      "missing": "GeoIP missing",
+      "partial": "GeoIP partial",
+      "offHelp": "GeoIP is switched off in Settings → GeoIP Databases - country, continent and ASN blocking will not work.",
+      "missingHelp": "GeoIP databases not found - country/continent/ASN blocking will not work. Add a MaxMind subscription under Settings → GeoIP Databases.",
+      "countryMissingHelp": "GeoLite2-Country database missing - country/continent blocking disabled",
+      "asnMissingHelp": "GeoLite2-ASN database missing - ASN blocking disabled",
+      "loadedHelp": "GeoLite2-Country and GeoLite2-ASN databases loaded"
+    },
+    "continentNames": {
+      "africa": "Africa",
+      "antarctica": "Antarctica",
+      "asia": "Asia",
+      "europe": "Europe",
+      "northAmerica": "N. America",
+      "oceania": "Oceania",
+      "southAmerica": "S. America"
+    },
+    "addToLabel": "Add to {label}",
+    "removeHeaderLabel": "Remove header {index}",
+    "searchCountries": "Search countries…",
+    "asnsHelp": "Autonomous System Numbers - press Enter to add",
+    "pressEnterToAdd": "Press Enter to add",
+    "trustedProxiesHelp": "Used to parse X-Forwarded-For. Use private_ranges for all RFC-1918 ranges.",
+    "trustedProxiesBlockResponse": "Trusted Proxies & Block Response",
+    "groupMemberCount": "{count, plural, one {# member} other {# members}}",
+    "removeErrorPageLabel": "Remove error page {index}",
+    "pathLabel": "Path {index}",
+    "removePathAllowLabel": "Remove path allow {index}",
+    "removePathBlockLabel": "Remove path block {index}",
+    "removePathRewriteLabel": "Remove path rewrite {index}",
+    "removeRedirectLabel": "Remove redirect {index}",
+    "deleteConfirm": "Are you sure you want to delete the proxy host <strong>{name}</strong>?",
+    "deleteDomainsLine": "• Domains: {domains}",
+    "deleteUpstreamsLine": "• Upstreams: {upstreams}",
+    "certExpires": "expires {date}",
+    "trustedRoleCertCount": "{count, plural, one {# cert} other {# certs}}",
+    "pathPatternRequired": "Path pattern is required",
+    "requestFailedStatus": "Failed ({status})",
+    "networkError": "Network error",
+    "upstreamDialledThrough": "Upstreams are dialled through <code>{node}</code>. Use a MagicDNS name or a tailnet IP in the Upstreams field above.",
+    "dnsPinningSummaryInherit": "Using global upstream DNS pinning defaults",
+    "dnsPinningSummaryOverride": "Override: {mode, select, inherit {inherit mode} enabled {enabled} disabled {disabled} other {{mode}}}, {family, select, inherit {inherit family} both {both} ipv6 {ipv6} ipv4 {ipv4} other {{family}}}",
+    "hostCreated": "Proxy host created and queued for Caddy reload.",
+    "hostCreatedAutoCert": "Proxy host created using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)', which provisions certificates through Caddy.",
+    "hostCreatedAutoCertNoCloudflare": "Proxy host created using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)'. Note: Without Cloudflare DNS integration, wildcard certificates require port 80 to be accessible for HTTP-01 challenges. Configure Cloudflare in Settings to enable DNS-01 challenges.",
+    "hostUpdated": "Proxy host updated.",
+    "hostUpdatedAutoCert": "Proxy host updated using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)', which provisions certificates through Caddy.",
+    "hostUpdatedAutoCertNoCloudflare": "Proxy host updated using Caddy Auto certificate management. Certificate ID {id} not found. Automatically using 'Managed by Caddy (Auto)'. Note: Without Cloudflare DNS integration, wildcard certificates require port 80 to be accessible for HTTP-01 challenges. Configure Cloudflare in Settings to enable DNS-01 challenges.",
+    "hostDeleted": "Proxy host deleted.",
+    "hostEnabledResult": "Proxy host enabled.",
+    "hostDisabledResult": "Proxy host disabled.",
+    "errorPageDefaultBody": "<h1>Service temporarily unavailable</h1>"
   },
   "settings": {
     "abortResponseDescription": "Caddy writes no status line or body - the native equivalent of a “444 / no response” policy.",
@@ -1204,7 +1738,7 @@
     "dashboardCheckNeedsSaveTitle": "Save the domain before checking it",
     "dashboardDisableConfirmAction": "Turn it off anyway",
     "dashboardDisableConfirmBody": "You are reading this page on {domain}, which is the domain about to stop being served. Saving will take this route away while you are using it.",
-    "dashboardDisableConfirmRecovery": "The dashboard stays reachable on the controller's own port - http://<host>:3000 - which is where you would turn this back on.",
+    "dashboardDisableConfirmRecovery": "The dashboard stays reachable on the controller's own port - http://'<host>':3000 - which is where you would turn this back on.",
     "dashboardDisableConfirmTitle": "This will end your current connection",
     "dashboardDnsCheckLabel": "Check reachability",
     "dashboardDnsChecking": "Checking…",
@@ -1219,7 +1753,7 @@
     "dashboardEnabledHelp": "Serves this dashboard through the Caddy this instance manages, as a host it maintains for you.",
     "dashboardEnabledLabel": "Reverse proxy this dashboard",
     "dashboardHostTitle": "Dashboard host",
-    "dashboardPortEscapeDescription": "This host is generated from the settings above rather than stored in Proxy Hosts, so nothing can delete it by accident. The controller also publishes its own port, so http://<host>:3000 reaches this page whatever happens to the route.",
+    "dashboardPortEscapeDescription": "This host is generated from the settings above rather than stored in Proxy Hosts, so nothing can delete it by accident. The controller also publishes its own port, so http://'<host>':3000 reaches this page whatever happens to the route.",
     "dashboardPortEscapeTitle": "You cannot lock yourself out with this",
     "dashboardTlsHelp": "Forces HTTPS and asks Caddy for a certificate. Only useful once requests to the domain arrive here.",
     "dashboardTlsLabel": "Serve it over HTTPS",
@@ -1245,7 +1779,7 @@
     "disabled": "Disabled",
     "dnsAddressFamilyHelp": "Both resolves AAAA + A with IPv6 preferred ordering.",
     "dnsPinningHelp": "Resolves upstream hostnames at config-apply time and writes IPs into Caddy's active config.",
-    "dnsPinningInfoDescription": "Resolution happens at config save/reload time and resolved IPs are written into Caddy's active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those HTTPS upstreams to avoid SNI mismatch.",
+    "dnsPinningInfoDescription": "Resolution happens at config save/reload time, and resolved IPs are written into Caddy's active config. If one handler has multiple different HTTPS upstream hostnames, HTTPS pinning is skipped for those HTTPS upstreams to avoid SNI mismatch.",
     "dnsProviderModuleDisabledDescription": "Enable it under Settings → Caddy Build and rebuild Caddy before using it for DNS-01 challenges. Credentials saved now will not be used until then.",
     "dnsProviderModuleDisabledTitle": "This provider's Caddy module is disabled",
     "dnsProviderPlaceholder": "Select a DNS provider...",
@@ -1307,11 +1841,12 @@
     },
     "groupsClaim": "Groups claim",
     "groupsClaimHelp": "Claim holding the user's groups. Use dots for nested claims, e.g. resource_access.cpm.roles. Remember to request a matching scope above.",
-    "homeAttentionCount": "{count} settings are configured but not working as intended",
+    "homeAttentionCount": "{count, plural, one {# setting is} other {# settings are}} configured but not working as intended",
     "homeAttentionTitle": "Needs attention",
     "homeChangeHistory": "Change history",
     "homeConfigure": "Configure",
     "homeEnvBadge": "env",
+    "save": "Save",
     "homeGroupAccess": "Access",
     "homeGroupRuntime": "Runtime",
     "homeGroupTraffic": "Traffic",
@@ -1343,19 +1878,19 @@
     "maxmindLicenceKey": "MaxMind licence key",
     "metricsEndpointHelp": "Prometheus-compatible scrape endpoint, exposed on a dedicated port.",
     "metricsInfoTitle": "Point your monitoring tool at the metrics endpoint",
-    "metricsPortHelp": "Separate from admin API on port 2019.",
+    "metricsPortHelp": "Separate from the admin API on port 2019.",
     "mirrorGroupsIntoCpm": "Mirror groups into CPM groups",
     "name": "Name",
     "noOauthProvidersConfigured": "No OAuth providers configured",
     "notAnswering": "Not answering",
     "notFound": "Not Found",
-    "oauthAutoLinkHelp": "Automatically link OAuth accounts to existing users with the same email address.",
+    "oauthAutoLinkHelp": "Signing in through this provider attaches to the existing user with the same email address. When off, users link it themselves from their profile.",
     "operatorGroups": "Operator groups",
     "outpostDomain": "Outpost domain",
     "outpostUpstream": "Outpost upstream",
     "overrideDiscoveredEndpoint": "Override discovered endpoint",
     "pairAnAgent": "Pair an agent",
-    "pairingCodeExpires": "Valid for {minutes} more minute(s).",
+    "pairingCodeExpires": "{minutes, plural, one {Valid for # more minute.} other {Valid for # more minutes.}}",
     "pairingCodeFailed": "Could not generate a pairing code.",
     "pairingCodeHelp": "Generate a code here, then run the pair command on the agent's host. The code is valid for five minutes and works once.",
     "pairingCodeRun": "Run this on the agent's host:",
@@ -1374,7 +1909,7 @@
     "registerNodesAsEphemeral": "Register nodes as ephemeral",
     "registry": {
       "analytics_enabled": {
-        "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. Leave unset to decide from whether a password is configured below.",
+        "description": "Collect traffic and WAF events. With an agent running the stack, turning this on also starts the ClickHouse container - no Compose profile needed. If left unset, analytics is on only when a password is configured below.",
         "label": "Enable analytics"
       },
       "app_name": {
@@ -1458,7 +1993,7 @@
         "label": "Internal forward-auth address"
       },
       "geoip_enabled": {
-        "description": "Country lookups for analytics and geo blocking. With a MaxMind account ID and licence key, turning this on also has the controller download the databases. Leave unset to decide from whether the databases are already present.",
+        "description": "Country lookups for analytics and geo blocking. If a MaxMind account ID and licence key are set, turning this on also makes the controller download the databases. If left unset, GeoIP is on only when the databases are already present.",
         "label": "Enable GeoIP"
       },
       "geoip_update_interval_hours": {
@@ -1471,7 +2006,7 @@
       },
       "geoipupdate_license_key": {
         "description": "Issued alongside the account ID at maxmind.com.",
-        "label": "MaxMind license key"
+        "label": "MaxMind licence key"
       },
       "login_block_ms": {
         "description": "How long a blocked client stays blocked.",
@@ -1502,9 +2037,9 @@
     "retentionDays": "Retention (days)",
     "reviewApply": "Apply to Caddy",
     "reviewApplying": "Applying...",
-    "reviewChangeCount": "{count} changes",
+    "reviewChangeCount": "{count, plural, one {# change} other {# changes}}",
     "reviewClose": "Close",
-    "reviewDiffStat": "+{added} lines, -{removed} lines",
+    "reviewDiffStat": "+{added, plural, one {# line} other {# lines}}, -{removed, plural, one {# line} other {# lines}}",
     "reviewDiscardAll": "Discard all",
     "reviewHistoryEmpty": "Nothing has been applied yet.",
     "reviewHistoryTitle": "Recent applies",
@@ -1513,7 +2048,7 @@
     "reviewSubtitle": "Revision #{from} to #{to} - nothing has reached Caddy yet.",
     "reviewTabConfig": "Config diff",
     "reviewTitle": "Review & apply",
-    "reviewUnchangedLines": "{count} unchanged lines",
+    "reviewUnchangedLines": "{count, plural, one {# unchanged line} other {# unchanged lines}}",
     "reviewUndo": "Undo",
     "reviewValidates": "Config builds cleanly",
     "revisionApplied": "applied {when}",
@@ -1523,26 +2058,6 @@
     "roleGroupNamesHelp": "Name the groups exactly as your provider reports them. Separate several with commas - platform-owners, sre-oncall - and any one of them grants the role. A role left blank falls back to the prefix above, so the two styles can be mixed. The most privileged match wins.",
     "roleMappingAuthorityHelp": "The provider becomes authoritative: a user who loses the admin group is demoted on their next sign-in. The last remaining admin is never demoted.",
     "rotateSecret": "Rotate Secret",
-    "saveAcmeSettings": "Save ACME settings",
-    "saveAnalyticsSettings": "Save analytics settings",
-    "saveAuthentikDefaults": "Save Authentik defaults",
-    "saveAvatarSettings": "Save avatar settings",
-    "saveDashboardHost": "Save dashboard host",
-    "saveDefaultResponse": "Save default response",
-    "saveDnsSettings": "Save DNS settings",
-    "saveErrorPages": "Save error pages",
-    "saveFavicon": "Save favicon",
-    "saveGeneralSettings": "Save general settings",
-    "saveGeoblockingSettings": "Save geoblocking settings",
-    "saveGeoipSettings": "Save GeoIP settings",
-    "saveLoggingSettings": "Save logging settings",
-    "saveMetricsSettings": "Save metrics settings",
-    "saveModuleSelection": "Save Module Selection",
-    "savePasswordPolicy": "Save password policy",
-    "saveTailscaleSettings": "Save Tailscale settings",
-    "saveTrustedProxiesSettings": "Save trusted proxies settings",
-    "saveUpdateSettings": "Save update settings",
-    "saveUpstreamDnsPinning": "Save upstream DNS pinning settings",
     "scopes": "Scopes",
     "scopesPlaceholder": "openid email profile",
     "secretLabel": "Client Secret",
@@ -1602,7 +2117,614 @@
       "unknown": "Unknown setting \"{label}\"",
       "wholeNumber": "{label} must be a whole number"
     },
-    "viewerGroups": "Viewer groups"
+    "viewerGroups": "Viewer groups",
+    "defaultResponseModeCaddy": "Caddy native behavior",
+    "defaultResponseModeRespond": "Custom HTTP response",
+    "defaultResponseModeRedirect": "Redirect",
+    "defaultResponseModeAbort": "No response (abort connection)",
+    "redirectStatus301": "301 Permanent",
+    "redirectStatus302": "302 Temporary",
+    "redirectStatus303": "303 See Other",
+    "redirectStatus307": "307 Temporary",
+    "redirectStatus308": "308 Permanent",
+    "dnsProviderSelectPlaceholder": "Select...",
+    "dnsProviderOptionUpdate": "{name} (update)",
+    "dnsProviderModuleDisabledOption": "Its caddy-dns module is disabled in Settings → Caddy Build",
+    "addOrUpdateDnsProviderTitle": "Add or update provider",
+    "addDnsProviderTitle": "Add a provider",
+    "updateDnsProvider": "Update provider",
+    "addDnsProvider": "Add provider",
+    "dnsProvidersSupported": "{count} providers supported",
+    "dnsProvidersSupportedWithUnavailable": "{count} providers supported - {unavailable} unavailable because their Caddy module is disabled",
+    "addressFamilyBoth": "Both (Prefer IPv6)",
+    "addressFamilyIpv6": "IPv6 only",
+    "addressFamilyIpv4": "IPv4 only",
+    "tailscaleAuthKeyStored": "An auth key is stored. Leave this empty to keep it.",
+    "tailscaleAuthKeyHelp": "A reusable auth key from the Tailscale admin console. A Caddy placeholder such as '{env.TS_AUTHKEY}' works too, and keeps the key out of the database.",
+    "tailscaleTagsHelp": "ACL tags applied when a node registers, comma-separated. Most reusable auth keys require at least one, e.g. \"tag:caddy\".",
+    "tailscaleApiTokenStored": "A token is stored. Leave this empty to keep it.",
+    "tailscaleApiTokenHelp": "A tskey-api-… token from the Tailscale admin console. Read access to keys is enough.",
+    "tailscaleTailnetHelp": "Which tailnet to ask. \"-\" means the token's own, which is right unless you administer several.",
+    "faviconSelectedAlt": "The favicon you selected",
+    "faviconCurrentAlt": "The current favicon",
+    "updateAvailableTitle": "Version {version} has been published",
+    "runningVersionTitle": "Running {version}",
+    "clickhousePasswordStored": "A password is stored. Leave this empty to keep it.",
+    "clickhousePasswordRequired": "Required - the ClickHouse container refuses to start without one.",
+    "maxmindLicenceKeyStored": "A licence key is stored. Leave this empty to keep it.",
+    "maxmindLicenceKeyHelp": "Issued alongside the account ID at maxmind.com.",
+    "agentNotReachableTitle": "{name} is not reachable",
+    "agentsTitle": "Agents",
+    "currentAgentTitle": "Current agent",
+    "localAgentName": "Local agent",
+    "logFormatConsole": "Console (Common Log Format)",
+    "oauthTypeOidc": "OIDC (OpenID Connect)",
+    "roleAdmin": "Admin",
+    "roleOperator": "Operator",
+    "roleUser": "User",
+    "roleViewer": "Viewer",
+    "oauthProviderRequiredFields": "Name, Client ID, and Client Secret are required.",
+    "localUsersDisabledWithProviders": "All accounts are provisioned by the providers below.",
+    "localUsersDisabledNoProvider": "No provider is enabled, so nobody can sign in.",
+    "providerSourceEnv": "ENV",
+    "providerSourceUi": "UI",
+    "editProviderNamed": "Edit {name}",
+    "deleteProviderNamed": "Delete {name}",
+    "envProviderCannotEdit": "Environment-sourced providers cannot be edited",
+    "editProvider": "Edit provider",
+    "envProviderCannotDelete": "Environment-sourced providers cannot be deleted",
+    "deleteProviderConfirm": "Delete \"{name}\"? Users who sign in through it will lose access.",
+    "editOauthProviderTitle": "Edit OAuth Provider",
+    "addOauthProviderTitle": "Add OAuth Provider",
+    "updateOauthProvider": "Update Provider",
+    "createOauthProvider": "Create Provider",
+    "newClientSecret": "New Client Secret",
+    "dnsChallengeOptions": {
+      "propagationDelay": {
+        "label": "Propagation Delay",
+        "placeholder": "e.g. 60s",
+        "description": "How long to wait before starting the DNS propagation checks, e.g. 60s or 5m.",
+        "descriptionWithDefault": "How long to wait before starting the DNS propagation checks, e.g. 60s or 5m. Defaults to {duration} for this provider."
+      },
+      "propagationTimeout": {
+        "label": "Propagation Timeout",
+        "placeholder": "e.g. 2m",
+        "description": "Maximum time to wait for the challenge TXT record to propagate, e.g. 2m or 15m. Use -1 to disable the propagation check.",
+        "descriptionWithDefault": "Maximum time to wait for the challenge TXT record to propagate, e.g. 2m or 15m. Use -1 to disable the propagation check. Defaults to {duration} for this provider."
+      }
+    },
+    "navGroups": {
+      "system": "System",
+      "networking": "Networking",
+      "security": "Security",
+      "observability": "Observability"
+    },
+    "sections": {
+      "general": {
+        "name": "General",
+        "desc": "Primary domain and ACME contact email"
+      },
+      "acme": {
+        "name": "ACME Server",
+        "desc": "Custom ACME directory URL for internal CAs"
+      },
+      "defaultResponse": {
+        "name": "Default Response",
+        "desc": "Handle requests for unknown hosts and direct IP access"
+      },
+      "avatars": {
+        "name": "User Avatars",
+        "desc": "Gravatar fallback for users without an icon"
+      },
+      "branding": {
+        "name": "Branding",
+        "desc": "The favicon browsers show for this instance"
+      },
+      "updates": {
+        "name": "Updates",
+        "desc": "Whether to check the registry for a newer release, and which one"
+      },
+      "caddyBuild": {
+        "name": "Caddy Build",
+        "desc": "Which plugins the Caddy image is compiled with"
+      },
+      "dashboard": {
+        "name": "Dashboard Host",
+        "desc": "Serve this dashboard through Caddy, on a domain of its own"
+      },
+      "agent": {
+        "name": "Agent",
+        "desc": "The service that recreates and rebuilds the Caddy container"
+      },
+      "dnsProviders": {
+        "name": "DNS Providers",
+        "desc": "Provider credentials for ACME DNS-01"
+      },
+      "dnsResolvers": {
+        "name": "DNS Resolvers",
+        "desc": "Custom resolvers for challenge verification"
+      },
+      "upstreamDns": {
+        "name": "Upstream DNS Pinning",
+        "desc": "Pin upstream IPs at config-apply time"
+      },
+      "trustedProxies": {
+        "name": "Trusted Proxies",
+        "desc": "Resolve real client IP behind an upstream proxy"
+      },
+      "tailscale": {
+        "name": "Tailscale",
+        "desc": "Node defaults for hosts served on, or reached over, your tailnet"
+      },
+      "geoip": {
+        "name": "GeoIP Databases",
+        "desc": "MaxMind subscription and whether country lookups run at all"
+      },
+      "geoblock": {
+        "name": "Global Geoblocking",
+        "desc": "Default geoblock rules across all hosts"
+      },
+      "errorPages": {
+        "name": "Error Pages",
+        "desc": "Global custom error responses (fallback for all hosts)"
+      },
+      "authentik": {
+        "name": "Authentik Defaults",
+        "desc": "Forward-auth defaults for new proxy hosts"
+      },
+      "oauth": {
+        "name": "OAuth Providers",
+        "desc": "OAuth/OIDC SSO providers"
+      },
+      "passwordPolicy": {
+        "name": "Password Policy",
+        "desc": "Migrate users off older password hashes"
+      },
+      "analytics": {
+        "name": "Analytics",
+        "desc": "Traffic and WAF event collection, and the ClickHouse it writes to"
+      },
+      "metrics": {
+        "name": "Metrics & Monitoring",
+        "desc": "Prometheus metrics endpoint"
+      },
+      "logging": {
+        "name": "Access Logging",
+        "desc": "HTTP access log for proxied requests"
+      }
+    },
+    "dnsProviders": {
+      "cloudflare": {
+        "description": "Cloudflare DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Token",
+            "placeholder": "Cloudflare API token with Zone:DNS:Edit permission"
+          }
+        }
+      },
+      "route53": {
+        "description": "AWS Route 53 DNS API (supports IAM roles when fields are empty)",
+        "fields": {
+          "accessKeyId": {
+            "label": "Access Key ID"
+          },
+          "secretAccessKey": {
+            "label": "Secret Access Key"
+          },
+          "region": {
+            "label": "AWS Region"
+          },
+          "hostedZoneId": {
+            "label": "Hosted Zone ID",
+            "description": "Optional. Required only if you have multiple zones for the same domain."
+          }
+        }
+      },
+      "digitalocean": {
+        "description": "DigitalOcean DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Token"
+          }
+        }
+      },
+      "duckdns": {
+        "description": "Duck DNS dynamic DNS service",
+        "fields": {
+          "apiToken": {
+            "label": "Token"
+          }
+        }
+      },
+      "hetzner": {
+        "description": "Hetzner DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Token"
+          }
+        }
+      },
+      "vultr": {
+        "description": "Vultr DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Key"
+          }
+        }
+      },
+      "porkbun": {
+        "description": "Porkbun DNS API",
+        "fields": {
+          "apiKey": {
+            "label": "API Key"
+          },
+          "apiSecretKey": {
+            "label": "API Secret Key"
+          }
+        }
+      },
+      "godaddy": {
+        "description": "GoDaddy DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Key:Secret",
+            "description": "Format: API_KEY:API_SECRET"
+          }
+        }
+      },
+      "namecheap": {
+        "description": "Namecheap DNS API",
+        "fields": {
+          "apiKey": {
+            "label": "API Key"
+          },
+          "user": {
+            "label": "Username"
+          }
+        }
+      },
+      "ovh": {
+        "description": "OVH DNS API",
+        "fields": {
+          "endpoint": {
+            "label": "Endpoint"
+          },
+          "applicationKey": {
+            "label": "Application Key"
+          },
+          "applicationSecret": {
+            "label": "Application Secret"
+          },
+          "consumerKey": {
+            "label": "Consumer Key"
+          }
+        }
+      },
+      "ionos": {
+        "description": "IONOS DNS API",
+        "fields": {
+          "authApiToken": {
+            "label": "API Token"
+          }
+        }
+      },
+      "linode": {
+        "description": "Linode/Akamai DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Token"
+          }
+        }
+      },
+      "njalla": {
+        "description": "Njalla DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Token"
+          }
+        }
+      },
+      "spaceship": {
+        "description": "Spaceship DNS API",
+        "fields": {
+          "apiKey": {
+            "label": "API Key"
+          },
+          "apiSecret": {
+            "label": "API Secret"
+          }
+        }
+      },
+      "desec": {
+        "description": "deSEC DNS API",
+        "fields": {
+          "token": {
+            "label": "API Token"
+          }
+        }
+      },
+      "dynu": {
+        "description": "Dynu DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Token"
+          }
+        }
+      },
+      "acmedns": {
+        "description": "acme-dns delegated DNS-01 validation (dedicated ACME challenge records only)",
+        "fields": {
+          "username": {
+            "label": "Username"
+          },
+          "password": {
+            "label": "Password"
+          },
+          "subdomain": {
+            "label": "Subdomain"
+          },
+          "serverUrl": {
+            "label": "Server URL"
+          }
+        }
+      },
+      "infomaniak": {
+        "description": "Infomaniak DNS API",
+        "fields": {
+          "apiToken": {
+            "label": "API Token"
+          }
+        }
+      },
+      "netcup": {
+        "description": "netcup CCP DNS API",
+        "fields": {
+          "customerNumber": {
+            "label": "Customer Number"
+          },
+          "apiKey": {
+            "label": "API Key"
+          },
+          "apiPassword": {
+            "label": "API Password"
+          }
+        }
+      },
+      "cloudns": {
+        "description": "ClouDNS DNS API",
+        "fields": {
+          "authId": {
+            "label": "Auth ID",
+            "description": "API user ID (created under API & Resellers). Required unless a sub-user ID is provided."
+          },
+          "subAuthId": {
+            "label": "Sub-user ID",
+            "description": "API sub-user ID. Required unless an API user ID is provided."
+          },
+          "authPassword": {
+            "label": "API Password",
+            "description": "Password of the API user or sub-user."
+          }
+        }
+      }
+    },
+    "tailscaleModuleDisabledBody": "{reason} These settings still save, but no host is served on the tailnet until the module is compiled in.",
+    "tailscaleUserspaceNote": "The node runs in userspace inside the Caddy container - no <code>tailscaled</code>, no TUN device, no extra ports published. Its identity is kept in the state directory below, so it survives a container recreate.",
+    "tailscaleKeyValidationDisabledBody": "Nothing here can tell a revoked or expired key from a working one - that is only discovered when Caddy tries to register the node, and a node that will not come up makes Caddy reject the <em>entire</em> configuration. Until the key is fixed, no proxy host on any agent can be updated.",
+    "faviconSelected": "Selected: {name}. Save to apply it.",
+    "faviconCustomSet": "A custom favicon is set.",
+    "faviconNone": "No custom favicon - browsers show their own default.",
+    "updateAvailableBody": "You are running {current}. Pull the new images and recreate the stack to move to it.",
+    "updateCheckIncomplete": "The last check did not complete: {error}",
+    "updateUpToDate": "{latest} is the newest release published, so this is up to date.",
+    "updateNoCheckYet": "No check has completed yet. Save or check now to run one.",
+    "updateChecksOff": "Update checks are off, so nothing is known about newer releases.",
+    "updateNotChecking": "Not checking.",
+    "updateLastChecked": "Last checked {when}.",
+    "updateNeverChecked": "Never checked.",
+    "inferredEnvironmentNote": "Saving here stores the value in the database, which takes precedence from then on. The variable can be removed from your <code>.env</code> afterwards.",
+    "analyticsInferredNote": "Analytics is {state, select, on {on} other {off}} because a ClickHouse password is {password, select, set {set} other {not set}}. Saving makes the choice explicit.",
+    "analyticsManagedNote": "No <code>COMPOSE_PROFILES</code> entry is needed. The first start pulls the ClickHouse image, which can take several minutes; turning analytics off stops the container and leaves its data volume intact.",
+    "analyticsUnmanagedNote": "These settings still decide whether analytics runs. Starting ClickHouse itself needs <code>clickhouse</code> in <code>COMPOSE_PROFILES</code> on the host.",
+    "geoipInferredNote": "GeoIP is {state, select, on {on} other {off}} because the databases are {present, select, yes {present} other {not present}} on disk. Saving makes the choice explicit.",
+    "geoipInstalled": "Installed: {editions}.",
+    "geoipNoneInstalled": "No databases are installed yet.",
+    "agentNeverReported": "never",
+    "agentRowSummary": "v{version} · {mode} · project {project}",
+    "agentLastReported": "last reported {when}",
+    "agentRowPorts": "{count, plural, one {# published port} other {# published ports}} · ports: {portsState} · build: {buildState}",
+    "sharedAgentConfigBody": "Proxy hosts, certificates and published ports belong to this controller, not to a host. A change is applied to all {count} agents or to none of them, so the fleet cannot drift apart.",
+    "agentsNothingReached": "Nothing was reached. Layer-4 ports, Caddy rebuilds and config changes will all fail until an agent answers.",
+    "agentsStartContainer": "Start the agent container, or pair a remote one below. Everything else keeps working without it.",
+    "agentsAnsweringNote": "{answering} of {total} answering. Unpairing forgets this side only - the agent keeps the secret until it is restarted or paired again, so restart it too if you are removing an agent you no longer trust.",
+    "metricsScrapeNote": "Scrape http://caddy-proxy-manager-caddy:{port}/metrics from within the Docker network.",
+    "oauthDialogEditDescription": "Update the OAuth provider configuration.",
+    "oauthDialogAddDescription": "Configure a new OAuth or OIDC provider for single sign-on.",
+    "health": {
+      "off": "Off",
+      "dnsProviders": {
+        "valueMore": "{provider} and {count} more",
+        "valueNone": "No provider - DNS-01 unavailable",
+        "detailNone": "Wildcard certificates and internal-only hosts need a DNS provider to solve the challenge."
+      },
+      "acme": {
+        "valueCustom": "Custom directory - {count, plural, one {# certificate} other {# certificates}}",
+        "valueLetsEncrypt": "Let's Encrypt - {count, plural, one {# certificate} other {# certificates}}"
+      },
+      "trustedProxies": {
+        "valueRanges": "{count, plural, one {# range trusted} other {# ranges trusted}}",
+        "valueNone": "No ranges trusted",
+        "detailGeoBlock": "Geo-Block is on but no proxy ranges are trusted, so every request is matched on the address Caddy sees, not the real client IP."
+      },
+      "defaultResponse": {
+        "valueConfigured": "Configured",
+        "valueUnset": "Not set",
+        "detailUnset": "Requests for unknown hostnames and direct IP hits fall through to the first matching host."
+      },
+      "oauth": {
+        "valueProviders": "{count, plural, one {# provider} other {# providers}}",
+        "valueLocalOnly": "Local accounts only"
+      },
+      "geoip": {
+        "name": "GeoIP",
+        "valueEmpty": "No database installed",
+        "valueBehind": "{behind} of {installed, plural, one {# database} other {# databases}} out of date",
+        "valueToday": "{count, plural, one {# database} other {# databases}}, updated today",
+        "valueAge": "{count, plural, one {# database} other {# databases}}, {days, plural, one {# day} other {# days}} old",
+        "detailEmpty": "GeoIP is enabled but no MaxMind database has been downloaded, so country lookups return nothing. Check the account ID and licence key.",
+        "detailEmptyDownloadFailed": "GeoIP is enabled but no MaxMind database has been downloaded, so country lookups return nothing. The last download failed: {error}",
+        "detailBehind": "MaxMind has published a newer {editions} than the copy on disk, and the controller has not downloaded it.",
+        "detailBehindDownloadFailed": "MaxMind has published a newer {editions} than the copy on disk, and the controller has not downloaded it. The last download failed: {error}",
+        "detailCheckFailed": "MaxMind could not be reached to check for updates: {error}",
+        "detailCheckStalled": "MaxMind has not been asked for updates recently, so whether these databases are current is unknown."
+      },
+      "geoblock": {
+        "name": "Geo-Block",
+        "valueDenying": "Denying {count, plural, one {# country} other {# countries}}",
+        "detailNoData": "Country rules are configured but no GeoIP database is installed, so nothing is being blocked.",
+        "detailStaleData": "Country rules are being matched against a database MaxMind has already superseded, so recently reassigned address ranges resolve to the wrong country."
+      },
+      "agent": {
+        "valueNone": "No agent paired",
+        "valueConnected": "{connected} of {paired} connected",
+        "detailMissing": "No paired agent is holding its event stream open, so configuration changes cannot reach Caddy.",
+        "detailNone": "Without an agent nothing starts or reconfigures the Caddy container."
+      },
+      "caddyBuild": {
+        "valueCustom": "{custom} custom, {disabled} disabled",
+        "valueStock": "Stock build"
+      },
+      "metrics": {
+        "name": "Metrics",
+        "valuePort": "Exposed on port {port}"
+      },
+      "analytics": {
+        "valueRetention": "ClickHouse - {days}-day retention",
+        "detailEnv": "Set in the environment, so this instance cannot change it here."
+      }
+    },
+    "stagedLabels": {
+      "general": "General",
+      "acme": "ACME Server",
+      "defaultResponse": "Default Response",
+      "avatars": "User Avatars",
+      "updates": "Updates",
+      "caddyBuild": "Caddy Build",
+      "dashboard": "Dashboard Host",
+      "dnsProviders": "DNS Providers",
+      "dnsResolvers": "DNS Resolvers",
+      "upstreamDns": "Upstream DNS",
+      "trustedProxies": "Trusted Proxies",
+      "tailscale": "Tailscale",
+      "geoblock": "Geo-Block",
+      "errorPages": "Error Pages",
+      "authentik": "Authentik",
+      "passwordPolicy": "Password Policy",
+      "metrics": "Metrics",
+      "logging": "Logging",
+      "waf": "WAF"
+    },
+    "results": {
+      "unknownError": "Unknown error",
+      "applyFailed": "Settings saved, but could not apply to Caddy: {error}",
+      "generalSaved": "General settings saved successfully",
+      "generalFailed": "Failed to save general settings",
+      "acmeInvalidUrl": "Invalid ACME directory URL.",
+      "acmeHttpsRequired": "ACME directory URL must use HTTPS.",
+      "acmeSaved": "ACME settings saved successfully",
+      "acmeFailed": "Failed to save ACME settings",
+      "cloudflareSaved": "Cloudflare settings saved and applied to Caddy successfully",
+      "cloudflareApplyFailed": "Settings saved, but could not apply to Caddy: {error}. You may need to start Caddy or check your configuration.",
+      "cloudflareFailed": "Failed to save Cloudflare settings",
+      "dnsProviderNothingToRemove": "No provider to remove",
+      "dnsProviderRemoved": "{name} removed.",
+      "dnsProviderRemovedNewDefault": "{name} removed. Default is now {default}.",
+      "dnsProviderNotConfigured": "Cannot set default: {name} is not configured",
+      "dnsProviderDefaultSet": "Default DNS provider set to {name}",
+      "dnsProviderDefaultCleared": "Default DNS provider set to None",
+      "dnsProviderSelect": "Select a provider to configure",
+      "dnsProviderUnknown": "Unknown DNS provider: {name}",
+      "dnsProviderFieldRequired": "{field} is required for {provider}",
+      "dnsProviderFieldDuration": "{field} must be a duration like \"600s\" or \"10m\" (or -1 to disable)",
+      "dnsProviderSaved": "{name} saved",
+      "dnsProviderSavedDefault": "{name} saved (default)",
+      "dnsProviderFailed": "Failed to save DNS provider settings",
+      "authentikRequired": "Outpost domain and upstream are required",
+      "authentikSaved": "Authentik defaults saved successfully",
+      "authentikFailed": "Failed to save Authentik settings",
+      "tailscaleKeyRejected": "Tailscale did not accept this key. {reason}",
+      "tailscaleSaved": "Tailscale settings saved successfully",
+      "tailscaleFailed": "Failed to save Tailscale settings",
+      "passwordPolicyFromEnv": "This policy is controlled by the AUTH_REQUIRE_PASSWORD_CHANGE_ON_LEGACY_HASH environment variable and cannot be changed here.",
+      "passwordPolicyRequireChange": "Users with an older password hash will be asked to choose a new password at next sign-in",
+      "passwordPolicyPromptDisabled": "Password migration prompt disabled",
+      "passwordPolicyFailed": "Failed to save password policy settings",
+      "avatarsFromEnv": "Gravatar is controlled by the AVATAR_GRAVATAR environment variable and cannot be changed here.",
+      "gravatarEnabled": "Gravatar fallback enabled",
+      "gravatarDisabled": "Gravatar fallback disabled - users without an icon show their initial",
+      "avatarsFailed": "Failed to save avatar settings",
+      "analyticsPasswordRequired": "Analytics needs a ClickHouse password - the container will not start without one.",
+      "analyticsEnabled": "Analytics enabled - the agent is starting ClickHouse, which can take a few minutes on first run.",
+      "analyticsDisabled": "Analytics disabled. The ClickHouse container is stopped; its data is kept.",
+      "analyticsFailed": "Failed to save analytics settings",
+      "geoipFailed": "Failed to save GeoIP settings",
+      "faviconRemoved": "Custom favicon removed",
+      "faviconChooseFile": "Choose an image file to upload.",
+      "faviconUpdated": "Favicon updated",
+      "faviconFailed": "Failed to save the favicon",
+      "updatesDisabled": "Update checks disabled - no requests will be made.",
+      "updatesSavedCheckFailed": "Saved, but the check failed: {error}",
+      "updatesSavedLatest": "Saved. Newest release published: {latest}",
+      "updatesFailed": "Failed to save update settings",
+      "updatesLatest": "Newest release published: {latest}",
+      "updatesCheckFailed": "The update check failed",
+      "metricsSaved": "Metrics settings saved and applied successfully",
+      "metricsFailed": "Failed to save metrics settings",
+      "loggingInvalidFormat": "Invalid log format. Must be 'json' or 'console'",
+      "loggingSaved": "Logging settings saved and applied successfully",
+      "loggingFailed": "Failed to save logging settings",
+      "dashboardSaved": "Dashboard host saved and applied successfully",
+      "dashboardApplyFailed": "Saved, but could not apply to Caddy: {error}",
+      "dashboardFailed": "Failed to save dashboard settings",
+      "trustedProxiesSaved": "Trusted proxies settings saved and applied successfully",
+      "trustedProxiesFailed": "Failed to save trusted proxies settings",
+      "dnsResolverRequired": "At least one DNS resolver is required when enabled",
+      "dnsSaved": "DNS settings saved and applied successfully",
+      "dnsFailed": "Failed to save DNS settings",
+      "upstreamDnsInvalidFamily": "Invalid address family selection",
+      "upstreamDnsSaved": "Upstream DNS resolution settings saved and applied successfully",
+      "upstreamDnsFailed": "Failed to save upstream DNS resolution settings",
+      "geoblockSaved": "Geoblocking settings saved and applied successfully",
+      "geoblockFailed": "Failed to save geoblocking settings",
+      "errorPagesInvalid": "Invalid error pages payload",
+      "errorPagesSaved": "Error pages saved and applied successfully",
+      "errorPagesFailed": "Failed to save error pages settings",
+      "defaultResponseInvalidMode": "Invalid default response mode",
+      "defaultResponseSaved": "Default response saved and applied successfully",
+      "defaultResponseFailed": "Failed to save default response settings",
+      "wafSettingsNotFound": "WAF settings not found.",
+      "wafRuleUnexcluded": "Rule {ruleId} removed from exclusions.",
+      "wafRemoveFailed": "Failed to remove WAF rule",
+      "wafRuleExcludedReloadFailed": "Rule {ruleId} added to exclusions. Warning: could not reload Caddy.",
+      "wafRuleSuppressed": "Rule {ruleId} suppressed globally.",
+      "wafSuppressFailed": "Failed to suppress WAF rule",
+      "wafNoHost": "No proxy host found for {hostname}.",
+      "wafRuleSuppressedForHost": "Rule {ruleId} suppressed for {hostname}.",
+      "wafBodyLimitExceeded": "In-memory body limit must not exceed the request body limit.",
+      "wafSaved": "WAF settings saved.",
+      "wafFailed": "Failed to save WAF settings",
+      "caddyBuildFollowsFleet": "That agent now follows the fleet module selection.",
+      "caddyBuildSaved": "Caddy module selection saved.",
+      "caddyBuildSavedRebuild": "Caddy module selection saved. Rebuild Caddy to apply the change to the running container.",
+      "caddyBuildApplyFailed": "Selection saved, but could not apply to Caddy: {error}",
+      "caddyBuildFailed": "Failed to save Caddy module selection",
+      "rebuildTriggered": "Rebuild triggered.",
+      "stagedApplied": "Applied as revision #{revision}",
+      "stagedAppliedReloadFailed": "Changes applied, but Caddy did not reload: {error}",
+      "caddyBuildSavedSnippetWarning": "{rebuild, select, yes {Caddy module selection saved. Rebuild Caddy to apply the change to the running container.} other {Caddy module selection saved.}} {count, plural, one {# proxy host ({names}) uses custom Caddyfile directives, which may reference a module you just switched off.} other {# proxy hosts ({names}{more, plural, =0 {} other {, and # more}}) use custom Caddyfile directives, which may reference a module you just switched off.}} Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently."
+    },
+    "geoipEditionDownloadFailed": "{edition}: {reason}"
   },
   "setup": {
     "account": {
@@ -1663,9 +2785,9 @@
     },
     "emptyDatabaseRequiredDescription": "This copies rows with their original identifiers, so it expects nothing to have been created here yet. Running it against a database that is already in use is not supported.",
     "emptyDatabaseRequiredTitle": "Migrate into an empty database",
+    "envBadgeLegend": "Purple badges show the environment variable each setting can also be set by.",
     "environmentCleanupEmptyDescription": "Nothing to remove - none of the settings you migrated were configured by an environment variable.",
     "environmentCleanupTitle": "Tidy up your .env",
-    "environmentMigrationDescription": "They are filled in below and marked. Saving copies them into the database, after which you can remove those entries from your .env.",
     "errors": {
       "alreadyCompleted": "Setup has already been completed.",
       "clientIdAndSecretRequired": "A client ID and secret are required.",
@@ -1675,7 +2797,15 @@
       "passwordsDiffer": "The two passwords do not match.",
       "providerSaveFailed": "Could not save the provider. Check the values and try again.",
       "usernameRequired": "A username is required.",
-      "usernameTaken": "That username is already taken."
+      "usernameTaken": "That username is already taken.",
+      "signInToFinish": "You need to be signed in to finish setup.",
+      "adminToFinish": "You need to be signed in as an administrator to finish setup.",
+      "analyticsPasswordRequired": "Analytics needs a ClickHouse password, or switch analytics off to continue.",
+      "settingsSaveFailed": "Could not save the configuration. Try again.",
+      "identityProviderIncomplete": "An identity provider needs a display name, issuer URL, client ID and client secret - or leave all four blank to skip it.",
+      "identityProviderCreateFailed": "The settings were saved, but the identity provider could not be created. Check its values and try again.",
+      "defaultDomainInvalid": "Enter a default domain of 253 characters or fewer.",
+      "acmeEmailInvalid": "The ACME contact email must be a valid email address, or left blank."
     },
     "groupPrefix": "Group prefix",
     "groupPrefixHelp": "With CPM_, membership of CPM_Admin grants admin. The three fields below override it.",
@@ -1687,6 +2817,8 @@
     "identityProvider": "Identity provider",
     "identityProviderDescription": "Sign in through an OIDC provider, as well as or instead of local accounts. Leave these blank to skip - one can be added from Settings at any time.",
     "identityProviderOptional": "Identity provider (optional)",
+    "importedBadgeLegend": "Blue badges mark values imported from environment variables that are already set.",
+    "importedFromEnvironment": "Imported from env",
     "issuerUrl": "Issuer URL",
     "issuerUrlHelp": "The provider's OIDC issuer. Its endpoints are discovered from here.",
     "legacyDatabaseBackupTitle": "Keep a copy of the old database",
@@ -1703,7 +2835,7 @@
       "confirmFootnote": "The old file is not modified either way. The application restarts once the copy finishes.",
       "confirmGroups": "{groups, plural, one {# group} other {# groups}}, {rows, plural, one {# row} other {# rows}}",
       "confirmLeaving": "Leaving behind",
-      "confirmNoAccountsDescription": "Users and their sign-in is unticked, so no account comes across.",
+      "confirmNoAccountsDescription": "\"Users and their sign-in\" is unticked, so no account comes across.",
       "confirmNoAccountsTitle": "This instance will still need its first administrator",
       "confirmNothing": "Nothing",
       "confirmSecrets": "Stored secrets",
@@ -1723,7 +2855,7 @@
     "migrationRestartDescription": "Your data is in PostgreSQL. The application is restarting so it runs from it: this process started against an empty database and is still working from what it read then.",
     "migrationRestartTitle": "Restarting to finish the migration",
     "migrationSelectionHelp": "Anything left unticked stays in the old file, which is not modified either way.",
-    "oauthAutoLinkHelp": "Off means a returning user with a matching local account is refused rather than merged.",
+    "oauthAutoLinkHelp": "Off means a sign-in matching a local account is refused rather than merged - that user links the provider from their profile instead.",
     "oauthAutoLinkLabel": "Link to an existing account with the same email",
     "oauthEnvironmentDescription": "Saving stores the provider in the database, after which those variables can be removed.",
     "oauthEnvironmentTitle": "Filled in from your OAUTH_ environment variables",
@@ -1758,23 +2890,120 @@
     "userGroup": "User group",
     "userinfoUrl": "Userinfo URL",
     "viewerGroup": "Viewer group",
-    "whatToMigrate": "What to migrate"
+    "whatToMigrate": "What to migrate",
+    "tristateInferred": "Let the Settings toggle decide",
+    "tristateRequired": "Required",
+    "tristateNotRequired": "Not required",
+    "secretKeepCurrent": "{description} Leave blank to keep the current value.",
+    "alreadyConfigured": "Already configured: {providers}",
+    "moreOptions": "More options",
+    "roleViewer": "Viewer",
+    "roleUser": "User",
+    "roleAdmin": "Admin",
+    "restartContinue": "Continue",
+    "restartContinueWithoutWaiting": "Continue without waiting",
+    "restartManually": "Restart it yourself, then continue - the migration itself is finished and does not need repeating.",
+    "restartManuallyWithDetail": "{detail} Restart it yourself, then continue - the migration itself is finished and does not need repeating.",
+    "migrationGroupWithRows": "{group} - {rows, plural, one {# row} other {# rows}}",
+    "migrationGroupRequiredBy": "{description} Required by {groups}.",
+    "migrationGroupUntickFirst": "Untick {groups} first to leave this behind.",
+    "accountsExcludedDescription": "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator, or configure single sign-on, on the next screen.",
+    "accountsExcludedOAuthDescription": "Your old users, passwords and API tokens stay behind. You will be taken to create the first administrator next - unless one of the migrated OAuth providers is enabled, in which case you can sign in through it instead.",
+    "migrationGroups": {
+      "users": {
+        "label": "Users and their sign-in",
+        "description": "Accounts, passwords, API tokens, groups and the per-user access rules on your hosts. Leaving these behind means creating a new administrator on the next screen."
+      },
+      "proxyHosts": {
+        "label": "Proxy hosts",
+        "description": "Your HTTP and layer-4 hosts, with their mTLS access rules. Certificates and access lists come with them, because a host that lost its access list would be published unprotected."
+      },
+      "certificates": {
+        "label": "Certificates",
+        "description": "Issued and uploaded certificates, certificate authorities, client certificates and mTLS roles."
+      },
+      "accessLists": {
+        "label": "Access lists",
+        "description": "Basic-auth lists and the usernames in them."
+      },
+      "oauthProviders": {
+        "label": "OAuth providers",
+        "description": "Configured identity providers, including their client secrets. Bringing an enabled provider across is a way in on its own, even without the old user accounts."
+      },
+      "agents": {
+        "label": "Agents",
+        "description": "Remote agents this controller had paired with, and their shared secrets."
+      },
+      "settings": {
+        "label": "Settings",
+        "description": "The stored configuration the Settings page writes - primary domain, ACME details, and the rest."
+      },
+      "auditLog": {
+        "label": "Audit log",
+        "description": "The history of who changed what. Usually the largest table, and never load-bearing."
+      }
+    },
+    "restartStopping": "Stopping the application…",
+    "restartWaiting": "Waiting for it to come back…",
+    "restartReady": "Back up. Taking you to the next step…",
+    "restartSignInMigrated": "You will be asked to sign in with one of the accounts that came across, using the password you already had.",
+    "restartSignInFresh": "No accounts came across, so the next step is creating the first administrator or configuring single sign-on.",
+    "restartRefused": "The restart request was refused (HTTP {status}).",
+    "restartStillRunning": "The application is still running after being asked to stop, so nothing appears to be supervising it.",
+    "restartNotBack": "The application stopped but has not come back.",
+    "migrationCandidateUsers": "{count, plural, one {# user} other {# users}}",
+    "migrationCandidateProxyHosts": "{count, plural, one {# proxy host} other {# proxy hosts}}",
+    "migrationCandidateCertificates": "{count, plural, one {# certificate} other {# certificates}}",
+    "migrationCandidateLastWritten": "Last written {date}",
+    "legacySecretRequiredDescription": "Certificate private keys, DNS provider credentials, OAuth client secrets and agent secrets in this file are encrypted with the <code>SESSION_SECRET</code> the old installation ran with, and this deployment has a different one. Enter the old value to bring them across.",
+    "migrationConnectionDropped": "The connection dropped before the migration reported back. Check whether it completed before running it again: a second run against a partly populated database is not supported.",
+    "legacyDatabaseBackupDescription": "The file at <code>{source}</code> was read, not modified. Download it now if you want a copy - once you are satisfied the migration is correct, it can be deleted.",
+    "legacyDatabaseDownloadLink": "Download the old database",
+    "environmentCleanupDescription": "These are stored in the database now and are no longer read from the environment: <code>{variables}</code>. Run this beside your <code>docker-compose.yml</code> to comment them out of your <code>.env</code>. It edits nothing else, leaves a <code>.env.bak</code> next to it, and comments rather than deletes so you keep a copy of the values.",
+    "environmentCleanupElsewhere": "If this deployment's environment comes from somewhere else - Compose's own <code>environment:</code> block, Swarm or Kubernetes secrets, a systemd unit - remove those variables from wherever you set them instead. Either way it is optional: a variable that is still set is simply ignored now that a value is stored.",
+    "migrateErrors": {
+      "expectedJson": "Expected a JSON body.",
+      "chooseDatabase": "Choose a database to migrate.",
+      "chooseGroups": "Choose at least one thing to migrate, or start fresh instead.",
+      "unknownDatabase": "That is not one of the databases found on this host. Reload the page and choose one of the files it offers.",
+      "legacyKeyRequired": "This database's secrets - certificate keys, provider credentials, agent secrets - are encrypted with the SESSION_SECRET the old installation ran with, which is not the one this deployment uses. Enter the old value to bring them across.",
+      "legacyKeyInvalid": "That SESSION_SECRET does not decrypt this database's secrets. Take it from the `.env` the old installation ran with, exactly as it appears there.",
+      "secretKeyMissing": "This database holds secrets encrypted with a different SESSION_SECRET than this deployment uses. Enter the old one to bring them across.",
+      "secretKeyWrong": "The SESSION_SECRET provided does not decrypt this database's secrets. Check it against the `.env` the old installation ran with.",
+      "secretUnreadableInTable": "{reason} (reading {table})",
+      "nothingWritten": "{reason} Nothing was written - the import stops before writing when a value cannot be read.",
+      "failedPartway": "The migration failed partway through. The database may be partly populated - empty it before trying again, so a retry does not merge two attempts.",
+      "nothingMigrated": "Nothing has been migrated on this instance."
+    }
   },
   "ui": {
     "cancel": "Cancel",
     "codeEditor": {
-      "keyboardHint": "Tab indents; press Escape then Tab to leave the field"
+      "keyboardHint": "Tab indents; press Escape then Tab to leave the field",
+      "plaintextLabel": "Text"
     },
     "emptyValue": "-",
     "passwordField": {
       "copiedLabel": "Copied",
       "copyLabel": "Copy password",
+      "copyUnavailableDescription": "Your browser only allows copying to the clipboard over HTTPS. The password is shown in the field - select it and copy it manually.",
+      "copyUnavailableTitle": "Copy it manually",
       "generateLabel": "Generate a strong password",
       "generateTooltip": "Generate strong password",
       "hideLabel": "Hide password",
       "revealLabel": "Show password"
     },
-    "viewDetails": "View details"
+    "viewDetails": "View details",
+    "statusChip": {
+      "active": "Active",
+      "inactive": "Paused",
+      "error": "Error",
+      "warning": "Warning"
+    },
+    "noDataAvailable": "No data available",
+    "save": "Save",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Search..."
   },
   "users": {
     "activeDisabledNote": "{active} active, {disabled} disabled",
@@ -1808,7 +3037,22 @@
     "searchPlaceholder": "Search users...",
     "users": "Users",
     "withSession": "With a session",
-    "withSessionNote": "Signed in and not yet expired"
+    "withSessionNote": "Signed in and not yet expired",
+    "roles": {
+      "admin": "Admin",
+      "operator": "Operator",
+      "user": "User",
+      "viewer": "Viewer"
+    },
+    "disabledBadge": "disabled",
+    "disableUserNamed": "Disable user {name}",
+    "enableUserNamed": "Enable user {name}",
+    "editUserNamed": "Edit user {name}",
+    "deleteUserNamed": "Delete user {name}",
+    "deleteUserConfirm": "Permanently delete user \"{name}\"? This cannot be undone.",
+    "disableUserConfirm": "Disable user \"{name}\"?",
+    "userCount": "{count, plural, one {# user} other {# users}}",
+    "editingNamed": "Editing {name}"
   },
   "waf": {
     "addRuleById": "Add Rule by ID",
@@ -1835,14 +3079,14 @@
     "events": "Events",
     "eventsEmptyDescription": "No WAF events found. Enable the WAF in Settings and send some traffic to see events here.",
     "eventsSearchPlaceholder": "Search by host, IP, URI, or rule message...",
-    "exclusionsDisabledDescription": "Exclusions are saved but have no effect until WAF is enabled.",
+    "exclusionsDisabledDescription": "Exclusions are saved but have no effect until the WAF is enabled.",
     "exclusionsDisabledTitle": "Global WAF is currently disabled",
     "exclusionsTabHelp": "Rule exclusions live on the Suppressed Rules tab",
     "file": "File",
     "firewall": "Firewall",
-    "fromUtc": "From (UTC)",
+    "rangeFrom": "From",
     "globalExclusionsHelp": "Rules listed here are suppressed globally via SecRuleRemoveById for all proxy hosts using global WAF settings.",
-    "globalSettingsDescription": "Configure the global Web Application Firewall. Per-host settings can merge with or override these defaults. Powered by Coraza with optional OWASP Core Rule Set.",
+    "globalSettingsDescription": "Configure the global Web Application Firewall. Per-host settings can merge with or override these defaults. Powered by Coraza with the optional OWASP Core Rule Set.",
     "headers": "Headers",
     "host": "Host",
     "invalidTimeRangeError": "Choose a valid custom time range",
@@ -1856,7 +3100,11 @@
     "moduleDisabledTitle": "The Coraza WAF module is disabled",
     "noGloballySuppressedRules": "No globally suppressed rules.",
     "overLimitAction": "Over-limit action",
+    "overLimitActionHelpDefault": "Coraza's own behaviour, which refuses the request with 413 Payload Too Large.",
+    "overLimitActionHelpPartial": "The request is forwarded whole, but only the part of its body within the limit is inspected - the rest reaches the upstream unchecked.",
+    "overLimitActionHelpReject": "A request whose body is over the limit is refused with 413 Payload Too Large and never reaches the upstream.",
     "overview": "Overview",
+    "save": "Save",
     "owaspCrsHelp": "Covers SQLi, XSS, LFI, RCE - recommended.",
     "owaspCrsLabel": "Load OWASP Core Rule Set",
     "pageDescription": "Web Application Firewall events and rule management.",
@@ -1870,7 +3118,6 @@
     "responseHeaders": "Response Headers",
     "ruleId": "Rule ID",
     "ruleMessage": "Rule Message",
-    "saveWafSettings": "Save WAF settings",
     "searchSuppressedRules": "Search suppressed rules",
     "searchWafEvents": "Search WAF events",
     "server": "Server",
@@ -1886,13 +3133,39 @@
     "suppressedRulesSearchPlaceholder": "Search by rule ID or message…",
     "tags": "Tags",
     "timeRange": "Time range",
-    "timeUtc": "Time (UTC)",
+    "time": "Time",
     "timestamp": "Timestamp",
-    "toUtc": "To (UTC)",
+    "rangeTo": "To",
     "transactionId": "Transaction ID",
     "uri": "URI",
     "views": "Views",
     "wafEvent": "WAF Event",
-    "wafOverLimitActionHelp": "Reject returns 413; Partial inspects what fits and forwards the rest."
+    "matchesTab": "Matches ({count})",
+    "suppressedGlobally": "Suppressed Globally",
+    "suppressForHost": "Suppress for {host}",
+    "suppressedForHost": "Suppressed for {host}",
+    "noRuleDescription": "No description available - the rule has not triggered yet",
+    "suppressedRulesEmptyDescription": "Add a rule above or open a WAF event and click \"Suppress Globally\".",
+    "removeSuppressionForRule": "Remove suppression for rule {id}",
+    "rangeAllTime": "All time",
+    "rangeCustom": "Custom",
+    "bodyLimitActionDefault": "Default",
+    "bodyLimitActionReject": "Reject",
+    "bodyLimitActionPartial": "Partial",
+    "templateAllowIp": "Allow IP",
+    "templateDisableWafForPath": "Disable WAF for path",
+    "templateRemoveXssRules": "Remove XSS rules",
+    "templateBlockUserAgent": "Block User-Agent",
+    "action": "Action",
+    "selected": "Selected",
+    "waf": "WAF",
+    "wafSettings": "WAF Settings",
+    "globalRuleExclusions": "Global WAF Rule Exclusions",
+    "ruleLabel": "Rule {id}",
+    "ruleNumber": "Rule #{id}",
+    "contentLengthBytes": "{length} bytes",
+    "actionDone": "Done",
+    "actionFailed": "Failed",
+    "ruleAlreadySuppressed": "Rule {id} is already suppressed."
   }
 }

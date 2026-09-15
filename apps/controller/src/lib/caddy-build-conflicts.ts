@@ -16,15 +16,61 @@ import {
 } from "./settings";
 
 /**
- * Why a selection cannot be applied yet, in the operator's terms, or null. Naming what uses the
- * module ("3 enabled L4 proxy hosts") is what makes the refusal actionable.
+ * One thing still using a module the selection turns off. Naming what uses it ("3 enabled L4 proxy
+ * hosts") is what makes the refusal actionable.
+ *
+ * Data rather than a sentence, so the settings action can say it in the reader's language through
+ * `moduleConflictMessage`; `describeModuleConflicts` says it in English for `/api/v1`. A test keeps
+ * the two wordings equal.
  */
+export type ModuleConflict =
+  | { kind: "l4Hosts" | "hostWaf" | "hostGeoblock" | "tailnetHosts"; count: number }
+  | { kind: "globalWaf" | "globalGeoblock" }
+  | { kind: "defaultDnsProvider" | "dnsProviderCredentials"; provider: string };
+
+/** A conflict as `/api/v1` has always worded it. */
+export function englishModuleConflict(conflict: ModuleConflict): string {
+  switch (conflict.kind) {
+    case "l4Hosts":
+      return `${conflict.count} enabled L4 proxy host${conflict.count === 1 ? " needs" : "s need"} the Layer 4 Proxy module`;
+    case "globalWaf":
+      return "global WAF is switched on and needs the Coraza WAF module";
+    case "globalGeoblock":
+      return "global geoblocking is switched on and needs the Request Blocker module";
+    case "hostWaf":
+      return `${conflict.count} proxy host${conflict.count === 1 ? " has" : "s have"} per-host WAF enabled and ${conflict.count === 1 ? "needs" : "need"} the Coraza WAF module`;
+    case "hostGeoblock":
+      return `${conflict.count} proxy host${conflict.count === 1 ? " has" : "s have"} per-host geoblocking enabled and ${conflict.count === 1 ? "needs" : "need"} the Request Blocker module`;
+    case "tailnetHosts":
+      return `${conflict.count} proxy host${conflict.count === 1 ? " is" : "s are"} served on the tailnet and ${conflict.count === 1 ? "needs" : "need"} the Tailscale module`;
+    case "defaultDnsProvider":
+      return `${conflict.provider} is the default DNS provider and needs its caddy-dns module`;
+    case "dnsProviderCredentials":
+      return `${conflict.provider} has DNS credentials configured and needs its caddy-dns module`;
+  }
+}
+
+/** The whole refusal in English, or null when nothing conflicts. */
+export function englishModuleConflicts(conflicts: readonly ModuleConflict[]): string | null {
+  if (conflicts.length === 0) return null;
+  return `Cannot disable those modules yet: ${conflicts.map(englishModuleConflict).join("; ")}. Turn the feature off first.`;
+}
+
+/** Why a selection cannot be applied yet, in English for `/api/v1`, or null. */
 export async function describeModuleConflicts(
   settings: CaddyBuildSettings,
   agentRowId?: number,
 ): Promise<string | null> {
+  return englishModuleConflicts(await findModuleConflicts(settings, agentRowId));
+}
+
+/** Everything still using a module the selection turns off; empty when it can be applied. */
+export async function findModuleConflicts(
+  settings: CaddyBuildSettings,
+  agentRowId?: number,
+): Promise<ModuleConflict[]> {
   const enabled = new Set(resolveEnabledModuleIds(settings));
-  const problems: string[] = [];
+  const problems: ModuleConflict[] = [];
 
   const l4Off = !enabled.has("caddy-l4");
   const wafOff = !enabled.has("coraza-waf");
@@ -53,19 +99,15 @@ export async function describeModuleConflicts(
 
   if (l4HostIds) {
     const l4Count = l4HostIds.filter(servesL4).length;
-    if (l4Count > 0) {
-      problems.push(
-        `${l4Count} enabled L4 proxy host${l4Count === 1 ? " needs" : "s need"} the Layer 4 Proxy module`,
-      );
-    }
+    if (l4Count > 0) problems.push({ kind: "l4Hosts", count: l4Count });
   }
 
   if (waf?.enabled && waf.mode !== "Off") {
-    problems.push("global WAF is switched on and needs the Coraza WAF module");
+    problems.push({ kind: "globalWaf" });
   }
 
   if (geoblock?.enabled) {
-    problems.push("global geoblocking is switched on and needs the Request Blocker module");
+    problems.push({ kind: "globalGeoblock" });
   }
 
   // Per-host config counts as much as the global switch: WAF and geoblocking can be on per host
@@ -74,29 +116,17 @@ export async function describeModuleConflicts(
     const hosts = allHosts.filter((host) => servesHttp(host.id));
     if (wafOff) {
       const count = hosts.filter((h) => h.enabled && h.waf?.enabled).length;
-      if (count > 0) {
-        problems.push(
-          `${count} proxy host${count === 1 ? " has" : "s have"} per-host WAF enabled and ${count === 1 ? "needs" : "need"} the Coraza WAF module`,
-        );
-      }
+      if (count > 0) problems.push({ kind: "hostWaf", count });
     }
     if (blockerOff) {
       const count = hosts.filter((h) => h.enabled && h.geoblock?.enabled).length;
-      if (count > 0) {
-        problems.push(
-          `${count} proxy host${count === 1 ? " has" : "s have"} per-host geoblocking enabled and ${count === 1 ? "needs" : "need"} the Request Blocker module`,
-        );
-      }
+      if (count > 0) problems.push({ kind: "hostGeoblock", count });
     }
     if (tailscaleOff) {
       // Worth refusing rather than warning: a tailnet-only host stops being served at all - the
       // config drops it rather than publishing it, which looks like the host simply vanished.
       const count = hosts.filter((h) => h.enabled && h.tailscale?.serve).length;
-      if (count > 0) {
-        problems.push(
-          `${count} proxy host${count === 1 ? " is" : "s are"} served on the tailnet and ${count === 1 ? "needs" : "need"} the Tailscale module`,
-        );
-      }
+      if (count > 0) problems.push({ kind: "tailnetHosts", count });
     }
   }
 
@@ -105,16 +135,24 @@ export async function describeModuleConflicts(
   const defaultProvider = dnsProviders?.default ?? null;
   for (const provider of Object.keys(dnsProviders?.providers ?? {})) {
     if (enabled.has(dnsModuleId(provider))) continue;
-    problems.push(
-      provider === defaultProvider
-        ? `${provider} is the default DNS provider and needs its caddy-dns module`
-        : `${provider} has DNS credentials configured and needs its caddy-dns module`,
-    );
+    problems.push({
+      kind: provider === defaultProvider ? "defaultDnsProvider" : "dnsProviderCredentials",
+      provider,
+    });
   }
 
-  if (problems.length === 0) return null;
-  return `Cannot disable those modules yet: ${problems.join("; ")}. Turn the feature off first.`;
+  return problems;
 }
+
+/** Which hosts the snippet warning names. The settings action says it, in the reader's language. */
+export type CaddyfileSnippetWarning = {
+  /** Enabled hosts with a custom Caddyfile snippet. */
+  count: number;
+  /** The first few of those, by name. */
+  names: string[];
+  /** How many more there are beyond `names`. */
+  more: number;
+};
 
 /**
  * A non-blocking heads-up about per-host Caddyfile snippets, or null. Only Caddy's adapter could
@@ -122,7 +160,7 @@ export async function describeModuleConflicts(
  */
 export async function describeCaddyfileSnippetWarning(
   settings: CaddyBuildSettings,
-): Promise<string | null> {
+): Promise<CaddyfileSnippetWarning | null> {
   const enabled = new Set(resolveEnabledModuleIds(settings));
   const anyDisabled = CADDY_MODULES.some((m) => !enabled.has(m.id));
   if (!anyDisabled) return null;
@@ -131,10 +169,6 @@ export async function describeCaddyfileSnippetWarning(
   const withSnippets = hosts.filter((h) => h.enabled && h.customCaddyfile?.trim());
   if (withSnippets.length === 0) return null;
 
-  const names = withSnippets
-    .slice(0, 3)
-    .map((h) => h.name)
-    .join(", ");
-  const more = withSnippets.length > 3 ? `, and ${withSnippets.length - 3} more` : "";
-  return `${withSnippets.length} proxy host${withSnippets.length === 1 ? "" : "s"} (${names}${more}) use custom Caddyfile directives, which may reference a module you just switched off. Review them before rebuilding - a snippet Caddy can no longer adapt is skipped silently.`;
+  const names = withSnippets.slice(0, 3).map((h) => h.name);
+  return { count: withSnippets.length, names, more: withSnippets.length - names.length };
 }

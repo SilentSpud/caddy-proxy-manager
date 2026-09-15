@@ -141,7 +141,7 @@ export function DataTable<T>({
   columns,
   data,
   keyField,
-  emptyMessage = "No data available",
+  emptyMessage,
   loading = false,
   onRowClick,
   rowStatus,
@@ -151,6 +151,7 @@ export function DataTable<T>({
   expandedRow,
 }: DataTableProps<T>) {
   const t = useTranslations("ui");
+  const emptyTitle = emptyMessage ?? t("noDataAvailable");
   const isEmpty = data.length === 0 && !loading;
   // Replaces the paired `block md:hidden` / `hidden md:block` wrappers, so only one of the two
   // views is ever mounted.
@@ -228,7 +229,7 @@ export function DataTable<T>({
           ))
         ) : isEmpty ? (
           <Card>
-            <EmptyState title={emptyMessage} isCompact />
+            <EmptyState title={emptyTitle} isCompact />
           </Card>
         ) : (
           data.map((row) => <VStack key={String(row[keyField])}>{mobileCard(row)}</VStack>)
@@ -241,7 +242,7 @@ export function DataTable<T>({
   if (isEmpty) {
     return (
       <Card>
-        <EmptyState title={emptyMessage} />
+        <EmptyState title={emptyTitle} />
       </Card>
     );
   }

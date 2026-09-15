@@ -124,9 +124,7 @@ export function CpmForwardAuthFields({
                     label={group.name}
                     description={group.description ?? undefined}
                     endContent={
-                      <Badge
-                        label={`${group.member_count} member${group.member_count !== 1 ? "s" : ""}`}
-                      />
+                      <Badge label={t("groupMemberCount", { count: group.member_count })} />
                     }
                   />
                 ))}

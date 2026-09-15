@@ -10,6 +10,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { DomainError, type DomainErrorParams, domainErrorMessage } from "./domain-error";
 import { clearSetting, getSetting, setSetting } from "./settings";
 
 const BRANDING_KEY = "branding";
@@ -34,9 +35,13 @@ export type FaviconAsset = {
 
 export type BrandingSettings = { favicon: FaviconAsset | null };
 
-export class FaviconValidationError extends Error {
-  constructor(message: string) {
-    super(message);
+/** Something wrong with the file itself, said as a code so the settings action can translate it. */
+export class FaviconValidationError extends DomainError {
+  constructor(
+    code: "faviconEmpty" | "faviconTooLarge" | "faviconNotImage",
+    params: DomainErrorParams = {},
+  ) {
+    super(code, params, domainErrorMessage(code, params));
     this.name = "FaviconValidationError";
   }
 }
@@ -93,19 +98,18 @@ export function sniffFaviconType(bytes: Uint8Array): string | null {
  * Throws `FaviconValidationError` with something an operator can act on; anything else is a bug.
  */
 export async function saveFavicon(file: File): Promise<FaviconAsset> {
-  if (file.size === 0) throw new FaviconValidationError("That file is empty.");
+  if (file.size === 0) throw new FaviconValidationError("faviconEmpty");
   if (file.size > MAX_FAVICON_BYTES) {
-    throw new FaviconValidationError(
-      `That file is ${Math.ceil(file.size / 1024)} KB. The limit is ${MAX_FAVICON_BYTES / 1024} KB.`,
-    );
+    throw new FaviconValidationError("faviconTooLarge", {
+      size: Math.ceil(file.size / 1024),
+      limit: MAX_FAVICON_BYTES / 1024,
+    });
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const type = sniffFaviconType(bytes);
   if (!type) {
-    throw new FaviconValidationError(
-      "That does not look like an image. Use a PNG, ICO, SVG, WebP, GIF or JPEG.",
-    );
+    throw new FaviconValidationError("faviconNotImage");
   }
 
   const buffer = Buffer.from(bytes);

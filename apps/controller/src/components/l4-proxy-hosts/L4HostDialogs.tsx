@@ -280,12 +280,10 @@ function L4HostForm({
           <HStack justify="between" vAlign="center" gap={4}>
             <VStack gap={0}>
               <Text type="body" size="sm" weight="semibold">
-                {enabled ? "L4 Host Enabled" : "L4 Host Paused"}
+                {enabled ? t("hostEnabledTitle") : t("hostPausedTitle")}
               </Text>
               <Text type="body" size="sm" color="secondary">
-                {enabled
-                  ? "This host is active and proxying connections"
-                  : "This host is disabled and will not accept connections"}
+                {enabled ? t("hostEnabledDescription") : t("hostPausedDescription")}
               </Text>
             </VStack>
             <Switch
@@ -352,7 +350,7 @@ function L4HostForm({
         {(matcherType === "tls_sni" || matcherType === "http_host") && (
           <TextInput
             {...NATIVE_REQUIRED}
-            label={matcherType === "tls_sni" ? "SNI Hostnames" : "HTTP Hostnames"}
+            label={matcherType === "tls_sni" ? t("sniHostnames") : t("httpHostnames")}
             htmlName="matcherValue"
             placeholder={t("matcherHostnamesPlaceholder")}
             value={text.matcherValue}
@@ -697,7 +695,7 @@ export function CreateL4HostDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={initialData ? "Duplicate L4 Proxy Host" : "Create L4 Proxy Host"}
+      title={initialData ? t("duplicateL4ProxyHost") : t("createL4ProxyHost")}
       maxWidth="lg"
       submitLabel={t("create")}
       onSubmit={() => {
@@ -708,7 +706,11 @@ export function CreateL4HostDialog({
         formId="create-l4-host-form"
         formAction={formAction}
         state={state}
-        initialData={initialData ? { ...initialData, name: `${initialData.name} (Copy)` } : null}
+        initialData={
+          initialData
+            ? { ...initialData, name: t("duplicateName", { name: initialData.name }) }
+            : null
+        }
         agents={agents}
       />
     </AppDialog>
@@ -793,7 +795,10 @@ export function DeleteL4HostDialog({
             <Banner status={state.status === "error" ? "error" : "success"} title={state.message} />
           )}
           <Text type="body" size="sm">
-            Are you sure you want to delete the L4 proxy host <strong>{host.name}</strong>?
+            {t.rich("deleteConfirm", {
+              name: host.name,
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </Text>
           <Card variant="muted" padding={3}>
             <MetadataList>

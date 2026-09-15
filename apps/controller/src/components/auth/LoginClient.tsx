@@ -20,6 +20,7 @@ import {
 } from "@/src/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
 import { formatAppVersion } from "@/src/lib/app-version";
+import { signInErrorMessage } from "@/src/lib/sign-in-error";
 
 interface LoginClientProps {
   enabledProviders: SignInProvider[];
@@ -38,6 +39,7 @@ export default function LoginClient({
   initialError = null,
 }: LoginClientProps) {
   const t = useTranslations("auth.login");
+  const tErrors = useTranslations("auth.errors");
   const router = useRouter();
   const [loginError, setLoginError] = useState<string | null>(initialError);
   const [loginPending, setLoginPending] = useState(false);
@@ -65,19 +67,14 @@ export default function LoginClient({
     // $InferServerPlugin types fail to merge into the client signature in some environments,
     // so we cast a stable shape here.
     type SignInUsername = (input: { username: string; password: string }) => Promise<{
-      error: { status?: number; message?: string } | null;
+      error: { status?: number; code?: string; message?: string } | null;
     }>;
     const signInUsername = (authClient.signIn as unknown as { username: SignInUsername }).username;
     const { error } = await signInUsername({ username: trimmedUsername, password });
 
     if (error) {
-      let message: string | null = null;
-      if (error.status === 429) {
-        message = error.message || t("rateLimited");
-      } else if (error.message) {
-        message = error.message;
-      }
-      setLoginError(message ?? t("invalidCredentials"));
+      // By code, not Better Auth's `message`: that is English whatever the reader's language.
+      setLoginError(signInErrorMessage(error, (key) => tErrors(key)));
       setLoginPending(false);
       // Keep the name on screen: the operator has to be able to tell a typo in it from a wrong
       // password, and sending them back to step one hides the evidence.

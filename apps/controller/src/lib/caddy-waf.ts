@@ -1,6 +1,7 @@
 /** WAF handler builder and effective-config resolver, split from caddy.ts for unit testing. */
 import type { WafSettings } from "./settings";
 import type { WafHostConfig } from "./models/proxy-hosts";
+import { type DomainErrorCode, domainError } from "./domain-error";
 
 // ---------------------------------------------------------------------------
 // Request body limits
@@ -58,14 +59,28 @@ export function bytesToMib(bytes: number | undefined): string {
   return typeof bytes === "number" && bytes > 0 ? String(Math.round(bytes / BYTES_PER_MIB)) : "";
 }
 
+/**
+ * Which field a body limit came from. Each is its own message rather than a label spliced into one,
+ * because not every language puts the field name first.
+ */
+export type BodyLimitErrorCode = Extract<
+  DomainErrorCode,
+  | "wafRequestBodyLimitInvalid"
+  | "wafInMemoryBodyLimitInvalid"
+  | "hostWafRequestBodyLimitInvalid"
+  | "hostWafInMemoryBodyLimitInvalid"
+>;
+
 /** Parses a MiB form field into bytes. Blank means "unset - inherit the default". */
-export function parseBodyLimitMib(raw: unknown, label: string): number | undefined {
+export function parseBodyLimitMib(raw: unknown, errorCode: BodyLimitErrorCode): number | undefined {
   if (typeof raw !== "string" || !raw.trim()) return undefined;
   const mib = Number(raw.trim());
   if (!Number.isInteger(mib) || mib < MIN_BODY_LIMIT_MIB || mib > MAX_BODY_LIMIT_MIB) {
-    throw new Error(
-      `${label} must be a whole number of MiB between ${MIN_BODY_LIMIT_MIB} and ${MAX_BODY_LIMIT_MIB}`,
-    );
+    // Strings, not numbers: the catalog would format 1024 as "1,024".
+    throw domainError(errorCode, {
+      min: String(MIN_BODY_LIMIT_MIB),
+      max: String(MAX_BODY_LIMIT_MIB),
+    });
   }
   return mib * BYTES_PER_MIB;
 }

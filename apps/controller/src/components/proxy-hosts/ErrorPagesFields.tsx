@@ -64,7 +64,8 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
       ...r,
       withRowId({
         statuses: "502, 503, 504",
-        body: "<h1>Service temporarily unavailable</h1>",
+        // Raw: the body is HTML, and formatting would read its tags as rich-text markup.
+        body: t.raw("errorPageDefaultBody") as string,
         contentType: "",
       }),
     ]);
@@ -104,7 +105,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                   <IconButton
                     variant="ghost"
                     size="sm"
-                    label={`Remove error page ${i + 1}`}
+                    label={t("removeErrorPageLabel", { index: i + 1 })}
                     icon={<Trash2 />}
                     onClick={() => removeRule(rule.rowId)}
                   />
@@ -115,7 +116,7 @@ export function ErrorPagesFields({ initialData = [], name = "errorPagesJson" }: 
                   label={t("responseBody")}
                   language="html"
                   height="sm"
-                  placeholder={t("errorPageBodyPlaceholder")}
+                  placeholder={t.raw("errorPageBodyPlaceholder") as string}
                   value={rule.body}
                   onChange={(next) => updateRule(rule.rowId, "body", next)}
                 />

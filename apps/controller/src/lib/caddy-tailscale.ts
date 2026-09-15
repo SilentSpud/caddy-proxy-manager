@@ -13,6 +13,8 @@
  * connection policies, HSTS and mTLS instead of being handed to the plugin's own TLS listener.
  */
 
+import { type DomainError, type DomainErrorCode, domainError } from "./domain-error";
+
 /**
  * Local rather than imported from settings-validation, which reaches back here to validate the
  * REST settings group - one direction only, as caddy-default-response.ts does.
@@ -59,13 +61,32 @@ export function normalizeNodeName(raw: string | null | undefined): string {
   return (raw ?? "").trim().toLowerCase();
 }
 
-/** Error message for an unusable node name, or null. */
-export function validateNodeName(name: string, label = "Tailscale node name"): string | null {
-  if (!name) return `${label} is required`;
-  if (!NODE_NAME_PATTERN.test(name)) {
-    return `${label} "${name}" is not a valid tailnet machine name. Use lowercase letters, digits and hyphens, e.g. "caddy".`;
-  }
+/** Which node name is being checked. Each has its own message, so no label is spliced into one. */
+export type NodeNameField = "node" | "upstreamNode" | "defaultNode";
+
+const NODE_NAME_CODES = {
+  node: { required: "tailscaleNodeNameRequired", invalid: "tailscaleNodeNameInvalid" },
+  upstreamNode: {
+    required: "tailscaleUpstreamNodeNameRequired",
+    invalid: "tailscaleUpstreamNodeNameInvalid",
+  },
+  defaultNode: { required: "tailscaleDefaultNodeRequired", invalid: "tailscaleDefaultNodeInvalid" },
+} as const satisfies Record<NodeNameField, Record<"required" | "invalid", DomainErrorCode>>;
+
+/**
+ * Why a node name is unusable, or null. A 400 for `/api/v1`, where a proxy host's node names are
+ * checked too.
+ */
+export function nodeNameProblem(name: string, field: NodeNameField = "node"): DomainError | null {
+  const codes = NODE_NAME_CODES[field];
+  if (!name) return domainError(codes.required, {}, { status: 400 });
+  if (!NODE_NAME_PATTERN.test(name)) return domainError(codes.invalid, { name }, { status: 400 });
   return null;
+}
+
+/** The English for an unusable node name, or null. */
+export function validateNodeName(name: string, field: NodeNameField = "node"): string | null {
+  return nodeNameProblem(name, field)?.message ?? null;
 }
 
 /**
@@ -177,15 +198,15 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
       ? input.defaultNode
       : TAILSCALE_DEFAULT_NODE,
   );
-  const nodeError = validateNodeName(defaultNode, "Default node name");
-  if (nodeError) throw new Error(nodeError);
+  const nodeError = nodeNameProblem(defaultNode, "defaultNode");
+  if (nodeError) throw nodeError;
 
   // Generous, because this same function runs over the *stored* blob, where the key is a base64
   // ciphertext several times the length of what was typed.
   const authKey = typeof input.authKey === "string" ? input.authKey.trim() : "";
-  if (authKey.length > 4096) throw new Error("Tailscale auth key is implausibly long");
+  if (authKey.length > 4096) throw domainError("tailscaleAuthKeyTooLong");
   if (/\s/.test(authKey) || hasForbiddenControlCharacter(authKey)) {
-    throw new Error("Tailscale auth key must not contain whitespace or control characters");
+    throw domainError("tailscaleAuthKeyInvalidCharacters");
   }
 
   const controlUrl = typeof input.controlUrl === "string" ? input.controlUrl.trim() : "";
@@ -194,28 +215,28 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
     try {
       parsed = new URL(controlUrl);
     } catch {
-      throw new Error(`Control server URL "${controlUrl}" is not a valid URL`);
+      throw domainError("tailscaleControlUrlInvalid", { url: controlUrl });
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new Error("Control server URL must be http or https");
+      throw domainError("tailscaleControlUrlProtocol");
     }
   }
 
   const stateDir = typeof input.stateDir === "string" ? input.stateDir.trim() : "";
   if (stateDir) {
     if (!stateDir.startsWith("/") || stateDir.includes("..")) {
-      throw new Error("State directory must be an absolute path inside the container");
+      throw domainError("tailscaleStateDirNotAbsolute");
     }
     if (hasForbiddenControlCharacter(stateDir)) {
-      throw new Error("State directory contains a control character");
+      throw domainError("tailscaleStateDirControlCharacter");
     }
   }
 
   const apiAccessToken =
     typeof input.apiAccessToken === "string" ? input.apiAccessToken.trim() : "";
-  if (apiAccessToken.length > 4096) throw new Error("API access token is implausibly long");
+  if (apiAccessToken.length > 4096) throw domainError("tailscaleApiTokenTooLong");
   if (/\s/.test(apiAccessToken) || hasForbiddenControlCharacter(apiAccessToken)) {
-    throw new Error("API access token must not contain whitespace or control characters");
+    throw domainError("tailscaleApiTokenInvalidCharacters");
   }
 
   // "-" is Tailscale's own shorthand for the token's tailnet. A named one is a DNS-ish string, so
@@ -223,7 +244,7 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
   const apiTailnet =
     typeof input.apiTailnet === "string" && input.apiTailnet.trim() ? input.apiTailnet.trim() : "-";
   if (!/^[A-Za-z0-9._@-]+$/.test(apiTailnet)) {
-    throw new Error(`Tailnet "${apiTailnet}" is not valid. Use "-" for the token's own tailnet.`);
+    throw domainError("tailscaleTailnetInvalid", { tailnet: apiTailnet });
   }
 
   const tags = Array.from(
@@ -233,10 +254,10 @@ export function normalizeTailscaleSettings(value: unknown): TailscaleSettings {
         .filter(Boolean),
     ),
   );
-  if (tags.length > MAX_TAGS) throw new Error(`At most ${MAX_TAGS} Tailscale tags are supported`);
+  if (tags.length > MAX_TAGS) throw domainError("tailscaleTooManyTags", { max: MAX_TAGS });
   for (const tag of tags) {
     if (!TAG_PATTERN.test(tag)) {
-      throw new Error(`Tailscale tag "${tag}" is not valid. Tags look like "tag:caddy".`);
+      throw domainError("tailscaleTagInvalid", { tag });
     }
   }
 

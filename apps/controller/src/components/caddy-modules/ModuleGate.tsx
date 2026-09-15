@@ -7,6 +7,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { useTranslations } from "next-intl";
 import type { CaddyFeatureId } from "@/src/lib/caddy-modules";
 
 export type ModuleGateState = {
@@ -59,12 +60,11 @@ export function useFeatureEnabled(feature: CaddyFeatureId): boolean {
 
 /** The sentence shown when a feature is off - names the module. Null when it is available. */
 export function useDisabledReason(feature: CaddyFeatureId): string | null {
+  const t = useTranslations("caddyModules");
   const gate = useModuleGate();
   if (gate.features[feature] ?? true) return null;
   const name = gate.moduleNames[feature];
-  return name
-    ? `Requires the ${name} Caddy module. Enable it in Settings → Caddy Build and rebuild Caddy.`
-    : "Requires a Caddy module that is not enabled. See Settings → Caddy Build.";
+  return name ? t("disabledReasonNamed", { name }) : t("disabledReasonUnnamed");
 }
 
 /**

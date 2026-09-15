@@ -192,7 +192,7 @@ describe('L4 proxy host create validation', () => {
       tlsTermination: true,
     };
     await expect(createL4ProxyHost(input, 1)).rejects.toThrow(
-      'TLS termination is only supported with TCP',
+      'TLS termination is only supported with the TCP protocol',
     );
   });
 

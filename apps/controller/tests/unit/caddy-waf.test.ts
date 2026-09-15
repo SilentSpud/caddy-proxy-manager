@@ -12,6 +12,7 @@ import {
   parseBodyLimitMib,
   resolveEffectiveWaf,
 } from '../../src/lib/caddy-waf';
+import { DomainError } from '../../src/lib/domain-error';
 
 const baseWaf = {
   enabled: true,
@@ -575,16 +576,41 @@ describe('findInvalidBodyLimitDirective', () => {
 
 describe('parseBodyLimitMib', () => {
   it('converts MiB to bytes and treats blank as unset', () => {
-    expect(parseBodyLimitMib('512', 'Limit')).toBe(536870912);
-    expect(parseBodyLimitMib('', 'Limit')).toBeUndefined();
-    expect(parseBodyLimitMib('  ', 'Limit')).toBeUndefined();
-    expect(parseBodyLimitMib(null, 'Limit')).toBeUndefined();
+    expect(parseBodyLimitMib('512', 'wafRequestBodyLimitInvalid')).toBe(536870912);
+    expect(parseBodyLimitMib('', 'wafRequestBodyLimitInvalid')).toBeUndefined();
+    expect(parseBodyLimitMib('  ', 'wafRequestBodyLimitInvalid')).toBeUndefined();
+    expect(parseBodyLimitMib(null, 'wafRequestBodyLimitInvalid')).toBeUndefined();
   });
 
   it('rejects values Coraza would refuse', () => {
-    expect(() => parseBodyLimitMib('1025', 'Limit')).toThrow(/between 1 and 1024/);
-    expect(() => parseBodyLimitMib('0', 'Limit')).toThrow();
-    expect(() => parseBodyLimitMib('1.5', 'Limit')).toThrow();
-    expect(() => parseBodyLimitMib('abc', 'Limit')).toThrow();
+    expect(() => parseBodyLimitMib('1025', 'wafRequestBodyLimitInvalid')).toThrow(
+      /between 1 and 1024/,
+    );
+    expect(() => parseBodyLimitMib('0', 'wafRequestBodyLimitInvalid')).toThrow();
+    expect(() => parseBodyLimitMib('1.5', 'wafRequestBodyLimitInvalid')).toThrow();
+    expect(() => parseBodyLimitMib('abc', 'wafRequestBodyLimitInvalid')).toThrow();
+  });
+
+  it('raises the code it was given, worded as the form used to word it', () => {
+    // The field name is part of each message rather than spliced in, so the four read in full.
+    const cases = [
+      ['wafRequestBodyLimitInvalid', 'Request body limit'],
+      ['wafInMemoryBodyLimitInvalid', 'In-memory body limit'],
+      ['hostWafRequestBodyLimitInvalid', 'WAF request body limit'],
+      ['hostWafInMemoryBodyLimitInvalid', 'WAF in-memory body limit'],
+    ] as const;
+    for (const [code, label] of cases) {
+      let caught: unknown;
+      try {
+        parseBodyLimitMib('2048', code);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(DomainError);
+      expect((caught as DomainError).code).toBe(code);
+      expect((caught as DomainError).message).toBe(
+        `${label} must be a whole number of MiB between 1 and 1024`,
+      );
+    }
   });
 });

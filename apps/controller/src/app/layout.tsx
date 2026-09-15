@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { getLocale, getMessages } from "next-intl/server";
+import { getLocale, getMessages, getTimeZone, getTranslations } from "next-intl/server";
 import { getLocaleDirection } from "@astryxdesign/core/i18n";
 import "./globals.css";
 import Providers from "./providers";
@@ -13,21 +13,22 @@ import { THEME_COOKIE, parseThemeMode, themeAttr } from "@/src/lib/theme-mode";
 // `title: { absolute: "..." }` - the forward auth portal does, since it runs on someone else's
 // domain and should not name the product guarding the app.
 //
-// Static, and the description is not translated: making this an async generateMetadata moves the
-// whole document's metadata out of <head> and into the streamed body, where `<title>` becomes part
-// of the page text. That is a change to every page's DOM, and it is not worth it for a meta
-// description behind a login that no reader sees in any language.
-export const metadata: Metadata = {
-  title: {
-    default: config.appName,
-    template: `%s · ${config.appName}`,
-  },
-  description: "Web UI for managing Caddy reverse proxies, certificates, and access control.",
-  // Pointed at the route unconditionally rather than looked up here: this is the root layout, so a
-  // database read would run on every page of every request. The route answers 404 when no icon has
-  // been uploaded, which the browser treats exactly as it treated the missing /favicon.ico before.
-  icons: { icon: "/api/branding/favicon" },
-};
+// A generateMetadata, so the description follows the reader's locale. It stays in <head> only
+// because next.config.mjs sets `htmlLimitedBots` - see there for what vinext does without it.
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common");
+  return {
+    title: {
+      default: config.appName,
+      template: `%s · ${config.appName}`,
+    },
+    description: t("metaDescription"),
+    // Pointed at the route unconditionally rather than looked up here: this is the root layout, so
+    // a database read would run on every page of every request. The route answers 404 when no icon
+    // has been uploaded, which the browser treats exactly as it treated the missing /favicon.ico.
+    icons: { icon: "/api/branding/favicon" },
+  };
+}
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
@@ -37,6 +38,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // switcher has to tell "chose English" from "we guessed English".
   const locale = await getLocale();
   const messages = await getMessages();
+  // Resolved from the time zone cookie in the same request config, and handed to the client
+  // provider so the browser formats timestamps in the zone the server just did.
+  const timeZone = await getTimeZone();
   const localePreference = parsePreference(cookieStore.get(LOCALE_COOKIE)?.value);
 
   return (
@@ -55,6 +59,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           locale={locale}
           localePreference={localePreference}
           messages={messages}
+          timeZone={timeZone}
         >
           {children}
         </Providers>

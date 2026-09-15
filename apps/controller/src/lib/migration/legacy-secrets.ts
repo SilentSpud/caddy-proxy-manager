@@ -76,10 +76,32 @@ export function verifyLegacyKey(probe: LegacySecretProbe, sessionSecret: string)
  */
 export type Rekeyer = (value: string) => string;
 
+/** Why a legacy secret could not be read: no old key was given, or the one given is wrong. */
+export type LegacySecretReason = "keyMissing" | "keyWrong";
+
+const LEGACY_SECRET_ENGLISH: Record<LegacySecretReason, string> = {
+  keyMissing:
+    "This database holds secrets encrypted with a different SESSION_SECRET than this deployment " +
+    "uses. Enter the old one to bring them across.",
+  keyWrong:
+    "The SESSION_SECRET provided does not decrypt this database's secrets. Check it against the " +
+    "`.env` the old installation ran with.",
+};
+
+/**
+ * Carries the reason and the table rather than only a sentence, so the setup route can say it in
+ * the reader's language (`setup.migrateErrors.*`). The English stays as the message, for the log.
+ */
 export class LegacySecretError extends Error {
-  constructor(message: string) {
-    super(message);
+  readonly reason: LegacySecretReason;
+  readonly table: string | undefined;
+
+  constructor(reason: LegacySecretReason, table?: string) {
+    const sentence = LEGACY_SECRET_ENGLISH[reason];
+    super(table ? `${sentence} (reading ${table})` : sentence);
     this.name = "LegacySecretError";
+    this.reason = reason;
+    this.table = table;
   }
 }
 
@@ -120,18 +142,12 @@ function rekeyToken(token: string, legacyKey: string | null): string {
   if (decryptSecretWith(token, config.sessionSecret) !== null) return token;
 
   if (!legacyKey) {
-    throw new LegacySecretError(
-      "This database holds secrets encrypted with a different SESSION_SECRET than this deployment " +
-        "uses. Enter the old one to bring them across.",
-    );
+    throw new LegacySecretError("keyMissing");
   }
 
   const plaintext = decryptSecretWith(token, legacyKey);
   if (plaintext === null) {
-    throw new LegacySecretError(
-      "The SESSION_SECRET provided does not decrypt this database's secrets. Check it against the " +
-        "`.env` the old installation ran with.",
-    );
+    throw new LegacySecretError("keyWrong");
   }
 
   return encryptSecret(plaintext);

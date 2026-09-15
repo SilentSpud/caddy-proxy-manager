@@ -5,8 +5,9 @@
  *
  * Fields are generated rather than written out, so adding a setting to
  * src/lib/settings/registry.ts puts it on this page and on the migration screen at the same time.
- * A value that came from the environment is labelled as such - that is the operator's cue that
- * saving here is what lets them delete it from their `.env`.
+ * Every field names the variable it can also be set by, so an operator can match it to a `.env`
+ * line. One whose value came from the environment is marked as well - that is the cue that saving
+ * here is what lets them delete it.
  *
  * The Defaults card is the exception, and is written out by hand because it is not a registry
  * setting: primary domain and ACME contact live together in the `general` JSON object that
@@ -15,7 +16,7 @@
  * expiring certificates at, and an instance that finishes setup without one issues its first
  * certificate with nobody to tell.
  */
-import { useActionState, useState } from "react";
+import { type ComponentProps, useActionState, useEffect, useRef, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Center } from "@astryxdesign/core/Center";
 import { Divider } from "@astryxdesign/core/Divider";
@@ -26,9 +27,11 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { EmailInput } from "@/src/components/ui/EmailInput";
+import { EnvTokens } from "@/src/components/ui/EnvTokens";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-attrs";
-import { FormCard, InfoAlert, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
+import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { saveSetupSettings } from "./actions";
 import { useTranslations } from "next-intl";
@@ -71,6 +74,28 @@ export type OAuthPrefill = {
   defaultRole: string;
   syncGroups: boolean;
 };
+
+/** The variable config.ts reads each identity-provider field from. */
+const OAUTH_ENV = {
+  providerName: "OAUTH_PROVIDER_NAME",
+  issuer: "OAUTH_ISSUER",
+  clientId: "OAUTH_CLIENT_ID",
+  clientSecret: "OAUTH_CLIENT_SECRET",
+  authorizationUrl: "OAUTH_AUTHORIZATION_URL",
+  tokenUrl: "OAUTH_TOKEN_URL",
+  userinfoUrl: "OAUTH_USERINFO_URL",
+  scopes: "OAUTH_SCOPES",
+  autoLink: "OAUTH_ALLOW_AUTO_LINKING",
+  roleMappingEnabled: "OAUTH_ROLE_MAPPING",
+  groupsClaim: "OAUTH_GROUPS_CLAIM",
+  groupPrefix: "OAUTH_GROUP_PREFIX",
+  adminGroup: "OAUTH_ADMIN_GROUP",
+  operatorGroup: "OAUTH_OPERATOR_GROUP",
+  userGroup: "OAUTH_USER_GROUP",
+  viewerGroup: "OAUTH_VIEWER_GROUP",
+  defaultRole: "OAUTH_DEFAULT_ROLE",
+  syncGroups: "OAUTH_SYNC_GROUPS",
+} as const satisfies Record<keyof OAuthPrefill, string>;
 
 export type OAuthCard = {
   /** Providers already configured. Non-empty means this card has nothing to add. */
@@ -116,13 +141,6 @@ export default function SetupSettingsClient({
     return !gate || values[gate.key] === true;
   };
 
-  // Only what is actually on screen. A hidden field is not migrated either, so counting it would
-  // tell the operator a value had been copied into the database and invite them to delete it from
-  // their .env - where it is still the only copy.
-  const migratedCount = fields.filter(
-    (field) => field.source === "environment" && isVisible(field),
-  ).length;
-
   return (
     <Center>
       <VStack gap={5} padding={5}>
@@ -130,13 +148,12 @@ export default function SetupSettingsClient({
         <VStack gap={2}>
           <Heading level={1}>{t("settingsStep.heading")}</Heading>
           <Text color="secondary">{t("databaseSettingsDescription")}</Text>
+          {/* The same text colors the badges use, so each line reads as the key to its badges. */}
+          <Text style={{ color: "var(--color-text-purple)" }}>{t("envBadgeLegend")}</Text>
+          {fields.some((field) => field.source === "environment") && (
+            <Text style={{ color: "var(--color-text-blue)" }}>{t("importedBadgeLegend")}</Text>
+          )}
         </VStack>
-
-        {migratedCount > 0 && (
-          <InfoAlert title={`${migratedCount} value(s) came from your .env file`}>
-            {t("environmentMigrationDescription")}
-          </InfoAlert>
-        )}
 
         <form action={submit}>
           <VStack gap={4}>
@@ -157,10 +174,10 @@ export default function SetupSettingsClient({
                   isRequired
                   width="100%"
                 />
-                <TextInput
+                <EmailInput
+                  domain="public"
                   label={t("acmeContactEmail")}
                   description={t("acmeEmailHelp")}
-                  type="email"
                   htmlName="acmeEmail"
                   value={acmeEmail}
                   onChange={setAcmeEmail}
@@ -214,6 +231,93 @@ export default function SetupSettingsClient({
   );
 }
 
+/** A field's name, the variable it can also be set by, and whether that variable is what set it. */
+function FieldLabel({
+  label,
+  env,
+  fromEnvironment = false,
+}: {
+  label: string;
+  env: string;
+  fromEnvironment?: boolean;
+}) {
+  const t = useTranslations("setup");
+  return (
+    <HStack gap={2} vAlign="center" wrap="wrap">
+      {/* The label type, so it matches the fields that draw their own (Defaults card). */}
+      <Text type="label">{label}</Text>
+      <EnvTokens names={[env]} />
+      {fromEnvironment && <Badge variant="blue" label={t("importedFromEnvironment")} />}
+    </HStack>
+  );
+}
+
+/**
+ * A switch with its label drawn beside it, since the Switch's own label only takes a string.
+ *
+ * The Switch keeps that label, visually hidden, as its accessible name. It generates its input id
+ * internally, so the visible label learns it after mount and points at it, which keeps a click on
+ * the text toggling the switch.
+ */
+function LabeledSwitch({
+  label,
+  description,
+  env,
+  fromEnvironment,
+  htmlName,
+  value,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  env: string;
+  fromEnvironment?: boolean;
+  htmlName: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [inputId, setInputId] = useState<string>();
+  useEffect(() => setInputId(inputRef.current?.id), []);
+
+  return (
+    <HStack gap={3} vAlign="start">
+      <Switch
+        ref={inputRef}
+        label={label}
+        isLabelHidden
+        htmlName={htmlName}
+        value={value}
+        onChange={onChange}
+      />
+      <label htmlFor={inputId} style={{ cursor: "pointer" }}>
+        <VStack gap={0}>
+          <FieldLabel label={label} env={env} fromEnvironment={fromEnvironment} />
+          {description && (
+            <Text size="xsm" color="secondary">
+              {description}
+            </Text>
+          )}
+        </VStack>
+      </label>
+    </HStack>
+  );
+}
+
+/** A text input whose visible label carries the variable it can also be set by. */
+function LabeledTextInput({
+  label,
+  env,
+  ...input
+}: { env: string } & Omit<ComponentProps<typeof TextInput>, "isLabelHidden">) {
+  return (
+    <VStack gap={1}>
+      <FieldLabel label={label} env={env} />
+      <TextInput {...input} label={label} isLabelHidden width="100%" />
+    </VStack>
+  );
+}
+
 /**
  * The switch that decides whether a group's feature runs at all.
  *
@@ -233,14 +337,15 @@ function GateSwitch({
 }) {
   return (
     <VStack gap={2}>
-      <Switch
+      <LabeledSwitch
         label={field.label}
         description={field.description}
+        env={field.env}
+        fromEnvironment={field.source === "environment"}
         htmlName={field.key}
         value={value}
         onChange={onChange}
       />
-      {field.source === "environment" && <Badge label={`from ${field.env}`} />}
       {value && <Divider />}
     </VStack>
   );
@@ -255,13 +360,13 @@ function SettingRow({
   value: string | boolean | undefined;
   onChange: (next: string | boolean) => void;
 }) {
+  const t = useTranslations("setup");
   const label = (
-    <HStack gap={2} align="center">
-      <Text size="sm" weight="medium">
-        {field.label}
-      </Text>
-      {field.source === "environment" && <Badge label={`from ${field.env}`} />}
-    </HStack>
+    <FieldLabel
+      label={field.label}
+      env={field.env}
+      fromEnvironment={field.source === "environment"}
+    />
   );
 
   // Tri-state: unset means "no opinion, let the Security toggle decide", which a text box cannot
@@ -278,9 +383,9 @@ function SettingRow({
           value={typeof value === "string" ? value : ""}
           onChange={(next: string) => onChange(next)}
           options={[
-            { value: "", label: "Let the Settings toggle decide" },
-            { value: "true", label: "Required" },
-            { value: "false", label: "Not required" },
+            { value: "", label: t("tristateInferred") },
+            { value: "true", label: t("tristateRequired") },
+            { value: "false", label: t("tristateNotRequired") },
           ]}
         />
       </VStack>
@@ -303,7 +408,7 @@ function SettingRow({
 
   const description =
     field.secret && field.source !== "default"
-      ? `${field.description} Leave blank to keep the current value.`
+      ? t("secretKeepCurrent", { description: field.description })
       : field.description;
 
   // Only a secret this deployment gets to choose; a licence key or a client secret is issued
@@ -373,7 +478,7 @@ function IdentityProviderCard({
       <FormCard title={t("identityProvider")}>
         <Banner
           status="info"
-          title={`Already configured: ${card.existing.join(", ")}`}
+          title={t("alreadyConfigured", { providers: card.existing.join(", ") })}
           description={t("providerManagementHelp")}
         />
       </FormCard>
@@ -395,76 +500,77 @@ function IdentityProviderCard({
           />
         )}
 
-        <TextInput
+        <LabeledTextInput
           label={t("displayName")}
+          env={OAUTH_ENV.providerName}
           description={t("providerNameHelp")}
           htmlName="idpName"
           value={value.providerName}
           onChange={set("providerName")}
-          width="100%"
         />
-        <TextInput
+        <LabeledTextInput
           label={t("issuerUrl")}
+          env={OAUTH_ENV.issuer}
           description={t("issuerUrlHelp")}
           htmlName="idpIssuer"
           value={value.issuer}
           onChange={set("issuer")}
-          width="100%"
         />
-        <TextInput
+        <LabeledTextInput
           {...AUTOFILL_OFF}
           label={t("clientId")}
+          env={OAUTH_ENV.clientId}
           htmlName="idpClientId"
           value={value.clientId}
           onChange={set("clientId")}
-          width="100%"
         />
-        <TextInput
+        <LabeledTextInput
           {...AUTOFILL_OFF}
           label={t("secretLabel")}
+          env={OAUTH_ENV.clientSecret}
           type="password"
           htmlName="idpClientSecret"
           value={value.clientSecret}
           onChange={set("clientSecret")}
-          width="100%"
         />
 
-        <Collapsible defaultIsOpen={false} trigger={<Text size="sm">More options</Text>}>
+        <Collapsible defaultIsOpen={false} trigger={<Text size="sm">{t("moreOptions")}</Text>}>
           <VStack gap={3} padding={2}>
             <Text size="xsm" color="secondary">
               {t("manualEndpointsHelp")}
             </Text>
-            <TextInput
+            <LabeledTextInput
               label={t("authorizationUrl")}
+              env={OAUTH_ENV.authorizationUrl}
               htmlName="idpAuthorizationUrl"
               value={value.authorizationUrl}
               onChange={set("authorizationUrl")}
-              width="100%"
             />
-            <TextInput
+            <LabeledTextInput
               label={t("tokenUrl")}
+              env={OAUTH_ENV.tokenUrl}
               htmlName="idpTokenUrl"
               value={value.tokenUrl}
               onChange={set("tokenUrl")}
-              width="100%"
             />
-            <TextInput
+            <LabeledTextInput
               label={t("userinfoUrl")}
+              env={OAUTH_ENV.userinfoUrl}
               htmlName="idpUserinfoUrl"
               value={value.userinfoUrl}
               onChange={set("userinfoUrl")}
-              width="100%"
             />
-            <TextInput
+            <LabeledTextInput
               label={t("scopes")}
+              env={OAUTH_ENV.scopes}
               description={t("scopesHelp")}
               htmlName="idpScopes"
               value={value.scopes}
               onChange={set("scopes")}
-              width="100%"
             />
-            <Switch
+            <LabeledSwitch
               label={t("oauthAutoLinkLabel")}
+              env={OAUTH_ENV.autoLink}
               description={t("oauthAutoLinkHelp")}
               htmlName="idpAutoLink"
               value={value.autoLink}
@@ -473,8 +579,9 @@ function IdentityProviderCard({
 
             <Divider />
 
-            <Switch
+            <LabeledSwitch
               label={t("groupRoleMappingLabel")}
+              env={OAUTH_ENV.roleMappingEnabled}
               description={t("groupRoleMappingHelp")}
               htmlName="idpRoleMapping"
               value={value.roleMappingEnabled}
@@ -482,69 +589,74 @@ function IdentityProviderCard({
             />
             {value.roleMappingEnabled && (
               <>
-                <TextInput
+                <LabeledTextInput
                   label={t("groupsClaim")}
+                  env={OAUTH_ENV.groupsClaim}
                   description={t("groupsClaimHelp")}
                   htmlName="idpGroupsClaim"
                   value={value.groupsClaim}
                   onChange={set("groupsClaim")}
-                  width="100%"
                 />
-                <TextInput
+                <LabeledTextInput
                   label={t("groupPrefix")}
+                  env={OAUTH_ENV.groupPrefix}
                   description={t("groupPrefixHelp")}
                   htmlName="idpGroupPrefix"
                   value={value.groupPrefix}
                   onChange={set("groupPrefix")}
-                  width="100%"
                 />
-                <TextInput
+                <LabeledTextInput
                   label={t("adminGroup")}
+                  env={OAUTH_ENV.adminGroup}
                   htmlName="idpAdminGroup"
                   value={value.adminGroup}
                   onChange={set("adminGroup")}
-                  width="100%"
                 />
-                <TextInput
+                <LabeledTextInput
                   label={t("operatorGroup")}
+                  env={OAUTH_ENV.operatorGroup}
                   htmlName="idpOperatorGroup"
                   value={value.operatorGroup}
                   onChange={set("operatorGroup")}
-                  width="100%"
                 />
-                <TextInput
+                <LabeledTextInput
                   label={t("userGroup")}
+                  env={OAUTH_ENV.userGroup}
                   htmlName="idpUserGroup"
                   value={value.userGroup}
                   onChange={set("userGroup")}
-                  width="100%"
                 />
-                <TextInput
+                <LabeledTextInput
                   label={t("viewerGroup")}
+                  env={OAUTH_ENV.viewerGroup}
                   htmlName="idpViewerGroup"
                   value={value.viewerGroup}
                   onChange={set("viewerGroup")}
-                  width="100%"
                 />
-                <Switch
+                <LabeledSwitch
                   label={t("groupSyncLabel")}
+                  env={OAUTH_ENV.syncGroups}
                   htmlName="idpSyncGroups"
                   value={value.syncGroups}
                   onChange={set("syncGroups")}
                 />
               </>
             )}
-            <Selector
-              label={t("defaultRoleLabel")}
-              htmlName="idpDefaultRole"
-              value={value.defaultRole}
-              onChange={(next: string) => set("defaultRole")(next)}
-              options={[
-                { value: "viewer", label: "Viewer" },
-                { value: "user", label: "User" },
-                { value: "admin", label: "Admin" },
-              ]}
-            />
+            <VStack gap={1}>
+              <FieldLabel label={t("defaultRoleLabel")} env={OAUTH_ENV.defaultRole} />
+              <Selector
+                label={t("defaultRoleLabel")}
+                isLabelHidden
+                htmlName="idpDefaultRole"
+                value={value.defaultRole}
+                onChange={(next: string) => set("defaultRole")(next)}
+                options={[
+                  { value: "viewer", label: t("roleViewer") },
+                  { value: "user", label: t("roleUser") },
+                  { value: "admin", label: t("roleAdmin") },
+                ]}
+              />
+            </VStack>
           </VStack>
         </Collapsible>
       </VStack>

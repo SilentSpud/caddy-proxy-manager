@@ -63,6 +63,18 @@ describe('settings environment tokens', () => {
     expect(unknown).toEqual([]);
   });
 
+  it('names only documented variables on the setup step', () => {
+    // The identity-provider card is not generated from the registry, so its names are typed out.
+    const setupClient = readFileSync(
+      join(process.cwd(), 'src/app/setup/settings/SetupSettingsClient.tsx'),
+      'utf8',
+    );
+    const names = Array.from(setupClient.matchAll(/"(OAUTH_[A-Z_]+)"/g), (m) => m[1]);
+
+    expect(names.length).toBeGreaterThan(15);
+    expect(names.filter((name) => !documented.has(name))).toEqual([]);
+  });
+
   it('backs every wildcard token with the members it stands for', () => {
     const searchable = new Set(tokensIn('envSearch'));
 

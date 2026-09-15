@@ -1,5 +1,6 @@
 /** E2E: L4 Proxy Hosts page - navigation, list, create/edit/delete dialogs. */
 import { test, expect, type Page } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';
 const ORIGIN = 'http://localhost:3000';
@@ -34,12 +35,14 @@ test.describe('L4 Proxy Hosts page', () => {
 
   test('shows empty state when search has no results', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
     await page.getByPlaceholder(/search/i).fill('zzz-nonexistent-host-zzz');
     await expect(page.getByText(/no l4 hosts match/i).last()).toBeVisible({ timeout: 5_000 });
   });
 
   test('create dialog opens and contains expected fields', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /create l4 host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -102,6 +105,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
   test('creates a new L4 proxy host', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /create l4 host/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -146,6 +150,7 @@ test.describe('L4 Proxy Hosts page', () => {
     page,
   }) => {
     await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
 
     for (let i = 1; i <= 3; i++) {
       // Re-open the dialog each iteration - this is what exercised the stale
@@ -173,6 +178,7 @@ test.describe('L4 Proxy Hosts page', () => {
    */
   test('toggling enabled updates the row status without reload', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /create l4 host/i }).click();
     await page.getByLabel('Name').fill('E2E Toggle Host');
     await page.getByLabel('Listen Address').fill(':20010');

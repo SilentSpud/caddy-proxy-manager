@@ -31,6 +31,7 @@ import {
   MonitorSmartphone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { useTranslations } from "next-intl";
 
 export type SettingItem = {
   id: string;
@@ -285,4 +286,39 @@ export function findSettingsItem(id: string): SettingItem | undefined {
 /** The group a section belongs to, for the breadcrumb the content pane renders. */
 export function groupForSection(id: string): SettingsGroup | undefined {
   return SETTINGS_GROUPS.find((group) => group.items.some((item) => item.id === id));
+}
+
+// ─── Messages ────────────────────────────────────────────────────────────────
+
+/*
+ * The English above stays the source, and the screens render the `settings.sections.*` and
+ * `settings.navGroups.*` catalog entries through these instead. Both are keyed by id at runtime,
+ * which TypeScript cannot check against the catalog, so `tests/unit/settings-sections-messages.test.ts`
+ * asserts every section and group has an entry that reads exactly as it does here.
+ */
+
+type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
+
+/** The one place the narrowing is given up, for the reason above. */
+type DynamicTranslate = (key: string) => string;
+
+function dynamic(t: SettingsTranslator): DynamicTranslate {
+  return t as unknown as DynamicTranslate;
+}
+
+/** A section or group id as a catalog key segment: `default-response` is `defaultResponse`. */
+export function sectionMessageName(id: string): string {
+  return id.replace(/-([a-z0-9])/g, (_, next: string) => next.toUpperCase());
+}
+
+export function settingsSectionName(t: SettingsTranslator, item: SettingItem): string {
+  return dynamic(t)(`sections.${sectionMessageName(item.id)}.name`);
+}
+
+export function settingsSectionDescription(t: SettingsTranslator, item: SettingItem): string {
+  return dynamic(t)(`sections.${sectionMessageName(item.id)}.desc`);
+}
+
+export function settingsGroupLabel(t: SettingsTranslator, group: SettingsGroup): string {
+  return dynamic(t)(`navGroups.${sectionMessageName(group.id)}`);
 }

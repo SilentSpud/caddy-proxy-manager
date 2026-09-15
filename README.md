@@ -307,13 +307,13 @@ is still honoured as an override until a value is stored.
 | How long a blocked client stays blocked, in ms | `LOGIN_BLOCK_MS` | `900000` |
 | Check the registry for a newer release. The only outbound request this app makes on its own | `UPDATE_CHECK_ENABLED` | `true` |
 | Image namespace the update check reads tags from, without the image name. Change it for a fork | `UPDATE_IMAGE_REPOSITORY` | `ghcr.io/silentspud/caddy-proxy-manager` |
-| Collect traffic and WAF events. Leave unset to decide from whether a password is set | `ANALYTICS_ENABLED` | Unset |
+| Collect traffic and WAF events. If left unset, analytics is on only when a password is set | `ANALYTICS_ENABLED` | Unset |
 | ClickHouse endpoint | `CLICKHOUSE_URL` | `http://clickhouse:8123` |
 | ClickHouse user | `CLICKHOUSE_USER` | `cpm` |
 | ClickHouse password. Required for analytics - the container will not start without one. Encrypted at rest | `CLICKHOUSE_PASSWORD` | None |
 | ClickHouse database | `CLICKHOUSE_DB` | `analytics` |
 | Days of analytics kept. Lowering it migrates the tables' TTL on the next start | `CLICKHOUSE_RETENTION_DAYS` | `30` |
-| Use GeoIP for country lookups and geo blocking. Leave unset to decide from whether the databases are present | `GEOIP_ENABLED` | Unset |
+| Use GeoIP for country lookups and geo blocking. If left unset, GeoIP is on only when the databases are present | `GEOIP_ENABLED` | Unset |
 | MaxMind account ID, for GeoLite2 downloads | `GEOIPUPDATE_ACCOUNT_ID` | None |
 | MaxMind license key. Encrypted at rest | `GEOIPUPDATE_LICENSE_KEY` | None |
 | Hours between checks for newer MaxMind databases, 1-168 | `GEOIP_UPDATE_INTERVAL_HOURS` | `24` |
@@ -350,6 +350,7 @@ is still honoured as an override until a value is stored.
 | `AGENT_PUID` / `AGENT_PGID` | Build args setting the UID/GID the agent runs as | `10002`/`10002` | No |
 | `CADDY_GID` | Caddy's GID, added to the web and agent containers' supplementary groups so they can use Caddy's logs. Must match Caddy's `PGID` | `10000` | No |
 | `CONTROLLER_GID` | The controller's GID, added to the agent's supplementary groups so it can read the bootstrap token. Must match web's `PGID` | `10001` | No |
+| `DEMO_MODE` | Run with no Caddy at all: admin calls go to an in-memory Caddy, a simulated agent reports builds, ports and services as done, and real agents are refused pairing and connection. No certificate is ordered and no DNS provider is called. Environment-only so a demo's visitors cannot turn it off | `false` | No |
 | `DASHBOARD_DOMAIN` | Domain this dashboard is served on. The bundled Caddyfile answers on it until CPM applies its own config, and setup uses it to switch on the managed host that reverse-proxies the dashboard - see [Proxying the dashboard itself](#proxying-the-dashboard-itself). Falls back to the hostname in `BASE_URL` | Unset | No |
 
 ### The agent's environment
@@ -1412,12 +1413,12 @@ Failures answer `400` with an `error_description` naming the check that failed. 
 
 **Account linking:**
 
-Attaching an OAuth identity to an existing CPM user requires **Auto-link accounts** to be enabled for that provider (**Settings → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers). The switch marks the provider as trusted to prove that its identity owns the CPM account carrying the same email address, so leave it off for any IdP where users can register an arbitrary email themselves.
+A signed-in user can always attach an OAuth identity to their own account from **Profile → OAuth Connections**, whatever the provider's settings. Their session proves who owns the CPM account and the provider login proves the identity, so the provider's email does not have to match - which is what lets the administrator setup creates (`name@localhost`) link one at all.
 
-With it enabled:
+**Auto-link accounts** (**Settings → OAuth Providers**, or `OAUTH_ALLOW_AUTO_LINKING=true` for environment-configured providers) governs only what happens when someone *signs in* through the provider and a CPM user already has the same email address:
 
-- Signing in through the provider links the identity to the existing user with the matching email.
-- **Profile → OAuth Connections** can link the provider to the signed-in account. The provider's email must match the signed-in user's email.
+- **On:** the sign-in links the identity to that existing user. The switch marks the provider as trusted to prove its identity owns the CPM account carrying that email, so leave it off for any IdP where users can register an arbitrary email themselves.
+- **Off:** the sign-in is refused, and the user links the provider from their profile instead.
 
 With it disabled, both paths are refused and the provider redirects to `/api/auth/error?error=account_not_linked`.
 

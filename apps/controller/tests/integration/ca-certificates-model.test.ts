@@ -14,7 +14,7 @@ import {
   users,
 } from '../../src/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { ApiConflictError } from '../../src/lib/api-errors';
+import { DomainError } from '../../src/lib/domain-error';
 
 let db: TestDb;
 
@@ -146,7 +146,8 @@ describe('deleteCaCertificate cascade', () => {
     await seedMtlsHost('host-trusts-cert', { trusted_client_cert_ids: [cert.id] });
 
     const failure = deleteCaCertificate(ca.id, userId);
-    await expect(failure).rejects.toBeInstanceOf(ApiConflictError);
+    await expect(failure).rejects.toBeInstanceOf(DomainError);
+    await expect(failure).rejects.toMatchObject({ code: 'caCertificateInUse', status: 409 });
     await expect(failure).rejects.toMatchObject({
       status: 409,
       message: expect.stringMatching(/in use by proxy host/i),

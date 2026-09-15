@@ -9,6 +9,7 @@
 
 import { MODULE_PATH_PATTERN, MODULE_VERSION_PATTERN } from "@cpm/shared";
 import { DNS_PROVIDERS } from "./dns-providers";
+import { type DomainError, domainError } from "./domain-error";
 
 /**
  * A capability the rest of the app can ask about. Features are what the UI and generation gate on,
@@ -39,6 +40,8 @@ export type CaddyModuleDefinition = {
   features: CaddyFeatureId[];
   /** DNS provider name for provider modules, so the DNS Providers UI can find its module. */
   dnsProvider?: string;
+  /** The provider's brand as it is written, which the translated module name is built around. */
+  dnsProviderDisplayName?: string;
 };
 
 const CORE_MODULES: CaddyModuleDefinition[] = [
@@ -100,6 +103,7 @@ const DNS_MODULES: CaddyModuleDefinition[] = DNS_PROVIDERS.map((provider) => ({
   category: "dns" as const,
   features: ["dns01" as const],
   dnsProvider: provider.name,
+  dnsProviderDisplayName: provider.displayName,
 }));
 
 /** Every module the UI offers as a toggle, in display order. */
@@ -144,24 +148,34 @@ export function normalizeModulePath(raw: string): string {
   return path.slice(0, end);
 }
 
-/** Validate a custom module entry; error message or null. Shared by the action and the REST API. */
-export function validateCustomModule(entry: CaddyCustomModule): string | null {
+/**
+ * What is wrong with a custom module entry, or null. Shared by the action, the REST API and the
+ * picker, which shows it inline - so it is a code, and each caller says it in its own language.
+ */
+export function customModuleProblem(entry: CaddyCustomModule): DomainError | null {
   const path = normalizeModulePath(entry.modulePath);
-  if (!path) return "Module path is required";
-  if (path.length > 200) return `Module path is too long: ${path.slice(0, 40)}…`;
+  if (!path) return domainError("customModulePathRequired", {}, { status: 400 });
+  if (path.length > 200) {
+    return domainError("customModulePathTooLong", { path: path.slice(0, 40) }, { status: 400 });
+  }
   if (!MODULE_PATH_PATTERN.test(path)) {
-    return `Invalid module path "${path}". Expected a Go module path such as github.com/owner/repo`;
+    return domainError("customModulePathInvalid", { path }, { status: 400 });
   }
   if (!path.includes("/")) {
-    return `Invalid module path "${path}". Expected a host and a path, such as github.com/owner/repo`;
+    return domainError("customModulePathMissingHost", { path }, { status: 400 });
   }
   if (entry.version) {
     const version = entry.version.trim();
     if (!MODULE_VERSION_PATTERN.test(version)) {
-      return `Invalid version "${version}" for ${path}. Expected a tag, branch, or commit such as v1.2.3`;
+      return domainError("customModuleVersionInvalid", { version, path }, { status: 400 });
     }
   }
   return null;
+}
+
+/** The English for a custom module entry's problem, or null. */
+export function validateCustomModule(entry: CaddyCustomModule): string | null {
+  return customModuleProblem(entry)?.message ?? null;
 }
 
 /** The `--with` argument for a custom module, e.g. "github.com/x/y@v1.2.3". */

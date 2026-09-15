@@ -28,7 +28,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
   return (
     <VStack gap={2}>
       <Text type="body" size="sm" weight="semibold">
-        {t("redirects")}{" "}
+        {t("redirects")}
       </Text>
       <input
         type="hidden"
@@ -70,7 +70,7 @@ export function RedirectsFields({ initialData = [] }: Props) {
               <IconButton
                 variant="ghost"
                 size="sm"
-                label={`Remove redirect ${i + 1}`}
+                label={t("removeRedirectLabel", { index: i + 1 })}
                 icon={<Trash2 />}
                 onClick={() => removeRule(rule.rowId)}
               />

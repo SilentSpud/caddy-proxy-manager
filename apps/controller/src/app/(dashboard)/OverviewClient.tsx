@@ -21,8 +21,10 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { useEmptyValue } from "@/components/ui/empty-value";
+import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
 
 // ApexCharts renders on the client only, for the reason given in AnalyticsClient: v7's
@@ -194,14 +196,17 @@ function formatBytes(bytes: number): string {
 }
 
 /** A bucket label short enough for an axis, at the resolution the range implies. */
-function formatBucket(ts: number, rangeSeconds: number): string {
+function formatBucket(
+  format: ReturnType<typeof useFormatter>,
+  ts: number,
+  rangeSeconds: number,
+): string {
   const d = new Date(ts * 1000);
-  if (rangeSeconds > 7 * 86400)
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  if (rangeSeconds > 7 * 86400) return format.dateTime(d, { day: "numeric", month: "short" });
   if (rangeSeconds > 86400) {
-    return d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit" });
+    return format.dateTime(d, { day: "numeric", month: "short", hour: "2-digit" });
   }
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return format.dateTime(d, { hour: "2-digit", minute: "2-digit" });
 }
 
 const RANGE_SECONDS: Record<Interval, number> = {
@@ -257,7 +262,7 @@ function Tile({
   return (
     <SelectableCard label={label} isSelected={isSelected} onChange={onSelect} padding={4}>
       <VStack gap={1}>
-        <Text type="body" size="sm" weight="semibold" color="secondary" maxLines={1}>
+        <Text type="body" weight="semibold" maxLines={1} style={CARD_TITLE_STYLE}>
           {label}
         </Text>
         <Text type="large" weight="semibold" hasTabularNumbers>
@@ -295,6 +300,7 @@ export default function OverviewClient({
   isAdmin?: boolean;
 }) {
   const t = useTranslations("overview");
+  const format = useFormatter();
   const emptyValue = useEmptyValue();
   const chartTheme = useChartTheme();
 
@@ -411,7 +417,7 @@ export default function OverviewClient({
       stroke: { curve: "smooth", width: 2 },
       dataLabels: { enabled: false },
       xaxis: {
-        categories: timeline.map((b) => formatBucket(b.ts, rangeSeconds)),
+        categories: timeline.map((b) => formatBucket(format, b.ts, rangeSeconds)),
         labels: { rotate: 0, style: { colors: chartTheme.labelColor, fontSize: "11px" } },
         axisBorder: { show: false },
         axisTicks: { show: false },
@@ -451,7 +457,7 @@ export default function OverviewClient({
         },
       },
     };
-  }, [chartTheme, plotted, chartSeries, isOverlay, timeline, rangeSeconds]);
+  }, [chartTheme, plotted, chartSeries, isOverlay, timeline, rangeSeconds, format]);
 
   /**
    * One row of the server log, whichever store it came from.
@@ -482,7 +488,7 @@ export default function OverviewClient({
         width: pixel(116),
         renderCell: (row) => (
           <Text type="code" size="sm" color="secondary">
-            {new Date(row.ts * 1000).toLocaleTimeString()}
+            <Timestamp value={row.ts * 1000} style="time" />
           </Text>
         ),
       },
@@ -490,7 +496,9 @@ export default function OverviewClient({
         // One column for "what happened": an HTTP status, or the kind of change.
         key: "what",
         header: t("logStatus"),
-        width: pixel(104),
+        // A share of the spare width rather than a fixed one: audit actions run as long as
+        // `forward_auth_access_denied`, which any width that suits an HTTP status cuts off.
+        width: proportional(1),
         renderCell: (row) =>
           row.kind === "traffic" ? (
             <HStack gap={1} vAlign="center">
@@ -507,7 +515,7 @@ export default function OverviewClient({
       {
         key: "detail",
         header: t("logDetail"),
-        width: proportional(1),
+        width: proportional(3),
         renderCell: (row) =>
           row.kind === "traffic" ? (
             <VStack gap={0}>
@@ -595,7 +603,7 @@ export default function OverviewClient({
     return (
       <VStack gap={8}>
         <VStack gap={1}>
-          <Heading level={1}>Welcome back, {userName}</Heading>
+          <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
           <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
             {t("pageDescription")}
           </Text>
@@ -610,7 +618,7 @@ export default function OverviewClient({
     <VStack gap={5}>
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
         <VStack gap={1}>
-          <Heading level={1}>Welcome back, {userName}</Heading>
+          <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
           {/* Not on a phone, like every page's description: read once, then only in the way. */}
           <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
             {t("pageDescription")}
@@ -643,11 +651,13 @@ export default function OverviewClient({
         {stats.map((stat) => (
           <ClickableCard
             key={stat.label}
-            label={
-              stat.total === undefined
-                ? `${stat.label}: ${stat.count}`
-                : `${stat.label}: ${t("statEnabledOf", { enabled: stat.count, total: stat.total })}`
-            }
+            label={t("statCardLabel", {
+              label: stat.label,
+              value:
+                stat.total === undefined
+                  ? stat.count
+                  : t("statEnabledOf", { enabled: stat.count, total: stat.total }),
+            })}
             href={stat.href}
             padding={4}
           >
@@ -664,7 +674,7 @@ export default function OverviewClient({
                     </Text>
                   )}
                 </HStack>
-                <Text type="body" size="sm" color="secondary">
+                <Text type="body" style={CARD_TITLE_STYLE}>
                   {stat.label}
                 </Text>
               </VStack>
@@ -738,9 +748,9 @@ export default function OverviewClient({
               isCompact
             />
           ) : (
-            // Table brings its own scroll wrapper, and its two fixed columns and truncating
-            // third come to a 320px minimum, so it fits any card it can be read in. Wrapping
-            // it again in an overflow-x box only added a second scroller - and one axis set
+            // Table brings its own scroll wrapper, and its fixed column plus two proportional ones
+            // (120px floor each) come to a 356px minimum, so it fits any card it can be read in.
+            // Wrapping it again in an overflow-x box only added a second scroller - and one axis set
             // to `auto` turns the other from `visible` into `auto` too, which is where the
             // stray vertical scrollbar came from.
             <Table data={logRows} columns={logColumns} idKey="id" />
@@ -758,8 +768,10 @@ export default function OverviewClient({
       {/* Kept so the 24h headline stays on the page even when a longer range is selected. */}
       {trafficSummary && trafficSummary.totalRequests > 0 && (
         <Text type="body" size="xsm" color="secondary">
-          {t("traffic24h")}: {trafficSummary.totalRequests.toLocaleString()} &middot; {t("blocked")}{" "}
-          {trafficSummary.blockedPercent}%
+          {t("traffic24hSummary", {
+            total: trafficSummary.totalRequests.toLocaleString(),
+            percent: trafficSummary.blockedPercent,
+          })}
         </Text>
       )}
     </VStack>

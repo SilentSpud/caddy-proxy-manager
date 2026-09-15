@@ -92,7 +92,7 @@ export function GroupAccessDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      title={`${t("accessFor")} ${groupName}`}
+      title={t("accessForGroup", { name: groupName })}
       maxWidth="lg"
       submitLabel={t("saveAccess")}
       onSubmit={submit}

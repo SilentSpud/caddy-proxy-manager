@@ -92,6 +92,7 @@ test.describe('Access Lists - empty state', () => {
 test.describe('Access Lists - create dialog', () => {
   test('clicking New opens the create dialog', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('dialog').getByText('New access list')).toBeVisible();
@@ -99,6 +100,7 @@ test.describe('Access Lists - create dialog', () => {
 
   test('create dialog has Name, Description, and Seed members fields', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByPlaceholder(/internal.*engineering/i)).toBeVisible();
@@ -109,6 +111,7 @@ test.describe('Access Lists - create dialog', () => {
 
   test('Create button is disabled when name is empty', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('button', { name: /create list/i })).toBeDisabled();
@@ -117,6 +120,7 @@ test.describe('Access Lists - create dialog', () => {
   test('create list with name only - appears in rail', async ({ page }) => {
     const listName = `E2E Create ${Date.now()}`;
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
 
@@ -138,6 +142,7 @@ test.describe('Access Lists - create dialog', () => {
   test('create list with description - description shows in detail pane', async ({ page }) => {
     const listName = `E2E Desc ${Date.now()}`;
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
 
@@ -158,6 +163,7 @@ test.describe('Access Lists - create dialog', () => {
   test('create list with seed members - members count shows', async ({ page }) => {
     const listName = `E2E Seed ${Date.now()}`;
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
 
@@ -181,6 +187,7 @@ test.describe('Access Lists - create dialog', () => {
 
   test('add another member link adds a second seed row', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
 
@@ -191,6 +198,7 @@ test.describe('Access Lists - create dialog', () => {
 
   test('generate password button fills password in seed row', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
 
@@ -204,6 +212,7 @@ test.describe('Access Lists - create dialog', () => {
 
   test('Cancel closes the create dialog', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('button', { name: /^new$/i }).first().click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -240,12 +249,14 @@ test.describe('Access Lists - rail interaction', () => {
 
   test('clicking a list in the rail selects it and shows detail', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(listA.name).first().click();
     await expect(page.getByRole('heading', { name: listA.name })).toBeVisible({ timeout: 5_000 });
   });
 
   test('clicking a different list switches the detail pane', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(listA.name).first().click();
     await expect(page.getByRole('heading', { name: listA.name })).toBeVisible({ timeout: 5_000 });
 
@@ -302,6 +313,7 @@ test.describe('Access Lists - rail interaction', () => {
 
   test('sort by Name reorders lists alphabetically', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('radio', { name: 'Name' }).click();
 
     const items = page.locator('ul > li');
@@ -317,6 +329,7 @@ test.describe('Access Lists - rail interaction', () => {
 
   test('sort by Members reorders by member count (descending)', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByRole('radio', { name: 'Members', exact: true }).click();
 
     // listB has 2 members, listA has 1 - listB should appear before listA
@@ -355,6 +368,7 @@ test.describe('Access Lists - detail pane tabs', () => {
 
   test('detail pane shows Members, Used by, and Settings tabs', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
@@ -365,6 +379,7 @@ test.describe('Access Lists - detail pane tabs', () => {
 
   test('detail header shows badges (members count, hosts count, updated)', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
@@ -375,6 +390,7 @@ test.describe('Access Lists - detail pane tabs', () => {
 
   test('detail header shows "unused" badge when no proxy hosts use the list', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
@@ -383,6 +399,7 @@ test.describe('Access Lists - detail pane tabs', () => {
 
   test('detail header shows description', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByText('Detail pane test')).toBeVisible({ timeout: 5_000 });
   });
@@ -401,6 +418,7 @@ test.describe('Access Lists - members tab', () => {
       ],
     });
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
   });
@@ -568,6 +586,7 @@ test.describe('Access Lists - members empty state', () => {
 
   test('empty members shows "No members yet" message', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
@@ -577,6 +596,7 @@ test.describe('Access Lists - members empty state', () => {
 
   test('empty members has "Add the first member" button', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
@@ -606,6 +626,7 @@ test.describe('Access Lists - settings tab', () => {
       description: 'Original description',
     });
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -700,6 +721,7 @@ test.describe('Access Lists - used-by tab', () => {
 
   test('used-by tab shows empty state when no proxy hosts use the list', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
@@ -725,6 +747,7 @@ test.describe('Access Lists - used-by tab', () => {
 
     try {
       await page.goto('/access-lists');
+      await waitForHydration(page);
       await page.getByText(list.name).first().click();
       await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
@@ -746,6 +769,7 @@ test.describe('Access Lists - used-by tab', () => {
 test.describe('Access Lists - keyboard shortcuts', () => {
   test('pressing N opens the create dialog', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.locator('body').click();
     await page.keyboard.press('n');
 
@@ -792,6 +816,7 @@ test.describe('Access Lists - cross-tab consistency', () => {
 
   test('switching from Members to Settings and back preserves member data', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByText('crossuser', { exact: true })).toBeVisible({ timeout: 5_000 });
 
@@ -804,6 +829,7 @@ test.describe('Access Lists - cross-tab consistency', () => {
 
   test('switching from Members to Used by shows correct tab content', async ({ page }) => {
     await page.goto('/access-lists');
+    await waitForHydration(page);
     await page.getByText(list.name).first().click();
     await expect(page.getByText('crossuser', { exact: true })).toBeVisible({ timeout: 5_000 });
 

@@ -11,13 +11,19 @@
 
 import type { ReactNode } from "react";
 import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
-import { Code } from "@astryxdesign/core/Code";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
+import { EnvTokens } from "@/src/components/ui/EnvTokens";
 import type { StagedView } from "@/src/lib/settings/staged-view";
-import { findSettingsItem, groupForSection } from "./sections";
+import {
+  findSettingsItem,
+  groupForSection,
+  settingsGroupLabel,
+  settingsSectionDescription,
+  settingsSectionName,
+} from "./sections";
 import { RevisionPill, StagedControls } from "./StagedChanges";
 
 export default function SettingsFrame({
@@ -74,18 +80,18 @@ function SettingsHeader({ sectionId, staged }: { sectionId: string | null; stage
             <Breadcrumbs>
               <BreadcrumbItem>{tNav("settings")}</BreadcrumbItem>
               {group ? (
-                <BreadcrumbItem isCurrent>{group.label}</BreadcrumbItem>
+                <BreadcrumbItem isCurrent>{settingsGroupLabel(t, group)}</BreadcrumbItem>
               ) : (
                 <BreadcrumbItem isCurrent>{t("homeOverview")}</BreadcrumbItem>
               )}
             </Breadcrumbs>
           </div>
           <HStack gap={2} vAlign="center" wrap="wrap">
-            <Heading level={1}>{item ? item.name : t("homeOverview")}</Heading>
+            <Heading level={1}>{item ? settingsSectionName(t, item) : t("homeOverview")}</Heading>
             <EnvTokens names={item?.env} />
           </HStack>
           <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
-            {item ? item.desc : t("homeSubtitle")}
+            {item ? settingsSectionDescription(t, item) : t("homeSubtitle")}
           </Text>
         </VStack>
 
@@ -95,33 +101,5 @@ function SettingsHeader({ sectionId, staged }: { sectionId: string | null; stage
         </HStack>
       </HStack>
     </div>
-  );
-}
-
-/**
- * The environment variables a section is configured by, as tokens beside its name.
- *
- * Named rather than explained: an operator holding a `.env` line recognises `CLICKHOUSE_URL`
- * faster than any sentence about it, and the same string is what the search matches on.
- */
-function EnvTokens({ names }: { names?: readonly string[] }) {
-  const t = useTranslations("settings");
-  if (!names || names.length === 0) return null;
-  return (
-    // A bare div with an aria-label is not exposed; the role is what gives the tokens a name
-    // instead of reading them out as loose words after the heading.
-    <HStack
-      gap={1}
-      vAlign="center"
-      wrap="wrap"
-      role="group"
-      aria-label={t("environmentVariablesLabel")}
-    >
-      {names.map((name) => (
-        <Code key={name} size="inherit" color="secondary">
-          {name}
-        </Code>
-      ))}
-    </HStack>
   );
 }

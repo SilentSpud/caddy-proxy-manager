@@ -37,7 +37,7 @@ export function AppDialog({
   children,
   maxWidth = "sm",
   actions,
-  submitLabel = "Save",
+  submitLabel,
   onSubmit,
   isSubmitting = false,
   isSubmitDisabled = false,
@@ -62,7 +62,7 @@ export function AppDialog({
                   <Button variant="secondary" label={t("cancel")} onClick={onClose} />
                   {onSubmit && (
                     <Button
-                      label={submitLabel}
+                      label={submitLabel ?? t("save")}
                       onClick={onSubmit}
                       isLoading={isSubmitting}
                       isDisabled={isSubmitting || isSubmitDisabled}

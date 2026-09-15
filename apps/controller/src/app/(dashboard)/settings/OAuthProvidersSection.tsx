@@ -86,17 +86,12 @@ const emptyForm: FormData = {
   syncGroups: false,
 };
 
-const TYPE_OPTIONS = [
-  { value: "oidc", label: "OIDC (OpenID Connect)" },
-  { value: "oauth2", label: "OAuth2" },
-];
-
 const ROLE_OPTIONS = [
-  { value: "admin", label: "Admin" },
-  { value: "operator", label: "Operator" },
-  { value: "user", label: "User" },
-  { value: "viewer", label: "Viewer" },
-];
+  { value: "admin", labelKey: "roleAdmin" },
+  { value: "operator", labelKey: "roleOperator" },
+  { value: "user", labelKey: "roleUser" },
+  { value: "viewer", labelKey: "roleViewer" },
+] as const;
 
 export default function OAuthProvidersSection({
   initialProviders,
@@ -180,7 +175,7 @@ export default function OAuthProvidersSection({
       !form.clientId.trim() ||
       (secretRequired && !form.clientSecret.trim())
     ) {
-      setError("Name, Client ID, and Client Secret are required.");
+      setError(t("oauthProviderRequiredFields"));
       return;
     }
 
@@ -297,9 +292,7 @@ export default function OAuthProvidersSection({
           status={anyEnabled ? "info" : "error"}
           title={t("localUsersDisabledTitle")}
           description={
-            anyEnabled
-              ? "All accounts are provisioned by the providers below."
-              : "No provider is enabled, so nobody can sign in."
+            anyEnabled ? t("localUsersDisabledWithProviders") : t("localUsersDisabledNoProvider")
           }
         />
       )}
@@ -325,7 +318,7 @@ export default function OAuthProvidersSection({
                   <Badge label={provider.type.toUpperCase()} />
                   <Badge
                     variant={isFromEnv ? "info" : "neutral"}
-                    label={isFromEnv ? "ENV" : "UI"}
+                    label={isFromEnv ? t("providerSourceEnv") : t("providerSourceUi")}
                   />
                   {provider.roleMappingEnabled && <Badge label={t("groupRoles")} />}
                   {provider.syncGroups && <Badge label={t("groupSync")} />}
@@ -352,25 +345,19 @@ export default function OAuthProvidersSection({
                   <IconButton
                     variant="secondary"
                     size="sm"
-                    label={`Edit ${provider.name}`}
+                    label={t("editProviderNamed", { name: provider.name })}
                     icon={<Pencil />}
                     isDisabled={isFromEnv}
-                    tooltip={
-                      isFromEnv ? "Environment-sourced providers cannot be edited" : "Edit provider"
-                    }
+                    tooltip={isFromEnv ? t("envProviderCannotEdit") : t("editProvider")}
                     onClick={() => openEditDialog(provider)}
                   />
                   <IconButton
                     variant="secondary"
                     size="sm"
-                    label={`Delete ${provider.name}`}
+                    label={t("deleteProviderNamed", { name: provider.name })}
                     icon={<Trash2 />}
                     isDisabled={isFromEnv}
-                    tooltip={
-                      isFromEnv
-                        ? "Environment-sourced providers cannot be deleted"
-                        : "Delete provider"
-                    }
+                    tooltip={isFromEnv ? t("envProviderCannotDelete") : t("deleteProvider")}
                     onClick={() => setDeleteConfirm(provider)}
                   />
                 </HStack>
@@ -394,9 +381,7 @@ export default function OAuthProvidersSection({
         onOpenChange={(open) => !open && setDeleteConfirm(null)}
         title={t("deleteOauthProvider")}
         description={
-          deleteConfirm === null
-            ? ""
-            : `Delete "${deleteConfirm.name}"? Users who sign in through it will lose access.`
+          deleteConfirm === null ? "" : t("deleteProviderConfirm", { name: deleteConfirm.name })
         }
         actionLabel={t("deleteProvider")}
         onAction={() => deleteConfirm && handleDelete(deleteConfirm.id)}
@@ -406,17 +391,15 @@ export default function OAuthProvidersSection({
       <AppDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={editingProvider ? "Edit OAuth Provider" : "Add OAuth Provider"}
+        title={editingProvider ? t("editOauthProviderTitle") : t("addOauthProviderTitle")}
         maxWidth="lg"
-        submitLabel={editingProvider ? "Update Provider" : "Create Provider"}
+        submitLabel={editingProvider ? t("updateOauthProvider") : t("createOauthProvider")}
         onSubmit={handleSave}
         isSubmitting={saving}
       >
         <VStack gap={3}>
           <Text type="body" size="sm" color="secondary">
-            {editingProvider
-              ? "Update the OAuth provider configuration."
-              : "Configure a new OAuth or OIDC provider for single sign-on."}
+            {editingProvider ? t("oauthDialogEditDescription") : t("oauthDialogAddDescription")}
           </Text>
 
           {error && <Banner status="error" title={t("couldNotSaveProvider")} description={error} />}
@@ -433,7 +416,11 @@ export default function OAuthProvidersSection({
           <Selector
             label={t("type")}
             size="sm"
-            options={TYPE_OPTIONS}
+            // "OAuth2" is the protocol's name and reads the same in every language.
+            options={[
+              { value: "oidc", label: t("oauthTypeOidc") },
+              { value: "oauth2", label: "OAuth2" },
+            ]}
             value={form.type}
             onChange={(v) => updateField("type", v)}
           />
@@ -468,7 +455,7 @@ export default function OAuthProvidersSection({
             <VStack gap={2}>
               <TextInput
                 {...AUTOFILL_NEW_PASSWORD}
-                label={editingProvider ? "New Client Secret" : "Client Secret"}
+                label={editingProvider ? t("newClientSecret") : t("secretLabel")}
                 isRequired
                 type="password"
                 size="sm"
@@ -628,7 +615,10 @@ export default function OAuthProvidersSection({
                   <Selector
                     label={t("defaultRoleLabel")}
                     size="sm"
-                    options={ROLE_OPTIONS}
+                    options={ROLE_OPTIONS.map(({ value, labelKey }) => ({
+                      value,
+                      label: t(labelKey),
+                    }))}
                     value={form.defaultRole}
                     onChange={(v) => updateField("defaultRole", v as AppRole)}
                   />

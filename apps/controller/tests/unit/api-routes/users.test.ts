@@ -209,6 +209,17 @@ describe('PUT /api/v1/users/[id] role and status', () => {
     expect(response.status).toBe(400);
     expect(vi.mocked(updateUserStatus)).not.toHaveBeenCalled();
   });
+
+  it('refuses an email that cannot be an address, before writing anything', async () => {
+    mockGetUserById.mockResolvedValue({ ...sampleUser, id: 2 } as any);
+
+    const response = await put({ role: 'viewer', email: 'not an email' });
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain('valid email address');
+    expect(vi.mocked(updateUserRole)).not.toHaveBeenCalled();
+    expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/v1/users', () => {
@@ -222,6 +233,19 @@ describe('POST /api/v1/users', () => {
 
     expect(response.status).toBe(400);
     expect((await response.json()).error).toContain('at least 12 characters');
+    expect(vi.mocked(createUser)).not.toHaveBeenCalled();
+  });
+
+  it('refuses an email that cannot be an address', async () => {
+    const response = await createPOST(
+      createMockRequest({
+        method: 'POST',
+        body: { email: 'new@', password: 'CorrectHorse2026!' },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain('valid email address');
     expect(vi.mocked(createUser)).not.toHaveBeenCalled();
   });
 

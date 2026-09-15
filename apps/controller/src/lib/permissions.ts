@@ -19,6 +19,7 @@
  */
 
 import type { Session } from "./auth";
+import { DomainError, domainErrorMessage } from "./domain-error";
 import {
   type EffectiveGrants,
   type GrantCapability,
@@ -39,9 +40,13 @@ export type Access = {
   grants: EffectiveGrants;
 };
 
-export class ForbiddenError extends Error {
-  constructor(message = "You do not have access to that.") {
-    super(message);
+/**
+ * A `DomainError`, so a server action says it in the reader's language. No status: `/api/v1` keeps
+ * treating it as it did before it carried a code.
+ */
+export class ForbiddenError extends DomainError {
+  constructor() {
+    super("accessDenied", {}, domainErrorMessage("accessDenied"));
     this.name = "ForbiddenError";
   }
 }

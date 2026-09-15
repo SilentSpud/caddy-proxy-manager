@@ -22,32 +22,6 @@ function domainSummary(r: AcmeHost) {
   return r.domains.length > 1 ? `${r.domains[0]} +${r.domains.length - 1}` : r.domains[0];
 }
 
-const columns = [
-  {
-    id: "name",
-    label: "Proxy Host",
-    render: (r: AcmeHost) => (
-      <HStack gap={3} vAlign="center">
-        <Icon icon={Lock} size="sm" color={r.enabled ? "success" : "disabled"} />
-        <VStack gap={0}>
-          <Text type="body" size="sm" weight="semibold">
-            {r.name}
-          </Text>
-          <Text type="code" size="xsm" color="secondary">
-            {domainSummary(r)}
-          </Text>
-        </VStack>
-      </HStack>
-    ),
-  },
-  {
-    id: "status",
-    label: "Status",
-    width: 110,
-    render: (r: AcmeHost) => <StatusChip status={r.enabled ? "active" : "inactive"} />,
-  },
-];
-
 function acmeMobileCard(r: AcmeHost) {
   return (
     <Card>
@@ -81,6 +55,32 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
       ? { total: filtered.length, page: 1, perPage: filtered.length || 1 }
       : acmePagination;
 
+  const columns = [
+    {
+      id: "name",
+      label: t("proxyHost"),
+      render: (r: AcmeHost) => (
+        <HStack gap={3} vAlign="center">
+          <Icon icon={Lock} size="sm" color={r.enabled ? "success" : "disabled"} />
+          <VStack gap={0}>
+            <Text type="body" size="sm" weight="semibold">
+              {r.name}
+            </Text>
+            <Text type="code" size="xsm" color="secondary">
+              {domainSummary(r)}
+            </Text>
+          </VStack>
+        </HStack>
+      ),
+    },
+    {
+      id: "status",
+      label: t("status"),
+      width: 110,
+      render: (r: AcmeHost) => <StatusChip status={r.enabled ? "active" : "inactive"} />,
+    },
+  ];
+
   return (
     <DataTable
       columns={columns}
@@ -89,7 +89,7 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
       emptyMessage={t("noAcmeCertificatesMatch")}
       pagination={pagination}
       mobileCard={acmeMobileCard}
-      rowStatus={(r) => (r.enabled ? null : { color: "gray", label: "Disabled" })}
+      rowStatus={(r) => (r.enabled ? null : { color: "gray", label: t("disabled") })}
     />
   );
 }

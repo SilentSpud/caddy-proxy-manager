@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # up front and fails on a member it cannot read. bunfig.toml comes along because it pins the
 # isolated linker, which decides the node_modules layout the builder stage copies below.
 COPY package.json bun.lock bunfig.toml ./
+# patchedDependencies in package.json: a frozen install refuses to run without the files it names.
+COPY patches ./patches
 COPY apps/controller/package.json ./apps/controller/
 COPY apps/agent/package.json ./apps/agent/
 COPY apps/site/package.json ./apps/site/

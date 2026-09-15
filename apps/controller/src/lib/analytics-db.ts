@@ -206,6 +206,26 @@ export async function getOverviewAnalytics(
   filter: TrafficEventFilter,
   limit: number,
 ): Promise<OverviewAnalytics> {
+  // Off means nothing to ask: a deployment without the container does not even resolve its host
+  // name, so the queries would turn the overview's "analytics is off" notice into a failed load.
+  if (!(await isAnalyticsEnabled())) {
+    return {
+      summary: {
+        totalRequests: 0,
+        uniqueIps: 0,
+        blockedRequests: 0,
+        blockedPercent: 0,
+        bytesServed: 0,
+        loggingDisabled: !(await isLoggingActive()),
+        analyticsDisabled: true,
+      },
+      statusClasses: { ok: 0, clientErrors: 0, serverErrors: 0, blocked: 0 },
+      wafBlocked: 0,
+      timeline: [],
+      events: [],
+    };
+  }
+
   const [summary, statusClasses, wafBlocked, timeline, events] = await Promise.all([
     getAnalyticsSummary(from, to, hosts),
     queryStatusClasses(from, to, hosts),

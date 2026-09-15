@@ -8,7 +8,6 @@ import {
   proxyHosts,
 } from "../db/schema";
 import { desc, eq, inArray } from "drizzle-orm";
-import { ApiConflictError } from "../api-errors";
 import { domainError } from "../domain-error";
 
 function tryParseJson<T>(value: string | null | undefined, fallback: T): T {
@@ -181,8 +180,12 @@ export async function deleteCaCertificate(id: number, actorUserId: number): Prom
   });
 
   if (referencing.length > 0) {
-    const names = referencing.map((h) => h.name).join(", ");
-    throw new ApiConflictError(`CA certificate is in use by proxy host(s): ${names}`);
+    // Still a 409 over REST. The names go as a list, so the delete dialog formats them for its reader.
+    throw domainError(
+      "caCertificateInUse",
+      { names: referencing.map((h) => h.name) },
+      { status: 409 },
+    );
   }
 
   // Cascade-delete the CA's issued certs and role mappings by hand: the schema declares

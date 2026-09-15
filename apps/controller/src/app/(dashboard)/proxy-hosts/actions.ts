@@ -48,9 +48,13 @@ import {
   parseOptionalNumber,
 } from "@/src/lib/form-parse";
 
-async function validateAndSanitizeCertificateId(
-  certificateId: number | null,
-): Promise<{ certificateId: number | null; warning?: string }> {
+async function validateAndSanitizeCertificateId(certificateId: number | null): Promise<{
+  certificateId: number | null;
+  /** English, for the server log. */
+  warning?: string;
+  /** What the operator-facing message needs to say the same thing in their language. */
+  missing?: { id: number; cloudflareConfigured: boolean };
+}> {
   // null is valid (Caddy Auto)
   if (certificateId === null) {
     return { certificateId: null };
@@ -72,7 +76,7 @@ async function validateAndSanitizeCertificateId(
       warning = `Certificate ID ${certificateId} not found. Automatically using 'Managed by Caddy (Auto)' which will provision certificates automatically using Caddy.`;
     }
 
-    return { certificateId: null, warning };
+    return { certificateId: null, warning, missing: { id: certificateId, cloudflareConfigured } };
   }
 
   return { certificateId };
@@ -487,11 +491,11 @@ function parseWafConfig(formData: FormData): { waf?: WafHostConfig | null } {
   // apply. createProxyHost/updateProxyHost re-validate the resulting config.
   const requestBodyLimit = parseBodyLimitMib(
     formData.get("wafRequestBodyLimitMb"),
-    "WAF request body limit",
+    "hostWafRequestBodyLimitInvalid",
   );
   const requestBodyInMemoryLimit = parseBodyLimitMib(
     formData.get("wafRequestBodyInMemoryLimitMb"),
-    "WAF in-memory body limit",
+    "hostWafInMemoryBodyLimitInvalid",
   );
   const rawLimitAction = formData.get("wafRequestBodyLimitAction");
   const requestBodyLimitAction =
@@ -726,7 +730,7 @@ export async function createProxyHostAction(
     const userId = Number(session.user.id);
 
     // Parse certificateId safely, then validate it exists and get the sanitized value
-    const { certificateId, warning } = await validateAndSanitizeCertificateId(
+    const { certificateId, warning, missing } = await validateAndSanitizeCertificateId(
       parseCertificateId(formData.get("certificateId")),
     );
 
@@ -790,12 +794,16 @@ export async function createProxyHostAction(
     revalidatePath("/proxy-hosts");
 
     // Return success with warning if applicable
-    if (warning) {
+    const t = await getTranslations("proxyHosts");
+    if (missing) {
+      const id = String(missing.id);
       return actionSuccess(
-        `Proxy host created using Caddy Auto certificate management. ${warning}`,
+        missing.cloudflareConfigured
+          ? t("hostCreatedAutoCert", { id })
+          : t("hostCreatedAutoCertNoCloudflare", { id }),
       );
     }
-    return actionSuccess("Proxy host created and queued for Caddy reload.");
+    return actionSuccess(t("hostCreated"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to create proxy host:", error);
@@ -822,6 +830,7 @@ export async function updateProxyHostAction(
     // Parse and validate certificate_id if present
     let certificateId: number | null | undefined;
     let warning: string | undefined;
+    let missing: { id: number; cloudflareConfigured: boolean } | undefined;
 
     if (formData.has("certificateId")) {
       // Validate certificate exists and get sanitized value
@@ -830,6 +839,7 @@ export async function updateProxyHostAction(
       );
       certificateId = validation.certificateId;
       warning = validation.warning;
+      missing = validation.missing;
 
       // Log warning if certificate was auto-fallback
       if (warning) {
@@ -907,12 +917,16 @@ export async function updateProxyHostAction(
     revalidatePath("/proxy-hosts");
 
     // Return success with warning if applicable
-    if (warning) {
+    const t = await getTranslations("proxyHosts");
+    if (missing) {
+      const id = String(missing.id);
       return actionSuccess(
-        `Proxy host updated using Caddy Auto certificate management. ${warning}`,
+        missing.cloudflareConfigured
+          ? t("hostUpdatedAutoCert", { id })
+          : t("hostUpdatedAutoCertNoCloudflare", { id }),
       );
     }
-    return actionSuccess("Proxy host updated.");
+    return actionSuccess(t("hostUpdated"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to update proxy host:", id, error);
@@ -930,7 +944,8 @@ export async function deleteProxyHostAction(
     assertCanManage(access, "proxyHost", id);
     await deleteProxyHost(id, access.userId);
     revalidatePath("/proxy-hosts");
-    return actionSuccess("Proxy host deleted.");
+    const t = await getTranslations("proxyHosts");
+    return actionSuccess(t("hostDeleted"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to delete proxy host:", id, error);
@@ -944,7 +959,8 @@ export async function toggleProxyHostAction(id: number, enabled: boolean): Promi
     assertCanManage(access, "proxyHost", id);
     await updateProxyHost(id, { enabled }, access.userId);
     revalidatePath("/proxy-hosts");
-    return actionSuccess(`Proxy host ${enabled ? "enabled" : "disabled"}.`);
+    const t = await getTranslations("proxyHosts");
+    return actionSuccess(enabled ? t("hostEnabledResult") : t("hostDisabledResult"));
   } catch (error) {
     const t = await getTranslations();
     console.error("Failed to toggle proxy host:", id, error);

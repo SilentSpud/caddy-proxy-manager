@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
 import { createProxyHost } from '../../helpers/proxy-api';
 import { expectStaged } from '../../helpers/staged-settings';
 import { httpGet, waitForRoute } from '../../helpers/http';
+import { waitForHydration } from '../../helpers/hydration';
 
 const DOMAIN = 'func-waf-custom-path.test';
 const ECHO_BODY = 'echo-ok';
@@ -18,8 +19,9 @@ test.describe
       page,
     }) => {
       await page.goto('/waf');
+      await waitForHydration(page);
       await page.getByRole('button', { name: /settings/i }).click();
-      await expect(page.getByRole('button', { name: /save waf settings/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
       // Hand-written ids the astryx controls never emit; both expose a role and
       // an accessible name instead.
@@ -37,7 +39,7 @@ test.describe
 
       // Wait for the staged banner: the button never disables, so it being
       // enabled says nothing about whether the save has landed.
-      await page.getByRole('button', { name: /save waf settings/i }).click();
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
       await expectStaged(page);
 
       await createProxyHost(page, {

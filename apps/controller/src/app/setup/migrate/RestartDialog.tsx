@@ -49,6 +49,14 @@ type Phase =
   /** Nothing restarted it, or it never came back. The operator finishes by hand. */
   | "stalled";
 
+/** Why the wait ended without the app, kept as data so the words are chosen at render. */
+type Detail =
+  /** The restart route's own explanation, already translated on the server. */
+  | { message: string }
+  | { code: "refused"; status: number }
+  | { code: "stillRunning" }
+  | { code: "notBack" };
+
 /** True when the app answered. A failure to connect is the expected reply while it is down. */
 async function isUp(): Promise<boolean> {
   try {
@@ -77,7 +85,9 @@ export default function RestartDialog({
 }) {
   const t = useTranslations("setup");
   const [phase, setPhase] = useState<Phase>("stopping");
-  const [detail, setDetail] = useState<string | null>(null);
+  // What went wrong, put into words at render rather than here: translating inside the effect
+  // would make `t` one of its dependencies, and re-running it would cancel the restart in flight.
+  const [detail, setDetail] = useState<Detail | null>(null);
   // Strict Mode mounts effects twice in development, and asking a process to exit twice is not
   // something to leave to chance.
   const started = useRef(false);
@@ -103,7 +113,11 @@ export default function RestartDialog({
         if (!response.ok && response.status !== 202) {
           const body = (await response.json().catch(() => null)) as { error?: string } | null;
           if (!cancelled) {
-            setDetail(body?.error ?? `The restart request was refused (HTTP ${response.status}).`);
+            setDetail(
+              body?.error != null
+                ? { message: body.error }
+                : { code: "refused", status: response.status },
+            );
             setPhase("stalled");
           }
           return;
@@ -123,10 +137,7 @@ export default function RestartDialog({
       if (cancelled) return;
 
       if (await isUp()) {
-        setDetail(
-          "The application is still running after being asked to stop, so nothing appears to be " +
-            "supervising it.",
-        );
+        setDetail({ code: "stillRunning" });
         setPhase("stalled");
         return;
       }
@@ -145,7 +156,7 @@ export default function RestartDialog({
       }
       if (cancelled) return;
 
-      setDetail("The application stopped but has not come back.");
+      setDetail({ code: "notBack" });
       setPhase("stalled");
     })();
 
@@ -156,10 +167,21 @@ export default function RestartDialog({
 
   const waiting = phase === "stopping" || phase === "starting" || phase === "ready";
 
+  const detailText =
+    detail === null
+      ? null
+      : "message" in detail
+        ? detail.message
+        : detail.code === "refused"
+          ? t("restartRefused", { status: detail.status })
+          : detail.code === "stillRunning"
+            ? t("restartStillRunning")
+            : t("restartNotBack");
+
   return (
     <Center>
       <VStack gap={2} padding={5}>
-        <Heading level={1}>Migration complete</Heading>
+        <Heading level={1}>{t("done.heading")}</Heading>
         <Text color="secondary">{t("migrationCopiedDescription")}</Text>
       </VStack>
 
@@ -178,10 +200,10 @@ export default function RestartDialog({
                     <Spinner />
                     <Text size="sm">
                       {phase === "stopping"
-                        ? "Stopping the application…"
+                        ? t("restartStopping")
                         : phase === "starting"
-                          ? "Waiting for it to come back…"
-                          : "Back up. Taking you to the next step…"}
+                          ? t("restartWaiting")
+                          : t("restartReady")}
                     </Text>
                   </HStack>
                 ) : (
@@ -190,9 +212,9 @@ export default function RestartDialog({
                       status="warning"
                       title={t("restartFailedTitle")}
                       description={
-                        detail
-                          ? `${detail} Restart it yourself, then continue - the migration itself is finished and does not need repeating.`
-                          : "Restart it yourself, then continue - the migration itself is finished and does not need repeating."
+                        detailText
+                          ? t("restartManuallyWithDetail", { detail: detailText })
+                          : t("restartManually")
                       }
                     />
                     <Text size="sm" color="secondary">
@@ -203,9 +225,7 @@ export default function RestartDialog({
                 )}
 
                 <Text size="xsm" color="secondary">
-                  {migratedSignIn
-                    ? "You will be asked to sign in with one of the accounts that came across, using the password you already had."
-                    : "No accounts came across, so the next step is creating the first administrator or configuring single sign-on."}
+                  {migratedSignIn ? t("restartSignInMigrated") : t("restartSignInFresh")}
                 </Text>
               </VStack>
             </LayoutContent>
@@ -215,7 +235,9 @@ export default function RestartDialog({
               <HStack gap={2} justify="end">
                 <Button
                   variant={phase === "stalled" ? "primary" : "secondary"}
-                  label={phase === "stalled" ? "Continue" : "Continue without waiting"}
+                  label={
+                    phase === "stalled" ? t("restartContinue") : t("restartContinueWithoutWaiting")
+                  }
                   onClick={goOn}
                 />
               </HStack>

@@ -21,6 +21,7 @@ import {
   apiErrorResponse,
 } from '@/src/lib/api-auth';
 import { ApiClientError, ApiConflictError, ApiValidationError } from '@/src/lib/api-errors';
+import { domainError } from '@/src/lib/domain-error';
 import { validateToken } from '@/src/lib/models/api-tokens';
 import { auth, checkSameOrigin } from '@/src/lib/auth';
 import { NextResponse } from 'next/server';
@@ -250,6 +251,29 @@ describe('apiErrorResponse', () => {
     const response = apiErrorResponse(error);
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual({ error: error.message });
+  });
+
+  it('answers a DomainError that names its 4xx with that status and its English', async () => {
+    const error = domainError('caCertificateInUse', { names: ['a', 'b'] }, { status: 409 });
+    const response = apiErrorResponse(error);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'CA certificate is in use by proxy host(s): a, b',
+    });
+  });
+
+  it('still redacts a DomainError with no status', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const response = apiErrorResponse(domainError('cannotDeleteOwnAccount'));
+    expect(response.status).toBe(500);
+    expect((await response.json()).error).toBe('Internal server error');
+    consoleSpy.mockRestore();
+  });
+
+  it('refuses a DomainError status outside 4xx', () => {
+    expect(() => domainError('nameRequired', {}, { status: 500 })).toThrow(
+      /status must be a 4xx status code/,
+    );
   });
 
   it('prevents client-safe errors from being used to expose 5xx failures', () => {

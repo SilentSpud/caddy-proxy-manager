@@ -3,7 +3,8 @@ import { requireApiAdmin, apiErrorResponse } from "@/src/lib/api-auth";
 import { listUsers, createUser } from "@/src/lib/models/user";
 import { config } from "@/src/lib/config";
 import { hashPassword } from "@/src/lib/password";
-import { DomainError } from "@/src/lib/domain-error";
+import { DomainError, domainErrorMessage } from "@/src/lib/domain-error";
+import { isEmailAddress } from "@/src/lib/email-address";
 import { assertAcceptablePassword, isUserRole } from "@/src/lib/user-admin";
 
 function stripPasswordHash(user: Record<string, unknown>) {
@@ -47,6 +48,9 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    }
+    if (!isEmailAddress(email)) {
+      return NextResponse.json({ error: domainErrorMessage("emailInvalid") }, { status: 400 });
     }
 
     try {

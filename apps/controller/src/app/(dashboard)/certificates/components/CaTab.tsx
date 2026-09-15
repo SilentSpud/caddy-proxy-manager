@@ -12,6 +12,7 @@ import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable, type Column } from "@/components/ui/DataTable";
+import { useEmptyValue } from "@/components/ui/empty-value";
 import {
   DeleteCaCertDialog,
   IssueClientCertDialog,
@@ -28,16 +29,16 @@ type Props = {
   statusFilter: string | null;
 };
 
-function formatRelativeDate(iso: string): string {
+function formatRelativeDate(t: ReturnType<typeof useTranslations<"certificates">>, iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diff / 86400000);
-  if (days < 1) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days}d ago`;
+  if (days < 1) return t("addedToday");
+  if (days === 1) return t("addedYesterday");
+  if (days < 30) return t("addedDaysAgo", { count: days });
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
+  if (months < 12) return t("addedMonthsAgo", { count: months });
   const years = Math.floor(months / 12);
-  return `${years}y ago`;
+  return t("addedYearsAgo", { count: years });
 }
 
 function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
@@ -54,7 +55,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
           <Text type="label" size="xsm" weight="semibold" color="secondary">
             {t("issuedClientCertificates")}
           </Text>
-          <Badge variant="success" label={`${active.length} active`} />
+          <Badge variant="success" label={t("activeCount", { count: active.length })} />
         </HStack>
         <HStack gap={2}>
           {ca.hasPrivateKey && (
@@ -91,7 +92,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
                 endContent={
                   <Badge
                     variant={expired ? "error" : "success"}
-                    label={expired ? "Expired" : "Active"}
+                    label={expired ? t("expired") : t("active")}
                   />
                 }
               />
@@ -99,8 +100,8 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
           })}
           {active.length > 5 && (
             <ListItem
-              label={`+${active.length - 5} more`}
-              description={'Use "Manage" to view all'}
+              label={t("moreCount", { count: active.length - 5 })}
+              description={t("useManageToViewAll")}
             />
           )}
         </List>
@@ -126,20 +127,21 @@ function CaActionsMenu({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("certificates");
   const [issuedOpen, setIssuedOpen] = useState(false);
 
   return (
     <>
       <MoreMenu
-        label={`Actions for CA certificate ${ca.name}`}
+        label={t("actionsForCaCertificate", { name: ca.name })}
         size="sm"
         alignment="end"
         items={[
           ...(ca.hasPrivateKey
-            ? [{ label: "Issue Client Cert", onClick: () => setIssuedOpen(true) }]
+            ? [{ label: t("issueClientCert"), onClick: () => setIssuedOpen(true) }]
             : []),
-          { label: "Edit", onClick: onEdit },
-          { label: "Delete", variant: "destructive" as const, onClick: onDelete },
+          { label: t("edit"), onClick: onEdit },
+          { label: t("delete"), variant: "destructive" as const, onClick: onDelete },
         ]}
       />
       <IssueClientCertDialog open={issuedOpen} cert={ca} onClose={() => setIssuedOpen(false)} />
@@ -153,6 +155,7 @@ function activeCount(ca: CaCertificateView) {
 
 export function CaTab({ caCertificates, search, statusFilter }: Props) {
   const t = useTranslations("certificates");
+  const emptyValue = useEmptyValue();
   const [drawerCert, setDrawerCert] = useState<CaCertificateView | null | false>(false);
   const [deleteCert, setDeleteCert] = useState<CaCertificateView | null>(null);
 
@@ -165,7 +168,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
   const columns: Column<CaCertificateView>[] = [
     {
       id: "name",
-      label: "Name",
+      label: t("name"),
       render: (ca) => (
         <HStack gap={3} vAlign="center">
           <Icon icon={ShieldCheck} size="sm" color="accent" />
@@ -177,20 +180,20 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
     },
     {
       id: "privateKey",
-      label: "Private Key",
+      label: t("privateKey"),
       width: 140,
       render: (ca) =>
         ca.hasPrivateKey ? (
           <Badge variant="success" icon={<KeyRound />} label={t("stored")} />
         ) : (
           <Text type="body" size="sm" color="secondary">
-            &mdash;
+            {emptyValue}
           </Text>
         ),
     },
     {
       id: "issued",
-      label: "Issued Certs",
+      label: t("issuedCerts"),
       width: 140,
       render: (ca) =>
         ca.issuedCerts.length === 0 ? (
@@ -200,17 +203,17 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
         ) : (
           <Badge
             variant={activeCount(ca) > 0 ? "info" : "neutral"}
-            label={`${activeCount(ca)}/${ca.issuedCerts.length} active`}
+            label={t("activeOfTotal", { active: activeCount(ca), total: ca.issuedCerts.length })}
           />
         ),
     },
     {
       id: "added",
-      label: "Added",
+      label: t("added"),
       width: 120,
       render: (ca) => (
         <Text type="body" size="sm" color="secondary">
-          {formatRelativeDate(ca.createdAt)}
+          {formatRelativeDate(t, ca.createdAt)}
         </Text>
       ),
     },
@@ -253,11 +256,14 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
             {ca.issuedCerts.length > 0 && (
               <Badge
                 variant={activeCount(ca) > 0 ? "info" : "neutral"}
-                label={`${activeCount(ca)}/${ca.issuedCerts.length} active`}
+                label={t("activeOfTotal", {
+                  active: activeCount(ca),
+                  total: ca.issuedCerts.length,
+                })}
               />
             )}
             <Text type="body" size="xsm" color="secondary">
-              {formatRelativeDate(ca.createdAt)}
+              {formatRelativeDate(t, ca.createdAt)}
             </Text>
           </HStack>
           {/* The desktop table expands in place; on mobile the panel simply
@@ -285,7 +291,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
         <Card>
           <EmptyState
             title={
-              search || statusFilter ? "No CA certificates match" : "No CA certificates configured"
+              search || statusFilter ? t("noCaCertificatesMatch") : t("noCaCertificatesConfigured")
             }
           />
         </Card>

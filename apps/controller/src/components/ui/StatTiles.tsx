@@ -4,10 +4,11 @@ import { Card } from "@astryxdesign/core/Card";
 import { Grid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
+import { CARD_TITLE_STYLE } from "./card-title";
 
 export type StatTile = {
   id: string;
-  /** What the number is. Sits above it, in supporting type. */
+  /** What the number is. Sits above it, as the card's title. */
   label: string;
   value: ReactNode;
   /** One line under the value, for the detail that makes the number actionable. */
@@ -29,7 +30,7 @@ export function StatTiles({ tiles }: { tiles: StatTile[] }) {
       {tiles.map((tile) => (
         <Card key={tile.id} padding={4}>
           <VStack gap={1}>
-            <Text type="supporting" color="secondary">
+            <Text type="body" style={CARD_TITLE_STYLE}>
               {tile.label}
             </Text>
             <HStack gap={2} vAlign="center">

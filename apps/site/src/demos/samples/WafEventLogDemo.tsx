@@ -12,7 +12,7 @@ import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { useTranslations } from "next-intl";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import { SearchField } from "@cpm/controller/src/components/ui/SearchField";
-import { formatDateTimeUtc } from "@cpm/controller/src/lib/date-format";
+import { Timestamp } from "@cpm/controller/src/components/ui/Timestamp";
 import { DemoSurface } from "../DemoSurface";
 
 type Event = {
@@ -313,11 +313,11 @@ function WafEventLogDemoContent() {
   const columns: Column<Event>[] = [
     {
       id: "ts",
-      label: "Time (UTC)",
-      width: 150,
+      label: t("time"),
+      width: 170,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
-          {formatDateTimeUtc(r.ts * 1000)}
+          <Timestamp value={r.ts * 1000} />
         </Text>
       ),
     },
