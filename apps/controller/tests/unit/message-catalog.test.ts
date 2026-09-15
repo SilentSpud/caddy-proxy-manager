@@ -7,6 +7,7 @@
  * to the user and look like typos.
  */
 import { describe, expect, it } from 'bun:test';
+import { createTranslator, IntlErrorCode } from 'next-intl';
 import messages from '../../messages/en.json';
 
 type Node = { [key: string]: string | Node };
@@ -31,6 +32,29 @@ describe('message catalog', () => {
     // English will wrap every other language too.
     const offenders = ALL.filter(([, value]) => /\n|\t| {2,}/.test(value)).map(([key]) => key);
     expect(offenders).toEqual([]);
+  });
+
+  it('parses every message, so none renders as its own key', () => {
+    // A placeholder written as `<host>` reads as an unclosed rich-text tag. next-intl cannot parse
+    // it and shows the key instead - `settings.dashboardPortEscapeDescription` did exactly that.
+    // Quote a literal one: `'<host>'`. Missing values fail differently (FORMATTING_ERROR) and are
+    // ignored here. The empty values object matters: without one the translator returns a message
+    // with no placeholders verbatim, never parsing it, and this test would pass on the bug.
+    const unparseable: string[] = [];
+    const t = createTranslator({
+      locale: 'en',
+      messages,
+      onError: (error) => {
+        if (error.code === IntlErrorCode.INVALID_MESSAGE) unparseable.push(error.message);
+      },
+    }) as unknown as (key: string, values: Record<string, never>) => string;
+
+    for (const [key] of ALL) {
+      const before = unparseable.length;
+      t(key, {});
+      if (unparseable.length > before) unparseable[unparseable.length - 1] = key;
+    }
+    expect(unparseable).toEqual([]);
   });
 
   it('carries no leading or trailing whitespace', () => {
