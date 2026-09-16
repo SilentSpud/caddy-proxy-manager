@@ -167,7 +167,7 @@ function fixSessionsSchema() {
 function fixAccountsSchema() {
   try {
     const cols = db.$client.prepare('PRAGMA table_info("accounts")').all() as Array<{
-      name: string; type: string; notnull: number; pk: number;
+      name: string; type: string; notnull: number; pk: number; dflt_value: string | null;
     }>;
     if (cols.length === 0) return;
     const idCol = cols.find((c) => c.name === 'id');
@@ -194,7 +194,13 @@ function fixAccountsSchema() {
       (index) => index.name === "accounts_provider_account_idx"
     );
     const idIsCorrect = idCol.type.toUpperCase() === "INTEGER" && idCol.pk === 1;
-    const issuerIsCorrect = issuerCol?.notnull === 1;
+    // "Correct" means a shape Better Auth accepts. Since Better Auth 1.7.3+ the
+    // runtime schema validation fails closed on NOT NULL columns it never
+    // writes unless they carry a database default (issue #283) — so the
+    // CPM-only `issuer` column must be NOT NULL *with* a default, not merely
+    // NOT NULL. Deployments upgraded from ≤ v1.11.2 carry the pre-0025 shape
+    // and are rebuilt here at boot, before Better Auth's check runs.
+    const issuerIsCorrect = issuerCol?.notnull === 1 && issuerCol?.dflt_value != null;
 
     if (idIsCorrect && issuerIsCorrect && hasCorrectIssuerIndex && !hasLegacyProviderIndex) {
       return;
@@ -263,7 +269,7 @@ function fixAccountsSchema() {
       db.$client.prepare(`CREATE TABLE "accounts_patch" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "userId" INTEGER NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
-        "issuer" TEXT NOT NULL,
+        "issuer" TEXT NOT NULL DEFAULT '',
         "accountId" TEXT NOT NULL,
         "providerId" TEXT NOT NULL,
         "accessToken" TEXT,
@@ -310,6 +316,21 @@ function fixAccountsSchema() {
     repair();
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown error";
+    const code = (error as { code?: string } | null)?.code;
+    if (code === "SQLITE_READONLY" || code === "SQLITE_READONLY_DBMOVED" || /readonly/i.test(detail)) {
+      // The repair is the first write of the boot sequence, so an unwritable
+      // database file surfaces here first. Callers hitting this after a
+      // `docker cp` round-trip saw a bare driver error with no hint (issue
+      // #283) — name the likely cause and the fix.
+      throw new Error(
+        `Failed to repair Better Auth accounts schema: ${detail}. ` +
+          "The SQLite database file is not writable by the application user " +
+          "(uid 10001 in the published image). Check ownership and permissions " +
+          "of the database file and its parent directory on the host volume " +
+          "(for example after a `docker cp`, run: chown 10001:10001 <file>).",
+        { cause: error }
+      );
+    }
     throw new Error(`Failed to repair Better Auth accounts schema: ${detail}`, {
       cause: error,
     });

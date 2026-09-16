@@ -2,7 +2,7 @@ import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { genericOAuth, username } from "better-auth/plugins";
 import db, { sqlite } from "./db";
 import * as schema from "./db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { config } from "./config";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "./secret";
 import type { OAuthProvider } from "./models/oauth-providers";
@@ -212,10 +212,18 @@ function createAuth(): any {
             if (data.idToken) data.idToken = encryptSecret(data.idToken);
             // Better Auth 1.7.4 removed `issuer` from the account schema and
             // keys external identities by (providerId, accountId). CPM's
-            // `accounts` table keeps a NOT NULL `issuer` column for its own
-            // identity bookkeeping, so derive it here before insert: the
-            // credential namespace for local password accounts, or the
-            // provider's pinned/synthetic OAuth issuer otherwise.
+            // `accounts` table keeps a NOT NULL `issuer` column (with a
+            // database default — see migration 0025 / issue #283) for its own
+            // identity bookkeeping. Derive the namespace here: the credential
+            // namespace for local password accounts, or the provider's
+            // pinned/synthetic OAuth issuer otherwise.
+            //
+            // NOTE: this assignment does NOT survive to the database on
+            // Better Auth 1.7.4 — its adapter maps inserts through the account
+            // model's own fields and silently drops unknown ones like `issuer`
+            // (verified against node_modules internals). The column default is
+            // what actually satisfies the insert, and the account.create.after
+            // hook below backfills the real namespace afterwards.
             const providerId = typeof data.providerId === "string" ? data.providerId : null;
             if (providerId) {
               const configured = providerId === "credential"
@@ -234,6 +242,49 @@ function createAuth(): any {
             return { data };
           },
           after: async (account) => {
+            // Better Auth 1.7.4's insert pipeline drops the issuer the `before`
+            // hook assigns (unknown field), so accounts created by Better Auth
+            // itself (credential link-account on sign-up, federated identities)
+            // land with the column default ''. CPM queries key on issuer
+            // namespaces (password change, account linking, identity lookup),
+            // so backfill the real namespace here. The drizzle db shares the
+            // same SQLite client Better Auth writes through, so this joins any
+            // open transaction instead of deadlocking on a second connection.
+            try {
+              const providerId = typeof account.providerId === "string" && account.providerId
+                ? account.providerId
+                : null;
+              const accountId = typeof account.accountId === "string" && account.accountId
+                ? account.accountId
+                : null;
+              const userId = typeof account.userId === "string" ? Number(account.userId) : account.userId;
+              if (providerId && accountId && Number.isFinite(userId)) {
+                const configured = providerId === "credential"
+                  ? null
+                  : await db
+                      .select({ issuer: schema.oauthProviders.issuer })
+                      .from(schema.oauthProviders)
+                      .where(eq(schema.oauthProviders.id, providerId))
+                      .get();
+                const issuer = providerId === "credential"
+                  ? CREDENTIAL_ACCOUNT_ISSUER
+                  : resolveOAuthAccountIssuer(providerId, configured?.issuer);
+                if (issuer) {
+                  db.update(schema.accounts)
+                    .set({ issuer })
+                    .where(and(
+                      eq(schema.accounts.userId, userId),
+                      eq(schema.accounts.providerId, providerId),
+                      eq(schema.accounts.accountId, accountId),
+                      eq(schema.accounts.issuer, "")
+                    ))
+                    .run();
+                }
+              }
+            } catch (e) {
+              // Bookkeeping only — never break authentication over it.
+              console.warn("[auth-server] Failed to backfill accounts.issuer:", e);
+            }
             // Better Auth writes federated identities to the `accounts` table
             // only. Re-derive the informational users.provider/subject columns
             // from it so auto-linking, profile linking, and federated sign-up

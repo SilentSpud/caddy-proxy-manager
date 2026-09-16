@@ -51,7 +51,14 @@ export const accounts = sqliteTable(
     userId: integer("userId")
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
-    issuer: text("issuer").notNull(),
+    // Better Auth 1.7.3+ stopped writing `issuer` (accounts are keyed by
+    // (providerId, accountId) again) and its runtime schema validation fails
+    // closed on any NOT NULL column it never writes unless the column is
+    // nullable or carries a database default. CPM fills issuer via the
+    // account.create.after hook, so the default only covers inserts that
+    // bypass it — it exists to keep Better Auth's schema check (and any
+    // insert path it doesn't reach) working. See issue #283.
+    issuer: text("issuer").notNull().default(""),
     accountId: text("accountId").notNull(),
     providerId: text("providerId").notNull(),
     accessToken: text("accessToken"),
