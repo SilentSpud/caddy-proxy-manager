@@ -59,7 +59,12 @@ jobs:
             type=semver,pattern={{major}}
             type=match,pattern=v(.*),group=1
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+            # `latest` must track the newest stable release, not the default
+            # branch: the repo's default branch is `develop`, so
+            # {{is_default_branch}} fired on every dev push and moved `latest`
+            # to unreleased builds (issue #281). Tag it only on v* tag builds,
+            # excluding pre-release tags (e.g. v1.12.0-rc.1).
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
 
       - name: Compute app version
         id: app-version
