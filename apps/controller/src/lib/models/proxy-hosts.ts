@@ -2566,24 +2566,40 @@ function dehydrateGeoBlock(geoblock: GeoBlockSettings | null): GeoBlockSettings 
   return geoblock;
 }
 
-function parseProxyHost(row: ProxyHostRow): ProxyHost {
-  const meta = parseMeta(row.meta ?? null);
+/** The part of a `ProxyHost` that lives in the `meta` blob rather than in its own column. */
+export type ProxyHostMetaView = Pick<
+  ProxyHost,
+  | "customReverseProxyJson"
+  | "customPreHandlersJson"
+  | "customCaddyfile"
+  | "authentik"
+  | "loadBalancer"
+  | "dnsResolver"
+  | "upstreamDnsResolution"
+  | "geoblock"
+  | "geoblockMode"
+  | "waf"
+  | "mtls"
+  | "cpmForwardAuth"
+  | "tailscale"
+  | "redirects"
+  | "rewrite"
+  | "locationRules"
+  | "pathAllows"
+  | "pathBlocks"
+  | "pathRewrites"
+  | "errorPages"
+>;
+
+/**
+ * A stored `meta` blob, hydrated the way the host form reads it.
+ *
+ * Exported for the dashboard host, which is not a row but carries the same blob in its settings -
+ * so its options render in the same fields and mean the same thing to the Caddy builder.
+ */
+export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
+  const meta = parseMeta(value);
   return {
-    id: row.id,
-    name: row.name,
-    domains: JSON.parse(row.domains),
-    upstreams: JSON.parse(row.upstreams),
-    certificateId: row.certificateId ?? null,
-    accessListId: row.accessListId ?? null,
-    sslForced: row.sslForced,
-    hstsEnabled: row.hstsEnabled,
-    hstsSubdomains: row.hstsSubdomains,
-    allowWebsocket: row.allowWebsocket,
-    preserveHostHeader: row.preserveHostHeader,
-    skipHttpsHostnameValidation: row.skipHttpsHostnameValidation,
-    enabled: row.enabled,
-    createdAt: toIso(row.createdAt)!,
-    updatedAt: toIso(row.updatedAt)!,
     customReverseProxyJson: meta.custom_reverse_proxy_json ?? null,
     customPreHandlersJson: meta.custom_pre_handlers_json ?? null,
     customCaddyfile: meta.custom_caddyfile ?? null,
@@ -2610,6 +2626,56 @@ function parseProxyHost(row: ProxyHostRow): ProxyHost {
     pathBlocks: meta.path_blocks ?? [],
     pathRewrites: meta.path_rewrites ?? [],
     errorPages: meta.error_pages ?? [],
+  };
+}
+
+/**
+ * Apply a host form's meta fields to a stored blob: `undefined` leaves a field alone, `null` or
+ * empty clears it. The same merge `updateProxyHost` does, for a blob that is not in `proxy_hosts`.
+ */
+export function mergeProxyHostMeta(
+  existing: string | null,
+  input: Partial<ProxyHostInput>,
+): string | null {
+  return buildMeta(parseMeta(existing), input);
+}
+
+/**
+ * The checks `createProxyHost` and `updateProxyHost` make before storing a host's options, for a
+ * caller storing them somewhere else. Throws the same domain errors.
+ */
+export async function assertProxyHostOptionsStorable(options: {
+  domains: string[];
+  certificateId: number | null;
+  agentIds: readonly number[];
+  meta: string | null;
+  customCaddyfileChanged: boolean;
+}): Promise<void> {
+  await assertWildcardIssuable(options.domains, options.certificateId);
+  if (options.customCaddyfileChanged) {
+    await assertCaddyfileAdapts(parseMeta(options.meta).custom_caddyfile, options.agentIds);
+  }
+  await assertTailscaleServable(options.meta);
+}
+
+function parseProxyHost(row: ProxyHostRow): ProxyHost {
+  return {
+    id: row.id,
+    name: row.name,
+    domains: JSON.parse(row.domains),
+    upstreams: JSON.parse(row.upstreams),
+    certificateId: row.certificateId ?? null,
+    accessListId: row.accessListId ?? null,
+    sslForced: row.sslForced,
+    hstsEnabled: row.hstsEnabled,
+    hstsSubdomains: row.hstsSubdomains,
+    allowWebsocket: row.allowWebsocket,
+    preserveHostHeader: row.preserveHostHeader,
+    skipHttpsHostnameValidation: row.skipHttpsHostnameValidation,
+    enabled: row.enabled,
+    createdAt: toIso(row.createdAt)!,
+    updatedAt: toIso(row.updatedAt)!,
+    ...proxyHostMetaView(row.meta ?? null),
   };
 }
 
@@ -2826,6 +2892,16 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
 
   await applyCaddyConfig();
   return (await getProxyHost(record.id))!;
+}
+
+/** A host's `meta` blob as stored, for copying it somewhere that stores the same blob. */
+export async function getProxyHostMeta(id: number): Promise<string | null> {
+  const [row] = await db
+    .select({ meta: proxyHosts.meta })
+    .from(proxyHosts)
+    .where(eq(proxyHosts.id, id))
+    .limit(1);
+  return row?.meta ?? null;
 }
 
 export async function getProxyHost(id: number): Promise<ProxyHost | null> {

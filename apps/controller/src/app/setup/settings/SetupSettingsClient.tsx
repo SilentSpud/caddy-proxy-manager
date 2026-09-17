@@ -34,6 +34,7 @@ import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
 import { saveSetupSettings } from "./actions";
+import type { DomainClaim } from "@/src/lib/dashboard-host-options";
 import { useTranslations } from "next-intl";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 
@@ -53,6 +54,13 @@ export type SettingField = {
 };
 
 export type GeneralFields = { defaultDomain: string; acmeEmail: string };
+
+export type DashboardCard = {
+  enabled: boolean;
+  domain: string;
+  /** Whether the domain came from DASHBOARD_DOMAIN. */
+  fromEnvironment: boolean;
+};
 
 export type OAuthPrefill = {
   providerName: string;
@@ -109,12 +117,16 @@ export default function SetupSettingsClient({
   fields,
   groups,
   general,
+  dashboard,
+  domainClaims,
   oauth,
   hasMigrateStep,
 }: {
   fields: SettingField[];
   groups: Array<{ id: string; title: string }>;
   general: GeneralFields;
+  dashboard: DashboardCard;
+  domainClaims: DomainClaim[];
   oauth: OAuthCard;
   hasMigrateStep: boolean;
 }) {
@@ -123,6 +135,13 @@ export default function SetupSettingsClient({
 
   const [defaultDomain, setDefaultDomain] = useState(general.defaultDomain);
   const [acmeEmail, setAcmeEmail] = useState(general.acmeEmail);
+  const [dashboardEnabled, setDashboardEnabled] = useState(dashboard.enabled);
+  const [dashboardDomain, setDashboardDomain] = useState(dashboard.domain);
+  const [copyClaim, setCopyClaim] = useState(true);
+  const normalizedDashboardDomain = dashboardDomain.trim().toLowerCase();
+  const claim = normalizedDashboardDomain
+    ? domainClaims.find((host) => host.domains.includes(normalizedDashboardDomain))
+    : undefined;
   const [idp, setIdp] = useState<OAuthPrefill>(oauth.prefill);
 
   const [values, setValues] = useState<Record<string, string | boolean>>(() =>
@@ -150,7 +169,8 @@ export default function SetupSettingsClient({
           <Text color="secondary">{t("databaseSettingsDescription")}</Text>
           {/* The same text colors the badges use, so each line reads as the key to its badges. */}
           <Text style={{ color: "var(--color-text-purple)" }}>{t("envBadgeLegend")}</Text>
-          {fields.some((field) => field.source === "environment") && (
+          {(dashboard.fromEnvironment ||
+            fields.some((field) => field.source === "environment")) && (
             <Text style={{ color: "var(--color-text-blue)" }}>{t("importedBadgeLegend")}</Text>
           )}
         </VStack>
@@ -183,6 +203,45 @@ export default function SetupSettingsClient({
                   onChange={setAcmeEmail}
                   width="100%"
                 />
+              </VStack>
+            </FormCard>
+
+            <FormCard title={t("dashboardHost")}>
+              <VStack gap={4}>
+                <VStack gap={2}>
+                  <Switch
+                    label={t("dashboardEnabledLabel")}
+                    description={t("dashboardEnabledHelp")}
+                    htmlName="dashboardEnabled"
+                    value={dashboardEnabled}
+                    onChange={setDashboardEnabled}
+                  />
+                  {dashboardEnabled && <Divider />}
+                </VStack>
+                {/* Hidden when off, like a gated group: the save reads a missing domain as "leave
+                    the dashboard host alone". */}
+                {dashboardEnabled && (
+                  <LabeledTextInput
+                    {...NATIVE_REQUIRED}
+                    label={t("dashboardDomainLabel")}
+                    env="DASHBOARD_DOMAIN"
+                    fromEnvironment={dashboard.fromEnvironment}
+                    description={t("dashboardDomainHelp")}
+                    htmlName="dashboardDomain"
+                    placeholder="cpm.example.com"
+                    value={dashboardDomain}
+                    onChange={setDashboardDomain}
+                    isRequired
+                  />
+                )}
+                {dashboardEnabled && claim && (
+                  <ClaimedDomainNotice
+                    claim={claim}
+                    domain={normalizedDashboardDomain}
+                    copy={copyClaim}
+                    onCopyChange={setCopyClaim}
+                  />
+                )}
               </VStack>
             </FormCard>
 
@@ -228,6 +287,50 @@ export default function SetupSettingsClient({
         </form>
       </VStack>
     </Center>
+  );
+}
+
+/**
+ * The dashboard's domain is already a migrated host's, and the dashboard host is about to take it.
+ *
+ * The dashboard host wins that tie, so leaving it unsaid would quietly stop the old host answering.
+ * Copying is on by default: a host on this domain was almost certainly the old way of reaching this
+ * dashboard, and its certificate, access list and HTTPS are what the operator's users already rely
+ * on. What happens to the old host is spelled out, because the save changes it.
+ */
+function ClaimedDomainNotice({
+  claim,
+  domain,
+  copy,
+  onCopyChange,
+}: {
+  claim: DomainClaim;
+  domain: string;
+  copy: boolean;
+  onCopyChange: (next: boolean) => void;
+}) {
+  const t = useTranslations("setup");
+  const onlyDomain = claim.domains.length === 1;
+  return (
+    <VStack gap={3}>
+      <Banner
+        status="warning"
+        title={t("dashboardClaimTitle", { name: claim.name, domain })}
+        description={t("dashboardClaimDescription", { name: claim.name })}
+      />
+      <input type="hidden" name="dashboardCopyFromHostId" value={claim.id} />
+      <Switch
+        label={t("dashboardCopyLabel", { name: claim.name })}
+        description={
+          onlyDomain
+            ? t("dashboardCopyHelpDisable", { name: claim.name })
+            : t("dashboardCopyHelpRemoveDomain", { name: claim.name, domain })
+        }
+        htmlName="dashboardCopySettings"
+        value={copy}
+        onChange={onCopyChange}
+      />
+    </VStack>
   );
 }
 
@@ -308,11 +411,15 @@ function LabeledSwitch({
 function LabeledTextInput({
   label,
   env,
+  fromEnvironment,
   ...input
-}: { env: string } & Omit<ComponentProps<typeof TextInput>, "isLabelHidden">) {
+}: { env: string; fromEnvironment?: boolean } & Omit<
+  ComponentProps<typeof TextInput>,
+  "isLabelHidden"
+>) {
   return (
     <VStack gap={1}>
-      <FieldLabel label={label} env={env} />
+      <FieldLabel label={label} env={env} fromEnvironment={fromEnvironment} />
       <TextInput {...input} label={label} isLabelHidden width="100%" />
     </VStack>
   );

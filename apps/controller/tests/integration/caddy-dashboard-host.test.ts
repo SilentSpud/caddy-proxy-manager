@@ -140,6 +140,51 @@ describe('the dashboard host in the generated config', () => {
     expect(dials).toContain('backend:8080');
   });
 
+  it('applies its proxy options the way a stored host would', async () => {
+    await saveDashboardSettings({
+      enabled: true,
+      domain: 'cpm.example.com',
+      tls: false,
+      options: {
+        certificateId: null,
+        accessListId: null,
+        hstsSubdomains: false,
+        skipHttpsHostnameValidation: false,
+        agentIds: [],
+        meta: JSON.stringify({ path_blocks: [{ path: '/blocked-by-dashboard/*', status: 403 }] }),
+      },
+    });
+
+    const document = JSON.stringify(await buildCaddyDocument());
+
+    expect(document).toContain('/blocked-by-dashboard/*');
+  });
+
+  it('is served only by the agents it is pinned to', async () => {
+    await saveDashboardSettings({
+      enabled: true,
+      domain: 'cpm.example.com',
+      tls: false,
+      options: {
+        certificateId: null,
+        accessListId: null,
+        hstsSubdomains: false,
+        skipHttpsHostnameValidation: false,
+        agentIds: [41],
+        meta: null,
+      },
+    });
+
+    const pinned = (await buildCaddyDocument(41)) as CaddyDocument;
+    const other = (await buildCaddyDocument(42)) as CaddyDocument;
+    const fleet = (await buildCaddyDocument()) as CaddyDocument;
+
+    expect(hostsInOrder(pinned)).toContain('cpm.example.com');
+    expect(hostsInOrder(other)).not.toContain('cpm.example.com');
+    // The fleet-wide document is every agent's, so it keeps the host.
+    expect(hostsInOrder(fleet)).toContain('cpm.example.com');
+  });
+
   it('leaves stored hosts alone', async () => {
     await saveDashboardSettings({ enabled: true, domain: 'cpm.example.com', tls: false });
     await createProxyHost(

@@ -39,6 +39,14 @@ import { redactDnsProviderSettingsForApi } from "@/src/lib/dns-providers";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { storedErrorMessage } from "@/src/lib/actions";
+import { dashboardHostFormView } from "@/src/lib/dashboard-host-options";
+import { listCertificates } from "@/src/lib/models/certificates";
+import { listCaCertificates } from "@/src/lib/models/ca-certificates";
+import { listAccessLists } from "@/src/lib/models/access-lists";
+import { listMtlsRoles } from "@/src/lib/models/mtls-roles";
+import { listIssuedClientCertificates } from "@/src/lib/models/issued-client-certificates";
+import { toCertificatePickerOption } from "@/src/lib/certificate-api";
+import type { DashboardHostOptionsData } from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -138,6 +146,37 @@ export default async function SettingsSectionPage({
     // Outside the staged scope: the callback URLs shown must be the ones sign-in uses right now.
     getPublicBaseUrl(),
   ]);
+  const dashboardSettings = dashboard ?? defaultDashboardSettings();
+
+  // The dashboard host's proxy options need the pickers the host form does. Only loaded on that
+  // section: the section is route-derived, and every other section would pay for lists it never shows.
+  let dashboardOptions: DashboardHostOptionsData | null = null;
+  if (section === "dashboard") {
+    const [certificates, caCertificates, accessLists, mtlsRoles, issuedClientCerts] =
+      await Promise.all([
+        listCertificates(),
+        listCaCertificates(),
+        listAccessLists(),
+        listMtlsRoles().catch(() => []),
+        listIssuedClientCertificates().catch(() => []),
+      ]);
+    dashboardOptions = {
+      view: dashboardHostFormView(dashboardSettings.options),
+      certificates: certificates.map(toCertificatePickerOption),
+      caCertificates,
+      accessLists,
+      mtlsRoles,
+      issuedClientCerts,
+      authentikDefaults: authentik,
+      agents: agentOptions,
+      tailscaleDefaults: {
+        enabled: tailscale?.enabled ?? false,
+        hasAuthKey: (tailscale?.authKey ?? "").trim().length > 0,
+        defaultNode: tailscale?.defaultNode ?? "",
+      },
+    };
+  }
+
   const connectedAgentIds = new Set(agentOptions.filter((a) => a.connected).map((a) => a.id));
 
   return (
@@ -186,7 +225,8 @@ export default async function SettingsSectionPage({
       tailscale={redactTailscaleSettingsForApi(tailscale ?? defaultTailscaleSettings())}
       // Never null downstream: an unset blob means the feature has not been decided, which the
       // form and the route builder both read as off with a domain to fill in.
-      dashboard={dashboard ?? defaultDashboardSettings()}
+      dashboard={dashboardSettings}
+      dashboardOptions={dashboardOptions}
       // Only whether one exists: the image itself is served by its own route, so shipping it in
       // this page's HTML would be a couple of hundred kilobytes of base64 for nothing.
       hasFavicon={favicon !== null}

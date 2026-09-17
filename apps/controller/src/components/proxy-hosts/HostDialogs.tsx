@@ -52,7 +52,7 @@ type ForwardAuthGroup = {
 };
 type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
 
-const NONE_VALUE = "__none__";
+export const NONE_VALUE = "__none__";
 
 /**
  * Close the dialog a second after the action succeeds, once. Keyed on the status alone: `onClose`
@@ -77,7 +77,7 @@ function ActionStatus({ status, message }: { status: string; message?: string })
   return <Banner status={status === "error" ? "error" : "success"} title={message} />;
 }
 
-function toOptions(items: { id: number; name: string }[], noneLabel: string) {
+export function toOptions(items: { id: number; name: string }[], noneLabel: string) {
   return [
     { value: NONE_VALUE, label: noneLabel },
     ...items.map((item) => ({ value: String(item.id), label: item.name })),
@@ -87,7 +87,7 @@ function toOptions(items: { id: number; name: string }[], noneLabel: string) {
 type ProxyHostsT = ReturnType<typeof useTranslations<"proxyHosts">>;
 
 /** Access list options, naming the empty ones: picking one closes the host rather than guarding it. */
-function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
+export function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
   return toOptions(
     accessLists.map((list) => ({
       id: list.id,
@@ -98,7 +98,7 @@ function accessListOptions(accessLists: AccessList[], t: ProxyHostsT) {
 }
 
 /** A warning on the picker while the chosen list has no members. */
-function accessListStatus(accessLists: AccessList[], accessListId: string, t: ProxyHostsT) {
+export function accessListStatus(accessLists: AccessList[], accessListId: string, t: ProxyHostsT) {
   const chosen = accessLists.find((list) => String(list.id) === accessListId);
   return chosen && chosen.entries.length === 0
     ? { type: "warning" as const, message: t("accessListEmptyWarning") }

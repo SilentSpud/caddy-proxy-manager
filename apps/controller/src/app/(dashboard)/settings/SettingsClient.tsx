@@ -16,6 +16,7 @@ import {
   StatusAlert,
   WarnAlert,
 } from "@/src/components/ui/FormLayout";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -45,6 +46,10 @@ import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
 import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
 import type { DashboardDnsCheck, DashboardHostSettings } from "@/src/lib/dashboard-host";
+import {
+  DashboardHostOptionsFields,
+  type DashboardHostOptionsData,
+} from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
 import type { UpdateStatus } from "@/src/lib/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
@@ -130,6 +135,8 @@ type Props = {
   agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
   /** How the dashboard is served through Caddy. Always a value: unset reads as off. */
   dashboard: DashboardHostSettings;
+  /** The pickers and values for the dashboard host's proxy options. Null off that section. */
+  dashboardOptions?: DashboardHostOptionsData | null;
   /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
   tailscale: TailscaleSettingsView;
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
@@ -177,6 +184,7 @@ export default function SettingsClient({
   agentBuildTargets,
   agentBuildSelections,
   dashboard,
+  dashboardOptions,
   tailscale,
   hasFavicon,
   updates,
@@ -253,6 +261,7 @@ export default function SettingsClient({
         {active === "dashboard" && (
           <DashboardHostSection
             dashboard={dashboard}
+            options={dashboardOptions ?? null}
             dashboardState={dashboardState}
             dashboardFormAction={dashboardFormAction}
           />
@@ -991,10 +1000,12 @@ function UpstreamDnsSection({
  */
 function DashboardHostSection({
   dashboard,
+  options,
   dashboardState,
   dashboardFormAction,
 }: {
   dashboard: DashboardHostSettings;
+  options: DashboardHostOptionsData | null;
   dashboardState: { success: boolean; message?: string } | null;
   dashboardFormAction: (payload: FormData) => void;
 }) {
@@ -1095,6 +1106,19 @@ function DashboardHostSection({
               <WarnAlert title={t("dashboardTlsUnverifiedTitle")}>
                 {t("dashboardTlsUnverifiedDescription")}
               </WarnAlert>
+            )}
+            {options && (
+              <Collapsible
+                defaultIsOpen={false}
+                trigger={<Text size="sm">{t("dashboardProxyOptions")}</Text>}
+              >
+                <VStack gap={3} padding={2}>
+                  <Text size="xsm" color="secondary">
+                    {t("dashboardProxyOptionsHelp")}
+                  </Text>
+                  <DashboardHostOptionsFields data={options} />
+                </VStack>
+              </Collapsible>
             )}
             {/*
               A plain SaveButton would submit before anything could be said about it, so when the

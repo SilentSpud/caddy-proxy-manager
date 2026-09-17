@@ -4,7 +4,8 @@ description: CPM reverse-proxying its own dashboard, on a domain of its own.
 ---
 
 The quickest way to see what this product does is to watch it proxy something, and the one upstream
-every deployment already has is the dashboard you are reading it in. Setup switches this on.
+every deployment already has is the dashboard you are reading it in. Setup offers to switch this
+on, with the domain filled in.
 
 ## How it differs from an ordinary host
 
@@ -19,9 +20,43 @@ dashboard is reached through.
 
 ## The domain
 
+The last setup step has a **Dashboard host** card with a switch and the domain. It opens with
 `DASHBOARD_DOMAIN` if you set it, otherwise the hostname in `BASE_URL` - the address you are
-already reaching CPM at. A localhost address says nothing about the name the instance will answer
-to, so that leaves the feature off with the field ready.
+already reaching CPM at - and failing both, the address you opened setup at. A localhost address
+says nothing about the name the instance will answer to, so that leaves the switch off.
+
+### A migrated host on the same domain
+
+If you migrated from an earlier installation and one of its proxy hosts already serves the domain
+you choose, setup says so: the dashboard host wins that tie, so the old host would stop answering on
+it. **Copy the settings from ...** is on by default. It brings the old host's certificate, access
+list, agents, HTTPS and every other option across to the dashboard host, then:
+
+- disables the old host, if the dashboard's domain was its only one, or
+- removes that domain from it, if it serves others.
+
+The old host's upstream is not copied - the dashboard host always points at the controller - and
+neither is CPM forward auth (see below). Switch the copy off to start the dashboard host clean; the
+old host is then left as it was, shadowed on that domain.
+
+## Proxy options
+
+**Settings → Dashboard Host → Proxy options** has the same options as an ordinary proxy host:
+certificate, access list, agent assignment, redirects and location rules, path rules, error pages,
+raw Caddy config, Authentik, Tailscale, load balancing, DNS resolution, geo-blocking, WAF and mTLS
+trust. Pinning it to agents works the way it does for a stored host - nothing ticked means every
+agent.
+
+A few things stay fixed, because the dashboard needs them to work at all or because they belong to
+a stored host:
+
+| Option | Why it is not offered |
+| ------ | --------------------- |
+| Name, domains, upstreams | The upstream is always the controller; the domain is the setting above |
+| Websockets, preserved Host header | Always on - the dashboard streams, and sign-in checks the host |
+| HTTPS and HSTS | Follow the **Serve it over HTTPS** switch |
+| CPM forward auth | Its grants are stored against a proxy host, and the dashboard is the sign-in it would redirect to |
+| mTLS access rules | Also stored against a proxy host; the mTLS trust settings themselves are available |
 
 ## HTTPS is checked, not assumed
 

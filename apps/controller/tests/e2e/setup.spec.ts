@@ -136,6 +136,21 @@ test.describe('First-run setup', () => {
     );
   });
 
+  test('the dashboard host is a choice here, and opens off without a usable name', async () => {
+    // This instance is reached at localhost with no DASHBOARD_DOMAIN, so there is no name to
+    // claim - the switch opens off and the domain is not asked for until it is on.
+    const proxy = page.getByRole('switch', { name: 'Reverse proxy this dashboard' });
+    await expect(proxy).not.toBeChecked();
+    await expect(page.getByRole('textbox', { name: 'Dashboard domain' })).toBeHidden();
+
+    await proxy.click();
+    await expect(page.getByRole('textbox', { name: 'Dashboard domain' })).toHaveValue('');
+
+    // Back off so the rest of this file finishes setup without claiming a domain.
+    await proxy.click();
+    await expect(page.getByRole('textbox', { name: 'Dashboard domain' })).toBeHidden();
+  });
+
   test('an identity provider can be configured here, not only on the account step', async () => {
     // The account step asks about OAuth only when it is the *only* way in. This instance created a
     // local administrator, so before this card the OAUTH_ half of a .env had nowhere to go.

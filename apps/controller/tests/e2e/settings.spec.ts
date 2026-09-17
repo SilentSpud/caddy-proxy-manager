@@ -410,6 +410,35 @@ test.describe('Settings - ACME Server', () => {
   });
 });
 
+// ─── Dashboard Host section ──────────────────────────────────────────────────
+
+test.describe('Settings - Dashboard Host', () => {
+  test('proxy options save with the host and survive a reload', async ({ page }) => {
+    await page.goto('/settings/dashboard');
+    await waitForHydration(page);
+    const domain = page.getByRole('textbox', { name: 'Dashboard domain' });
+    if ((await domain.inputValue()) === '') await domain.fill('dashboard-e2e.example.test');
+
+    // The same fields a proxy host has, behind a disclosure.
+    await page.getByText('Proxy options', { exact: true }).click();
+    const hstsSubdomains = page.getByRole('switch', { name: 'HSTS Subdomains' });
+    await expect(hstsSubdomains).toBeVisible();
+    const before = await hstsSubdomains.isChecked();
+    await hstsSubdomains.click();
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expectStaged(page, 10_000);
+    await applyStagedChanges(page);
+
+    await page.reload();
+    await waitForHydration(page);
+    await page.getByText('Proxy options', { exact: true }).click();
+    const reloaded = page.getByRole('switch', { name: 'HSTS Subdomains' });
+    if (before) await expect(reloaded).not.toBeChecked();
+    else await expect(reloaded).toBeChecked();
+  });
+});
+
 // ─── DNS Providers section ───────────────────────────────────────────────────
 
 test.describe('Settings - DNS Providers', () => {

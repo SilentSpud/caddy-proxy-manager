@@ -48,14 +48,48 @@ export type DashboardHostSettings = {
    * operator's first experience of the product would be a certificate error.
    */
   tls: boolean;
+  /**
+   * Everything else a proxy host can be configured with. Absent on settings saved before the
+   * dashboard host had options, which reads as a host with none.
+   */
+  options?: DashboardHostOptions;
+};
+
+/**
+ * A proxy host's options, minus what the managed host decides for itself.
+ *
+ * The upstream is the controller, and websocket upgrades and the preserved Host header are what the
+ * dashboard needs to work at all, so none of those are offered. HTTPS and HSTS follow `tls`.
+ * Everything that lives in a host's `meta` blob is carried as that blob, so the Caddy builder reads
+ * it exactly as it reads a stored host's.
+ */
+export type DashboardHostOptions = {
+  certificateId: number | null;
+  accessListId: number | null;
+  hstsSubdomains: boolean;
+  skipHttpsHostnameValidation: boolean;
+  /** The agents that serve it. Empty means every agent, as it does for a stored host. */
+  agentIds: number[];
+  /** A proxy host `meta` blob, as `proxy_hosts.meta` stores it. */
+  meta: string | null;
+};
+
+export const EMPTY_DASHBOARD_HOST_OPTIONS: DashboardHostOptions = {
+  certificateId: null,
+  accessListId: null,
+  hstsSubdomains: false,
+  skipHttpsHostnameValidation: false,
+  agentIds: [],
+  meta: null,
 };
 
 /**
  * The id the synthetic row carries.
  *
  * Negative so it cannot collide with a `proxy_hosts` serial, and so anything that does look this
- * up by id - an access list, a certificate, an agent assignment - finds nothing rather than
- * somebody else's host.
+ * up by id finds nothing rather than somebody else's host. That is also why the two host features
+ * stored in tables keyed by host - mTLS access rules and CPM forward-auth grants - are not offered
+ * for it: its certificate, access list and agents travel in `options` instead.
  */
 export const DASHBOARD_HOST_ID = -1;
 
@@ -109,11 +143,14 @@ export function defaultDashboardSettings(): DashboardHostSettings {
  * So the host comes up on HTTP and Settings -> Dashboard Host offers the check, which is
  * meaningful the moment the route is live. That is also the safe order: HTTP works immediately,
  * and HTTPS is turned on once something has confirmed it will succeed.
+ *
+ * The domain is the one the operator confirmed on the setup form, which opens with
+ * `seedDashboardDomain()` - so a deployment that never touches that card gets what it always did.
  */
-export function activateDashboardHost(): DashboardHostSettings {
-  const domain = seedDashboardDomain();
-  if (!domain) return { enabled: false, domain: "", tls: false };
-  return { enabled: true, domain, tls: false };
+export function activateDashboardHost(domain: string): DashboardHostSettings {
+  const name = domain.trim().toLowerCase();
+  if (!name) return { enabled: false, domain: "", tls: false };
+  return { enabled: true, domain: name, tls: false };
 }
 
 /**
@@ -136,6 +173,8 @@ export function buildDashboardHostRow(
   // anyway would answer with a proxy error, which is worse than not claiming the domain at all.
   if (!upstream) return null;
 
+  const options = settings.options ?? EMPTY_DASHBOARD_HOST_OPTIONS;
+
   return {
     id: DASHBOARD_HOST_ID,
     name: DASHBOARD_HOST_NAME,
@@ -143,19 +182,19 @@ export function buildDashboardHostRow(
     // Plain strings, the shape parseUpstreamTarget reads. http:// because Caddy reaches the
     // controller inside the network the two share, not across the internet.
     upstreams: JSON.stringify([`http://${upstream}`]),
-    certificateId: null,
-    accessListId: null,
+    certificateId: options.certificateId,
+    accessListId: options.accessListId,
     sslForced: settings.tls ? 1 : 0,
     // Tied to TLS: an HSTS header sent over a domain that is not yet on HTTPS pins the browser to
     // a scheme this host is not serving, and the operator cannot clear it from here.
     hstsEnabled: settings.tls ? 1 : 0,
-    hstsSubdomains: 0,
+    hstsSubdomains: settings.tls && options.hstsSubdomains ? 1 : 0,
     // The dashboard streams: agent status and the log views are server-sent events.
     allowWebsocket: 1,
     // The controller builds absolute URLs from the request host, and better-auth checks it.
     preserveHostHeader: 1,
-    skipHttpsHostnameValidation: 0,
-    meta: null,
+    skipHttpsHostnameValidation: options.skipHttpsHostnameValidation ? 1 : 0,
+    meta: options.meta,
     enabled: 1,
   };
 }
