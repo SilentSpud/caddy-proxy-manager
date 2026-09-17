@@ -35,6 +35,26 @@
 
 @layer components {
   /**
+   * AppShell paints its content area with the card token. The page is the body colour at every
+   * width - black in dark mode, light grey in light - with cards lifted off it, so the content area
+   * asks for the body colour itself. Otherwise the whole panel turns card-coloured and only the
+   * sidebar reads as the page.
+   */
+  .astryx-app-shell .astryx-layout-content {
+    background-color: var(--color-background-body);
+  }
+
+  /**
+   * The sidebar sits a step off the black page in dark mode, so the two read as separate surfaces
+   * without a card-bright panel. Light mode keeps the page colour it already has. Both elements:
+   * the panel and the nav inside it each paint their own background.
+   */
+  .astryx-app-shell-sidenav,
+  .astryx-app-shell-sidenav .astryx-side-nav {
+    background-color: light-dark(var(--color-background-body), #111111);
+  }
+
+  /**
    * Visual masking for a secret in a multi-line field: a private key needs a <textarea>, since
    * <input type="password"> strips newlines on paste and corrupts PEM. Where -webkit-text-security
    * is unsupported the field degrades to plain text.

@@ -74,11 +74,23 @@
 }
 
 /**
- * Phone palette: an OLED-friendly dark theme, below the same 767px edge the rest of the app uses
- * for narrow. Light mode is untouched - each token keeps its light half and changes only the dark.
+ * The page is pure black in dark mode at every width, so a desktop reads as the same theme as the
+ * phone. On OLED an unlit pixel draws no power, so the gutter between cards costs nothing to show.
+ * Light mode is untouched: the token keeps the neutral theme's light half.
+ */
+@layer astryx-theme {
+  @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
+    :scope {
+      --color-background-body: light-dark(#f1f1f1, #000000);
+    }
+  }
+}
+
+/**
+ * Phone palette: the rest of the OLED-friendly dark theme, below the same 767px edge the rest of
+ * the app uses for narrow. Light mode is untouched - each token keeps its light half and changes
+ * only the dark.
  *
- * - The page goes to pure black. An unlit OLED pixel draws no power, so the gutter between cards
- *   costs nothing to show.
  * - Cards go to #262626. The neutral theme paints --color-background-card the same #1b1b1b as its
  *   body, so a card is separated by its border alone; on a black page the fill does that job, at
  *   1.39:1 against the page.
@@ -90,7 +102,6 @@
   @media (max-width: 767px) {
     @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
       :scope {
-        --color-background-body: light-dark(#f1f1f1, #000000);
         --color-background-card: light-dark(#ffffff, #262626);
         --color-text-primary: light-dark(#000000, #ebebeb);
       }

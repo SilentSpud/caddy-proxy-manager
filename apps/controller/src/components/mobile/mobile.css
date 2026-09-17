@@ -192,13 +192,6 @@
       display: none;
     }
 
-    /* AppShell paints its content area with the card token. On a desktop card and body are the same
-       colour; on a phone cards are lifted off the black page, so the page area has to ask for the
-       body colour itself or every screen turns card grey. */
-    .astryx-app-shell .astryx-layout-content {
-      background-color: var(--color-background-body);
-    }
-
     .cpm-mobile-content {
       padding-bottom: calc(var(--cpm-tabbar-height) + env(safe-area-inset-bottom, 0px));
     }
