@@ -164,10 +164,13 @@ test.describe.serial('L4 Port Manager Sidecar', () => {
     // lives on the shared data volume, writable from the web container at
     // /app/data (the sidecar sees the same files at /data).
     const staleTs = Math.floor(Date.now() / 1000) - 3600;
+    // Plant the files as root (-u root): a crashed apply left them owned by the
+    // sidecar user (root) on the shared volume, so the web user (uid 10001)
+    // cannot overwrite l4-ports.status — writing as root mirrors production.
     execFileSync(
       'docker',
       [
-        'exec', 'caddy-proxy-manager-web', 'sh', '-c',
+        'exec', '-u', 'root', 'caddy-proxy-manager-web', 'sh', '-c',
         `echo ${staleTs} > /app/data/.l4-apply.lock && ` +
         `printf '{"state":"applying","message":"Recreating caddy container with updated ports...","appliedAt":"2020-01-01T00:00:00.000Z"}' > /app/data/l4-ports.status`,
       ],

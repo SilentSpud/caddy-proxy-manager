@@ -3,6 +3,10 @@
  *
  * Sends raw TCP connections and UDP datagrams to Caddy's L4 proxy ports
  * and reads responses.
+ *
+ * Default read timeout is generous (10 s) because the echo backends used in
+ * the compose test stack are linux/amd64 images that run under emulation on
+ * Apple Silicon hosts and can be slow to produce their banner under load.
  */
 import net from 'node:net';
 import dgram from 'node:dgram';
@@ -20,7 +24,7 @@ export function tcpSend(
   host: string,
   port: number,
   payload: string,
-  timeoutMs = 5_000
+  timeoutMs = 10_000
 ): Promise<TcpResponse> {
   return new Promise((resolve, reject) => {
     let data = '';
