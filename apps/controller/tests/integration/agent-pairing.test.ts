@@ -522,6 +522,21 @@ describe('POST /api/agent/v1/pair/preview', () => {
     expect(redeemRepairCode(AGENT_ID, code).ok).toBe(true);
   });
 
+  it('says nothing about a disabled agent to a caller without its code', async () => {
+    const first = ensurePairingCode();
+    expect((await pair(first.code)).status).toBe(200);
+    await ctx.db
+      .update(schema.agents)
+      .set({ enabled: false })
+      .where(eq(schema.agents.agentId, AGENT_ID));
+    const { code } = mintRepairCode(AGENT_ID);
+
+    // A wrong code is refused as wrong, exactly as for an enabled agent.
+    expect((await preview('ZZZZZZ')).status).toBe(401);
+    // The right one still does not bring a disabled agent back.
+    expect((await preview(code)).status).toBe(403);
+  });
+
   it('does not preview a bootstrap token', async () => {
     const response = await preview('f'.repeat(64));
     expect(response.status).toBe(400);

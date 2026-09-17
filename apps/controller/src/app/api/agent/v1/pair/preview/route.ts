@@ -50,7 +50,6 @@ export async function POST(request: Request) {
   if (looksLikeBootstrapToken(code)) return bad("Bootstrap tokens are not previewed.");
 
   const existing = await findAgentRowByAgentId(agentId);
-  if (existing && !existing.enabled) return bad("This agent is disabled on the controller.", 403);
 
   const client = (await getClientIp(request.headers)) ?? "unknown";
   if (clientThrottled(client)) {
@@ -61,6 +60,10 @@ export async function POST(request: Request) {
     recordFailedGuess(client);
     return bad(checked.error, 401);
   }
+  // Only after the code is right: refused before it, a wrong-code caller could tell an agent id
+  // that is disabled here from one that is not. The pair route refuses earlier, because there the
+  // point is not to spend a code on an agent that cannot come back - a preview spends nothing.
+  if (existing && !existing.enabled) return bad("This agent is disabled on the controller.", 403);
 
   const [controllerName, controllerId] = await Promise.all([
     controllerDisplayName(),

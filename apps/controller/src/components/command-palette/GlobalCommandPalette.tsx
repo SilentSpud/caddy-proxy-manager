@@ -88,6 +88,8 @@ export function GlobalCommandPaletteProvider({
     function handler(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        // One toggle per press: a held shortcut repeats, and would flicker the palette open and shut.
+        if (event.repeat) return;
         setIsOpen((open) => !open);
       }
     }
