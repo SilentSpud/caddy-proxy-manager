@@ -1,15 +1,25 @@
 /**
  * Caddy health monitoring service
- * Monitors Caddy for restarts/crashes and automatically reapplies configuration
+ * Monitors Caddy for restarts/recreations and automatically reapplies the
+ * configuration Caddy Proxy Manager last pushed.
+ *
+ * Detection is content-based: after every successful apply, `applyCaddyConfig`
+ * records a fingerprint (sha256) of the config Caddy is actually serving.
+ * Each health check re-fetches the live config and compares — any difference
+ * means Caddy is no longer running our configuration (container recreated
+ * with a missing/stale autosave, restarted onto the image's default
+ * Caddyfile, or externally modified) and the applied config is pushed again.
+ * A hash comparison is the only reliable signal: Caddy may come back with a
+ * non-empty config (the default Caddyfile defines an `http` app), so checks
+ * like "is the config empty" or "did the ETag disappear" miss real drift.
  */
 
-import http from "node:http";
-import https from "node:https";
+import { applyCaddyConfig, getCaddyLiveConfigHash, getLastAppliedConfigHash } from "./caddy";
 import { config } from "./config";
-import { applyCaddyConfig } from "./caddy";
 
 type CaddyMonitorState = {
   isHealthy: boolean;
+  /** Fingerprint of the config Caddy was last seen serving (debug aid). */
   lastConfigId: string | null;
   lastCheckTime: number;
   consecutiveFailures: number;
@@ -17,7 +27,7 @@ type CaddyMonitorState = {
 
 const HEALTH_CHECK_INTERVAL = 10000; // Check every 10 seconds
 const MAX_CONSECUTIVE_FAILURES = 3; // Consider unhealthy after 3 failures
-const REAPPLY_DELAY = 5000; // Wait 5 seconds after detecting restart before reapplying
+const REAPPLY_DELAY = 5000; // Wait 5 seconds after detecting drift before reapplying
 
 const monitorState: CaddyMonitorState = {
   isHealthy: false,
@@ -28,60 +38,19 @@ const monitorState: CaddyMonitorState = {
 
 let monitorInterval: NodeJS.Timeout | null = null;
 let isMonitoring = false;
+// True while a drift-triggered reapply is scheduled/running, so a health
+// check landing inside the REAPPLY_DELAY window doesn't schedule another one.
+let reapplyPending = false;
 
 /**
- * Get the current Caddy config ID from the admin API
- * This is used to detect when Caddy has restarted (config ID changes)
- */
-async function getCaddyConfigId(): Promise<string | null> {
-  try {
-    const response = await new Promise<{ status: number; text: string; etag: string | null }>((resolve, reject) => {
-      const parsed = new URL(`${config.caddyApiUrl}/config/`);
-      const lib = parsed.protocol === "https:" ? https : http;
-      const req = lib.request(
-        { hostname: parsed.hostname, port: parsed.port, path: parsed.pathname, method: "GET" },
-        (res) => {
-          let data = "";
-          res.on("data", (chunk) => (data += chunk));
-          res.on("end", () => resolve({ status: res.statusCode ?? 0, text: data, etag: res.headers.etag ?? null }));
-        }
-      );
-      req.setTimeout(5000, () => { req.destroy(); reject(new Error("timeout")); });
-      req.on("error", reject);
-      req.end();
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      return null;
-    }
-
-    // Use ETag or compute a simple hash from the response
-    const etag = response.etag;
-    if (etag) {
-      return etag;
-    }
-
-    // Fallback: use the config object's structure
-    const configData = JSON.parse(response.text);
-    // Check if config is essentially empty (default state after restart)
-    const isEmpty = !configData.apps || Object.keys(configData.apps).length === 0;
-    return isEmpty ? "empty" : "configured";
-  } catch {
-    // Network error or timeout
-    return null;
-  }
-}
-
-/**
- * Check if Caddy is healthy and detect restarts
+ * Check if Caddy is healthy and detect configuration drift
  */
 async function checkCaddyHealth(): Promise<void> {
-  const now = Date.now();
-  monitorState.lastCheckTime = now;
+  monitorState.lastCheckTime = Date.now();
 
-  const currentConfigId = await getCaddyConfigId();
+  const liveConfigId = await getCaddyLiveConfigHash();
 
-  if (currentConfigId === null) {
+  if (liveConfigId === null) {
     // Caddy is not responding
     monitorState.consecutiveFailures++;
 
@@ -95,40 +64,33 @@ async function checkCaddyHealth(): Promise<void> {
   }
 
   // Caddy is responding
-  const wasUnhealthy = !monitorState.isHealthy;
   monitorState.consecutiveFailures = 0;
   monitorState.isHealthy = true;
+  monitorState.lastConfigId = liveConfigId;
 
-  // Detect restart: config ID changed to "empty" or Caddy was previously unhealthy
-  const hasRestarted =
-    (monitorState.lastConfigId !== null && currentConfigId === "empty") ||
-    (wasUnhealthy && currentConfigId === "empty");
+  const expectedConfigId = getLastAppliedConfigHash();
+  const hasDrifted = expectedConfigId !== null && liveConfigId !== expectedConfigId;
 
-  if (hasRestarted) {
-    console.log("[CaddyMonitor] Caddy restart detected! Waiting before reapplying configuration...");
+  if (hasDrifted) {
+    if (reapplyPending) {
+      return;
+    }
+    reapplyPending = true;
+    console.log("[CaddyMonitor] Caddy configuration drift detected (restart or external change)! Waiting before reapplying...");
 
     // Wait a bit for Caddy to fully initialize
     setTimeout(async () => {
       try {
-        console.log("[CaddyMonitor] Reapplying Caddy configuration after restart...");
+        console.log("[CaddyMonitor] Reapplying Caddy configuration after drift...");
         await applyCaddyConfig();
         console.log("[CaddyMonitor] Configuration reapplied successfully");
-
-        // Update the config ID after successful reapplication
-        const newConfigId = await getCaddyConfigId();
-        monitorState.lastConfigId = newConfigId;
       } catch (error) {
-        console.error("[CaddyMonitor] Failed to reapply configuration after restart:", error);
+        console.error("[CaddyMonitor] Failed to reapply configuration after drift:", error);
         // Will retry on next health check
+      } finally {
+        reapplyPending = false;
       }
     }, REAPPLY_DELAY);
-  } else if (monitorState.lastConfigId === null) {
-    // First time seeing Caddy healthy
-    console.log("[CaddyMonitor] Caddy health monitoring initialized");
-    monitorState.lastConfigId = currentConfigId;
-  } else {
-    // Normal operation, update last known config ID
-    monitorState.lastConfigId = currentConfigId;
   }
 }
 
@@ -136,6 +98,12 @@ async function checkCaddyHealth(): Promise<void> {
  * Start monitoring Caddy health
  */
 export function startCaddyMonitoring(): void {
+  if (!config.caddyMonitorEnabled) {
+    console.log(
+      "[CaddyMonitor] Disabled (CADDY_MONITOR_ENABLED=false) — this instance does not own the targeted Caddy"
+    );
+    return;
+  }
   if (isMonitoring) {
     console.log("[CaddyMonitor] Already monitoring");
     return;

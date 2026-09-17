@@ -162,6 +162,11 @@ export const config = {
     return getSessionSecret();
   },
   caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
+  // Auto-recovery of the Caddy configuration on drift (restart/recreation).
+  // Disable on instances that do not own the targeted Caddy (e.g. auxiliary
+  // CPM instances sharing one Caddy in the e2e stack) — two enabled monitors
+  // with different databases would endlessly fight over the configuration.
+  caddyMonitorEnabled: process.env.CADDY_MONITOR_ENABLED !== "false",
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
   get adminUsername() {
     return getAdminCredentials().username;

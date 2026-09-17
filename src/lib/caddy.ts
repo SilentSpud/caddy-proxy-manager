@@ -2766,6 +2766,32 @@ function caddyRequest(url: string, method: string, body?: string): Promise<{ sta
   });
 }
 
+/**
+ * Fingerprint (sha256) of the live Caddy config as of the last successful
+ * apply. The CaddyMonitor compares this against the config Caddy is actually
+ * serving to detect restarts/recreations that did not resume the applied
+ * configuration — including coming back with the image's default Caddyfile,
+ * which has a non-empty `http` app and therefore cannot be detected by
+ * checking for an "empty" config.
+ */
+let lastAppliedConfigHash: string | null = null;
+
+export function getLastAppliedConfigHash(): string | null {
+  return lastAppliedConfigHash;
+}
+
+export async function getCaddyLiveConfigHash(): Promise<string | null> {
+  try {
+    const response = await caddyRequest(`${config.caddyApiUrl}/config/`, "GET");
+    if (response.status < 200 || response.status >= 300) {
+      return null;
+    }
+    return crypto.createHash("sha256").update(response.text).digest("hex");
+  } catch {
+    return null;
+  }
+}
+
 export async function applyCaddyConfig() {
   const document = await buildCaddyDocument();
   const payload = JSON.stringify(document);
@@ -2796,6 +2822,10 @@ export async function applyCaddyConfig() {
       "CADDY_REJECTED"
     );
   }
+
+  // Record what Caddy is actually serving now, so the monitor can detect a
+  // later restart/recreation that leaves Caddy without this configuration.
+  lastAppliedConfigHash = await getCaddyLiveConfigHash();
 
   try {
     await syncInstances();

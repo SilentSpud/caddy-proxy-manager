@@ -39,6 +39,10 @@ services:
       DATABASE_PATH: /app/data/caddy-proxy-manager.db
       DATABASE_URL: file:/app/data/caddy-proxy-manager.db
       CADDY_API_URL: http://caddy:2019
+      # Shares the main E2E Caddy with the primary web instance; only one
+      # monitor may auto-heal a shared Caddy or the two instances fight over
+      # the configuration (this instance has its own empty database).
+      CADDY_MONITOR_ENABLED: "false"
       AUTH_ALLOW_SELF_REGISTRATION: "true"
       AUTH_RATE_LIMIT_ENABLED: "false"
       OAUTH_ENABLED: "false"
