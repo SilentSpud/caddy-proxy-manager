@@ -27,6 +27,8 @@ import {
   AGENT_OPERATIONS,
   CONTROLLER_AGENT_ROUTES,
   signatureBase,
+  type AgentPairPreviewRequest,
+  type AgentPairPreviewResponse,
 } from "@cpm/shared";
 
 /** Pairing crosses a network an operator just typed an address for, so it fails fast on a typo. */
@@ -98,6 +100,33 @@ export class ControllerClient {
 
   get controllerUrl(): string {
     return this.url;
+  }
+
+  /**
+   * Who this code would pair with, without spending it. Unsigned, like `pair`.
+   *
+   * Null when the controller has no preview route - one older than this agent. The caller still
+   * asks the operator, just without a name to show.
+   */
+  async previewPair(request: AgentPairPreviewRequest): Promise<AgentPairPreviewResponse | null> {
+    const response = await this.send(
+      CONTROLLER_AGENT_ROUTES.pairPreview,
+      "POST",
+      JSON.stringify(request),
+      PAIR_TIMEOUT_MS,
+      null,
+    );
+    if (response.status === 404 || response.status === 405) return null;
+    if (!response.ok) {
+      throw new ControllerRejected(
+        response.status,
+        await errorMessage(
+          response,
+          `The controller refused the pairing code (${response.status}).`,
+        ),
+      );
+    }
+    return (await response.json()) as AgentPairPreviewResponse;
   }
 
   /**

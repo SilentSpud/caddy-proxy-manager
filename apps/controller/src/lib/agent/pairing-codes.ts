@@ -83,16 +83,19 @@ export function revokeRepairCode(agentId: string): void {
 export type RedeemResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Check a submitted code against one live code, burning it on success.
+ * Check a submitted code against one live code, burning it on success unless `keep` is set.
  *
  * Burning it is what makes it one-time: a code that stayed valid for its whole five minutes would
- * let anyone who saw the operator's screen pair a second agent.
+ * let anyone who saw the operator's screen pair a second agent. `keep` is the preview's check - it
+ * says whether the code is right without using it up - and a wrong guess still costs the code's
+ * budget, so previewing is no cheaper a way to guess than pairing.
  */
 function redeem(
   live: LiveCode | null | undefined,
   submitted: string,
   now: number,
   discard: () => void,
+  keep = false,
 ): RedeemResult {
   const expired = {
     ok: false as const,
@@ -110,7 +113,7 @@ function redeem(
     return { ok: false, error: "That pairing code is not valid." };
   }
 
-  discard();
+  if (!keep) discard();
   return { ok: true };
 }
 
@@ -119,6 +122,38 @@ export function redeemPairingCode(submitted: string, now = Date.now()): RedeemRe
   return redeem(current, submitted, now, () => {
     current = null;
   });
+}
+
+/** Whether the live code is right, without spending it. */
+export function checkPairingCode(submitted: string, now = Date.now()): RedeemResult {
+  return redeem(
+    current,
+    submitted,
+    now,
+    () => {
+      current = null;
+    },
+    true,
+  );
+}
+
+/** Whether this agent's re-pair code is right, without spending it. */
+export function checkRepairCode(
+  agentId: string,
+  submitted: string,
+  now = Date.now(),
+): RedeemResult {
+  const live = repairCodes.get(agentId);
+  if (!live) return redeemRepairCode(agentId, submitted, now);
+  return redeem(
+    live,
+    submitted,
+    now,
+    () => {
+      repairCodes.delete(agentId);
+    },
+    true,
+  );
 }
 
 /** Redeem the re-pair code minted for this agent. The live code never re-pairs anyone. */

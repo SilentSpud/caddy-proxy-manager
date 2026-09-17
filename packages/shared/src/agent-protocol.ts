@@ -360,6 +360,14 @@ export const CONTROLLER_AGENT_ROUTES = {
    */
   pair: `${CONTROLLER_AGENT_API_PREFIX}/pair`,
   /**
+   * Unauthenticated, like `pair`: who a code would pair with, without spending it.
+   *
+   * The agent asks this before pairing so the operator can confirm the controller by name - a
+   * typo'd address that happens to answer is otherwise indistinguishable from the right one until
+   * the code is gone. A wrong code counts against the same budget as a wrong pairing attempt.
+   */
+  pairPreview: `${CONTROLLER_AGENT_API_PREFIX}/pair/preview`,
+  /**
    * Everything else: the event subscription, the status report and the command results.
    *
    * One endpoint, because that is how GraphQL works. The agent opens a `subscription` here and
@@ -444,6 +452,19 @@ export type AgentPairRequest = {
   /** Shown in the controller's agent list so an operator can tell two hosts apart. */
   agentName?: string;
   agentVersion: string;
+};
+
+export type AgentPairPreviewRequest = {
+  code: string;
+  /** Decides which code is checked: a known agent can only be re-paired with its own. */
+  agentId: string;
+};
+
+export type AgentPairPreviewResponse = {
+  controllerId: string;
+  controllerName: string;
+  /** True when the code would replace an existing pairing rather than add a new agent. */
+  repair: boolean;
 };
 
 export type AgentPairResponse = {
@@ -537,6 +558,8 @@ export const AGENT_LOCAL_ROUTES = {
   state: "/local/state",
   /** Hand a running agent its controller address and pairing code. */
   pair: "/local/pair",
+  /** Who a pairing would be with, so `cpm-agent --pair` can ask before it happens. */
+  pairPreview: "/local/pair/preview",
 } as const;
 
 export type AgentLifecycle =
@@ -565,6 +588,22 @@ export type AgentLocalPairRequest = {
   port?: number;
   code: string;
 };
+
+export type AgentLocalPairPreviewResponse =
+  | {
+      ok: true;
+      /** The address the pairing would dial, normalized the way pairing will use it. */
+      controllerUrl: string;
+      /** Null when the controller predates the preview route and so cannot say. */
+      controllerName: string | null;
+      controllerId: string | null;
+      repair: boolean;
+    }
+  | {
+      ok: false;
+      /** Already a sentence, and already English - this goes to a terminal. */
+      error: string;
+    };
 
 export type AgentLocalPairResponse = {
   ok: boolean;

@@ -22,7 +22,7 @@ import {
   insertPairedAgent,
   recordAgentContact,
 } from "../models/agents";
-import { getSetting } from "../settings";
+import { controllerDisplayName } from "../agent/controller-name";
 import { createSimulatedCaddy } from "./simulated-caddy";
 
 /** Hex like a real agentId, and recognisable in a database dump. */
@@ -152,8 +152,7 @@ export async function startSimulatedAgent(
     settleResults(DEMO_AGENT_ID, [{ id: command.id, ok: true, response: caddy(command.request) }]);
   }
 
-  const controllerName =
-    (await getSetting<string>("branding_title").catch(() => null)) || "Caddy Proxy Manager";
+  const controllerName = await controllerDisplayName();
   const { events } = attach({
     agentId: DEMO_AGENT_ID,
     agentRowId: row.id,

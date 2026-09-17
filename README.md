@@ -952,8 +952,22 @@ Wrong guesses are limited to five a minute per client address and 200 per code. 
 agent's host:
 
 ```bash
-docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm.example.com --code ABCDEF
+docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host https://cpm.example.com --code ABCDEF
 ```
+
+Before anything is exchanged, the agent asks the controller who it is - without spending the code -
+and asks you to confirm:
+
+```text
+This agent is about to pair with "Caddy Proxy Manager" (controller 3f9a1c2e)
+  at https://cpm.example.com:443
+Confirm pairing? [y/N]
+```
+
+The name is the controller's Application name (`APP_NAME`, or the setup step) - the one its sidebar
+shows. Answering no changes nothing and leaves the code valid. The prompt needs a terminal, hence
+`-it`; a script with none can pass `--yes` once it has another way to be sure of the address. A
+wrong code is refused at this step and counts against the same guess limits.
 
 `--host` is the controller's address as the agent can reach it. A bare host means `https://` on
 443, except loopback and single-label names such as `web`. Plain `http://` towards a private address
@@ -1006,7 +1020,7 @@ serves exactly as it does on a flat network.
 Pairing is unchanged: generate a code under **Settings → Agents** and run
 
 ```bash
-docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm-controller.tailnet-1234.ts.net --code ABCDEF
+docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host https://cpm-controller.tailnet-1234.ts.net --code ABCDEF
 ```
 
 **Headscale.** Everything above applies; set `--login-server` and use whatever address your
@@ -1032,6 +1046,15 @@ Two things worth knowing:
 Unpairing revokes the secret. The agent's next call is refused, it drops back to idle, and **it
 stops Caddy** - so unpairing takes that host out of service. Pair it again with a fresh code to
 bring it back.
+
+### Stopping the agent
+
+The agent owns Caddy on its host, so **stopping the agent stops Caddy** first - `docker compose
+stop agent`, a host shutdown, anything that sends it `SIGTERM`. It gives Caddy 40 seconds, inside
+the minute the bundled compose file allows the agent to exit. When the agent starts again with a
+pairing it starts Caddy straight away, without waiting for the controller, so a host that reboots
+while its controller is unreachable still serves; the controller's own setting still wins once it
+answers. A restart the controller asks for, after a migration, keeps Caddy running.
 
 ---
 

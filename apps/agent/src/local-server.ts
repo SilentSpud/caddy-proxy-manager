@@ -37,6 +37,17 @@ export function createLocalHandler(lifecycle: AgentLifecycle) {
       return Response.json(await lifecycle.localState());
     }
 
+    if (url.pathname === AGENT_LOCAL_ROUTES.pairPreview) {
+      if (request.method !== "POST") {
+        return Response.json({ error: "Use POST to preview a pairing." }, { status: 405 });
+      }
+      const parsed = await readPairBody(request);
+      if (parsed instanceof Response) return parsed;
+      return Response.json(
+        await lifecycle.previewPair(parsed.host, parsed.port ?? null, parsed.code),
+      );
+    }
+
     if (url.pathname === AGENT_LOCAL_ROUTES.pair) {
       if (request.method !== "POST") {
         return Response.json({ error: "Use POST to pair." }, { status: 405 });
@@ -48,7 +59,8 @@ export function createLocalHandler(lifecycle: AgentLifecycle) {
   };
 }
 
-async function handlePair(request: Request, lifecycle: AgentLifecycle): Promise<Response> {
+/** The body both pairing routes take, or the response that refuses it. */
+async function readPairBody(request: Request): Promise<AgentLocalPairRequest | Response> {
   const raw = await request.arrayBuffer();
   if (raw.byteLength > MAX_BODY_BYTES) {
     return Response.json({ error: "That request is too large to be a pairing." }, { status: 413 });
@@ -67,6 +79,12 @@ async function handlePair(request: Request, lifecycle: AgentLifecycle): Promise<
   if (parsed.port !== undefined && parsed.port !== null && typeof parsed.port !== "number") {
     return Response.json({ error: "The port must be a number." }, { status: 400 });
   }
+  return parsed;
+}
+
+async function handlePair(request: Request, lifecycle: AgentLifecycle): Promise<Response> {
+  const parsed = await readPairBody(request);
+  if (parsed instanceof Response) return parsed;
 
   const outcome = await lifecycle.pair(parsed.host, parsed.port ?? null, parsed.code);
   const body: AgentLocalPairResponse = {

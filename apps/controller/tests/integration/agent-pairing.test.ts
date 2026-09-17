@@ -48,6 +48,9 @@ const { deleteAgent, listAgents, findAgentByAgentId, renameAgent } = await impor
 );
 const bootstrap = await import('../../src/lib/agent/bootstrap');
 const { POST } = await import('../../src/app/api/agent/v1/pair/route');
+const { POST: PREVIEW } = await import('../../src/app/api/agent/v1/pair/preview/route');
+const { saveSettings, invalidateSettingsCache } = await import('../../src/lib/settings/resolve');
+const { appName } = await import('../../src/lib/settings/registry');
 
 const AGENT_ID = 'a'.repeat(32);
 const OTHER_ID = 'b'.repeat(32);
@@ -73,6 +76,7 @@ beforeEach(async () => {
   bootstrap.resetBootstrapState();
   await ctx.db.delete(schema.agents);
   await ctx.db.delete(schema.settings);
+  invalidateSettingsCache();
 });
 
 afterEach(() => {
@@ -146,6 +150,15 @@ describe('pairing codes', () => {
 });
 
 describe('POST /api/agent/v1/pair', () => {
+  it('introduces the controller by its Application name', async () => {
+    await saveSettings({ [appName.key]: 'Branch Office' });
+    const { code } = ensurePairingCode();
+    const response = await pair(code);
+    expect(((await response.json()) as { controllerName: string }).controllerName).toBe(
+      'Branch Office',
+    );
+  });
+
   it('stores the agent and returns a secret it did not receive', async () => {
     const { code } = ensurePairingCode();
     const response = await POST(
@@ -448,5 +461,69 @@ describe('bootstrap token', () => {
 
     await bootstrap.forgetBootstrapAgent(OTHER_ID);
     expect(await bootstrap.autoPairingDisabled()).toBe(false);
+  });
+});
+
+describe('POST /api/agent/v1/pair/preview', () => {
+  async function preview(code: string, agentId = AGENT_ID) {
+    return PREVIEW(
+      new Request('http://controller.test/api/agent/v1/pair/preview', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code, agentId }),
+      }),
+    );
+  }
+
+  it('names the controller for a right code without spending it', async () => {
+    // The Application name - what the sidebar calls this instance - not a separate branding value.
+    await saveSettings({ [appName.key]: 'Edge Controller' });
+    const { code } = ensurePairingCode();
+
+    const response = await preview(code);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      controllerName: string;
+      controllerId: string;
+      repair: boolean;
+    };
+    expect(body.controllerName).toBe('Edge Controller');
+    expect(body.controllerId.length).toBeGreaterThan(0);
+    expect(body.repair).toBe(false);
+
+    // Still good for the pairing the operator confirms next.
+    expect((await pair(code)).status).toBe(200);
+  });
+
+  it('says nothing about the controller for a wrong code', async () => {
+    ensurePairingCode();
+    const response = await preview('ZZZZZZ');
+    expect(response.status).toBe(401);
+    expect(await response.text()).not.toContain('Caddy Proxy Manager');
+  });
+
+  it('counts a wrong guess against the same throttle as pairing', async () => {
+    const { code } = ensurePairingCode();
+    for (let i = 0; i < 5; i += 1) expect((await preview('ZZZZZZ')).status).toBe(401);
+    // The sixth attempt - right or not, preview or pair - is refused for this address.
+    expect((await preview(code)).status).toBe(429);
+    expect((await pair(code)).status).toBe(429);
+  });
+
+  it('reports a re-pair for an agent that is already known', async () => {
+    const first = ensurePairingCode();
+    expect((await pair(first.code)).status).toBe(200);
+    const { code } = mintRepairCode(AGENT_ID);
+
+    const response = await preview(code);
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { repair: boolean }).repair).toBe(true);
+    // And the re-pair code is still there to use.
+    expect(redeemRepairCode(AGENT_ID, code).ok).toBe(true);
+  });
+
+  it('does not preview a bootstrap token', async () => {
+    const response = await preview('f'.repeat(64));
+    expect(response.status).toBe(400);
   });
 });

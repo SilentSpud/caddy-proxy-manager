@@ -49,8 +49,21 @@ An agent elsewhere cannot read that volume, so it pairs with a code you carry. G
 minute per address - then run on the agent's host:
 
 ```bash
-docker exec caddy-proxy-manager-agent cpm-agent --pair --host https://cpm.example.com --code ABCDEF
+docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host https://cpm.example.com --code ABCDEF
 ```
+
+The agent first asks the controller its name - without spending the code - and waits for you to
+confirm it:
+
+```text
+This agent is about to pair with "Caddy Proxy Manager" (controller 3f9a1c2e)
+  at https://cpm.example.com:443
+Confirm pairing? [y/N]
+```
+
+The name is the controller's Application name - the one its sidebar shows. Answering no changes
+nothing and the code stays valid. The prompt needs a terminal, which is what `-it` is for; a script
+can pass `--yes` instead.
 
 A bare host means `https://`. Plain `http://` works towards a private address with a warning and is
 refused towards a public one unless `CONTROLLER_ALLOW_INSECURE_HTTP=true`, because the secret
@@ -75,3 +88,12 @@ Hosts can also be pinned to specific agents, so one machine serves a subset rath
 Unpairing revokes the secret. The agent's next call is refused, it drops back to idle, and **it
 stops Caddy** - so unpairing takes that host out of service. Pair it again with a fresh code to
 bring it back.
+
+## Stopping the agent
+
+The agent owns Caddy on its host, so **stopping the agent stops Caddy** first - `docker compose
+stop agent`, a host shutdown, anything that sends it `SIGTERM`. It gives Caddy 40 seconds, inside
+the minute the bundled compose file allows the agent to exit. When the agent starts again with a
+pairing it starts Caddy straight away, without waiting for the controller, so a host that reboots
+while its controller is unreachable still serves; the controller's own setting still wins once it
+answers. A restart the controller asks for, after a migration, keeps Caddy running.
