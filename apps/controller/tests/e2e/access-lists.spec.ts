@@ -49,7 +49,6 @@ test.describe('Access Lists - page load', () => {
     await page.goto('/access-lists');
     // Level 1: with no lists, the rail's "No access lists yet" heading matches the name too.
     await expect(page.getByRole('heading', { name: 'Access Lists', level: 1 })).toBeVisible();
-    await expect(page.getByText('HTTP basic auth')).toBeVisible();
   });
 
   test('shows a "New" button in the rail', async ({ page }) => {

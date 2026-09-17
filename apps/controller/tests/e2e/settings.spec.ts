@@ -940,15 +940,12 @@ test.describe('Settings - form data round-trip via API', () => {
 // ─── Detail header ───────────────────────────────────────────────────────────
 
 test.describe('Settings - detail header', () => {
-  test('header shows description text for each section', async ({ page }) => {
+  test('header shows the section title with no description under it', async ({ page }) => {
+    // Titles stand alone; a section's description lives in the command palette and on the
+    // Settings overview cards, not under its heading.
     await goToSection(page, 'General');
-    await expect(page.getByText('Primary domain and ACME contact email')).toBeVisible();
-
-    await page
-      .locator(SETTINGS_SIDEBAR)
-      .getByRole('link', { name: 'DNS Providers', exact: true })
-      .click();
-    await expect(page.getByText('Provider credentials for ACME DNS-01')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
+    await expect(page.getByText('Primary domain and ACME contact email')).toHaveCount(0);
   });
 
   test('header breadcrumb trail includes Settings prefix', async ({ page }) => {
