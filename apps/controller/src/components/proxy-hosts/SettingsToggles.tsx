@@ -20,6 +20,11 @@ type SettingsTogglesProps = {
   hstsSubdomains?: boolean;
   skipHttpsValidation?: boolean;
   enabled?: boolean;
+  /**
+   * Off for the managed dashboard host, whose on/off switch is its own setting - and whose form
+   * already posts an `enabled` field this one would collide with.
+   */
+  showEnabled?: boolean;
 };
 
 const SETTINGS: ToggleSetting[] = [
@@ -41,6 +46,7 @@ export function SettingsToggles({
   hstsSubdomains = true,
   skipHttpsValidation = false,
   enabled = true,
+  showEnabled = true,
 }: SettingsTogglesProps) {
   const t = useTranslations("proxyHosts");
   const [values, setValues] = useState({
@@ -54,26 +60,30 @@ export function SettingsToggles({
 
   return (
     <VStack gap={6}>
-      <input type="hidden" name="enabledPresent" value="1" />
-      <input type="hidden" name="enabled" value={values.enabled ? "on" : ""} />
+      {showEnabled && (
+        <>
+          <input type="hidden" name="enabledPresent" value="1" />
+          <input type="hidden" name="enabled" value={values.enabled ? "on" : ""} />
 
-      {/* Banner carries the enabled/paused state semantically, replacing a
-          border and background tinted with primary/5 when active. */}
-      <Banner
-        status={values.enabled ? "success" : "warning"}
-        title={values.enabled ? t("proxyHostEnabledTitle") : t("proxyHostPausedTitle")}
-        description={
-          values.enabled ? t("proxyHostActiveDescription") : t("proxyHostPausedDescription")
-        }
-        endContent={
-          <Switch
-            label={t("proxyHostEnabled")}
-            isLabelHidden
-            value={values.enabled}
-            onChange={handleChange("enabled")}
+          {/* Banner carries the enabled/paused state semantically, replacing a
+              border and background tinted with primary/5 when active. */}
+          <Banner
+            status={values.enabled ? "success" : "warning"}
+            title={values.enabled ? t("proxyHostEnabledTitle") : t("proxyHostPausedTitle")}
+            description={
+              values.enabled ? t("proxyHostActiveDescription") : t("proxyHostPausedDescription")
+            }
+            endContent={
+              <Switch
+                label={t("proxyHostEnabled")}
+                isLabelHidden
+                value={values.enabled}
+                onChange={handleChange("enabled")}
+              />
+            }
           />
-        }
-      />
+        </>
+      )}
 
       <Card>
         <VStack gap={3}>

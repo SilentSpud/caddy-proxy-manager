@@ -13,7 +13,6 @@ import type { ReactNode } from "react";
 import { Breadcrumbs, BreadcrumbItem } from "@astryxdesign/core/Breadcrumbs";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { Text } from "@astryxdesign/core/Text";
 import { useTranslations } from "next-intl";
 import { EnvTokens } from "@/src/components/ui/EnvTokens";
 import type { StagedView } from "@/src/lib/settings/staged-view";
@@ -21,7 +20,6 @@ import {
   findSettingsItem,
   groupForSection,
   settingsGroupLabel,
-  settingsSectionDescription,
   settingsSectionName,
 } from "./sections";
 import { RevisionPill, StagedControls } from "./StagedChanges";
@@ -90,9 +88,6 @@ function SettingsHeader({ sectionId, staged }: { sectionId: string | null; stage
             <Heading level={1}>{item ? settingsSectionName(t, item) : t("homeOverview")}</Heading>
             <EnvTokens names={item?.env} />
           </HStack>
-          <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
-            {item ? settingsSectionDescription(t, item) : t("homeSubtitle")}
-          </Text>
         </VStack>
 
         <HStack gap={2} vAlign="center" style={{ flexShrink: 0 }}>

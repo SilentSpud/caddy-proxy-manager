@@ -17,7 +17,9 @@ const SETTINGS_ORIGIN = 'http://localhost:3000';
  * own; waiting harder before the first one just moves the race.
  */
 async function openPaletteWithKeyboard(page: Page) {
-  await expect(page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...')).toBeVisible();
+  await expect(
+    page.locator(SETTINGS_SIDEBAR).getByText('Search...', { exact: true }),
+  ).toBeVisible();
   await expect(async () => {
     await page.keyboard.press('ControlOrMeta+k');
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1_000 });
@@ -75,7 +77,7 @@ test.describe('Settings - page load & layout', () => {
   test('sidebar search button is visible with keyboard hint', async ({ page }) => {
     await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
-    await expect(sidebar.getByText('Jump to setting...')).toBeVisible();
+    await expect(sidebar.getByText('Search...', { exact: true })).toBeVisible();
     await expect(sidebar.locator('kbd').first()).toBeVisible();
   });
 });
@@ -169,7 +171,7 @@ test.describe('Settings - Cmd-K palette', () => {
   test('clicking the search button opens the command palette', async ({ page }) => {
     await page.goto('/settings/general');
     await waitForHydration(page);
-    await page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...').click();
+    await page.locator(SETTINGS_SIDEBAR).getByText('Search...', { exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
@@ -221,7 +223,7 @@ test.describe('Settings - Cmd-K palette', () => {
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('zzzzxyzzy');
-    await expect(dialog.getByText(/no settings match/i)).toBeVisible();
+    await expect(dialog.getByText(/nothing matches your search/i)).toBeVisible();
   });
 });
 
@@ -407,6 +409,35 @@ test.describe('Settings - ACME Server', () => {
     const res = await page.request.get(API_SETTINGS_ACME);
     const data = await res.json();
     expect(data.caUrl).toBe(CUSTOM_DIR);
+  });
+});
+
+// ─── Dashboard Host section ──────────────────────────────────────────────────
+
+test.describe('Settings - Dashboard Host', () => {
+  test('proxy options save with the host and survive a reload', async ({ page }) => {
+    await page.goto('/settings/dashboard');
+    await waitForHydration(page);
+    const domain = page.getByRole('textbox', { name: 'Dashboard domain' });
+    if ((await domain.inputValue()) === '') await domain.fill('dashboard-e2e.example.test');
+
+    // The same fields a proxy host has, behind a disclosure.
+    await page.getByText('Proxy options', { exact: true }).click();
+    const hstsSubdomains = page.getByRole('switch', { name: 'HSTS Subdomains' });
+    await expect(hstsSubdomains).toBeVisible();
+    const before = await hstsSubdomains.isChecked();
+    await hstsSubdomains.click();
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expectStaged(page, 10_000);
+    await applyStagedChanges(page);
+
+    await page.reload();
+    await waitForHydration(page);
+    await page.getByText('Proxy options', { exact: true }).click();
+    const reloaded = page.getByRole('switch', { name: 'HSTS Subdomains' });
+    if (before) await expect(reloaded).not.toBeChecked();
+    else await expect(reloaded).toBeChecked();
   });
 });
 
@@ -909,15 +940,12 @@ test.describe('Settings - form data round-trip via API', () => {
 // ─── Detail header ───────────────────────────────────────────────────────────
 
 test.describe('Settings - detail header', () => {
-  test('header shows description text for each section', async ({ page }) => {
+  test('header shows the section title with no description under it', async ({ page }) => {
+    // Titles stand alone; a section's description lives in the command palette and on the
+    // Settings overview cards, not under its heading.
     await goToSection(page, 'General');
-    await expect(page.getByText('Primary domain and ACME contact email')).toBeVisible();
-
-    await page
-      .locator(SETTINGS_SIDEBAR)
-      .getByRole('link', { name: 'DNS Providers', exact: true })
-      .click();
-    await expect(page.getByText('Provider credentials for ACME DNS-01')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
+    await expect(page.getByText('Primary domain and ACME contact email')).toHaveCount(0);
   });
 
   test('header breadcrumb trail includes Settings prefix', async ({ page }) => {

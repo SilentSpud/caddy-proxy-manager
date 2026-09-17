@@ -16,6 +16,7 @@ import {
   StatusAlert,
   WarnAlert,
 } from "@/src/components/ui/FormLayout";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -45,6 +46,11 @@ import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
 import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
 import type { DashboardDnsCheck, DashboardHostSettings } from "@/src/lib/dashboard-host";
+import { pairingHostFor } from "@/src/lib/dashboard-host-address";
+import {
+  DashboardHostOptionsFields,
+  type DashboardHostOptionsData,
+} from "@/src/components/proxy-hosts/DashboardHostOptionsFields";
 import type { UpdateStatus } from "@/src/lib/updates";
 import { CaddyBuildFields } from "@/components/caddy-modules/CaddyBuildFields";
 import { dnsModuleId } from "@/src/lib/caddy-modules";
@@ -130,6 +136,8 @@ type Props = {
   agentBuildSelections?: Record<number, CaddyBuildSettings | null>;
   /** How the dashboard is served through Caddy. Always a value: unset reads as off. */
   dashboard: DashboardHostSettings;
+  /** The pickers and values for the dashboard host's proxy options. Null off that section. */
+  dashboardOptions?: DashboardHostOptionsData | null;
   /** Tailscale node defaults, with the auth key replaced by whether one is stored. */
   tailscale: TailscaleSettingsView;
   /** Whether a custom favicon is stored. The bytes are served by its route, never sent here. */
@@ -177,6 +185,7 @@ export default function SettingsClient({
   agentBuildTargets,
   agentBuildSelections,
   dashboard,
+  dashboardOptions,
   tailscale,
   hasFavicon,
   updates,
@@ -253,6 +262,7 @@ export default function SettingsClient({
         {active === "dashboard" && (
           <DashboardHostSection
             dashboard={dashboard}
+            options={dashboardOptions ?? null}
             dashboardState={dashboardState}
             dashboardFormAction={dashboardFormAction}
           />
@@ -365,7 +375,9 @@ export default function SettingsClient({
             agentBuildSelections={agentBuildSelections}
           />
         )}
-        {active === "agent" && <AgentSection agents={agents} />}
+        {active === "agent" && (
+          <AgentSection agents={agents} pairingHost={pairingHostFor(dashboard)} />
+        )}
         {active === "analytics" && (
           <AnalyticsSection
             analytics={analytics}
@@ -798,6 +810,7 @@ function DnsProvidersSection({
           <Button
             type="submit"
             form="dnsp-add-form"
+            variant="primary"
             size="sm"
             label={hasProvider && isUpdate ? t("updateDnsProvider") : t("addDnsProvider")}
             isDisabled={!hasProvider}
@@ -991,10 +1004,12 @@ function UpstreamDnsSection({
  */
 function DashboardHostSection({
   dashboard,
+  options,
   dashboardState,
   dashboardFormAction,
 }: {
   dashboard: DashboardHostSettings;
+  options: DashboardHostOptionsData | null;
   dashboardState: { success: boolean; message?: string } | null;
   dashboardFormAction: (payload: FormData) => void;
 }) {
@@ -1095,6 +1110,19 @@ function DashboardHostSection({
               <WarnAlert title={t("dashboardTlsUnverifiedTitle")}>
                 {t("dashboardTlsUnverifiedDescription")}
               </WarnAlert>
+            )}
+            {options && (
+              <Collapsible
+                defaultIsOpen={false}
+                trigger={<Text size="sm">{t("dashboardProxyOptions")}</Text>}
+              >
+                <VStack gap={3} padding={2}>
+                  <Text size="xsm" color="secondary">
+                    {t("dashboardProxyOptionsHelp")}
+                  </Text>
+                  <DashboardHostOptionsFields data={options} />
+                </VStack>
+              </Collapsible>
             )}
             {/*
               A plain SaveButton would submit before anything could be said about it, so when the
@@ -2187,7 +2215,14 @@ function AgentRow({
   );
 }
 
-function AgentSection({ agents }: { agents: Props["agents"] }) {
+function AgentSection({
+  agents,
+  pairingHost,
+}: {
+  agents: Props["agents"];
+  /** The dashboard domain, when set - otherwise the command keeps a placeholder to fill in. */
+  pairingHost: { host: string; insecure: boolean } | null;
+}) {
   const t = useTranslations("settings");
   const [code, setCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -2332,11 +2367,17 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
               <Text size="sm" color="secondary">
                 {t("pairingCodeRun")}
               </Text>
-              <Code>{`cpm-agent --pair --host <this-controller> --code ${code.code}`}</Code>
+              <Code>{`docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host ${pairingHost?.host ?? "<this-controller>"} --code ${code.code}`}</Code>
+              {pairingHost?.insecure && (
+                <Text size="xsm" color="secondary">
+                  {t("pairingHostInsecureHint")}
+                </Text>
+              )}
             </VStack>
           ) : (
             <Button
               type="button"
+              variant="primary"
               size="sm"
               label={t("generatePairingCode")}
               onClick={() => {

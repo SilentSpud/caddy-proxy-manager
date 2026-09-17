@@ -328,8 +328,8 @@ export class DockerHost {
    * `stop`, never `down`: an agent that was unpaired must not be how someone discovers their ACME
    * account and issued certificates are gone.
    */
-  async stopCaddy(): Promise<CommandResult> {
-    return this.compose(["--profile", "caddy", "stop", "caddy"], { timeoutSeconds: 120 });
+  async stopCaddy(timeoutSeconds = 120): Promise<CommandResult> {
+    return this.compose(["--profile", "caddy", "stop", "caddy"], { timeoutSeconds });
   }
 
   /** Whether Caddy's container exists and is running. False for both "stopped" and "never created". */

@@ -95,7 +95,6 @@ export default function CertificatesClient({
     <VStack gap={6}>
       <ListPageHeader
         title={t("sslTlsCertificates")}
-        description={t("automaticHttpsDescription")}
         stats={
           <StatTiles
             tiles={[

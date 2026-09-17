@@ -217,7 +217,7 @@ function validateAuthentik(value: Record<string, unknown>): void {
 }
 
 function validateDashboard(value: Record<string, unknown>): void {
-  onlyKeys(value, ["enabled", "domain", "tls"], "dashboard settings");
+  onlyKeys(value, ["enabled", "domain", "tls", "options"], "dashboard settings");
   booleanValue(required(value, "enabled", "dashboard settings"), "dashboard.enabled");
   booleanValue(required(value, "tls", "dashboard settings"), "dashboard.tls");
   // Required even when disabled: the domain is what the route is rebuilt from the moment it is
@@ -232,6 +232,61 @@ function validateDashboard(value: Record<string, unknown>): void {
   // what stops anything else being stored to begin with.
   if (!isHostname(domain)) {
     invalid("dashboard.domain must be a hostname, e.g. cpm.example.com");
+  }
+  if (value.options !== undefined) validateDashboardOptions(value.options);
+}
+
+/**
+ * The shape of the dashboard host's proxy options. The `meta` blob is only checked for being a JSON
+ * object here: the Caddy builder reads it through the same parser it uses for `proxy_hosts.meta`,
+ * and the settings form builds it through the proxy host model, which does the field-level checks.
+ */
+function validateDashboardOptions(input: unknown): void {
+  const options = record(input, "dashboard.options");
+  onlyKeys(
+    options,
+    [
+      "certificateId",
+      "accessListId",
+      "hstsSubdomains",
+      "skipHttpsHostnameValidation",
+      "agentIds",
+      "meta",
+    ],
+    "dashboard.options",
+  );
+  for (const key of ["certificateId", "accessListId"] as const) {
+    const id = required(options, key, "dashboard.options");
+    if (id !== null) integerValue(id, `dashboard.options.${key}`, 1, 2_147_483_647);
+  }
+  booleanValue(
+    required(options, "hstsSubdomains", "dashboard.options"),
+    "dashboard.options.hstsSubdomains",
+  );
+  booleanValue(
+    required(options, "skipHttpsHostnameValidation", "dashboard.options"),
+    "dashboard.options.skipHttpsHostnameValidation",
+  );
+  const agentIds = required(options, "agentIds", "dashboard.options");
+  if (!Array.isArray(agentIds) || agentIds.length > MAX_LIST_ITEMS) {
+    invalid(`dashboard.options.agentIds must be an array with at most ${MAX_LIST_ITEMS} entries`);
+  }
+  agentIds.forEach((id, index) => {
+    integerValue(id, `dashboard.options.agentIds[${index}]`, 1, 2_147_483_647);
+  });
+  const meta = required(options, "meta", "dashboard.options");
+  if (meta !== null) {
+    const text = stringValue(meta, "dashboard.options.meta", {
+      max: MAX_SETTINGS_BYTES,
+      controls: true,
+    });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      invalid("dashboard.options.meta must be a JSON object");
+    }
+    record(parsed, "dashboard.options.meta");
   }
 }
 

@@ -18,6 +18,10 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { useAppShellMobile } from "@astryxdesign/core/AppShell";
 import { UserAvatar } from "@/src/components/UserAvatar";
+import {
+  GlobalCommandPaletteProvider,
+  PaletteSearchButton,
+} from "@/src/components/command-palette/GlobalCommandPalette";
 import { LocaleSwitcher } from "@/src/components/locale/LocaleSwitcher";
 import { MobileTabBar } from "@/src/components/mobile/MobileTabBar";
 import { MoreDrawer } from "@/src/components/mobile/MoreDrawer";
@@ -184,9 +188,9 @@ export default function DashboardLayoutClient({
     [pathname],
   );
 
-  // Settings renders its own header and padding; Access Lists its own full-bleed frame.
+  // Settings renders its own header and padding; the list-detail pages their own full-bleed frame.
   const inSettings = pathname === "/settings" || pathname.startsWith("/settings/");
-  const isFullBleed = inSettings || pathname === "/access-lists";
+  const isFullBleed = inSettings || ["/access-lists", "/users", "/groups"].includes(pathname);
 
   // On a phone the tab bar is the navigation, so AppShell's hamburger drawer is switched off
   // rather than left as a second way to do the same thing.
@@ -224,7 +228,7 @@ export default function DashboardLayoutClient({
   // its first row is the way back - see ./settings/SettingsSideNav.tsx.
   if (inSettings) {
     return (
-      <>
+      <GlobalCommandPaletteProvider role={user.role}>
         <AppShell
           banner={banner}
           contentPadding={0}
@@ -239,12 +243,12 @@ export default function DashboardLayoutClient({
           {content}
         </AppShell>
         {mobileChrome}
-      </>
+      </GlobalCommandPaletteProvider>
     );
   }
 
   return (
-    <>
+    <GlobalCommandPaletteProvider role={user.role}>
       <AppShell
         banner={banner}
         contentPadding={isFullBleed ? 0 : 6}
@@ -276,6 +280,13 @@ export default function DashboardLayoutClient({
             }
             footer={<UserFooter user={user} avatar={avatar} />}
           >
+            {/* Hidden on a phone: there is no keyboard shortcut to advertise there, and the tab
+                bar is the navigation. */}
+            <div className="cpm-desktop-only">
+              <VStack padding={2}>
+                <PaletteSearchButton />
+              </VStack>
+            </div>
             {/* Laid out like the Settings rail: ungrouped pages first under a hidden title, then one
                 titled section per group, each skipped when this role can open nothing in it. */}
             <SideNavSection title={t("sectionLabel")} isHeaderHidden>
@@ -296,6 +307,6 @@ export default function DashboardLayoutClient({
         {content}
       </AppShell>
       {mobileChrome}
-    </>
+    </GlobalCommandPaletteProvider>
   );
 }

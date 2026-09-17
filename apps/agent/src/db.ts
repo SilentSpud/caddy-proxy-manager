@@ -58,6 +58,7 @@ const APPLIED_MODULES_KEY = "applied_caddy_modules";
 const FLEET_CONFIG_KEY = "fleet_config";
 const SERVICES_STATUS_KEY = "managed_services_status";
 const APPLIED_SERVICES_KEY = "applied_managed_services";
+const CADDY_STOPPED_FOR_SHUTDOWN_KEY = "caddy_stopped_for_shutdown";
 
 export class AgentStore {
   private readonly db: Database;
@@ -229,6 +230,26 @@ export class AgentStore {
 
   setAppliedCaddyModules(modules: string[]): void {
     this.writeState(APPLIED_MODULES_KEY, JSON.stringify(modules));
+  }
+
+  /**
+   * Whether this agent stopped Caddy because it was itself shutting down.
+   *
+   * An explicit stop is one `restart: unless-stopped` does not undo, so without this a host that
+   * rebooted would bring the agent back but not Caddy - and the agent only starts Caddy once the
+   * controller says so, which a controller that is down never does. The flag lets the next start
+   * put Caddy back straight away, as the restart policy used to.
+   */
+  caddyStoppedForShutdown(): boolean {
+    return this.readState(CADDY_STOPPED_FOR_SHUTDOWN_KEY) === "true";
+  }
+
+  setCaddyStoppedForShutdown(stopped: boolean): void {
+    if (stopped) {
+      this.writeState(CADDY_STOPPED_FOR_SHUTDOWN_KEY, "true");
+    } else {
+      this.db.query("DELETE FROM state WHERE key = ?").run(CADDY_STOPPED_FOR_SHUTDOWN_KEY);
+    }
   }
 
   // ─── Fleet configuration ───────────────────────────────────────────────────

@@ -47,8 +47,8 @@ test.describe('Access Lists - page load', () => {
 
   test('shows the left rail with "Access Lists" heading', async ({ page }) => {
     await page.goto('/access-lists');
-    await expect(page.getByRole('heading', { name: 'Access Lists' })).toBeVisible();
-    await expect(page.getByText('HTTP basic auth')).toBeVisible();
+    // Level 1: with no lists, the rail's "No access lists yet" heading matches the name too.
+    await expect(page.getByRole('heading', { name: 'Access Lists', level: 1 })).toBeVisible();
   });
 
   test('shows a "New" button in the rail', async ({ page }) => {
@@ -786,14 +786,16 @@ test.describe('Access Lists - keyboard shortcuts', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2_000 });
   });
 
-  test('Cmd+K focuses the search input', async ({ page }) => {
+  test('Cmd+K opens the global command palette, not the rail search', async ({ page }) => {
+    // The shortcut belongs to the palette on every page now; the rail search is a click away.
     await page.goto('/access-lists');
-    const search = page.getByPlaceholder(/search lists or members/i);
-
+    await waitForHydration(page);
     await page.locator('body').click();
-    await page.keyboard.press('Meta+k');
-
-    await expect(search).toBeFocused({ timeout: 3_000 });
+    await expect(async () => {
+      await page.keyboard.press('ControlOrMeta+k');
+      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await expect(page.getByPlaceholder(/search lists or members/i)).not.toBeFocused();
   });
 });
 

@@ -9,6 +9,7 @@ import { isEmailAddress } from "@/src/lib/email-address";
 import { dnsProviderFieldText } from "@/src/lib/dns-provider-messages";
 import { applyCaddyConfig } from "@/src/lib/caddy";
 import { validateSettingsGroup } from "@/src/lib/settings-validation";
+import { readDashboardHostOptions } from "@/src/lib/dashboard-host-options";
 import {
   type DashboardDnsCheck,
   type DashboardHostSettings,
@@ -953,10 +954,14 @@ async function updateDashboardSettingsActionUnlocked(
   try {
     await requireAdmin();
 
+    const domain = String(formData.get("domain") ?? "").trim();
+    const current = await getDashboardSettings();
     const settings = validateSettingsGroup("dashboard", {
       enabled: formData.get("enabled") === "on",
-      domain: String(formData.get("domain") ?? "").trim(),
+      domain,
       tls: formData.get("tls") === "on",
+      // Through the proxy host model, so the options meet the checks a stored host's would.
+      options: await readDashboardHostOptions(formData, current?.options, domain),
     }) as DashboardHostSettings;
 
     await saveDashboardSettings(settings);

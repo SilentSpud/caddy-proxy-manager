@@ -36,7 +36,7 @@ import {
 } from "@/src/lib/models/agents";
 import { getClientIp } from "@/src/lib/client-ip";
 import { isDemoMode } from "@/src/lib/demo-mode";
-import { getSetting } from "@/src/lib/settings";
+import { controllerDisplayName } from "@/src/lib/agent/controller-name";
 
 /** A pairing body is four short fields; anything larger is not one. */
 const MAX_BODY_BYTES = 4 * 1024;
@@ -106,14 +106,14 @@ export async function POST(request: Request) {
   }
   if (bootstrap) await recordBundledAgent(agentId);
 
-  const [brandingTitle, controllerId] = await Promise.all([
-    getSetting<string>("branding_title").catch(() => null),
+  const [controllerName, controllerId] = await Promise.all([
+    controllerDisplayName(),
     getControllerId(),
   ]);
 
   return Response.json({
     secret,
     controllerId,
-    controllerName: brandingTitle || "Caddy Proxy Manager",
+    controllerName,
   } satisfies AgentPairResponse);
 }

@@ -10,61 +10,15 @@
  */
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Button } from "@astryxdesign/core/Button";
-import { Kbd } from "@astryxdesign/core/Kbd";
+import { usePathname } from "next/navigation";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { VStack } from "@astryxdesign/core/Stack";
-import { ArrowLeft, LayoutGrid, Search } from "lucide-react";
+import { ArrowLeft, LayoutGrid } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { CommandPalette } from "@astryxdesign/core/CommandPalette";
-import { createStaticSource } from "@astryxdesign/core/Typeahead/utils";
-import { Text } from "@astryxdesign/core/Text";
-import { useEffect, useMemo, useState } from "react";
-import {
-  SETTINGS_GROUPS,
-  SETTINGS_ITEMS,
-  groupForSection,
-  settingsGroupLabel,
-  settingsSectionDescription,
-  settingsSectionName,
-} from "./sections";
+import { SETTINGS_GROUPS, settingsGroupLabel, settingsSectionName } from "./sections";
+import { PaletteSearchButton } from "@/src/components/command-palette/GlobalCommandPalette";
 import { storageKeysForSection } from "@/src/lib/settings/section-keys";
-
-type PaletteItem = {
-  id: string;
-  label: string;
-  auxiliaryData: { desc: string; group: string; env: string[] };
-};
-
-type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
-
-// Keywords let a search match a setting's description or its group - and its environment
-// variables, so an operator who knows a setting only as the line in their `.env` can search for
-// that name and land on the page that owns it. Built per render rather than at module scope,
-// because the names it matches are the reader's language; the variable names are the same in all.
-function paletteSource(t: SettingsTranslator) {
-  const items: PaletteItem[] = SETTINGS_ITEMS.map((item) => {
-    const group = groupForSection(item.id);
-    return {
-      id: item.id,
-      label: settingsSectionName(t, item),
-      auxiliaryData: {
-        desc: settingsSectionDescription(t, item),
-        group: group ? settingsGroupLabel(t, group) : "",
-        env: [...(item.env ?? []), ...(item.envSearch ?? [])],
-      },
-    };
-  });
-  return createStaticSource(items, {
-    keywords: (item) => [
-      item.auxiliaryData.desc,
-      item.auxiliaryData.group,
-      ...item.auxiliaryData.env,
-    ],
-  });
-}
 
 export default function SettingsSideNav({
   footer,
@@ -78,37 +32,14 @@ export default function SettingsSideNav({
   const t = useTranslations("settings");
   const tNav = useTranslations("nav");
   const pathname = usePathname();
-  const router = useRouter();
   const staged = new Set(stagedKeys);
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const searchSource = useMemo(() => paletteSource(t), [t]);
-
-  // The shortcut binds here rather than in the page, because the palette moved into the rail with
-  // the rest of navigation - and the rail is mounted on every settings route.
-  useEffect(() => {
-    function handler(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setPaletteOpen(true);
-      }
-    }
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   return (
     <SideNav footer={footer} data-testid="settings-rail">
       <VStack gap={2} padding={2}>
         <SideNavItem as={Link} href="/" label={t("backToDashboard")} icon={<ArrowLeft />} />
-        <Button
-          variant="secondary"
-          size="sm"
-          width="100%"
-          icon={<Search />}
-          label={t("settingsSearchButtonLabel")}
-          endContent={<Kbd keys="mod+K" />}
-          onClick={() => setPaletteOpen(true)}
-        />
+        {/* The global palette - pages and settings alike, the same one the shortcut opens. */}
+        <PaletteSearchButton />
       </VStack>
 
       <SideNavSection title={tNav("settings")} isHeaderHidden>
@@ -144,28 +75,6 @@ export default function SettingsSideNav({
           })}
         </SideNavSection>
       ))}
-
-      <CommandPalette
-        isOpen={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        label={t("settingsSearchLabel")}
-        searchSource={searchSource}
-        emptySearchText={t("settingsSearchEmpty")}
-        onValueChange={(id) => {
-          router.push(`/settings/${id}`);
-          setPaletteOpen(false);
-        }}
-        renderItem={(item) => (
-          <VStack gap={0}>
-            <Text type="body" size="sm" weight="medium">
-              {item.label}
-            </Text>
-            <Text type="body" size="xsm" color="secondary" maxLines={1}>
-              {item.auxiliaryData.desc}
-            </Text>
-          </VStack>
-        )}
-      />
     </SideNav>
   );
 }

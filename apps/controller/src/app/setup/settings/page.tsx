@@ -5,7 +5,9 @@ import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
 import { listOAuthProviders } from "@/src/lib/models/oauth-providers";
-import { getGeneralSettings } from "@/src/lib/settings";
+import { isHostname, seedDashboardDomain } from "@/src/lib/dashboard-host";
+import { listDomainClaims } from "@/src/lib/dashboard-host-options";
+import { getDashboardSettings, getGeneralSettings } from "@/src/lib/settings";
 import { baseUrl, SETTING_DEFINITIONS, SETTING_GROUPS } from "@/src/lib/settings/registry";
 import { gateDefaults } from "@/src/lib/settings/optional-features";
 import { resolveAllSettings } from "@/src/lib/settings/resolve";
@@ -26,13 +28,18 @@ export default async function SetupSettingsPage() {
     redirect(SETUP_PATHS[stage]);
   }
 
-  const [resolved, gates, general, providers, requestHeaders] = await Promise.all([
-    resolveAllSettings(),
-    gateDefaults(),
-    getGeneralSettings(),
-    listOAuthProviders(),
-    headers(),
-  ]);
+  const [resolved, gates, general, dashboard, claims, providers, requestHeaders] =
+    await Promise.all([
+      resolveAllSettings(),
+      gateDefaults(),
+      getGeneralSettings(),
+      getDashboardSettings(),
+      // Only a migrated deployment has hosts at this point - and it is the one likely to have been
+      // proxying this dashboard already, under a host the dashboard host would now shadow.
+      listDomainClaims(),
+      listOAuthProviders(),
+      headers(),
+    ]);
   const proposedBaseUrl = proposeBaseUrl(resolved.get(baseUrl.key), requestHeaders);
 
   // Secrets are never sent to the browser. An operator re-entering one is a small cost next to a
@@ -94,10 +101,38 @@ export default async function SetupSettingsPage() {
           general?.defaultDomain ?? domainFromBaseUrl(resolved.get(baseUrl.key)?.value),
         acmeEmail: general?.acmeEmail ?? "",
       }}
+      dashboard={dashboardCard(dashboard, proposedBaseUrl)}
+      domainClaims={claims}
       oauth={oauthCard(providers.map((provider) => provider.name))}
       hasMigrateStep={hasLegacyDatabase()}
     />
   );
+}
+
+/**
+ * The dashboard-host card: whether CPM proxies its own dashboard once setup finishes, and on which
+ * name.
+ *
+ * Opens with what setup used to do without asking - DASHBOARD_DOMAIN, else the BASE_URL hostname -
+ * so leaving the card alone changes nothing. The address this page was reached at is the last
+ * resort, for the deployment whose BASE_URL is still the loopback default: it is the same guess the
+ * Public URL field makes, and it is only a guess the operator can see and change. No usable name
+ * means the switch opens off, rather than claiming a domain nobody gave.
+ */
+function dashboardCard(
+  stored: { enabled: boolean; domain: string } | null,
+  proposedBaseUrl: string | null,
+) {
+  if (stored?.domain) {
+    return { enabled: stored.enabled, domain: stored.domain, fromEnvironment: false };
+  }
+  const seeded = seedDashboardDomain();
+  if (seeded) {
+    return { enabled: true, domain: seeded, fromEnvironment: !!config.dashboardDomain };
+  }
+  const reached = proposedBaseUrl ? new URL(proposedBaseUrl).hostname : "";
+  const domain = isHostname(reached) ? reached : "";
+  return { enabled: domain !== "", domain, fromEnvironment: false };
 }
 
 /**

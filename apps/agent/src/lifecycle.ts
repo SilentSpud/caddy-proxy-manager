@@ -27,6 +27,7 @@ import {
   MANAGED_SERVICES,
   MAX_CADDY_CONFIG_BYTES,
   SHIPPED_CADDY_MODULES,
+  type AgentLocalPairPreviewResponse,
 } from "@cpm/shared";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -85,6 +86,8 @@ export class AgentLifecycle {
   private stopped = false;
   /** What the controller last said it wanted. Null until the first frame arrives. */
   private desired: AgentDesiredState | null = null;
+  /** Caddy being started again after the agent's own shutdown stopped it; see `start`. */
+  private caddyRestore: Promise<void> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   /** Polls for a bootstrap token that has not been written yet. Null unless idle and waiting. */
   private bootstrapWatch: ReturnType<typeof setInterval> | null = null;
@@ -103,6 +106,9 @@ export class AgentLifecycle {
   async start(): Promise<void> {
     const storedUrl = this.deps.store.pairedControllerUrl();
     const [storedController] = this.deps.store.listControllers();
+    // Read once and cleared at once: it describes the last shutdown, and only this start acts on it.
+    const restoreCaddy = this.deps.store.caddyStoppedForShutdown();
+    this.deps.store.setCaddyStoppedForShutdown(false);
 
     if (storedUrl && storedController) {
       // Checked on resume too: a pairing stored before plain http to a public address was refused
@@ -118,6 +124,10 @@ export class AgentLifecycle {
       }
       this.adopt(storedUrl, storedController.controllerId, storedController.secret);
       console.log(`[agent] resuming pairing with ${storedUrl}`);
+      // Before the controller answers, so a host that rebooted while its controller is unreachable
+      // still serves. The controller's desired state still decides: if it has turned Caddy off,
+      // the first reconcile stops it again.
+      if (restoreCaddy) this.caddyRestore = this.startCaddy().catch(() => {});
       void this.run();
       return;
     }
@@ -236,6 +246,46 @@ export class AgentLifecycle {
     return this.pairWith(url, normalizedCode);
   }
 
+  /**
+   * Who `pair` would pair with, asked before it runs so `cpm-agent --pair` can confirm by name.
+   *
+   * Validates the address and code exactly as `pair` does, and touches no state: the stream, the
+   * stored pairing and the lifecycle are all left as they are, so answering "no" changes nothing.
+   */
+  async previewPair(
+    host: string,
+    port: number | null,
+    code: string,
+  ): Promise<AgentLocalPairPreviewResponse> {
+    let url: string;
+    let normalizedCode: string;
+    try {
+      url = normalizeControllerUrl(host, port);
+      normalizedCode = normalizePairingCode(code);
+      checkControllerTransport(url, this.deps.config.allowInsecureHttp);
+    } catch (error) {
+      if (error instanceof ControllerAddressError) return { ok: false, error: error.message };
+      throw error;
+    }
+
+    const agentId = this.deps.store.agentId();
+    try {
+      const preview = await new ControllerClient(url, agentId).previewPair({
+        code: normalizedCode,
+        agentId,
+      });
+      return {
+        ok: true,
+        controllerUrl: url,
+        controllerName: preview?.controllerName ?? null,
+        controllerId: preview?.controllerId ?? null,
+        repair: preview?.repair ?? false,
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   async localState(): Promise<AgentLocalState> {
     return {
       lifecycle: this.lifecycle,
@@ -248,6 +298,32 @@ export class AgentLifecycle {
       },
       message: this.message,
     };
+  }
+
+  /**
+   * Stop Caddy as this agent shuts down, and remember that it did.
+   *
+   * The agent is what owns Caddy on this host, so Caddy does not outlive it. Bounded, because the
+   * container is given a short grace period before it is killed, and a Docker daemon that is itself
+   * shutting down may never answer. Never throws: the shutdown goes on either way.
+   */
+  async stopCaddyForShutdown(timeoutSeconds: number): Promise<void> {
+    try {
+      if (!(await this.deps.docker.caddyRunning())) return;
+      console.log("[agent] stopping Caddy before shutting down");
+      const result = await this.deps.docker.stopCaddy(timeoutSeconds);
+      if (result.ok) {
+        this.deps.store.setCaddyStoppedForShutdown(true);
+      } else {
+        console.error(
+          result.timedOut
+            ? `[agent] Caddy did not stop within ${timeoutSeconds}s; shutting down anyway`
+            : `[agent] could not stop Caddy: ${result.output}`,
+        );
+      }
+    } catch (error) {
+      console.error("[agent] could not stop Caddy:", error);
+    }
   }
 
   /** Tear the stream down and stop reconnecting. Leaves Caddy exactly as it is. */
@@ -325,7 +401,7 @@ export class AgentLifecycle {
     this.connection = null;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
-    await this.stopCaddy();
+    await this.stopCaddy("no controller is configured");
   }
 
   // ─── The stream ────────────────────────────────────────────────────────────
@@ -425,11 +501,17 @@ export class AgentLifecycle {
    * rebuild Caddy's image every time a network blip dropped the stream.
    */
   private async reconcile(state: AgentDesiredState): Promise<void> {
+    // A restore still starting Caddy must finish first: a "Caddy off" that ran alongside it would
+    // find nothing running yet, do nothing, and leave Caddy coming up against the controller's word.
+    if (this.caddyRestore) {
+      await this.caddyRestore;
+      this.caddyRestore = null;
+    }
     this.desired = state;
     const { store, operations } = this.deps;
 
     if (!state.caddyEnabled) {
-      await this.stopCaddy();
+      await this.stopCaddy("the controller has it switched off");
     } else {
       await this.startCaddy();
     }
@@ -547,9 +629,9 @@ export class AgentLifecycle {
     if (!result.ok) console.error("[agent] could not start Caddy:", result.output);
   }
 
-  private async stopCaddy(): Promise<void> {
+  private async stopCaddy(reason: string): Promise<void> {
     if (!(await this.deps.docker.caddyRunning().catch(() => false))) return;
-    console.log("[agent] stopping Caddy: no controller is configured");
+    console.log(`[agent] stopping Caddy: ${reason}`);
     const result = await this.deps.docker.stopCaddy();
     if (!result.ok) console.error("[agent] could not stop Caddy:", result.output);
   }

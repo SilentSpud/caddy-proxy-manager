@@ -201,8 +201,9 @@ services:
         PGID: ${PGID:-10000}
     # Behind a profile so `docker compose up` does not start it. The agent does, once it is paired
     # and the controller has a configuration to serve - an unpaired host must not answer 80 and 443
-    # with a default page. `restart: unless-stopped` still applies once the agent has started it,
-    # so a reboot brings it back without waiting for the agent to notice.
+    # with a default page. The agent also stops it when the agent itself is stopped, and starts it
+    # again as soon as it comes back with a pairing - before the controller answers, so a reboot
+    # with the controller unreachable still serves. `restart: unless-stopped` covers a crash.
     profiles: ["caddy"]
     restart: unless-stopped
     ports:
@@ -296,6 +297,9 @@ services:
   agent:
     container_name: caddy-proxy-manager-agent
     image: ghcr.io/silentspud/caddy-proxy-manager/agent:latest
+    # The agent stops Caddy before it exits, and allows that 40 seconds; Docker's default of 10
+    # would kill it part-way through.
+    stop_grace_period: 1m
     build:
       context: .
       dockerfile: docker/agent/Dockerfile
@@ -314,7 +318,8 @@ services:
       AGENT_MODE: ${AGENT_MODE:-standalone}
       # Where the agent dials to reach its controller. The compose service name works for an agent
       # in this stack; an agent on another host needs the controller's reachable address instead,
-      # and pairs with `cpm-agent --pair --host <that address> --code <code>`.
+      # and pairs with `docker exec -it <agent> cpm-agent --pair --host <that address> --code <code>`,
+      # confirming the controller name it shows.
       CONTROLLER_URL: ${CONTROLLER_URL:-http://web:3000}
       # Plain http to a controller address that is not private (loopback, a compose name, RFC 1918,
       # a tailnet) is refused, because pairing sends the shared secret over it. true accepts that.

@@ -10,7 +10,13 @@
 
 import { chmodSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { AGENT_LOCAL_ROUTES, type AgentLocalPairResponse, type AgentLocalState } from "@cpm/shared";
+import { createInterface } from "node:readline/promises";
+import {
+  AGENT_LOCAL_ROUTES,
+  type AgentLocalPairPreviewResponse,
+  type AgentLocalPairResponse,
+  type AgentLocalState,
+} from "@cpm/shared";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { stop as stopAnalytics } from "./analytics/runner";
@@ -55,6 +61,12 @@ const argv = yargs(hideBin(process.argv))
     describe: "Six-letter pairing code, read off the controller's Settings page",
     defaultDescription: "$PAIRING_CODE",
   })
+  .option("yes", {
+    alias: "y",
+    type: "boolean",
+    default: false,
+    describe: "With --pair: skip the confirmation, for a script with no terminal to answer it",
+  })
   .option("healthcheck", {
     type: "boolean",
     default: false,
@@ -68,6 +80,7 @@ const argv = yargs(hideBin(process.argv))
   .check((parsed) => {
     if (parsed.pair && !parsed.host) throw new Error("--pair needs --host.");
     if (parsed.pair && !parsed.code) throw new Error("--pair needs --code.");
+    if (parsed.yes && !parsed.pair) throw new Error("--yes only applies to --pair.");
     if (parsed.pair && parsed.healthcheck)
       throw new Error("--pair and --healthcheck are separate.");
     return true;
@@ -126,11 +139,44 @@ if (argv.pair) {
     process.exit(1);
   }
 
+  const pairBody = JSON.stringify({ host: argv.host, port: argv.port, code: argv.code });
+
+  // Ask first. The controller names itself for a right code without spending it, so a typo'd
+  // address that happens to reach some other controller is caught here rather than after the
+  // pairing has happened there.
+  if (!argv.yes) {
+    let preview: AgentLocalPairPreviewResponse;
+    try {
+      const response = await localFetch(AGENT_LOCAL_ROUTES.pairPreview, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: pairBody,
+      });
+      if (response.status === 404) {
+        // The running agent predates previews - this binary was updated before it restarted.
+        preview = { ok: false, error: "The running agent is too old to confirm a pairing." };
+      } else {
+        preview = (await response.json()) as AgentLocalPairPreviewResponse;
+      }
+    } catch (error) {
+      console.error(`Could not reach the agent on ${config.socketPath}: ${describeError(error)}`);
+      process.exit(1);
+    }
+    if (!preview.ok) {
+      console.error(preview.error);
+      process.exit(1);
+    }
+    if (!(await confirmPairing(preview))) {
+      console.log("Not paired. Nothing was changed, and the code is still valid.");
+      process.exit(1);
+    }
+  }
+
   try {
     const response = await localFetch(AGENT_LOCAL_ROUTES.pair, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ host: argv.host, port: argv.port, code: argv.code }),
+      body: pairBody,
     });
     const body = (await response.json()) as AgentLocalPairResponse;
 
@@ -144,6 +190,41 @@ if (argv.pair) {
   } catch (error) {
     console.error(`Could not reach the agent on ${config.socketPath}: ${describeError(error)}`);
     process.exit(1);
+  }
+}
+
+/**
+ * Show who the pairing is with and wait for a yes.
+ *
+ * Needs a terminal: `docker exec` without `-it` has no stdin to answer from, and reading an empty
+ * one as "no" would look like the pairing failing for no reason. That case is told how to proceed.
+ */
+async function confirmPairing(
+  preview: Extract<AgentLocalPairPreviewResponse, { ok: true }>,
+): Promise<boolean> {
+  const who = preview.controllerName
+    ? `"${preview.controllerName}"${preview.controllerId ? ` (controller ${preview.controllerId.slice(0, 8)})` : ""}`
+    : "a controller that does not report its name";
+  console.log(`This agent is about to pair with ${who}`);
+  console.log(`  at ${preview.controllerUrl}`);
+  if (preview.repair) {
+    console.log("  replacing this agent's existing pairing with that controller.");
+  }
+
+  if (!process.stdin.isTTY) {
+    console.error(
+      "Confirming needs a terminal. Run this with `docker exec -it`, or add --yes if you have " +
+        "already checked the controller above.",
+    );
+    return false;
+  }
+
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await prompt.question("Confirm pairing? [y/N] ");
+    return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    prompt.close();
   }
 }
 
@@ -184,8 +265,9 @@ const lifecycle = new AgentLifecycle({
   docker,
   operations,
   // The controller's restart goes through the same shutdown a signal does, so the socket file and
-  // the store are released before `restart: unless-stopped` brings this container back.
-  exit: (reason) => shutdown(`restart (${reason})`),
+  // the store are released before `restart: unless-stopped` brings this container back. It keeps
+  // Caddy up: the restart is the controller's, and Caddy was just restarted on purpose.
+  exit: (reason) => shutdown(`restart (${reason})`, { stopCaddy: false }),
 });
 
 // A socket file left by a killed process makes bind fail with EADDRINUSE, which reads as "the port
@@ -213,10 +295,28 @@ void operations.restorePublishedPorts().catch((error: unknown) => {
   console.warn("[agent] could not restore the Caddy container's published ports:", error);
 });
 
-function shutdown(signal: string): void {
+/**
+ * Seconds Caddy is given to stop when the agent is shut down. Inside the agent container's
+ * `stop_grace_period` in the bundled compose file, with room left to release the socket and store.
+ */
+const CADDY_SHUTDOWN_TIMEOUT_SECONDS = 40;
+
+let shuttingDown = false;
+
+function shutdown(signal: string, options: { stopCaddy: boolean } = { stopCaddy: true }): void {
+  // A second Ctrl+C while Caddy is stopping must not start a second shutdown over the first.
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`[agent] ${signal} received, shutting down`);
   lifecycle.stop();
-  void Promise.resolve(stopAnalytics())
+  // Caddy first: this agent is what manages it, so it goes down with the agent rather than being
+  // left serving a configuration nothing on this host can change any more.
+  void (
+    options.stopCaddy
+      ? lifecycle.stopCaddyForShutdown(CADDY_SHUTDOWN_TIMEOUT_SECONDS)
+      : Promise.resolve()
+  )
+    .then(() => stopAnalytics())
     .catch(() => {
       // Shutting down regardless: a parser that will not stop cleanly must not keep the socket
       // from being released.

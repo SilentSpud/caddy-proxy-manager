@@ -5,6 +5,7 @@ import {
   checkDashboardDns,
   isHostname,
 } from '@/src/lib/dashboard-host';
+import { pairingHostFor } from '@/src/lib/dashboard-host-address';
 import { createProbeNonce, probeSignatureMatches, signProbe } from '@/src/lib/reachability-probe';
 import { validateSettingsGroup } from '@/src/lib/settings-validation';
 
@@ -52,6 +53,63 @@ describe('the managed dashboard host', () => {
     const secure = buildDashboardHostRow({ ...on, tls: true }, 'web:3000');
     expect(secure?.hstsEnabled).toBe(1);
     expect(secure?.sslForced).toBe(1);
+  });
+
+  it('carries its proxy options into the row', () => {
+    const meta = JSON.stringify({ redirects: [{ from: '/old', to: '/new', status: 301 }] });
+    const row = buildDashboardHostRow(
+      {
+        ...on,
+        tls: true,
+        options: {
+          certificateId: 7,
+          accessListId: 3,
+          hstsSubdomains: true,
+          skipHttpsHostnameValidation: true,
+          agentIds: [2],
+          meta,
+        },
+      },
+      'web:3000',
+    );
+
+    expect(row?.certificateId).toBe(7);
+    expect(row?.accessListId).toBe(3);
+    expect(row?.hstsSubdomains).toBe(1);
+    expect(row?.skipHttpsHostnameValidation).toBe(1);
+    expect(row?.meta).toBe(meta);
+    // Never from the options: the dashboard needs both to work at all.
+    expect(row?.allowWebsocket).toBe(1);
+    expect(row?.preserveHostHeader).toBe(1);
+    expect(JSON.parse(row?.upstreams ?? '[]')).toEqual(['http://web:3000']);
+  });
+
+  it('keeps HSTS subdomains off while TLS is', () => {
+    const row = buildDashboardHostRow(
+      {
+        ...on,
+        tls: false,
+        options: {
+          certificateId: null,
+          accessListId: null,
+          hstsSubdomains: true,
+          skipHttpsHostnameValidation: false,
+          agentIds: [],
+          meta: null,
+        },
+      },
+      'web:3000',
+    );
+
+    expect(row?.hstsSubdomains).toBe(0);
+  });
+
+  it('reads settings saved before it had options as a host with none', () => {
+    const row = buildDashboardHostRow(on, 'web:3000');
+
+    expect(row?.certificateId).toBeNull();
+    expect(row?.accessListId).toBeNull();
+    expect(row?.meta).toBeNull();
   });
 });
 
@@ -207,5 +265,71 @@ describe('dashboard settings validation', () => {
         upstream: 'web:3000',
       }),
     ).toThrow();
+  });
+
+  const options = {
+    certificateId: null,
+    accessListId: 4,
+    hstsSubdomains: false,
+    skipHttpsHostnameValidation: false,
+    agentIds: [1, 2],
+    meta: '{"redirects":[{"from":"/a","to":"/b","status":301}]}',
+  };
+  const withOptions = (overrides: Record<string, unknown>) => ({
+    enabled: true,
+    domain: 'cpm.example.com',
+    tls: false,
+    options: { ...options, ...overrides },
+  });
+
+  it('accepts proxy options', () => {
+    const input = withOptions({});
+    expect(validateSettingsGroup('dashboard', input)).toEqual(input);
+    expect(() => validateSettingsGroup('dashboard', withOptions({ meta: null }))).not.toThrow();
+  });
+
+  it('refuses malformed proxy options', () => {
+    expect(() => validateSettingsGroup('dashboard', withOptions({ meta: 'not json' }))).toThrow(
+      /JSON object/,
+    );
+    expect(() => validateSettingsGroup('dashboard', withOptions({ meta: '[1]' }))).toThrow();
+    expect(() => validateSettingsGroup('dashboard', withOptions({ agentIds: [0] }))).toThrow();
+    expect(() => validateSettingsGroup('dashboard', withOptions({ certificateId: '1' }))).toThrow();
+    expect(() => validateSettingsGroup('dashboard', withOptions({ upstreams: [] }))).toThrow(
+      /unknown field/,
+    );
+    const { hstsSubdomains: _, ...missing } = options;
+    expect(() =>
+      validateSettingsGroup('dashboard', {
+        enabled: true,
+        domain: 'cpm.example.com',
+        tls: false,
+        options: missing,
+      }),
+    ).toThrow(/required/);
+  });
+});
+
+describe('the pairing command address', () => {
+  it('is the bare domain once the host is on HTTPS', () => {
+    // A bare public name is https on 443 to the agent, which is where Caddy serves it.
+    expect(pairingHostFor({ ...on, domain: ' CPM.Example.com ', tls: true })).toEqual({
+      host: 'cpm.example.com',
+      insecure: false,
+    });
+  });
+
+  it('spells out http and port 80 while the host is on plain HTTP', () => {
+    // `http://` alone would send the agent to the controller's own port 3000.
+    expect(pairingHostFor({ ...on, tls: false })).toEqual({
+      host: 'http://cpm.example.com:80',
+      insecure: true,
+    });
+  });
+
+  it('is absent when the host is off or has no domain', () => {
+    expect(pairingHostFor(null)).toBeNull();
+    expect(pairingHostFor({ ...on, enabled: false })).toBeNull();
+    expect(pairingHostFor({ ...on, domain: '  ' })).toBeNull();
   });
 });

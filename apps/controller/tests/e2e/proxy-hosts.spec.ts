@@ -9,6 +9,8 @@ const API_AUTHENTIK_SETTINGS = 'http://localhost:3000/api/v1/settings/authentik'
 test.describe('Proxy Hosts', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/proxy-hosts');
+    // The tests below click Create Host first thing; a click before hydration opens nothing.
+    await waitForHydration(page);
   });
 
   test('page loads with Create Host button visible', async ({ page }) => {
@@ -348,6 +350,7 @@ test.describe('Proxy Hosts', () => {
       expect(saveResp.ok()).toBeTruthy();
 
       await page.goto('/proxy-hosts');
+      await waitForHydration(page);
       const row = page.locator('tr', { hasText: 'Authentik Edit Defaults Host' });
       await expect(row).toBeVisible({ timeout: 10_000 });
       await row.getByRole('button', { name: /^Actions for / }).click();
@@ -441,6 +444,7 @@ test.describe('Proxy Hosts', () => {
       expect(saveResp.ok()).toBeTruthy();
 
       await page.goto('/proxy-hosts');
+      await waitForHydration(page);
       const row = page.locator('tr', { hasText: 'Authentik Own Values Host' });
       await expect(row).toBeVisible({ timeout: 10_000 });
       await row.getByRole('button', { name: /^Actions for / }).click();

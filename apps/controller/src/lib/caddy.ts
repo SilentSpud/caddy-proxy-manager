@@ -2975,8 +2975,15 @@ export async function buildCaddyDocument(agentRowId?: number, options: { adaptVi
   // two rows claiming the same exact domain tie and fall back to this order. Winning that tie is
   // the point - a host someone creates for the dashboard's domain must not shadow the route the
   // dashboard is reached through. Absent entirely when the setting is off, the domain is blank, or
-  // the dial address could not be worked out.
-  const dashboardRow = buildDashboardHostRow(dashboardSettings, getCpmDialAddress());
+  // the dial address could not be worked out - or when it is pinned to agents this one is not.
+  const dashboardAgents = dashboardSettings?.options?.agentIds ?? [];
+  const dashboardServedHere =
+    agentRowId === undefined ||
+    dashboardAgents.length === 0 ||
+    dashboardAgents.includes(agentRowId);
+  const dashboardRow = dashboardServedHere
+    ? buildDashboardHostRow(dashboardSettings, getCpmDialAddress())
+    : null;
   const proxyHostRows: ProxyHostRow[] = dashboardRow
     ? [dashboardRow, ...storedHostRows]
     : storedHostRows;

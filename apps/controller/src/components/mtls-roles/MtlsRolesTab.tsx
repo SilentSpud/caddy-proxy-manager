@@ -49,7 +49,7 @@ export function MtlsRolesTab({ roles, issuedCerts, search }: Props) {
         <CreateRoleCard onClose={() => setCreateOpen(false)} />
       ) : (
         <Button
-          variant="secondary"
+          variant="primary"
           width="100%"
           icon={<Plus />}
           label={t("createNewRole")}
@@ -138,6 +138,7 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
         <HStack justify="end" gap={2}>
           <Button variant="ghost" size="sm" label={t("cancel")} onClick={onClose} />
           <Button
+            variant="primary"
             size="sm"
             label={t("createRole")}
             onClick={handleCreate}

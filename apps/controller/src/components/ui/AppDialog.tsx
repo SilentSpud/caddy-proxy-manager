@@ -62,6 +62,9 @@ export function AppDialog({
                   <Button variant="secondary" label={t("cancel")} onClick={onClose} />
                   {onSubmit && (
                     <Button
+                      // Explicit: Astryx's default is secondary, which left the one action a
+                      // dialog exists for the same grey as Cancel beside it.
+                      variant="primary"
                       label={submitLabel ?? t("save")}
                       onClick={onSubmit}
                       isLoading={isSubmitting}

@@ -371,7 +371,13 @@ export default function OAuthProvidersSection({
       })}
 
       <HStack justify="end">
-        <Button size="sm" icon={<Plus />} label={t("addProvider")} onClick={openAddDialog} />
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<Plus />}
+          label={t("addProvider")}
+          onClick={openAddDialog}
+        />
       </HStack>
 
       {/* The inline Confirm/Cancel pair became a real dialog, so a destructive

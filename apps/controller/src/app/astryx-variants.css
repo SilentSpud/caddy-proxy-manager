@@ -31,6 +31,17 @@
      */
     :scope {
       --color-accent: var(--color-text-pink);
+
+      /* Dark mode only; each light half is the theme's own. Secondary ink - the field labels,
+         stat captions and descriptions - was #9e9e9e, which at the 10-12px those labels are set in
+         read as disabled beside white values. #bdbdbd keeps the step down from primary white and is
+         11.2:1 on the black page, 9.2:1 on a desktop card. Green ink on its own green ground
+         (green badges, success banners) was #90ca90 on #2b422b, 6:1 but dim; #b6e8b6 lifts it to
+         7.9:1 there. The success colour, a separate token at #a4d6a3, follows it: it is the text of
+         a success message and the fill behind a success badge's dark ink. */
+      --color-text-secondary: light-dark(#474747, #bdbdbd);
+      --color-text-green: light-dark(#00490b, #b6e8b6);
+      --color-success: light-dark(#00490b, #b6e8b6);
     }
 
     /**
@@ -74,11 +85,23 @@
 }
 
 /**
- * Phone palette: an OLED-friendly dark theme, below the same 767px edge the rest of the app uses
- * for narrow. Light mode is untouched - each token keeps its light half and changes only the dark.
+ * The page is pure black in dark mode at every width, so a desktop reads as the same theme as the
+ * phone. On OLED an unlit pixel draws no power, so the gutter between cards costs nothing to show.
+ * Light mode is untouched: the token keeps the neutral theme's light half.
+ */
+@layer astryx-theme {
+  @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
+    :scope {
+      --color-background-body: light-dark(#f1f1f1, #000000);
+    }
+  }
+}
+
+/**
+ * Phone palette: the rest of the OLED-friendly dark theme, below the same 767px edge the rest of
+ * the app uses for narrow. Light mode is untouched - each token keeps its light half and changes
+ * only the dark.
  *
- * - The page goes to pure black. An unlit OLED pixel draws no power, so the gutter between cards
- *   costs nothing to show.
  * - Cards go to #262626. The neutral theme paints --color-background-card the same #1b1b1b as its
  *   body, so a card is separated by its border alone; on a black page the fill does that job, at
  *   1.39:1 against the page.
@@ -90,7 +113,6 @@
   @media (max-width: 767px) {
     @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
       :scope {
-        --color-background-body: light-dark(#f1f1f1, #000000);
         --color-background-card: light-dark(#ffffff, #262626);
         --color-text-primary: light-dark(#000000, #ebebeb);
       }

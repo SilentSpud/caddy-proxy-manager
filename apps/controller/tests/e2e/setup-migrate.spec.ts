@@ -153,6 +153,27 @@ test.describe('Migrating an existing installation', () => {
     await expect(page).toHaveURL(/\/setup\/settings$/, { timeout: 30_000 });
   });
 
+  test('a migrated host on the dashboard domain is offered as the dashboard host', async () => {
+    // The old host was very likely how this dashboard was reached before. The dashboard host wins
+    // the tie for its exact domain, so the old one would stop answering without being told.
+    await page.getByRole('switch', { name: 'Reverse proxy this dashboard' }).click();
+    const domain = page.getByRole('textbox', { name: 'Dashboard domain' });
+    await domain.fill('unrelated.example.com');
+    await expect(page.getByText(/already serves/)).toHaveCount(0);
+
+    await domain.fill(LEGACY_FIXTURE.proxyHostDomain.toUpperCase());
+    await expect(
+      page.getByText(
+        `${LEGACY_FIXTURE.proxyHostName} already serves ${LEGACY_FIXTURE.proxyHostDomain}`,
+      ),
+    ).toBeVisible();
+    // On by default, and it says what it will do to the old host.
+    await expect(
+      page.getByRole('switch', { name: `Copy the settings from ${LEGACY_FIXTURE.proxyHostName}` }),
+    ).toBeChecked();
+    await expect(page.getByText(/then disables legacy-app/)).toBeVisible();
+  });
+
   test('finishing setup ends on the summary a migrated deployment is owed', async () => {
     // Not the dashboard: an operator who has just replaced their database needs to be told where
     // the old one is and what to remove from their .env before they go anywhere else.
@@ -164,6 +185,23 @@ test.describe('Migrating an existing installation', () => {
 
   test('the proxy hosts it had are there', async () => {
     await page.goto('/proxy-hosts');
+    await expect(
+      page.getByRole('table').getByText(LEGACY_FIXTURE.proxyHostName, { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('the dashboard host took over the domain and the host it was copied from', async () => {
+    await page.goto('/settings/dashboard');
+    await expect(page.getByRole('textbox', { name: 'Dashboard domain' })).toHaveValue(
+      LEGACY_FIXTURE.proxyHostDomain,
+      { timeout: 15_000 },
+    );
+    // The legacy host forced HTTPS, and browsers that visited it are pinned to it.
+    await expect(page.getByRole('checkbox', { name: 'Serve it over HTTPS' })).toBeChecked();
+    await expect(page.getByText('Proxy options')).toBeVisible();
+
+    // Its only domain is the dashboard's now, so it is paused rather than left looking live.
+    await page.goto('/proxy-hosts?state=disabled');
     await expect(
       page.getByRole('table').getByText(LEGACY_FIXTURE.proxyHostName, { exact: true }),
     ).toBeVisible({ timeout: 15_000 });

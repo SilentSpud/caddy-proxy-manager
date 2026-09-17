@@ -1269,12 +1269,7 @@ export default function WafEventsClient({
   return (
     <VStack gap={4}>
       <HStack justify="between" vAlign="center" gap={2}>
-        <VStack gap={1}>
-          <Heading level={1}>{t("waf")}</Heading>
-          <Text type="body" color="secondary" className="cpm-desktop-only">
-            {t("pageDescription")}
-          </Text>
-        </VStack>
+        <Heading level={1}>{t("waf")}</Heading>
         {/* A phone has no room for the tabs: the views move behind the overflow button, and search
             waits behind its icon until it is wanted. */}
         <HStack gap={1} vAlign="center" className="cpm-mobile-flex">

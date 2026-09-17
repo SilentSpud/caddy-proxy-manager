@@ -24,7 +24,6 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Fab } from "@/src/components/mobile/Fab";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { StatTiles } from "@/components/ui/StatTiles";
 import { useEmptyValue } from "@/components/ui/empty-value";
@@ -127,9 +126,13 @@ export default function AgentsClient({
 
   return (
     <VStack gap={6}>
-      <PageHeader title={t("title")} description={t("pageDescription")} />
-      {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way there. */}
-      {isAdmin && <Fab label={t("pairAgent")} href="/settings/agent" />}
+      {/* Pairing lives in Settings behind requireAdmin, so only an admin is offered the way there.
+          As the header's action it is a button on a desktop and the floating button on a phone -
+          before, the desktop had no way there from this page at all. */}
+      <PageHeader
+        title={t("title")}
+        action={isAdmin ? { label: t("pairAgent"), href: "/settings/agent" } : undefined}
+      />
 
       {message?.text && <Banner status={message.ok ? "success" : "error"} title={message.text} />}
 

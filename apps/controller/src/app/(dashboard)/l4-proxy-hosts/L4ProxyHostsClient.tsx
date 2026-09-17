@@ -301,7 +301,6 @@ export default function L4ProxyHostsClient({
 
       <ListPageHeader
         title={t("l4ProxyHosts")}
-        description={t("pageDescription")}
         action={
           canCreate
             ? {

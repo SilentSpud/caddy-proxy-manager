@@ -18,7 +18,9 @@ import {
   saveDashboardSettings,
   saveGeneralSettings,
 } from "@/src/lib/settings";
-import { activateDashboardHost } from "@/src/lib/dashboard-host";
+import { activateDashboardHost, isHostname } from "@/src/lib/dashboard-host";
+import { dashboardSettingsFromHost } from "@/src/lib/dashboard-host-options";
+import { updateProxyHost } from "@/src/lib/models/proxy-hosts";
 // SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
 // JSON groups and one to the registry, and this action now saves through both.
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
@@ -134,6 +136,15 @@ export async function saveSetupSettings(
     return { error: t("acmeEmailInvalid") };
   }
 
+  // Only posted while the card's switch is on - the domain field is hidden otherwise, the same way a
+  // gated group's fields are. Checked here, before anything is written, because the save below is
+  // best-effort and would otherwise swallow a typo into a dashboard that never comes up.
+  const dashboardEnabled = formData.get("dashboardEnabled") === "on";
+  const dashboardDomain = String(formData.get("dashboardDomain") ?? "").trim();
+  if (dashboardEnabled && !isHostname(dashboardDomain)) {
+    return { error: t("dashboardDomainInvalid") };
+  }
+
   let general: GeneralSettings;
   try {
     general = validateSettingsGroup("general", {
@@ -168,13 +179,22 @@ export async function saveSetupSettings(
   const providerError = await createProviderFromForm(formData);
   if (providerError) return { error: providerError };
 
-  // CPM proxies its own dashboard from here on, so the operator's first look at the product is a
-  // working host rather than an empty list. Over HTTP: whether HTTPS would work is a question only
+  // CPM proxies its own dashboard from here on, unless the operator switched that off, so their
+  // first look at the product is a working host rather than an empty list. Switched off, nothing is
+  // stored: no dashboard settings already reads as off, and the Settings page seeds the domain the
+  // same way this form did. Over HTTP: whether HTTPS would work is a question only
   // the reachability check can answer, and it cannot answer it until the route is live. Best-effort
   // on purpose - a settings write failing is not a reason to refuse a setup that has already saved
   // everything it was asked to.
   try {
-    await saveDashboardSettings(activateDashboardHost());
+    if (dashboardEnabled) {
+      const copyFrom = copySourceFromForm(formData);
+      const copied = copyFrom ? await dashboardSettingsFromHost(copyFrom, dashboardDomain) : null;
+      await saveDashboardSettings(copied?.settings ?? activateDashboardHost(dashboardDomain));
+      if (copied) {
+        await retireCopiedHost(copied.host, copied.settings.domain, Number(session.user.id));
+      }
+    }
   } catch (error) {
     console.error("Setup: could not enable the dashboard host", error);
   }
@@ -184,6 +204,39 @@ export async function saveSetupSettings(
   // A deployment that migrated has one more thing owed to it: its old database back, and a .env it
   // can safely replace. Everyone else is finished here.
   redirect((await getMigrationSource()) ? "/setup/done" : "/");
+}
+
+/** The stored host the operator chose to copy into the dashboard host, if they did. */
+function copySourceFromForm(formData: FormData): number | null {
+  if (formData.get("dashboardCopySettings") !== "on") return null;
+  const id = Number(formData.get("dashboardCopyFromHostId"));
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Take the dashboard's domain away from the host its settings were copied from.
+ *
+ * The dashboard host wins the tie for an exact domain, so the old host would otherwise sit in the
+ * list looking like it serves a name it never answers for. A host with no other domain is
+ * disabled rather than deleted - it keeps its settings, and switching it back on is one click. One
+ * with other domains keeps serving those. Best-effort, like the rest of the dashboard host here:
+ * the copy has already been saved, and the shadowed host is harmless.
+ */
+async function retireCopiedHost(
+  host: { id: number; domains: string[] },
+  domain: string,
+  actorUserId: number,
+): Promise<void> {
+  const remaining = host.domains.filter((claimed) => claimed.toLowerCase() !== domain);
+  try {
+    await updateProxyHost(
+      host.id,
+      remaining.length === 0 ? { enabled: false } : { domains: remaining },
+      actorUserId,
+    );
+  } catch (error) {
+    console.error("Setup: could not retire the host copied into the dashboard host", error);
+  }
 }
 
 /**
