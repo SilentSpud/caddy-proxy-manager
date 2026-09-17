@@ -174,11 +174,24 @@ test.describe('Migrating an existing installation', () => {
     await expect(page.getByText(/then disables legacy-app/)).toBeVisible();
   });
 
-  test('finishing setup ends on the summary a migrated deployment is owed', async () => {
+  test('finishing setup restarts again and ends on the summary a migrated deployment is owed', async () => {
+    // Past the file's 60s default, and wider than the first restart's: this one can spend up to a
+    // minute waiting out the cooldown the migration's restart left behind.
+    test.setTimeout(300_000);
+
     // Not the dashboard: an operator who has just replaced their database needs to be told where
-    // the old one is and what to remove from their .env before they go anywhere else.
+    // the old one is and what to remove from their .env before they go anywhere else. The dashboard
+    // host claimed a domain a moment ago and the restart still lands here, because the summary is
+    // behind the session this browser holds for this address.
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
-    await expect(page).toHaveURL(/\/setup\/done$/, { timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Restarting to finish setup' })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    // The second real restart in this file, and the one the cooldown can land on: the route allows
+    // one a minute and the migration's was not long ago, which the screen waits out rather than
+    // reporting.
+    await expect(page).toHaveURL(/\/setup\/done$/, { timeout: 240_000 });
     await expect(page.getByRole('heading', { name: 'Migration complete' })).toBeVisible();
     await expect(page.getByRole('link', { name: /download the old database/i })).toBeVisible();
   });

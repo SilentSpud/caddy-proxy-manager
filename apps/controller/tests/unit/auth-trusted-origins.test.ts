@@ -10,6 +10,7 @@ const ctx = vi.hoisted(() => ({
   setupCompleted: false as boolean | Error,
   setupChecks: 0,
   publicUrl: 'http://localhost:3000',
+  dashboard: null as { enabled: boolean; domain: string; tls: boolean } | null,
 }));
 
 vi.mock('@/src/lib/setup', () => ({
@@ -22,6 +23,10 @@ vi.mock('@/src/lib/setup', () => ({
 
 vi.mock('@/src/lib/settings/resolve', () => ({
   getSetting: async () => ctx.publicUrl,
+}));
+
+vi.mock('@/src/lib/settings', () => ({
+  getDashboardSettings: async () => ctx.dashboard,
 }));
 
 import {
@@ -42,6 +47,7 @@ beforeEach(() => {
   ctx.setupCompleted = false;
   ctx.setupChecks = 0;
   ctx.publicUrl = 'http://localhost:3000';
+  ctx.dashboard = null;
   resetTrustedOriginsCache();
 });
 
@@ -123,6 +129,28 @@ describe('extraTrustedOrigins', () => {
   it('adds no request address without a request', async () => {
     expect(await extraTrustedOrigins()).not.toContain(SERVER_IP);
   });
+
+  it('trusts the dashboard host, which is this app under a name of its own', async () => {
+    // Setup seeds the dashboard domain from BASE_URL's hostname, so it differs from the Public URL
+    // by port alone - and a sign-in at the domain the operator was just sent to would be refused.
+    ctx.setupCompleted = true;
+    ctx.dashboard = { enabled: true, domain: 'cpm.example.com', tls: false };
+    expect(await extraTrustedOrigins()).toContain('http://cpm.example.com');
+
+    ctx.dashboard = { enabled: true, domain: 'cpm.example.com', tls: true };
+    expect(await extraTrustedOrigins()).toContain('https://cpm.example.com');
+  });
+
+  it('trusts nothing for a dashboard host that serves nothing', async () => {
+    ctx.setupCompleted = true;
+    ctx.dashboard = { enabled: false, domain: 'cpm.example.com', tls: false };
+    expect(await extraTrustedOrigins()).not.toContain('http://cpm.example.com');
+
+    // Only a hostname, for the same reason the probe insists on one: anything else could carry a
+    // scheme, a port or a path into what is being trusted.
+    ctx.dashboard = { enabled: true, domain: 'cpm.example.com/evil', tls: false };
+    expect(await extraTrustedOrigins()).toHaveLength(1);
+  });
 });
 
 describe('isPublicOrigin', () => {
@@ -131,6 +159,10 @@ describe('isPublicOrigin', () => {
     expect(await isPublicOrigin('https://proxy.example.com')).toBe(true);
     expect(await isPublicOrigin(new URL(config.baseUrl).origin)).toBe(true);
     expect(await isPublicOrigin('https://attacker.example')).toBe(false);
+    // The dashboard host is trusted for signing in, not for everything a public origin is: the
+    // forward-auth portal reads this list too.
+    ctx.dashboard = { enabled: true, domain: 'cpm.example.com', tls: true };
+    expect(await isPublicOrigin('https://cpm.example.com')).toBe(false);
     expect(await isPublicOrigin('https://proxy.example.com:8443')).toBe(false);
     expect(await isPublicOrigin(null)).toBe(false);
   });

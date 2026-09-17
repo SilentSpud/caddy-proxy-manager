@@ -1,6 +1,7 @@
 /**
  * POST /api/setup/restart ends the process. It is reachable without signing in, so it has to stay
- * a single restart for the operator who ran the import - not a way for anyone to keep ending it.
+ * a single restart for the operator who ran the import or finished setup - not a way for anyone to
+ * keep ending it.
  */
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
@@ -203,12 +204,68 @@ describe('POST /api/setup/restart in any state', () => {
     await agent.stop();
   });
 
-  it('refuses once setup is complete', async () => {
+  it('refuses a completed deployment that nobody has just finished setting up', async () => {
     await markSetupCompleted();
 
     const response = await post();
 
     expect(response.status).toBe(409);
     expect(mockRestart).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/setup/restart as setup finishes', () => {
+  // The other half of the same reasoning: the process resolved its settings, its gates and its
+  // providers against a database that had none of them, so finishing setup restarts too.
+  // The migration source the outer setup records stays: what marks this branch is the completion
+  // flag, not the absence of an import.
+  beforeEach(async () => {
+    await markSetupCompleted();
+  });
+
+  it('restarts for the browser that finished setup, holding the token the save issued', async () => {
+    const token = await issueRestartToken();
+
+    const response = await post({ 'x-cpm-restart-token': token });
+
+    expect(response.status).toBe(202);
+    expect(mockRestart).toHaveBeenCalledTimes(1);
+  });
+
+  it('spends the token, so the same one cannot stop the app again', async () => {
+    const token = await issueRestartToken();
+    expect((await post({ 'x-cpm-restart-token': token })).status).toBe(202);
+
+    await clearCooldown();
+    const replay = await post({ 'x-cpm-restart-token': token });
+
+    expect(replay.status).toBe(409);
+    expect(mockRestart).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not a standing restart endpoint for administrators', async () => {
+    // Deliberately narrower than the migration branch: an admin session alone would leave every
+    // completed deployment with a permanent way to stop the process.
+    await issueRestartToken();
+    mockAuth.mockResolvedValue({
+      user: { id: '1', email: 'admin@example.com', name: 'Admin', role: 'admin' },
+    });
+
+    const response = await post();
+
+    expect(response.status).toBe(409);
+    expect(mockRestart).not.toHaveBeenCalled();
+  });
+
+  it('needs no migration to have happened', async () => {
+    // A fresh install has nothing in `setup:migrated_from`, which is what the migration branch
+    // refuses on.
+    await ctx.db.delete(settings).where(eq(settings.key, 'setup:migrated_from'));
+    const token = await issueRestartToken();
+
+    const response = await post({ 'x-cpm-restart-token': token });
+
+    expect(response.status).toBe(202);
+    expect(mockRestart).toHaveBeenCalledTimes(1);
   });
 });

@@ -53,6 +53,20 @@ Setup switches on the [dashboard host](../../features/dashboard-host/), so the i
 reverse-proxying something - itself - before you have created anything. It comes up on HTTP; HTTPS
 is a check you run once the domain reaches you.
 
+## Finishing restarts the application
+
+Saving the last step stores configuration the running process resolved before any of it existed:
+settings were cached and the enabled identity providers listed at boot, against a database that had
+neither. So setup restarts the application rather than handing you a process still answering from
+the empty one, and the screen waits for it to go away and come back. Coming back is also what
+applies the Caddy configuration, which is how the dashboard host you just created starts answering.
+
+If you gave the dashboard host a domain, that is where you land once it has been confirmed to reach
+this deployment - otherwise you stay on the address you set up at, which always works. Your session
+belongs to the address you signed in at, so the new domain asks you to sign in again. A deployment
+with nothing supervising the container never comes back on its own: the screen says so, and gives
+you the command to restart it by hand.
+
 ## Two things skip the flow
 
 - **An existing pre-3.0 installation.** A SQLite database found on the host is offered for

@@ -16,7 +16,7 @@
  * expiring certificates at, and an instance that finishes setup without one issues its first
  * certificate with nobody to tell.
  */
-import { type ComponentProps, useActionState, useEffect, useRef, useState } from "react";
+import { type ComponentProps, type FormEvent, useEffect, useRef, useState } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Center } from "@astryxdesign/core/Center";
 import { Divider } from "@astryxdesign/core/Divider";
@@ -33,7 +33,7 @@ import { Switch } from "@/src/components/ui/FormBooleanControls";
 import { AUTOFILL_OFF, NATIVE_REQUIRED } from "@/src/components/ui/native-input-attrs";
 import { FormCard, SaveButton, StatusAlert } from "@/src/components/ui/FormLayout";
 import { SetupSteps } from "@/src/components/ui/SetupSteps";
-import { saveSetupSettings } from "./actions";
+import RestartDialog from "@/src/components/setup/RestartDialog";
 import type { DomainClaim } from "@/src/lib/dashboard-host-options";
 import { useTranslations } from "next-intl";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
@@ -131,7 +131,14 @@ export default function SetupSettingsClient({
   hasMigrateStep: boolean;
 }) {
   const t = useTranslations("setup");
-  const [state, submit] = useActionState(saveSetupSettings, { error: null });
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  /** What the save answered, which is what turns this page into the restart dialog. */
+  const [finished, setFinished] = useState<{
+    next: string;
+    restartToken: string;
+    dashboardOrigin: string | null;
+  } | null>(null);
 
   const [defaultDomain, setDefaultDomain] = useState(general.defaultDomain);
   const [acmeEmail, setAcmeEmail] = useState(general.acmeEmail);
@@ -152,6 +159,62 @@ export default function SetupSettingsClient({
       ]),
     ),
   );
+
+  /**
+   * Save through a route handler rather than a server action, so the page survives its own success.
+   * An action re-renders the page it was called from, and this one redirects the moment setup
+   * reads as complete - which is precisely when the restart still has to be explained.
+   */
+  async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/setup/complete", {
+        method: "POST",
+        body: new FormData(event.currentTarget),
+      });
+      // Spelled out rather than imported from the route, as the migration screen does: a client
+      // component reaching into a route module is a server import waiting to be bundled.
+      const body = (await response.json()) as
+        | { ok: true; next: string; restartToken: string; dashboardOrigin: string | null }
+        | { ok: false; error: string };
+      if (!body.ok) {
+        setError(body.error);
+        return;
+      }
+      setFinished({
+        next: body.next,
+        restartToken: body.restartToken,
+        dashboardOrigin: body.dashboardOrigin,
+      });
+    } catch {
+      setError(t("errors.settingsSaveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (finished) {
+    const domain = finished.dashboardOrigin ? new URL(finished.dashboardOrigin).host : null;
+    return (
+      <RestartDialog
+        next={finished.next}
+        restartToken={finished.restartToken}
+        preferredOrigin={finished.dashboardOrigin}
+        copy={{
+          heading: t("setupCompleteHeading"),
+          lead: t("setupCompleteDescription"),
+          title: t("setupRestartTitle"),
+          description: t("setupRestartDescription"),
+          note: domain ? t("restartSignInDashboard", { domain }) : t("restartSignInSetup"),
+          manually: t("setupRestartManually"),
+          manuallyWithDetail: (detail) => t("setupRestartManuallyWithDetail", { detail }),
+        }}
+      />
+    );
+  }
 
   /** Whether a field is on screen: everything, minus the groups whose gate is switched off. */
   const isVisible = (field: SettingField) => {
@@ -175,9 +238,9 @@ export default function SetupSettingsClient({
           )}
         </VStack>
 
-        <form action={submit}>
+        <form onSubmit={save}>
           <VStack gap={4}>
-            {state.error && <StatusAlert message={state.error} success={false} />}
+            {error && <StatusAlert message={error} success={false} />}
 
             <FormCard title={t("defaults")}>
               <VStack gap={3}>
@@ -282,7 +345,7 @@ export default function SetupSettingsClient({
 
             <IdentityProviderCard card={oauth} value={idp} onChange={setIdp} />
 
-            <SaveButton label={t("saveAndFinishSetup")} />
+            <SaveButton label={t("saveAndFinishSetup")} isDisabled={saving} />
           </VStack>
         </form>
       </VStack>

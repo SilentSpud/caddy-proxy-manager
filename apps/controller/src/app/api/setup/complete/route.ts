@@ -1,8 +1,6 @@
-"use server";
-
-import { redirect } from "next/navigation";
+import type { NextRequest } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { auth } from "@/src/lib/auth";
+import { auth, checkSameOrigin } from "@/src/lib/auth";
 import { createOAuthProvider, listOAuthProviders } from "@/src/lib/models/oauth-providers";
 import { isAppRole } from "@/src/lib/oidc-groups";
 import {
@@ -15,27 +13,33 @@ import { propagateOptionalFeatureSettings } from "@/src/lib/settings/optional-fe
 import { resolveAllSettings, saveSettings } from "@/src/lib/settings/resolve";
 import {
   type GeneralSettings,
+  getDashboardSettings,
   saveDashboardSettings,
   saveGeneralSettings,
 } from "@/src/lib/settings";
-import { activateDashboardHost, isHostname } from "@/src/lib/dashboard-host";
+import { activateDashboardHost, dashboardHostOrigin, isHostname } from "@/src/lib/dashboard-host";
 import { dashboardSettingsFromHost } from "@/src/lib/dashboard-host-options";
 import { updateProxyHost } from "@/src/lib/models/proxy-hosts";
 // SettingsValidationError, not the registry's SettingValidationError beside it: one belongs to the
-// JSON groups and one to the registry, and this action now saves through both.
+// JSON groups and one to the registry, and this route now saves through both.
 import { SettingsValidationError, validateSettingsGroup } from "@/src/lib/settings-validation";
 import { isEmailAddress } from "@/src/lib/email-address";
 import {
   getMigrationSource,
   isSetupCompleted,
+  issueRestartToken,
   markSetupCompleted,
   promoteFirstSetupAdmin,
 } from "@/src/lib/setup";
 
-export type SetupSettingsState = { error: string | null };
-
 /**
- * Save the configuration collected by the last setup step, then mark setup finished.
+ * POST /api/setup/complete - save the last step's configuration and finish setup.
+ *
+ * A route handler rather than a server action, for the reason app/api/setup/migrate/route.ts gives:
+ * a server action re-renders the page it was called from, and this page redirects the moment
+ * `getSetupState` answers "complete" - so the operator was thrown to the dashboard before the
+ * restart could be explained, let alone performed. A fetch leaves the page mounted, which is what
+ * lets the restart dialog happen in front of them.
  *
  * Whoever completes setup is the administrator. A signed-in session is required - this step runs
  * after the sign-in setup insists on, so there is a real user by now - but demanding that they
@@ -45,25 +49,44 @@ export type SetupSettingsState = { error: string | null };
  * relaxing the check outright matters: finishing setup with nobody an admin would leave a
  * completed instance with no way to reach Settings at all.
  */
-export async function saveSetupSettings(
-  _previous: SetupSettingsState,
-  formData: FormData,
-): Promise<SetupSettingsState> {
+
+export type CompleteSetupResponse =
+  | {
+      ok: true;
+      /** Where to go once the app is back, as a path on whichever origin answers. */
+      next: string;
+      /** `restartToken` lets this browser, and only this one, ask /api/setup/restart. */
+      restartToken: string;
+      /** The origin the dashboard host now claims, to prefer over this one. Null when it has none. */
+      dashboardOrigin: string | null;
+    }
+  | { ok: false; error: string };
+
+function json(body: CompleteSetupResponse, status: number): Response {
+  return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+export async function POST(request: NextRequest): Promise<Response> {
+  const originCheck = checkSameOrigin(request);
+  if (originCheck) return originCheck;
+
   const t = await getTranslations("setup.errors");
-  const session = await auth();
+  const session = await auth(request);
   if (!session?.user) {
-    return { error: t("signInToFinish") };
+    return json({ ok: false, error: t("signInToFinish") }, 401);
   }
   if (await isSetupCompleted()) {
-    redirect("/");
+    return json({ ok: false, error: t("alreadyCompleted") }, 409);
   }
 
-  // Before the writes below, so the rest of this action runs as an administrator. A no-op when
-  // the account step already made one, which is every local-account setup - and for a second,
+  const formData = await request.formData();
+
+  // Before the writes below, so the rest of this runs as an administrator. A no-op when the
+  // account step already made one, which is every local-account setup - and for a second,
   // ordinary user reaching this step, which is what the check below still refuses.
   const promoted = await promoteFirstSetupAdmin(Number(session.user.id));
   if (!promoted && session.user.role !== "admin") {
-    return { error: t("adminToFinish") };
+    return json({ ok: false, error: t("adminToFinish") }, 403);
   }
 
   // Read from the registry rather than iterating the form, so a setting the form did not post is
@@ -116,7 +139,7 @@ export async function saveSetupSettings(
   if (values[analyticsEnabled.key] === true) {
     const password = values[clickhousePassword.key] ?? resolved.get(clickhousePassword.key)?.value;
     if (typeof password !== "string" || password.trim() === "") {
-      return { error: t("analyticsPasswordRequired") };
+      return json({ ok: false, error: t("analyticsPasswordRequired") }, 400);
     }
   }
 
@@ -130,10 +153,10 @@ export async function saveSetupSettings(
   const defaultDomain = String(formData.get("defaultDomain") ?? "").trim();
   const acmeEmail = String(formData.get("acmeEmail") ?? "").trim();
   if (defaultDomain.length === 0 || defaultDomain.length > 253) {
-    return { error: t("defaultDomainInvalid") };
+    return json({ ok: false, error: t("defaultDomainInvalid") }, 400);
   }
   if (acmeEmail !== "" && !isEmailAddress(acmeEmail, "public")) {
-    return { error: t("acmeEmailInvalid") };
+    return json({ ok: false, error: t("acmeEmailInvalid") }, 400);
   }
 
   // Only posted while the card's switch is on - the domain field is hidden otherwise, the same way a
@@ -142,7 +165,7 @@ export async function saveSetupSettings(
   const dashboardEnabled = formData.get("dashboardEnabled") === "on";
   const dashboardDomain = String(formData.get("dashboardDomain") ?? "").trim();
   if (dashboardEnabled && !isHostname(dashboardDomain)) {
-    return { error: t("dashboardDomainInvalid") };
+    return json({ ok: false, error: t("dashboardDomainInvalid") }, 400);
   }
 
   let general: GeneralSettings;
@@ -155,7 +178,7 @@ export async function saveSetupSettings(
     }) as GeneralSettings;
   } catch (error) {
     if (error instanceof SettingsValidationError) {
-      return { error: error.message };
+      return json({ ok: false, error: error.message }, 400);
     }
     throw error;
   }
@@ -165,10 +188,10 @@ export async function saveSetupSettings(
     await saveGeneralSettings(general);
   } catch (error) {
     if (error instanceof SettingValidationError) {
-      return { error: error.message };
+      return json({ ok: false, error: error.message }, 400);
     }
     console.error("Setup: failed to save settings", error);
-    return { error: t("settingsSaveFailed") };
+    return json({ ok: false, error: t("settingsSaveFailed") }, 500);
   }
 
   // Analytics and GeoIP decide whether a container runs, and the operator has just chosen. Without
@@ -177,7 +200,7 @@ export async function saveSetupSettings(
   await propagateOptionalFeatureSettings();
 
   const providerError = await createProviderFromForm(formData);
-  if (providerError) return { error: providerError };
+  if (providerError) return json({ ok: false, error: providerError }, 400);
 
   // CPM proxies its own dashboard from here on, unless the operator switched that off, so their
   // first look at the product is a working host rather than an empty list. Switched off, nothing is
@@ -202,8 +225,27 @@ export async function saveSetupSettings(
   await markSetupCompleted();
 
   // A deployment that migrated has one more thing owed to it: its old database back, and a .env it
-  // can safely replace. Everyone else is finished here.
-  redirect((await getMigrationSource()) ? "/setup/done" : "/");
+  // can safely replace. Everyone else goes to the dashboard.
+  const migrated = (await getMigrationSource()) !== null;
+
+  // Read back rather than rebuilt from the form: the write above is best-effort, and a dashboard
+  // origin nothing was stored for would send the operator to a domain this instance never claimed.
+  //
+  // Not offered to a migrated deployment, whatever it claimed: the summary it is owed is behind the
+  // session it has, and a session belongs to one address. Sent to the dashboard's domain it would
+  // meet a sign-in page instead, and the summary is not shown twice. Its own last button goes
+  // there.
+  const dashboardOrigin = migrated ? null : dashboardHostOrigin(await getDashboardSettings());
+
+  return json(
+    {
+      ok: true,
+      next: migrated ? "/setup/done" : "/",
+      restartToken: await issueRestartToken(),
+      dashboardOrigin,
+    },
+    200,
+  );
 }
 
 /** The stored host the operator chose to copy into the dashboard host, if they did. */
