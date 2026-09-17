@@ -46,6 +46,7 @@ import type { CaddyBuildSettings } from "@/lib/settings";
 import type { AnalyticsView, GeoipView } from "@/src/lib/settings/optional-features";
 import type { TailscaleSettingsView } from "@/src/lib/caddy-tailscale";
 import type { DashboardDnsCheck, DashboardHostSettings } from "@/src/lib/dashboard-host";
+import { pairingHostFor } from "@/src/lib/dashboard-host-address";
 import {
   DashboardHostOptionsFields,
   type DashboardHostOptionsData,
@@ -374,7 +375,9 @@ export default function SettingsClient({
             agentBuildSelections={agentBuildSelections}
           />
         )}
-        {active === "agent" && <AgentSection agents={agents} />}
+        {active === "agent" && (
+          <AgentSection agents={agents} pairingHost={pairingHostFor(dashboard)} />
+        )}
         {active === "analytics" && (
           <AnalyticsSection
             analytics={analytics}
@@ -807,6 +810,7 @@ function DnsProvidersSection({
           <Button
             type="submit"
             form="dnsp-add-form"
+            variant="primary"
             size="sm"
             label={hasProvider && isUpdate ? t("updateDnsProvider") : t("addDnsProvider")}
             isDisabled={!hasProvider}
@@ -2211,7 +2215,14 @@ function AgentRow({
   );
 }
 
-function AgentSection({ agents }: { agents: Props["agents"] }) {
+function AgentSection({
+  agents,
+  pairingHost,
+}: {
+  agents: Props["agents"];
+  /** The dashboard domain, when set - otherwise the command keeps a placeholder to fill in. */
+  pairingHost: { host: string; insecure: boolean } | null;
+}) {
   const t = useTranslations("settings");
   const [code, setCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -2356,11 +2367,17 @@ function AgentSection({ agents }: { agents: Props["agents"] }) {
               <Text size="sm" color="secondary">
                 {t("pairingCodeRun")}
               </Text>
-              <Code>{`cpm-agent --pair --host <this-controller> --code ${code.code}`}</Code>
+              <Code>{`docker exec -it caddy-proxy-manager-agent cpm-agent --pair --host ${pairingHost?.host ?? "<this-controller>"} --code ${code.code}`}</Code>
+              {pairingHost?.insecure && (
+                <Text size="xsm" color="secondary">
+                  {t("pairingHostInsecureHint")}
+                </Text>
+              )}
             </VStack>
           ) : (
             <Button
               type="button"
+              variant="primary"
               size="sm"
               label={t("generatePairingCode")}
               onClick={() => {

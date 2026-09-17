@@ -520,7 +520,6 @@ export default function ProxyHostsClient({
     <VStack gap={6}>
       <ListPageHeader
         title={t("proxyHosts")}
-        description={t("pageDescription")}
         action={
           canCreate
             ? {

@@ -5,6 +5,7 @@ import {
   checkDashboardDns,
   isHostname,
 } from '@/src/lib/dashboard-host';
+import { pairingHostFor } from '@/src/lib/dashboard-host-address';
 import { createProbeNonce, probeSignatureMatches, signProbe } from '@/src/lib/reachability-probe';
 import { validateSettingsGroup } from '@/src/lib/settings-validation';
 
@@ -306,5 +307,29 @@ describe('dashboard settings validation', () => {
         options: missing,
       }),
     ).toThrow(/required/);
+  });
+});
+
+describe('the pairing command address', () => {
+  it('is the bare domain once the host is on HTTPS', () => {
+    // A bare public name is https on 443 to the agent, which is where Caddy serves it.
+    expect(pairingHostFor({ ...on, domain: ' CPM.Example.com ', tls: true })).toEqual({
+      host: 'cpm.example.com',
+      insecure: false,
+    });
+  });
+
+  it('spells out http and port 80 while the host is on plain HTTP', () => {
+    // `http://` alone would send the agent to the controller's own port 3000.
+    expect(pairingHostFor({ ...on, tls: false })).toEqual({
+      host: 'http://cpm.example.com:80',
+      insecure: true,
+    });
+  });
+
+  it('is absent when the host is off or has no domain', () => {
+    expect(pairingHostFor(null)).toBeNull();
+    expect(pairingHostFor({ ...on, enabled: false })).toBeNull();
+    expect(pairingHostFor({ ...on, domain: '  ' })).toBeNull();
   });
 });

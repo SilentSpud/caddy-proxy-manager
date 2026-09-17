@@ -25,7 +25,7 @@ export default function ApiDocsClient() {
 
   return (
     <VStack gap={4}>
-      <PageHeader title={t("title")} description={t("pageDescription")} />
+      <PageHeader title={t("title")} />
 
       <Card padding={4}>
         <HStack gap={4} vAlign="center" wrap="wrap" justify="between">

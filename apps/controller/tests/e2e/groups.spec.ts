@@ -1,113 +1,144 @@
 /** E2E: Groups page - creation, member management, deletion. Runs as admin. */
 import { test, expect } from '@playwright/test';
+import { waitForHydration } from '../helpers/hydration';
 
 test.describe('Groups page', () => {
+  // One group walked through create, members and delete, so the tests share it in order.
+  test.describe.configure({ mode: 'serial' });
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/groups');
+    await waitForHydration(page);
   });
 
+  const rail = (page: import('@playwright/test').Page) =>
+    page.getByRole('navigation', { name: 'Groups' });
+
   test('page loads with Groups heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Groups', exact: true })).toBeVisible();
-    await expect(
-      page.getByText('Organize users into groups for forward auth access control.'),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Groups', level: 1 })).toBeVisible();
+    await expect(page.getByPlaceholder('Search groups...')).toBeVisible();
   });
 
   test('New Group button is visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /new group/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /new group/i }).first()).toBeVisible();
   });
 
-  test('clicking New Group toggles create form', async ({ page }) => {
-    await page.getByRole('button', { name: /new group/i }).click();
+  test('clicking New Group opens the create dialog', async ({ page }) => {
+    await page
+      .getByRole('button', { name: /new group/i })
+      .first()
+      .click();
 
-    // Form fields should appear
-    await expect(page.getByLabel('Name')).toBeVisible();
-    await expect(page.getByLabel('Description')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Create' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Name')).toBeVisible();
+    await expect(dialog.getByLabel('Description')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Create' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible();
   });
 
-  test('clicking Cancel hides the create form', async ({ page }) => {
-    await page.getByRole('button', { name: /new group/i }).click();
-    await expect(page.getByLabel('Name')).toBeVisible();
+  test('clicking Cancel closes the create dialog', async ({ page }) => {
+    await page
+      .getByRole('button', { name: /new group/i })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Name')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByLabel('Name')).not.toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   test('create a new group', async ({ page }) => {
-    await page.getByRole('button', { name: /new group/i }).click();
+    await page
+      .getByRole('button', { name: /new group/i })
+      .first()
+      .click();
 
-    await page.getByLabel('Name').fill('E2E Test Group');
-    await page.getByLabel('Description').fill('Created by E2E test');
-    await page.getByRole('button', { name: 'Create' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Name').fill('E2E Test Group');
+    await dialog.getByLabel('Description').fill('Created by E2E test');
+    await dialog.getByRole('button', { name: 'Create' }).click();
 
-    // Group should appear in the list
-    await expect(page.getByText('E2E Test Group')).toBeVisible({ timeout: 10_000 });
+    // It appears in the rail and is selected, so its detail heads the page.
+    await expect(rail(page).getByText('E2E Test Group')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'E2E Test Group', level: 2 })).toBeVisible();
     await expect(page.getByText('Created by E2E test')).toBeVisible();
     await expect(page.getByText('0 members').first()).toBeVisible();
   });
 
-  test('add member to group', async ({ page }) => {
-    // Ensure the group exists
-    await expect(page.getByText('E2E Test Group', { exact: true })).toBeVisible({ timeout: 5_000 });
-
-    // Click add member button
-    await page.getByRole('button', { name: 'Add member' }).first().click();
-    await expect(page.getByText('Add a user to this group')).toBeVisible();
-
-    // The available-users list renders as ListItems inside the add-member
-    // panel - the old '.border.rounded-md' container class is not emitted any
-    // more, so scope to the panel that owns the prompt text instead.
-    const addPanel = page
-      .locator('div.astryx-stack')
-      .filter({ hasText: 'Add a user to this group' })
-      .last();
-    const noneLeft = addPanel.getByText('All users are already in this group.');
-    const firstUser = addPanel.getByRole('listitem').first();
-
-    // Assert one of the two branches actually rendered, so an empty panel is a
-    // failure rather than a silently skipped test.
-    await expect(firstUser.or(noneLeft).first()).toBeVisible({ timeout: 5_000 });
-
-    if (await firstUser.isVisible()) {
-      await firstUser.click();
-      await expect(page.getByText('1 member').first()).toBeVisible({ timeout: 10_000 });
+  test('add members to group, several in one go', async ({ page }) => {
+    // Two accounts of this run's own, so there is always a pair to pick whatever else exists.
+    const tag = `picker-${Date.now()}`;
+    const origin = new URL(page.url()).origin;
+    for (const n of [1, 2]) {
+      const response = await page.request.post('http://localhost:3000/api/v1/users', {
+        headers: { Origin: origin },
+        data: {
+          email: `${tag}-${n}@test.local`,
+          name: `${tag} ${n}`,
+          password: 'PickerPass2026!',
+          role: 'user',
+        },
+      });
+      expect(response.status()).toBe(201);
     }
+    await page.reload();
+    await waitForHydration(page);
+
+    await rail(page).getByText('E2E Test Group', { exact: true }).click();
+    await page.getByRole('button', { name: 'Add member' }).first().click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Choose the users to add to this group')).toBeVisible();
+    await dialog.getByPlaceholder('Search users...').fill(tag);
+    const boxes = dialog.getByRole('checkbox');
+    await expect(boxes).toHaveCount(2, { timeout: 5_000 });
+
+    // Ticking does not add or close: the dialog stays until Add commits the whole selection.
+    await boxes.nth(0).check();
+    await boxes.nth(1).check();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('2 selected')).toBeVisible();
+
+    await dialog.getByRole('button', { name: 'Add 2 members' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByText('2 members').first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('the access tab says what the group manages', async ({ page }) => {
+    await rail(page).getByText('E2E Test Group', { exact: true }).click();
+    // Astryx tabs are buttons (the navigation pattern), named with their count badge - which also
+    // keeps this apart from the header's "Access - <group>" icon button.
+    await page.getByRole('button', { name: /^Access\s*\d+$/ }).click();
+    await expect(page.getByRole('heading', { name: 'Managed resources' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit access' })).toBeVisible();
   });
 
   test('remove member from group', async ({ page }) => {
-    // If the group has a member, remove it
-    const removeMemberBtn = page.getByRole('button', { name: /^Remove .+ from / }).first();
-    if (await removeMemberBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await removeMemberBtn.click();
-      await expect(page.getByText('0 members').first()).toBeVisible({ timeout: 10_000 });
-    }
+    await rail(page).getByText('E2E Test Group', { exact: true }).click();
+    // The test above left two members, so removing one is visible as a count of one.
+    await page
+      .getByRole('button', { name: /^Remove .+ from / })
+      .first()
+      .click();
+    await expect(page.getByText('1 member', { exact: true }).first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('delete group via confirm dialog', async ({ page }) => {
-    await expect(page.getByText('E2E Test Group')).toBeVisible({ timeout: 5_000 });
+    await rail(page).getByText('E2E Test Group', { exact: true }).click();
 
-    // Deletion is confirmed through an in-app AlertDialog (it replaced
-    // window.confirm), so there is no native dialog event to accept. The row
-    // button is labelled per group; the dialog's action is the bare verb.
+    // Deletion is confirmed through an in-app AlertDialog. The header button is labelled per
+    // group; the dialog's action is the bare verb.
     await page.getByRole('button', { name: 'Delete group E2E Test Group' }).click();
     const confirm = page.getByRole('alertdialog');
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: 'Delete group', exact: true }).click();
 
-    // Group should be removed
-    await expect(page.getByText('E2E Test Group', { exact: true })).not.toBeVisible({
+    await expect(rail(page).getByText('E2E Test Group', { exact: true })).not.toBeVisible({
       timeout: 10_000,
     });
-  });
-
-  test('shows empty state when no groups exist', async ({ page }) => {
-    // If there are no groups, the empty state text should be visible
-    // (This may or may not show depending on existing data)
-    const newGroupBtn = page.getByRole('button', { name: /new group/i });
-    // At minimum the button should always be visible
-    await expect(newGroupBtn).toBeVisible();
   });
 });
 

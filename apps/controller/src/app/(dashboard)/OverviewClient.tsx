@@ -602,12 +602,7 @@ export default function OverviewClient({
   if (!isAdmin) {
     return (
       <VStack gap={8}>
-        <VStack gap={1}>
-          <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
-          <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
-            {t("pageDescription")}
-          </Text>
-        </VStack>
+        <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
       </VStack>
     );
   }
@@ -617,13 +612,7 @@ export default function OverviewClient({
   return (
     <VStack gap={5}>
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
-        <VStack gap={1}>
-          <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
-          {/* Not on a phone, like every page's description: read once, then only in the way. */}
-          <Text type="body" size="sm" color="secondary" className="cpm-desktop-only">
-            {t("pageDescription")}
-          </Text>
-        </VStack>
+        <Heading level={1}>{t("welcomeBack", { name: userName })}</Heading>
         <SegmentedControl
           label={t("timeRange")}
           size="sm"

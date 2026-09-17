@@ -61,7 +61,7 @@ function IssuedCertsPanel({ ca }: { ca: CaCertificateView }) {
           {ca.hasPrivateKey && (
             <Button
               size="sm"
-              variant="secondary"
+              variant="primary"
               label={t("issueCert")}
               onClick={() => setIssueCaOpen(true)}
             />
@@ -278,7 +278,7 @@ export function CaTab({ caCertificates, search, statusFilter }: Props) {
     <VStack gap={4}>
       <HStack justify="end" className="cpm-desktop-only">
         <Button
-          variant="secondary"
+          variant="primary"
           size="sm"
           label={t("addCaCertificate")}
           icon={<Plus />}

@@ -150,6 +150,7 @@ export function IssueClientCertDialog({
       <Button
         type="submit"
         form={issueFormId}
+        variant="primary"
         label={t("issueCertificate")}
         isLoading={isPending}
         isDisabled={isPending}

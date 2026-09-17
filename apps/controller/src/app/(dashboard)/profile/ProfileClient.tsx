@@ -804,7 +804,13 @@ export default function ProfileClient({
                   </VStack>
                 </Grid>
                 <HStack justify="end">
-                  <Button type="submit" size="sm" icon={<Plus />} label={t("createToken")} />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus />}
+                    label={t("createToken")}
+                  />
                 </HStack>
               </VStack>
             </form>

@@ -17,7 +17,9 @@ const SETTINGS_ORIGIN = 'http://localhost:3000';
  * own; waiting harder before the first one just moves the race.
  */
 async function openPaletteWithKeyboard(page: Page) {
-  await expect(page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...')).toBeVisible();
+  await expect(
+    page.locator(SETTINGS_SIDEBAR).getByText('Search...', { exact: true }),
+  ).toBeVisible();
   await expect(async () => {
     await page.keyboard.press('ControlOrMeta+k');
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1_000 });
@@ -75,7 +77,7 @@ test.describe('Settings - page load & layout', () => {
   test('sidebar search button is visible with keyboard hint', async ({ page }) => {
     await page.goto('/settings/general');
     const sidebar = page.locator(SETTINGS_SIDEBAR);
-    await expect(sidebar.getByText('Jump to setting...')).toBeVisible();
+    await expect(sidebar.getByText('Search...', { exact: true })).toBeVisible();
     await expect(sidebar.locator('kbd').first()).toBeVisible();
   });
 });
@@ -169,7 +171,7 @@ test.describe('Settings - Cmd-K palette', () => {
   test('clicking the search button opens the command palette', async ({ page }) => {
     await page.goto('/settings/general');
     await waitForHydration(page);
-    await page.locator(SETTINGS_SIDEBAR).getByText('Jump to setting...').click();
+    await page.locator(SETTINGS_SIDEBAR).getByText('Search...', { exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
@@ -221,7 +223,7 @@ test.describe('Settings - Cmd-K palette', () => {
     await openPaletteWithKeyboard(page);
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder(/search/i).fill('zzzzxyzzy');
-    await expect(dialog.getByText(/no settings match/i)).toBeVisible();
+    await expect(dialog.getByText(/nothing matches your search/i)).toBeVisible();
   });
 });
 

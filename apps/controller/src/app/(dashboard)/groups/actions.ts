@@ -17,11 +17,12 @@ import {
 } from "@/src/lib/models/group-grants";
 import { logAuditEvent } from "@/src/lib/audit";
 
-export async function createGroupAction(formData: FormData) {
+/** Returns the new group's id, so the page can select it. */
+export async function createGroupAction(formData: FormData): Promise<{ id: number }> {
   const session = await requireAdmin();
   const userId = Number(session.user.id);
 
-  await createGroup(
+  const group = await createGroup(
     {
       name: String(formData.get("name") ?? ""),
       description: formData.get("description") ? String(formData.get("description")) : null,
@@ -30,6 +31,8 @@ export async function createGroupAction(formData: FormData) {
   );
 
   revalidatePath("/groups");
+  revalidatePath("/users");
+  return { id: group.id };
 }
 
 export async function updateGroupAction(id: number, formData: FormData) {
@@ -53,6 +56,7 @@ export async function deleteGroupAction(id: number) {
   const userId = Number(session.user.id);
   await deleteGroup(id, userId);
   revalidatePath("/groups");
+  revalidatePath("/users");
 }
 
 export async function addGroupMemberAction(groupId: number, memberId: number) {
@@ -60,6 +64,19 @@ export async function addGroupMemberAction(groupId: number, memberId: number) {
   const userId = Number(session.user.id);
   await addGroupMember(groupId, memberId, userId);
   revalidatePath("/groups");
+  // The Users page shows each account's groups, and changes them from there too.
+  revalidatePath("/users");
+}
+
+/** Add several users at once - the member picker's multi-select - with one revalidation. */
+export async function addGroupMembersAction(groupId: number, memberIds: number[]) {
+  const session = await requireAdmin();
+  const userId = Number(session.user.id);
+  for (const memberId of new Set(memberIds)) {
+    await addGroupMember(groupId, memberId, userId);
+  }
+  revalidatePath("/groups");
+  revalidatePath("/users");
 }
 
 export async function removeGroupMemberAction(groupId: number, memberId: number) {
@@ -67,6 +84,7 @@ export async function removeGroupMemberAction(groupId: number, memberId: number)
   const userId = Number(session.user.id);
   await removeGroupMember(groupId, memberId, userId);
   revalidatePath("/groups");
+  revalidatePath("/users");
 }
 
 /**

@@ -31,6 +31,17 @@
      */
     :scope {
       --color-accent: var(--color-text-pink);
+
+      /* Dark mode only; each light half is the theme's own. Secondary ink - the field labels,
+         stat captions and descriptions - was #9e9e9e, which at the 10-12px those labels are set in
+         read as disabled beside white values. #bdbdbd keeps the step down from primary white and is
+         11.2:1 on the black page, 9.2:1 on a desktop card. Green ink on its own green ground
+         (green badges, success banners) was #90ca90 on #2b422b, 6:1 but dim; #b6e8b6 lifts it to
+         7.9:1 there. The success colour, a separate token at #a4d6a3, follows it: it is the text of
+         a success message and the fill behind a success badge's dark ink. */
+      --color-text-secondary: light-dark(#474747, #bdbdbd);
+      --color-text-green: light-dark(#00490b, #b6e8b6);
+      --color-success: light-dark(#00490b, #b6e8b6);
     }
 
     /**

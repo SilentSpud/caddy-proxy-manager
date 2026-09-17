@@ -201,7 +201,7 @@ export function ImportedTab({ importedCerts, managedCerts, search, statusFilter 
     <VStack gap={4}>
       <HStack justify="end" className="cpm-desktop-only">
         <Button
-          variant="secondary"
+          variant="primary"
           size="sm"
           label={t("importCertificate")}
           icon={<Plus />}

@@ -39,8 +39,12 @@
    * width - black in dark mode, light grey in light - with cards lifted off it, so the content area
    * asks for the body colour itself. Otherwise the whole panel turns card-coloured and only the
    * sidebar reads as the page.
+   *
+   * Not inside a dialog or sheet: those lay out with the same LayoutContent, sit in the shell's DOM
+   * even though they render on top, and must keep their own surface rather than turn page black.
    */
-  .astryx-app-shell .astryx-layout-content {
+  .astryx-app-shell
+  .astryx-layout-content:not(:is(dialog, [role="dialog"], [role="alertdialog"]) *) {
     background-color: var(--color-background-body);
   }
 
@@ -52,6 +56,53 @@
   .astryx-app-shell-sidenav,
   .astryx-app-shell-sidenav .astryx-side-nav {
     background-color: light-dark(var(--color-background-body), #111111);
+  }
+
+  /**
+   * A page whose root is a full-page Layout (a list rail beside a detail pane, as on Access Lists)
+   * asks for `height="fill"`, which is a percentage of this wrapper. The wrapper is otherwise sized
+   * by its content, so the percentage resolved to nothing and both panes stopped where the rail's
+   * content did. Only those pages get a definite height: every other page keeps growing with its
+   * content and scrolling in the shell.
+   */
+  .cpm-mobile-content:has(> .astryx-layout) {
+    height: 100%;
+  }
+
+  /**
+   * The draggable divider beside a Layout side panel (components/ui/PanelResizeHandle.tsx). The
+   * element is the 1px line; the ::before is a wider invisible grab area centred on it, so the line
+   * stays thin without being hard to hit.
+   */
+  .cpm-panel-resize-handle {
+    position: relative;
+    flex: none;
+    width: 1px;
+    align-self: stretch;
+    background-color: var(--color-border);
+    cursor: col-resize;
+    touch-action: none;
+    z-index: 1;
+    transition: background-color 120ms ease;
+  }
+
+  .cpm-panel-resize-handle::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline: -4px;
+  }
+
+  .cpm-panel-resize-handle:hover,
+  .cpm-panel-resize-handle[data-dragging] {
+    background-color: var(--color-border-pink);
+    box-shadow: 0 0 0 1px var(--color-border-pink);
+  }
+
+  .cpm-panel-resize-handle:focus-visible {
+    outline: none;
+    background-color: var(--color-border-pink);
+    box-shadow: 0 0 0 1px var(--color-border-pink);
   }
 
   /**

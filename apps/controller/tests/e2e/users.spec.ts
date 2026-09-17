@@ -28,71 +28,86 @@ test.describe('Users page', () => {
     await waitForHydration(page);
   });
 
-  test('page loads with Users heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-    await expect(page.getByText('Manage user accounts, roles, and access.')).toBeVisible();
+  /** The rail's row for an account, found by its email. */
+  const railRow = (page: import('@playwright/test').Page, email: string) =>
+    page
+      .getByRole('navigation', { name: 'Users' })
+      .getByRole('listitem')
+      .filter({ hasText: email });
+
+  test('page loads with the user list beside the selected user', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible();
+    // The first account is selected, so the detail is never an empty pane on arrival.
+    await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible();
   });
 
   test('displays at least one user (the admin)', async ({ page }) => {
-    await expect(page.getByText(/\d+ users?/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/\d+ users? shown/)).toBeVisible({ timeout: 5000 });
   });
 
   test('search input filters users', async ({ page }) => {
     await page.getByPlaceholder('Search users...').fill('testadmin');
-    await expect(page.getByText(/1 user/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/^1 user shown/)).toBeVisible({ timeout: 5000 });
 
     await page.getByPlaceholder('Search users...').fill('nonexistent-zzz');
     await expect(page.getByText('No users found.')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('the status filter narrows the list', async ({ page }) => {
+    await page.getByRole('radio', { name: 'Disabled' }).click();
+    await expect(railRow(page, 'testadmin@localhost')).toHaveCount(0);
+
+    await page.getByRole('radio', { name: 'Active' }).click();
+    await expect(railRow(page, 'testadmin@localhost')).toBeVisible();
+  });
+
+  test('selecting a user shows their details and groups', async ({ page }) => {
+    await railRow(page, 'testadmin@localhost').click();
+    const detail = page.getByRole('main');
+    await expect(detail.getByRole('heading', { name: 'Details' })).toBeVisible();
+    await expect(detail.getByText('Sign-in method')).toBeVisible();
+    await expect(detail.getByRole('heading', { name: 'Groups' })).toBeVisible();
   });
 
   test('admin user shows admin role badge', async ({ page }) => {
     await expect(page.getByText('admin', { exact: true }).first()).toBeVisible();
   });
 
-  test('clicking edit button shows edit form', async ({ page }) => {
-    await page
-      .getByRole('button', { name: /^Edit user / })
-      .first()
-      .click();
-    await expect(page.getByText(/editing/i)).toBeVisible();
-    await expect(page.getByPlaceholder('Display name')).toBeVisible();
-    await expect(page.getByPlaceholder('Email address')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+  test('clicking edit opens the edit dialog', async ({ page }) => {
+    await page.getByRole('button', { name: /^Edit user / }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText(/editing/i)).toBeVisible();
+    await expect(dialog.getByPlaceholder('Display name')).toBeVisible();
+    await expect(dialog.getByPlaceholder('Email address')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible();
   });
 
-  test('clicking cancel closes the edit form', async ({ page }) => {
-    await page
-      .getByRole('button', { name: /^Edit user / })
-      .first()
-      .click();
-    await expect(page.getByText(/editing/i)).toBeVisible();
+  test('clicking cancel closes the edit dialog', async ({ page }) => {
+    await page.getByRole('button', { name: /^Edit user / }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText(/editing/i)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByText(/editing/i)).not.toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
-  test('edit form has role select with Admin, User, Viewer options', async ({ page }) => {
-    await page
-      .getByRole('button', { name: /^Edit user / })
-      .first()
-      .click();
+  test('edit dialog has role select with Admin, User, Viewer options', async ({ page }) => {
+    await page.getByRole('button', { name: /^Edit user / }).click();
 
-    // The role select trigger should be visible
-    const roleTrigger = page.getByRole('combobox').first();
+    const roleTrigger = page.getByRole('dialog').getByRole('combobox').first();
     await expect(roleTrigger).toBeVisible();
     await roleTrigger.click();
 
-    // Check dropdown options
     await expect(page.getByRole('option', { name: 'Admin' })).toBeVisible();
     await expect(page.getByRole('option', { name: 'User' })).toBeVisible();
     await expect(page.getByRole('option', { name: 'Viewer' })).toBeVisible();
   });
 
-  test('user row shows action buttons (edit, disable, delete)', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /^Edit user / }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Disable user / }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Delete user / }).first()).toBeVisible();
+  test('the selected user has edit, disable and delete actions', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /^Edit user / })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Disable user / })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Delete user / })).toBeVisible();
   });
 
   // ── Create user (UI) ──────────────────────────────────────────────────
@@ -101,15 +116,16 @@ test.describe('Users page', () => {
     await expect(page.getByRole('button', { name: /create user/i })).toBeVisible();
   });
 
-  test('clicking Create User shows create form', async ({ page }) => {
+  test('clicking Create User opens the create dialog', async ({ page }) => {
     await page.getByRole('button', { name: /create user/i }).click();
 
     await expect(page.getByTestId('create-email')).toBeVisible();
     await expect(page.getByTestId('create-name')).toBeVisible();
     await expect(page.getByTestId('create-role')).toBeVisible();
     await expect(page.getByTestId('create-password')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Create', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('button', { name: 'Create', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible();
   });
 
   test('the generate button fills the password with a usable value', async ({ page }) => {
@@ -142,19 +158,19 @@ test.describe('Users page', () => {
     await page.getByTestId('create-name').fill('Generated Password User');
     await page.getByRole('button', { name: /generate a strong password/i }).click();
 
-    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Create', exact: true }).click();
 
     // The real assertion: what the generator produces satisfies the policy the server applies,
     // so the form does not bounce it.
     await expect(page.getByTestId('create-email')).not.toBeVisible();
-    await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
+    await expect(railRow(page, email)).toBeVisible({ timeout: 5000 });
   });
 
-  test('clicking Cancel hides the create form', async ({ page }) => {
+  test('clicking Cancel closes the create dialog', async ({ page }) => {
     await page.getByRole('button', { name: /create user/i }).click();
     await expect(page.getByTestId('create-email')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByTestId('create-email')).not.toBeVisible();
   });
 
@@ -172,15 +188,14 @@ test.describe('Users page', () => {
     await page.getByTestId('create-name').fill('New Test User');
     await page.getByTestId('create-password').fill(password);
 
-    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(page.getByTestId('create-email')).not.toBeVisible();
-    await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
-    // The row name renders through Text maxLines, which also mounts a hidden
-    // truncation tooltip carrying the same string - filter to the visible one.
-    await expect(
-      page.getByText('New Test User', { exact: true }).filter({ visible: true }),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(railRow(page, email)).toBeVisible({ timeout: 5000 });
+    // The new account is selected once it arrives, so its name heads the detail.
+    await expect(page.getByRole('heading', { name: 'New Test User', level: 2 })).toBeVisible({
+      timeout: 5000,
+    });
 
     const created = getUserRecord(email);
     expect(created.provider).toBe('credentials');
@@ -218,10 +233,10 @@ test.describe('Users page', () => {
     await page.getByTestId('create-role').click();
     await page.getByRole('option', { name: 'Viewer' }).click();
 
-    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Create', exact: true }).click();
 
-    await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('viewer', { exact: true }).first()).toBeVisible({ timeout: 5000 });
+    await expect(railRow(page, email)).toBeVisible({ timeout: 5000 });
+    await expect(railRow(page, email).getByText('viewer', { exact: true })).toBeVisible();
 
     const created = getUserRecord(email);
     expect(created.role).toBe('viewer');

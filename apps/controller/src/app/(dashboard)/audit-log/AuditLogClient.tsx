@@ -135,7 +135,6 @@ export default function AuditLogClient({
     <VStack gap={6}>
       <ListPageHeader
         title={t("auditLog")}
-        description={t("pageDescription")}
         stats={
           <StatTiles
             tiles={[

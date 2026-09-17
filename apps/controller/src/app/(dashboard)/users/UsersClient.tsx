@@ -1,33 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { UserCog, Trash2, Pencil, Ban, CheckCircle2, Plus } from "lucide-react";
+/**
+ * Users as a list-detail page: accounts in a searchable rail, the selected account on the right.
+ *
+ * The shape the admin consoles on Mobbin converge on (Zoho CRM, Canny, Pinterest Business): a rail
+ * row is avatar, name, email and a role badge; the detail leads with the person and their state,
+ * keeps the actions in its header, and lays the rest out as sections - details, then the groups
+ * they belong to. Creating and editing happen in dialogs, so the list never reflows under a form.
+ */
+import { useEffect, useMemo, useState } from "react";
+import { Ban, CheckCircle2, Pencil, Plus, Trash2, UserCog, Users as UsersIcon } from "lucide-react";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
-import { Grid } from "@astryxdesign/core/Grid";
-import { Icon } from "@astryxdesign/core/Icon";
+import { Heading } from "@astryxdesign/core/Heading";
 import { IconButton } from "@astryxdesign/core/IconButton";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Selector } from "@astryxdesign/core/Selector";
-import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { ListPageHeader } from "@/components/ui/ListPageHeader";
+import { AppDialog } from "@/components/ui/AppDialog";
+import { SplitPage } from "@/components/ui/SplitPage";
 import { Fab } from "@/src/components/mobile/Fab";
 import { SearchField } from "@/components/ui/SearchField";
-import { StatTiles } from "@/components/ui/StatTiles";
 import { EmailInput } from "@/src/components/ui/EmailInput";
 import { GeneratedPasswordField } from "@/src/components/ui/GeneratedPasswordField";
 import { AUTOFILL_EMAIL, NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
+import { Timestamp } from "@/components/ui/Timestamp";
 import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { useRouter } from "next/navigation";
-import { useFormatter, useTranslations } from "next-intl";
-import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
+import { useTranslations } from "next-intl";
 import {
   createUserAction,
   updateUserRoleAction,
@@ -35,12 +44,15 @@ import {
   updateUserInfoAction,
   deleteUserAction,
 } from "./actions";
+import { addGroupMemberAction, removeGroupMemberAction } from "../groups/actions";
+
+type Role = "admin" | "operator" | "user" | "viewer";
 
 type UserEntry = {
   id: number;
   email: string;
   name: string | null;
-  role: "admin" | "operator" | "user" | "viewer";
+  role: Role;
   provider: string | null;
   subject: string | null;
   avatarUrl: string | null;
@@ -52,11 +64,22 @@ type UserEntry = {
   lastSessionAt: string | null;
 };
 
+/** A group, and who is in it - enough to show and change one user's memberships. */
+export type GroupSummary = {
+  id: number;
+  name: string;
+  source: string;
+  memberIds: number[];
+};
+
 type Props = {
   users: UserEntry[];
+  groups?: GroupSummary[];
   /** False in OIDC-only mode: accounts come from the IdP, not from this page. */
   localUsersEnabled?: boolean;
 };
+
+type StatusFilter = "all" | "active" | "disabled";
 
 const ROLE_OPTIONS = [
   { value: "admin", labelKey: "roles.admin" },
@@ -66,7 +89,7 @@ const ROLE_OPTIONS = [
 ] as const;
 
 /** Role tint. Admin reads as elevated privilege, the rest are informational. */
-const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
+const ROLE_VARIANTS: Record<Role, "red" | "blue" | "neutral"> = {
   admin: "red",
   // Elevated, but only over what their groups were granted - not the whole instance.
   operator: "blue",
@@ -74,328 +97,264 @@ const ROLE_VARIANTS: Record<UserEntry["role"], "red" | "blue" | "neutral"> = {
   viewer: "neutral",
 };
 
-function userLabel(user: UserEntry) {
+function userLabel(user: Pick<UserEntry, "name" | "email">) {
   return user.name ?? user.email.split("@")[0];
 }
 
-export default function UsersClient({ users, localUsersEnabled = true }: Props) {
+/** "local" is the absence of an external provider, so anything else names an IdP. */
+function isExternal(user: UserEntry) {
+  return !!user.provider && user.provider !== "local" && user.provider !== "credentials";
+}
+
+export default function UsersClient({ users, groups = [], localUsersEnabled = true }: Props) {
   const t = useTranslations("users");
-  const roleOptions = ROLE_OPTIONS.map((role) => ({ value: role.value, label: t(role.labelKey) }));
   const router = useRouter();
-  const [editUserId, setEditUserId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(users[0]?.id ?? null);
   const [search, setSearch] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [createOpen, setCreateOpen] = useState(false);
   // These actions used to fail silently: nothing caught them and nothing was shown.
   const [error, setError] = useState<string | null>(null);
-  const [createRole, setCreateRole] = useState<UserEntry["role"]>("user");
-  const [createEmail, setCreateEmail] = useState("");
-  const [createName, setCreateName] = useState("");
-  const [createPassword, setCreatePassword] = useState("");
+  // A just-created account is selected once the refreshed list delivers it: its id is only known
+  // after the server has rendered the row, so the create dialog hands over the email instead.
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
-  const [roleFilter, setRoleFilter] = useState("all");
+  useEffect(() => {
+    if (!pendingEmail) return;
+    const created = users.find((u) => u.email.toLowerCase() === pendingEmail);
+    if (created) {
+      setPendingEmail(null);
+      setSelectedId(created.id);
+    }
+  }, [users, pendingEmail]);
 
-  const searched = search
-    ? users.filter(
-        (u) =>
-          u.name?.toLowerCase().includes(search.toLowerCase()) ||
-          u.email.toLowerCase().includes(search.toLowerCase()) ||
-          u.role.includes(search.toLowerCase()),
-      )
-    : users;
-  const filtered = roleFilter === "all" ? searched : searched.filter((u) => u.role === roleFilter);
+  // A deleted selection falls back to the first account rather than an empty pane. Keyed on the
+  // list alone: a record just created is selected before the refreshed list delivers it, and
+  // checking on every selection change would throw that selection away.
+  useEffect(() => {
+    setSelectedId((current) =>
+      current !== null && !users.some((entry) => entry.id === current)
+        ? (users[0]?.id ?? null)
+        : current,
+    );
+  }, [users]);
 
-  // The tiles and the tab counts report on every account, not on what the search left behind:
-  // narrowing the list should not change what the deployment is said to hold.
-  const roleCounts = ROLE_OPTIONS.reduce(
-    (acc, role) => {
-      acc[role.value as UserEntry["role"]] = users.filter((u) => u.role === role.value).length;
-      return acc;
-    },
-    { admin: 0, operator: 0, user: 0, viewer: 0 } as Record<UserEntry["role"], number>,
-  );
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (status === "active" && u.status !== "active") return false;
+      if (status === "disabled" && u.status === "active") return false;
+      if (!q) return true;
+      return (
+        (u.name ?? "").toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        u.role.includes(q)
+      );
+    });
+  }, [users, search, status]);
+
+  const selected = users.find((u) => u.id === selectedId) ?? null;
   const activeCount = users.filter((u) => u.status === "active").length;
-  const disabledCount = users.length - activeCount;
-  // "local" is the absence of an external provider, so anything else names an IdP.
-  const idpCount = users.filter((u) => u.provider && u.provider !== "local").length;
-  const withSessionCount = users.filter((u) => u.lastSessionAt).length;
 
-  return (
-    <VStack gap={6}>
-      <ListPageHeader
-        title={t("users")}
-        description={t("pageDescription")}
-        stats={
-          <StatTiles
-            tiles={[
-              {
-                id: "total",
-                label: t("users"),
-                value: users.length,
-                note: t("activeDisabledNote", { active: activeCount, disabled: disabledCount }),
-              },
-              {
-                id: "admins",
-                label: t("roleAdmins"),
-                value: roleCounts.admin,
-                note: t("operatorsNote", { count: roleCounts.operator }),
-              },
-              {
-                id: "idp",
-                label: t("fromIdp"),
-                value: idpCount,
-                note: t("reconciledOnSignIn"),
-              },
-              {
-                id: "sessions",
-                label: t("withSession"),
-                value: withSessionCount,
-                note: t("withSessionNote"),
-              },
-            ]}
-          />
-        }
-        filters={
-          <TabList value={roleFilter} onChange={setRoleFilter}>
-            <Tab value="all" label={t("filterAll")} endContent={<Badge label={users.length} />} />
-            {ROLE_OPTIONS.map((role) => (
-              <Tab
-                key={role.value}
-                value={role.value}
-                label={t(role.labelKey)}
-                endContent={<Badge label={roleCounts[role.value as UserEntry["role"]]} />}
-              />
-            ))}
-          </TabList>
-        }
-        search={
-          <SearchField
-            value={search}
-            onChange={setSearch}
-            placeholder={t("searchPlaceholder")}
-            label={t("searchLabel")}
-          />
-        }
-      />
+  const refresh = (message: string | null = null) => {
+    setError(message);
+    if (message === null) router.refresh();
+  };
 
-      {error && <Banner status="error" title={t("errorTitle")} description={error} />}
-
-      <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
-        <HStack gap={3} vAlign="center">
-          <Text type="body" size="sm" color="secondary">
-            {t("userCount", { count: filtered.length })}
-          </Text>
+  const rail = (open: () => void) => (
+    <VStack gap={3} padding={3}>
+      <div className="cpm-list-header cpm-list-header-inset">
+        <HStack justify="between" vAlign="center" gap={2}>
+          <Heading level={1}>{t("users")}</Heading>
           {localUsersEnabled && (
-            <>
-              <Button
-                className="cpm-desktop-only"
-                variant="secondary"
-                size="sm"
-                icon={<Plus />}
-                label={t("createUser")}
-                onClick={() => setShowCreate(!showCreate)}
-              />
-              <Fab label={t("createUser")} onClick={() => setShowCreate(true)} />
-            </>
+            <Button
+              variant="primary"
+              size="lg"
+              icon={<Plus />}
+              label={t("createUser")}
+              onClick={() => setCreateOpen(true)}
+              className="cpm-desktop-only"
+            />
           )}
         </HStack>
-      </HStack>
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder={t("searchPlaceholder")}
+          label={t("searchLabel")}
+          width="100%"
+        />
+        <SegmentedControl
+          label={t("statusFilterLabel")}
+          size="sm"
+          layout="fill"
+          value={status}
+          onChange={(v) => setStatus(v as StatusFilter)}
+        >
+          <SegmentedControlItem value="all" label={t("filterAll")} />
+          <SegmentedControlItem value="active" label={t("filterActive")} />
+          <SegmentedControlItem value="disabled" label={t("filterDisabled")} />
+        </SegmentedControl>
+      </div>
 
-      {localUsersEnabled && showCreate && (
-        <Card>
-          <form
-            action={async (formData) => {
-              formData.set("role", createRole);
-              const result = await createUserAction(formData);
-              if (result.status === "error") {
-                setError(result.message ?? null);
-                return;
+      {filtered.length === 0 ? (
+        <EmptyState icon={<UserCog />} title={t("noUsersFound")} isCompact />
+      ) : (
+        <List>
+          {filtered.map((user) => (
+            <ListItem
+              key={user.id}
+              isSelected={user.id === selectedId}
+              startContent={
+                <UserAvatar avatar={user.avatar} alt={userLabel(user)} size="sm" tooltip={false} />
               }
-              setError(null);
-              setShowCreate(false);
-              setCreateRole("user");
-              setCreateEmail("");
-              setCreateName("");
-              setCreatePassword("");
-              router.refresh();
-            }}
-          >
-            <VStack gap={3}>
-              <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
-                <EmailInput
-                  {...NATIVE_REQUIRED}
-                  {...AUTOFILL_EMAIL}
-                  data-testid="create-email"
-                  label={t("email")}
-                  htmlName="email"
-                  value={createEmail}
-                  onChange={setCreateEmail}
-                  placeholder={t("emailPlaceholder")}
-                  isRequired
-                />
-                <TextInput
-                  data-testid="create-name"
-                  label={t("name")}
-                  isOptional
-                  htmlName="name"
-                  value={createName}
-                  onChange={setCreateName}
-                  placeholder={t("displayName")}
-                />
-                <Selector
-                  data-testid="create-role"
-                  label={t("role")}
-                  options={roleOptions}
-                  value={createRole}
-                  onChange={(v) => setCreateRole(v as UserEntry["role"])}
-                />
-                <GeneratedPasswordField
-                  data-testid="create-password"
-                  label={t("password")}
-                  htmlName="password"
-                  value={createPassword}
-                  onChange={setCreatePassword}
-                  placeholder={t("passwordPlaceholder")}
-                  isRequired
-                  minLength={8}
-                />
-              </Grid>
-              <HStack gap={2}>
-                <Button type="submit" size="sm" label={t("create")} />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  label={t("cancel")}
-                  onClick={() => setShowCreate(false)}
-                />
-              </HStack>
-            </VStack>
-          </form>
-        </Card>
+              label={userLabel(user)}
+              description={user.email}
+              endContent={
+                <HStack gap={1} vAlign="center">
+                  {user.status !== "active" && <Badge variant="error" label={t("disabledBadge")} />}
+                  <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
+                </HStack>
+              }
+              onClick={() => {
+                setSelectedId(user.id);
+                open();
+              }}
+            />
+          ))}
+        </List>
       )}
 
-      {filtered.length === 0 && (
-        <Card>
-          <EmptyState icon={<UserCog />} title={t("noUsersFound")} />
-        </Card>
-      )}
-
-      <VStack gap={3}>
-        {filtered.map((user) => (
-          <Card key={user.id} padding={3}>
-            {editUserId === user.id ? (
-              <EditUserRow
-                user={user}
-                onClose={() => setEditUserId(null)}
-                onError={setError}
-                onSave={() => {
-                  setEditUserId(null);
-                  router.refresh();
-                }}
-              />
-            ) : (
-              <UserRow
-                user={user}
-                onEdit={() => setEditUserId(user.id)}
-                onError={setError}
-                onRefresh={() => router.refresh()}
-              />
-            )}
-          </Card>
-        ))}
-      </VStack>
+      {/* Totals at the foot: the rail scrolls, and these describe the whole set. */}
+      <Text type="supporting" color="secondary">
+        {t("railSummary", { count: filtered.length, active: activeCount, total: users.length })}
+      </Text>
     </VStack>
+  );
+
+  return (
+    <SplitPage
+      storageKey="users-rail"
+      railLabel={t("users")}
+      resizeLabel={t("resizeRail")}
+      backLabel={t("backToUsers")}
+      hasSelection={selected !== null}
+      rail={rail}
+      phoneExtras={
+        localUsersEnabled ? (
+          <Fab label={t("createUser")} onClick={() => setCreateOpen(true)} />
+        ) : undefined
+      }
+      detail={
+        <VStack gap={4}>
+          {error && <Banner status="error" title={t("errorTitle")} description={error} />}
+          {selected ? (
+            <UserDetail
+              // Remounted per user, so an open dialog or a half-typed field never carries across.
+              key={selected.id}
+              user={selected}
+              groups={groups}
+              onDone={refresh}
+            />
+          ) : (
+            <EmptyState
+              icon={<UserCog />}
+              title={t("selectionEmptyTitle")}
+              description={t("selectionEmptyDescription")}
+            />
+          )}
+        </VStack>
+      }
+    >
+      {localUsersEnabled && (
+        <CreateUserDialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onError={setError}
+          onCreated={(email) => {
+            setCreateOpen(false);
+            setError(null);
+            setSearch("");
+            setStatus("all");
+            setPendingEmail(email.toLowerCase());
+            router.refresh();
+          }}
+        />
+      )}
+    </SplitPage>
   );
 }
 
-function UserRow({
+function UserDetail({
   user,
-  onEdit,
-  onError,
-  onRefresh,
+  groups,
+  onDone,
 }: {
   user: UserEntry;
-  onEdit: () => void;
-  onError: (message: string | null) => void;
-  onRefresh: () => void;
+  groups: GroupSummary[];
+  /** null after a successful change, the message after a failed one. */
+  onDone: (message: string | null) => void;
 }) {
   const t = useTranslations("users");
-  const format = useFormatter();
   const isDisabled = user.status !== "active";
   const [confirmKind, setConfirmKind] = useState<"disable" | "delete" | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const name = userLabel(user);
 
   return (
-    <HStack gap={3} vAlign="center" justify="between">
-      <HStack gap={3} vAlign="center">
-        <UserAvatar avatar={user.avatar} alt={user.name ?? user.email} size="md" />
-        <VStack gap={0}>
-          <HStack gap={2} vAlign="center">
-            <Text type="body" size="sm" weight="medium" maxLines={1}>
-              {userLabel(user)}
+    <VStack gap={5}>
+      <HStack gap={4} vAlign="start" justify="between" wrap="wrap">
+        <HStack gap={4} vAlign="center">
+          <UserAvatar avatar={user.avatar} alt={name} size={48} tooltip={false} />
+          <VStack gap={1}>
+            <HStack gap={2} vAlign="center" wrap="wrap">
+              <Heading level={2} maxLines={1}>
+                {name}
+              </Heading>
+              <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
+              {isDisabled && <Badge variant="error" label={t("disabledBadge")} />}
+            </HStack>
+            <Text type="body" size="sm" color="secondary">
+              {user.email}
             </Text>
-            {isDisabled && <Badge variant="error" label={t("disabledBadge")} />}
-          </HStack>
-          <Text type="body" size="xsm" color="secondary" maxLines={1}>
-            {user.email} · {user.provider}
-          </Text>
-          {user.lastSessionAt ? (
-            <UtcTooltip value={user.lastSessionAt}>
-              <Text type="supporting" color="secondary" maxLines={1}>
-                {t("lastSignedIn", {
-                  when: format.dateTime(
-                    new Date(user.lastSessionAt),
-                    TIMESTAMP_STYLES.dateTimeShort,
-                  ),
-                })}
-              </Text>
-            </UtcTooltip>
-          ) : (
-            <Text type="supporting" color="secondary" maxLines={1}>
-              {t("noActiveSession")}
-            </Text>
-          )}
-        </VStack>
-      </HStack>
+          </VStack>
+        </HStack>
 
-      <HStack gap={2} vAlign="center">
-        <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
         <HStack gap={1} vAlign="center">
-          {user.status === "active" ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Pencil />}
+            label={t("edit")}
+            aria-label={t("editUserNamed", { name })}
+            onClick={() => setEditOpen(true)}
+          />
+          {isDisabled ? (
             <IconButton
               variant="ghost"
               size="sm"
-              label={t("disableUserNamed", { name: userLabel(user) })}
-              tooltip={t("disableUser")}
-              icon={<Ban />}
-              onClick={() => setConfirmKind("disable")}
-            />
-          ) : (
-            <IconButton
-              variant="ghost"
-              size="sm"
-              label={t("enableUserNamed", { name: userLabel(user) })}
+              label={t("enableUserNamed", { name })}
               tooltip={t("enableUser")}
               icon={<CheckCircle2 />}
               onClick={async () => {
                 const result = await updateUserStatusAction(user.id, "active");
-                if (result.status === "error") return onError(result.message ?? null);
-                onError(null);
-                onRefresh();
+                onDone(result.status === "error" ? (result.message ?? null) : null);
               }}
+            />
+          ) : (
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label={t("disableUserNamed", { name })}
+              tooltip={t("disableUser")}
+              icon={<Ban />}
+              onClick={() => setConfirmKind("disable")}
             />
           )}
           <IconButton
             variant="ghost"
             size="sm"
-            label={t("editUserNamed", { name: userLabel(user) })}
-            tooltip={t("editUser")}
-            icon={<Pencil />}
-            onClick={onEdit}
-          />
-          <IconButton
-            variant="ghost"
-            size="sm"
-            label={t("deleteUserNamed", { name: userLabel(user) })}
+            label={t("deleteUserNamed", { name })}
             tooltip={t("deleteUser")}
             icon={<Trash2 />}
             onClick={() => setConfirmKind("delete")}
@@ -403,8 +362,59 @@ function UserRow({
         </HStack>
       </HStack>
 
-      {/* Both actions used window.confirm, which is unstyled and not announced
-          as a dialog. The wording is carried over unchanged. */}
+      {isDisabled && (
+        <Banner
+          status="warning"
+          title={t("disabledBannerTitle")}
+          description={t("disabledBannerDescription")}
+        />
+      )}
+
+      <Card>
+        <VStack gap={3}>
+          <Heading level={3}>{t("details")}</Heading>
+          <MetadataList>
+            <MetadataListItem label={t("email")}>{user.email}</MetadataListItem>
+            <MetadataListItem label={t("role")}>{t(`roles.${user.role}`)}</MetadataListItem>
+            <MetadataListItem label={t("signInMethod")}>
+              {isExternal(user)
+                ? t("signInExternal", { provider: user.provider ?? "" })
+                : t("signInLocal")}
+            </MetadataListItem>
+            {isExternal(user) && user.subject && (
+              <MetadataListItem label={t("subject")}>
+                <Text type="code" size="sm">
+                  {user.subject}
+                </Text>
+              </MetadataListItem>
+            )}
+            <MetadataListItem label={t("lastSignIn")}>
+              {user.lastSessionAt ? (
+                <Timestamp value={user.lastSessionAt} style="dateTimeShort" />
+              ) : (
+                t("noActiveSession")
+              )}
+            </MetadataListItem>
+            <MetadataListItem label={t("created")}>
+              <Timestamp value={user.createdAt} style="date" />
+            </MetadataListItem>
+          </MetadataList>
+        </VStack>
+      </Card>
+
+      <GroupsCard user={user} groups={groups} onDone={onDone} />
+
+      <EditUserDialog
+        open={editOpen}
+        user={user}
+        onClose={() => setEditOpen(false)}
+        onDone={(message) => {
+          if (message === null) setEditOpen(false);
+          onDone(message);
+        }}
+      />
+
+      {/* Both actions used window.confirm, which is unstyled and not announced as a dialog. */}
       <AlertDialog
         isOpen={confirmKind !== null}
         onOpenChange={(open) => !open && setConfirmKind(null)}
@@ -421,25 +431,217 @@ function UserRow({
               ? await deleteUserAction(user.id)
               : await updateUserStatusAction(user.id, "disabled");
           setConfirmKind(null);
-          if (result.status === "error") return onError(result.message ?? null);
-          onError(null);
-          onRefresh();
+          onDone(result.status === "error" ? (result.message ?? null) : null);
         }}
       />
-    </HStack>
+    </VStack>
   );
 }
 
-function EditUserRow({
+/** The groups this account is in, with the ones it is not in a pick away. */
+function GroupsCard({
   user,
-  onClose,
-  onError,
-  onSave,
+  groups,
+  onDone,
 }: {
   user: UserEntry;
+  groups: GroupSummary[];
+  onDone: (message: string | null) => void;
+}) {
+  const t = useTranslations("users");
+  const memberOf = groups.filter((g) => g.memberIds.includes(user.id));
+  const available = groups.filter((g) => !g.memberIds.includes(user.id));
+  const [adding, setAdding] = useState("");
+
+  return (
+    <Card>
+      <VStack gap={3}>
+        <HStack justify="between" vAlign="center" gap={2} wrap="wrap">
+          <Heading level={3}>{t("groupsTitle")}</Heading>
+          <Badge label={t("groupCount", { count: memberOf.length })} />
+        </HStack>
+        {memberOf.length === 0 ? (
+          <Text type="body" size="sm" color="secondary">
+            {groups.length === 0 ? t("noGroupsExist") : t("notInAnyGroup")}
+          </Text>
+        ) : (
+          <List hasDividers>
+            {memberOf.map((group) => (
+              <ListItem
+                key={group.id}
+                startContent={<UsersIcon size={16} />}
+                label={group.name}
+                description={group.source === "oidc" ? t("groupFromIdp") : undefined}
+                endContent={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    label={t("removeFromGroup")}
+                    aria-label={t("removeFromGroupNamed", { group: group.name })}
+                    onClick={async () => {
+                      try {
+                        await removeGroupMemberAction(group.id, user.id);
+                        onDone(null);
+                      } catch {
+                        onDone(t("groupChangeFailed"));
+                      }
+                    }}
+                  />
+                }
+              />
+            ))}
+          </List>
+        )}
+        {available.length > 0 && (
+          <HStack gap={2} vAlign="end" wrap="wrap">
+            <Selector
+              label={t("addToGroup")}
+              size="sm"
+              placeholder={t("chooseGroup")}
+              options={available.map((g) => ({ value: String(g.id), label: g.name }))}
+              value={adding}
+              onChange={(v) => setAdding(v as string)}
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              label={t("add")}
+              isDisabled={adding === ""}
+              onClick={async () => {
+                try {
+                  await addGroupMemberAction(Number(adding), user.id);
+                  setAdding("");
+                  onDone(null);
+                } catch {
+                  onDone(t("groupChangeFailed"));
+                }
+              }}
+            />
+          </HStack>
+        )}
+      </VStack>
+    </Card>
+  );
+}
+
+function CreateUserDialog({
+  open,
+  onClose,
+  onError,
+  onCreated,
+}: {
+  open: boolean;
   onClose: () => void;
   onError: (message: string | null) => void;
-  onSave: () => void;
+  onCreated: (email: string) => void;
+}) {
+  const t = useTranslations("users");
+  const roleOptions = ROLE_OPTIONS.map((role) => ({ value: role.value, label: t(role.labelKey) }));
+  const [role, setRole] = useState<Role>("user");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setRole("user");
+      setEmail("");
+      setName("");
+      setPassword("");
+      setDialogError(null);
+    }
+  }, [open]);
+
+  return (
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      title={t("createUser")}
+      maxWidth="md"
+      submitLabel={t("create")}
+      isSubmitting={submitting}
+      onSubmit={() =>
+        (document.getElementById("create-user-form") as HTMLFormElement | null)?.requestSubmit()
+      }
+    >
+      <form
+        id="create-user-form"
+        action={async (formData) => {
+          formData.set("role", role);
+          setSubmitting(true);
+          try {
+            const result = await createUserAction(formData);
+            if (result.status === "error") {
+              setDialogError(result.message ?? null);
+              return;
+            }
+            onError(null);
+            onCreated(email);
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+      >
+        <VStack gap={3}>
+          {dialogError && (
+            <Banner status="error" title={t("errorTitle")} description={dialogError} />
+          )}
+          <EmailInput
+            {...NATIVE_REQUIRED}
+            {...AUTOFILL_EMAIL}
+            data-testid="create-email"
+            label={t("email")}
+            htmlName="email"
+            value={email}
+            onChange={setEmail}
+            placeholder={t("emailPlaceholder")}
+            isRequired
+            hasAutoFocus
+          />
+          <TextInput
+            data-testid="create-name"
+            label={t("name")}
+            isOptional
+            htmlName="name"
+            value={name}
+            onChange={setName}
+            placeholder={t("displayName")}
+          />
+          <Selector
+            data-testid="create-role"
+            label={t("role")}
+            options={roleOptions}
+            value={role}
+            onChange={(v) => setRole(v as Role)}
+          />
+          <GeneratedPasswordField
+            data-testid="create-password"
+            label={t("password")}
+            htmlName="password"
+            value={password}
+            onChange={setPassword}
+            placeholder={t("passwordPlaceholder")}
+            isRequired
+            minLength={8}
+          />
+        </VStack>
+      </form>
+    </AppDialog>
+  );
+}
+
+function EditUserDialog({
+  open,
+  user,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  user: UserEntry;
+  onClose: () => void;
+  onDone: (message: string | null) => void;
 }) {
   const t = useTranslations("users");
   const roleOptions = ROLE_OPTIONS.map((option) => ({
@@ -449,57 +651,69 @@ function EditUserRow({
   const [role, setRole] = useState(user.role);
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRole(user.role);
+      setName(user.name ?? "");
+      setEmail(user.email);
+    }
+  }, [open, user]);
 
   return (
-    <VStack gap={3}>
-      <HStack gap={2} vAlign="center">
-        <Icon icon={Pencil} size="sm" />
-        <Text type="body" size="sm" weight="medium">
-          {t("editingNamed", { name: user.name ?? user.email })}
-        </Text>
-      </HStack>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      title={t("editingNamed", { name: user.name ?? user.email })}
+      maxWidth="md"
+      submitLabel={t("save")}
+      isSubmitting={submitting}
+      onSubmit={() =>
+        (document.getElementById("edit-user-form") as HTMLFormElement | null)?.requestSubmit()
+      }
+    >
       <form
+        id="edit-user-form"
         action={async (formData) => {
-          const info = await updateUserInfoAction(user.id, formData);
-          if (info.status === "error") return onError(info.message ?? null);
-          if (role !== user.role) {
-            const roleResult = await updateUserRoleAction(user.id, role);
-            if (roleResult.status === "error") return onError(roleResult.message ?? null);
+          setSubmitting(true);
+          try {
+            const info = await updateUserInfoAction(user.id, formData);
+            if (info.status === "error") return onDone(info.message ?? null);
+            if (role !== user.role) {
+              const roleResult = await updateUserRoleAction(user.id, role);
+              if (roleResult.status === "error") return onDone(roleResult.message ?? null);
+            }
+            onDone(null);
+          } finally {
+            setSubmitting(false);
           }
-          onError(null);
-          onSave();
         }}
       >
         <VStack gap={3}>
-          <Grid columns={{ minWidth: 200, max: 3 }} gap={3}>
-            <TextInput
-              label={t("name")}
-              htmlName="name"
-              value={name}
-              onChange={setName}
-              placeholder={t("displayName")}
-            />
-            <EmailInput
-              {...AUTOFILL_EMAIL}
-              label={t("email")}
-              htmlName="email"
-              value={email}
-              onChange={setEmail}
-              placeholder={t("emailAddress")}
-            />
-            <Selector
-              label={t("role")}
-              options={roleOptions}
-              value={role}
-              onChange={(v) => setRole(v as UserEntry["role"])}
-            />
-          </Grid>
-          <HStack gap={2}>
-            <Button type="submit" size="sm" label={t("save")} />
-            <Button type="button" variant="ghost" size="sm" label={t("cancel")} onClick={onClose} />
-          </HStack>
+          <TextInput
+            label={t("name")}
+            htmlName="name"
+            value={name}
+            onChange={setName}
+            placeholder={t("displayName")}
+          />
+          <EmailInput
+            {...AUTOFILL_EMAIL}
+            label={t("email")}
+            htmlName="email"
+            value={email}
+            onChange={setEmail}
+            placeholder={t("emailAddress")}
+          />
+          <Selector
+            label={t("role")}
+            options={roleOptions}
+            value={role}
+            onChange={(v) => setRole(v as Role)}
+          />
         </VStack>
       </form>
-    </VStack>
+    </AppDialog>
   );
 }

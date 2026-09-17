@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -27,7 +27,6 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { Kbd } from "@astryxdesign/core/Kbd";
 import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
@@ -53,6 +52,7 @@ import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp, UtcTooltip } from "@/components/ui/Timestamp";
+import { PanelResizeHandle, usePersistedPanelWidth } from "@/components/ui/PanelResizeHandle";
 import { generatePassword } from "@/src/lib/password-generator";
 import {
   createAccessListAction,
@@ -307,7 +307,13 @@ function MembersTab({
             </Text>
           )}
         </HStack>
-        <Button size="sm" icon={<Plus />} label={t("addMember")} onClick={() => setAdding(true)} />
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<Plus />}
+          label={t("addMember")}
+          onClick={() => setAdding(true)}
+        />
       </HStack>
 
       {adding && (
@@ -911,15 +917,11 @@ function ListsRail({
           header; on a desktop the wrapper has no box and the rail's own gaps apply. */}
       <div className="cpm-list-header cpm-list-header-inset">
         <HStack justify="between" vAlign="center" gap={2}>
-          <VStack gap={0}>
-            <Heading level={1}>{t("title")}</Heading>
-            <Text type="body" size="xsm" color="secondary" className="cpm-desktop-only">
-              {t("railSubtitle", { count: lists.length })}
-            </Text>
-          </VStack>
+          <Heading level={1}>{t("title")}</Heading>
           {/* The phone gets this as a floating button instead. */}
           <Button
-            size="sm"
+            variant="primary"
+            size="lg"
             icon={<Plus />}
             label={t("new")}
             onClick={onNew}
@@ -927,18 +929,13 @@ function ListsRail({
           />
         </HStack>
 
-        <HStack gap={2} vAlign="center">
-          <SearchField
-            value={query}
-            onChange={setQuery}
-            placeholder={t("searchPlaceholder")}
-            label={t("searchAccessLists")}
-            width="100%"
-          />
-          <span className="cpm-desktop-only">
-            <Kbd keys="mod+K" />
-          </span>
-        </HStack>
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder={t("searchPlaceholder")}
+          label={t("searchAccessLists")}
+          width="100%"
+        />
 
         <SegmentedControl
           label={t("sortAccessLists")}
@@ -953,7 +950,15 @@ function ListsRail({
         </SegmentedControl>
       </div>
 
-      {filtered.length === 0 ? (
+      {lists.length === 0 ? (
+        // Nothing to search yet, so not a search miss: say so, and offer the way to make one.
+        <EmptyState
+          title={t("noListsTitle")}
+          description={t("noListsDescription")}
+          isCompact
+          actions={<Button variant="ghost" size="sm" label={t("new")} onClick={onNew} />}
+        />
+      ) : filtered.length === 0 ? (
         <EmptyState
           title={t("noListsMatch", { query })}
           isCompact
@@ -1018,6 +1023,12 @@ function ListsRail({
 export default function AccessListsClient({ lists: initialLists, usage: initialUsage }: Props) {
   const t = useTranslations("accessLists");
   const router = useRouter();
+  // Before the narrow branch's early return, so the hook order never changes with the width.
+  const railWidth = usePersistedPanelWidth("access-lists-rail", {
+    defaultWidth: 320,
+    minWidth: 240,
+    maxWidth: 560,
+  });
   const [lists, setLists] = useState(initialLists);
   const [usage, setUsage] = useState(initialUsage);
   const [selectedId, setSelectedId] = useState<number | null>(initialLists[0]?.id ?? null);
@@ -1028,7 +1039,6 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
   // picked. The desktop ignores this and always shows both.
   const isNarrow = useMediaQuery("(max-width: 767px)");
   const [detailOpen, setDetailOpen] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
 
   // Sync from server props when they change (e.g. after revalidation)
   useEffect(() => {
@@ -1063,15 +1073,10 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
     [router],
   );
 
-  // Keyboard shortcuts: ⌘K focuses search, N creates. Both were wired to a raw input ref; the
-  // search box is a component now, so the shortcut focuses the input inside its wrapper.
+  // N creates a list. The mod+K shortcut belongs to the global command palette now.
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        searchRef.current?.querySelector("input")?.focus();
-        return;
-      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tgt = e.target as HTMLElement;
       if (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA") return;
       if (e.key === "n" || e.key === "N") {
@@ -1084,19 +1089,17 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
   }, []);
 
   const rail = (onSelect: (id: number) => void) => (
-    <div ref={searchRef}>
-      <ListsRail
-        lists={lists}
-        selectedId={selectedId}
-        onSelect={onSelect}
-        onNew={() => setNewOpen(true)}
-        query={query}
-        setQuery={setQuery}
-        sort={sort}
-        setSort={setSort}
-        usage={usage}
-      />
-    </div>
+    <ListsRail
+      lists={lists}
+      selectedId={selectedId}
+      onSelect={onSelect}
+      onNew={() => setNewOpen(true)}
+      query={query}
+      setQuery={setQuery}
+      sort={sort}
+      setSort={setSort}
+      usage={usage}
+    />
   );
 
   const newDialog = (
@@ -1143,9 +1146,13 @@ export default function AccessListsClient({ lists: initialLists, usage: initialU
       <Layout
         height="fill"
         start={
-          <LayoutPanel width={320} hasDivider role="navigation" label={t("accessLists")}>
-            {rail(setSelectedId)}
-          </LayoutPanel>
+          <>
+            {/* No hasDivider: the handle is the line, and both would paint it. */}
+            <LayoutPanel width={railWidth.width} role="navigation" label={t("accessLists")}>
+              {rail(setSelectedId)}
+            </LayoutPanel>
+            <PanelResizeHandle label={t("resizeRail")} panel={railWidth} />
+          </>
         }
         content={
           <LayoutContent padding={6}>
