@@ -202,11 +202,23 @@ payloads from older masters (optional field).
 | Browser branch keeps redirect flow; API branch converts 3xx→401 | `tests/unit/caddy-forward-auth-generic.test.ts` (split tests) |
 | Strip-before-upstream on every route incl. excluded/bypass | unit test "strips spoofable identity headers…" + functional spoofing tests |
 | WebSocket handshake ⇒ 401 | functional test via raw-socket handshake |
+| **Authenticated WebSocket upgrade through the forward-auth layer** | `tests/e2e/functional/forward-auth-real-authelia.spec.ts` (101 via real Authelia session) |
 | Bypass headers skip auth, still behind strip + WAF/geoblock chain | unit + functional tests |
 | Valid session ⇒ identity headers copied to upstream | functional tests (whoami body assertions) |
+| **Real IdP negotiation** (browser 302 / API 401 / `Accept: */*` wildcard behavior) | `forward-auth-real-authelia.spec.ts` against actual Authelia v4.38 |
+| **Real upstream enforcement** (bypass delegates to the upstream's own key; wrong key rejected by Moonraker, not by CPM) | `forward-auth-real-moonraker.spec.ts` against actual Moonraker v0.11 |
 | Fail-closed on invalid upstream / missing endpoint | unit tests (`rejects` assertions) |
 | One-provider-per-host conflict rule (incl. legacy escape hatch) | unit tests |
-| Real Caddy accepts the generated config (matcher shapes, `not` array form) | all 14 functional tests run through the live Caddy container |
+| Real Caddy accepts the generated config (matcher shapes, `not` array form) | all functional tests run through the live Caddy container |
+
+Notes from the real-IdP integration tests that unit tests could not capture:
+
+- Authelia v4.38 requires `https` for the target URL (tests run over TLS with
+  an imported self-signed certificate, matching production) and for any
+  configured portal URL.
+- Authelia treats a leading `Accept: */*` as browser-like and responds 302 —
+  the apiSplit 3xx→401 conversion is what turns that into a clean 401 for
+  machine clients (asserted with the exact static body).
 
 ## 12. Recommendations for operators
 

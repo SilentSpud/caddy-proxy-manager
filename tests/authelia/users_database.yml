@@ -1,0 +1,11 @@
+---
+# File-based user database for the test Authelia instance. The password hash
+# was generated with Authelia's own CLI for 'TestPassword2026!':
+#   authelia crypto hash generate argon2 --password 'TestPassword2026!'
+users:
+  e2euser:
+    displayname: 'E2E User'
+    email: 'e2euser@example.com'
+    groups:
+      - 'admins'
+    password: '$argon2id$v=19$m=65536,t=3,p=4$8mGFifgJer6jlud/7ThwKw$oGizcRb0e2Zk2yp60JluzmZlG+mZiHGoN/XjOQiDqY8'

@@ -1,0 +1,73 @@
+---
+# Real Authelia instance for the functional forward-auth tests
+# (tests/e2e/functional/forward-auth-real-*.spec.ts).
+#
+# Caddy reaches it as "authelia:9091" (the forward_auth provider upstream);
+# the test runner performs first-factor login at localhost:9092 with a
+# "Host: auth.test" header, which matches the session cookie entry so
+# Authelia issues a capturable session cookie.
+#
+# Everything shares the auth.test cookie scope: the portal is auth.test and
+# the protected hosts are subdomains (app.auth.test, mr.auth.test). The
+# authelia_url uses https because Authelia requires a secure scheme for it
+# (validation only — the server itself listens on plain HTTP for the test
+# environment; the e2e never follows the redirect, it only asserts it).
+server:
+  address: 'tcp://0.0.0.0:9091/'
+  endpoints:
+    authz:
+      forward-auth:
+        implementation: 'ForwardAuth'
+
+log:
+  level: info
+
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+    password:
+      algorithm: argon2id
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: 'app.auth.test'
+      policy: 'one_factor'
+    - domain: 'mr.auth.test'
+      policy: 'one_factor'
+
+session:
+  name: 'authelia_session'
+  secret: 'e2e-test-session-secret-0123456789abcdef'
+  inactivity: '1h'
+  expiration: '8h'
+  cookies:
+    - name: 'authelia_session'
+      domain: 'auth.test'
+      authelia_url: 'https://auth.test'
+      inactivity: '1h'
+      expiration: '8h'
+
+regulation:
+  max_retries: 100
+  find_time: '2m'
+  ban_time: '5m'
+
+storage:
+  encryption_key: 'e2e-test-storage-encryption-key-32!'
+  local:
+    path: /data/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /data/notification.txt
+
+identity_validation:
+  reset_password:
+    jwt_secret: 'e2e-test-reset-password-jwt-secret-0123456789'
+
+totp:
+  disable: true
+
+webauthn:
+  disable: true

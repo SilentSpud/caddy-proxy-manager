@@ -142,6 +142,35 @@ services:
       - ./tests/mock-forward-auth/server.js:/server.js:ro
     networks:
       - caddy-network
+  # REAL Authelia instance backing tests/e2e/functional/forward-auth-real-*.spec.ts.
+  # Caddy reaches it as "authelia:9091" (the forward-auth provider upstream);
+  # the test runner logs in at localhost:9092 with a "Host: auth.test" header
+  # (matching the portal cookie-domain entry) and replays the issued session
+  # cookie against the protected hosts.
+  authelia:
+    image: authelia/authelia:4.38
+    command: ["--config", "/config/configuration.yml"]
+    volumes:
+      - ./tests/authelia/configuration.yml:/config/configuration.yml:ro
+      - ./tests/authelia/users_database.yml:/config/users_database.yml:ro
+      - authelia-data:/data
+    ports:
+      - "9092:9091"
+    networks:
+      caddy-network:
+        aliases:
+          - auth.test
+  # REAL Moonraker instance (upstream for the Moonraker scenario): validates
+  # its own X-Api-Key for non-trusted clients, so the bypass-header path is
+  # verified end-to-end against the real thing.
+  moonraker:
+    image: mkuf/moonraker:latest
+    container_name: moonraker-e2e
+    command: ["-c", "/opt/printer_data/config/moonraker.conf", "-d", "/opt/printer_data"]
+    volumes:
+      - ./tests/moonraker/moonraker.conf:/opt/printer_data/config/moonraker.conf:ro
+    networks:
+      - caddy-network
   # TCP echo server for L4 proxy tests.
   # Listens on port 9000 and echoes back anything sent to it with a prefix.
   tcp-echo:
@@ -339,3 +368,5 @@ volumes:
     name: web-master-data-test
   web-slave-data:
     name: web-slave-data-test
+  authelia-data:
+    name: authelia-data-test
