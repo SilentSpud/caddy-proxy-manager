@@ -12,9 +12,10 @@ import { INITIAL_ACTION_STATE } from "@/lib/actions";
 import { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificate-api";
 import { ProxyHost } from "@/lib/models/proxy-hosts";
-import { AuthentikSettings } from "@/lib/settings";
+import { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AuthentikFields } from "./AuthentikFields";
+import { ForwardAuthFields } from "./ForwardAuthFields";
 import { DnsResolverFields } from "./DnsResolverFields";
 import { LoadBalancerFields } from "./LoadBalancerFields";
 import { SettingsToggles } from "./SettingsToggles";
@@ -45,6 +46,7 @@ export function CreateHostDialog({
     certificates,
     accessLists,
     authentikDefaults,
+    forwardAuthDefaults,
     initialData,
     caCertificates = [],
     mtlsRoles = [],
@@ -57,6 +59,7 @@ export function CreateHostDialog({
     certificates: CertificatePickerOption[];
     accessLists: AccessList[];
     authentikDefaults: AuthentikSettings | null;
+    forwardAuthDefaults?: ForwardAuthSettings | null;
     initialData?: ProxyHost | null;
     caCertificates?: CaCertificate[];
     mtlsRoles?: MtlsRole[];
@@ -181,6 +184,7 @@ export function CreateHostDialog({
                     </p>
                 </div>
                 <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
+                <ForwardAuthFields forwardAuth={initialData?.forwardAuth} defaults={forwardAuthDefaults ?? null} />
                 <CpmForwardAuthFields
                     cpmForwardAuth={initialData?.cpmForwardAuth}
                     users={forwardAuthUsers}
@@ -209,6 +213,7 @@ export function EditHostDialog({
     certificates,
     accessLists,
     authentikDefaults,
+    forwardAuthDefaults,
     caCertificates = [],
     mtlsRoles = [],
     issuedClientCerts = [],
@@ -223,6 +228,7 @@ export function EditHostDialog({
     accessLists: AccessList[];
     // Required, matching CreateHostDialog — see AuthentikFields (#232).
     authentikDefaults: AuthentikSettings | null;
+    forwardAuthDefaults?: ForwardAuthSettings | null;
     caCertificates?: CaCertificate[];
     mtlsRoles?: MtlsRole[];
     issuedClientCerts?: IssuedClientCertificate[];
@@ -337,6 +343,7 @@ export function EditHostDialog({
                     </p>
                 </div>
                 <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
+                <ForwardAuthFields forwardAuth={host.forwardAuth} defaults={forwardAuthDefaults ?? null} />
                 <CpmForwardAuthFields
                     cpmForwardAuth={host.cpmForwardAuth}
                     users={forwardAuthUsers}

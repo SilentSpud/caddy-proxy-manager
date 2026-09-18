@@ -8,6 +8,7 @@ import {
   deleteProxyHost,
   updateProxyHost,
   type ProxyHostAuthentikInput,
+  type ProxyHostForwardAuthInput,
   type LoadBalancerInput,
   type LoadBalancingPolicy,
   type DnsResolverInput,
@@ -144,6 +145,66 @@ function parseCpmForwardAuthConfig(formData: FormData): CpmForwardAuthInput | un
   }
   if (excludedPaths.length > 0 || formData.has("cpmForwardAuthExcludedPaths")) {
     result.excluded_paths = excludedPaths.length > 0 ? excludedPaths : null;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function parseForwardAuthConfig(formData: FormData): ProxyHostForwardAuthInput | undefined {
+  if (!formData.has("forwardAuthPresent")) {
+    return undefined;
+  }
+
+  const enabledIndicator = formData.has("forwardAuthEnabledPresent");
+  const enabledValue = enabledIndicator
+    ? formData.has("forwardAuthEnabled")
+      ? parseCheckbox(formData.get("forwardAuthEnabled"))
+      : false
+    : undefined;
+  const providerRaw = parseOptionalText(formData.get("forwardAuthProvider"));
+  const provider =
+    providerRaw === "authelia" || providerRaw === "custom" ? providerRaw : undefined;
+  const authUpstream = parseOptionalText(formData.get("forwardAuthUpstream"));
+  const authEndpoint = parseOptionalText(formData.get("forwardAuthEndpoint"));
+  const copyHeaders = parseCsv(formData.get("forwardAuthCopyHeaders"));
+  const trustedProxies = parseCsv(formData.get("forwardAuthTrustedProxies"));
+  const apiSplit = formData.has("forwardAuthApiSplitPresent")
+    ? parseCheckbox(formData.get("forwardAuthApiSplit"))
+    : undefined;
+  const apiBypassHeaders = parseCsv(formData.get("forwardAuthApiBypassHeaders"));
+  const protectedPaths = parseCsv(formData.get("forwardAuthProtectedPaths"));
+  const excludedPaths = parseCsv(formData.get("forwardAuthExcludedPaths"));
+
+  const result: ProxyHostForwardAuthInput = {};
+  if (enabledValue !== undefined) {
+    result.enabled = enabledValue;
+  }
+  if (provider !== undefined) {
+    result.provider = provider;
+  }
+  if (authUpstream !== null) {
+    result.authUpstream = authUpstream;
+  }
+  if (authEndpoint !== null) {
+    result.authEndpoint = authEndpoint;
+  }
+  if (copyHeaders.length > 0 || formData.has("forwardAuthCopyHeaders")) {
+    result.copyHeaders = copyHeaders;
+  }
+  if (trustedProxies.length > 0 || formData.has("forwardAuthTrustedProxies")) {
+    result.trustedProxies = trustedProxies;
+  }
+  if (apiSplit !== undefined) {
+    result.apiSplit = apiSplit;
+  }
+  if (apiBypassHeaders.length > 0 || formData.has("forwardAuthApiBypassHeaders")) {
+    result.apiBypassHeaders = apiBypassHeaders;
+  }
+  if (protectedPaths.length > 0 || formData.has("forwardAuthProtectedPaths")) {
+    result.protectedPaths = protectedPaths;
+  }
+  if (excludedPaths.length > 0 || formData.has("forwardAuthExcludedPaths")) {
+    result.excludedPaths = excludedPaths;
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
@@ -617,6 +678,7 @@ export async function createProxyHostAction(
         customReverseProxyJson: parseOptionalText(formData.get("customReverseProxyJson")),
         authentik: parseAuthentikConfig(formData),
         cpmForwardAuth: parseCpmForwardAuthConfig(formData),
+        forwardAuth: parseForwardAuthConfig(formData),
         loadBalancer: parseLoadBalancerConfig(formData),
         dnsResolver: parseDnsResolverConfig(formData),
         upstreamDnsResolution: parseUpstreamDnsResolutionConfig(formData),
@@ -707,6 +769,7 @@ export async function updateProxyHostAction(
           : undefined,
         authentik: parseAuthentikConfig(formData),
         cpmForwardAuth: parseCpmForwardAuthConfig(formData),
+        forwardAuth: parseForwardAuthConfig(formData),
         loadBalancer: parseLoadBalancerConfig(formData),
         dnsResolver: parseDnsResolverConfig(formData),
         upstreamDnsResolution: parseUpstreamDnsResolutionConfig(formData),

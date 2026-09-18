@@ -1,5 +1,5 @@
 import SettingsClient from "./SettingsClient";
-import { getGeneralSettings, getAcmeSettings, getAuthentikSettings, getMetricsSettings, getLoggingSettings, getDnsSettings, getDnsProviderSettings, getSetting, getUpstreamDnsResolutionSettings, getGeoBlockSettings, getErrorPagesSettings, getTrustedProxiesSettings, getDefaultResponseSettings } from "@/src/lib/settings";
+import { getGeneralSettings, getAcmeSettings, getAuthentikSettings, getForwardAuthSettings, getMetricsSettings, getLoggingSettings, getDnsSettings, getDnsProviderSettings, getSetting, getUpstreamDnsResolutionSettings, getGeoBlockSettings, getErrorPagesSettings, getTrustedProxiesSettings, getDefaultResponseSettings } from "@/src/lib/settings";
 import { getInstanceMode, getSlaveLastSync, getSlaveMasterToken, isInstanceModeFromEnv, isSyncTokenFromEnv, getEnvSlaveInstances } from "@/src/lib/instance-sync";
 import { toEnvSlaveInstanceView } from "@/src/lib/instance-sync-view";
 import { listInstances } from "@/src/lib/models/instances";
@@ -16,11 +16,12 @@ export default async function SettingsPage() {
   const modeFromEnv = isInstanceModeFromEnv();
   const tokenFromEnv = isSyncTokenFromEnv();
 
-  const [general, acme, dnsProvider, authentik, metrics, logging, dns, upstreamDnsResolution, instanceMode, globalGeoBlock, globalErrorPages, trustedProxies, defaultResponse, oauthProviders] = await Promise.all([
+  const [general, acme, dnsProvider, authentik, forwardAuth, metrics, logging, dns, upstreamDnsResolution, instanceMode, globalGeoBlock, globalErrorPages, trustedProxies, defaultResponse, oauthProviders] = await Promise.all([
     getGeneralSettings(),
     getAcmeSettings(),
     getDnsProviderSettings(),
     getAuthentikSettings(),
+    getForwardAuthSettings(),
     getMetricsSettings(),
     getLoggingSettings(),
     getDnsSettings(),
@@ -33,13 +34,14 @@ export default async function SettingsPage() {
     listOAuthProviders(),
   ]);
 
-  const [overrideGeneral, overrideAcme, overrideDnsProvider, overrideAuthentik, overrideMetrics, overrideLogging, overrideDns, overrideUpstreamDnsResolution, overrideTrustedProxies, overrideDefaultResponse] =
+  const [overrideGeneral, overrideAcme, overrideDnsProvider, overrideAuthentik, overrideForwardAuth, overrideMetrics, overrideLogging, overrideDns, overrideUpstreamDnsResolution, overrideTrustedProxies, overrideDefaultResponse] =
     instanceMode === "slave"
       ? await Promise.all([
           getSetting("general"),
           getSetting("acme"),
           getSetting("dns_provider"),
           getSetting("authentik"),
+          getSetting("forward_auth"),
           getSetting("metrics"),
           getSetting("logging"),
           getSetting("dns"),
@@ -47,7 +49,7 @@ export default async function SettingsPage() {
           getSetting("trusted_proxies"),
           getSetting("default_response")
         ])
-      : [null, null, null, null, null, null, null, null, null, null];
+      : [null, null, null, null, null, null, null, null, null, null, null];
 
   const [slaveToken, slaveLastSync] = instanceMode === "slave"
     ? await Promise.all([getSlaveMasterToken(), getSlaveLastSync()])
@@ -65,6 +67,7 @@ export default async function SettingsPage() {
       dnsProvider={dnsProvider ? redactDnsProviderSettingsForApi(dnsProvider) : null}
       dnsProviderDefinitions={DNS_PROVIDERS}
       authentik={authentik}
+      forwardAuth={forwardAuth}
       metrics={metrics}
       logging={logging}
       dns={dns}
@@ -84,6 +87,7 @@ export default async function SettingsPage() {
           acme: overrideAcme !== null,
           dnsProvider: overrideDnsProvider !== null,
           authentik: overrideAuthentik !== null,
+          forwardAuth: overrideForwardAuth !== null,
           metrics: overrideMetrics !== null,
           logging: overrideLogging !== null,
           dns: overrideDns !== null,

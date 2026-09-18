@@ -432,6 +432,76 @@ export type CpmForwardAuthInput = {
   excluded_paths?: string[] | null;
 };
 
+/** Preset profiles for the generic forward-auth provider. */
+export const FORWARD_AUTH_PROVIDERS = ["authelia", "custom"] as const;
+export type ForwardAuthProvider = (typeof FORWARD_AUTH_PROVIDERS)[number];
+
+export const DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT = "/api/authz/forward-auth";
+export const DEFAULT_AUTHELIA_FORWARD_AUTH_HEADERS = [
+  "Remote-User",
+  "Remote-Groups",
+  "Remote-Email",
+  "Remote-Name",
+  "Remote-IP"
+];
+
+export type ProxyHostForwardAuthConfig = {
+  enabled: boolean;
+  provider: ForwardAuthProvider;
+  /** Base URL of the forward-auth server, e.g. http://authelia:9091 */
+  authUpstream: string | null;
+  /** URI the auth subrequest is rewritten to. May include a query string. */
+  authEndpoint: string | null;
+  /** Headers copied from the auth server's 2xx response onto the upstream request. */
+  copyHeaders: string[];
+  trustedProxies: string[];
+  /**
+   * Split browser vs API auth: non-browser requests (no Accept: text/html,
+   * or carrying X-Requested-With) get a 401 when the auth server responds
+   * with a redirect instead of being sent to the login portal. WebSocket
+   * handshakes always land in this branch.
+   */
+  apiSplit: boolean;
+  /**
+   * Requests carrying any of these headers skip forward auth entirely and go
+   * straight to the upstream, which performs its own API-key/Authorization
+   * check (e.g. Moonraker's X-Api-Key).
+   */
+  apiBypassHeaders: string[];
+  protectedPaths: string[] | null;
+  excludedPaths: string[] | null;
+};
+
+export type ProxyHostForwardAuthInput = {
+  enabled?: boolean;
+  provider?: ForwardAuthProvider | null;
+  authUpstream?: string | null;
+  authEndpoint?: string | null;
+  copyHeaders?: string[] | null;
+  trustedProxies?: string[] | null;
+  apiSplit?: boolean | null;
+  apiBypassHeaders?: string[] | null;
+  protectedPaths?: string[] | null;
+  excludedPaths?: string[] | null;
+};
+
+type ForwardAuthMeta = {
+  enabled?: boolean;
+  provider?: ForwardAuthProvider;
+  auth_upstream?: string;
+  auth_endpoint?: string;
+  copy_headers?: string[];
+  trusted_proxies?: string[];
+  api_split?: boolean;
+  api_bypass_headers?: string[];
+  protected_paths?: string[];
+  excluded_paths?: string[];
+};
+
+/** Valid HTTP header name (RFC 7230 token) — copy/bypass headers end up in
+ * Caddy placeholders and matcher keys, so free-form text is not allowed. */
+const HEADER_NAME_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z-]+$/;
+
 type CpmForwardAuthMeta = {
   enabled?: boolean;
   protected_paths?: string[];
@@ -450,6 +520,7 @@ type ProxyHostMeta = {
   waf?: WafHostConfig;
   mtls?: MtlsConfig;
   cpm_forward_auth?: CpmForwardAuthMeta;
+  forward_auth?: ForwardAuthMeta;
   redirects?: RedirectRule[];
   rewrite?: RewriteConfig;
   location_rules?: LocationRuleMeta[];
@@ -486,6 +557,7 @@ export type ProxyHost = {
   waf: WafHostConfig | null;
   mtls: MtlsConfig | null;
   cpmForwardAuth: CpmForwardAuthConfig | null;
+  forwardAuth: ProxyHostForwardAuthConfig | null;
   redirects: RedirectRule[];
   rewrite: RewriteConfig | null;
   locationRules: LocationRule[];
@@ -519,6 +591,7 @@ export type ProxyHostInput = {
   waf?: WafHostConfig | null;
   mtls?: MtlsConfig | null;
   cpmForwardAuth?: CpmForwardAuthInput | null;
+  forwardAuth?: ProxyHostForwardAuthInput | null;
   redirects?: RedirectRule[] | null;
   rewrite?: RewriteConfig | null;
   locationRules?: LocationRuleInput[] | null;
@@ -596,6 +669,70 @@ function sanitizeAuthentikMeta(meta: ProxyHostAuthentikMeta | undefined): ProxyH
     }
   }
 
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+/**
+ * Sanitizes the generic forward-auth meta block read from storage. Header
+ * names are validated against the RFC 7230 token grammar because they are
+ * interpolated into Caddy placeholder strings and matcher keys; Caddy
+ * placeholders (`{...}`) are stripped from the auth endpoint and paths to
+ * prevent request-context injection into generated config.
+ */
+function sanitizeForwardAuthMeta(meta: ForwardAuthMeta | undefined): ForwardAuthMeta | undefined {
+  if (!meta) return undefined;
+  const normalized: ForwardAuthMeta = {};
+  if (meta.enabled !== undefined) {
+    normalized.enabled = Boolean(meta.enabled);
+  }
+  if (meta.provider && (FORWARD_AUTH_PROVIDERS as readonly string[]).includes(meta.provider)) {
+    normalized.provider = meta.provider;
+  }
+  const upstream = normalizeMetaValue(meta.auth_upstream ?? null);
+  if (upstream) {
+    normalized.auth_upstream = upstream;
+  }
+  const endpoint = normalizeMetaValue(meta.auth_endpoint ?? null);
+  if (endpoint) {
+    normalized.auth_endpoint = endpoint.replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+  }
+  if (Array.isArray(meta.copy_headers)) {
+    const headers = meta.copy_headers
+      .map((header) => header?.trim())
+      .filter((header): header is string => Boolean(header) && HEADER_NAME_RE.test(header));
+    if (headers.length > 0) {
+      normalized.copy_headers = headers;
+    }
+  }
+  if (Array.isArray(meta.trusted_proxies)) {
+    const proxies = meta.trusted_proxies.map((proxy) => proxy?.trim()).filter((proxy): proxy is string => Boolean(proxy));
+    if (proxies.length > 0) {
+      normalized.trusted_proxies = proxies;
+    }
+  }
+  if (meta.api_split !== undefined) {
+    normalized.api_split = Boolean(meta.api_split);
+  }
+  if (Array.isArray(meta.api_bypass_headers)) {
+    const headers = meta.api_bypass_headers
+      .map((header) => header?.trim())
+      .filter((header): header is string => Boolean(header) && HEADER_NAME_RE.test(header));
+    if (headers.length > 0) {
+      normalized.api_bypass_headers = headers;
+    }
+  }
+  if (Array.isArray(meta.protected_paths)) {
+    const paths = meta.protected_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    if (paths.length > 0) {
+      normalized.protected_paths = paths;
+    }
+  }
+  if (Array.isArray(meta.excluded_paths)) {
+    const paths = meta.excluded_paths.map((p) => p?.trim().replace(/\{[^}]*\}/g, "")).filter((p): p is string => Boolean(p)); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    if (paths.length > 0) {
+      normalized.excluded_paths = paths;
+    }
+  }
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
@@ -845,6 +982,11 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
     }
   }
 
+  const forwardAuth = sanitizeForwardAuthMeta(meta.forward_auth);
+  if (forwardAuth) {
+    normalized.forward_auth = forwardAuth;
+  }
+
   if (meta.redirects && meta.redirects.length > 0) {
     normalized.redirects = meta.redirects;
   }
@@ -1084,6 +1226,7 @@ function parseMeta(value: string | null): ProxyHostMeta {
       waf: parsed.waf,
       mtls: parsed.mtls,
       cpm_forward_auth: sanitizeCpmForwardAuthMeta(parsed.cpm_forward_auth),
+      forward_auth: sanitizeForwardAuthMeta(parsed.forward_auth),
       redirects: sanitizeRedirectRules(parsed.redirects),
       rewrite: sanitizeRewriteConfig(parsed.rewrite) ?? undefined,
       location_rules: sanitizeLocationRuleMetas(parsed.location_rules),
@@ -1192,6 +1335,146 @@ function normalizeAuthentikInput(
 
   if ((next.enabled ?? false) && next.outpost_domain && !next.auth_endpoint) {
     next.auth_endpoint = `/${next.outpost_domain}/auth/caddy`;
+  }
+
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function normalizeForwardAuthInput(
+  input: ProxyHostForwardAuthInput | null | undefined,
+  existing: ForwardAuthMeta | undefined
+): ForwardAuthMeta | undefined {
+  if (input === undefined) {
+    return existing;
+  }
+  if (input === null) {
+    return undefined;
+  }
+
+  const next: ForwardAuthMeta = { ...(existing ?? {}) };
+
+  if (input.enabled !== undefined) {
+    next.enabled = Boolean(input.enabled);
+  }
+
+  if (input.provider !== undefined) {
+    if (input.provider && (FORWARD_AUTH_PROVIDERS as readonly string[]).includes(input.provider)) {
+      next.provider = input.provider;
+    } else {
+      delete next.provider;
+    }
+  }
+
+  if (input.authUpstream !== undefined) {
+    const upstream = normalizeMetaValue(input.authUpstream ?? null);
+    if (upstream) {
+      next.auth_upstream = upstream;
+    } else {
+      delete next.auth_upstream;
+    }
+  }
+
+  if (input.authEndpoint !== undefined) {
+    const endpoint = normalizeMetaValue(input.authEndpoint ?? null);
+    if (endpoint) {
+      next.auth_endpoint = endpoint.replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+    } else {
+      delete next.auth_endpoint;
+    }
+  }
+
+  if (input.copyHeaders !== undefined) {
+    const headers = (input.copyHeaders ?? [])
+      .map((header) => header?.trim())
+      .filter((header): header is string => Boolean(header) && HEADER_NAME_RE.test(header));
+    if (headers.length > 0) {
+      next.copy_headers = headers;
+    } else {
+      delete next.copy_headers;
+    }
+  }
+
+  if (input.trustedProxies !== undefined) {
+    const proxies = (input.trustedProxies ?? [])
+      .map((proxy) => proxy?.trim())
+      .filter((proxy): proxy is string => Boolean(proxy));
+    if (proxies.length > 0) {
+      next.trusted_proxies = proxies;
+    } else {
+      delete next.trusted_proxies;
+    }
+  }
+
+  if (input.apiSplit !== undefined) {
+    next.api_split = Boolean(input.apiSplit);
+  }
+
+  if (input.apiBypassHeaders !== undefined) {
+    const headers = (input.apiBypassHeaders ?? [])
+      .map((header) => header?.trim())
+      .filter((header): header is string => Boolean(header) && HEADER_NAME_RE.test(header));
+    if (headers.length > 0) {
+      next.api_bypass_headers = headers;
+    } else {
+      delete next.api_bypass_headers;
+    }
+  }
+
+  if (input.protectedPaths !== undefined) {
+    const paths = (input.protectedPaths ?? [])
+      .map((path) => path?.trim())
+      .filter((path): path is string => Boolean(path));
+    if (paths.length > 0) {
+      next.protected_paths = paths;
+    } else {
+      delete next.protected_paths;
+    }
+  }
+
+  if (input.excludedPaths !== undefined) {
+    const paths = (input.excludedPaths ?? [])
+      .map((path) => path?.trim())
+      .filter((path): path is string => Boolean(path));
+    if (paths.length > 0) {
+      next.excluded_paths = paths;
+    } else {
+      delete next.excluded_paths;
+    }
+  }
+
+  // Apply provider preset defaults for fields the caller left blank. Only
+  // used when the provider is set on this request; explicit empty values on
+  // later updates still clear the field.
+  if (input.provider !== undefined && (next.enabled ?? false)) {
+    const provider = next.provider ?? "authelia";
+    if (!next.auth_endpoint && provider === "authelia") {
+      next.auth_endpoint = DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT;
+    }
+    if (!next.copy_headers && provider === "authelia") {
+      next.copy_headers = [...DEFAULT_AUTHELIA_FORWARD_AUTH_HEADERS];
+    }
+  }
+
+  // Fail closed on enabled-but-incomplete configs: config generation skips
+  // hosts it cannot parse, so an invalid upstream/endpoint would silently
+  // publish the host UNPROTECTED rather than disabled.
+  if (next.enabled) {
+    const provider = next.provider ?? "authelia";
+    const upstream = next.auth_upstream;
+    if (!upstream) {
+      throw new ApiValidationError("forwardAuth.authUpstream is required when generic forward auth is enabled");
+    }
+    try {
+      const parsed = new URL(upstream);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("bad protocol");
+      }
+    } catch {
+      throw new ApiValidationError("forwardAuth.authUpstream must be a valid http(s) URL");
+    }
+    if (provider === "custom" && !next.auth_endpoint) {
+      throw new ApiValidationError("forwardAuth.authEndpoint is required when the provider preset is 'custom'");
+    }
   }
 
   return Object.keys(next).length > 0 ? next : undefined;
@@ -1486,6 +1769,36 @@ function normalizeUpstreamDnsResolutionInput(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
+/**
+ * Rejects hosts that enable more than one forward-auth provider at once.
+ *
+ * Caddy config generation applies a fixed precedence (authentik > generic
+ * forward_auth > cpm_forward_auth), so a host with two enabled providers
+ * would silently authenticate via only one of them — a config the UI shows
+ * as active but that does not do what the admin asked for. Legacy hosts that
+ * already carry a conflicting combination keep working (generation precedence
+ * is unchanged); the conflict is only rejected when the current request
+ * itself enables one of the providers, so unrelated edits of such hosts
+ * still succeed.
+ */
+function assertSingleForwardAuthProvider(meta: ProxyHostMeta, input: Partial<ProxyHostInput>): void {
+  const enabled: string[] = [];
+  if (meta.authentik?.enabled) enabled.push("Authentik forward auth");
+  if (meta.forward_auth?.enabled) enabled.push("generic forward auth");
+  if (meta.cpm_forward_auth?.enabled) enabled.push("CPM forward auth");
+  if (enabled.length < 2) {
+    return;
+  }
+  const touched =
+    input.authentik !== undefined || input.forwardAuth !== undefined || input.cpmForwardAuth !== undefined;
+  if (!touched) {
+    return;
+  }
+  throw new ApiValidationError(
+    `Only one forward-auth provider can be enabled per host — this host would have ${enabled.join(" + ")}. Disable one of them first.`
+  );
+}
+
 function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): string | null {
   const next: ProxyHostMeta = { ...existing };
 
@@ -1593,6 +1906,17 @@ function buildMeta(existing: ProxyHostMeta, input: Partial<ProxyHostInput>): str
       delete next.cpm_forward_auth;
     }
   }
+
+  if (input.forwardAuth !== undefined) {
+    const forwardAuth = normalizeForwardAuthInput(input.forwardAuth, existing.forward_auth);
+    if (forwardAuth) {
+      next.forward_auth = forwardAuth;
+    } else {
+      delete next.forward_auth;
+    }
+  }
+
+  assertSingleForwardAuthProvider(next, input);
 
   if (input.redirects !== undefined) {
     const rules = sanitizeRedirectRules(input.redirects ?? []);
@@ -1721,6 +2045,80 @@ function dehydrateAuthentik(config: ProxyHostAuthentikConfig | null): ProxyHostA
     meta.trusted_proxies = [...config.trustedProxies];
   }
   meta.set_outpost_host_header = config.setOutpostHostHeader;
+  if (config.protectedPaths && config.protectedPaths.length > 0) {
+    meta.protected_paths = [...config.protectedPaths];
+  }
+  if (config.excludedPaths && config.excludedPaths.length > 0) {
+    meta.excluded_paths = [...config.excludedPaths];
+  }
+
+  return meta;
+}
+
+function hydrateForwardAuth(meta: ForwardAuthMeta | undefined): ProxyHostForwardAuthConfig | null {
+  if (!meta) {
+    return null;
+  }
+
+  const provider: ForwardAuthProvider = meta.provider ?? "authelia";
+  const authEndpoint =
+    normalizeMetaValue(meta.auth_endpoint ?? null) ??
+    (provider === "authelia" ? DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT : null);
+  const copyHeaders =
+    Array.isArray(meta.copy_headers) && meta.copy_headers.length > 0
+      ? meta.copy_headers
+      : provider === "authelia"
+        ? [...DEFAULT_AUTHELIA_FORWARD_AUTH_HEADERS]
+        : [];
+  const trustedProxies =
+    Array.isArray(meta.trusted_proxies) && meta.trusted_proxies.length > 0
+      ? meta.trusted_proxies
+      : DEFAULT_AUTHENTIK_TRUSTED_PROXIES;
+
+  return {
+    enabled: Boolean(meta.enabled),
+    provider,
+    authUpstream: normalizeMetaValue(meta.auth_upstream ?? null),
+    authEndpoint,
+    copyHeaders,
+    trustedProxies,
+    apiSplit: Boolean(meta.api_split),
+    apiBypassHeaders: Array.isArray(meta.api_bypass_headers) ? meta.api_bypass_headers : [],
+    protectedPaths:
+      Array.isArray(meta.protected_paths) && meta.protected_paths.length > 0 ? meta.protected_paths : null,
+    excludedPaths:
+      Array.isArray(meta.excluded_paths) && meta.excluded_paths.length > 0 ? meta.excluded_paths : null
+  };
+}
+
+function dehydrateForwardAuth(config: ProxyHostForwardAuthConfig | null): ForwardAuthMeta | undefined {
+  if (!config) {
+    return undefined;
+  }
+
+  const meta: ForwardAuthMeta = {
+    enabled: config.enabled,
+    provider: config.provider
+  };
+
+  if (config.authUpstream) {
+    meta.auth_upstream = config.authUpstream;
+  }
+  if (config.authEndpoint) {
+    meta.auth_endpoint = config.authEndpoint;
+  }
+  if (config.copyHeaders.length > 0) {
+    meta.copy_headers = [...config.copyHeaders];
+  }
+  if (config.trustedProxies.length > 0) {
+    meta.trusted_proxies = [...config.trustedProxies];
+  }
+  if (config.apiSplit) {
+    meta.api_split = true;
+  }
+  if (config.apiBypassHeaders.length > 0) {
+    meta.api_bypass_headers = [...config.apiBypassHeaders];
+  }
   if (config.protectedPaths && config.protectedPaths.length > 0) {
     meta.protected_paths = [...config.protectedPaths];
   }
@@ -1993,6 +2391,7 @@ function parseProxyHost(row: ProxyHostRow): ProxyHost {
     cpmForwardAuth: meta.cpm_forward_auth?.enabled
       ? { enabled: true, protected_paths: meta.cpm_forward_auth.protected_paths ?? null, excluded_paths: meta.cpm_forward_auth.excluded_paths ?? null }
       : null,
+    forwardAuth: hydrateForwardAuth(meta.forward_auth),
     redirects: meta.redirects ?? [],
     rewrite: meta.rewrite ?? null,
     locationRules: hydrateLocationRules(meta.location_rules),
@@ -2145,6 +2544,7 @@ export async function updateProxyHost(id: number, input: Partial<ProxyHostInput>
         ...(existing.cpmForwardAuth.excluded_paths ? { excluded_paths: existing.cpmForwardAuth.excluded_paths } : {})
       }
     } : {}),
+    ...(existing.forwardAuth ? { forward_auth: dehydrateForwardAuth(existing.forwardAuth) } : {}),
     ...(existing.redirects && existing.redirects.length > 0 ? { redirects: existing.redirects } : {}),
     ...(existing.rewrite ? { rewrite: existing.rewrite } : {}),
     ...(existing.locationRules && existing.locationRules.length > 0 ? { location_rules: dehydrateLocationRules(existing.locationRules) } : {}),

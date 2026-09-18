@@ -35,6 +35,15 @@ export type AuthentikSettings = {
   authEndpoint?: string;
 };
 
+export type ForwardAuthSettings = {
+  /** Preset used to prefill new proxy hosts: "authelia" or "custom". */
+  provider: "authelia" | "custom";
+  /** Base URL of the default forward-auth server, e.g. http://authelia:9091 */
+  authUpstream: string;
+  /** Optional default auth endpoint (provider presets supply one otherwise). */
+  authEndpoint?: string;
+};
+
 export type MetricsSettings = {
   enabled: boolean;
   port?: number; // Port to expose metrics on (default: 9090, separate from admin API)
@@ -223,6 +232,14 @@ export async function getAuthentikSettings(): Promise<AuthentikSettings | null> 
 
 export async function saveAuthentikSettings(settings: AuthentikSettings): Promise<void> {
   await setSetting("authentik", settings);
+}
+
+export async function getForwardAuthSettings(): Promise<ForwardAuthSettings | null> {
+  return await getEffectiveSetting<ForwardAuthSettings>("forward_auth");
+}
+
+export async function saveForwardAuthSettings(settings: ForwardAuthSettings): Promise<void> {
+  await setSetting("forward_auth", settings);
 }
 
 export async function getMetricsSettings(): Promise<MetricsSettings | null> {

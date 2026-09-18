@@ -166,6 +166,32 @@ type CpmForwardAuthMeta = {
   excluded_paths?: string[];
 };
 
+type ForwardAuthMeta = {
+  enabled?: boolean;
+  provider?: string;
+  auth_upstream?: string;
+  auth_endpoint?: string;
+  copy_headers?: string[];
+  trusted_proxies?: string[];
+  api_split?: boolean;
+  api_bypass_headers?: string[];
+  protected_paths?: string[];
+  excluded_paths?: string[];
+};
+
+const DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT = "/api/authz/forward-auth";
+const DEFAULT_AUTHELIA_FORWARD_AUTH_HEADERS = [
+  "Remote-User",
+  "Remote-Groups",
+  "Remote-Email",
+  "Remote-Name",
+  "Remote-IP"
+];
+
+/** RFC 7230 token — copy/bypass header names are interpolated into Caddy
+ * placeholders and matcher keys, so free-form text must never reach them. */
+const FA_HEADER_NAME_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z-]+$/;
+
 type MtlsMeta = {
   enabled?: boolean;
   trusted_client_cert_ids?: number[];
@@ -180,6 +206,7 @@ type ProxyHostMeta = {
   custom_pre_handlers_json?: string;
   authentik?: ProxyHostAuthentikMeta;
   cpm_forward_auth?: CpmForwardAuthMeta;
+  forward_auth?: ForwardAuthMeta;
   load_balancer?: LoadBalancerMeta;
   dns_resolver?: DnsResolverMeta;
   upstream_dns_resolution?: UpstreamDnsResolutionMeta;
@@ -224,6 +251,23 @@ type AuthentikRouteConfig = {
   copyHeaders: string[];
   trustedProxies: string[];
   setOutpostHostHeader: boolean;
+  protectedPaths: string[] | null;
+  excludedPaths: string[] | null;
+};
+
+type ForwardAuthRouteConfig = {
+  enabled: boolean;
+  provider: "authelia" | "custom";
+  /** host:port dial address extracted from the auth server URL. */
+  dialAddress: string;
+  /** URI (may include a query string) the auth subrequest is rewritten to. */
+  authEndpoint: string;
+  copyHeaders: string[];
+  trustedProxies: string[];
+  /** Non-browser requests get a 401 instead of the auth server's redirect. */
+  apiSplit: boolean;
+  /** Header names that make a request skip forward auth entirely. */
+  apiBypassHeaders: string[];
   protectedPaths: string[] | null;
   excludedPaths: string[] | null;
 };
@@ -867,6 +911,7 @@ async function buildProxyRoutes(
     const handlers: Record<string, unknown>[] = [];
     const meta = parseJson<ProxyHostMeta>(row.meta, {});
     const authentik = parseAuthentikConfig(meta.authentik);
+    const forwardAuth = parseForwardAuthConfig(meta.forward_auth);
     const cpmForwardAuth = meta.cpm_forward_auth?.enabled ? meta.cpm_forward_auth : null;
     const hostRoutes: CaddyHttpRoute[] = [];
 
@@ -1392,6 +1437,168 @@ async function buildProxyRoutes(
             terminal: true
           };
           hostRoutes.push(route);
+        }
+      }
+    } else if (forwardAuth) {
+      // ── Generic Forward Auth (Authelia etc., issue #188) ────────────
+      // Split browser vs API authentication:
+      //
+      //  - Browser requests (Accept: text/html, no X-Requested-With) go
+      //    through the plain forward-auth handler: the auth server's 302
+      //    "go log in" response passes through untouched so the browser is
+      //    redirected to the auth portal.
+      //
+      //  - Non-browser requests (API clients, WebSocket handshakes) go
+      //    through a handler that converts the auth server's 3xx redirect
+      //    into a bare 401 (apiSplit), so machine clients get a machine
+      //    error instead of an HTML login page.
+      //
+      //  - Requests carrying any apiBypassHeaders header skip forward auth
+      //    entirely and reach the upstream, which performs its own API-key
+      //    / Authorization check (e.g. Moonraker's X-Api-Key).
+      //
+      // Security: the identity headers copied from the auth server's 2xx
+      // response (Remote-User, Remote-Groups, ...) are STRIPPED from every
+      // inbound request before it reaches the upstream — on protected and
+      // unprotected routes alike. Without this a caller could forge their
+      // identity directly to the upstream: on unauthenticated routes the
+      // forged headers would pass straight through, and on authenticated
+      // routes the copy step only overwrites a header when the verify
+      // response value is non-empty. Same class of fix as the X-CPM-*
+      // stripping below (SECURITY-AUDIT H1).
+      const faStripHandler: Record<string, unknown> | null =
+        forwardAuth.copyHeaders.length > 0
+          ? { handler: "headers", request: { delete: [...forwardAuth.copyHeaders] } }
+          : null;
+      const faHandlers = faStripHandler ? [faStripHandler, ...handlers] : handlers;
+
+      const browserMatcher: Record<string, unknown> = {
+        header: { Accept: ["*text/html*"] },
+        // Caddy's `not` matcher takes an ARRAY of matcher sets.
+        not: [{ header: { "X-Requested-With": ["*"] } }]
+      };
+
+      const browserFaHandler = buildGenericForwardAuthHandler(forwardAuth, false);
+      const apiFaHandler = forwardAuth.apiSplit ? buildGenericForwardAuthHandler(forwardAuth, true) : null;
+
+      const locationRules = meta.location_rules ?? [];
+
+      for (const domainGroup of domainGroups) {
+        // API-key bypass routes first — they must win over both auth routes.
+        for (const bypassHeader of forwardAuth.apiBypassHeaders) {
+          hostRoutes.push({
+            match: [{ host: domainGroup, header: { [bypassHeader]: ["*"] } }],
+            handle: [...faHandlers, JSON.parse(JSON.stringify(reverseProxyHandler))],
+            terminal: true
+          });
+        }
+
+        if (forwardAuth.protectedPaths && forwardAuth.protectedPaths.length > 0) {
+          // Whitelist mode: only the listed paths get auth.
+          for (const protectedPath of forwardAuth.protectedPaths) {
+            const pathMatch: Record<string, unknown> = { host: domainGroup, path: [protectedPath] };
+            const protectedProxy = JSON.parse(JSON.stringify(reverseProxyHandler));
+            if (apiFaHandler) {
+              hostRoutes.push({
+                match: [{ ...pathMatch, ...browserMatcher }],
+                handle: [...faHandlers, browserFaHandler, protectedProxy],
+                terminal: true
+              });
+              hostRoutes.push({
+                match: [{ ...pathMatch }],
+                handle: [...faHandlers, apiFaHandler, JSON.parse(JSON.stringify(reverseProxyHandler))],
+                terminal: true
+              });
+            } else {
+              hostRoutes.push({
+                match: [{ ...pathMatch }],
+                handle: [...faHandlers, browserFaHandler, protectedProxy],
+                terminal: true
+              });
+            }
+          }
+
+          // Location rules are unprotected (no forward auth), matching the
+          // catch-all behavior in whitelist mode.
+          for (const rule of locationRules) {
+            const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
+              rule,
+              Boolean(row.skipHttpsHostnameValidation),
+              Boolean(row.preserveHostHeader)
+            );
+            if (!safePath) continue;
+            hostRoutes.push({
+              match: [{ host: domainGroup, path: [safePath] }],
+              handle: [...faHandlers, locationProxy],
+              terminal: true
+            });
+          }
+
+          // Unprotected catch-all.
+          hostRoutes.push({
+            match: [{ host: domainGroup }],
+            handle: [...faHandlers, reverseProxyHandler],
+            terminal: true
+          });
+        } else {
+          // Exclusion / full-site mode.
+          for (const excludedPath of forwardAuth.excludedPaths ?? []) {
+            hostRoutes.push({
+              match: [{ host: domainGroup, path: [excludedPath] }],
+              handle: [...faHandlers, JSON.parse(JSON.stringify(reverseProxyHandler))],
+              terminal: true
+            });
+          }
+
+          for (const rule of locationRules) {
+            const { safePath, reverseProxyHandler: locationProxy } = buildLocationReverseProxy(
+              rule,
+              Boolean(row.skipHttpsHostnameValidation),
+              Boolean(row.preserveHostHeader)
+            );
+            if (!safePath) continue;
+            if (apiFaHandler) {
+              hostRoutes.push({
+                match: [{ host: domainGroup, path: [safePath], ...browserMatcher }],
+                handle: [...faHandlers, browserFaHandler, locationProxy],
+                terminal: true
+              });
+              hostRoutes.push({
+                match: [{ host: domainGroup, path: [safePath] }],
+                handle: [...faHandlers, apiFaHandler, JSON.parse(JSON.stringify(locationProxy))],
+                terminal: true
+              });
+            } else {
+              hostRoutes.push({
+                match: [{ host: domainGroup, path: [safePath] }],
+                handle: [...faHandlers, browserFaHandler, locationProxy],
+                terminal: true
+              });
+            }
+          }
+
+          // Browser catch-all: forward auth with the portal redirect flow.
+          // Without apiSplit a single unified catch-all handles everything.
+          if (apiFaHandler) {
+            hostRoutes.push({
+              match: [{ host: domainGroup, ...browserMatcher }],
+              handle: [...faHandlers, browserFaHandler, JSON.parse(JSON.stringify(reverseProxyHandler))],
+              terminal: true
+            });
+
+            // API/WebSocket catch-all: 3xx from the auth server becomes 401.
+            hostRoutes.push({
+              match: [{ host: domainGroup }],
+              handle: [...faHandlers, apiFaHandler, reverseProxyHandler],
+              terminal: true
+            });
+          } else {
+            hostRoutes.push({
+              match: [{ host: domainGroup }],
+              handle: [...faHandlers, browserFaHandler, reverseProxyHandler],
+              terminal: true
+            });
+          }
         }
       }
     } else if (cpmForwardAuth) {
@@ -2921,6 +3128,175 @@ function parseAuthentikConfig(meta: ProxyHostAuthentikMeta | undefined | null): 
     protectedPaths,
     excludedPaths
   };
+}
+
+/**
+ * Parses the generic forward-auth meta block (issue #188) into the values
+ * needed to generate Caddy routes. Returns null unless enabled with a valid
+ * upstream URL and endpoint.
+ *
+ * Defense in depth: values stored via the model layer are already sanitized,
+ * but this parser re-validates because it reads the raw meta JSON.
+ */
+function parseForwardAuthConfig(meta: ForwardAuthMeta | undefined | null): ForwardAuthRouteConfig | null {
+  if (!meta || !meta.enabled) {
+    return null;
+  }
+
+  const upstreamRaw = typeof meta.auth_upstream === "string" ? meta.auth_upstream.trim() : "";
+  if (!upstreamRaw) {
+    return null;
+  }
+
+  let dialAddress: string;
+  try {
+    const url = new URL(upstreamRaw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+    const port = url.port || (url.protocol === "https:" ? "443" : "80");
+    dialAddress = `${url.hostname}:${port}`;
+  } catch {
+    return null;
+  }
+
+  const provider = meta.provider === "custom" ? "custom" : "authelia";
+  const endpointRaw = (typeof meta.auth_endpoint === "string" ? meta.auth_endpoint.trim() : "")
+    .replace(/\{[^}]*\}/g, ""); // codeql[js/polynomial-redos] false positive: [^}]* is linear, no backtracking ambiguity
+  const authEndpoint = endpointRaw || (provider === "authelia" ? DEFAULT_AUTHELIA_FORWARD_AUTH_ENDPOINT : "");
+  const hasControlChar = /[\r\n]/.test(authEndpoint) || authEndpoint.includes("\u0000");
+  if (!authEndpoint.startsWith("/") || hasControlChar) {
+    return null;
+  }
+
+  const copyHeaders =
+    Array.isArray(meta.copy_headers) && meta.copy_headers.length > 0
+      ? meta.copy_headers.map((h) => h?.trim()).filter((h): h is string => Boolean(h) && FA_HEADER_NAME_RE.test(h))
+      : provider === "authelia"
+        ? [...DEFAULT_AUTHELIA_FORWARD_AUTH_HEADERS]
+        : [];
+
+  const trustedProxiesRaw =
+    Array.isArray(meta.trusted_proxies) && meta.trusted_proxies.length > 0
+      ? meta.trusted_proxies.map((p) => p?.trim()).filter((p): p is string => Boolean(p))
+      : ["private_ranges"];
+  const trustedProxies = trustedProxiesRaw.includes("private_ranges")
+    ? ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fd00::/8", "::1/128"]
+    : trustedProxiesRaw;
+
+  const apiBypassHeaders =
+    Array.isArray(meta.api_bypass_headers)
+      ? meta.api_bypass_headers.map((h) => h?.trim()).filter((h): h is string => Boolean(h) && FA_HEADER_NAME_RE.test(h))
+      : [];
+
+  const sanitizePaths = (paths: unknown): string[] | null =>
+    Array.isArray(paths) && paths.length > 0
+      ? paths
+          .map((p) => (typeof p === "string" ? p.trim().replace(/\{[^}]*\}/g, "") : ""))
+          .filter((p): p is string => Boolean(p))
+      : null;
+
+  return {
+    enabled: true,
+    provider,
+    dialAddress,
+    authEndpoint,
+    copyHeaders,
+    trustedProxies,
+    apiSplit: Boolean(meta.api_split),
+    apiBypassHeaders,
+    protectedPaths: sanitizePaths(meta.protected_paths),
+    excludedPaths: sanitizePaths(meta.excluded_paths)
+  };
+}
+
+/**
+ * Builds the forward-auth subrequest handler (a reverse_proxy to the auth
+ * server with the request rewritten to the auth endpoint).
+ *
+ * On a 2xx auth response, the configured identity headers are copied from the
+ * auth response onto the original request. With `api401` set, any 3xx auth
+ * response (the "go log in at the portal" redirect) is converted to a bare
+ * 401 so non-browser clients and WebSocket handshakes are never handed an
+ * HTML login page.
+ */
+function buildGenericForwardAuthHandler(cfg: ForwardAuthRouteConfig, api401: boolean): Record<string, unknown> {
+  const handleResponseRoutes: Record<string, unknown>[] = [
+    { handle: [{ handler: "vars" }] }
+  ];
+  for (const headerName of cfg.copyHeaders) {
+    handleResponseRoutes.push({
+      handle: [
+        {
+          handler: "headers",
+          request: {
+            set: {
+              [headerName]: [`{http.reverse_proxy.header.${headerName}}`]
+            }
+          }
+        }
+      ],
+      match: [
+        {
+          not: [
+            {
+              vars: {
+                [`{http.reverse_proxy.header.${headerName}}`]: [""]
+              }
+            }
+          ]
+        }
+      ]
+    });
+  }
+
+  const handleResponse: Record<string, unknown>[] = [
+    {
+      match: { status_code: [2] },
+      routes: handleResponseRoutes
+    }
+  ];
+  if (api401) {
+    handleResponse.push({
+      match: { status_code: [301, 302, 303, 307, 308] },
+      routes: [
+        {
+          handle: [
+            {
+              handler: "static_response",
+              status_code: 401,
+              body: "Unauthorized"
+            }
+          ]
+        }
+      ]
+    });
+  }
+
+  const handler: Record<string, unknown> = {
+    handler: "reverse_proxy",
+    upstreams: [{ dial: cfg.dialAddress }],
+    rewrite: {
+      method: "GET",
+      uri: cfg.authEndpoint
+    },
+    headers: {
+      request: {
+        set: {
+          "X-Forwarded-Method": ["{http.request.method}"],
+          "X-Forwarded-Uri": ["{http.request.uri}"],
+          "X-Forwarded-Host": ["{http.request.hostport}"],
+          "X-Forwarded-Proto": ["{http.request.scheme}"]
+        }
+      }
+    },
+    handle_response: handleResponse
+  };
+
+  if (cfg.trustedProxies.length > 0) {
+    handler.trusted_proxies = [...cfg.trustedProxies];
+  }
+  return handler;
 }
 
 const VALID_LB_POLICIES = ["random", "round_robin", "least_conn", "ip_hash", "first", "header", "cookie", "uri_hash"];

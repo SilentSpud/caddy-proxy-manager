@@ -194,6 +194,17 @@ function validateAuthentik(value: Record<string, unknown>): void {
   optionalString(value, "authEndpoint", "authentik", 4096);
 }
 
+function validateForwardAuth(value: Record<string, unknown>): void {
+  onlyKeys(value, ["provider", "authUpstream", "authEndpoint"], "Forward Auth settings");
+  const provider = required(value, "provider", "Forward Auth settings");
+  if (provider !== "authelia" && provider !== "custom") {
+    invalid("forward_auth.provider must be 'authelia' or 'custom'");
+  }
+  const upstream = stringValue(required(value, "authUpstream", "Forward Auth settings"), "forward_auth.authUpstream", { min: 1, max: 4096 });
+  httpUrl(upstream, "forward_auth.authUpstream");
+  optionalString(value, "authEndpoint", "forward_auth", 4096);
+}
+
 function validateMetrics(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "port"], "metrics settings");
   booleanValue(required(value, "enabled", "metrics settings"), "metrics.enabled");
@@ -409,6 +420,7 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
     case "acme": validateAcme(value); break;
     case "cloudflare": validateCloudflare(value); break;
     case "authentik": validateAuthentik(value); break;
+    case "forward-auth": validateForwardAuth(value); break;
     case "metrics": validateMetrics(value); break;
     case "logging": validateLogging(value); break;
     case "trusted-proxies": validateTrustedProxies(value); break;

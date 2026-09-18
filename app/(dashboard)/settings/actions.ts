@@ -6,7 +6,7 @@ import { applyCaddyConfig } from "@/src/lib/caddy";
 import { parseBodyLimitMib } from "@/src/lib/caddy-waf";
 import { getInstanceMode, getSlaveMasterToken, setInstanceMode, setSlaveMasterToken, syncInstances } from "@/src/lib/instance-sync";
 import { createInstance, deleteInstance, updateInstance } from "@/src/lib/models/instances";
-import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings, saveDefaultResponseSettings, type DefaultResponseSettings } from "@/src/lib/settings";
+import { clearSetting, getSetting, saveCloudflareSettings, getDnsProviderSettings, saveDnsProviderSettings, saveGeneralSettings, saveAcmeSettings, saveAuthentikSettings, saveForwardAuthSettings, saveMetricsSettings, saveLoggingSettings, saveDnsSettings, saveUpstreamDnsResolutionSettings, saveGeoBlockSettings, saveWafSettings, getWafSettings, saveErrorPagesSettings, saveTrustedProxiesSettings, saveDefaultResponseSettings, type DefaultResponseSettings } from "@/src/lib/settings";
 import { listProxyHosts, updateProxyHost, sanitizeErrorPageRules } from "@/src/lib/models/proxy-hosts";
 import { getWafRuleMessages } from "@/src/lib/models/waf-events";
 import type { CloudflareSettings, DnsProviderSettings, GeoBlockSettings, WafSettings } from "@/src/lib/settings";
@@ -341,6 +341,41 @@ async function updateAuthentikSettingsActionUnlocked(_prevState: ActionResult | 
   } catch (error) {
     console.error("Failed to save Authentik settings:", error);
     return { success: false, message: error instanceof Error ? error.message : "Failed to save Authentik settings" };
+  }
+}
+
+async function updateForwardAuthSettingsActionUnlocked(_prevState: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const mode = await getInstanceMode();
+    const overrideEnabled = formData.get("overrideEnabled") === "on";
+    if (mode === "slave" && !overrideEnabled) {
+      await clearSetting("forward_auth");
+      await syncInstances();
+      revalidatePath("/settings");
+      return { success: true, message: "Forward Auth defaults reset to master values" };
+    }
+    const providerRaw = String(formData.get("provider") ?? "").trim();
+    const provider = providerRaw === "custom" ? "custom" : providerRaw === "authelia" ? "authelia" : null;
+    const authUpstream = String(formData.get("authUpstream") ?? "").trim();
+    const authEndpoint = formData.get("authEndpoint") ? String(formData.get("authEndpoint")).trim() : undefined;
+
+    if (!provider || !authUpstream) {
+      return { success: false, message: "Provider and auth server URL are required" };
+    }
+
+    await saveForwardAuthSettings({
+      provider,
+      authUpstream,
+      authEndpoint: authEndpoint && authEndpoint.length > 0 ? authEndpoint : undefined
+    });
+
+    await syncInstances();
+    revalidatePath("/settings");
+    return { success: true, message: "Forward Auth defaults saved successfully" };
+  } catch (error) {
+    console.error("Failed to save Forward Auth settings:", error);
+    return { success: false, message: error instanceof Error ? error.message : "Failed to save Forward Auth settings" };
   }
 }
 
@@ -1214,6 +1249,7 @@ export const updateAcmeSettingsAction = serializedSettingsAction(updateAcmeSetti
 export const updateCloudflareSettingsAction = serializedSettingsAction(updateCloudflareSettingsActionUnlocked);
 export const updateDnsProviderSettingsAction = serializedSettingsAction(updateDnsProviderSettingsActionUnlocked);
 export const updateAuthentikSettingsAction = serializedSettingsAction(updateAuthentikSettingsActionUnlocked);
+export const updateForwardAuthSettingsAction = serializedSettingsAction(updateForwardAuthSettingsActionUnlocked);
 export const updateMetricsSettingsAction = serializedSettingsAction(updateMetricsSettingsActionUnlocked);
 export const updateLoggingSettingsAction = serializedSettingsAction(updateLoggingSettingsActionUnlocked);
 export const updateTrustedProxiesSettingsAction = serializedSettingsAction(updateTrustedProxiesSettingsActionUnlocked);

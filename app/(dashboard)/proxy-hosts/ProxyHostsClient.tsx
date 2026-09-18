@@ -7,7 +7,7 @@ import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificate-api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
-import type { AuthentikSettings } from "@/lib/settings";
+import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { toggleProxyHostAction } from "./actions";
@@ -38,6 +38,7 @@ type Props = {
   accessLists: AccessList[];
   caCertificates: CaCertificate[];
   authentikDefaults: AuthentikSettings | null;
+  forwardAuthDefaults?: ForwardAuthSettings | null;
   pagination: { total: number; page: number; perPage: number };
   initialSearch: string;
   initialSort?: { sortBy: string; sortDir: "asc" | "desc" };
@@ -48,7 +49,7 @@ type Props = {
   forwardAuthAccessMap?: ForwardAuthAccessMap;
 };
 
-export default function ProxyHostsClient({ hosts, certificates, accessLists, caCertificates, authentikDefaults, pagination, initialSearch, initialSort, mtlsRoles, issuedClientCerts, forwardAuthUsers, forwardAuthGroups, forwardAuthAccessMap }: Props) {
+export default function ProxyHostsClient({ hosts, certificates, accessLists, caCertificates, authentikDefaults, pagination, initialSearch, initialSort, mtlsRoles, issuedClientCerts, forwardAuthUsers, forwardAuthGroups, forwardAuthAccessMap, forwardAuthDefaults }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
   const [editHost, setEditHost] = useState<ProxyHost | null>(null);
@@ -327,6 +328,7 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
         certificates={certificates}
         accessLists={accessLists}
         authentikDefaults={authentikDefaults}
+        forwardAuthDefaults={forwardAuthDefaults}
         caCertificates={caCertificates}
         mtlsRoles={mtlsRoles ?? []}
         issuedClientCerts={issuedClientCerts ?? []}
@@ -342,6 +344,7 @@ export default function ProxyHostsClient({ hosts, certificates, accessLists, caC
           certificates={certificates}
           accessLists={accessLists}
           authentikDefaults={authentikDefaults}
+        forwardAuthDefaults={forwardAuthDefaults}
           caCertificates={caCertificates}
           mtlsRoles={mtlsRoles ?? []}
           issuedClientCerts={issuedClientCerts ?? []}

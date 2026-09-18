@@ -28,7 +28,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import type {
   GeneralSettings,
   AcmeSettings,
-  AuthentikSettings,
+  AuthentikSettings, ForwardAuthSettings,
   MetricsSettings,
   LoggingSettings,
   DnsSettings,
@@ -48,6 +48,7 @@ import {
   updateGeneralSettingsAction,
   updateAcmeSettingsAction,
   updateAuthentikSettingsAction,
+  updateForwardAuthSettingsAction,
   updateMetricsSettingsAction,
   updateLoggingSettingsAction,
   updateDnsSettingsAction,
@@ -108,6 +109,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
       { id: "geoblock", name: "Global Geoblocking", desc: "Default geoblock rules across all hosts", icon: <MapPin className="h-4 w-4" /> },
       { id: "error-pages", name: "Error Pages", desc: "Global custom error responses (fallback for all hosts)", icon: <FileWarning className="h-4 w-4" /> },
       { id: "authentik", name: "Authentik Defaults", desc: "Forward-auth defaults for new proxy hosts", icon: <UserCheck className="h-4 w-4" /> },
+      { id: "forward-auth", name: "Forward Auth Defaults", desc: "Generic forward-auth (Authelia) defaults for new proxy hosts", icon: <ShieldCheck className="h-4 w-4" /> },
       { id: "oauth", name: "OAuth Providers", desc: "OAuth/OIDC SSO providers", icon: <KeyRound className="h-4 w-4" /> },
     ],
   },
@@ -385,6 +387,7 @@ type Props = {
   dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
   authentik: AuthentikSettings | null;
+  forwardAuth: ForwardAuthSettings | null;
   metrics: MetricsSettings | null;
   logging: LoggingSettings | null;
   dns: DnsSettings | null;
@@ -404,6 +407,7 @@ type Props = {
       acme: boolean;
       dnsProvider: boolean;
       authentik: boolean;
+      forwardAuth: boolean;
       metrics: boolean;
       logging: boolean;
       dns: boolean;
@@ -441,6 +445,7 @@ export default function SettingsClient({
   dnsProvider,
   dnsProviderDefinitions,
   authentik,
+  forwardAuth,
   metrics,
   logging,
   dns,
@@ -475,6 +480,7 @@ export default function SettingsClient({
   const [selectedProvider, setSelectedProvider] = useState("none");
   const configuredProviders = dnsProvider?.providers ? Object.keys(dnsProvider.providers) : [];
   const [authentikState, authentikFormAction] = useActionState(updateAuthentikSettingsAction, null);
+  const [forwardAuthState, forwardAuthFormAction] = useActionState(updateForwardAuthSettingsAction, null);
   const [metricsState, metricsFormAction] = useActionState(updateMetricsSettingsAction, null);
   const [loggingState, loggingFormAction] = useActionState(updateLoggingSettingsAction, null);
   const [dnsState, dnsFormAction] = useActionState(updateDnsSettingsAction, null);
@@ -496,6 +502,7 @@ export default function SettingsClient({
   const [acmeOverride, setAcmeOverride] = useState(instanceSync.overrides.acme);
   const [dnsProviderOverride, setDnsProviderOverride] = useState(instanceSync.overrides.dnsProvider);
   const [authentikOverride, setAuthentikOverride] = useState(instanceSync.overrides.authentik);
+  const [forwardAuthOverride, setForwardAuthOverride] = useState(instanceSync.overrides.forwardAuth);
   const [metricsOverride, setMetricsOverride] = useState(instanceSync.overrides.metrics);
   const [loggingOverride, setLoggingOverride] = useState(instanceSync.overrides.logging);
   const [dnsOverride, setDnsOverride] = useState(instanceSync.overrides.dns);
@@ -639,6 +646,16 @@ export default function SettingsClient({
                   isSlave={isSlave}
                   authentikOverride={authentikOverride}
                   setAuthentikOverride={setAuthentikOverride}
+                />
+              )}
+              {active === "forward-auth" && (
+                <ForwardAuthSection
+                  forwardAuth={forwardAuth}
+                  forwardAuthState={forwardAuthState}
+                  forwardAuthFormAction={forwardAuthFormAction}
+                  isSlave={isSlave}
+                  forwardAuthOverride={forwardAuthOverride}
+                  setForwardAuthOverride={setForwardAuthOverride}
                 />
               )}
               {active === "oauth" && (
@@ -1752,6 +1769,81 @@ function AuthentikSection({
         </FormRow>
         <div className="flex justify-end">
           <Button type="submit" size="sm">Save Authentik defaults</Button>
+        </div>
+      </form>
+    </FormCard>
+  );
+}
+
+// ─── Section: Forward Auth Defaults (generic / Authelia) ─────────────────────
+
+function ForwardAuthSection({
+  forwardAuth,
+  forwardAuthState,
+  forwardAuthFormAction,
+  isSlave,
+  forwardAuthOverride,
+  setForwardAuthOverride,
+}: {
+  forwardAuth: ForwardAuthSettings | null;
+  forwardAuthState: { success: boolean; message?: string } | null;
+  forwardAuthFormAction: (payload: FormData) => void;
+  isSlave: boolean;
+  forwardAuthOverride: boolean;
+  setForwardAuthOverride: (v: boolean) => void;
+}) {
+  return (
+    <FormCard>
+      <form action={forwardAuthFormAction} className="flex flex-col gap-3">
+        {forwardAuthState?.message && (
+          <StatusAlert message={forwardAuthState.message} success={forwardAuthState.success} />
+        )}
+        {isSlave && (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="forward-auth-override"
+              name="overrideEnabled"
+              checked={forwardAuthOverride}
+              onCheckedChange={(v) => setForwardAuthOverride(!!v)}
+            />
+            <Label htmlFor="forward-auth-override">Override master settings</Label>
+          </div>
+        )}
+        <FormRow label="Provider preset">
+          <select
+            name="provider"
+            defaultValue={forwardAuth?.provider ?? "authelia"}
+            disabled={isSlave && !forwardAuthOverride}
+            className="h-8 rounded-md border bg-background px-2 text-sm"
+          >
+            <option value="authelia">Authelia</option>
+            <option value="custom">Custom (generic forward auth)</option>
+          </select>
+        </FormRow>
+        <FormRow label="Auth server URL">
+          <Input
+            name="authUpstream"
+            placeholder="http://authelia:9091"
+            defaultValue={forwardAuth?.authUpstream ?? ""}
+            required
+            disabled={isSlave && !forwardAuthOverride}
+            className="h-8 text-sm font-mono"
+          />
+        </FormRow>
+        <FormRow label="Auth endpoint">
+          <Input
+            name="authEndpoint"
+            placeholder="/api/authz/forward-auth"
+            defaultValue={forwardAuth?.authEndpoint ?? ""}
+            disabled={isSlave && !forwardAuthOverride}
+            className="h-8 text-sm font-mono"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Optional. Authelia hosts are prefilled with /api/authz/forward-auth when blank.
+          </p>
+        </FormRow>
+        <div className="flex justify-end">
+          <Button type="submit" size="sm">Save Forward Auth defaults</Button>
         </div>
       </form>
     </FormCard>
