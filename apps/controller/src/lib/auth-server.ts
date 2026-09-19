@@ -350,6 +350,19 @@ async function createAuth(baseURL: string): Promise<any> {
             // single IdP session has to match against.
             rememberIdpSession(account);
 
+            // Self-registration is the one password Better Auth writes itself - its change and
+            // reset endpoints are disabled, and every other path goes through models/user.
+            if (account.providerId === "credential" && account.password) {
+              try {
+                const { markPasswordChanged } = await import("./models/user");
+                const userId =
+                  typeof account.userId === "string" ? Number(account.userId) : account.userId;
+                if (Number.isFinite(userId)) await markPasswordChanged(userId);
+              } catch (e) {
+                console.warn("[auth-server] Failed to record when the password was set:", e);
+              }
+            }
+
             // Better Auth writes federated identities to the `accounts` table
             // only. Re-derive the informational users.provider/subject columns
             // from it so auto-linking, profile linking, and federated sign-up

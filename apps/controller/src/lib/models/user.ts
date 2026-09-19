@@ -9,6 +9,8 @@ export type User = {
   email: string;
   name: string | null;
   passwordHash: string | null;
+  /** When the login password was last set; null without one, or when it predates the record. */
+  passwordChangedAt: string | null;
   role: AppRole;
   provider: string | null;
   subject: string | null;
@@ -26,6 +28,7 @@ function parseDbUser(user: DbUser): User {
     email: user.email,
     name: user.name,
     passwordHash: user.passwordHash,
+    passwordChangedAt: toIso(user.passwordChangedAt),
     role: user.role as AppRole,
     provider: user.provider,
     subject: user.subject,
@@ -80,6 +83,7 @@ export async function createUser(data: {
       email,
       name: data.name ?? null,
       passwordHash: data.passwordHash ?? null,
+      passwordChangedAt: data.passwordHash ? now : null,
       role,
       provider,
       subject: data.subject,
@@ -139,6 +143,7 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
     .update(users)
     .set({
       passwordHash,
+      passwordChangedAt: now,
       updatedAt: now,
     })
     .where(eq(users.id, userId));
@@ -154,6 +159,15 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
 }
 
 /**
+ * Record that a user's password was just set, by a path that wrote the hash itself - Better Auth's
+ * own endpoints, which reach the credential account without going through updateUserPassword.
+ */
+export async function markPasswordChanged(userId: number): Promise<void> {
+  const now = nowIso();
+  await db.update(users).set({ passwordChangedAt: now }).where(eq(users.id, userId));
+}
+
+/**
  * Drop a user's password: the hash on the user row and the Better Auth credential account that
  * mirrors it, leaving their linked providers as the only way in. Callers must have checked that at
  * least one provider is linked - this does not, so it can never be the reason a check was skipped.
@@ -163,7 +177,10 @@ export async function removeUserPassword(userId: number): Promise<void> {
   await db
     .delete(accounts)
     .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
-  await db.update(users).set({ passwordHash: null, updatedAt: now }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ passwordHash: null, passwordChangedAt: null, updatedAt: now })
+    .where(eq(users.id, userId));
   // users.provider still says "credentials"; re-derive it from the accounts now left.
   await syncUserOAuthIdentity(userId);
 }
@@ -294,4 +311,17 @@ export async function lastSessionByUser(): Promise<Map<number, string>> {
     if (iso) byUser.set(row.userId, iso);
   }
   return byUser;
+}
+
+/**
+ * The users who have a login password. A credential account is the test, not users.passwordHash:
+ * a self-registered user's password lives on the account Better Auth created, and the hash column
+ * on their user row is never filled in.
+ */
+export async function usersWithPassword(): Promise<Set<number>> {
+  const rows = await db
+    .selectDistinct({ userId: accounts.userId })
+    .from(accounts)
+    .where(eq(accounts.providerId, "credential"));
+  return new Set(rows.map((row) => row.userId));
 }
