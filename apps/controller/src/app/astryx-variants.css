@@ -138,3 +138,62 @@
     }
   }
 }
+
+/**
+ * Table text at one size, the way admin tables almost all do it (Tailscale, Render, Vanta, Cloudflare
+ * and the rest): every value in a row is body size, a second line under a name drops one step and
+ * goes grey, headings and status badges sit a step below body, and a value too long for its column
+ * truncates - with the whole of it in a tooltip - rather than the text shrinking to fit. Nothing
+ * here follows the viewport.
+ *
+ * Cells ask for sm (12px) and xsm (10px) all over, which read as fine print beside the heading, so
+ * inside a cell those tokens are body size too. The table captures the theme's small size first,
+ * for the two places that still want it: a token cannot be redefined in terms of itself.
+ */
+@layer astryx-theme {
+  @scope ([data-astryx-theme="neutral"]) to ([data-astryx-theme]) {
+    .astryx-table {
+      --cpm-table-small: var(--font-size-sm);
+    }
+
+    .astryx-table-cell {
+      --font-size-sm: var(--text-body-size);
+      --font-size-xs: var(--text-body-size);
+      --font-size-2xs: var(--text-body-size);
+      vertical-align: middle;
+    }
+
+    /* A value truncates only if everything around it can narrow: a flex item will not shrink
+       below its content unless told, so a name and its domain spilled into the next column instead
+       of reaching the ellipsis. Icons keep their size. */
+    .astryx-table-cell .astryx-stack,
+    .astryx-table-cell .astryx-stack > :not(.astryx-icon) {
+      min-width: 0;
+    }
+
+    /* 16px a side rather than 12, so neighbouring values never read as one. */
+    .astryx-table-cell,
+    .astryx-table-header-cell {
+      padding-inline: var(--spacing-4);
+    }
+
+    /* A heading is a step below the values it heads, and wraps rather than losing its end to an
+       ellipsis: "Requests, 2..." does not say what the number is. */
+    .astryx-table-header-cell {
+      --text-body-size: var(--cpm-table-small);
+      --text-label-size: var(--cpm-table-small);
+      --font-size-sm: var(--cpm-table-small);
+      white-space: normal;
+      text-overflow: clip;
+    }
+
+    /* The second line of a two-line cell - a host's domain under its name. Grey comes from the
+       Text itself; the size is set here so every table agrees. */
+    .cpm-cell-lines > :nth-child(2) {
+      --text-body-size: var(--cpm-table-small);
+      --text-code-size: var(--cpm-table-small);
+      --font-size-sm: var(--cpm-table-small);
+      --font-size-xs: var(--cpm-table-small);
+    }
+  }
+}

@@ -235,7 +235,7 @@ function RoleCard({
           <HStack gap={3} vAlign="center">
             <Icon icon={ShieldCheck} />
             <VStack gap={0}>
-              <Text type="body" size="sm" weight="semibold" maxLines={1}>
+              <Text type="body" size="sm" weight="semibold">
                 {role.name}
               </Text>
               <Text type="body" size="xsm" color="secondary">

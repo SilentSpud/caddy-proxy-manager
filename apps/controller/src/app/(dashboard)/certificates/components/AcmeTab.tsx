@@ -3,6 +3,7 @@
 import { Lock } from "lucide-react";
 import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { DataTable } from "@/components/ui/DataTable";
@@ -62,13 +63,15 @@ export function AcmeTab({ acmeHosts, acmePagination, search, statusFilter }: Pro
       render: (r: AcmeHost) => (
         <HStack gap={3} vAlign="center">
           <Icon icon={Lock} size="sm" color={r.enabled ? "success" : "disabled"} />
-          <VStack gap={0}>
+          <VStack gap={0} className="cpm-cell-lines">
             <Text type="body" size="sm" weight="semibold">
               {r.name}
             </Text>
-            <Text type="code" size="xsm" color="secondary">
-              {domainSummary(r)}
-            </Text>
+            <Tooltip content={r.domains.join(", ")}>
+              <Text type="code" size="xsm" color="secondary" maxLines={1}>
+                {domainSummary(r)}
+              </Text>
+            </Tooltip>
           </VStack>
         </HStack>
       ),

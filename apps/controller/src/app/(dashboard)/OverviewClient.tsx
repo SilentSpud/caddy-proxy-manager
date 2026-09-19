@@ -262,7 +262,7 @@ function Tile({
   return (
     <SelectableCard label={label} isSelected={isSelected} onChange={onSelect} padding={4}>
       <VStack gap={1}>
-        <Text type="body" weight="semibold" maxLines={1} style={CARD_TITLE_STYLE}>
+        <Text type="body" weight="semibold" style={CARD_TITLE_STYLE}>
           {label}
         </Text>
         <Text type="large" weight="semibold" hasTabularNumbers>
@@ -518,7 +518,7 @@ export default function OverviewClient({
         width: proportional(3),
         renderCell: (row) =>
           row.kind === "traffic" ? (
-            <VStack gap={0}>
+            <VStack gap={0} className="cpm-cell-lines">
               <Text type="code" size="sm" maxLines={1}>
                 {row.method} {row.host}
                 {row.uri}
@@ -531,7 +531,7 @@ export default function OverviewClient({
               </Text>
             </VStack>
           ) : (
-            <VStack gap={0}>
+            <VStack gap={0} className="cpm-cell-lines">
               <Text type="body" size="sm" maxLines={1}>
                 {row.summary}
               </Text>

@@ -635,9 +635,7 @@ function DetailPane({
       <HStack gap={4} vAlign="start">
         <Icon icon={KeyRound} color="accent" />
         <VStack gap={1}>
-          <Heading level={2} maxLines={1}>
-            {list.name}
-          </Heading>
+          <Heading level={2}>{list.name}</Heading>
           <Text type="body" size="sm" color="secondary">
             {list.description || t("noDescription")}
           </Text>

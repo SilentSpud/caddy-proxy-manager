@@ -312,9 +312,7 @@ function UserDetail({
           <UserAvatar avatar={user.avatar} alt={name} size={48} tooltip={false} />
           <VStack gap={1}>
             <HStack gap={2} vAlign="center" wrap="wrap">
-              <Heading level={2} maxLines={1}>
-                {name}
-              </Heading>
+              <Heading level={2}>{name}</Heading>
               <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
               {isDisabled && <Badge variant="error" label={t("disabledBadge")} />}
             </HStack>
