@@ -36,7 +36,7 @@ RUN case "$TARGETARCH" in \
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Debian rather than docker:cli, whose Alpine base is musl: the compiled binary carries its own
 # glibc-linked Bun runtime and will not start there.
-FROM debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132 AS runner
+FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS runner
 
 # docker-ce-cli and the compose plugin from Docker's own repository. `docker compose` is invoked
 # for every operation this container exists to perform, so its absence is a startup failure rather

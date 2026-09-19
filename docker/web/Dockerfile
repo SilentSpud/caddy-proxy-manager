@@ -65,7 +65,7 @@ RUN case "$TARGETARCH" in \
 # standalone node_modules copied below were installed there and may carry native binaries.
 # The only runtime stage - the e2e suite runs this same image, seeding through the `db-seed`
 # container rather than executing code here.
-FROM debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132 AS runner
+FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS runner
 ARG PUID=10001
 ARG PGID=10001
 
