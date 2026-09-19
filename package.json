@@ -50,7 +50,7 @@
     "test:e2e:no-clickhouse": "bun run --filter @cpm/controller test:e2e:no-clickhouse"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.13",
+    "@biomejs/biome": "^2.5.14",
     "@socketsecurity/bun-security-scanner": "^1.1.2",
     "@types/bun": "^1.4.2",
     "typescript": "^7.0.2"
@@ -64,6 +64,6 @@
     "core-js-pure"
   ],
   "patchedDependencies": {
-    "vinext@1.0.0-beta.9": "patches/vinext@1.0.0-beta.9.patch"
+    "vinext@1.0.0-beta.10": "patches/vinext@1.0.0-beta.10.patch"
   }
 }

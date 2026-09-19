@@ -11,21 +11,21 @@
     "typecheck": "astro sync && tsc --noEmit -p tsconfig.typecheck.json"
   },
   "dependencies": {
-    "@astrojs/react": "^6.0.5",
-    "@astrojs/starlight": "^0.42.0",
-    "@astryxdesign/core": "^0.6.0",
-    "@astryxdesign/theme-neutral": "^0.6.0",
+    "@astrojs/react": "^6.0.6",
+    "@astrojs/starlight": "^0.42.2",
+    "@astryxdesign/core": "^0.6.2",
+    "@astryxdesign/theme-neutral": "^0.6.2",
     "@catppuccin/starlight": "^2.1.0",
     "@cpm/controller": "workspace:*",
-    "apexcharts": "^7.2.0",
-    "astro": "^7.3.2",
-    "lucide-react": "^1.45.0",
+    "apexcharts": "^7.4.0",
+    "astro": "^7.3.3",
+    "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-apexcharts": "^2.1.1",
     "react-dom": "^19.3.0",
     "satteri": "^0.10.5",
     "sharp": "^0.35.4",
-    "use-intl": "^4.14.4"
+    "use-intl": "^4.14.5"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
