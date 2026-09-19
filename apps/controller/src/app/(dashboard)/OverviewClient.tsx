@@ -26,6 +26,7 @@ import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
+import { useTableDensity } from "@/components/ui/TableDensity";
 
 // ApexCharts renders on the client only, for the reason given in AnalyticsClient: v7's
 // server entry is an async Server Component this file cannot reach, and there is nothing
@@ -300,6 +301,7 @@ export default function OverviewClient({
   isAdmin?: boolean;
 }) {
   const t = useTranslations("overview");
+  const density = useTableDensity();
   const format = useFormatter();
   const emptyValue = useEmptyValue();
   const chartTheme = useChartTheme();
@@ -742,7 +744,7 @@ export default function OverviewClient({
             // Wrapping it again in an overflow-x box only added a second scroller - and one axis set
             // to `auto` turns the other from `visible` into `auto` too, which is where the
             // stray vertical scrollbar came from.
-            <Table data={logRows} columns={logColumns} idKey="id" />
+            <Table data={logRows} columns={logColumns} idKey="id" density={density} />
           )}
           <Text type="body" size="xsm" color="secondary">
             {isEventsOnly

@@ -43,6 +43,7 @@ import { useEmptyValue } from "@/components/ui/empty-value";
 import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { CountryBreakdown } from "./CountryBreakdown";
 import type { MapMetric } from "./WorldMapInner";
+import { useTableDensity } from "@/components/ui/TableDensity";
 
 // ── Dynamic imports (browser-only) ────────────────────────────────────────────
 
@@ -393,6 +394,7 @@ function asArray<T>(value: unknown): T[] {
 
 export default function AnalyticsClient() {
   const t = useTranslations("analytics");
+  const density = useTableDensity();
   const format = useFormatter();
   const emptyValue = useEmptyValue();
   const [interval, setIntervalVal] = useState<DisplayInterval>("1h");
@@ -1151,6 +1153,7 @@ export default function AnalyticsClient() {
                   <EmptyState title={t("geoDataEmptyTitle")} isCompact />
                 ) : (
                   <Table
+                    density={density}
                     data={countryRows}
                     // A phone keeps the country and the two counts that answer "is it hostile";
                     // five fixed columns are wider than the card.
@@ -1196,7 +1199,12 @@ export default function AnalyticsClient() {
                         height={220}
                       />
                     </div>
-                    <Table data={protocolRows} columns={protocolColumns} idKey="proto" />
+                    <Table
+                      density={density}
+                      data={protocolRows}
+                      columns={protocolColumns}
+                      idKey="proto"
+                    />
                   </>
                 )}
               </VStack>
@@ -1233,7 +1241,13 @@ export default function AnalyticsClient() {
               ) : (
                 <>
                   <div className="cpm-desktop-only">
-                    <Table data={blockedRows} columns={blockedColumns} idKey="id" hasHover />
+                    <Table
+                      density={density}
+                      data={blockedRows}
+                      columns={blockedColumns}
+                      idKey="id"
+                      hasHover
+                    />
                   </div>
                   {/* Seven columns become rows on a phone: who, what they hit, and from where. */}
                   <div className="cpm-mobile-only">
@@ -1280,7 +1294,12 @@ export default function AnalyticsClient() {
                     height={Math.max(120, wafStats.topRules.length * 32)}
                   />
                 </div>
-                <Table data={wafRuleRows} columns={wafRuleColumns} idKey="ruleId" />
+                <Table
+                  density={density}
+                  data={wafRuleRows}
+                  columns={wafRuleColumns}
+                  idKey="ruleId"
+                />
               </VStack>
             </Card>
           )}

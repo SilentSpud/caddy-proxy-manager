@@ -16,6 +16,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
@@ -28,11 +29,26 @@ import { UserAvatar } from "@/src/components/UserAvatar";
 import type { ResolvedAvatar } from "@/src/lib/avatar";
 import { MAX_AVATAR_FILE_KB } from "@/src/lib/avatar-limits";
 import { authClient } from "@/src/lib/auth-client";
-import { Key, Link, LogIn, Lock, LogOut, Monitor, Plus, Trash2, Unlink, User } from "lucide-react";
+import {
+  Key,
+  Link,
+  LogIn,
+  Lock,
+  LogOut,
+  Monitor,
+  Plus,
+  Rows3,
+  Trash2,
+  Unlink,
+  User,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ApiToken } from "@/lib/models/api-tokens";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { revokeSessionAction, revokeOtherSessionsAction } from "./session-actions";
+import { saveTableDensityAction } from "./display-actions";
+import { useSetTableDensity, useTableDensity } from "@/components/ui/TableDensity";
+import { isTableDensity, TABLE_DENSITIES } from "@/src/lib/table-density";
 import { passwordPolicyHint, passwordPolicyMessage } from "@/src/lib/password-policy-message";
 import { useFormatter, useNow, useTranslations } from "next-intl";
 import { TIMESTAMP_STYLES, UtcTooltip } from "@/components/ui/Timestamp";
@@ -135,6 +151,60 @@ function ProfileSection({
         {children}
       </VStack>
     </Card>
+  );
+}
+
+/**
+ * How tightly this user's tables are set. Applied at once through the provider, so the choice is
+ * visible before the save comes back; a refused save puts the old one back and says why.
+ */
+function DisplaySection({ onError }: { onError: (message: string) => void }) {
+  const t = useTranslations("profile");
+  const density = useTableDensity();
+  const setDensity = useSetTableDensity();
+  const [saving, setSaving] = useState(false);
+
+  const choose = async (next: string) => {
+    if (!isTableDensity(next) || next === density) return;
+    const previous = density;
+    setDensity(next);
+    setSaving(true);
+    try {
+      const result = await saveTableDensityAction(next);
+      if (!result.ok) {
+        setDensity(previous);
+        onError(result.error);
+      }
+    } catch {
+      setDensity(previous);
+      onError(t("tableDensitySaveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ProfileSection icon={Rows3} title={t("display")}>
+      <VStack gap={2}>
+        <SegmentedControl
+          label={t("tableDensity")}
+          value={density}
+          onChange={choose}
+          isDisabled={saving}
+        >
+          {TABLE_DENSITIES.map((option) => (
+            <SegmentedControlItem
+              key={option}
+              value={option}
+              label={t(`tableDensityOptions.${option}`)}
+            />
+          ))}
+        </SegmentedControl>
+        <Text type="body" size="sm" color="secondary">
+          {t("tableDensityHelp")}
+        </Text>
+      </VStack>
+    </ProfileSection>
   );
 }
 
@@ -527,6 +597,8 @@ export default function ProfileClient({
             </MetadataList>
           </VStack>
         </ProfileSection>
+
+        <DisplaySection onError={setError} />
 
         {localPasswordsEnabled && (
           <ProfileSection icon={Lock} title={t("passwordManagement")}>

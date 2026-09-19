@@ -14,6 +14,8 @@ import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
 import { stagedKeys } from "@/src/lib/settings/staged-view";
 import { getMoreDrawerPins } from "@/src/lib/models/nav-preferences";
+import { getTableDensity } from "@/src/lib/models/table-density";
+import { TableDensityProvider } from "@/components/ui/TableDensity";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await requireUser();
@@ -23,7 +25,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   // Every read below is independent, so they share one round trip; this runs on every dashboard
   // navigation, which is what makes the serial version worth avoiding.
-  const [mustChangePassword, gravatar, moduleGate, updates, stagedSet, morePins] =
+  const [mustChangePassword, gravatar, moduleGate, updates, stagedSet, morePins, tableDensity] =
     await Promise.all([
       requiresLegacyPasswordChange(userId),
       isGravatarEnabled(),
@@ -40,6 +42,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       // One indexed read per request, for the phone's More drawer. Null means the user never chose,
       // which is also what keeps the drawer offering to be customized.
       getMoreDrawerPins(userId),
+      // The same shape of read, for how tightly this user's tables are set.
+      getTableDensity(userId),
     ]);
 
   // Gate the whole dashboard rather than individual pages: a user still on a
@@ -59,17 +63,19 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const staged = stagedSet ? [...stagedSet] : [];
   return (
     <ModuleGateProvider value={moduleGate}>
-      <DashboardLayoutClient
-        user={session.user}
-        avatar={avatar}
-        appName={config.appName}
-        demoMode={isDemoMode()}
-        updateAvailable={updates.updateAvailable}
-        stagedKeys={staged}
-        morePins={morePins}
-      >
-        {children}
-      </DashboardLayoutClient>
+      <TableDensityProvider initial={tableDensity}>
+        <DashboardLayoutClient
+          user={session.user}
+          avatar={avatar}
+          appName={config.appName}
+          demoMode={isDemoMode()}
+          updateAvailable={updates.updateAvailable}
+          stagedKeys={staged}
+          morePins={morePins}
+        >
+          {children}
+        </DashboardLayoutClient>
+      </TableDensityProvider>
     </ModuleGateProvider>
   );
 }
