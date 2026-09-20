@@ -122,11 +122,14 @@ test.describe('Certificates', () => {
       await page.getByRole('button', { name: /acme/i }).click();
 
       const acmeTab = page.getByRole('main');
-      // DataTable renders both a hidden mobile card and a visible desktop table row.
-      // Mobile card is first in the DOM (block md:hidden) - use .last() to get the visible desktop row.
-      await expect(acmeTab.getByText(`*.${domain}`).last()).toBeVisible({ timeout: 5_000 });
+      // The domain line is in three places: the hidden mobile card, the desktop table row, and
+      // the row's tooltip, whose closed popover still holds its text. Scoping to the table is
+      // what the assertion means anyway - .last() only worked while the visible row happened to
+      // come last, and the tooltip now renders after it.
+      const acmeTable = acmeTab.getByRole('table');
+      await expect(acmeTable.getByText(`*.${domain}`)).toBeVisible({ timeout: 5_000 });
       // The subdomain host should NOT appear as a separate entry
-      await expect(acmeTab.getByText(`sub.${domain}`)).not.toBeVisible({ timeout: 5_000 });
+      await expect(acmeTable.getByText(`sub.${domain}`)).not.toBeVisible({ timeout: 5_000 });
     } finally {
       if (subHostId) await page.request.delete(`${API}/proxy-hosts/${subHostId}`, { headers });
       if (wcHostId) await page.request.delete(`${API}/proxy-hosts/${wcHostId}`, { headers });
