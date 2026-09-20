@@ -11,6 +11,8 @@ import { assertNoNewAdminDialTargets, isAdminActor } from "./admin-dial-targets"
 import {
   CORAZA_MAX_BODY_LIMIT,
   CORAZA_MIN_BODY_LIMIT,
+  droppedWafDirectiveDetails,
+  filterCustomDirectives,
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
 } from "../caddy-waf";
@@ -433,6 +435,16 @@ function validateWafMeta(waf: WafHostConfig): WafHostConfig {
     throw domainError(
       "hostWafDirectiveBodyLimitOutOfRange",
       { directive: badDirective, ...bounds },
+      { status: 400 },
+    );
+  }
+  // Same reasoning for echoing the lines: only lines the allowlist is about to discard are named,
+  // and a discarded line that says nothing is what makes a WAF rule look like it does nothing.
+  const { dropped } = filterCustomDirectives(waf.custom_directives);
+  if (dropped.length > 0) {
+    throw domainError(
+      "hostWafDirectivesDropped",
+      { count: dropped.length, details: droppedWafDirectiveDetails(dropped) },
       { status: 400 },
     );
   }

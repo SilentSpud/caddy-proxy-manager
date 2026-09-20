@@ -1,7 +1,7 @@
 /** WAF handler builder and effective-config resolver, split from caddy.ts for unit testing. */
 import type { WafSettings } from "./settings";
 import type { WafHostConfig } from "./models/proxy-hosts";
-import { type DomainErrorCode, domainError } from "./domain-error";
+import { type DomainErrorCode, domainError, domainErrorMessage } from "./domain-error";
 
 // ---------------------------------------------------------------------------
 // Request body limits
@@ -107,6 +107,110 @@ export function findInvalidBodyLimitDirective(
     if (match && !isValidBodyLimit(Number(match[2]))) return trimmed;
   }
   return null;
+}
+
+/**
+ * Why a custom SecLang line never reaches Caddy. A code rather than a sentence: the wording lives
+ * in the catalog, next to every other sentence a person reads.
+ */
+export type DroppedWafDirectiveReason =
+  | "wafDirectiveDroppedInclude"
+  | "wafDirectiveDroppedRuleMutation"
+  | "wafDirectiveDroppedCtlRuleEngine"
+  | "wafDirectiveDroppedBodyLimit"
+  | "wafDirectiveDroppedNotAllowed";
+
+/** A custom SecLang line CPM will not send to Caddy, and why. */
+export type DroppedWafDirective = { line: string; reason: DroppedWafDirectiveReason };
+
+/** Allowed on their own; anything else is dropped. */
+const ALLOWED_DIRECTIVE_PREFIXES = [
+  /^SecRule\s/,
+  /^SecAction\s/,
+  /^SecMarker\s/,
+  /^SecDefaultAction\s/,
+];
+
+/** SecRule* variants that are not a plain SecRule: they mutate or disable the engine. */
+const BLOCKED_SEC_RULE_PREFIXES = [
+  /^SecRuleEngine\s/i,
+  /^SecRuleRemoveById\s/i,
+  /^SecRuleRemoveByTag\s/i,
+  /^SecRuleRemoveByMsg\s/i,
+  /^SecRuleUpdateActionById\s/i,
+  /^SecRuleUpdateTargetById\s/i,
+];
+
+/**
+ * Splits the user's custom directives into the lines that will be emitted and the ones this drops.
+ *
+ * The allowlist is the security boundary and stays exactly as strict as it was; what changed is
+ * that a dropped line is now something to say out loud. A silently discarded
+ * `SecRuleUpdateActionById` reads as "the WAF ignores my rule" rather than "CPM refused that
+ * directive", so both validators fail the write and name each line (upstream discussion #146).
+ */
+export function filterCustomDirectives(raw: string | null | undefined): {
+  kept: string[];
+  dropped: DroppedWafDirective[];
+} {
+  const kept: string[] = [];
+  const dropped: DroppedWafDirective[] = [];
+  if (!raw?.trim()) return { kept, dropped };
+
+  for (const line of raw.trim().split("\n")) {
+    const trimmed = line.trim();
+    // Blank lines and comments carry nothing to reject.
+    if (!trimmed || trimmed.startsWith("#")) {
+      kept.push(line);
+      continue;
+    }
+    // Include would read arbitrary files out of the container filesystem.
+    if (/^Include\s/i.test(trimmed)) {
+      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedInclude" });
+      continue;
+    }
+    // Body limits are allowed, but only inside the range Coraza accepts - an out-of-range value
+    // would make Caddy reject the whole config document. Input validation reports these; dropping
+    // here is the net. (SecRequestBodyNoFilesLimit parses but is not enforced by Coraza:
+    // corazawaf/coraza#896. Kept accepted so existing configs keep loading.)
+    const bodyLimit = BODY_LIMIT_DIRECTIVE.exec(trimmed);
+    if (bodyLimit) {
+      if (isValidBodyLimit(Number(bodyLimit[2]))) kept.push(line);
+      else dropped.push({ line: trimmed, reason: "wafDirectiveDroppedBodyLimit" });
+      continue;
+    }
+    if (BODY_LIMIT_ACTION_DIRECTIVE.test(trimmed)) {
+      kept.push(line);
+      continue;
+    }
+    // Before the generic allowlist, so the reason names the real objection.
+    if (BLOCKED_SEC_RULE_PREFIXES.some((pattern) => pattern.test(trimmed))) {
+      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedRuleMutation" });
+      continue;
+    }
+    if (!ALLOWED_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(trimmed))) {
+      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedNotAllowed" });
+      continue;
+    }
+    // ctl:ruleEngine inside an allowed line can conditionally disable the WAF.
+    if (/ctl:ruleEngine/i.test(trimmed)) {
+      dropped.push({ line: trimmed, reason: "wafDirectiveDroppedCtlRuleEngine" });
+      continue;
+    }
+    kept.push(line);
+  }
+  return { kept, dropped };
+}
+
+/**
+ * The "line -> why" list both validators put in their error. Echoing the line back is safe: only
+ * lines CPM is about to drop are named, so nothing new is repeated to the caller.
+ */
+export function droppedWafDirectiveDetails(dropped: readonly DroppedWafDirective[]): string[] {
+  // The bounds go as strings, or the catalog would format 1073741824 with separators. Only the
+  // body-limit reason reads them; the others ignore the extra params.
+  const bounds = { min: String(CORAZA_MIN_BODY_LIMIT), max: String(CORAZA_MAX_BODY_LIMIT) };
+  return dropped.map((entry) => `"${entry.line}" - ${domainErrorMessage(entry.reason, bounds)}`);
 }
 
 /**
@@ -250,45 +354,12 @@ export function buildWafHandler(waf: WafSettings): Record<string, unknown> {
     parts.push(`SecRequestBodyLimitAction ${waf.request_body_limit_action}`);
   }
 
-  // Allowlist approach: only permit known-safe directive prefixes in custom directives
-  if (waf.custom_directives?.trim()) {
-    const directives = waf.custom_directives.trim();
-    const allowedPrefixes = [/^SecRule\s/, /^SecAction\s/, /^SecMarker\s/, /^SecDefaultAction\s/];
-    // SecRule* variants that are NOT plain SecRule (must be rejected)
-    const blockedSecRulePrefixes = [
-      /^SecRuleEngine\s/i,
-      /^SecRuleRemoveById\s/i,
-      /^SecRuleRemoveByTag\s/i,
-      /^SecRuleRemoveByMsg\s/i,
-      /^SecRuleUpdateActionById\s/i,
-      /^SecRuleUpdateTargetById\s/i,
-    ];
-    const lines = directives.split("\n");
-    const safeLines = lines.filter((line) => {
-      const trimmed = line.trim();
-      // Allow empty lines and comments
-      if (!trimmed || trimmed.startsWith("#")) return true;
-      // Reject Include directives (prevents file inclusion from container filesystem)
-      if (/^Include\s/i.test(trimmed)) return false;
-      // Body limits are allowed, but only inside the range Coraza accepts -
-      // an out-of-range value would make Caddy reject the whole config
-      // document. Input validation reports these; dropping here is the net.
-      // (SecRequestBodyNoFilesLimit parses but is not enforced by Coraza:
-      // corazawaf/coraza#896. Kept accepted so existing configs keep loading.)
-      const bodyLimit = BODY_LIMIT_DIRECTIVE.exec(trimmed);
-      if (bodyLimit) return isValidBodyLimit(Number(bodyLimit[2]));
-      if (BODY_LIMIT_ACTION_DIRECTIVE.test(trimmed)) return true;
-      // Check against allowlist
-      if (!allowedPrefixes.some((pattern) => pattern.test(trimmed))) return false;
-      // Reject blocked SecRule* variants (e.g. SecRuleEngine)
-      if (blockedSecRulePrefixes.some((pattern) => pattern.test(trimmed))) return false;
-      // Reject ctl:ruleEngine inside allowed lines (can conditionally disable WAF)
-      if (/ctl:ruleEngine/i.test(trimmed)) return false;
-      return true;
-    });
-    if (safeLines.length > 0) {
-      parts.push(safeLines.join("\n"));
-    }
+  // Allowlist approach: only known-safe directive prefixes reach the handler. The validators
+  // refuse a write that would drop a line, so by here `dropped` is normally empty - this stays the
+  // net for rows written before that check existed.
+  const { kept } = filterCustomDirectives(waf.custom_directives);
+  if (kept.length > 0) {
+    parts.push(kept.join("\n"));
   }
 
   const handler: Record<string, unknown> = {

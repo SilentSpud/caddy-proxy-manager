@@ -113,6 +113,12 @@ describe('REST settings runtime validation', () => {
         custom_directives: 'SecRequestBodyLimit 10737418240',
       }),
     ).toThrow(/out-of-range body limit/);
+    expect(() =>
+      validateSettingsGroup('waf', {
+        ...validGroups.waf,
+        custom_directives: 'SecRuleUpdateActionById 9001 "deny"',
+      }),
+    ).toThrow(/would be dropped and never sent to Caddy/);
   });
 
   it("accepts WAF body limits inside Coraza's range", () => {

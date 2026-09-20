@@ -2,6 +2,8 @@ import { isHostname } from "./dashboard-host";
 import { isIP } from "node:net";
 import {
   bodyLimitRangeMessage,
+  droppedWafDirectiveDetails,
+  filterCustomDirectives,
   findInvalidBodyLimitDirective,
   isValidBodyLimit,
 } from "./caddy-waf";
@@ -481,6 +483,14 @@ function validateWaf(value: Record<string, unknown>): void {
   if (badDirective) {
     invalid(
       `waf.custom_directives has an out-of-range body limit: "${badDirective}" - ${bodyLimitRangeMessage("the byte count")}`,
+    );
+  }
+  // A dropped line is a rule the user believes is running. Refuse the write and name each one,
+  // rather than accepting the settings and quietly emitting a WAF without them.
+  const { dropped } = filterCustomDirectives(directives);
+  if (dropped.length > 0) {
+    invalid(
+      `waf.custom_directives has ${dropped.length} line(s) that would be dropped and never sent to Caddy: ${droppedWafDirectiveDetails(dropped).join(", ")}. Remove or rewrite them for them to take effect.`,
     );
   }
   if (value.excluded_rule_ids !== undefined)
