@@ -65,6 +65,7 @@
       text-decoration: none;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .cpm-fab:disabled {
@@ -136,6 +137,7 @@
       font-weight: 600;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     /* A filter moved off its default, in the accent so a narrowed page never passes for the whole. */
@@ -210,6 +212,8 @@
       border-top: 1px solid var(--color-neutral);
     }
 
+    /* touch-action below: without it the browser holds every tap 300ms for a possible double-tap
+       zoom, which is longer than the window handleMore uses to tell one More tap from two. */
     .cpm-tab {
       position: relative;
       flex: 1;
@@ -227,6 +231,7 @@
       text-decoration: none;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .cpm-tab[data-active] {
@@ -280,10 +285,14 @@
       z-index: 55;
       max-height: calc(100dvh - var(--cpm-tabbar-height) - 48px);
       overflow-y: auto;
+      /* A scroll that reaches the end of the sheet stops there rather than moving the page behind. */
+      overscroll-behavior: contain;
       padding: 8px 12px 16px;
       background: var(--color-background-surface);
       border-top: 1px solid var(--color-neutral);
       border-radius: 16px 16px 0 0;
+      /* The sheet takes focus on open so the next Tab starts inside it; that focus is never the
+         user's own keypress, so a ring on the whole panel would only look like an error. */
       outline: none;
     }
 
@@ -325,6 +334,7 @@
       text-align: center;
       text-decoration: none;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     /* The page you are on, in the tonal treatment: the accent at a lower weight. */
@@ -368,6 +378,8 @@
       border: 1px solid var(--color-neutral);
       color: var(--color-text-secondary);
       text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .cpm-sheet-row-text {

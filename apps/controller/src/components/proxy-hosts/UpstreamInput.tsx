@@ -9,6 +9,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { withRowId, withRowIds, type WithRowId } from "@/lib/row-id";
+import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
 
 type UpstreamEntry = {
@@ -103,6 +104,7 @@ export function UpstreamInput({
               onChange={(next) => handleProtocolChange(entry.rowId, next as string)}
             />
             <TextInput
+              {...NO_SPELLCHECK}
               label={t("upstreamLabel", { index: index + 1 })}
               isLabelHidden
               value={entry.address}

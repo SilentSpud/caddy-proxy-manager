@@ -17,6 +17,7 @@ import { type SignInProvider, SignInProviders } from "@/src/components/auth/Sign
 import {
   AUTOFILL_CURRENT_PASSWORD,
   AUTOFILL_USERNAME,
+  NO_SPELLCHECK,
 } from "@/src/components/ui/native-input-attrs";
 import { authClient } from "@/src/lib/auth-client";
 import { formatAppVersion } from "@/src/lib/app-version";
@@ -201,6 +202,7 @@ export default function LoginClient({
                   ) : (
                     <TextInput
                       {...AUTOFILL_USERNAME}
+                      {...NO_SPELLCHECK}
                       label={t("username")}
                       htmlName="username"
                       value={username}

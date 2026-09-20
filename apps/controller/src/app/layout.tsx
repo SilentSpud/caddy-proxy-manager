@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { getLocale, getMessages, getTimeZone, getTranslations } from "next-intl/server";
 import { getLocaleDirection } from "@astryxdesign/core/i18n";
@@ -7,7 +7,14 @@ import "./globals.css";
 import Providers from "./providers";
 import { config } from "@/src/lib/config";
 import { LOCALE_COOKIE, parsePreference } from "@/src/lib/locale";
-import { THEME_COOKIE, parseThemeMode, themeAttr } from "@/src/lib/theme-mode";
+import { THEME_COOKIE, parseThemeMode, themeAttr, themeColor } from "@/src/lib/theme-mode";
+
+// From the same cookie `<html data-theme>` is rendered from, so the browser's own chrome is tinted
+// with the mode the page is actually in rather than the one the OS would have chosen.
+export async function generateViewport(): Promise<Viewport> {
+  const cookieStore = await cookies();
+  return { themeColor: themeColor(parseThemeMode(cookieStore.get(THEME_COOKIE)?.value)) };
+}
 
 // Each page sets its own `title`; the template appends APP_NAME. A page opts out with
 // `title: { absolute: "..." }` - the forward auth portal does, since it runs on someone else's

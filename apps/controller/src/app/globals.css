@@ -106,6 +106,16 @@
   }
 
   /**
+   * components/ui/CodeEditor.tsx stacks a transparent <textarea> over the highlighted <pre>, so the
+   * textarea takes `outline: none` - its own ring would draw under the glyphs the reader sees. The
+   * frame carries the focus indicator instead.
+   */
+  .cpm-code-editor:focus-within {
+    border-color: var(--color-border-pink);
+    box-shadow: 0 0 0 1px var(--color-border-pink);
+  }
+
+  /**
    * Visual masking for a secret in a multi-line field: a private key needs a <textarea>, since
    * <input type="password"> strips newlines on paste and corrupts PEM. Where -webkit-text-security
    * is unsupported the field degrades to plain text.

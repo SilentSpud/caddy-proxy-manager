@@ -137,7 +137,7 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
         label: "Access Key ID",
         type: "string",
         required: false,
-        placeholder: "AKIA...",
+        placeholder: "AKIA…",
       },
       { key: "secret_access_key", label: "Secret Access Key", type: "password", required: false },
       {

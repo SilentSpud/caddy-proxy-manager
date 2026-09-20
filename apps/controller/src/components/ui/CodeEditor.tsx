@@ -205,6 +205,7 @@ export function CodeEditor({
       {htmlName && !isDisabled && <input type="hidden" name={htmlName} value={value} />}
 
       <div
+        className="cpm-code-editor"
         style={{
           position: "relative",
           height: `${HEIGHTS[height]}px`,
@@ -232,6 +233,9 @@ export function CodeEditor({
           />
           <pre
             aria-hidden="true"
+            // A page translator would otherwise rewrite the directives in place, and the reader
+            // would copy a Caddyfile that no longer parses.
+            translate="no"
             style={{ ...textLayer, color: "var(--color-text-primary)", pointerEvents: "none" }}
           >
             {/* The theme gives `code` its own font and a line-height of its own, which would put

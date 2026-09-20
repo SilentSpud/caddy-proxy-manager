@@ -24,7 +24,7 @@ import {
 // this a same-origin fetch (CSP `connect-src 'self'`) instead of inlining 756 KB into a JS chunk.
 import atlasUrl from "world-atlas/countries-50m.json?url";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { regionName } from "@/src/lib/region-names";
 
 // maplibre-gl v6 resolves its tile worker from `import.meta.url`, which does not survive bundling -
@@ -307,6 +307,7 @@ export default function WorldMapInner({
 }) {
   const t = useTranslations("analytics");
   const locale = useLocale();
+  const format = useFormatter();
   const [baseGeojson, setBaseGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
@@ -556,7 +557,7 @@ export default function WorldMapInner({
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {info.total.toLocaleString()}
+                        {format.number(info.total)}
                       </span>
                     </div>
                     {info.blocked > 0 && (
@@ -578,7 +579,7 @@ export default function WorldMapInner({
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          {info.blocked.toLocaleString()}
+                          {format.number(info.blocked)}
                         </span>
                       </div>
                     )}
@@ -595,7 +596,7 @@ export default function WorldMapInner({
                           {t("uniqueIps")}
                         </span>
                         <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                          {info.uniqueIps.toLocaleString()}
+                          {format.number(info.uniqueIps)}
                         </span>
                       </div>
                     )}

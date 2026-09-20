@@ -87,10 +87,12 @@ export default function SetupDoneClient({
           )}
         </FormCard>
 
+        {/* An href rather than a click handler: the destination is a real URL the operator may
+            want to open in a second tab, and a button would have swallowed the middle click. */}
         <Button
           variant="primary"
           label={t("dashboardLinkLabel")}
-          onClick={() => window.location.assign(dashboardOrigin ? `${dashboardOrigin}/` : "/")}
+          href={dashboardOrigin ? `${dashboardOrigin}/` : "/"}
         />
       </VStack>
     </Center>

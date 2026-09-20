@@ -3,7 +3,7 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { DataTable, type Column } from "@cpm/controller/src/components/ui/DataTable";
 import { StatTiles } from "@cpm/controller/src/components/ui/StatTiles";
 import { StatusChip } from "@cpm/controller/src/components/ui/StatusChip";
@@ -95,7 +95,7 @@ function ProxyHostsTableDemoContent() {
     }),
     { total: 0, blocked: 0 },
   );
-  const numberFormat = new Intl.NumberFormat();
+  const format = useFormatter();
 
   const rows = useMemo(() => {
     const filtered =
@@ -176,11 +176,11 @@ function ProxyHostsTableDemoContent() {
         r.requests ? (
           <VStack gap={0} hAlign="end">
             <Text type="code" size="sm">
-              {numberFormat.format(r.requests.total)}
+              {format.number(r.requests.total)}
             </Text>
             {r.requests.blocked > 0 && (
               <Text type="supporting" color="secondary">
-                {t("blockedCount", { count: numberFormat.format(r.requests.blocked) })}
+                {t("blockedCount", { count: format.number(r.requests.blocked) })}
               </Text>
             )}
           </VStack>
@@ -217,7 +217,7 @@ function ProxyHostsTableDemoContent() {
             {
               id: "requests",
               label: t("requests24h"),
-              value: numberFormat.format(traffic.total),
+              value: format.number(traffic.total),
               note: t("blockedShareNote", {
                 percent: ((traffic.blocked / traffic.total) * 100).toFixed(1),
               }),

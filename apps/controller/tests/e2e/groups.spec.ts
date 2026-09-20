@@ -16,7 +16,7 @@ test.describe('Groups page', () => {
 
   test('page loads with Groups heading', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Groups', level: 1 })).toBeVisible();
-    await expect(page.getByPlaceholder('Search groups...')).toBeVisible();
+    await expect(page.getByPlaceholder('Search groups…')).toBeVisible();
   });
 
   test('New Group button is visible', async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe('Groups page', () => {
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Choose the users to add to this group')).toBeVisible();
-    await dialog.getByPlaceholder('Search users...').fill(tag);
+    await dialog.getByPlaceholder('Search users…').fill(tag);
     const boxes = dialog.getByRole('checkbox');
     await expect(boxes).toHaveCount(2, { timeout: 5_000 });
 
