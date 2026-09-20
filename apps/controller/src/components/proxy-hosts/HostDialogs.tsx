@@ -41,6 +41,7 @@ import type { CaCertificate } from "@/lib/models/ca-certificates";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
+import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { useTranslations } from "next-intl";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
@@ -181,6 +182,7 @@ export function CreateHostDialog({
             isRequired
           />
           <TextArea
+            {...NO_SPELLCHECK}
             label={t("domains")}
             htmlName="domains"
             placeholder="app.example.com"
@@ -310,6 +312,7 @@ export function EditHostDialog({
           />
           <TextInput label={t("name")} htmlName="name" value={name} onChange={setName} isRequired />
           <TextArea
+            {...NO_SPELLCHECK}
             label={t("domains")}
             htmlName="domains"
             value={domains}

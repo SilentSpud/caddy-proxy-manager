@@ -42,7 +42,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { useEmptyValue } from "@/components/ui/empty-value";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   CreateHostDialog,
   EditHostDialog,
@@ -199,10 +199,6 @@ const FEATURES: ReadonlyArray<{
   },
 ];
 
-// Built once: constructing a formatter resolves locale data, and this component re-renders on
-// every keystroke in the search field.
-const NUMBER_FORMAT = new Intl.NumberFormat();
-
 /** "example.com +2" - the primary entry plus a count of the rest. */
 function summarize(values: string[]) {
   return values.length > 1 ? `${values[0]} +${values.length - 1}` : values[0];
@@ -278,6 +274,7 @@ export default function ProxyHostsClient({
   canEditRawConfig = false,
 }: Props) {
   const t = useTranslations("proxyHosts");
+  const format = useFormatter();
   const emptyValue = useEmptyValue();
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
@@ -437,11 +434,11 @@ export default function ProxyHostsClient({
               return (
                 <VStack gap={0} hAlign="end" className="cpm-cell-lines">
                   <Text type="code" size="sm">
-                    {NUMBER_FORMAT.format(row.total)}
+                    {format.number(row.total)}
                   </Text>
                   {row.blocked > 0 && (
                     <Text type="supporting" color="secondary">
-                      {t("blockedCount", { count: NUMBER_FORMAT.format(row.blocked) })}
+                      {t("blockedCount", { count: format.number(row.blocked) })}
                     </Text>
                   )}
                 </VStack>
@@ -553,7 +550,7 @@ export default function ProxyHostsClient({
               {
                 id: "requests",
                 label: t("requests24h"),
-                value: trafficKnown ? NUMBER_FORMAT.format(trafficTotals.total) : t("noData"),
+                value: trafficKnown ? format.number(trafficTotals.total) : t("noData"),
                 note: trafficKnown
                   ? t("blockedShareNote", { percent: blockedShare })
                   : t("analyticsOffNote"),

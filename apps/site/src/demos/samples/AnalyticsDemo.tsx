@@ -13,7 +13,7 @@ import {
 } from "@cpm/controller/src/app/(dashboard)/analytics/CountryBreakdown";
 import { FilterChip } from "@cpm/controller/src/components/mobile/FilterChip";
 import { OptionSheet } from "@cpm/controller/src/components/mobile/OptionSheet";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { DemoSurface } from "../DemoSurface";
 
 type Range = "24h" | "7d" | "30d";
@@ -125,6 +125,7 @@ function Bar({
   max: number;
   badge?: string;
 }) {
+  const format = useFormatter();
   return (
     <VStack gap={1}>
       <HStack justify="between" vAlign="center" gap={2}>
@@ -135,7 +136,7 @@ function Bar({
           </Text>
         </HStack>
         <Text type="code" size="xsm" color="secondary">
-          {value.toLocaleString("en-GB")}
+          {format.number(value)}
         </Text>
       </HStack>
       <div

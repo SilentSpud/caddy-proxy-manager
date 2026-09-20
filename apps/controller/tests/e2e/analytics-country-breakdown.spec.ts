@@ -83,7 +83,7 @@ test.describe('Analytics country breakdown', () => {
 
       // Narrow the page to the seeded host, so the country table holds only the seeded country.
       await page.locator('button[aria-haspopup="listbox"]').click();
-      await page.getByPlaceholder('Search hosts...').fill(tag);
+      await page.getByPlaceholder('Search hosts…').fill(tag);
       await page.getByRole('option', { name: host }).click();
       await page.keyboard.press('Escape');
 

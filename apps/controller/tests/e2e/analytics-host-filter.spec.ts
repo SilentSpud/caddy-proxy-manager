@@ -91,7 +91,7 @@ test.describe('Analytics host filter (#171)', () => {
       // button, the only one on the page.
       const openHostList = async () => {
         await page.locator('button[aria-haspopup="listbox"]').click();
-        await page.getByPlaceholder('Search hosts...').fill(tag);
+        await page.getByPlaceholder('Search hosts…').fill(tag);
       };
 
       // By default only configured proxy hosts are listed.

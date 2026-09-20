@@ -32,3 +32,22 @@ export function parseThemeMode(value: string | undefined): ThemeMode {
 export function themeAttr(mode: ThemeMode): "light" | "dark" | undefined {
   return mode === "system" ? undefined : mode;
 }
+
+/**
+ * `--color-background-body` in both modes, repeated here because `<meta name="theme-color">` takes
+ * a literal - keep in step with the `light-dark()` pair in src/app/astryx-variants.css.
+ */
+const BODY_COLOR = { light: "#f1f1f1", dark: "#000000" } as const;
+
+/**
+ * What the browser tints its own chrome with, so a phone's status bar matches the page instead of
+ * the default white. "system" has to hand the choice back to the OS through `media`; the other two
+ * are a single value, since `data-theme` overrides the OS and the media query would then be wrong.
+ */
+export function themeColor(mode: ThemeMode): string | { media: string; color: string }[] {
+  if (mode !== "system") return BODY_COLOR[mode];
+  return [
+    { media: "(prefers-color-scheme: light)", color: BODY_COLOR.light },
+    { media: "(prefers-color-scheme: dark)", color: BODY_COLOR.dark },
+  ];
+}

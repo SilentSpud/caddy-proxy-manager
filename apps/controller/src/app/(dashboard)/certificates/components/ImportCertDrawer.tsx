@@ -10,6 +10,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
 import { AppDialog } from "@/components/ui/AppDialog";
+import { NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { createCertificateAction, updateCertificateAction } from "../actions";
 import type { ImportedCertView } from "../page";
 import { useTranslations } from "next-intl";
@@ -112,6 +113,7 @@ export function ImportCertDrawer({ open, cert, onClose }: Props) {
           />
 
           <TextArea
+            {...NO_SPELLCHECK}
             label={t("domainsOnePerLine")}
             htmlName="domain_names"
             value={domains}

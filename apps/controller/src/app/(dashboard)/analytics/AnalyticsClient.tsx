@@ -192,11 +192,14 @@ function parseUA(ua: string, unknown: string): string {
   return ua.substring(0, 32);
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+/** Through next-intl, not `toFixed`, which writes English's decimal separator in every locale. */
+function formatBytes(format: ReturnType<typeof useFormatter>, bytes: number): string {
+  const fixed = (value: number, digits: number) =>
+    format.number(value, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  if (bytes < 1024) return `${format.number(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${fixed(bytes / 1024, 1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${fixed(bytes / 1024 / 1024, 1)} MB`;
+  return `${fixed(bytes / 1024 / 1024 / 1024, 2)} GB`;
 }
 
 /** An axis label at the resolution the range implies, on the reader's clock. */
@@ -678,7 +681,7 @@ export default function AnalyticsClient() {
       width: pixel(90),
       renderCell: (row) => (
         <Text type="body" size="sm" hasTabularNumbers>
-          {row.total.toLocaleString()}
+          {format.number(row.total)}
         </Text>
       ),
     },
@@ -689,7 +692,7 @@ export default function AnalyticsClient() {
       width: pixel(104),
       renderCell: (row) => (
         <Text type="body" size="sm" hasTabularNumbers>
-          {row.uniqueIps.toLocaleString()}
+          {format.number(row.uniqueIps)}
         </Text>
       ),
     },
@@ -700,7 +703,7 @@ export default function AnalyticsClient() {
       width: pixel(80),
       renderCell: (row) => (
         <Text type="body" size="sm" color={row.waf > 0 ? "primary" : "secondary"} hasTabularNumbers>
-          {row.waf > 0 ? row.waf.toLocaleString() : emptyValue}
+          {row.waf > 0 ? format.number(row.waf) : emptyValue}
         </Text>
       ),
     },
@@ -716,7 +719,7 @@ export default function AnalyticsClient() {
           color={row.blocked > 0 ? "primary" : "secondary"}
           hasTabularNumbers
         >
-          {row.blocked.toLocaleString()}
+          {format.number(row.blocked)}
         </Text>
       ),
     },
@@ -742,7 +745,7 @@ export default function AnalyticsClient() {
       width: pixel(110),
       renderCell: (row) => (
         <Text type="body" size="sm" hasTabularNumbers>
-          {row.count.toLocaleString()}
+          {format.number(row.count)}
         </Text>
       ),
     },
@@ -870,7 +873,7 @@ export default function AnalyticsClient() {
       align: "end",
       renderCell: (row) => (
         <Text type="body" size="sm" weight="semibold" hasTabularNumbers>
-          {row.count.toLocaleString()}
+          {format.number(row.count)}
         </Text>
       ),
     },
@@ -1000,17 +1003,17 @@ export default function AnalyticsClient() {
                     {t("totalRequests")}
                   </Text>
                   <Text type="display-3" hasTabularNumbers>
-                    {summary.totalRequests.toLocaleString()}
+                    {format.number(summary.totalRequests)}
                   </Text>
                 </VStack>
                 <Grid columns={{ minWidth: 80, max: 3 }} gap={2}>
                   {[
                     {
                       label: t("blockedRequests"),
-                      value: summary.blockedRequests.toLocaleString(),
+                      value: format.number(summary.blockedRequests),
                       tone: summary.blockedRequests > 0 ? ("error" as const) : undefined,
                     },
-                    { label: t("uniqueIps"), value: summary.uniqueIps.toLocaleString() },
+                    { label: t("uniqueIps"), value: format.number(summary.uniqueIps) },
                     { label: t("blockRate"), value: `${summary.blockedPercent}%` },
                   ].map((stat) => (
                     <VStack key={stat.label} gap={0}>
@@ -1026,7 +1029,7 @@ export default function AnalyticsClient() {
                   ))}
                 </Grid>
                 <Text type="body" size="sm" color="secondary">
-                  {t("wafEventsCount", { count: (wafStats?.total ?? 0).toLocaleString() })}
+                  {t("wafEventsCount", { count: format.number(wafStats?.total ?? 0) })}
                 </Text>
               </VStack>
             </Card>
@@ -1037,14 +1040,14 @@ export default function AnalyticsClient() {
             data-testid="analytics-stats"
             className="cpm-desktop-only"
           >
-            <StatCard label={t("totalRequests")} value={summary.totalRequests.toLocaleString()} />
-            <StatCard label={t("uniqueIps")} value={summary.uniqueIps.toLocaleString()} />
+            <StatCard label={t("totalRequests")} value={format.number(summary.totalRequests)} />
+            <StatCard label={t("uniqueIps")} value={format.number(summary.uniqueIps)} />
             <StatCard
               label={t("blockedRequests")}
-              value={summary.blockedRequests.toLocaleString()}
+              value={format.number(summary.blockedRequests)}
               sub={
                 (wafStats?.total ?? 0) > 0
-                  ? t("blockedFromWaf", { count: wafStats!.total.toLocaleString() })
+                  ? t("blockedFromWaf", { count: format.number(wafStats!.total) })
                   : undefined
               }
               tone={summary.blockedRequests > 0 ? "error" : undefined}
@@ -1052,12 +1055,12 @@ export default function AnalyticsClient() {
             <StatCard
               label={t("blockRate")}
               value={`${summary.blockedPercent}%`}
-              sub={t("bytesServed", { bytes: formatBytes(summary.bytesServed) })}
+              sub={t("bytesServed", { bytes: formatBytes(format, summary.bytesServed) })}
               tone={summary.blockedPercent > 10 ? "warning" : undefined}
             />
             <StatCard
               label={t("wafEvents")}
-              value={(wafStats?.total ?? 0).toLocaleString()}
+              value={format.number(wafStats?.total ?? 0)}
               sub={
                 wafStats && wafStats.topRules.length > 0
                   ? t("rulesTriggered", { count: wafStats.topRules.length })

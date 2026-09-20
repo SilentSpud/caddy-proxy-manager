@@ -84,7 +84,7 @@ export function dnsProviderFieldText(
   return {
     label: translate(`${base}.label`),
     description: field.description ? translate(`${base}.description`) : undefined,
-    // Most placeholders are example values (`us-east-1`, `AKIA...`) and are not in the catalog;
+    // Most placeholders are example values (`us-east-1`, `AKIA…`) and are not in the catalog;
     // the ones written as prose are.
     placeholder: translate.has(`${base}.placeholder`)
       ? translate(`${base}.placeholder`)

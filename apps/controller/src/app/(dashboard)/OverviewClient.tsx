@@ -187,13 +187,19 @@ const PLOTTABLE: PlottedMetric[] = METRICS.filter(
   (m): m is PlottedMetric => m.series !== null && m.color !== undefined,
 );
 
-/** Bytes as the log shows them, so a row and its tile agree on the unit. */
-function formatBytes(bytes: number): string {
+/**
+ * Bytes as the log shows them, so a row and its tile agree on the unit. The number goes through
+ * next-intl rather than `toFixed`, which writes the decimal separator English uses whatever the
+ * page's locale is.
+ */
+function formatBytes(format: ReturnType<typeof useFormatter>, bytes: number): string {
+  const fixed = (value: number, digits: number) =>
+    format.number(value, { minimumFractionDigits: digits, maximumFractionDigits: digits });
   if (bytes <= 0) return "0";
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} B`;
+  if (bytes >= 1024 ** 3) return `${fixed(bytes / 1024 ** 3, 1)} GB`;
+  if (bytes >= 1024 ** 2) return `${fixed(bytes / 1024 ** 2, 1)} MB`;
+  if (bytes >= 1024) return `${format.number(Math.round(bytes / 1024))} KB`;
+  return `${format.number(bytes)} B`;
 }
 
 /** A bucket label short enough for an axis, at the resolution the range implies. */
@@ -434,7 +440,7 @@ export default function OverviewClient({
         labels: {
           style: { colors: chartTheme.labelColor },
           formatter: (value: number) =>
-            m.format === "bytes" ? formatBytes(value) : Math.round(value).toLocaleString(),
+            m.format === "bytes" ? formatBytes(format, value) : format.number(Math.round(value)),
         },
       })),
       legend: {
@@ -454,8 +460,8 @@ export default function OverviewClient({
         y: {
           formatter: (value: number, opts?: { seriesIndex: number }) =>
             plotted[opts?.seriesIndex ?? 0]?.format === "bytes"
-              ? formatBytes(value)
-              : Math.round(value).toLocaleString(),
+              ? formatBytes(format, value)
+              : format.number(Math.round(value)),
         },
       },
     };
@@ -528,7 +534,7 @@ export default function OverviewClient({
               {/* The rest of what traffic_events stores, on one line: nine columns will
                   not fit a table that also has to carry audit rows. */}
               <Text type="body" size="xsm" color="secondary" maxLines={1}>
-                {formatBytes(row.bytesSent)} &middot; {row.proto || emptyValue} &middot;{" "}
+                {formatBytes(format, row.bytesSent)} &middot; {row.proto || emptyValue} &middot;{" "}
                 {row.countryCode ?? emptyValue} &middot; {row.clientIp}
               </Text>
             </VStack>
@@ -544,7 +550,7 @@ export default function OverviewClient({
           ),
       },
     ],
-    [t, emptyValue],
+    [t, emptyValue, format],
   );
 
   const logRows = useMemo<LogRow[]>(() => {
@@ -583,19 +589,19 @@ export default function OverviewClient({
   }, [payload, previewPayload, filter, isEventsOnly, blendsEvents, recentEvents]);
 
   const tileValue = (key: MetricKey): string => {
-    if (key === "serverEvents") return serverEventCount.toLocaleString();
+    if (key === "serverEvents") return format.number(serverEventCount);
     if (!payload) return emptyValue;
     switch (key) {
       case "requests":
-        return payload.summary.totalRequests.toLocaleString();
+        return format.number(payload.summary.totalRequests);
       case "serverErrors":
-        return payload.statusClasses.serverErrors.toLocaleString();
+        return format.number(payload.statusClasses.serverErrors);
       case "clientErrors":
-        return payload.statusClasses.clientErrors.toLocaleString();
+        return format.number(payload.statusClasses.clientErrors);
       case "bandwidth":
-        return formatBytes(payload.summary.bytesServed);
+        return formatBytes(format, payload.summary.bytesServed);
       case "blocked":
-        return payload.statusClasses.blocked.toLocaleString();
+        return format.number(payload.statusClasses.blocked);
     }
   };
 
@@ -760,7 +766,7 @@ export default function OverviewClient({
       {trafficSummary && trafficSummary.totalRequests > 0 && (
         <Text type="body" size="xsm" color="secondary">
           {t("traffic24hSummary", {
-            total: trafficSummary.totalRequests.toLocaleString(),
+            total: format.number(trafficSummary.totalRequests),
             percent: trafficSummary.blockedPercent,
           })}
         </Text>

@@ -18,7 +18,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { X } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { regionName } from "@/src/lib/region-names";
 
 export type CountryBreakdownData = {
@@ -35,6 +35,7 @@ type Row = { label: string; count: number };
 
 /** A labelled count with a bar scaled to the largest in its list. */
 function RankedList({ title, rows, color }: { title: string; rows: Row[]; color: string }) {
+  const format = useFormatter();
   const top = rows.reduce((max, row) => Math.max(max, row.count), 0);
   return (
     <VStack gap={2}>
@@ -48,7 +49,7 @@ function RankedList({ title, rows, color }: { title: string; rows: Row[]; color:
               {row.label}
             </Text>
             <Text type="code" size="xsm" color="secondary" hasTabularNumbers>
-              {row.count.toLocaleString()}
+              {format.number(row.count)}
             </Text>
           </HStack>
           <div
@@ -141,6 +142,7 @@ export function CountryBreakdownView({
 }) {
   const t = useTranslations("analytics");
   const locale = useLocale();
+  const format = useFormatter();
 
   // Named in the UI's locale rather than the browser's, so the header matches the map's popup and
   // the server and client render the same text. "XX" is the code for requests GeoIP could not
@@ -159,10 +161,10 @@ export function CountryBreakdownView({
             {data && (
               <Text type="supporting" color="secondary">
                 {t("breakdownSummary", {
-                  requests: data.total.toLocaleString(),
+                  requests: format.number(data.total),
                   share: share ?? "0",
-                  uniqueIps: data.uniqueIps.toLocaleString(),
-                  blocked: data.blocked.toLocaleString(),
+                  uniqueIps: format.number(data.uniqueIps),
+                  blocked: format.number(data.blocked),
                 })}
               </Text>
             )}

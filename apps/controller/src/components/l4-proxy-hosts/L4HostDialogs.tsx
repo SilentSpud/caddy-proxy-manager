@@ -20,7 +20,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
+import { NATIVE_REQUIRED, NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
 import { Globe, Layers, MapPin, Pin } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
@@ -328,6 +328,7 @@ function L4HostForm({
 
         <TextArea
           {...NATIVE_REQUIRED}
+          {...NO_SPELLCHECK}
           label={t("upstreams")}
           htmlName="upstreams"
           placeholder={"10.0.0.1:5432\n10.0.0.2:5432"}

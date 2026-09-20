@@ -34,7 +34,7 @@ test.describe('Global command palette', () => {
   test('the rail button opens it', async ({ page }) => {
     await page.goto('/');
     await waitForHydration(page);
-    await page.getByRole('button', { name: /^Search\.\.\./ }).click();
+    await page.getByRole('button', { name: /^Search…/ }).click();
     await expect(page.getByRole('dialog').getByPlaceholder(/search/i)).toBeVisible();
   });
 

@@ -4,6 +4,7 @@ import { type ComponentProps, type FocusEvent, useState } from "react";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useTranslations } from "next-intl";
 import { type EmailDomain, isEmailAddress } from "@/src/lib/email-address";
+import { NO_SPELLCHECK } from "./native-input-attrs";
 
 type EmailInputProps = Omit<ComponentProps<typeof TextInput>, "type" | "status" | "value"> & {
   value: string;
@@ -36,6 +37,7 @@ export function EmailInput({ domain = "any", value, ...props }: EmailInputProps)
 
   return (
     <TextInput
+      {...NO_SPELLCHECK}
       {...props}
       {...onBlur}
       type="email"

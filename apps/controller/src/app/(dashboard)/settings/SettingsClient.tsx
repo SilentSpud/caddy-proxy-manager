@@ -26,6 +26,7 @@ import {
   AUTOFILL_NEW_PASSWORD,
   AUTOFILL_OFF,
   NATIVE_REQUIRED,
+  NO_SPELLCHECK,
 } from "@/components/ui/native-input-attrs";
 import type {
   GeneralSettings,
@@ -1077,6 +1078,7 @@ function DashboardHostSection({
               onChange={setEnabled}
             />
             <TextInput
+              {...NO_SPELLCHECK}
               label={t("dashboardDomainLabel")}
               description={t("dashboardDomainHelp")}
               htmlName="domain"
@@ -1738,6 +1740,7 @@ function BrandingSection({
           <input
             type="file"
             name="favicon"
+            aria-label={t("faviconFileLabel")}
             accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/webp,image/gif,image/jpeg,.ico"
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
@@ -2153,11 +2156,21 @@ function GeoipSection({
 
 // ─── Section: Agent ──────────────────────────────────────────────────────────
 
-/** Human date for a timestamp the agent or the pairing recorded, or `never` when there is none. */
-function whenText(iso: string | null, never: string): string {
+/**
+ * Human date for a timestamp the agent or the pairing recorded, or `never` when there is none.
+ * Formatted through next-intl so the zone and locale match every other timestamp on the page -
+ * `toLocaleString()` would use whatever the runtime has, which differs between container and browser.
+ */
+function whenText(
+  format: ReturnType<typeof useFormatter>,
+  iso: string | null,
+  never: string,
+): string {
   if (!iso) return never;
   const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? never : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime())
+    ? never
+    : format.dateTime(parsed, TIMESTAMP_STYLES.dateTime);
 }
 
 /** One agent's line in the fleet list: what it is, and whether it is answering. */
@@ -2175,6 +2188,7 @@ function AgentRow({
   onRemove: ReactNode;
 }) {
   const t = useTranslations("settings");
+  const format = useFormatter();
   return (
     <VStack gap={2}>
       <HStack gap={2} align="center" justify="between">
@@ -2196,7 +2210,9 @@ function AgentRow({
             )}
           </HStack>
           <Text size="xsm" color="secondary">
-            {t("agentLastReported", { when: whenText(lastSeenAt, t("agentNeverReported")) })}
+            {t("agentLastReported", {
+              when: whenText(format, lastSeenAt, t("agentNeverReported")),
+            })}
           </Text>
           {status && (
             <Text size="xsm" color="secondary">

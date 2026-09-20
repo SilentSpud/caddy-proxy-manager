@@ -136,15 +136,31 @@ interface AuditData {
   messages?: AuditMessage[];
 }
 
+/**
+ * Seven of these run over every message of every event in the table, and the field name is one of a
+ * fixed handful - so the pattern is compiled once per field rather than once per call.
+ */
+const bracketPatterns = new Map<string, RegExp>();
+
+function bracketPattern(field: string, flags: string): RegExp {
+  const key = `${field}:${flags}`;
+  let pattern = bracketPatterns.get(key);
+  if (!pattern) {
+    pattern = new RegExp(`\\[${field} "([^"]*)"\\]`, flags);
+    bracketPatterns.set(key, pattern);
+  }
+  // A /g regex carries lastIndex between uses; matchAll below starts from wherever it was left.
+  pattern.lastIndex = 0;
+  return pattern;
+}
+
 function extractBracketField(message: string, field: string): string | null {
-  const match = message.match(new RegExp(`\\[${field} "([^"]*)"\\]`));
+  const match = message.match(bracketPattern(field, ""));
   return match ? match[1] : null;
 }
 
 function extractBracketFields(message: string, field: string): string[] {
-  return [...message.matchAll(new RegExp(`\\[${field} "([^"]*)"\\]`, "g"))].map(
-    (match) => match[1],
-  );
+  return [...message.matchAll(bracketPattern(field, "g"))].map((match) => match[1]);
 }
 
 function normalizeAuditMessage(message: AuditMessage): AuditMessage {

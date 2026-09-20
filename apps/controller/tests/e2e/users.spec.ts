@@ -46,10 +46,10 @@ test.describe('Users page', () => {
   });
 
   test('search input filters users', async ({ page }) => {
-    await page.getByPlaceholder('Search users...').fill('testadmin');
+    await page.getByPlaceholder('Search users…').fill('testadmin');
     await expect(page.getByText(/^1 user shown/)).toBeVisible({ timeout: 5000 });
 
-    await page.getByPlaceholder('Search users...').fill('nonexistent-zzz');
+    await page.getByPlaceholder('Search users…').fill('nonexistent-zzz');
     await expect(page.getByText('No users found.')).toBeVisible({ timeout: 5000 });
   });
 
