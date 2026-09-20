@@ -2533,6 +2533,27 @@
             "description": "Password of the API user or sub-user."
           }
         }
+      },
+      "rfc2136": {
+        "description": "RFC 2136 dynamic DNS updates via a TSIG key (BIND 9 and compatible servers)",
+        "fields": {
+          "keyName": {
+            "label": "TSIG Key Name",
+            "description": "Name of the TSIG key as defined on the DNS server."
+          },
+          "keyAlg": {
+            "label": "TSIG Algorithm",
+            "description": "HMAC algorithm of the TSIG key, e.g. hmac-sha256, hmac-sha512 or hmac-md5."
+          },
+          "key": {
+            "label": "TSIG Key Secret",
+            "description": "The base64 shared secret from the key statement, or from `tsig-keygen`."
+          },
+          "server": {
+            "label": "DNS Server",
+            "description": "Authoritative server that accepts RFC 2136 dynamic updates, as host:port."
+          }
+        }
       }
     },
     "tailscaleModuleDisabledBody": "{reason} These settings still save, but no host is served on the tailnet until the module is compiled in.",

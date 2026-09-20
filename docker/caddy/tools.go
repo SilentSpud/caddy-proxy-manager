@@ -31,6 +31,7 @@ import (
 	_ "github.com/caddy-dns/njalla"
 	_ "github.com/caddy-dns/ovh"
 	_ "github.com/caddy-dns/porkbun"
+	_ "github.com/caddy-dns/rfc2136"
 	_ "github.com/caddy-dns/route53"
 	_ "github.com/caddy-dns/spaceship"
 	_ "github.com/caddy-dns/vultr"
