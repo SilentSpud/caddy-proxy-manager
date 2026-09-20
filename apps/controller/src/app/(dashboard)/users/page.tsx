@@ -1,5 +1,5 @@
 import UsersClient from "./UsersClient";
-import { lastSessionByUser, listUsers } from "@/src/lib/models/user";
+import { lastSessionByUser, listUsers, usersWithPassword } from "@/src/lib/models/user";
 import { listGroups } from "@/src/lib/models/groups";
 import { requireAdmin } from "@/src/lib/auth";
 import { config } from "@/src/lib/config";
@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function UsersPage() {
   await requireAdmin();
-  const [allUsers, gravatarEnabled, lastSessions, allGroups] = await Promise.all([
+  const [allUsers, gravatarEnabled, lastSessions, allGroups, withPassword] = await Promise.all([
     listUsers(),
     isGravatarEnabled(),
     // Best-effort: the list is still useful without it, and a failure here should not take the
@@ -23,6 +23,7 @@ export default async function UsersPage() {
     lastSessionByUser().catch(() => new Map<number, string>()),
     // The same: memberships are a section of the detail, not the page.
     listGroups().catch(() => []),
+    usersWithPassword().catch(() => new Set<number>()),
   ]);
   // Strip password hashes before sending to client, and resolve each row's icon
   // here - Gravatar hashing needs node:crypto.
@@ -30,6 +31,8 @@ export default async function UsersPage() {
     ...rest,
     avatar: resolveAvatar(rest, 72, { gravatar: gravatarEnabled }),
     lastSessionAt: lastSessions.get(rest.id) ?? null,
+    // The hash stays on the server; the detail only needs to know one exists.
+    hasPassword: passwordHash !== null || withPassword.has(rest.id),
   }));
   // Only what the detail's groups section needs: who is in each group, not their details.
   const groups = allGroups.map((group) => ({

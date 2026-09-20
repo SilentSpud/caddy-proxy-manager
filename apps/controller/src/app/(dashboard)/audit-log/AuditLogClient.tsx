@@ -94,7 +94,7 @@ export default function AuditLogClient({
       label: t("resource"),
       width: 200,
       render: (r) => (
-        <VStack gap={0}>
+        <VStack gap={0} className="cpm-cell-lines">
           <Text type="body" size="sm">
             {r.entityType}
           </Text>

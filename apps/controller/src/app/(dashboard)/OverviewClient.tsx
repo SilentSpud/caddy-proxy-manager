@@ -26,6 +26,7 @@ import { CARD_TITLE_STYLE } from "@/components/ui/card-title";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { useChartTheme, type ChartTheme } from "./analytics/chart-theme";
+import { useTableDensity } from "@/components/ui/TableDensity";
 
 // ApexCharts renders on the client only, for the reason given in AnalyticsClient: v7's
 // server entry is an async Server Component this file cannot reach, and there is nothing
@@ -262,7 +263,7 @@ function Tile({
   return (
     <SelectableCard label={label} isSelected={isSelected} onChange={onSelect} padding={4}>
       <VStack gap={1}>
-        <Text type="body" weight="semibold" maxLines={1} style={CARD_TITLE_STYLE}>
+        <Text type="body" weight="semibold" style={CARD_TITLE_STYLE}>
           {label}
         </Text>
         <Text type="large" weight="semibold" hasTabularNumbers>
@@ -300,6 +301,7 @@ export default function OverviewClient({
   isAdmin?: boolean;
 }) {
   const t = useTranslations("overview");
+  const density = useTableDensity();
   const format = useFormatter();
   const emptyValue = useEmptyValue();
   const chartTheme = useChartTheme();
@@ -518,7 +520,7 @@ export default function OverviewClient({
         width: proportional(3),
         renderCell: (row) =>
           row.kind === "traffic" ? (
-            <VStack gap={0}>
+            <VStack gap={0} className="cpm-cell-lines">
               <Text type="code" size="sm" maxLines={1}>
                 {row.method} {row.host}
                 {row.uri}
@@ -531,7 +533,7 @@ export default function OverviewClient({
               </Text>
             </VStack>
           ) : (
-            <VStack gap={0}>
+            <VStack gap={0} className="cpm-cell-lines">
               <Text type="body" size="sm" maxLines={1}>
                 {row.summary}
               </Text>
@@ -742,7 +744,7 @@ export default function OverviewClient({
             // Wrapping it again in an overflow-x box only added a second scroller - and one axis set
             // to `auto` turns the other from `visible` into `auto` too, which is where the
             // stray vertical scrollbar came from.
-            <Table data={logRows} columns={logColumns} idKey="id" />
+            <Table data={logRows} columns={logColumns} idKey="id" density={density} />
           )}
           <Text type="body" size="xsm" color="secondary">
             {isEventsOnly

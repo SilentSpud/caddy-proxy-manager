@@ -205,9 +205,22 @@ test.describe('First-run setup', () => {
     await expect(page.getByRole('textbox', { name: 'ClickHouse URL' })).toBeHidden();
   });
 
-  test('saving the settings finishes setup and opens the dashboard', async () => {
+  test('saving the settings restarts the app, then opens the dashboard', async () => {
+    // Past the file's 60s default: a container really does stop and start here.
+    test.setTimeout(180_000);
+
+    // The restart is part of finishing, not a detail of it: this process resolved its settings and
+    // listed its OAuth providers against a database that had neither, and coming back is what
+    // applies the Caddy configuration a dashboard host would need.
     await page.getByRole('button', { name: 'Save and finish setup' }).click();
-    await expect(page).toHaveURL(new RegExp(`^${SETUP_ORIGIN}/?$`), { timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Restarting to finish setup' })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    // Container down, container up, then the dashboard. Generous: this is a real restart of a real
+    // container, and the compose healthcheck alone allows 20s of start period. This instance is
+    // reached at localhost and claimed no dashboard domain, so it comes back on the same origin.
+    await expect(page).toHaveURL(new RegExp(`^${SETUP_ORIGIN}/?$`), { timeout: 180_000 });
   });
 
   test('setup is one-way: its screens redirect away once finished', async () => {

@@ -381,7 +381,7 @@ services:
   # needs it, and publishing 5432 is how a database ends up on the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
-    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    image: postgres:18-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
@@ -408,7 +408,7 @@ services:
   # in COMPOSE_PROFILES is only needed on a deployment with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
-    image: clickhouse/clickhouse-server:26.8.3.105-alpine@sha256:91f21d5996c6ecbd29570b01912cc3dd1e46eade94160e55c4fe3d743d408e9e
+    image: clickhouse/clickhouse-server:26.8.7.19-alpine@sha256:2bece7c646f08865eadc2000a60427e2964adf2b46908a6d476dfa7cc5408720
     profiles: [clickhouse]
     restart: always
     environment:

@@ -1,8 +1,8 @@
 diff --git a/dist/server/request-pipeline.js b/dist/server/request-pipeline.js
-index f7b435dd140bc1834ba7ae872346ca22de10b221..400962ed36a1d345ee9cc8c53decc5157745c7c3 100644
+index 5a3cade..a5cf5b1 100644
 --- a/dist/server/request-pipeline.js
 +++ b/dist/server/request-pipeline.js
-@@ -356,6 +356,8 @@ function cloneRequestWithHeaders(request, headers) {
+@@ -361,6 +361,8 @@ function cloneRequestWithHeaders(request, headers) {
  	let cloned;
  	try {
  		cloned = new Request(request, { headers });
@@ -11,7 +11,7 @@ index f7b435dd140bc1834ba7ae872346ca22de10b221..400962ed36a1d345ee9cc8c53decc515
  	} catch {
  		const init = {
  			method: request.method,
-@@ -392,6 +394,7 @@ function cloneRequestWithUrl(request, url) {
+@@ -397,6 +399,7 @@ function cloneRequestWithUrl(request, url) {
  	let cloned;
  	try {
  		cloned = new Request(url, request);

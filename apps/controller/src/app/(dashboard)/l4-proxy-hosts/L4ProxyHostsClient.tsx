@@ -8,6 +8,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
@@ -208,13 +209,15 @@ export default function L4ProxyHostsClient({
       render: (host) => (
         <HStack gap={3} vAlign="center">
           <Icon icon={Network} size="sm" color={host.protocol === "tcp" ? "accent" : "warning"} />
-          <VStack gap={0}>
+          <VStack gap={0} className="cpm-cell-lines">
             <Text type="body" size="sm" weight="semibold">
               {host.name}
             </Text>
-            <Text type="body" size="xsm" color="secondary">
-              {formatMatcher(host, t)}
-            </Text>
+            <Tooltip content={formatMatcher(host, t)}>
+              <Text type="body" size="xsm" color="secondary" maxLines={1}>
+                {formatMatcher(host, t)}
+              </Text>
+            </Tooltip>
           </VStack>
         </HStack>
       ),
@@ -242,9 +245,11 @@ export default function L4ProxyHostsClient({
       render: (host) => (
         <HStack gap={2} vAlign="center">
           <Icon icon={ArrowRight} size="xsm" color="secondary" />
-          <Text type="code" size="sm" weight="medium">
-            {summarizeUpstreams(host.upstreams)}
-          </Text>
+          <Tooltip content={host.upstreams.join(", ")}>
+            <Text type="code" size="sm" weight="medium" maxLines={1}>
+              {summarizeUpstreams(host.upstreams)}
+            </Text>
+          </Tooltip>
         </HStack>
       ),
     },
@@ -269,7 +274,7 @@ export default function L4ProxyHostsClient({
       <HStack justify="between" vAlign="start" gap={2}>
         <VStack gap={1}>
           <HStack gap={2} vAlign="center">
-            <Text type="body" size="sm" weight="semibold" maxLines={1}>
+            <Text type="body" size="sm" weight="semibold">
               {host.name}
             </Text>
             <ProtocolBadge protocol={host.protocol} />

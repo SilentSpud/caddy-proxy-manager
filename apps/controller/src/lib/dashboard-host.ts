@@ -154,6 +154,20 @@ export function activateDashboardHost(domain: string): DashboardHostSettings {
 }
 
 /**
+ * The origin the dashboard host answers on, or null when it serves nothing.
+ *
+ * The scheme follows `tls`, which is what the managed route is actually configured with - a host
+ * forcing HTTPS redirects the plain request away, and one that is not has no certificate to offer.
+ * Built from a validated hostname, so it is safe to put in a Location or a fetch.
+ */
+export function dashboardHostOrigin(settings: DashboardHostSettings | null): string | null {
+  if (!settings?.enabled) return null;
+  const domain = settings.domain.trim().toLowerCase();
+  if (!isHostname(domain)) return null;
+  return `${settings.tls ? "https" : "http"}://${domain}`;
+}
+
+/**
  * The synthetic host, or null when there is nothing to serve.
  *
  * Returns a `ProxyHostRow` rather than a Caddy route so it travels the same path every other host
@@ -253,10 +267,12 @@ async function resolveAddresses(name: string): Promise<string[]> {
  * Answers true only when the response carries the right signature: a server that is not this one
  * can return 200, can return `{"status":"ok"}`, and can echo the nonce, but cannot sign it.
  *
- * Plain HTTP, because this runs before HTTPS has been turned on - proving the name arrives here is
- * the precondition for asking Caddy for a certificate, not something that can wait until after.
+ * The scheme is the caller's: `checkDashboardDns` asks over HTTP, because it runs before HTTPS has
+ * been turned on and proving the name arrives here is the precondition for asking Caddy for a
+ * certificate. A host already serving HTTPS is asked over HTTPS instead - it redirects the plain
+ * request away, which `redirect: "manual"` reads as "not this instance".
  */
-async function probeSelf(domain: string): Promise<boolean> {
+async function probeSelf(domain: string, scheme: "http" | "https" = "http"): Promise<boolean> {
   // Interpolating the stored setting straight into a URL is what CodeQL flagged, and it was right
   // to. `isHostname` is the narrow gate: letters, digits, dots and hyphens only, so nothing can
   // carry a scheme, credentials, a port, a path or a query into the request. An unusable value
@@ -270,7 +286,7 @@ async function probeSelf(domain: string): Promise<boolean> {
   if (!isHostname(domain)) return false;
 
   const nonce = createProbeNonce();
-  const url = `http://${domain}${PROBE_PATH}?${PROBE_PARAM}=${encodeURIComponent(nonce)}`;
+  const url = `${scheme}://${domain}${PROBE_PATH}?${PROBE_PARAM}=${encodeURIComponent(nonce)}`;
 
   const answered = await withTimeout(async (signal) => {
     // `redirect: "manual"` rather than following: a redirect to somewhere else is not this
@@ -321,4 +337,21 @@ export async function checkDashboardDns(
   // closed port without reporting more than it can be sure of, so both read as "did not reach
   // here" and the message covers the ways that happens.
   return { ok: false, resolved: addresses, reason: "otherServer" };
+}
+
+/**
+ * Whether the dashboard host is answering, on the scheme it is configured for.
+ *
+ * The narrower half of `checkDashboardDns`: no DNS lookup and no reason, because the only caller
+ * is deciding whether to send a browser there. A false is not a diagnosis - Caddy may not be
+ * running yet, the record may not exist - which is why it only ever costs the operator the
+ * redirect, never the page they are on.
+ */
+export async function dashboardHostAnswers(
+  settings: DashboardHostSettings | null,
+): Promise<boolean> {
+  if (!settings?.enabled) return false;
+  const domain = settings.domain.trim().toLowerCase();
+  if (!isHostname(domain)) return false;
+  return await probeSelf(domain, settings.tls ? "https" : "http");
 }

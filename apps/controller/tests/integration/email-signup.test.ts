@@ -103,6 +103,9 @@ describe('email self-registration', () => {
     expect(created, 'signup should have created the user').toBeDefined();
     expect(created?.role).toBe('user');
     expect(created?.status).toBe('active');
+    // Better Auth writes this password itself, never through models/user, so the account hook is
+    // the only thing that can date it.
+    expect(created?.passwordChangedAt).toBeTruthy();
 
     const accounts = await db.select().from(schema.accounts);
     const credential = accounts.find(

@@ -35,7 +35,7 @@ import {
 } from "@/src/lib/migration/selection";
 import { migrationGroupDescription, migrationGroupLabel } from "@/src/lib/migration/messages";
 import { skipMigration } from "./actions";
-import RestartDialog from "./RestartDialog";
+import RestartDialog from "@/src/components/setup/RestartDialog";
 import { useTranslations } from "next-intl";
 
 export type Candidate = {
@@ -202,8 +202,16 @@ export default function SetupMigrateClient({
     return (
       <RestartDialog
         next={imported.next}
-        migratedSignIn={imported.migratedSignIn}
         restartToken={imported.restartToken}
+        copy={{
+          heading: t("done.heading"),
+          lead: t("migrationCopiedDescription"),
+          title: t("migrationRestartTitle"),
+          description: t("migrationRestartDescription"),
+          note: imported.migratedSignIn ? t("restartSignInMigrated") : t("restartSignInFresh"),
+          manually: t("restartManually"),
+          manuallyWithDetail: (detail) => t("restartManuallyWithDetail", { detail }),
+        }}
       />
     );
   }

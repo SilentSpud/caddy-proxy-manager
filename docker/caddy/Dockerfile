@@ -6,7 +6,7 @@
 # and the version stops floating. Pinned to an exact tag for that second reason; it selects the Go
 # toolchain and xcaddy only - what gets compiled is pinned in docker/caddy/go.mod. The two are
 # allowed to drift: this tag is the xcaddy pin, go.mod is the Caddy and plugin pin.
-FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder@sha256:403d237d0bb16d2e62b1f93ca9ebb4953ecbb78aee5986765713a39f9263a5b4 AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder@sha256:401121e61853cb9c7df83cba43e532e49a68e30f32921c7bdcb7a4912168c067 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -69,7 +69,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # stages on one distro means it stays that way even if a plugin pulls in cgo. Not caddy:<version>
 # itself - this stage overwrites /usr/bin/caddy, so the official binary would sit in a lower layer
 # as ~50MB of dead weight. wget is busybox's, which the compose healthcheck uses unchanged.
-FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 # Accept build args for user/group IDs to support rootless operation
 # Using 10000 as default to avoid conflicts with system users

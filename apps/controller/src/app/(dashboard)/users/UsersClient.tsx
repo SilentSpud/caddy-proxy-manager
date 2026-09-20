@@ -62,6 +62,10 @@ type UserEntry = {
   avatar: ResolvedAvatar;
   /** Most recent session start, or null when no session of theirs is still on file. */
   lastSessionAt: string | null;
+  /** Whether they have a login password at all - an SSO-only user does not. */
+  hasPassword: boolean;
+  /** When it was last set; null when there is none, or it predates the record. */
+  passwordChangedAt: string | null;
 };
 
 /** A group, and who is in it - enough to show and change one user's memberships. */
@@ -308,9 +312,7 @@ function UserDetail({
           <UserAvatar avatar={user.avatar} alt={name} size={48} tooltip={false} />
           <VStack gap={1}>
             <HStack gap={2} vAlign="center" wrap="wrap">
-              <Heading level={2} maxLines={1}>
-                {name}
-              </Heading>
+              <Heading level={2}>{name}</Heading>
               <Badge variant={ROLE_VARIANTS[user.role]} label={user.role} />
               {isDisabled && <Badge variant="error" label={t("disabledBadge")} />}
             </HStack>
@@ -393,6 +395,15 @@ function UserDetail({
                 <Timestamp value={user.lastSessionAt} style="dateTimeShort" />
               ) : (
                 t("noActiveSession")
+              )}
+            </MetadataListItem>
+            <MetadataListItem label={t("passwordChanged")}>
+              {!user.hasPassword ? (
+                t("passwordNone")
+              ) : user.passwordChangedAt ? (
+                <Timestamp value={user.passwordChangedAt} style="dateTimeShort" />
+              ) : (
+                t("passwordChangedUnknown")
               )}
             </MetadataListItem>
             <MetadataListItem label={t("created")}>

@@ -338,9 +338,7 @@ function GroupDetail({
         <HStack gap={4} vAlign="start">
           <Icon icon={Users} color="accent" />
           <VStack gap={1}>
-            <Heading level={2} maxLines={1}>
-              {group.name}
-            </Heading>
+            <Heading level={2}>{group.name}</Heading>
             <Text type="body" size="sm" color="secondary">
               {group.description || t("noDescription")}
             </Text>

@@ -39,7 +39,7 @@ export function StatusChip({ status, label }: StatusChipProps) {
   return (
     <HStack gap={2} vAlign="center">
       <StatusDot variant={config.variant} label={displayLabel} />
-      <Text type="body" size="xsm" weight="semibold">
+      <Text type="body" size="sm" weight="semibold">
         {displayLabel}
       </Text>
     </HStack>

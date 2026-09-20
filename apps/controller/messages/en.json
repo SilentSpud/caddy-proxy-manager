@@ -1253,7 +1253,17 @@
     "avatarInvalid": "Invalid avatar data",
     "avatarFormatInvalid": "Avatar must be a base64-encoded PNG, JPEG, or WebP image",
     "avatarImageTooLarge": "Avatar image is too large",
-    "avatarUpdateFailed": "Failed to update avatar"
+    "avatarUpdateFailed": "Failed to update avatar",
+    "display": "Display",
+    "tableDensity": "Table density",
+    "tableDensityHelp": "How much space each table row takes. Text stays the same size; only the padding around it changes. Saved to your account, so it follows you to any browser.",
+    "tableDensityOptions": {
+      "compact": "Compact",
+      "balanced": "Balanced",
+      "spacious": "Spacious"
+    },
+    "tableDensityInvalid": "That is not a table density this app offers.",
+    "tableDensitySaveFailed": "Could not save your table density. Try again."
   },
   "proxyHosts": {
     "accessList": "Access List",
@@ -2971,10 +2981,19 @@
       }
     },
     "restartStopping": "Stopping the application…",
+    "restartQueued": "Waiting for the last restart to settle…",
     "restartWaiting": "Waiting for it to come back…",
     "restartReady": "Back up. Taking you to the next step…",
     "restartSignInMigrated": "You will be asked to sign in with one of the accounts that came across, using the password you already had.",
     "restartSignInFresh": "No accounts came across, so the next step is creating the first administrator or configuring single sign-on.",
+    "setupCompleteHeading": "Setup complete",
+    "setupCompleteDescription": "Everything you entered is saved.",
+    "setupRestartTitle": "Restarting to finish setup",
+    "setupRestartDescription": "The application is restarting so it runs from the configuration you just saved: this process started against an empty database and is still working from what it read then. Coming back is also what hands your dashboard host to Caddy.",
+    "setupRestartManually": "Restart it yourself, then continue - the settings themselves are saved and do not need entering again.",
+    "setupRestartManuallyWithDetail": "{detail} Restart it yourself, then continue - the settings themselves are saved and do not need entering again.",
+    "restartSignInSetup": "The dashboard opens as soon as the application is back, and you stay signed in.",
+    "restartSignInDashboard": "This dashboard is served at {domain} from now on. You will be taken there once it answers, and asked to sign in again - the session you are using belongs to the address you are on now.",
     "restartRefused": "The restart request was refused (HTTP {status}).",
     "restartStillRunning": "The application is still running after being asked to stop, so nothing appears to be supervising it.",
     "restartNotBack": "The application stopped but has not come back.",
@@ -3048,6 +3067,9 @@
     "filterAll": "All",
     "name": "Name",
     "noActiveSession": "No active session",
+    "passwordChanged": "Password last changed",
+    "passwordChangedUnknown": "Not recorded",
+    "passwordNone": "No password set",
     "noUsersFound": "No users found.",
     "password": "Password",
     "passwordPlaceholder": "Min 8 characters",

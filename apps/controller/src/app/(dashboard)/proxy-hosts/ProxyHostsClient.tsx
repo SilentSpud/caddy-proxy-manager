@@ -25,6 +25,7 @@ import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { Icon } from "@astryxdesign/core/Icon";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Switch } from "@astryxdesign/core/Switch";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import type { AccessList } from "@/lib/models/access-lists";
@@ -352,13 +353,15 @@ export default function ProxyHostsClient({
       render: (host) => (
         <HStack gap={3} vAlign="center">
           <Icon icon={Globe} size="sm" color={host.enabled ? "success" : "disabled"} />
-          <VStack gap={0}>
+          <VStack gap={0} className="cpm-cell-lines">
             <Text type="body" size="sm" weight="semibold">
               {host.name}
             </Text>
-            <Text type="code" size="xsm" color="secondary">
-              {summarize(host.domains)}
-            </Text>
+            <Tooltip content={host.domains.join(", ")}>
+              <Text type="code" size="xsm" color="secondary" maxLines={1}>
+                {summarize(host.domains)}
+              </Text>
+            </Tooltip>
           </VStack>
         </HStack>
       ),
@@ -370,29 +373,33 @@ export default function ProxyHostsClient({
       render: (host) => (
         <HStack gap={2} vAlign="center">
           <Icon icon={ArrowRight} size="xsm" color="secondary" />
-          <Text type="code" size="sm" weight="medium">
-            {summarize(host.upstreams)}
-          </Text>
+          <Tooltip content={host.upstreams.join(", ")}>
+            <Text type="code" size="sm" weight="medium" maxLines={1}>
+              {summarize(host.upstreams)}
+            </Text>
+          </Tooltip>
         </HStack>
       ),
     },
     {
       id: "tls",
       label: t("tls"),
-      width: 150,
+      width: 180,
       render: (host) => {
         const name = host.certificateId ? certificateNames.get(host.certificateId) : undefined;
         if (!name) {
           return (
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {emptyValue}
             </Text>
           );
         }
         return (
-          <Text type="body" size="sm" maxLines={1}>
-            {name}
-          </Text>
+          <Tooltip content={name}>
+            <Text type="body" size="sm" maxLines={1}>
+              {name}
+            </Text>
+          </Tooltip>
         );
       },
     },
@@ -406,7 +413,7 @@ export default function ProxyHostsClient({
         // in the list saves opening the host to find out.
         if (assigned.length === 0) {
           return (
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {t("servedByEveryAgent")}
             </Text>
           );
@@ -428,7 +435,7 @@ export default function ProxyHostsClient({
             render: (host: ProxyHost) => {
               const row = hostTraffic[host.id] ?? { total: 0, blocked: 0 };
               return (
-                <VStack gap={0} hAlign="end">
+                <VStack gap={0} hAlign="end" className="cpm-cell-lines">
                   <Text type="code" size="sm">
                     {NUMBER_FORMAT.format(row.total)}
                   </Text>
@@ -450,7 +457,7 @@ export default function ProxyHostsClient({
         const active = FEATURES.filter((f) => f.isOn(host));
         if (active.length === 0) {
           return (
-            <Text type="body" size="xsm" color="secondary">
+            <Text type="body" size="sm" color="secondary">
               {emptyValue}
             </Text>
           );
@@ -493,7 +500,7 @@ export default function ProxyHostsClient({
     <Card>
       <HStack justify="between" vAlign="start" gap={2}>
         <VStack gap={1}>
-          <Text type="body" size="sm" weight="semibold" maxLines={1}>
+          <Text type="body" size="sm" weight="semibold">
             {host.name}
           </Text>
           <Text type="code" size="xsm" color="secondary" maxLines={1}>

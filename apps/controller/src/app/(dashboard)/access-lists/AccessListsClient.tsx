@@ -49,6 +49,7 @@ import { AppDialog } from "@/components/ui/AppDialog";
 import { Fab } from "@/src/components/mobile/Fab";
 import { SearchField } from "@/components/ui/SearchField";
 import { AUTOFILL_OFF } from "@/components/ui/native-input-attrs";
+import { useTableDensity } from "@/components/ui/TableDensity";
 import { useTranslations } from "next-intl";
 import { useEmptyValue } from "@/components/ui/empty-value";
 import { Timestamp, UtcTooltip } from "@/components/ui/Timestamp";
@@ -137,6 +138,7 @@ function MembersTab({
 }) {
   const t = useTranslations("accessLists");
   const emptyValue = useEmptyValue();
+  const density = useTableDensity();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({ username: "", password: "" });
@@ -399,7 +401,14 @@ function MembersTab({
           }
         />
       ) : (
-        <Table data={rows} columns={columns} idKey="id" hasHover plugins={{ selection }} />
+        <Table
+          data={rows}
+          columns={columns}
+          idKey="id"
+          density={density}
+          hasHover
+          plugins={{ selection }}
+        />
       )}
     </VStack>
   );
@@ -635,9 +644,7 @@ function DetailPane({
       <HStack gap={4} vAlign="start">
         <Icon icon={KeyRound} color="accent" />
         <VStack gap={1}>
-          <Heading level={2} maxLines={1}>
-            {list.name}
-          </Heading>
+          <Heading level={2}>{list.name}</Heading>
           <Text type="body" size="sm" color="secondary">
             {list.description || t("noDescription")}
           </Text>

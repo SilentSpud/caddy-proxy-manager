@@ -21,6 +21,7 @@ import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { VStack } from "@astryxdesign/core/Stack";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { useTranslations } from "next-intl";
+import { useTableDensity } from "./TableDensity";
 
 export type Column<T> = {
   id: string;
@@ -156,6 +157,7 @@ export function DataTable<T>({
   // Replaces the paired `block md:hidden` / `hidden md:block` wrappers, so only one of the two
   // views is ever mounted.
   const isNarrow = useMediaQuery("(max-width: 767px)");
+  const density = useTableDensity();
 
   // Astryx's Table requires rows to carry an index signature. The app's domain types are plain
   // interfaces, so the cast is confined to this boundary rather than pushed onto every model.
@@ -260,6 +262,7 @@ export function DataTable<T>({
           data={data as readonly unknown[] as TableRow[]}
           columns={tableColumns}
           idKey={String(keyField)}
+          density={density}
           hasHover
           plugins={Object.keys(plugins).length > 0 ? plugins : undefined}
         />

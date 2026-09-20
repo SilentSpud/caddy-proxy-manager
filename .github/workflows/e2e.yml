@@ -1,14 +1,30 @@
 name: End-to-end tests
 
 on:
-  # Pull requests only. This suite builds the whole Compose stack and runs single-worker against a
-  # live Caddy, so it is the expensive check by a wide margin - running it on every push to a work
-  # branch spends that on commits nobody is ready to merge, and running it again on the push to main
-  # re-proved a tree the pull request had already tested. The run against the merge result is the
-  # one that decides whether the code lands, and it is the one kept.
+  # Opt-in, not automatic. This suite builds the whole Compose stack and runs single-worker against
+  # a live Caddy, so it is the expensive check by a wide margin, and it is no longer a required
+  # check on main - most pull requests do not need 20 minutes of it to be reviewable. Two ways in:
+  #
+  #   - run it by hand from the Actions tab, against any branch or tag;
+  #   - label a pull request `e2e`, and it runs on the merge result and on every push after that.
+  #
+  # `synchronize` without the label check would run it for every push to every pull request, so the
+  # job itself is guarded below - a workflow-level filter cannot read the label list.
+  #
+  # A manual run takes no `ref` input, and so tests the head of whatever ref was picked. An input
+  # that fed `actions/checkout` would be a cache-poisoning hole (CodeQL
+  # actions/cache-poisoning/poisonable-step): a run dispatched from main writes into main's cache
+  # scope, so checking out an arbitrary commit there lets that commit's code seed the cache every
+  # later run on main restores. To test one commit, push it to a branch or tag and dispatch that.
+  workflow_dispatch:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - reopened
+      - labeled
+      - synchronize
 
 # One run per ref. A force-push supersedes the in-flight run rather than leaving
 # a 30-minute Docker job grinding against a commit nobody is looking at.
@@ -18,6 +34,10 @@ concurrency:
 
 jobs:
   e2e:
+    # A pull request runs this only while it carries the `e2e` label; a manual run always does.
+    # Removing the label stops later pushes from starting a run, and the guard is a job-level `if`
+    # rather than a workflow-level filter because only the job can see `labels`.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e')
     runs-on: ubuntu-latest
     # tests/global-setup.ts allows 180s for the stack to come up and the suite
     # itself runs single-worker against a live Caddy, so this is slow by nature.
@@ -91,7 +111,7 @@ jobs:
       # The default docker driver cannot export build cache, so type=gha in
       # tests/docker-compose.ci.yml needs a real buildx builder to exist first.
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # tests/global-setup.ts drives `docker compose up -d --build` over
       # docker-compose.yml + tests/docker-compose.test.yml, seeds fixtures, logs

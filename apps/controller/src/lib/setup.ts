@@ -130,28 +130,45 @@ export async function issueRestartToken(): Promise<string> {
   return token;
 }
 
-/** Whether `token` is the unexpired one issued, spending it if so. */
-export async function consumeRestartToken(token: string | null): Promise<boolean> {
-  if (!token) return false;
+/** The stored token row, when `token` is the unexpired one it was issued for. */
+async function matchRestartToken(token: string | null): Promise<{ value: string } | null> {
+  if (!token) return null;
   const [row] = await db
     .select({ value: settings.value })
     .from(settings)
     .where(eq(settings.key, RESTART_TOKEN_KEY))
     .limit(1);
-  if (!row) return false;
+  if (!row) return null;
 
   let stored: { hash?: unknown; expiresAt?: unknown };
   try {
     stored = JSON.parse(row.value);
   } catch {
-    return false;
+    return null;
   }
-  if (typeof stored.hash !== "string" || typeof stored.expiresAt !== "number") return false;
-  if (stored.expiresAt <= Date.now()) return false;
+  if (typeof stored.hash !== "string" || typeof stored.expiresAt !== "number") return null;
+  if (stored.expiresAt <= Date.now()) return null;
 
   const presented = Buffer.from(hashRestartToken(token), "hex");
   const expected = Buffer.from(stored.hash, "hex");
-  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) return false;
+  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) return null;
+  return row;
+}
+
+/**
+ * Whether `token` is the unexpired one issued, leaving it unspent.
+ *
+ * For a caller that may still refuse the request afterwards: the token buys one restart, and
+ * spending it on an answer of "not yet" would cost the operator the only one they have.
+ */
+export async function restartTokenMatches(token: string | null): Promise<boolean> {
+  return (await matchRestartToken(token)) !== null;
+}
+
+/** Whether `token` is the unexpired one issued, spending it if so. */
+export async function consumeRestartToken(token: string | null): Promise<boolean> {
+  const row = await matchRestartToken(token);
+  if (!row) return false;
 
   // Deleted by value, so two requests racing with the same token cannot both spend it.
   const spent = await db

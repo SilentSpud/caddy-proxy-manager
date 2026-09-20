@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/src/lib/auth";
+import { dashboardHostAnswers, dashboardHostOrigin } from "@/src/lib/dashboard-host";
 import { planEnvCleanup } from "@/src/lib/migration/env-file";
+import { getDashboardSettings } from "@/src/lib/settings";
 import { SETTING_DEFINITIONS } from "@/src/lib/settings/registry";
 import { resolveAllSettings } from "@/src/lib/settings/resolve";
 import { getMigrationSource, isSetupCompleted } from "@/src/lib/setup";
@@ -38,5 +40,14 @@ export default async function SetupDonePage() {
     ).map((definition) => definition.env),
   );
 
-  return <SetupDoneClient source={source} cleanup={cleanup} />;
+  // The dashboard's own domain, when setup claimed one and it answers there: this page is the one
+  // place a migrated deployment is not handed over automatically, so its last button is where that
+  // happens. Asked rather than assumed - the check is bounded, and a button onto a domain whose
+  // DNS does not arrive here yet is worse than one that stays where the operator already is.
+  const dashboardSettings = await getDashboardSettings();
+  const dashboard = (await dashboardHostAnswers(dashboardSettings))
+    ? dashboardHostOrigin(dashboardSettings)
+    : null;
+
+  return <SetupDoneClient source={source} cleanup={cleanup} dashboardOrigin={dashboard} />;
 }

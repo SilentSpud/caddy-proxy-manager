@@ -1151,7 +1151,7 @@ export default function WafEventsClient({
     {
       id: "ts",
       label: t("time"),
-      width: 170,
+      width: 220,
       render: (r) => (
         <Text type="code" size="xsm" color="secondary">
           <Timestamp value={r.ts * 1000} />
@@ -1167,13 +1167,12 @@ export default function WafEventsClient({
     {
       id: "severity",
       label: t("severity"),
-      width: 100,
+      width: 120,
       render: (r) => <SeverityChip severity={r.severity} />,
     },
     {
       id: "host",
       label: t("host"),
-      width: 130,
       render: (r) =>
         r.host ? (
           <Tooltip content={r.host}>
@@ -1190,7 +1189,7 @@ export default function WafEventsClient({
     {
       id: "clientIp",
       label: t("clientIp"),
-      width: 130,
+      width: 200,
       render: (r) => (
         <HStack gap={1} vAlign="center">
           <Text type="code" size="xsm">
@@ -1203,7 +1202,6 @@ export default function WafEventsClient({
     {
       id: "method",
       label: t("request"),
-      width: 200,
       render: (r) => (
         <HStack gap={2} vAlign="center">
           <Text type="code" size="xsm" weight="bold" color={r.method ? "accent" : "secondary"}>
@@ -1316,28 +1314,51 @@ export default function WafEventsClient({
             <WafStatusCard stats={stats} isEnabled={globalWafEnabled} />
           </div>
           <VStack gap={3}>
-            {/* Was five buttons whose "selected" state read only as a filled
-                variant; SegmentedControl exposes the choice as a radio group. */}
-            <div className="cpm-desktop-only">
-              <SegmentedControl
-                label={t("timeRange")}
-                size="sm"
-                value={range}
-                onChange={handleRangeChange}
+            {/* The range on the left and search at the far right, one row. On a phone the chip
+                takes the range's place, and search wraps under it once opened. */}
+            <HStack justify="between" vAlign="center" gap={3} wrap="wrap">
+              {/* Was five buttons whose "selected" state read only as a filled
+                  variant; SegmentedControl exposes the choice as a radio group. */}
+              <div className="cpm-desktop-only">
+                <SegmentedControl
+                  label={t("timeRange")}
+                  size="sm"
+                  value={range}
+                  onChange={handleRangeChange}
+                >
+                  {rangeOptions.map((o) => (
+                    <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
+                  ))}
+                </SegmentedControl>
+              </div>
+              <div className="cpm-chip-row cpm-mobile-flex">
+                <FilterChip
+                  label={rangeOptions.find((o) => o.value === range)?.label ?? range}
+                  aria-label={t("timeRange")}
+                  isActive={range !== "all"}
+                  onClick={() => setRangeSheetOpen(true)}
+                />
+              </div>
+              {/* Always there on a desktop; on a phone only once the search icon asks for it, or
+                  while a search is applied so the filter never hides. Grows to its cap, and the
+                  auto margin keeps it right-aligned when it wraps onto a line of its own. */}
+              <div
+                ref={searchWrapRef}
+                className={searchOpen || searchTerm ? undefined : "cpm-desktop-only"}
+                style={{ flex: "1 1 240px", maxWidth: 480, marginInlineStart: "auto" }}
               >
-                {rangeOptions.map((o) => (
-                  <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
-                ))}
-              </SegmentedControl>
-            </div>
-            <div className="cpm-chip-row cpm-mobile-flex">
-              <FilterChip
-                label={rangeOptions.find((o) => o.value === range)?.label ?? range}
-                aria-label={t("timeRange")}
-                isActive={range !== "all"}
-                onClick={() => setRangeSheetOpen(true)}
-              />
-            </div>
+                <SearchField
+                  value={searchTerm}
+                  onChange={(v) => {
+                    setSearchTerm(v);
+                    updateSearch(v);
+                  }}
+                  placeholder={t("eventsSearchPlaceholder")}
+                  label={t("searchWafEvents")}
+                  width="100%"
+                />
+              </div>
+            </HStack>
             <OptionSheet
               title={t("timeRange")}
               isOpen={rangeSheetOpen}
@@ -1367,24 +1388,6 @@ export default function WafEventsClient({
                 />
               </HStack>
             )}
-            {/* Always there on a desktop; on a phone only once the search icon asks for it, or
-                while a search is applied so the filter never hides. */}
-            <div
-              ref={searchWrapRef}
-              className={searchOpen || searchTerm ? undefined : "cpm-desktop-only"}
-              style={{ maxWidth: 480 }}
-            >
-              <SearchField
-                value={searchTerm}
-                onChange={(v) => {
-                  setSearchTerm(v);
-                  updateSearch(v);
-                }}
-                placeholder={t("eventsSearchPlaceholder")}
-                label={t("searchWafEvents")}
-                width="100%"
-              />
-            </div>
           </VStack>
           {isNarrow && selected ? (
             // A phone has no room for the list and the event side by side: the event replaces it.

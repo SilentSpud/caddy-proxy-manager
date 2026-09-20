@@ -20,6 +20,10 @@ export const users = pgTable(
     email: text("email").notNull(),
     name: text("name"),
     passwordHash: text("passwordHash"),
+    // When the login password was last set. Null for a user without one, and for one whose password
+    // predates this column - the credential account's updatedAt cannot stand in for it, because the
+    // environment-seeded admin rewrites that row on every start.
+    passwordChangedAt: isoTimestamp("passwordChangedAt"),
     role: text("role").notNull().default("user"),
     provider: text("provider"),
     subject: text("subject"),

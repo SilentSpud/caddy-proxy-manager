@@ -20,9 +20,12 @@ import { SetupSteps } from "@/src/components/ui/SetupSteps";
 export default function SetupDoneClient({
   source,
   cleanup,
+  dashboardOrigin,
 }: {
   source: string;
   cleanup: EnvCleanup;
+  /** Where the dashboard now answers, when setup claimed a domain for it. */
+  dashboardOrigin: string | null;
 }) {
   const t = useTranslations("setup");
   return (
@@ -87,7 +90,7 @@ export default function SetupDoneClient({
         <Button
           variant="primary"
           label={t("dashboardLinkLabel")}
-          onClick={() => window.location.assign("/")}
+          onClick={() => window.location.assign(dashboardOrigin ? `${dashboardOrigin}/` : "/")}
         />
       </VStack>
     </Center>

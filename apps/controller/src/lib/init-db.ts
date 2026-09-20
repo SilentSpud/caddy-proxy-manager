@@ -1,4 +1,4 @@
-import { hashPassword } from "./password";
+import { hashPassword, verifyPassword } from "./password";
 import db, { nowIso } from "./db";
 import { config } from "./config";
 import { users, accounts } from "./db/schema";
@@ -41,12 +41,18 @@ export async function ensureAdminUser(): Promise<void> {
     // Admin user exists - always update the password hash so env-var changes take effect, and keep
     // the role at "admin".
     const now = nowIso();
+    // Rehashed on every start, so a new hash says nothing: only an ADMIN_PASSWORD that no longer
+    // matches the stored one is a change worth dating.
+    const passwordChanged =
+      !existingUser.passwordHash ||
+      !(await verifyPassword(adminPassword, existingUser.passwordHash));
     await db
       .update(users)
       .set({
         email: adminEmail,
         subject,
         passwordHash,
+        ...(passwordChanged ? { passwordChangedAt: now } : {}),
         role: "admin",
         username: adminUsername.toLowerCase(),
         displayUsername: adminUsername,
@@ -66,6 +72,7 @@ export async function ensureAdminUser(): Promise<void> {
     email: adminEmail,
     name: adminUsername,
     passwordHash,
+    passwordChangedAt: now,
     role: "admin",
     provider,
     subject,
