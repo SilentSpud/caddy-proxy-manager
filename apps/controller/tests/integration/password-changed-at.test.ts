@@ -31,6 +31,7 @@ import { eq } from 'drizzle-orm';
 import {
   createUser,
   getUserById,
+  markPasswordChanged,
   removeUserPassword,
   updateUserPassword,
   usersWithPassword,
@@ -89,6 +90,29 @@ describe('users.passwordChangedAt', () => {
 
     await removeUserPassword(user.id);
     expect(await changedAt(user.id)).toBeNull();
+  });
+
+  it('moves updatedAt too, whichever path sets the password', async () => {
+    // A password is a security-relevant field: a row whose password just changed must not still
+    // read as untouched. markPasswordChanged is the path Better Auth's own endpoints take, which
+    // writes the hash itself and so never reaches updateUserPassword.
+    const user = await createUser({
+      email: 'touched@example.com',
+      provider: 'credentials',
+      subject: 'touched@example.com',
+      passwordHash: 'first',
+    });
+
+    await tick();
+    await updateUserPassword(user.id, 'second');
+    const afterUpdate = (await getUserById(user.id))!;
+    expect(afterUpdate.updatedAt > user.updatedAt).toBe(true);
+
+    await tick();
+    await markPasswordChanged(user.id);
+    const afterMark = (await getUserById(user.id))!;
+    expect(afterMark.passwordChangedAt! > afterUpdate.passwordChangedAt!).toBe(true);
+    expect(afterMark.updatedAt > afterUpdate.updatedAt).toBe(true);
   });
 
   it('counts a credential account as a password even with no hash on the user row', async () => {
