@@ -5,17 +5,18 @@ on:
   # a live Caddy, so it is the expensive check by a wide margin, and it is no longer a required
   # check on main - most pull requests do not need 20 minutes of it to be reviewable. Two ways in:
   #
-  #   - run it by hand from the Actions tab, against a branch or any commit on one (`ref` below);
+  #   - run it by hand from the Actions tab, against any branch or tag;
   #   - label a pull request `e2e`, and it runs on the merge result and on every push after that.
   #
   # `synchronize` without the label check would run it for every push to every pull request, so the
   # job itself is guarded below - a workflow-level filter cannot read the label list.
+  #
+  # A manual run takes no `ref` input, and so tests the head of whatever ref was picked. An input
+  # that fed `actions/checkout` would be a cache-poisoning hole (CodeQL
+  # actions/cache-poisoning/poisonable-step): a run dispatched from main writes into main's cache
+  # scope, so checking out an arbitrary commit there lets that commit's code seed the cache every
+  # later run on main restores. To test one commit, push it to a branch or tag and dispatch that.
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Branch, tag or commit SHA to test (defaults to the selected branch)
-        required: false
-        type: string
   pull_request:
     branches:
       - main
@@ -26,10 +27,9 @@ on:
       - synchronize
 
 # One run per ref. A force-push supersedes the in-flight run rather than leaving
-# a 30-minute Docker job grinding against a commit nobody is looking at. A manual run keys on the
-# commit it was pointed at, so it does not cancel the pull request's own run of the same branch.
+# a 30-minute Docker job grinding against a commit nobody is looking at.
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -61,9 +61,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Empty on a pull request, where the default (the merge result) is the tree that matters.
-          ref: ${{ inputs.ref }}
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
