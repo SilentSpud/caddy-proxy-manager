@@ -240,6 +240,7 @@ from inside the image - the runtime has no shell HTTP client to call instead.
 - **User Management** - Admin page for managing users: edit roles, status, profiles; disable or delete accounts; search and filter
 - **Groups** - Organize users into groups for forward auth access control. Assign groups to proxy hosts to grant access to all members at once
 - **Authentik Integration** - Forward-auth SSO per proxy host with configurable header forwarding and protected paths
+- **Forward Auth (external)** - Point a host at any forward-auth server (Authelia preset, or custom). Optionally answer non-browser callers with 401 instead of the login redirect, and let a header such as `X-Api-Key` bypass auth so the upstream checks it itself. **Settings → Forward Auth Defaults** sets what new hosts inherit
 - **Tailscale** - Serve a proxy host privately on your tailnet, gate it on the caller's Tailscale identity, or reach a backend that only exists on the tailnet. A Tailscale node runs inside the Caddy container - no `tailscaled` on the host, no TUN device, no published ports - and `*.ts.net` certificates come from Tailscale rather than ACME
 - **DNS Controls** - Custom DNS resolvers per host, upstream DNS pinning with IPv4/IPv6/both address family selection
 - **GraphQL API** - Every resource under `/api/graphql`, with Bearer token authentication. One endpoint, one schema, introspectable by any GraphQL client. The agent protocol lives in the same schema as a subscription, separated by which credential a field requires

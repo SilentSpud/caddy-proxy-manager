@@ -273,6 +273,15 @@ services:
     image: traefik/whoami
     networks:
       - caddy-network
+  # Stands in for Authelia, reachable by Caddy as "mock-forward-auth:9091". Backs the generic
+  # forward-auth functional tests; see the file for what each endpoint answers.
+  mock-forward-auth:
+    image: node:22-alpine
+    command: ["node", "/server.js"]
+    volumes:
+      - ./apps/controller/tests/mock-forward-auth/server.js:/server.js:ro
+    networks:
+      - caddy-network
   # TCP echo server for L4 proxy tests.
   # Listens on port 9000 and echoes back anything sent to it with a prefix.
   tcp-echo:

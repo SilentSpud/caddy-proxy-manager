@@ -203,6 +203,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         env: ["FORWARD_AUTH_INTERNAL_URL"],
       },
       {
+        id: "forward-auth",
+        name: "Forward Auth Defaults",
+        desc: "Defaults for hosts authenticating through an external auth server",
+        icon: UserCheck,
+      },
+      {
         id: "oauth",
         name: "OAuth Providers",
         desc: "OAuth/OIDC SSO providers",

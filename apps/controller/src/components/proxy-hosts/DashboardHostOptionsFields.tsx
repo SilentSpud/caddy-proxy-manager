@@ -19,10 +19,11 @@ import type { IssuedClientCertificate } from "@/lib/models/issued-client-certifi
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { CertificatePickerOption } from "@/lib/certificate-api";
 import type { DashboardHostFormView } from "@/lib/dashboard-host-options";
-import type { AuthentikSettings } from "@/lib/settings";
+import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
 import { AgentAssignmentFields, type AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { AdvancedConfigFields } from "./AdvancedConfigFields";
 import { AuthentikFields } from "./AuthentikFields";
+import { ForwardAuthFields } from "./ForwardAuthFields";
 import { DnsResolverFields } from "./DnsResolverFields";
 import { ErrorPagesFields } from "./ErrorPagesFields";
 import { GeoBlockFields } from "./GeoBlockFields";
@@ -46,6 +47,7 @@ export type DashboardHostOptionsData = {
   certificates: CertificatePickerOption[];
   accessLists: AccessList[];
   authentikDefaults: AuthentikSettings | null;
+  forwardAuthDefaults: ForwardAuthSettings | null;
   caCertificates: CaCertificate[];
   mtlsRoles: MtlsRole[];
   issuedClientCerts: IssuedClientCertificate[];
@@ -94,6 +96,7 @@ export function DashboardHostOptionsFields({ data }: { data: DashboardHostOption
       {/* The settings page is admin-only, which is who may edit raw config. */}
       <AdvancedConfigFields host={view} />
       <AuthentikFields authentik={view.authentik} defaults={data.authentikDefaults} />
+      <ForwardAuthFields forwardAuth={view.forwardAuth} defaults={data.forwardAuthDefaults} />
       <TailscaleFields tailscale={view.tailscale} defaults={data.tailscaleDefaults} />
       <LoadBalancerFields loadBalancer={view.loadBalancer} />
       <DnsResolverFields dnsResolver={view.dnsResolver} />

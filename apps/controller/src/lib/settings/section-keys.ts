@@ -35,6 +35,7 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   geoblock: { label: "Geo-Block", keys: ["geoblock"] },
   "error-pages": { label: "Error Pages", keys: ["error_pages"] },
   authentik: { label: "Authentik", keys: ["authentik"] },
+  "forward-auth": { label: "Forward Auth", keys: ["forward_auth"] },
   "password-policy": { label: "Password Policy", keys: ["password_policy"] },
   metrics: { label: "Metrics", keys: ["metrics"] },
   logging: { label: "Logging", keys: ["logging"] },

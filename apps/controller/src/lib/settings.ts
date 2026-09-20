@@ -56,6 +56,19 @@ export type AuthentikSettings = {
   authEndpoint?: string;
 };
 
+/**
+ * Defaults a new proxy host's forward-auth block is prefilled from, so an operator running one
+ * auth server for the whole fleet types its address once rather than per host. Nothing is applied
+ * from here: a host carries its own block, and this only seeds the form.
+ */
+export type ForwardAuthSettings = {
+  provider: "authelia" | "custom";
+  /** Base URL of the auth server, e.g. http://authelia:9091 */
+  authUpstream: string;
+  /** Left out for a preset that supplies its own. */
+  authEndpoint?: string;
+};
+
 export type MetricsSettings = {
   enabled: boolean;
   port?: number; // Port to expose metrics on (default: 9090, separate from admin API)
@@ -303,6 +316,14 @@ export async function getAuthentikSettings(): Promise<AuthentikSettings | null> 
 
 export async function saveAuthentikSettings(settings: AuthentikSettings): Promise<void> {
   await setSetting("authentik", settings);
+}
+
+export async function getForwardAuthSettings(): Promise<ForwardAuthSettings | null> {
+  return await getSetting<ForwardAuthSettings>("forward_auth");
+}
+
+export async function saveForwardAuthSettings(settings: ForwardAuthSettings): Promise<void> {
+  await setSetting("forward_auth", settings);
 }
 
 export async function getMetricsSettings(): Promise<MetricsSettings | null> {

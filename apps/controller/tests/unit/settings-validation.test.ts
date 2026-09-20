@@ -26,6 +26,7 @@ const validGroups: Record<string, Record<string, unknown>> = {
   acme: { caUrl: 'https://ca.example.com/acme/directory' },
   cloudflare: { apiToken: 'secret', zoneId: 'zone' },
   authentik: { outpostDomain: 'auth.example.com', outpostUpstream: 'http://authentik:9000' },
+  'forward-auth': { provider: 'authelia', authUpstream: 'http://authelia:9091' },
   metrics: { enabled: true, port: 9090 },
   logging: { enabled: true, format: 'json' },
   dns: { enabled: true, resolvers: ['1.1.1.1'], fallbacks: [], timeout: '5s' },

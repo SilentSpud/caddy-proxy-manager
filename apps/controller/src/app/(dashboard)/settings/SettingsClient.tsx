@@ -32,6 +32,7 @@ import type {
   GeneralSettings,
   AcmeSettings,
   AuthentikSettings,
+  ForwardAuthSettings,
   MetricsSettings,
   LoggingSettings,
   DnsSettings,
@@ -78,6 +79,7 @@ import {
   updateGeneralSettingsAction,
   updateAcmeSettingsAction,
   updateAuthentikSettingsAction,
+  updateForwardAuthSettingsAction,
   updateMetricsSettingsAction,
   updateAnalyticsSettingsAction,
   updateGeoipSettingsAction,
@@ -118,6 +120,7 @@ type Props = {
   dnsProvider: DnsProviderApiStatus | null;
   dnsProviderDefinitions: DnsProviderDefinition[];
   authentik: AuthentikSettings | null;
+  forwardAuth: ForwardAuthSettings | null;
   metrics: MetricsSettings | null;
   logging: LoggingSettings | null;
   dns: DnsSettings | null;
@@ -169,6 +172,7 @@ export default function SettingsClient({
   dnsProvider,
   dnsProviderDefinitions,
   authentik,
+  forwardAuth,
   metrics,
   logging,
   dns,
@@ -216,6 +220,10 @@ export default function SettingsClient({
   const [selectedProvider, setSelectedProvider] = useState("none");
   const configuredProviders = dnsProvider?.providers ? Object.keys(dnsProvider.providers) : [];
   const [authentikState, authentikFormAction] = useActionState(updateAuthentikSettingsAction, null);
+  const [forwardAuthState, forwardAuthFormAction] = useActionState(
+    updateForwardAuthSettingsAction,
+    null,
+  );
   const [metricsState, metricsFormAction] = useActionState(updateMetricsSettingsAction, null);
   const [analyticsState, analyticsFormAction] = useActionState(updateAnalyticsSettingsAction, null);
   const [geoipState, geoipFormAction] = useActionState(updateGeoipSettingsAction, null);
@@ -329,6 +337,13 @@ export default function SettingsClient({
             authentik={authentik}
             authentikState={authentikState}
             authentikFormAction={authentikFormAction}
+          />
+        )}
+        {active === "forward-auth" && (
+          <ForwardAuthSection
+            forwardAuth={forwardAuth}
+            forwardAuthState={forwardAuthState}
+            forwardAuthFormAction={forwardAuthFormAction}
           />
         )}
         {active === "oauth" && (
@@ -1530,6 +1545,65 @@ function AuthentikSection({
             value={authEndpoint}
             onChange={setAuthEndpoint}
             placeholder="/outpost.goauthentik.io/auth/caddy"
+          />
+          <SaveButton />
+        </VStack>
+      </form>
+    </FormCard>
+  );
+}
+
+/**
+ * Defaults for a host authenticating through an external forward-auth server. Only what every
+ * host would otherwise repeat - the rest of the block is per host, in the host dialog.
+ */
+function ForwardAuthSection({
+  forwardAuth,
+  forwardAuthState,
+  forwardAuthFormAction,
+}: {
+  forwardAuth: ForwardAuthSettings | null;
+  forwardAuthState: { success: boolean; message?: string } | null;
+  forwardAuthFormAction: (payload: FormData) => void;
+}) {
+  const t = useTranslations("settings");
+  const [provider, setProvider] = useState<string>(forwardAuth?.provider ?? "authelia");
+  const [authUpstream, setAuthUpstream] = useState(forwardAuth?.authUpstream ?? "");
+  const [authEndpoint, setAuthEndpoint] = useState(forwardAuth?.authEndpoint ?? "");
+
+  return (
+    <FormCard>
+      <form action={forwardAuthFormAction}>
+        <VStack gap={3}>
+          {forwardAuthState?.message && (
+            <StatusAlert message={forwardAuthState.message} success={forwardAuthState.success} />
+          )}
+          <Selector
+            label={t("forwardAuthProvider")}
+            htmlName="forwardAuthProvider"
+            options={[
+              { value: "authelia", label: "Authelia" },
+              { value: "custom", label: t("forwardAuthProviderCustom") },
+            ]}
+            value={provider}
+            onChange={(next) => setProvider(next as string)}
+          />
+          <TextInput
+            {...NATIVE_REQUIRED}
+            label={t("forwardAuthUpstream")}
+            htmlName="forwardAuthUpstream"
+            value={authUpstream}
+            onChange={setAuthUpstream}
+            placeholder="http://authelia:9091"
+            isRequired
+          />
+          <TextInput
+            label={t("authEndpoint")}
+            isOptional
+            htmlName="forwardAuthEndpoint"
+            value={authEndpoint}
+            onChange={setAuthEndpoint}
+            placeholder="/api/authz/forward-auth"
           />
           <SaveButton />
         </VStack>

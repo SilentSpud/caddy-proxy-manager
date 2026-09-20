@@ -24,6 +24,8 @@ import {
   saveCloudflareSettings,
   getAuthentikSettings,
   saveAuthentikSettings,
+  getForwardAuthSettings,
+  saveForwardAuthSettings,
   getMetricsSettings,
   saveMetricsSettings,
   getLoggingSettings,
@@ -90,6 +92,14 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     get: getAuthentikSettings,
     save: saveAuthentikSettings as (data: never) => Promise<void>,
     storageKey: "authentik",
+    applyCaddy: true,
+  },
+  "forward-auth": {
+    get: getForwardAuthSettings,
+    save: saveForwardAuthSettings as (data: never) => Promise<void>,
+    storageKey: "forward_auth",
+    // Nothing in the generated config reads it - it only seeds the host form - but the apply is
+    // what pushes the new value to the agents, and every other group here does the same.
     applyCaddy: true,
   },
   metrics: {

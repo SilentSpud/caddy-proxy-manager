@@ -27,6 +27,7 @@ import {
   saveGeneralSettings,
   saveAcmeSettings,
   saveAuthentikSettings,
+  saveForwardAuthSettings,
   saveMetricsSettings,
   saveLoggingSettings,
   saveDnsSettings,
@@ -491,6 +492,43 @@ async function updateAuthentikSettingsActionUnlocked(
     return {
       success: false,
       message: await errorText(error, t("results.authentikFailed")),
+    };
+  }
+}
+
+/**
+ * Defaults a new host's forward-auth block is prefilled from. Nothing is applied from here: the
+ * host carries its own block, and this only saves the operator typing one address per host.
+ */
+async function updateForwardAuthSettingsActionUnlocked(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireAdmin();
+    const providerRaw = String(formData.get("forwardAuthProvider") ?? "").trim();
+    const provider = providerRaw === "custom" ? "custom" : "authelia";
+    const authUpstream = String(formData.get("forwardAuthUpstream") ?? "").trim();
+    const authEndpoint = String(formData.get("forwardAuthEndpoint") ?? "").trim();
+
+    if (!authUpstream) {
+      return { success: false, message: t("results.forwardAuthRequired") };
+    }
+
+    await saveForwardAuthSettings({
+      provider,
+      authUpstream,
+      authEndpoint: authEndpoint.length > 0 ? authEndpoint : undefined,
+    });
+
+    revalidatePath("/settings");
+    return { success: true, message: t("results.forwardAuthSaved") };
+  } catch (error) {
+    console.error("Failed to save forward auth settings:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.forwardAuthFailed")),
     };
   }
 }
@@ -1823,6 +1861,9 @@ export const updateDnsProviderSettingsAction = stagedSettingsAction(
 );
 export const updateAuthentikSettingsAction = stagedSettingsAction(
   updateAuthentikSettingsActionUnlocked,
+);
+export const updateForwardAuthSettingsAction = stagedSettingsAction(
+  updateForwardAuthSettingsActionUnlocked,
 );
 export const updateMetricsSettingsAction = stagedSettingsAction(
   updateMetricsSettingsActionUnlocked,

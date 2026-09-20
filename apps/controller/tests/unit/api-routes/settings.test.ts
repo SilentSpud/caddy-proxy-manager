@@ -14,6 +14,8 @@ vi.mock('@/src/lib/settings', () => ({
   saveCloudflareSettings: vi.fn(),
   getAuthentikSettings: vi.fn(),
   saveAuthentikSettings: vi.fn(),
+  getForwardAuthSettings: vi.fn(),
+  saveForwardAuthSettings: vi.fn(),
   getMetricsSettings: vi.fn(),
   saveMetricsSettings: vi.fn(),
   getLoggingSettings: vi.fn(),
@@ -92,6 +94,8 @@ import {
   saveCloudflareSettings,
   getAuthentikSettings,
   saveAuthentikSettings,
+  getForwardAuthSettings,
+  saveForwardAuthSettings,
   getMetricsSettings,
   saveMetricsSettings,
   getLoggingSettings,
@@ -126,6 +130,8 @@ const mockGetCloudflare = vi.mocked(getCloudflareSettings);
 const mockSaveCloudflare = vi.mocked(saveCloudflareSettings);
 const mockGetAuthentik = vi.mocked(getAuthentikSettings);
 const mockSaveAuthentik = vi.mocked(saveAuthentikSettings);
+const mockGetForwardAuth = vi.mocked(getForwardAuthSettings);
+const mockSaveForwardAuth = vi.mocked(saveForwardAuthSettings);
 const mockGetMetrics = vi.mocked(getMetricsSettings);
 const mockSaveMetrics = vi.mocked(saveMetricsSettings);
 const mockGetLogging = vi.mocked(getLoggingSettings);
@@ -630,6 +636,60 @@ describe('PUT authentik settings', () => {
     expect(data).toEqual({ ok: true });
     expect(mockSaveAuthentik).toHaveBeenCalledWith(body);
     expect(mockApplyCaddyConfig).toHaveBeenCalled();
+  });
+});
+
+describe('GET forward-auth settings', () => {
+  it('returns the forward auth defaults', async () => {
+    const settings = {
+      provider: 'authelia' as const,
+      authUpstream: 'http://authelia:9091',
+      authEndpoint: '/api/authz/forward-auth',
+    };
+    mockGetForwardAuth.mockResolvedValue(settings);
+
+    const response = await GET(createMockRequest(), {
+      params: Promise.resolve({ group: 'forward-auth' }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual(settings);
+    expect(mockGetForwardAuth).toHaveBeenCalled();
+  });
+});
+
+describe('PUT forward-auth settings', () => {
+  it('saves the forward auth defaults and applies caddy config', async () => {
+    mockSaveForwardAuth.mockResolvedValue(undefined);
+
+    const body = {
+      provider: 'authelia',
+      authUpstream: 'http://authelia:9091',
+      authEndpoint: '/api/authz/forward-auth',
+    };
+    const response = await PUT(createMockRequest({ method: 'PUT', body }), {
+      params: Promise.resolve({ group: 'forward-auth' }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ ok: true });
+    expect(mockSaveForwardAuth).toHaveBeenCalledWith(body);
+    expect(mockApplyCaddyConfig).toHaveBeenCalled();
+  });
+
+  it('rejects an auth server that is not an http(s) URL', async () => {
+    const response = await PUT(
+      createMockRequest({
+        method: 'PUT',
+        body: { provider: 'authelia', authUpstream: 'authelia:9091' },
+      }),
+      { params: Promise.resolve({ group: 'forward-auth' }) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockSaveForwardAuth).not.toHaveBeenCalled();
   });
 });
 

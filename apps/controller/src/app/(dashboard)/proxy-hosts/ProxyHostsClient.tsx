@@ -32,7 +32,7 @@ import type { AccessList } from "@/lib/models/access-lists";
 import type { CertificatePickerOption } from "@/lib/certificate-api";
 import type { ProxyHost } from "@/lib/models/proxy-hosts";
 import type { CaCertificate } from "@/lib/models/ca-certificates";
-import type { AuthentikSettings } from "@/lib/settings";
+import type { AuthentikSettings, ForwardAuthSettings } from "@/lib/settings";
 import type { TailscaleHostDefaults } from "@/components/proxy-hosts/TailscaleFields";
 import type { MtlsRole } from "@/lib/models/mtls-roles";
 import type { IssuedClientCertificate } from "@/lib/models/issued-client-certificates";
@@ -66,6 +66,7 @@ type Props = {
   accessLists: AccessList[];
   caCertificates: CaCertificate[];
   authentikDefaults: AuthentikSettings | null;
+  forwardAuthDefaults: ForwardAuthSettings | null;
   /** Prefilled into a new host's domains field. Empty means there is nothing to offer. */
   defaultDomain: string;
   tailscaleDefaults: TailscaleHostDefaults | null;
@@ -254,6 +255,7 @@ export default function ProxyHostsClient({
   accessLists,
   caCertificates,
   authentikDefaults,
+  forwardAuthDefaults,
   defaultDomain,
   tailscaleDefaults,
   pagination,
@@ -621,6 +623,7 @@ export default function ProxyHostsClient({
         certificates={certificates}
         accessLists={accessLists}
         authentikDefaults={authentikDefaults}
+        forwardAuthDefaults={forwardAuthDefaults}
         tailscaleDefaults={tailscaleDefaults}
         caCertificates={caCertificates}
         mtlsRoles={mtlsRoles ?? []}
@@ -638,6 +641,7 @@ export default function ProxyHostsClient({
           certificates={certificates}
           accessLists={accessLists}
           authentikDefaults={authentikDefaults}
+          forwardAuthDefaults={forwardAuthDefaults}
           tailscaleDefaults={tailscaleDefaults}
           caCertificates={caCertificates}
           mtlsRoles={mtlsRoles ?? []}

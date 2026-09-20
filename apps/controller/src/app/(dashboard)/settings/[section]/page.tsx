@@ -4,6 +4,7 @@ import {
   getGeneralSettings,
   getAcmeSettings,
   getAuthentikSettings,
+  getForwardAuthSettings,
   getMetricsSettings,
   getLoggingSettings,
   getDnsSettings,
@@ -82,6 +83,7 @@ export default async function SettingsSectionPage({
       acme,
       dnsProvider,
       authentik,
+      forwardAuth,
       metrics,
       logging,
       dns,
@@ -116,6 +118,7 @@ export default async function SettingsSectionPage({
         getAcmeSettings(),
         getDnsProviderSettings(),
         getAuthentikSettings(),
+        getForwardAuthSettings(),
         getMetricsSettings(),
         getLoggingSettings(),
         getDnsSettings(),
@@ -168,6 +171,7 @@ export default async function SettingsSectionPage({
       mtlsRoles,
       issuedClientCerts,
       authentikDefaults: authentik,
+      forwardAuthDefaults: forwardAuth,
       agents: agentOptions,
       tailscaleDefaults: {
         enabled: tailscale?.enabled ?? false,
@@ -188,6 +192,7 @@ export default async function SettingsSectionPage({
       dnsProvider={dnsProvider ? redactDnsProviderSettingsForApi(dnsProvider) : null}
       dnsProviderDefinitions={DNS_PROVIDERS}
       authentik={authentik}
+      forwardAuth={forwardAuth}
       metrics={metrics}
       logging={logging}
       dns={dns}

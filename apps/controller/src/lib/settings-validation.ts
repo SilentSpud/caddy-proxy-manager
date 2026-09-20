@@ -218,6 +218,21 @@ function validateAuthentik(value: Record<string, unknown>): void {
   optionalString(value, "authEndpoint", "authentik", 4096);
 }
 
+function validateForwardAuth(value: Record<string, unknown>): void {
+  onlyKeys(value, ["provider", "authUpstream", "authEndpoint"], "Forward Auth settings");
+  const provider = required(value, "provider", "Forward Auth settings");
+  if (provider !== "authelia" && provider !== "custom") {
+    invalid("forward_auth.provider must be authelia or custom");
+  }
+  const upstream = stringValue(
+    required(value, "authUpstream", "Forward Auth settings"),
+    "forward_auth.authUpstream",
+    { min: 1, max: 4096 },
+  );
+  httpUrl(upstream, "forward_auth.authUpstream");
+  optionalString(value, "authEndpoint", "forward_auth", 4096);
+}
+
 function validateDashboard(value: Record<string, unknown>): void {
   onlyKeys(value, ["enabled", "domain", "tls", "options"], "dashboard settings");
   booleanValue(required(value, "enabled", "dashboard settings"), "dashboard.enabled");
@@ -615,6 +630,9 @@ export function validateSettingsGroup(group: string, input: unknown): unknown {
       break;
     case "authentik":
       validateAuthentik(value);
+      break;
+    case "forward-auth":
+      validateForwardAuth(value);
       break;
     case "dashboard":
       validateDashboard(value);
