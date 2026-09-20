@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { Resolver } from "node:dns/promises";
 import { buildDashboardHostRow } from "./dashboard-host";
@@ -3438,6 +3439,57 @@ function assertCaddyAccepted(response: { status: number; text: string }, who: st
 }
 
 /**
+ * What each Caddy was serving immediately after this controller last loaded it, keyed by agent
+ * ("" for the Caddy reached with no agent attached).
+ *
+ * The health monitor compares this against the config a Caddy is actually serving. A hash is the
+ * only signal that holds: Caddy answers `/config/` with an ETag whichever config it holds, and a
+ * container that came back on the image's default Caddyfile serves a perfectly non-empty `http`
+ * app - so "did the ETag go" and "is the config empty" both miss a real drift. What is compared is
+ * the config Caddy reports, not the document that was posted, because Caddy normalises what it
+ * stores and the two would never match.
+ */
+const appliedConfigHashes = new Map<string, string>();
+
+/** The fingerprint recorded by the last successful load onto this Caddy, if there was one. */
+export function getLastAppliedConfigHash(agentId?: string): string | null {
+  return appliedConfigHashes.get(agentId ?? "") ?? null;
+}
+
+/** Fingerprint of what a Caddy is serving right now, or null when it cannot be asked. */
+export async function getCaddyLiveConfigHash(agentId?: string): Promise<string | null> {
+  try {
+    const response = await caddyAdminRequest({
+      path: "/config/",
+      method: "GET",
+      timeoutMs: 5000,
+      agentId,
+    });
+    if (response.status < 200 || response.status >= 300) return null;
+    return createHash("sha256").update(response.text).digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record what a Caddy serves now that a load has been accepted. Failing to read it back only
+ * forgets the fingerprint: the monitor then treats that Caddy as one it has nothing to compare
+ * against, which is where it started.
+ */
+async function noteAppliedConfig(agentId?: string): Promise<void> {
+  const key = agentId ?? "";
+  const hash = await getCaddyLiveConfigHash(agentId);
+  if (hash) appliedConfigHashes.set(key, hash);
+  else appliedConfigHashes.delete(key);
+}
+
+/** Test seam: forget every recorded fingerprint. */
+export function resetAppliedConfigHashes(): void {
+  appliedConfigHashes.clear();
+}
+
+/**
  * Build the configuration and load it onto every agent's Caddy.
  *
  * A document per agent, not one for the fleet. The controller's database is still the single
@@ -3488,6 +3540,9 @@ export async function applyCaddyConfig() {
     if (!result.ok) continue;
     assertCaddyAccepted(result.value, result.agent);
   }
+
+  // Every agent accepted, so record what each is serving for the monitor to compare against.
+  await Promise.all(targets.map((target) => noteAppliedConfig(target.agentId)));
 }
 
 /**
@@ -3517,6 +3572,7 @@ async function loadOne(
     throw new CaddyApplyError("Failed to apply Caddy configuration", "CADDY_REQUEST_FAILED");
   }
   assertCaddyAccepted(response, who);
+  await noteAppliedConfig(agent?.agentId);
 }
 
 /**

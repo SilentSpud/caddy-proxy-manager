@@ -289,6 +289,7 @@ is still honoured as an override until a value is stored.
 | Application name - sidebar, login card, page-title suffix | `APP_NAME` | `Caddy Proxy Manager` |
 | Public URL. OAuth redirect URIs are built from it, so it must match what the provider has registered | `BASE_URL` | `http://localhost:3000` |
 | Caddy admin API, for a deployment running Caddy with **no** agent. With an agent, every admin call is proxied through it and this is unused | `CADDY_API_URL` | `http://caddy-admin:2019` |
+| Re-apply this controller's configuration to a Caddy that drifted away from it (restarted onto an old or default config). Turn it off on a controller pointed at a Caddy it does not own, or two of them fight over the configuration | `CADDY_MONITOR_ENABLED` | `true` |
 | Pinned as `admin.listen` in a config the controller loads with no agent in between, as the agent pins every config it forwards. Must match the `caddy` service's value | `CADDY_ADMIN_LISTEN` | `caddy-admin:2019` in `docker-compose.yml`, else unset (sent as built) |
 | Gravatar fallback for user icons. Off keeps every avatar lookup off the network | `AVATAR_GRAVATAR` | `true` |
 | Internal forward-auth address Caddy dials. Derived from the container network when empty | `FORWARD_AUTH_INTERNAL_URL` | Derived |

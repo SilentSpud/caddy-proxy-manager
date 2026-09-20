@@ -175,6 +175,13 @@ export const config = {
     return getSessionSecret();
   },
   caddyApiUrl: process.env.CADDY_API_URL ?? DEFAULT_CADDY_URL,
+  /**
+   * Whether this controller re-applies its configuration to a Caddy that drifted away from it.
+   * On by default; turn it off on a controller that points at a Caddy it does not own, such as a
+   * second instance with its own database sharing one Caddy, or the two monitors push their own
+   * idea of the desired state at each other every pass.
+   */
+  caddyMonitorEnabled: process.env.CADDY_MONITOR_ENABLED !== "false",
   baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
   appName: APP_NAME,
   /**

@@ -78,6 +78,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: cpm_registration
       CADDY_API_URL: http://caddy:2019
+      # This controller shares the stack's Caddy but has its own empty database, so its idea of
+      # the desired state is "nothing". Only the instance that owns a Caddy may heal it, or the
+      # two monitors would overwrite each other's configuration every pass.
+      CADDY_MONITOR_ENABLED: "false"
       AUTH_ALLOW_SELF_REGISTRATION: "true"
       AUTH_RATE_LIMIT_ENABLED: "false"
       OAUTH_ENABLED: "false"
