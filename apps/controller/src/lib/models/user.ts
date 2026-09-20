@@ -164,7 +164,10 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
  */
 export async function markPasswordChanged(userId: number): Promise<void> {
   const now = nowIso();
-  await db.update(users).set({ passwordChangedAt: now }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ passwordChangedAt: now, updatedAt: now })
+    .where(eq(users.id, userId));
 }
 
 /**

@@ -80,8 +80,11 @@ async function isSetupFinished(): Promise<boolean> {
 }
 
 /**
- * Better Auth's `trustedOrigins`. Called on every auth request, so every lookup is cached: the
- * settings by their own module, the setup flag here once it is set.
+ * Better Auth's `trustedOrigins`. Called on every auth request, and only the setup flag is
+ * remembered - once setup is seen finished it stops costing a query. The Public URL and the
+ * dashboard host are two `getSetting` calls, so two indexed single-row reads, on every auth
+ * request; `settings` caches nothing. Worth revisiting if it ever shows up in a profile, but auth
+ * already reads the session row from the same database.
  */
 export async function extraTrustedOrigins(request?: Request): Promise<string[]> {
   const origins = new Set(await publicOrigins());
